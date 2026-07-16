@@ -21,9 +21,6 @@ on:
 permissions:
   contents: read
 
-env:
-  AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
-
 concurrency:
   group: path-risk-check-matrix-smoke-${{ github.ref }}
   cancel-in-progress: false
@@ -41,6 +38,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh

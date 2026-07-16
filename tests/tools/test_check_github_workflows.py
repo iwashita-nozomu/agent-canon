@@ -423,6 +423,38 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_workflow_level_credentials_fail(self) -> None:
+        """AgentCanon credentials must stay on the checkout-helper step."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            workflow_path = root / ".github" / "workflows" / "ci.yml"
+            workflow_path.write_text(
+                workflow_path.read_text(encoding="utf-8").replace(
+                    "concurrency:\n",
+                    "env:\n"
+                    "  AGENT_CANON_REPO_SSH_KEY: "
+                    "${{ secrets.AGENT_CANON_REPO_SSH_KEY }}\n"
+                    "concurrency:\n",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "agent_canon_credentials_must_be_step_local:"
+                "AGENT_CANON_REPO_SSH_KEY",
+                result.stdout,
+            )
+
     def test_pr_flow_requires_separate_standalone_and_template_templates(self) -> None:
         """Ensure PR workflow does not route all PRs to one template."""
         with tempfile.TemporaryDirectory() as tmp_dir:
