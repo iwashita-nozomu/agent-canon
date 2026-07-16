@@ -134,12 +134,10 @@ SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS = (
     "AGENT_CANON_SUBMODULE_AUTH=missing",
     "AGENT_CANON_SUBMODULE_AUTH=denied",
     "AGENT_CANON_SUBMODULE_AUTH=ssh_denied",
-    "AGENT_CANON_SUBMODULE_AUTH=token_persisted",
-    "AGENT_CANON_SUBMODULE_AUTH=ssh_persisted",
     "AGENT_CANON_REPO_TOKEN",
     "AGENT_CANON_REPO_SSH_KEY",
-    "GITHUB_ENV",
-    "url.${ssh_submodule_url}.insteadOf",
+    "unset AGENT_CANON_REPO_TOKEN AGENT_CANON_REPO_SSH_KEY",
+    "Credentials are never written to GITHUB_ENV",
     "untrusted PR context",
     "exit 86",
 )
@@ -367,17 +365,25 @@ def has_permissions(workflow: dict[str, object]) -> bool:
     return bool(jobs) and all("permissions" in job for _job_name, job in jobs)
 
 
-def has_credential_env(
-    workflow: dict[str, object],
-    context: StepContext,
-) -> bool:
-    """Return whether a helper step receives AgentCanon credentials."""
-    env_values: list[object] = []
-    for source in (workflow, context.job, context.step):
-        env = as_string_dict(source.get("env"))
-        if env is not None:
-            env_values.extend(env.keys())
-    return any(name in env_values for name in AGENT_CANON_CREDENTIALS)
+def credential_env_names(source: dict[str, object]) -> set[str]:
+    """Return AgentCanon credential names declared by one workflow object."""
+    env = as_string_dict(source.get("env"))
+    if env is None:
+        return set()
+    return {name for name in AGENT_CANON_CREDENTIALS if name in env}
+
+
+def has_credential_env(context: StepContext) -> bool:
+    """Return whether a helper step receives step-local AgentCanon credentials."""
+    return bool(credential_env_names(context.step))
+
+
+def non_step_credential_env_names(workflow: dict[str, object]) -> set[str]:
+    """Return AgentCanon credentials exposed beyond their helper step."""
+    names = credential_env_names(workflow)
+    for _job_name, job in job_items(workflow):
+        names.update(credential_env_names(job))
+    return names
 
 
 def agent_canon_checkout_command_steps(workflow: dict[str, object]) -> list[StepContext]:
@@ -427,8 +433,18 @@ def agent_canon_checkout_policy_findings(
             findings.append(Finding("error", path, "agent_canon_credentials_not_allowed"))
     if helpers and not referenced_agent_canon_checkout_script_available(root, workflow_text):
         findings.append(Finding("error", path, "missing_referenced_agent_canon_checkout_helper"))
+    non_step_credentials = non_step_credential_env_names(workflow)
+    if helpers and non_step_credentials:
+        findings.append(
+            Finding(
+                "error",
+                path,
+                "agent_canon_credentials_must_be_step_local:"
+                + ",".join(sorted(non_step_credentials)),
+            )
+        )
     for helper_index, context in enumerate(helpers, start=1):
-        if not has_credential_env(workflow, context):
+        if not has_credential_env(context):
             findings.append(
                 Finding(
                     "error",
