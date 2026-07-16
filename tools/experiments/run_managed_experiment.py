@@ -3,6 +3,10 @@
 # contract tool
 # responsibility Provides run managed experiment experiment workflow tooling.
 # upstream design ../README.md shared automation index
+# upstream design ../../reports/agents/w1-tool-env-routing-20260716/design_brief.md approved W1-DESIGN-20260716-R3-GPU-COMPLETIONCOVERAGE-REPAIR
+# upstream design ../../documents/experiment_runner.md external ExperimentRunner ownership and task boundary
+# upstream implementation ./execution_resource_plan.py canonical discovery/planning/prelaunch/terminal owner
+# downstream integration ../../reports/agents/w1-tool-env-routing-20260716/ordered_integration_interface.json ordered W2-W4 interface
 # @dependency-end
 
 """Run one experiment while recording canonical server-side run metadata."""
@@ -19,13 +23,33 @@ import shutil
 import socket
 import subprocess
 import sys
-import threading
 import time
 import tomllib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TextIO
+from typing import Callable, Mapping, cast
+
+from tools.experiments.execution_resource_plan import (
+    CALLER_ALLOCATION_PROVENANCE,
+    COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION,
+    COMPLETION_COVERAGE_FILENAME,
+    ExperimentRunnerExecutionPort,
+    ExperimentRunnerPreLaunchAdapter,
+    CompletionCoverageAdapter,
+    CompletionCoverageInput,
+    ResourceRequest,
+    ResourcePlanError,
+    TypedPreflightFailure,
+    discover_resources,
+    dispose_resources,
+    execute_with_experiment_runner,
+    freeze_resource_plan,
+    managed_run_adapter_integration_contract,
+    materialize_environment,
+    plan_gpu_allocation,
+    record_terminal,
+)
 
 DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
 CONFIG_SOURCE_SNAPSHOT_NAME = "config_source.yaml"
@@ -52,9 +76,6 @@ MANAGED_RUN_ARTIFACTS = frozenset(
     }
 )
 FILE_READ_CHUNK_BYTES = 1024 * 1024
-STREAM_TERMINATION_TIMEOUT_SECONDS = 10
-INTERRUPTED_EXIT_CODE = 130
-COMMAND_START_FAILURE_EXIT_CODE = 127
 PREFLIGHT_FAILURE_EXIT_CODE = 2
 DURATION_ROUND_DIGITS = 3
 REGISTERED_COMMAND_KINDS = ("default", "formal")
@@ -1057,107 +1078,6 @@ def resolve_registered_command_match(
     return None
 
 
-def mirror_stream(
-    stream: TextIO,
-    *,
-    console: TextIO,
-    side_log: TextIO,
-    combined_log: TextIO,
-    combined_lock: threading.Lock,
-    label: str,
-) -> None:
-    """Copy one child-process stream to console and log files."""
-    for line in stream:
-        console.write(line)
-        console.flush()
-        side_log.write(line)
-        side_log.flush()
-        with combined_lock:
-            combined_log.write(f"[{label}] {line}")
-            combined_log.flush()
-
-
-def run_streamed_command(
-    command: list[str],
-    *,
-    cwd: Path,
-    env: dict[str, str],
-    log_path: Path,
-    stdout_path: Path,
-    stderr_path: Path,
-) -> int:
-    """Run one command, teeing stdout and stderr to durable log files."""
-    with (
-        log_path.open("w", encoding="utf-8") as log_handle,
-        stdout_path.open("w", encoding="utf-8") as stdout_handle,
-        stderr_path.open("w", encoding="utf-8") as stderr_handle,
-    ):
-        command_line = "$ " + shlex.join(command) + "\n"
-        log_handle.write(command_line)
-        stdout_handle.write(command_line)
-        stderr_handle.write(command_line)
-        log_handle.flush()
-        stdout_handle.flush()
-        stderr_handle.flush()
-
-        try:
-            process = subprocess.Popen(
-                command,
-                cwd=cwd,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-        except OSError as exc:
-            message = f"command_start_error={type(exc).__name__}: {exc}\n"
-            sys.stderr.write(message)
-            log_handle.write("[stderr] " + message)
-            stderr_handle.write(message)
-            return COMMAND_START_FAILURE_EXIT_CODE
-
-        assert process.stdout is not None
-        assert process.stderr is not None
-        combined_lock = threading.Lock()
-        stdout_thread = threading.Thread(
-            target=mirror_stream,
-            kwargs={
-                "stream": process.stdout,
-                "console": sys.stdout,
-                "side_log": stdout_handle,
-                "combined_log": log_handle,
-                "combined_lock": combined_lock,
-                "label": "stdout",
-            },
-        )
-        stderr_thread = threading.Thread(
-            target=mirror_stream,
-            kwargs={
-                "stream": process.stderr,
-                "console": sys.stderr,
-                "side_log": stderr_handle,
-                "combined_log": log_handle,
-                "combined_lock": combined_lock,
-                "label": "stderr",
-            },
-        )
-        stdout_thread.start()
-        stderr_thread.start()
-        try:
-            exit_code = process.wait()
-        except KeyboardInterrupt:
-            process.terminate()
-            try:
-                exit_code = process.wait(timeout=STREAM_TERMINATION_TIMEOUT_SECONDS)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
-                exit_code = INTERRUPTED_EXIT_CODE
-        stdout_thread.join(timeout=STREAM_TERMINATION_TIMEOUT_SECONDS)
-        stderr_thread.join(timeout=STREAM_TERMINATION_TIMEOUT_SECONDS)
-        return exit_code
-
-
 def resolve_topic_dir(
     repo_root: Path, identity: RunIdentity, registry: RegistryContext
 ) -> Path:
@@ -1436,8 +1356,397 @@ def finalize_run_manifest(
     write_json(context.paths.artifact_manifest_path, build_artifact_manifest(context))
 
 
-def run_cli(args: argparse.Namespace) -> int:
-    """Run one managed experiment from parsed CLI args."""
+def _config_int(config: Mapping[str, object], key: str, default: int) -> int:
+    value = config.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{key} must be a non-negative integer")
+    return value
+
+
+def _config_bool(config: Mapping[str, object], key: str, default: bool) -> bool:
+    value = config.get(key, default)
+    if not isinstance(value, bool):
+        raise ValueError(f"{key} must be a boolean")
+    return value
+
+
+def _config_chunks(config: Mapping[str, object], run_name: str) -> tuple[str, ...]:
+    value = config.get("requested_chunks", [run_name])
+    if not isinstance(value, list) or not value or any(
+        not isinstance(item, str) or not item for item in value
+    ):
+        raise ValueError("requested_chunks must be a non-empty array of strings")
+    return tuple(value)
+
+
+def _resource_request_for_managed_run(
+    context: RunContext,
+    run_config: Mapping[str, object],
+) -> ResourceRequest:
+    """Translate CLI/config metadata into the one canonical resource request."""
+    raw_config = run_config.get("config", {})
+    if not isinstance(raw_config, Mapping):
+        raise ValueError("managed run config must remain a mapping")
+    config = cast(Mapping[str, object], raw_config)
+    try:
+        cpu_requested_set = tuple(
+            sorted(
+                os.sched_getaffinity(0)
+                if "cpu_requested_set" not in config
+                else cast(list[int], config["cpu_requested_set"])
+            )
+        )
+    except (AttributeError, OSError, TypeError, ValueError) as exc:
+        raise TypedPreflightFailure(
+            "cpu_capability_discovery_unavailable",
+            "managed run cannot declare an authoritative CPU set",
+        ) from exc
+    if any(isinstance(cpu, bool) or not isinstance(cpu, int) for cpu in cpu_requested_set):
+        raise ValueError("cpu_requested_set must contain integers")
+    environment = build_run_environment(context)
+    gpu_requested_count = _config_int(config, "gpu_requested_count", 0)
+    configured_provenance = str(config.get("gpu_allocation_provenance", ""))
+    if gpu_requested_count and configured_provenance not in {
+        "",
+        CALLER_ALLOCATION_PROVENANCE,
+    }:
+        raise TypedPreflightFailure(
+            "gpu_allocation_provenance_conflict",
+            "managed GPU execution cannot override canonical scheduler UUID provenance",
+            observed_provenance=configured_provenance,
+        )
+    lock_root_value = config.get("lock_root", "/var/lib/agent-canon/runtime/locks")
+    if not isinstance(lock_root_value, str) or not lock_root_value:
+        raise ValueError("lock_root must be a non-empty absolute path")
+    timeout_value = config.get("maximum_timeout_seconds", 3600.0)
+    if isinstance(timeout_value, bool) or not isinstance(timeout_value, (int, float)):
+        raise ValueError("maximum_timeout_seconds must be a positive number")
+    return ResourceRequest(
+        owner_id=str(config.get("owner_id", "worker-luna")),
+        parent_id=str(config.get("parent_id", "parent-sol")),
+        context_id=str(config.get("context_id", "context-continuation")),
+        maximum_timeout_seconds=float(timeout_value),
+        argv=tuple(context.command.command),
+        cwd=context.repo_root,
+        environment=environment,
+        integration_contract=managed_run_adapter_integration_contract(),
+        plan_id=context.identity.run_name,
+        run_id=context.identity.run_name,
+        cpu_requested_set=cpu_requested_set,
+        gpu_requested_count=gpu_requested_count,
+        gpu_requested_memory_bytes=_config_int(
+            config, "gpu_requested_memory_bytes", 0
+        ),
+        gpu_allocation_provenance=(
+            CALLER_ALLOCATION_PROVENANCE if gpu_requested_count else ""
+        ),
+        temp_bytes=_config_int(config, "temp_bytes", 0),
+        runtime_root=Path("/var/lib/agent-canon/runtime"),
+        source_projection_root=Path(
+            f"/workspace/reports/agents/{context.identity.run_name}/runtime"
+        ),
+        requested_chunks=_config_chunks(config, context.identity.run_name),
+        lock_root=Path(lock_root_value),
+        lock_namespace_shared_across_schedulers=_config_bool(
+            config, "lock_namespace_shared_across_schedulers", False
+        ),
+        lock_namespace_host_safe=_config_bool(
+            config, "lock_namespace_host_safe", False
+        ),
+        lock_namespace_visibility_witness=str(
+            config.get("lock_namespace_visibility_witness", "")
+        ),
+    )
+
+
+def _process_records(processes: object) -> tuple[Mapping[str, object], ...]:
+    records: list[Mapping[str, object]] = []
+    for process in cast(tuple[object, ...], tuple(processes)):
+        records.append(
+            {
+                "pid": getattr(process, "pid"),
+                "process_start_identity": getattr(process, "process_start_identity"),
+                "gpu_uuid": getattr(process, "gpu_uuid"),
+                "kind": getattr(process, "kind"),
+                "parent_pid": getattr(process, "parent_pid"),
+                "relationship": getattr(process, "relationship"),
+                "observation_timestamp": getattr(
+                    process, "observation_timestamp", ""
+                ),
+                "observation_fingerprint": getattr(
+                    process, "observation_fingerprint", ""
+                ),
+            }
+        )
+    return tuple(records)
+
+
+def _runner_quiescence_evidence(
+    runner_port: ExperimentRunnerExecutionPort,
+    plan: object,
+) -> Mapping[str, object]:
+    """Require the runner owner to prove its process tree cannot create contexts."""
+    plan_fingerprint = str(getattr(plan, "plan_fingerprint"))
+    try:
+        evidence = runner_port.quiescence_evidence(plan=plan)
+    except Exception as exc:
+        observation = getattr(plan, "resource_probe").observe()
+        payload = {
+            "plan_fingerprint": plan_fingerprint,
+            "quiescent": False,
+            "process_tree_terminal": False,
+            "can_create_gpu_context": True,
+            "observed_at": observation.observed_at,
+            "observation_event_id": observation.observation_event_id,
+            "observation_fingerprint": observation.fingerprint,
+            "process_identities": _process_records(observation.process_identities),
+            "failure_type": type(exc).__name__,
+            "failure_message": str(exc),
+        }
+        return {
+            **payload,
+            "evidence_fingerprint": hashlib.sha256(
+                json.dumps(payload, sort_keys=True).encode("utf-8")
+            ).hexdigest(),
+        }
+    if not isinstance(evidence, Mapping):
+        payload = {
+            "plan_fingerprint": plan_fingerprint,
+            "quiescent": False,
+            "process_tree_terminal": False,
+            "can_create_gpu_context": True,
+            "creation_barrier": "missing",
+            "observed_at": utc_now(),
+            "observation_event_id": "",
+            "process_identities": (),
+            "failure_type": "runner_quiescence_evidence_malformed",
+        }
+        return {
+            **payload,
+            "evidence_fingerprint": hashlib.sha256(
+                json.dumps(payload, sort_keys=True).encode("utf-8")
+            ).hexdigest(),
+        }
+    return dict(evidence)
+
+
+def execute_managed_run(
+    context: RunContext,
+    run_config: Mapping[str, object],
+    *,
+    runner_port: ExperimentRunnerExecutionPort,
+    task: Callable[..., object],
+    cases: list[object],
+    context_builder: Callable[..., object],
+    initializer: Callable[..., object],
+    resource_estimator: Callable[..., object],
+    skip_controller: object | None = None,
+) -> object:
+    """Execute one managed run through the mandatory plan and runner boundary."""
+    request = _resource_request_for_managed_run(context, run_config)
+    discovered = discover_resources(request)
+    allocation = plan_gpu_allocation(request, discovered)
+    frozen_plan = freeze_resource_plan(request, discovered, allocation)
+    materialized = materialize_environment(frozen_plan)
+    prelaunch = ExperimentRunnerPreLaunchAdapter(
+        managed_run_adapter_integration_contract()
+    ).pre_launch(
+        materialized.plan,
+        materialized,
+        allocation,
+        runner_port.prelaunch_transport,
+    )
+    execution_result: object | None = None
+    runner_failure: BaseException | None = None
+    terminal = None
+    try:
+        execution_result = execute_with_experiment_runner(
+            prelaunch.plan,
+            prelaunch,
+            runner_port,
+            task=task,
+            cases=cases,
+            context_builder=context_builder,
+            initializer=initializer,
+            resource_estimator=resource_estimator,
+            skip_controller=skip_controller,
+        )
+    except BaseException as exc:
+        runner_failure = exc
+    runner_exit_code = (
+        _execution_exit_code(execution_result)
+        if execution_result is not None
+        else None
+    )
+    execution_completed = (
+        runner_failure is None
+        and execution_result is not None
+        and runner_exit_code == 0
+    )
+    if runner_failure is not None:
+        no_completion = {
+            "failure_type": type(runner_failure).__name__,
+            "failure_message": str(runner_failure),
+        }
+        stop_reason = type(runner_failure).__name__
+    elif execution_result is None:
+        no_completion = {
+            "failure_type": "ExperimentRunnerResultMissing",
+            "failure_message": "ExperimentRunner returned no execution result",
+        }
+        stop_reason = "experiment_runner_result_missing"
+    elif not execution_completed:
+        no_completion = {
+            "failure_type": "ExperimentRunnerNonzeroExit",
+            "failure_message": "ExperimentRunner returned a nonzero exit result",
+            "raw_exit_code": runner_exit_code,
+        }
+        stop_reason = "experiment_runner_nonzero_exit"
+    else:
+        no_completion = None
+        stop_reason = None
+    try:
+        terminal = record_terminal(
+            prelaunch.plan,
+            execution_result,
+            terminal_event_id=f"terminal-{context.identity.run_name}",
+            no_completion=no_completion,
+            terminal_chunk_ids=(
+                request.requested_chunks if execution_completed else ()
+            ),
+            stop_reason=stop_reason,
+            disposition=None if execution_completed else "partial_not_completion",
+            stdout_path=str(context.paths.stdout_log_path),
+            stderr_path=str(context.paths.stderr_log_path),
+            startup_log_path=str(context.paths.startup_log_path),
+            run_log_path=str(context.paths.log_path),
+            artifact_manifest_path=str(context.paths.artifact_manifest_path),
+        )
+    finally:
+        if terminal is not None:
+            quiescence_evidence = _runner_quiescence_evidence(
+                runner_port,
+                terminal.plan,
+            )
+            completion_input = _completion_input_for_managed_run(
+                terminal,
+                materialized,
+                run_config,
+            )
+            dispose_resources(
+                terminal.plan,
+                terminal,
+                completion_coverage_adapter=CompletionCoverageAdapter(
+                    Path(cast(str, terminal.plan.container["source_projection_root"]))
+                    / COMPLETION_COVERAGE_FILENAME
+                ),
+                completion_coverage_input=completion_input,
+                runner_quiescence_evidence=quiescence_evidence,
+            )
+    if runner_failure is not None:
+        raise runner_failure
+    if execution_result is None:
+        raise ResourcePlanError("ExperimentRunner returned no execution result")
+    return execution_result
+
+
+def _completion_input_for_managed_run(
+    terminal: object,
+    materialized: object,
+    run_config: Mapping[str, object],
+) -> CompletionCoverageInput:
+    plan = getattr(terminal, "plan")
+    allocation = plan.gpu_allocation
+    observation = plan.resource_probe.observe()
+    raw_runtime_config = run_config.get("config", {})
+    runtime_config = (
+        raw_runtime_config if isinstance(raw_runtime_config, Mapping) else {}
+    )
+    raw_lineage = runtime_config.get("parent_certified_w1_lineage", {})
+    lineage = raw_lineage if isinstance(raw_lineage, Mapping) else {}
+    lineage_certified = (
+        lineage.get("status") == "parent_certified"
+        and lineage.get("artifact")
+        == "reports/agents/w1-tool-env-routing-20260716/control_topology_ledger.md"
+        and all(
+            isinstance(lineage.get(name), str) and bool(lineage.get(name))
+            for name in ("commit", "tree", "source_blob")
+        )
+    )
+    return CompletionCoverageInput(
+        schema_version=COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION,
+        plan_fingerprint=terminal.plan_fingerprint,
+        terminal_event_id=terminal.terminal_event_id,
+        candidate_gpu_ids=allocation.candidate_ids,
+        occupied_gpu_ids=_process_records(allocation.occupied_process_identities),
+        reserved_gpu_ids=allocation.reserved_ids,
+        selected_gpu_ids=allocation.selected_ids,
+        eligible_gpu_ids=allocation.eligible_ids,
+        lock_readback=allocation.lock_readback,
+        effective_env={
+            "plan_fingerprint": terminal.plan_fingerprint,
+            "certificate": plan.readback.get("environment_certificate", {}),
+            "materialized_environment": getattr(materialized, "persisted_env_map"),
+        },
+        actual_gpu_processes=_process_records(observation.process_identities),
+        release_retention_disposition={"lease_retention_owner": "ExecutionResourcePlan"},
+        concurrent_run_evidence={
+            "planner": "canonical_plan_gpu_allocation",
+            "final_observation": {
+                "timestamp": observation.observed_at,
+                "fingerprint": observation.fingerprint,
+                "event_id": observation.observation_event_id,
+            },
+        },
+        mig_evidence={"mapping": plan.resources["gpu"].get("mig_parent_by_uuid", {})},
+        container_visible_uuid_mapping={
+            "allocated_ids": allocation.caller_allocated_ids,
+            "selected_ids": allocation.selected_ids,
+        },
+        os_safe_lock_placement={"lock_root": str(allocation.lock_root)},
+        descendant_retention_evidence={"force_kill": False},
+        taxonomy_linked_validation_outcome={
+            "taxonomy_owner": "documents/runtime-profiles-and-check-matrix.json",
+            "taxonomy_reader_projection": "documents/runtime-profiles-and-check-matrix.md",
+            "status": "no_validation_failure",
+        },
+        planned_chunk_ids=terminal.planned_chunk_ids,
+        terminal_chunk_ids=terminal.terminal_chunk_ids,
+        terminal_chunk_records=terminal.terminal_chunk_records,
+        required_evidence={
+            "terminal": True,
+            "partial": True,
+            "parent_certified_w1_lineage": dict(lineage),
+        },
+        effective_env_certificate_matches=True,
+        cleanup_has_unresolved_leak_or_unknown=False,
+        required_review_gates_passed=lineage_certified,
+        unresolved_design_issue_blockers=(
+            () if lineage_certified else ("parent_certified_w1_lineage_missing",)
+        ),
+    )
+
+
+def _execution_exit_code(execution_result: object) -> int:
+    raw_exit_code = getattr(execution_result, "raw_exit_code", None)
+    if isinstance(raw_exit_code, int):
+        return raw_exit_code
+    status = getattr(execution_result, "status", None)
+    return 0 if status in (None, "ok", "completed", "success") else 1
+
+
+def run_cli(
+    args: argparse.Namespace,
+    *,
+    runner_port: ExperimentRunnerExecutionPort | None = None,
+    task: Callable[..., object] | None = None,
+    cases: list[object] | None = None,
+    context_builder: Callable[..., object] | None = None,
+    initializer: Callable[..., object] | None = None,
+    resource_estimator: Callable[..., object] | None = None,
+    skip_controller: object | None = None,
+) -> int:
+    """Run one managed experiment only through an injected ExperimentRunner port."""
     context = build_run_context(args)
     patterns = resolve_eval_artifact_patterns(
         context.registry.defaults,
@@ -1483,6 +1792,43 @@ def run_cli(args: argparse.Namespace) -> int:
         )
         return PREFLIGHT_FAILURE_EXIT_CODE
 
+    bindings = (
+        runner_port,
+        task,
+        cases,
+        context_builder,
+        initializer,
+        resource_estimator,
+    )
+    if any(binding is None for binding in bindings):
+        message = (
+            "managed execution requires the external ExperimentRunner port and "
+            "task/cases/context/initializer/resource-estimator bindings; direct command "
+            "launch is not an authorized route"
+        )
+        print(message, file=sys.stderr)
+        manifest["preflight_error"] = {
+            "kind": "experiment_runner_binding_required",
+            "message": message,
+            "canonical_owner": "tools/experiments/execution_resource_plan.py",
+        }
+        append_startup_event(
+            context,
+            "preflight_failed",
+            {
+                "exit_code": PREFLIGHT_FAILURE_EXIT_CODE,
+                "message": message,
+            },
+        )
+        finalize_run_manifest(
+            context,
+            manifest,
+            start_monotonic,
+            PREFLIGHT_FAILURE_EXIT_CODE,
+            patterns,
+        )
+        return PREFLIGHT_FAILURE_EXIT_CODE
+
     append_startup_event(
         context,
         "command_start",
@@ -1491,14 +1837,18 @@ def run_cli(args: argparse.Namespace) -> int:
             "command_source": context.command.source,
         },
     )
-    exit_code = run_streamed_command(
-        context.command.command,
-        cwd=context.repo_root,
-        env=build_run_environment(context),
-        log_path=context.paths.log_path,
-        stdout_path=context.paths.stdout_log_path,
-        stderr_path=context.paths.stderr_log_path,
+    execution_result = execute_managed_run(
+        context,
+        run_config,
+        runner_port=cast(ExperimentRunnerExecutionPort, runner_port),
+        task=cast(Callable[..., object], task),
+        cases=cast(list[object], cases),
+        context_builder=cast(Callable[..., object], context_builder),
+        initializer=cast(Callable[..., object], initializer),
+        resource_estimator=cast(Callable[..., object], resource_estimator),
+        skip_controller=skip_controller,
     )
+    exit_code = _execution_exit_code(execution_result)
     append_startup_event(context, "command_exit", {"exit_code": exit_code})
     finalize_run_manifest(context, manifest, start_monotonic, exit_code, patterns)
     return exit_code
@@ -1508,7 +1858,7 @@ def main() -> int:
     """Run the CLI."""
     try:
         return run_cli(parse_args())
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, ResourcePlanError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
 
