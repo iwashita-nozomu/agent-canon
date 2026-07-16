@@ -6,7 +6,6 @@
 # upstream design ../../documents/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
 # upstream design ../../documents/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
 # upstream design ../../documents/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
-# upstream design ../../documents/local-llm-responsibility-analysis.md local LLM devcontainer boundary
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
 # upstream design ../../documents/tools/lean_proof_env.md Lean proof environment toolchain boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
@@ -88,10 +87,10 @@ REQUIRED_POST_CREATE_SNIPPETS = (
     "AGENT_CANON_TOOLS_HOME",
     "${tools_home}/agent-canon/bin/agent-canon",
     "/usr/local/bin/agent-canon",
-    "install_llama_cpp",
-    "tools/install_llama_cpp.sh",
-    "ggml-org/SmolLM3-3B-GGUF:Q4_K_M",
-    "${tools_home}/bin/llama-cli",
+    "AGENT_CANON_RUNTIME_ROOT",
+    "AGENT_CANON_SOURCE_PROJECTION_ROOT",
+    "tool-availability.json",
+    "tree --version",
     "install_secret_scanners",
     "gitleaks",
     "trufflehog",
@@ -418,7 +417,7 @@ def validate_dockerignore(root: Path) -> list[Finding]:
         return [Finding("missing_file", relative, "missing")]
     text = path.read_text(encoding="utf-8")
     findings: list[Finding] = []
-    for ignored_path in (".git", ".state", "*.gguf", "*.safetensors", "pytorch_model*.bin", "model-*.bin", ".cache/huggingface", ".cache/llama.cpp", "vendor/local-llm-server/llama-cpp/models", "vendor/local-llm-server/llama-cpp/cache", "vendor/local-llm-server/llama-cpp/runtime", "vendor/agent-canon"):
+    for ignored_path in (".git", ".state", "*.gguf", "*.safetensors", "pytorch_model*.bin", "model-*.bin", ".cache/huggingface", "vendor/agent-canon"):
         if not re.search(rf"(^|\n){re.escape(ignored_path)}(\n|$)", text):
             findings.append(
                 Finding("dependency_contract_violation", relative, f"missing-ignore:{ignored_path}")

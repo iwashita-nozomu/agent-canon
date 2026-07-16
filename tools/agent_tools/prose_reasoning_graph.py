@@ -5,7 +5,7 @@
 # upstream design ../../documents/prose-reasoning-graph/dsl-spec.md normative graph and DSL contract
 # upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill contract
 # upstream design ../../agents/workflows/workflow-references.md writing and discourse prior art
-# upstream implementation ../../rust/agent-canon/src/local_llm.rs extracts LocalLLM prose IR
+# upstream implementation ./vector_search.py provides deterministic prose term extraction
 # downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py tests CLI behavior
 # downstream design ../../documents/tools/prose_reasoning_graph.md documents tool contract
 # @dependency-end
@@ -19,10 +19,8 @@ import heapq
 import json
 import os
 import re
-import shutil
 import sqlite3
 import subprocess
-import tempfile
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
@@ -156,9 +154,6 @@ WSL_MOUNT_MIN_PATH_PARTS = 3
 DEFAULT_DB_HOME_ENV = "AGENT_CANON_PROSE_GRAPH_HOME"
 DEFAULT_DB_NAME = "prose_graph.sqlite"
 DEFAULT_CACHE_HASH_LENGTH = 12
-DEFAULT_LOCAL_LLM_DOCUMENT_BATCH_SIZE = 4
-DEFAULT_LOCAL_LLM_TERM_BATCH_SIZE = 32
-DEFAULT_LOCAL_LLM_JOBS = 4
 VERIFICATION_RECURSION_MAX_DEPTH = 3
 FORM_NODE_LABEL_WORD_LIMIT = 8
 CONCEPT_CANDIDATE_LIMIT = 12
@@ -195,7 +190,6 @@ DEFAULT_ORDERING_CONFIDENCE = 1.0
 NO_ORDERING_EDGE_COUNT = 0
 NO_ORDERING_CONFIDENCE = 0.0
 STRUCTURED_ANALYSIS_INVENTORY_STDOUT_KEY = "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY_JSON"
-LOCAL_LLM_PROSE_IR_STDOUT_KEY = "LOCAL_LLM_PROSE_IR_JSON"
 GRAPH_TOPOLOGY_CONCEPTS = frozenset(
     {
         "graph",
@@ -348,7 +342,6 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--kind", default="document")
     ingest.add_argument("--prompt", default="", help="Optional user prompt text for corpus/domain inference.")
     ingest.add_argument("--prompt-file", type=Path, help="Optional user prompt file for corpus/domain inference.")
-    add_local_llm_ir_args(ingest)
     add_stats_out(ingest)
 
     ingest_set = subparsers.add_parser("ingest-set", help="Ingest multiple Markdown/plain text files into one graph DB.")
@@ -358,7 +351,6 @@ def build_parser() -> argparse.ArgumentParser:
     ingest_set.add_argument("--recursive", action="store_true", help="Recurse into input directories.")
     ingest_set.add_argument("--prompt", default="", help="Optional user prompt text for corpus/domain inference.")
     ingest_set.add_argument("--prompt-file", type=Path, help="Optional user prompt file for corpus/domain inference.")
-    add_local_llm_ir_args(ingest_set)
     add_stats_out(ingest_set)
 
     analyze = subparsers.add_parser("analyze", help="Analyze graph layers.")
@@ -420,7 +412,6 @@ def build_parser() -> argparse.ArgumentParser:
     check_document.add_argument("--kind", default="document")
     check_document.add_argument("--prompt", default="", help="Optional user prompt text for corpus/domain inference.")
     check_document.add_argument("--prompt-file", type=Path, help="Optional user prompt file for corpus/domain inference.")
-    add_local_llm_ir_args(check_document)
     add_stats_out(check_document)
 
     return parser
@@ -435,53 +426,6 @@ def add_db_profile(parser: argparse.ArgumentParser) -> None:
 def add_stats_out(parser: argparse.ArgumentParser) -> None:
     """Add the compact stats artifact argument."""
     parser.add_argument("--stats-out", type=Path, help="Write compact command stats JSON.")
-
-
-def add_local_llm_ir_args(parser: argparse.ArgumentParser) -> None:
-    """Add LocalLLM prose IR extraction arguments."""
-    parser.add_argument(
-        "--local-llm-ir-json",
-        type=Path,
-        help="Use an existing LocalLLM prose IR JSON instead of running local-llm extract-prose-ir.",
-    )
-    parser.add_argument(
-        "--local-llm-root",
-        type=Path,
-        help="Root for local-llm extract-prose-ir. Defaults from the input path.",
-    )
-    parser.add_argument(
-        "--term",
-        action="append",
-        default=[],
-        help="Term to include in the LocalLLM prose IR batch. May be repeated.",
-    )
-    parser.add_argument(
-        "--terms-file",
-        action="append",
-        type=Path,
-        default=[],
-        help="File containing additional terms for the LocalLLM prose IR batch. May be repeated.",
-    )
-    parser.add_argument(
-        "--local-llm-document-batch-size",
-        type=int,
-        default=DEFAULT_LOCAL_LLM_DOCUMENT_BATCH_SIZE,
-        help="Maximum documents per LocalLLM prose IR part.",
-    )
-    parser.add_argument(
-        "--local-llm-term-batch-size",
-        type=int,
-        default=DEFAULT_LOCAL_LLM_TERM_BATCH_SIZE,
-        help="Maximum terms per LocalLLM prose IR part.",
-    )
-    parser.add_argument(
-        "--local-llm-jobs",
-        "--llm-jobs",
-        dest="local_llm_jobs",
-        type=int,
-        default=DEFAULT_LOCAL_LLM_JOBS,
-        help="Maximum LocalLLM prose IR parts to run concurrently.",
-    )
 
 
 def emit_command_stats(args: argparse.Namespace, status_key: str, fields: dict[str, object]) -> None:
@@ -857,13 +801,13 @@ def verification_action_for_rule(rule: str) -> dict[str, object]:
             "evidence_required": ["hypothesis", "metric", "baseline", "expected result", "run or rerun decision"],
             "recursive_verification": recursive_verification_for_route("experiment_plan_verification"),
         }
-    if rule == "local_llm_experiment_plan_ir_missing":
+    if rule == "semantic_experiment_plan_ir_missing":
         return {
-            "add": "LocalLLM prose IR with analysis_intents.experiment_plan status",
-            "verification_route": "local_llm_environment_repair",
-            "verification_question": "Why is LocalLLM prose IR missing from a graph that requires experiment-plan applicability?",
-            "verification_targets": ["$prose-reasoning-graph", "agent-canon local-llm extract-prose-ir"],
-            "evidence_required": ["local_llm_prose_ir.analysis_intents", "LocalLLM command path and model evidence"],
+            "add": "deterministic semantic prose IR with analysis_intents.experiment_plan status",
+            "verification_route": "semantic_environment_repair",
+            "verification_question": "Why is deterministic semantic prose evidence missing from a graph that requires experiment-plan applicability?",
+            "verification_targets": ["$prose-reasoning-graph", "deterministic semantic prose evidence"],
+            "evidence_required": ["semantic_prose_ir.analysis_intents", "deterministic capability and owner evidence"],
         }
     if rule == "presentation_format_candidate":
         return {
@@ -1038,21 +982,21 @@ def command_ingest(args: argparse.Namespace) -> int:
     db_path = graph_db_path(args, [input_path])
     text = input_path.read_text(encoding="utf-8")
     prompt_text = prompt_context(args)
-    local_llm_ir = local_llm_prose_ir_payload(args, [input_path], prompt_text, db_path)
-    corpus_hints = corpus_hints_from_local_llm_ir(local_llm_ir)
+    semantic_ir = semantic_prose_ir_payload(args, [input_path], prompt_text, db_path)
+    corpus_hints = corpus_hints_from_semantic_ir(semantic_ir)
     with connect(db_path) as connection:
         initialize_schema(connection)
         clear_database(connection)
-        set_metadata(connection, "local_llm_prose_ir", local_llm_ir)
+        set_metadata(connection, "semantic_prose_ir", semantic_ir)
         set_metadata(connection, "corpus_hints", corpus_hints)
         set_metadata(
             connection,
             "corpus_hint_inputs",
             {
-                "source": "local_llm_prose_ir",
+                "source": "semantic_prose_ir",
                 "document_path": str(input_path),
                 "prompt_supplied": bool(prompt_text.strip()),
-                "ir_schema": local_llm_ir.get("schema", ""),
+                "ir_schema": semantic_ir.get("schema", ""),
             },
         )
         ingest_document(
@@ -1068,7 +1012,7 @@ def command_ingest(args: argparse.Namespace) -> int:
         "PROSE_REASONING_GRAPH_INGEST",
         {
             "PROSE_REASONING_GRAPH_DB": str(db_path),
-            "PROSE_REASONING_GRAPH_LOCAL_LLM_IR": str(local_llm_ir.get("artifact_path", "")),
+            "PROSE_REASONING_GRAPH_SEMANTIC_IR": str(semantic_ir.get("artifact_path", "")),
         },
     )
     return 0
@@ -1081,21 +1025,21 @@ def command_ingest_set(args: argparse.Namespace) -> int:
     input_paths = expand_ingest_inputs(input_args, bool(args.recursive))
     prompt_text = prompt_context(args)
     documents = [(path, path.read_text(encoding="utf-8")) for path in input_paths]
-    local_llm_ir = local_llm_prose_ir_payload(args, input_paths, prompt_text, db_path)
-    corpus_hints = corpus_hints_from_local_llm_ir(local_llm_ir)
+    semantic_ir = semantic_prose_ir_payload(args, input_paths, prompt_text, db_path)
+    corpus_hints = corpus_hints_from_semantic_ir(semantic_ir)
     with connect(db_path) as connection:
         initialize_schema(connection)
         clear_database(connection)
-        set_metadata(connection, "local_llm_prose_ir", local_llm_ir)
+        set_metadata(connection, "semantic_prose_ir", semantic_ir)
         set_metadata(connection, "corpus_hints", corpus_hints)
         set_metadata(
             connection,
             "corpus_hint_inputs",
             {
-                "source": "local_llm_prose_ir",
+                "source": "semantic_prose_ir",
                 "document_paths": [str(path) for path, _ in documents],
                 "prompt_supplied": bool(prompt_text.strip()),
-                "ir_schema": local_llm_ir.get("schema", ""),
+                "ir_schema": semantic_ir.get("schema", ""),
             },
         )
         connection.execute(
@@ -1118,7 +1062,7 @@ def command_ingest_set(args: argparse.Namespace) -> int:
         {
             "PROSE_REASONING_GRAPH_DB": str(db_path),
             "PROSE_REASONING_GRAPH_DOCUMENTS": len(documents),
-            "PROSE_REASONING_GRAPH_LOCAL_LLM_IR": str(local_llm_ir.get("artifact_path", "")),
+            "PROSE_REASONING_GRAPH_SEMANTIC_IR": str(semantic_ir.get("artifact_path", "")),
         },
     )
     return 0
@@ -1193,108 +1137,51 @@ def prompt_context(args: argparse.Namespace) -> str:
     return "\n".join(prompt_parts)
 
 
-def local_llm_prose_ir_payload(
+def semantic_prose_ir_payload(
     args: argparse.Namespace,
     input_paths: Sequence[Path],
     prompt_text: str,
     db_path: Path,
 ) -> dict[str, object]:
-    """Return LocalLLM-extracted prose intermediate representation."""
-    explicit_ir = getattr(args, "local_llm_ir_json", None)
-    if isinstance(explicit_ir, Path):
-        if not explicit_ir.is_file():
-            raise ValueError(f"LocalLLM prose IR JSON does not exist: {explicit_ir}")
-        payload = read_json_file(explicit_ir)
-        payload.setdefault("artifact_path", str(explicit_ir))
-        return payload
-
-    repo_root = local_llm_root(args, input_paths[0])
-    ir_path = db_path.parent / "local_llm_prose_ir.json"
-    command = [
-        str(agent_canon_cli(repo_root)),
-        "local-llm",
-        "extract-prose-ir",
-        "--root",
-        str(repo_root),
-        "--json-out",
-        str(ir_path),
-        "--document-batch-size",
-        str(getattr(args, "local_llm_document_batch_size", DEFAULT_LOCAL_LLM_DOCUMENT_BATCH_SIZE)),
-        "--term-batch-size",
-        str(getattr(args, "local_llm_term_batch_size", DEFAULT_LOCAL_LLM_TERM_BATCH_SIZE)),
-        "--llm-jobs",
-        str(getattr(args, "local_llm_jobs", DEFAULT_LOCAL_LLM_JOBS)),
-    ]
-    if prompt_text.strip():
-        command.extend(["--prompt", prompt_text])
-    for term in cast(list[str], getattr(args, "term", [])):
-        command.extend(["--term", term])
-    for terms_file in cast(list[Path], getattr(args, "terms_file", [])):
-        command.extend(["--terms-file", str(terms_file.resolve())])
-    command.extend(str(path.resolve()) for path in input_paths)
-    command_env = os.environ.copy()
-    command_env.setdefault("CARGO_TARGET_DIR", str(Path(tempfile.gettempdir()) / "agent-canon-local-llm-target"))
-    cargo = shutil.which("cargo", path=command_env.get("PATH"))
-    if cargo:
-        cargo_path = Path(cargo).resolve()
-        if cargo_path.parent.name == "bin" and cargo_path.parent.parent.name == ".cargo":
-            cargo_home = cargo_path.parent.parent
-            rustup_home = cargo_home.parent / ".rustup"
-            command_env.setdefault("CARGO_HOME", str(cargo_home))
-            if rustup_home.is_dir():
-                command_env.setdefault("RUSTUP_HOME", str(rustup_home))
-    command_env.setdefault("RUSTUP_TOOLCHAIN", "stable")
-    result = subprocess.run(
-        command,
-        cwd=repo_root,
-        env=command_env,
-        check=False,
-        capture_output=True,
-        text=True,
+    """Return deterministic prose intermediate representation and its evidence path."""
+    texts = [path.read_text(encoding="utf-8") for path in input_paths]
+    tokens = Counter(
+        token.casefold()
+        for text in texts
+        for token in re.findall(r"[0-9A-Za-z_\u0080-\uFFFF]+", text)
+        if len(token) >= CONCEPT_MIN_TERM_LENGTH and token.casefold() not in STOPWORDS
     )
-    if result.returncode != 0:
-        raise ValueError(
-            "local-llm extract-prose-ir failed: "
-            f"exit={result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}"
-        )
-    emitted_ir = stdout_field(result.stdout, LOCAL_LLM_PROSE_IR_STDOUT_KEY)
-    if emitted_ir:
-        ir_path = Path(emitted_ir)
-    if not ir_path.is_file():
-        raise ValueError(f"local-llm prose IR JSON was not created: {ir_path}")
-    payload = read_json_file(ir_path)
-    payload.setdefault("artifact_path", str(ir_path))
-    payload.setdefault("source_command", "agent-canon local-llm extract-prose-ir")
+    top_terms = tuple(token for token, _count in tokens.most_common(CONCEPT_CANDIDATE_LIMIT))
+    combined = "\n".join((*texts, prompt_text))
+    experiment_status = "present" if any(
+        cue in combined.casefold() for cue in EXPERIMENT_ACTIVITY_CUES
+    ) else "absent"
+    ir_path = db_path.parent / "semantic_prose_ir.json"
+    payload: dict[str, object] = {
+        "schema": "semantic-prose-ir/v1",
+        "artifact_path": str(ir_path),
+        "source": "deterministic_capability_evidence",
+        "documents": tuple(str(path.resolve()) for path in input_paths),
+        "prompt_present": bool(prompt_text.strip()),
+        "terms": top_terms,
+        "analysis_intents": ({"intent": "experiment_plan", "status": experiment_status},),
+        "corpus_hints": [
+            {
+                "corpus_id": "deterministic_prose",
+                "label": "Deterministic prose and document-structure corpus",
+                "score": len(top_terms),
+                "selected": True,
+                "basis": {"source": "deterministic_capability_evidence", "terms": top_terms},
+            }
+        ],
+    }
+    ir_path.parent.mkdir(parents=True, exist_ok=True)
+    ir_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return payload
 
 
-def local_llm_root(args: argparse.Namespace, input_path: Path) -> Path:
-    """Return the LocalLLM root for IR extraction."""
-    explicit_root = getattr(args, "local_llm_root", None)
-    if isinstance(explicit_root, Path):
-        return explicit_root.resolve()
-    return structured_repo_root(args, input_path)
-
-
-def agent_canon_cli(repo_root: Path) -> Path | str:
-    """Return the preferred AgentCanon Rust CLI entrypoint."""
-    override = os.environ.get("AGENT_CANON_CLI", "").strip()
-    if override:
-        return override
-
-    candidates = [
-        repo_root / "tools" / "bin" / "agent-canon",
-        Path.cwd() / "tools" / "bin" / "agent-canon",
-        Path.cwd() / "vendor" / "agent-canon" / "tools" / "bin" / "agent-canon",
-    ]
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-    return "agent-canon"
-
-
-def corpus_hints_from_local_llm_ir(payload: dict[str, object]) -> list[dict[str, object]]:
-    """Return corpus hints extracted by LocalLLM prose IR."""
+def corpus_hints_from_semantic_ir(payload: dict[str, object]) -> list[dict[str, object]]:
+    """Return corpus hints extracted from deterministic semantic evidence."""
     hints = object_list(payload.get("corpus_hints"))
     if hints:
         return hints
@@ -1304,7 +1191,7 @@ def corpus_hints_from_local_llm_ir(payload: dict[str, object]) -> list[dict[str,
             "label": "General prose and document-structure corpus",
             "score": 0,
             "selected": True,
-            "basis": {"source": "local_llm_prose_ir", "signals": []},
+            "basis": {"source": "deterministic_capability_evidence", "signals": []},
         }
     ]
 
@@ -2646,8 +2533,8 @@ def experiment_plan_applicable_for_graph(
     _texts: Iterable[str],
     profile: str,
 ) -> bool:
-    """Return true when LocalLLM IR says experiment-plan analysis is applicable."""
-    local_status = local_llm_experiment_plan_status(connection)
+    """Return true when deterministic semantic IR says experiment-plan analysis is applicable."""
+    local_status = semantic_experiment_plan_status(connection)
     if local_status == "present":
         return True
     if local_status == "absent" and profile == "experiment":
@@ -2656,18 +2543,18 @@ def experiment_plan_applicable_for_graph(
         return False
     insert_document_diagnostic(
         connection,
-        "local_llm_experiment_plan_ir_missing",
+        "semantic_experiment_plan_ir_missing",
         (
-            "LocalLLM experiment-plan intent is missing; repair prose IR generation "
+            "Deterministic experiment-plan intent is missing; repair prose IR generation "
             "before accepting experiment-plan diagnostics."
         ),
     )
     return False
 
 
-def local_llm_experiment_plan_status(connection: sqlite3.Connection) -> str:
-    """Return LocalLLM IR's experiment-plan intent status."""
-    payload = metadata_json(connection, "local_llm_prose_ir", {})
+def semantic_experiment_plan_status(connection: sqlite3.Connection) -> str:
+    """Return deterministic semantic IR's experiment-plan intent status."""
+    payload = metadata_json(connection, "semantic_prose_ir", {})
     if not isinstance(payload, dict):
         return ""
     typed_payload = cast(dict[str, object], payload)
@@ -2939,7 +2826,7 @@ def projection_payload(connection: sqlite3.Connection, profile: str, db_path: Pa
         "graph_db": str(db_path),
         "canonical_graph": "text_anchored_semantic_graph",
         "documents": fetch_document_records(connection),
-        "local_llm_prose_ir": metadata_json(connection, "local_llm_prose_ir", {}),
+        "semantic_prose_ir": metadata_json(connection, "semantic_prose_ir", {}),
         "corpus_hints": metadata_json(connection, "corpus_hints", []),
         "layers": {layer: counts.get(layer, 0) for layer in LAYERS},
         "skill_handoffs": skill_handoffs(profile, db_path),
@@ -4067,8 +3954,8 @@ def command_check_document(args: argparse.Namespace) -> int:
     inventory_json = structured_inventory_path(args, repo_root)
     prompt_text = prompt_context(args)
     source_text = input_path.read_text(encoding="utf-8")
-    local_llm_ir = local_llm_prose_ir_payload(args, [input_path], prompt_text, db_path)
-    corpus_hints = corpus_hints_from_local_llm_ir(local_llm_ir)
+    semantic_ir = semantic_prose_ir_payload(args, [input_path], prompt_text, db_path)
+    corpus_hints = corpus_hints_from_semantic_ir(semantic_ir)
 
     diagnostics_path = out_dir / "prose_diagnostics.md"
     explanation_path = out_dir / "prose_explanation.md"
@@ -4079,16 +3966,16 @@ def command_check_document(args: argparse.Namespace) -> int:
     with connect(db_path) as connection:
         initialize_schema(connection)
         clear_database(connection)
-        set_metadata(connection, "local_llm_prose_ir", local_llm_ir)
+        set_metadata(connection, "semantic_prose_ir", semantic_ir)
         set_metadata(connection, "corpus_hints", corpus_hints)
         set_metadata(
             connection,
             "corpus_hint_inputs",
             {
-                "source": "local_llm_prose_ir",
+                "source": "semantic_prose_ir",
                 "document_path": str(input_path),
                 "prompt_supplied": bool(prompt_text.strip()),
-                "ir_schema": local_llm_ir.get("schema", ""),
+                "ir_schema": semantic_ir.get("schema", ""),
             },
         )
         ingest_document(
@@ -4143,7 +4030,7 @@ def command_check_document(args: argparse.Namespace) -> int:
             "PROSE_REASONING_GRAPH_INTEGRATION_PLAN": str(integration_path),
             "PROSE_REASONING_GRAPH_SKILL_HANDOFF": str(handoff_path),
             "PROSE_REASONING_GRAPH_STRUCTURED_ANALYSIS_INVENTORY": str(inventory_json),
-            "PROSE_REASONING_GRAPH_LOCAL_LLM_IR": str(local_llm_ir.get("artifact_path", "")),
+            "PROSE_REASONING_GRAPH_SEMANTIC_IR": str(semantic_ir.get("artifact_path", "")),
             "PROSE_REASONING_GRAPH_PROSE_DIAGNOSTICS": len(prose_diagnostics),
             "PROSE_REASONING_GRAPH_EDIT_OPERATIONS": len(operations),
             "PROSE_REASONING_GRAPH_DOCUMENT_CANON_FINDINGS": len(document_canon_findings),

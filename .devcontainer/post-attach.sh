@@ -7,6 +7,9 @@
 # @dependency-end
 set -euo pipefail
 
+runtime_root="${AGENT_CANON_RUNTIME_ROOT:-/var/lib/agent-canon/runtime}"
+source_projection_root="${AGENT_CANON_SOURCE_PROJECTION_ROOT:-/workspace/reports/agents/devcontainer/runtime}"
+
 gpu_device_visible() {
   [ -e /dev/nvidia0 ] && return 0
   command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1
@@ -48,9 +51,9 @@ if [ -S /var/run/docker.sock ]; then
   docker_socket_status="mounted"
 fi
 
-codex_home_status="not-mounted"
-if [ -d /root/.codex ] || [ -d "${HOME:-/root}/.codex" ]; then
-  codex_home_status="mounted"
+codex_home_status="container-local (host mount forbidden)"
+if grep -F '/root/.codex' /proc/self/mountinfo >/dev/null 2>&1; then
+  codex_home_status="forbidden-host-mount-detected"
 fi
 
 codex_login_status="unauthenticated"
@@ -104,6 +107,8 @@ echo "/mnt/git: ${mnt_git_status}"
 echo "secret-mount: ${secret_mount_status} (${secret_mount_target}, mode=${AGENT_CANON_SECRET_DIR_MODE:-ro})"
 echo "docker-socket: ${docker_socket_status}"
 echo "host-codex-home: ${codex_home_status}"
+echo "runtime-root: ${runtime_root} ($(if [ -d "$runtime_root" ]; then echo available; else echo missing; fi))"
+echo "source-projection: ${source_projection_root} ($(if [ -f "$runtime_root/tool-availability.json" ]; then echo cataloged-tools-readback; else echo missing; fi))"
 echo "codex-login: ${codex_login_status}"
 echo "host-gh-config: ${gh_config_status}"
 echo "host-ssh-dir: ${ssh_dir_status}"

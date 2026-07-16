@@ -332,13 +332,13 @@ AREA_DATA: tuple[AreaData, ...] = (
         "Find candidate tools, documents, code, and dependency context from a purpose string.",
         "run_coordinated_search",
         (
-            "agent-canon local-llm search --purpose \"<goal>\"",
-            "agent-canon local-llm build-index --surface tools --surface documents",
+            "python3 tools/agent_tools/search.py --purpose \"<goal>\"",
+            "python3 tools/agent_tools/search.py --purpose \"<goal>\" --refresh-index --surface tools --surface documents",
         ),
         (
             "vector_search.py",
             "tool-search",
-            "llm-search",
+            "semantic-search",
             "semantic-search",
             "search-to-edit-scope",
             "dependency-expanded-search",

@@ -8,7 +8,6 @@
 # downstream implementation ./evaluate_agent_run.py resolves behavior eval manifests
 # downstream implementation ./evaluate_workflow_selection.py resolves workflow selection manifests
 # downstream implementation ./evaluate_report_quality.py resolves report quality manifests
-# downstream implementation ./local_llm_eval.py resolves local LLM eval manifests
 # downstream implementation ./eval_accumulation_check.py resolves eval family registries
 # downstream implementation ./run_accumulated_agent_evals.py resolves producer manifests
 # @dependency-end

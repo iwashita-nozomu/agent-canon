@@ -168,22 +168,10 @@ check_post_create_python_install() {
       || report_issue ".devcontainer/post-create.sh must install the AgentCanon Rust CLI under AGENT_CANON_TOOLS_HOME"
     grep -q '/usr/local/bin/agent-canon' "$post_create" \
       || report_issue ".devcontainer/post-create.sh must expose the AgentCanon Rust CLI on PATH"
-    grep -q 'install_llama_cpp' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must install llama.cpp for local single-file responsibility review"
-    grep -q 'tools/install_llama_cpp.sh' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must call the shared llama.cpp installer"
-    grep -q 'ggml-org/SmolLM3-3B-GGUF:Q4_K_M' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must set the default 3B-class local LLM model selector"
-    grep -q '${tools_home}/bin/llama-cli' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must expose llama-cli under AGENT_CANON_TOOLS_HOME"
-    if [ ! -f tools/install_llama_cpp.sh ]; then
-      report_issue "tools/install_llama_cpp.sh not found"
-    else
-      grep -q 'ggml-org/llama.cpp' tools/install_llama_cpp.sh \
-        || report_issue "tools/install_llama_cpp.sh must fetch llama.cpp from its canonical repository"
-      grep -q 'cmake --build' tools/install_llama_cpp.sh \
-        || report_issue "tools/install_llama_cpp.sh must build llama.cpp"
-    fi
+    grep -q 'AGENT_CANON_RUNTIME_ROOT' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must publish the container-local runtime root"
+    grep -q 'tool-availability.json' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must publish cataloged tool availability"
     grep -q '/etc/profile.d/agent-canon-rust.sh' "$post_create" \
       || report_issue ".devcontainer/post-create.sh must publish Rust PATH for non-interactive devcontainer exec"
   fi
@@ -200,6 +188,9 @@ check_post_create_python_install() {
     if [ ! -f "$generate_compose" ]; then
       report_issue ".devcontainer/generate-runtime-compose.sh not found"
     else
+      if grep -F '${HOME}/.codex:/root/.codex' "$generate_compose" >/dev/null 2>&1; then
+        report_issue ".devcontainer/generate-runtime-compose.sh must not mount host ~/.codex"
+      fi
       grep -q 'agent-canon-source-only' "$generate_compose" \
         || report_issue ".devcontainer/generate-runtime-compose.sh must support standalone AgentCanon source-only mode"
       grep -q 'mcr.microsoft.com/devcontainers/base:ubuntu-22.04' "$generate_compose" \

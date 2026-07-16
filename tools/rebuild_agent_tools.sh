@@ -4,7 +4,6 @@
 # responsibility Rebuilds local compiled AgentCanon tools after AgentCanon source updates.
 # upstream design ../CONTAINER_OPERATIONS.md compiled tool cache and devcontainer boundary.
 # upstream design ../documents/rust-agent-tool-migration.md Rust CLI migration and rebuild policy.
-# upstream implementation ./install_llama_cpp.sh rebuilds llama.cpp when a local source checkout exists.
 # downstream implementation ./update_agent_canon.sh calls this after safe AgentCanon updates.
 # downstream implementation ../tests/tools/test_update_agent_canon.py validates rebuild behavior.
 # @dependency-end
@@ -122,33 +121,10 @@ rebuild_rust_cli() {
   echo "AGENT_CANON_TOOL_REBUILD_RUST=rebuilt"
 }
 
-rebuild_llama_cpp() {
-  local source_root
-  local installer
-  local rebuild_args
-
-  source_root="$(agent_canon_source_root)"
-  if [ -z "$source_root" ]; then
-    echo "AGENT_CANON_LLAMA_CPP=skipped_missing_agent_canon_source"
-    return
-  fi
-  installer="$source_root/tools/install_llama_cpp.sh"
-  if [ ! -f "$installer" ]; then
-    echo "AGENT_CANON_LLAMA_CPP=skipped_missing_installer"
-    return
-  fi
-  rebuild_args=(--skip-missing-source)
-  if [ "${AGENT_CANON_REBUILD_LLAMA_CPP:-1}" = "1" ]; then
-    rebuild_args+=(--force)
-  fi
-  AGENT_CANON_TOOLS_HOME="$TOOLS_HOME" bash "$installer" "${rebuild_args[@]}"
-}
-
 main() {
   echo "AGENT_CANON_TOOL_REBUILD_ROOT=$ROOT_DIR"
   echo "AGENT_CANON_TOOL_REBUILD_TOOLS_HOME=$TOOLS_HOME"
   rebuild_rust_cli
-  rebuild_llama_cpp
   echo "AGENT_CANON_TOOL_REBUILD=pass"
 }
 

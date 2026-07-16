@@ -117,9 +117,6 @@ if [ -n "${AGENT_CANON_SECRET_DIR:-}" ] && [ "$secret_mode" != "invalid" ]; then
     secret_mount_status="enabled"
   fi
 fi
-if [ -d "${HOME}/.codex" ]; then
-  volume_lines+=("      - ${HOME}/.codex:/root/.codex")
-fi
 if [ -d "${HOME}/.config/gh" ]; then
   volume_lines+=("      - ${HOME}/.config/gh:/root/.config/gh")
 fi
@@ -189,6 +186,8 @@ environment_lines=(
   "      DEVCONTAINER_GPU_REQUEST: \"${gpu_request}\""
   "      AGENT_CANON_SECRET_MOUNT: \"${secret_target}\""
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
+  '      AGENT_CANON_RUNTIME_ROOT: "/var/lib/agent-canon/runtime"'
+  '      AGENT_CANON_SOURCE_PROJECTION_ROOT: "/workspace/reports/agents/devcontainer/runtime"'
   "${pack_environment_lines[@]}"
 )
 if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then

@@ -48,6 +48,11 @@ SOURCE_PROJECTION_TEMPLATE = "/workspace/reports/agents/{run_id}/runtime"
 STRUCTURE_CONTRACT_REF = "documents/repo-structure-contract.toml"
 VALIDATION_TAXONOMY_REF = "documents/runtime-profiles-and-check-matrix.json"
 VALIDATION_TAXONOMY_READER_REF = "documents/runtime-profiles-and-check-matrix.md"
+DESIGN_MANAGER_ARTIFACT = "reports/agents/w1-tool-env-routing-20260716/design_partition.json"
+DESIGN_AUTHORITY_ARTIFACT = "reports/agents/w1-tool-env-routing-20260716/design_brief.md"
+APPROVED_DESIGN_REVISION = "W1-DESIGN-20260716-R3-GPU-COMPLETIONCOVERAGE-REPAIR"
+ORGANIZER_CONTEXT_ID = "019f6480-0e7d-73a2-9838-e343adc44457"
+MANAGED_RUN_ADAPTER_PATH = "tools/experiments/run_managed_experiment.py"
 CALLER_ALLOCATION_PROVENANCE = "caller_scheduler_allocated_uuid_set"
 COMPLETION_COVERAGE_FILENAME = "completion_coverage.json"
 ENVIRONMENT_CERTIFICATE_FILENAME = "environment_certificate.json"
@@ -58,14 +63,7 @@ CLEANUP_EVIDENCE_FILENAME = "cleanup_evidence.json"
 CLOSEOUT_INTENT_FILENAME = "closeout_intent.json"
 CLOSEOUT_EVIDENCE_FILENAME = "closeout_evidence.json"
 _PLANNER_PROVENANCE = object()
-TARGETED_TEST_DEFERRAL = MappingProxyType(
-    {
-        "scope": "W1-RP-repair-1",
-        "status": "deferred_by_writer_instruction",
-        "reason": "user_forbids_python_tests_dynamic_graphs_and_broad_validation",
-        "integration_gate": "W3 EnvironmentCertificate gates source integration only",
-    }
-)
+_MANAGED_RUN_INTEGRATION_PROVENANCE = object()
 
 GPU_ENVIRONMENT_KEYS = frozenset(
     {
@@ -672,6 +670,74 @@ def _is_gpu_index(value: str) -> bool:
 
 
 @dataclass(frozen=True)
+class ManagedRunAdapterIntegrationContract:
+    """Ordered W1 contract consumed by the out-of-scope managed-run adapter."""
+
+    manager_artifact_path: str = DESIGN_MANAGER_ARTIFACT
+    design_authority_path: str = DESIGN_AUTHORITY_ARTIFACT
+    approved_design_revision: str = APPROVED_DESIGN_REVISION
+    organizer_context_id: str = ORGANIZER_CONTEXT_ID
+    downstream_adapter_path: str = MANAGED_RUN_ADAPTER_PATH
+    canonical_planner: str = "plan_gpu_allocation"
+    canonical_pre_launch_adapter: str = "ExperimentRunnerPreLaunchAdapter"
+    scheduler_role: str = "transport_only_no_reselection_no_rewrite"
+    bypass_forbidden: bool = True
+    _provenance: object = field(default=None, init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        expected = (
+            DESIGN_MANAGER_ARTIFACT,
+            DESIGN_AUTHORITY_ARTIFACT,
+            APPROVED_DESIGN_REVISION,
+            ORGANIZER_CONTEXT_ID,
+            MANAGED_RUN_ADAPTER_PATH,
+            "plan_gpu_allocation",
+            "ExperimentRunnerPreLaunchAdapter",
+            "transport_only_no_reselection_no_rewrite",
+            True,
+        )
+        observed = (
+            self.manager_artifact_path,
+            self.design_authority_path,
+            self.approved_design_revision,
+            self.organizer_context_id,
+            self.downstream_adapter_path,
+            self.canonical_planner,
+            self.canonical_pre_launch_adapter,
+            self.scheduler_role,
+            self.bypass_forbidden,
+        )
+        if observed != expected:
+            raise PlanStateError("managed-run integration contract is not the approved W1 interface")
+
+    def record(self) -> Mapping[str, object]:
+        return MappingProxyType(
+            {
+                "manager_artifact_path": self.manager_artifact_path,
+                "design_authority_path": self.design_authority_path,
+                "approved_design_revision": self.approved_design_revision,
+                "organizer_context_id": self.organizer_context_id,
+                "downstream_adapter_path": self.downstream_adapter_path,
+                "canonical_planner": self.canonical_planner,
+                "canonical_pre_launch_adapter": self.canonical_pre_launch_adapter,
+                "scheduler_role": self.scheduler_role,
+                "bypass_forbidden": self.bypass_forbidden,
+            }
+        )
+
+
+def managed_run_adapter_integration_contract() -> ManagedRunAdapterIntegrationContract:
+    """Materialize the only approved W1-to-managed-run ordered interface."""
+    contract = ManagedRunAdapterIntegrationContract()
+    object.__setattr__(
+        contract,
+        "_provenance",
+        _MANAGED_RUN_INTEGRATION_PROVENANCE,
+    )
+    return contract
+
+
+@dataclass(frozen=True)
 class ResourceRequest:
     owner_id: str
     parent_id: str
@@ -680,6 +746,7 @@ class ResourceRequest:
     argv: tuple[str, ...]
     cwd: Path
     environment: Mapping[str, str]
+    integration_contract: ManagedRunAdapterIntegrationContract
     plan_id: str = ""
     cpu_requested_set: tuple[int, ...] = ()
     gpu_requested_count: int = 0
@@ -718,6 +785,17 @@ class ResourceRequest:
             raise ValueError("GPU requirements cannot be negative")
         if not self.argv:
             raise ValueError("argv must not be empty")
+        if (
+            self.integration_contract._provenance
+            is not _MANAGED_RUN_INTEGRATION_PROVENANCE
+        ):
+            raise TypedPreflightFailure(
+                "managed_run_adapter_bypass",
+                "resource requests must enter through the approved managed-run adapter interface",
+                required_adapter=MANAGED_RUN_ADAPTER_PATH,
+                manager_artifact=DESIGN_MANAGER_ARTIFACT,
+                approved_design_revision=APPROVED_DESIGN_REVISION,
+            )
         if not self.cwd.is_absolute():
             raise ValueError("cwd must be absolute")
         if self.gpu_requested_count and self.gpu_allocation_provenance != CALLER_ALLOCATION_PROVENANCE:
@@ -2313,6 +2391,7 @@ def freeze_resource_plan(
         "parent_id": request.parent_id,
         "context_id": request.context_id,
         "maximum_timeout_seconds": request.maximum_timeout_seconds,
+        "managed_run_integration": request.integration_contract.record(),
     }
     execution = {
         "cwd": str(request.cwd.absolute()),
@@ -2388,7 +2467,6 @@ def freeze_resource_plan(
             "partial": None,
             "cleanup": None,
             "closeout": None,
-            "targeted_test_deferral": TARGETED_TEST_DEFERRAL,
         },
         state=PlanState.PLAN_FROZEN,
         state_history=(*discovered.state_history, PlanState.PLAN_FROZEN),
@@ -2807,6 +2885,7 @@ def _readback_processes(raw: object) -> tuple[ProcessIdentity, ...]:
 class ExperimentRunnerPreLaunchAdapter:
     """The sole pre-launch transport adapter; it never selects or rewrites GPUs."""
 
+    integration_contract: ManagedRunAdapterIntegrationContract
     _transported_plan_fingerprints: set[str] = field(default_factory=set)
     _transport_lock: threading.Lock = field(
         default_factory=threading.Lock,
@@ -2822,6 +2901,13 @@ class ExperimentRunnerPreLaunchAdapter:
         runner_transport: RunnerTransport,
     ) -> PreLaunchContext:
         _require_state(plan, PlanState.ENV_MATERIALIZED)
+        if (
+            self.integration_contract._provenance
+            is not _MANAGED_RUN_INTEGRATION_PROVENANCE
+            or plan.owner.get("managed_run_integration")
+            != self.integration_contract.record()
+        ):
+            raise PlanStateError("ExperimentRunner pre-launch bypassed the managed-run interface")
         if canonical_environment.plan_fingerprint != plan.plan_fingerprint:
             raise EnvironmentReadbackMismatch("environment packet fingerprint mismatch")
         if canonical_environment.plan != plan:
@@ -2830,6 +2916,7 @@ class ExperimentRunnerPreLaunchAdapter:
             raise PlanStateError("pre-launch allocation is not the frozen allocation")
         readback_fingerprint = _environment_readback_fingerprint(canonical_environment, gpu_allocation)
         payload = {
+            "scheduler_policy": "transport_only_no_reselection_no_rewrite",
             "canonical_environment": {
                 "plan_fingerprint": plan.plan_fingerprint,
                 "exact_env_map": dict(canonical_environment.exact_env_map),
@@ -2889,7 +2976,10 @@ class ExperimentRunnerPreLaunchAdapter:
             raise EnvironmentReadbackMismatch("runner transport changed the plan fingerprint")
         if acknowledgement.get("readback_fingerprint") != readback_fingerprint:
             raise EnvironmentReadbackMismatch("runner transport changed the environment packet")
+        if acknowledgement.get("scheduler_policy") != payload["scheduler_policy"]:
+            raise EnvironmentReadbackMismatch("runner transport changed the scheduler policy")
         required_acknowledgement_fields = (
+            "scheduler_policy",
             "effective_environment",
             "cwd",
             "argv",
@@ -2979,7 +3069,7 @@ class ExperimentRunnerPreLaunchAdapter:
                 "pre_launch_transport": {
                     "readback_fingerprint": readback_fingerprint,
                     "transported_exactly_once": True,
-                    "scheduler_policy": "transport_only_no_reselection_no_rewrite",
+                    "scheduler_policy": payload["scheduler_policy"],
                 }
             },
         )
@@ -3584,6 +3674,8 @@ def _require_state(plan: ExecutionResourcePlan, state: PlanState) -> None:
 
 
 __all__ = [
+    "CALLER_ALLOCATION_PROVENANCE",
+    "COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION",
     "CleanupEvidence",
     "CloseoutEvidence",
     "CompletionCoverage",
