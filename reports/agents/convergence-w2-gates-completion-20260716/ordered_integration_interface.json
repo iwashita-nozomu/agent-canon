@@ -1,0 +1,76 @@
+{
+  "schema": "agent-canon.ordered-integration-interface.v1",
+  "run_id": "convergence-w2-gates-completion-20260716",
+  "design_ref": "reports/agents/convergence-w2-gates-completion-20260716/design_partition.json#handoff.crossing_edges",
+  "source_packet_ref": "reports/agents/convergence-w2-gates-completion-20260716/source_packet.md#Fixed latest clauses",
+  "branch_creation_reason": "convergence_w2_gate_completion_authority",
+  "owner": "W1 shared catalog/config/dependency integration writer",
+  "order": [
+    {
+      "ordinal": 1,
+      "after": "W2 source freeze and review",
+      "before": "W3/parent integration",
+      "action": "apply the exact shared-surface deletions below, then regenerate owned projections"
+    }
+  ],
+  "patches": [
+    {
+      "path": "tools/catalog.yaml",
+      "owner": "W1 shared catalog integration writer",
+      "operation": "delete-entry",
+      "selector": "id: run-docs-checks",
+      "desired_result": "remove the compatibility_wrapper catalog record for tools/ci/run_docs_checks.sh; keep tools/bin/agent-canon docs check as the sole docs checker command"
+    },
+    {
+      "path": "responsibility-scope.toml",
+      "owner": "W1 shared dependency-scope integration writer",
+      "operation": "delete-reference",
+      "selector": "shared-policy-documents.protecting_tools contains tools/ci/run_docs_checks.sh",
+      "desired_result": "remove the deleted forwarder from protecting_tools without adding a replacement checker"
+    },
+    {
+      "path": "documents/tools/agent-canon.md",
+      "owner": "W1 shared policy-document integration writer",
+      "operation": "delete-reference",
+      "selector": "dependency header downstream implementation tools/ci/run_docs_checks.sh and Legacy Entrypoints run_docs_checks.sh paragraph",
+      "desired_result": "remove the forwarder reference and compatibility-forwarder instructions; retain the canonical tools/bin/agent-canon docs commands"
+    },
+    {
+      "path": "rust/agent-canon/src/docs.rs",
+      "owner": "W1 dependency-header integration writer",
+      "operation": "delete-reference",
+      "selector": "dependency header downstream implementation ../../../tools/ci/run_docs_checks.sh",
+      "desired_result": "remove the reverse dependency pair for the deleted forwarder"
+    },
+    {
+      "path": "documents/log-surface-inventory.json",
+      "owner": "W1 generated-projection owner",
+      "operation": "regenerate",
+      "selector": "all entries whose path is tools/ci/run_docs_checks.sh",
+      "desired_result": "regenerate the inventory so no deleted forwarder path or forwarder log field remains"
+    },
+    {
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "owner": "W1 runtime-projection integration writer",
+      "operation": "delete-reference",
+      "selector": "run_docs_checks.sh keyword entries in workflow/tool routing projections",
+      "desired_result": "remove routing recognition for the deleted forwarder; retain agent-canon docs check/format/fix-math/fix-mermaid recognition"
+    },
+    {
+      "path": "evidence/agent-evals/workflow_selection_eval.toml",
+      "owner": "W1 evaluation-projection integration writer",
+      "operation": "delete-reference",
+      "selector": "run_docs_checks.sh prompt variants",
+      "desired_result": "remove stale forwarder prompt variants while retaining canonical docs command coverage"
+    }
+  ],
+  "consumer_closure": {
+    "canonical_owner": "tools/bin/agent-canon docs check",
+    "forbidden": [
+      "reintroduce a shell forwarder",
+      "add a second Markdown/math/Mermaid checker",
+      "retain a catalog record for the deleted forwarder",
+      "turn a generated inventory into a hand-edited source"
+    ]
+  }
+}

@@ -219,6 +219,9 @@ DEFAULT_QUALITY_CHECK_STAGES = (
 )
 DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
     "tools/bin/agent-canon docs check <changed-markdown-paths>",
+    "python3 tools/agent_tools/check_convention_compliance.py",
+    "python3 tools/agent_tools/check_dependency_headers.py --changed",
+    "bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing",
     "bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header",
 )
 CANONICAL_FORMAT_CHECK_ROUTE = "tools/bin/agent-canon docs check <changed-markdown-paths>"
