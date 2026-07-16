@@ -6,9 +6,12 @@
 # upstream design ../../reports/agents/w1-tool-env-routing-20260716/design_brief.md approved W1-DESIGN-20260716-R3-GPU-COMPLETIONCOVERAGE-REPAIR
 # upstream design ../../documents/experiment_runner.md external ExperimentRunner ownership and task boundary
 # upstream implementation ./execution_resource_plan.py canonical discovery/planning/prelaunch/terminal owner
+# upstream implementation ../../experiment_runner/python/experiment_runner/runner.py StandardRunner integer monitor route (explicitly excluded by W1 binding)
+# upstream implementation ../../experiment_runner/python/experiment_runner/resource_scheduler.py StandardFullResourceScheduler integer GPU route (explicitly excluded by W1 binding)
 # downstream integration ../../reports/agents/w1-tool-env-routing-20260716/ordered_integration_interface.json ordered W2-W4 interface
 # static route evidence: run_cli -> execute_managed_run -> discover_resources -> plan_gpu_allocation -> freeze_resource_plan -> materialize_environment -> ExperimentRunnerPreLaunchAdapter.pre_launch -> execute_with_experiment_runner -> record_terminal -> dispose_resources
-# alternate managed GPU launch routes: none; default CLI rejects missing external ExperimentRunner bindings instead of launching directly
+# alternate managed GPU launch routes: none; W1UUIDScheduler is the only GPU binding and never enters integer scheduler/monitor paths
+# upstream evidence ../../reports/agents/w1-tool-env-routing-20260716/nvidia_primary_process_visibility_review.md NVIDIA process/PID/MIG/UUID visibility gate
 # @dependency-end
 
 """Run one experiment while recording canonical server-side run metadata."""
@@ -53,6 +56,7 @@ from tools.experiments.execution_resource_plan import (
     managed_run_adapter_integration_contract,
     materialize_environment,
     plan_gpu_allocation,
+    release_runner_owned_gpu_leases,
     PlanState,
     record_terminal,
     _failure_after_durable_cleanup,
@@ -201,13 +205,141 @@ class RunContext:
     git: GitSnapshot
 
 
+@dataclass(frozen=True)
+class _W1CPUCapacity:
+    """External-runner capacity with no integer GPU capacity or assignment."""
+
+    max_workers: int = 1
+
+
+@dataclass(frozen=True)
+class _W1Completion:
+    case: object
+    context: Mapping[str, object]
+    result: object
+
+
+@dataclass(frozen=True)
+class _W1RunnerResult:
+    """Canonical result synthesized after StandardRunner has joined children."""
+
+    status: str
+    raw_exit_code: int
+    message: str
+    source: str = "w1_experiment_runner_binding"
+
+
+@dataclass(frozen=True)
+class _W1ContextInitializer:
+    exact_environment: Mapping[str, str]
+    initializer: Callable[..., object]
+    apply_environment: Callable[..., object]
+
+    def __call__(self, context: dict[str, object]) -> None:
+        context["environment_variables"] = dict(self.exact_environment)
+        self.apply_environment(context)
+        self.initializer(context)
+
+
+class _W1UUIDScheduler:
+    """Structural Scheduler for StandardRunner without GPU-ID scheduling."""
+
+    def __init__(
+        self,
+        *,
+        cases: list[object],
+        context_builder: Callable[..., object] | None,
+        skip_controller: object | None,
+        exact_environment: Mapping[str, str],
+        selected_ids: tuple[str, ...],
+    ) -> None:
+        self._pending = list(cases)
+        self._context_builder = context_builder
+        self.skip_controller = skip_controller
+        self._exact_environment = dict(exact_environment)
+        self._selected_ids = tuple(selected_ids)
+        self._resource_capacity = _W1CPUCapacity()
+        self.completions: list[_W1Completion] = []
+
+    @property
+    def resource_capacity(self) -> _W1CPUCapacity:
+        return self._resource_capacity
+
+    @property
+    def total_case_count(self) -> int:
+        return len(self.completions) + len(self._pending)
+
+    def _reject_integer_route_keys(self, context: Mapping[str, object]) -> None:
+        environment = context.get("environment_variables", {})
+        metadata = context.get("runner_metadata", {})
+        forbidden = {
+            "gpu_ids",
+            "gpu_id",
+            "EXPERIMENT_RUNNER_ASSIGNED_GPU_IDS",
+            "EXPERIMENT_RUNNER_GPU_SLOT",
+        }
+        observed = tuple(
+            sorted(
+                key
+                for key in forbidden
+                if key in environment or (isinstance(metadata, Mapping) and key in metadata)
+            )
+        )
+        if observed:
+            raise TypedPreflightFailure(
+                "experiment_runner_integer_gpu_route_forbidden",
+                "W1 UUID allocation cannot enter an integer scheduler or monitor route",
+                forbidden_keys=observed,
+            )
+
+    def next_case(self) -> tuple[object, dict[str, object]] | None:
+        if not self._pending:
+            return None
+        case = self._pending.pop(0)
+        raw_context = (
+            self._context_builder(case) if self._context_builder is not None else {}
+        )
+        if not isinstance(raw_context, Mapping):
+            raise TypedPreflightFailure(
+                "experiment_runner_context_invalid",
+                "canonical context builder must return a mapping",
+            )
+        self._reject_integer_route_keys(raw_context)
+        context = dict(raw_context)
+        context["environment_variables"] = dict(self._exact_environment)
+        context["runner_metadata"] = {
+            "w1_uuid_route": True,
+            "integer_gpu_scheduler_used": False,
+            "integer_gpu_monitor_route_used": False,
+            "selected_uuid_count": len(self._selected_ids),
+        }
+        return case, context
+
+    def on_finish(self, case: object, context: Mapping[str, object], result: object) -> None:
+        self.completions.append(
+            _W1Completion(case=case, context=dict(context), result=result)
+        )
+        if self.skip_controller is not None:
+            update = getattr(self.skip_controller, "update", None)
+            if callable(update):
+                update(case, context, result)
+
+    def is_completed(self) -> bool:
+        return not self._pending
+
+
 class CanonicalExperimentRunnerBinding:
-    """Concrete lazy binding to the external StandardRunner contract."""
+    """Concrete W1 UUID binding to StandardRunner without integer GPU routes."""
 
     def __init__(self, context: RunContext, run_config: Mapping[str, object]) -> None:
         self.context = context
         self.run_config = run_config
         self._runner: object | None = None
+        self._runner_finished = False
+        self._runner_quiescence: Mapping[str, object] | None = None
+        self._lease_cleanup_result: Mapping[str, object] | None = None
+        self._exact_environment: Mapping[str, str] = {}
+        self._selected_ids: tuple[str, ...] = ()
 
     def _topic_module(self) -> object:
         entrypoint = self.context.topic_dir / "run.py"
@@ -279,37 +411,137 @@ class CanonicalExperimentRunnerBinding:
         resource_estimator: Callable[..., object],
         skip_controller: object | None,
     ) -> object:
-        del task, cases, context_builder, initializer, resource_estimator, skip_controller
         try:
             runner_module = importlib.import_module("experiment_runner")
             topic_module = self._topic_module()
             standard_worker = getattr(runner_module, "StandardWorker")
-            scheduler_type = getattr(runner_module, "StandardFullResourceScheduler")
             runner_type = getattr(runner_module, "StandardRunner")
-            cases_value = getattr(topic_module, "cases")
+            selected_ids = tuple(getattr(plan.gpu_allocation, "selected_ids", ()))
+            exact_environment = dict(
+                cast(Mapping[str, str], getattr(plan, "execution")["env"])
+            )
+            if selected_ids and tuple(
+                exact_environment.get("CUDA_VISIBLE_DEVICES", "").split(",")
+            ) != selected_ids:
+                raise TypedPreflightFailure(
+                    "experiment_runner_uuid_environment_mismatch",
+                    "frozen UUID allocation is not the exact CUDA_VISIBLE_DEVICES packet",
+                    selected_ids=selected_ids,
+                )
+            if selected_ids and exact_environment.get("NVIDIA_VISIBLE_DEVICES") != ",".join(selected_ids):
+                raise TypedPreflightFailure(
+                    "experiment_runner_uuid_environment_mismatch",
+                    "frozen UUID allocation is not the exact NVIDIA_VISIBLE_DEVICES packet",
+                    selected_ids=selected_ids,
+                )
+            task_value = task if callable(task) else self._runner_callable(topic_module, "task")
+            cases_value = cases or list(getattr(topic_module, "cases"))
+            context_value = context_builder or self._runner_callable(topic_module, "context_builder")
+            initializer_value = initializer or self._runner_callable(topic_module, "initializer")
+            estimator_value = resource_estimator or self._runner_callable(topic_module, "resource_estimate")
+            skip_value = skip_controller or getattr(topic_module, "skip_controller", None)
             worker = standard_worker(
-                task=self._runner_callable(topic_module, "task"),
-                resource_estimator=self._runner_callable(topic_module, "resource_estimate"),
-                initializer=self._runner_callable(topic_module, "initializer"),
+                task=task_value,
+                resource_estimator=estimator_value,
+                initializer=_W1ContextInitializer(
+                    exact_environment,
+                    initializer_value,
+                    getattr(runner_module, "apply_environment_variables"),
+                ),
             )
-            scheduler = scheduler_type.from_worker(
+            scheduler = _W1UUIDScheduler(
                 cases=cases_value,
-                worker=worker,
-                context_builder=self._runner_callable(topic_module, "context_builder"),
-                skip_controller=getattr(topic_module, "skip_controller", None),
-                resource_capacity=getattr(plan, "resources"),
+                context_builder=context_value,
+                skip_controller=skip_value,
+                exact_environment=exact_environment,
+                selected_ids=selected_ids,
             )
-            self._runner = runner_type(scheduler)
-            return self._runner.run(worker)
+            self._exact_environment = exact_environment
+            self._selected_ids = selected_ids
+            self._runner = runner_type(
+                scheduler,
+                monitor=None,
+                on_case_finished=None,
+            )
+            try:
+                self._runner.run(worker)
+            finally:
+                self._runner_finished = True
+                self._runner_quiescence = self._build_quiescence(plan)
+            failed = any(
+                getattr(completion.result, "status", "ok") == "failed"
+                for completion in scheduler.completions
+            )
+            return _W1RunnerResult(
+                status="failed" if failed else "ok",
+                raw_exit_code=1 if failed else 0,
+                message="one or more managed cases failed" if failed else "completed",
+            )
+        except TypedPreflightFailure:
+            raise
         except Exception as exc:
             raise TypedPreflightFailure(
                 "experiment_runner_binding_unavailable",
-                "the canonical ExperimentRunner components could not be bound",
+                "the canonical W1 UUID ExperimentRunner binding could not be completed",
                 failure_type=type(exc).__name__,
                 failure_message=str(exc),
             ) from exc
 
+    def _build_quiescence(self, plan: object) -> Mapping[str, object]:
+        runner_pid = os.getpid()
+        try:
+            observation = getattr(plan, "resource_probe").observe()
+            stat = Path("/proc/self/stat").read_text(encoding="utf-8")
+            start_identity = stat.rsplit(")", 1)[-1].split()[19]
+        except Exception as exc:
+            return {
+                "plan_fingerprint": getattr(plan, "plan_fingerprint", ""),
+                "quiescent": False,
+                "process_tree_terminal": False,
+                "can_create_gpu_context": True,
+                "failure_type": type(exc).__name__,
+                "failure_message": str(exc),
+            }
+        return {
+            "plan_fingerprint": getattr(plan, "plan_fingerprint", ""),
+            "quiescent": True,
+            "process_tree_terminal": True,
+            "can_create_gpu_context": False,
+            "creation_barrier": "runner_process_tree_joined",
+            "runner_root_pid": runner_pid,
+            "runner_root_process_start_identity": start_identity,
+            "observed_at": observation.observed_at,
+            "observation_event_id": observation.observation_event_id,
+            "observation_fingerprint": observation.fingerprint,
+            "process_identities": tuple(_process_records(observation.process_identities)),
+            "integer_gpu_scheduler_used": False,
+            "integer_gpu_monitor_route_used": False,
+        }
+
+    def _dispose_gpu_leases(self, payload: Mapping[str, object]) -> Mapping[str, object]:
+        if self._lease_cleanup_result is not None:
+            return self._lease_cleanup_result
+        if not self._runner_finished or self._runner_quiescence is None:
+            raise TypedPreflightFailure(
+                "runner_lease_cleanup_not_ready",
+                "W1 lease disposal cannot run before the external runner terminally exits",
+            )
+        plan = payload.get("plan")
+        if plan is None:
+            raise TypedPreflightFailure(
+                "runner_lease_cleanup_plan_missing",
+                "W1 lease disposer requires the frozen/terminal plan",
+            )
+        result = release_runner_owned_gpu_leases(
+            plan,
+            runner_quiescence_evidence=self._runner_quiescence,
+        )
+        self._lease_cleanup_result = result
+        return result
+
     def quiescence_evidence(self, *, plan: object) -> Mapping[str, object]:
+        if self._runner_quiescence is not None:
+            return self._runner_quiescence
         if self._runner is None:
             raise TypedPreflightFailure(
                 "runner_quiescence_evidence_unavailable",
@@ -325,12 +557,8 @@ class CanonicalExperimentRunnerBinding:
         return cast(Mapping[str, object], evidence(plan=plan))
 
     def side_effect_disposers(self, *, plan: object) -> Mapping[str, object]:
-        if self._runner is None:
-            return {}
-        disposers = getattr(self._runner, "side_effect_disposers", None)
-        if not callable(disposers):
-            return {}
-        return cast(Mapping[str, object], disposers(plan=plan))
+        del plan
+        return {"gpu-leases": self._dispose_gpu_leases}
 
 
 def repo_root_from_script() -> Path:
@@ -1628,6 +1856,9 @@ def _process_records(processes: object) -> tuple[Mapping[str, object], ...]:
                 "observation_fingerprint": getattr(
                     process, "observation_fingerprint", ""
                 ),
+                "container_namespace_identity": getattr(
+                    process, "container_namespace_identity", ""
+                ),
             }
         )
     return tuple(records)
@@ -1775,8 +2006,50 @@ def execute_managed_run(
             artifact_manifest_path=str(context.paths.artifact_manifest_path),
         )
     except Exception as exc:
+        runner_cleanup: Mapping[str, object]
+        try:
+            raw_disposers = runner_port.side_effect_disposers(plan=materialized.plan)
+            disposer = (
+                raw_disposers.get("gpu-leases")
+                if isinstance(raw_disposers, Mapping)
+                else None
+            )
+            if not callable(disposer):
+                raise TypedPreflightFailure(
+                    "runner_lease_disposer_unavailable",
+                    "terminal persistence failure has no W1 runner-owned lease disposer",
+                )
+            candidate = disposer(
+                {
+                    "plan": materialized.plan,
+                    "runner_quiescence_evidence": _runner_quiescence_evidence(
+                        runner_port,
+                        materialized.plan,
+                    ),
+                    "terminal_persistence_failed": True,
+                }
+            )
+            runner_cleanup = (
+                cast(Mapping[str, object], candidate)
+                if isinstance(candidate, Mapping)
+                else {"disposition": "invalid_runner_cleanup_result"}
+            )
+        except Exception as cleanup_exc:
+            runner_cleanup = {
+                "disposition": "retained_or_unknown",
+                "failure_type": type(cleanup_exc).__name__,
+                "failure_message": str(cleanup_exc),
+                "force_kill": False,
+            }
+        cleanup_failure = TypedPreflightFailure(
+            "terminal_persistence_failed",
+            "terminal persistence failed after W1 runner-owned cleanup boundary",
+            original_failure_type=type(exc).__name__,
+            original_failure_message=str(exc),
+            runner_owned_cleanup=runner_cleanup,
+        )
         cleanup = handle_pre_execution_failure(
-            exc,
+            cleanup_failure,
             failed_operation="terminal_persistence",
             source_state=PlanState.ENV_MATERIALIZED,
             plan=materialized.plan,

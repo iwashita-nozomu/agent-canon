@@ -9,16 +9,58 @@
 
 from __future__ import annotations
 
+import threading
+from dataclasses import dataclass, field
 from typing import Mapping, Sequence
 
 from tools.experiments.execution_resource_plan import (
     DiscoveredResources,
     GPUDevice,
+    ProcessIdentity,
     ResourceObservation,
     ResourceRequest,
-    SnapshotResourceProbe,
     UUIDReservationStore,
 )
+
+
+@dataclass(frozen=True)
+class SnapshotResourceProbe:
+    """Deterministic observation source confined to the test evidence boundary."""
+
+    allocated: frozenset[str]
+    processes: tuple[ProcessIdentity, ...]
+    memory: Mapping[str, int]
+    current_boot_id: str
+    visible: frozenset[str] = frozenset()
+    observation_sequence: tuple[ResourceObservation, ...] = ()
+    _observation_index: int = field(default=0, init=False, repr=False, compare=False)
+    _observation_lock: threading.Lock = field(
+        default_factory=threading.Lock,
+        init=False,
+        repr=False,
+        compare=False,
+    )
+
+    def observe(self) -> ResourceObservation:
+        if self.observation_sequence:
+            with self._observation_lock:
+                index = self._observation_index
+                object.__setattr__(self, "_observation_index", index + 1)
+            if index >= len(self.observation_sequence):
+                raise RuntimeError("deterministic observation sequence exhausted")
+            return self.observation_sequence[index]
+        return ResourceObservation(
+            caller_allocated_ids=self.allocated,
+            process_identities=self.processes,
+            gpu_devices=tuple(
+                GPUDevice(uuid=uuid, free_memory_bytes=free_memory)
+                for uuid, free_memory in sorted(self.memory.items())
+            ),
+            free_memory_bytes=self.memory,
+            boot_id=self.current_boot_id,
+            container_visible_ids=self.visible,
+            observed_at="injected-test-observation",
+        )
 
 
 def discover_test_resources(

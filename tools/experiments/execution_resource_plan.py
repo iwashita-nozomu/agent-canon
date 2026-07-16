@@ -8,6 +8,7 @@
 # upstream design ../../documents/repo-structure-contract.toml tree capability authority
 # upstream design ../../documents/runtime-profiles-and-check-matrix.json validation failure taxonomy authority
 # upstream design ../../documents/runtime-profiles-and-check-matrix.md validation failure reader projection
+# upstream evidence ../../reports/agents/w1-tool-env-routing-20260716/nvidia_primary_process_visibility_review.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
 # downstream integration ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
 # downstream integration ../../experiments/_template/run.py direct GPU launch is statically prohibited
@@ -247,6 +248,7 @@ class ProcessIdentity:
     relationship: str = "unknown"
     observation_timestamp: str = ""
     observation_fingerprint: str = ""
+    container_namespace_identity: str = ""
 
     def __post_init__(self) -> None:
         if (
@@ -338,48 +340,6 @@ class ResourceProbe(Protocol):
 
     def observe(self) -> ResourceObservation: ...
 
-
-@dataclass(frozen=True)
-class SnapshotResourceProbe:
-    """Deterministic probe adapter for a scheduler/NVML observation source."""
-
-    allocated: frozenset[str]
-    processes: tuple[ProcessIdentity, ...]
-    memory: Mapping[str, int]
-    current_boot_id: str
-    visible: frozenset[str] = frozenset()
-    observation_sequence: tuple[ResourceObservation, ...] = ()
-    _observation_index: int = field(default=0, init=False, repr=False, compare=False)
-    _observation_lock: threading.Lock = field(
-        default_factory=threading.Lock,
-        init=False,
-        repr=False,
-        compare=False,
-    )
-
-    def observe(self) -> ResourceObservation:
-        if self.observation_sequence:
-            with self._observation_lock:
-                index = self._observation_index
-                object.__setattr__(self, "_observation_index", index + 1)
-            if index >= len(self.observation_sequence):
-                raise TypedPreflightFailure(
-                    "injected_observation_sequence_exhausted",
-                    "deterministic observation sequence has no fresh snapshot",
-                )
-            return self.observation_sequence[index]
-        return ResourceObservation(
-            caller_allocated_ids=self.allocated,
-            process_identities=self.processes,
-            gpu_devices=tuple(
-                GPUDevice(uuid=uuid, free_memory_bytes=free_memory)
-                for uuid, free_memory in sorted(self.memory.items())
-            ),
-            free_memory_bytes=self.memory,
-            boot_id=self.current_boot_id,
-            container_visible_ids=self.visible,
-            observed_at="injected-test-observation",
-        )
 
 def _xml_text(element: ET.Element | None, field_name: str) -> str:
     value = element.text.strip() if element is not None and element.text else ""
@@ -553,20 +513,122 @@ def _structured_unit_uuid(
     return "MIG-" + parent_uuid.text.strip() + "/" + "/".join(identifiers)
 
 
+_PROCESS_INVENTORY_TAGS = frozenset(
+    {"processes", "compute_processes", "graphics_processes"}
+)
+
+
+def _xml_local_name(element: ET.Element) -> str:
+    return element.tag.rsplit("}", 1)[-1]
+
+
+def _process_inventory_containers(element: ET.Element) -> tuple[ET.Element, ...]:
+    return tuple(
+        candidate
+        for candidate in element.iter()
+        if _xml_local_name(candidate) in _PROCESS_INVENTORY_TAGS
+    )
+
+
+def _prove_allocated_process_inventory_visibility(
+    root: ET.Element,
+    allocated_ids: frozenset[str],
+    parent_map: Mapping[ET.Element, ET.Element],
+) -> Mapping[str, object]:
+    """Prove a structured process table covers every allocated physical/MIG unit."""
+    element_by_uuid: dict[str, ET.Element] = {}
+    for gpu in root.findall(".//gpu"):
+        uuid_element = gpu.find("uuid")
+        if uuid_element is None or not uuid_element.text:
+            continue
+        uuid = uuid_element.text.strip()
+        element_by_uuid[uuid] = gpu
+    for element in root.iter():
+        if _xml_local_name(element) not in {
+            "mig_device",
+            "gpu_instance",
+            "compute_instance",
+        }:
+            continue
+        uuid = _structured_unit_uuid(element, parent_map)
+        if uuid:
+            element_by_uuid[uuid] = element
+
+    unit_witnesses: dict[str, object] = {}
+    hidden_markers = (
+        "insufficient permission",
+        "permission denied",
+        "not supported",
+        "unknown error",
+    )
+    for uuid in sorted(allocated_ids):
+        unit = element_by_uuid.get(uuid)
+        if unit is None:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "allocated GPU/MIG UUID has no structured process-inventory scope",
+                gpu_uuid=uuid,
+            )
+        containers = _process_inventory_containers(unit)
+        coverage_source = "allocated_unit_process_table"
+        if not containers:
+            physical = _nearest_xml_ancestor(unit, parent_map, frozenset({"gpu"}))
+            if physical is not None:
+                containers = _process_inventory_containers(physical)
+                coverage_source = "physical_parent_process_table"
+        if not containers:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "structured GPU XML omitted the process inventory for an allocated unit",
+                gpu_uuid=uuid,
+            )
+        inventory_text = " ".join(
+            text.strip().lower()
+            for container in containers
+            for text in container.itertext()
+            if text.strip()
+        )
+        hidden_marker = next(
+            (marker for marker in hidden_markers if marker in inventory_text),
+            None,
+        )
+        if hidden_marker is not None:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "structured GPU process inventory is unsupported or permission-hidden",
+                gpu_uuid=uuid,
+                visibility_failure=hidden_marker,
+            )
+        process_count = sum(
+            1
+            for container in containers
+            for candidate in container.iter()
+            if _xml_local_name(candidate) == "process_info"
+        )
+        unit_witnesses[uuid] = {
+            "visible": True,
+            "coverage_source": coverage_source,
+            "container_tags": tuple(
+                sorted({_xml_local_name(container) for container in containers})
+            ),
+            "process_count": process_count,
+            "explicit_empty": process_count == 0,
+        }
+    return MappingProxyType(
+        {
+            "schema_version": "gpu-process-inventory-visibility/v1",
+            "allocated_ids": tuple(sorted(allocated_ids)),
+            "all_allocated_units_visible": True,
+            "units": MappingProxyType(unit_witnesses),
+        }
+    )
+
+
 def _parse_structured_gpu_processes(
     root: ET.Element,
     device_by_uuid: Mapping[str, GPUDevice],
     parent_map: Mapping[ET.Element, ET.Element],
 ) -> tuple[ProcessIdentity, ...]:
-    process_containers = tuple(
-        root.findall(path)
-        for path in (".//processes", ".//compute_processes", ".//graphics_processes")
-    )
-    if not any(process_containers):
-        raise TypedPreflightFailure(
-            "gpu_process_identity_unproven",
-            "structured GPU XML omitted the process inventory required to prove O_t",
-        )
     processes: list[ProcessIdentity] = []
     for process_info in root.findall(".//process_info"):
         pid_text = _xml_text(process_info.find("pid"), "process_info.pid")
@@ -587,10 +649,26 @@ def _parse_structured_gpu_processes(
         ancestor: ET.Element | None = process_info
         bound_uuid = _structured_unit_uuid(process_info, parent_map)
         raw_process_kind = process_info.findtext("type", default="").strip().upper()
-        if "G" in raw_process_kind and "C" in raw_process_kind:
+        process_kind_tokens = frozenset(
+            token.strip() for token in raw_process_kind.split("+") if token.strip()
+        )
+        if not process_kind_tokens or not process_kind_tokens.issubset(
+            {"C", "G", "M", "O"}
+        ):
+            raise TypedPreflightFailure(
+                "gpu_process_kind_visibility_unproven",
+                "GPU process context is not classified by the structured inventory",
+                pid=pid,
+                observed_type=raw_process_kind,
+            )
+        if {"G", "C"}.issubset(process_kind_tokens):
             process_kind = "compute_graphics"
-        elif "G" in raw_process_kind:
+        elif "G" in process_kind_tokens:
             process_kind = "graphics"
+        elif "M" in process_kind_tokens:
+            process_kind = "mps_compute"
+        elif "O" in process_kind_tokens:
+            process_kind = "other_gpu_context"
         else:
             process_kind = "compute"
         graphics_ancestor = False
@@ -606,13 +684,8 @@ def _parse_structured_gpu_processes(
                 if bound_uuid in device_by_uuid:
                     break
             ancestor = parent_map.get(ancestor)
-        if not graphics_ancestor and not ({"C", "G"} & set(raw_process_kind)):
-            raise TypedPreflightFailure(
-                "gpu_process_kind_visibility_unproven",
-                "GPU process context is not classified as compute or graphics",
-                pid=pid,
-                observed_type=raw_process_kind,
-            )
+        if graphics_ancestor:
+            process_kind = "graphics"
         if not bound_uuid or bound_uuid not in device_by_uuid:
             raise TypedPreflightFailure(
                 "gpu_process_uuid_visibility_unproven",
@@ -622,31 +695,31 @@ def _parse_structured_gpu_processes(
                 process_kind=process_kind,
             )
         start_identity, parent_pid = _proc_start_and_parent(pid)
-        relationship = _process_relationship(pid, parent_pid)
-        affected_units = (bound_uuid,)
-        if device_by_uuid[bound_uuid].mig_parent_uuid is None:
-            affected_units = tuple(
-                sorted(
-                    {
-                        bound_uuid,
-                        *(
-                            uuid
-                            for uuid, device in device_by_uuid.items()
-                            if device.mig_parent_uuid == bound_uuid
-                        ),
-                    }
-                )
+        try:
+            container_namespace_identity = str(Path(f"/proc/{pid}/ns/pid").readlink())
+        except (FileNotFoundError, PermissionError, OSError) as exc:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "GPU process PID/container namespace mapping is unavailable",
+                pid=pid,
+            ) from exc
+        if not container_namespace_identity:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "GPU process container namespace identity is empty",
+                pid=pid,
             )
-        processes.extend(
+        relationship = _process_relationship(pid, parent_pid)
+        processes.append(
             ProcessIdentity(
                 pid=pid,
                 process_start_identity=start_identity,
-                gpu_uuid=affected_uuid,
+                gpu_uuid=bound_uuid,
                 kind=process_kind,
                 parent_pid=parent_pid,
                 relationship=relationship,
+                container_namespace_identity=container_namespace_identity,
             )
-            for affected_uuid in affected_units
         )
     return tuple(
         sorted(
@@ -792,6 +865,13 @@ class _NvidiaSMIObservationAdapter:
                     allocated=tuple(sorted(allocated)),
                     observed=tuple(sorted(parsed_devices)),
                 )
+            process_inventory_visibility = (
+                _prove_allocated_process_inventory_visibility(
+                    root,
+                    allocated,
+                    parent_map,
+                )
+            )
             devices = tuple(sorted(parsed_devices.values(), key=lambda device: device.uuid))
             processes = _parse_structured_gpu_processes(root, parsed_devices, parent_map)
             tool_capability["nvidia-smi"] = {
@@ -799,6 +879,11 @@ class _NvidiaSMIObservationAdapter:
                 "path": nvidia_smi,
                 "query": "-q -x",
                 "structured": True,
+                "process_type_taxonomy": ("C", "G", "M", "O", "C+G", "M+C"),
+                "pid_identity": "authoritative_proc_pid_stat_and_pid_namespace",
+                "uuid_identity": "full_gpu_or_mig_uuid",
+                "narrower_sources_rejected": ("pmon", "query-compute-apps"),
+                "process_inventory_visibility": process_inventory_visibility,
             }
         else:
             tool_capability["nvidia-smi"] = {
@@ -951,9 +1036,7 @@ class ReservationLease:
     def release(
         self,
         *,
-        gpu_processes: Callable[[], Sequence[ProcessIdentity]],
-        occupied_gpu_units: Callable[[Sequence[ProcessIdentity]], Sequence[str]]
-        | None = None,
+        observation_supplier: Callable[[], ResourceObservation],
     ) -> Mapping[str, object]:
         if self._released.is_set():
             return MappingProxyType(
@@ -963,19 +1046,28 @@ class ReservationLease:
                     "result": "already_released",
                 }
             )
-        if occupied_gpu_units is None:
+        observation = observation_supplier()
+        if not observation.gpu_devices:
             raise TypedPreflightFailure(
-                "gpu_occupancy_mapping_required",
-                "GPU lease release requires the canonical physical/MIG occupancy mapping",
+                "gpu_structured_probe_unavailable",
+                "GPU lease release requires a coherent structured observation",
                 uuid=self.uuid,
+                observation_event_id=observation.observation_event_id,
+                observation_fingerprint=observation.fingerprint,
             )
-        observed_processes = tuple(gpu_processes())
+        observed_processes = observation.process_identities
+        occupied_units = _occupied_gpu_units(
+            observed_processes,
+            observation.gpu_devices,
+            (self.uuid,),
+        )
         holders = tuple(
             process
             for process in observed_processes
-            if self.uuid in occupied_gpu_units((process,))
+            if self.uuid
+            in _occupied_gpu_units((process,), observation.gpu_devices, (self.uuid,))
         )
-        readback_at = utc_now()
+        readback_at = observation.observed_at
         relationship_evidence = tuple(_process_record(process) for process in holders)
         if holders:
             return MappingProxyType(
@@ -985,6 +1077,9 @@ class ReservationLease:
                     "result": "retained_live_gpu_holder",
                     "lock_held_during_readback": True,
                     "process_readback_at": readback_at,
+                    "observation_event_id": observation.observation_event_id,
+                    "observation_fingerprint": observation.fingerprint,
+                    "occupied_gpu_units": occupied_units,
                     "holder_processes": relationship_evidence,
                     "force_kill": False,
                 }
@@ -1001,6 +1096,9 @@ class ReservationLease:
             "result": "released",
             "lock_held_during_readback": True,
             "process_readback_at": readback_at,
+            "observation_event_id": observation.observation_event_id,
+            "observation_fingerprint": observation.fingerprint,
+            "occupied_gpu_units": occupied_units,
             "holder_processes": relationship_evidence,
             "force_kill": False,
         }
@@ -1141,18 +1239,6 @@ class UUIDReservationStore:
         process_start_identity: Callable[[int], str | None],
     ) -> StaleReclaimEvidence:
         """Repeat every stale proof under the UUID lock and persist the result."""
-        def capture_observation() -> tuple[
-            str,
-            tuple[ProcessIdentity, ...],
-            tuple[GPUDevice, ...],
-        ]:
-            observation = observation_supplier()
-            return (
-                observation.boot_id,
-                observation.process_identities,
-                observation.gpu_devices,
-            )
-
         def holds_uuid(
             processes: Sequence[ProcessIdentity],
             devices: Sequence[GPUDevice],
@@ -1194,7 +1280,10 @@ class UUIDReservationStore:
                 under_lock_proof=empty_proof,
                 recorded_at=recorded_at,
             )
-        prelock_boot_id, prelock_processes, prelock_devices = capture_observation()
+        prelock_observation = observation_supplier()
+        prelock_boot_id = prelock_observation.boot_id
+        prelock_processes = prelock_observation.process_identities
+        prelock_devices = prelock_observation.gpu_devices
         prelock_owner_start = process_start_identity(owner_pid)
         prelock_owner_dead_or_reused = prelock_owner_start in (None, "dead") or (
             prelock_owner_start not in (owner_start, "unknown")
@@ -1220,6 +1309,9 @@ class UUIDReservationStore:
             "stale_owner_proved": prelock_stale_owner_proved,
             "gpu_process_absent": not holds_uuid(prelock_processes, prelock_devices),
             "gpu_processes": tuple(_process_record(process) for process in prelock_processes),
+            "observation_timestamp": prelock_observation.observed_at,
+            "observation_event_id": prelock_observation.observation_event_id,
+            "observation_fingerprint": prelock_observation.fingerprint,
         }
         if not all(
             bool(prelock_proof[key])
@@ -1256,7 +1348,20 @@ class UUIDReservationStore:
             current = json.loads(os.read(descriptor, 1024 * 1024) or b"{}")
             current_owner_pid = current.get("owner_pid")
             current_owner_start = current.get("owner_process_start_identity")
-            under_lock_boot_id, under_lock_processes, under_lock_devices = capture_observation()
+            under_lock_observation = observation_supplier()
+            under_lock_boot_id = under_lock_observation.boot_id
+            under_lock_processes = under_lock_observation.process_identities
+            under_lock_devices = under_lock_observation.gpu_devices
+            observation_fresh = (
+                bool(prelock_observation.observation_event_id)
+                and bool(under_lock_observation.observation_event_id)
+                and prelock_observation.observation_event_id
+                != under_lock_observation.observation_event_id
+                and bool(prelock_observation.fingerprint)
+                and bool(under_lock_observation.fingerprint)
+                and prelock_observation.fingerprint
+                != under_lock_observation.fingerprint
+            )
             under_lock_owner_start = (
                 process_start_identity(current_owner_pid)
                 if isinstance(current_owner_pid, int)
@@ -1297,6 +1402,10 @@ class UUIDReservationStore:
                 "gpu_processes": tuple(
                     _process_record(process) for process in under_lock_processes
                 ),
+                "observation_timestamp": under_lock_observation.observed_at,
+                "observation_event_id": under_lock_observation.observation_event_id,
+                "observation_fingerprint": under_lock_observation.fingerprint,
+                "fresh_from_prelock_observation": observation_fresh,
             }
             reclaimed = all(
                 bool(under_lock_proof[key])
@@ -1307,6 +1416,7 @@ class UUIDReservationStore:
                     "boot_identity_present",
                     "stale_owner_proved",
                     "gpu_process_absent",
+                    "fresh_from_prelock_observation",
                 )
             )
             if reclaimed:
@@ -2482,6 +2592,7 @@ def _json_safe(value: object) -> object:
             "kind": value.kind,
             "parent_pid": value.parent_pid,
             "relationship": value.relationship,
+            "container_namespace_identity": value.container_namespace_identity,
         }
     if isinstance(value, GPUDevice):
         return {
@@ -2504,6 +2615,7 @@ def _process_record(process: ProcessIdentity) -> Mapping[str, object]:
             "relationship": process.relationship,
             "observation_timestamp": process.observation_timestamp,
             "observation_fingerprint": process.observation_fingerprint,
+            "container_namespace_identity": process.container_namespace_identity,
         }
     )
 
@@ -3137,11 +3249,6 @@ def discover_resources(request: ResourceRequest) -> DiscoveredResources:
 
 
 def _discover_resources_impl(request: ResourceRequest) -> DiscoveredResources:
-    if isinstance(request.resource_probe, SnapshotResourceProbe):
-        raise TypedPreflightFailure(
-            "snapshot_probe_not_production",
-            "SnapshotResourceProbe is only valid for injected deterministic test evidence",
-        )
     if request.resource_probe is None:
         probe: ResourceProbe = NvidiaSMIResourceProbe.discover(
             request.environment,
@@ -3166,6 +3273,24 @@ def _discover_resources_impl(request: ResourceRequest) -> DiscoveredResources:
                 "gpu_structured_readback_capability_unproven",
                 "GPU execution requires NVIDIA runtime-projected structured probe capability",
                 tool_capability=structured_probe,
+            )
+        visibility = structured_probe.get("process_inventory_visibility")
+        visible_units = (
+            visibility.get("allocated_ids")
+            if isinstance(visibility, Mapping)
+            else None
+        )
+        if (
+            not isinstance(visibility, Mapping)
+            or visibility.get("all_allocated_units_visible") is not True
+            or tuple(visible_units or ())
+            != tuple(sorted(observation.caller_allocated_ids))
+        ):
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "GPU execution requires an explicit process-table visibility witness for every allocated UUID/MIG UUID",
+                allocated_ids=tuple(sorted(observation.caller_allocated_ids)),
+                process_inventory_visibility=visibility,
             )
     return _discover_resources_from_probe_impl(
         request,
@@ -3282,23 +3407,7 @@ def _release_lease_with_observation(
     observation_supplier: Callable[[], ResourceObservation],
 ) -> Mapping[str, object]:
     """Release against one coherent live-holder observation and frozen mapping."""
-    observation = observation_supplier()
-    if not observation.gpu_devices:
-        raise TypedPreflightFailure(
-            "gpu_structured_probe_unavailable",
-            "lease release requires a fresh structured GPU device observation",
-            observation_event_id=observation.observation_event_id,
-            observation_fingerprint=observation.fingerprint,
-        )
-    devices = observation.gpu_devices
-    return lease.release(
-        gpu_processes=lambda: observation.process_identities,
-        occupied_gpu_units=lambda processes: _occupied_gpu_units(
-            processes,
-            devices,
-            (lease.uuid,),
-        ),
-    )
+    return lease.release(observation_supplier=observation_supplier)
 
 
 def plan_gpu_allocation(
@@ -4002,7 +4111,7 @@ def _freeze_resource_plan_impl(
         {"id": "log-root", "owner": "ExecutionResourcePlan", "target": str(log_root), "policy": "container-local", "disposal": "record_only"},
         {"id": "source-projection", "owner": "ExecutionResourcePlan", "target": str(source_projection), "policy": "controlled_source_bound", "disposal": "record_only"},
         {"id": "runner-process-tree", "owner": "ExperimentRunner", "target": plan_id, "policy": "runner_owned_descendant_lifecycle", "disposal": "dispose_after_terminal"},
-        {"id": "gpu-leases", "owner": "ExecutionResourcePlan", "target": str(request.lock_root), "policy": "shared_scheduler_visibility", "disposal": "release_if_no_descendant"},
+        {"id": "gpu-leases", "owner": "CanonicalExperimentRunnerBinding", "target": str(request.lock_root), "policy": "shared_scheduler_visibility", "disposal": "owner_callback_after_runner_join"},
         {"id": "cpu-affinity", "owner": "ExperimentRunner", "target": request.cpu_requested_set, "policy": "runner_owned", "disposal": "dispose_if_applied"},
         {"id": "gpu-slot", "owner": "ExperimentRunner", "target": gpu_allocation.slot_id, "policy": "runner_owned", "disposal": "dispose_if_allocated"},
         {"id": "temp-handle", "owner": "ExperimentRunner", "target": str(run_root), "policy": "retain_evidence_remove_transient", "disposal": "owner_callback"},
@@ -4240,12 +4349,27 @@ def _verify_effective_environment_impl(
         "available",
     } and tree_capability.get("structure_contract_ref") == STRUCTURE_CONTRACT_REF
     structured_probe = tool_availability.get("nvidia-smi")
+    process_inventory_visibility = (
+        structured_probe.get("process_inventory_visibility")
+        if isinstance(structured_probe, Mapping)
+        else None
+    )
+    process_inventory_visibility_valid = (
+        not plan.gpu_allocation.selected_ids
+        or (
+            isinstance(process_inventory_visibility, Mapping)
+            and process_inventory_visibility.get("all_allocated_units_visible") is True
+            and tuple(process_inventory_visibility.get("allocated_ids", ()))
+            == tuple(plan.gpu_allocation.caller_allocated_ids)
+        )
+    )
     structured_probe_valid = (
         not plan.gpu_allocation.selected_ids
         or (
             isinstance(structured_probe, Mapping)
             and structured_probe.get("available") is True
             and structured_probe.get("structured") is True
+            and process_inventory_visibility_valid
         )
     )
     tool_availability_valid = bool(tool_availability) and structured_probe_valid
@@ -4330,6 +4454,9 @@ def _verify_effective_environment_impl(
             "tree_capability_valid": tree_capability_valid,
             "tool_availability_valid": tool_availability_valid,
             "structured_probe_valid": structured_probe_valid,
+            "process_inventory_visibility_valid": (
+                process_inventory_visibility_valid
+            ),
         },
         "redacted_environment": _redacted_environment(observed),
         "readback_fingerprint": readback_fingerprint,
@@ -5033,6 +5160,81 @@ def record_terminal(
     )
 
 
+def release_runner_owned_gpu_leases(
+    plan: ExecutionResourcePlan,
+    *,
+    runner_quiescence_evidence: Mapping[str, object],
+) -> Mapping[str, object]:
+    """Dispose GPU leases from the W1 runner adapter's terminal boundary.
+
+    This is intentionally a separate owner call from ``StandardRunner`` callbacks:
+    its caller is responsible for invoking it from an adapter ``finally``/side-effect
+    disposer after the external runner has joined all descendants.  A failed or
+    incomplete quiescence proof retains every lease and never force-kills a process.
+    """
+    if plan.state not in {
+        PlanState.ENV_MATERIALIZED,
+        PlanState.EXECUTE,
+        PlanState.TERMINAL,
+    }:
+        raise PlanStateError("runner-owned lease disposal requires a materialized or terminal plan")
+    plan_fingerprint = plan.plan_fingerprint
+    quiescent = (
+        runner_quiescence_evidence.get("plan_fingerprint") == plan_fingerprint
+        and runner_quiescence_evidence.get("quiescent") is True
+        and runner_quiescence_evidence.get("process_tree_terminal") is True
+        and runner_quiescence_evidence.get("can_create_gpu_context") is False
+    )
+    dispositions: list[Mapping[str, object]] = []
+    released: list[str] = []
+    retained: list[str] = []
+    for lease in plan.gpu_allocation.leases:
+        if not quiescent:
+            disposition = {
+                "uuid": lease.uuid,
+                "reservation_id": lease.reservation_id,
+                "result": "retained_runner_quiescence_unproved",
+                "force_kill": False,
+                "runner_quiescence_evidence": runner_quiescence_evidence,
+            }
+            retained.append(lease.uuid)
+            dispositions.append(disposition)
+            continue
+        try:
+            witness = _release_lease_with_observation(
+                lease,
+                plan.resource_probe.observe,
+            )
+            result = str(witness.get("result", "unknown"))
+            if result in {"released", "already_released"}:
+                released.append(lease.uuid)
+            else:
+                retained.append(lease.uuid)
+            dispositions.append(witness)
+        except Exception as exc:
+            retained.append(lease.uuid)
+            dispositions.append(
+                {
+                    "uuid": lease.uuid,
+                    "reservation_id": lease.reservation_id,
+                    "result": "retained_release_observation_failed",
+                    "failure_type": type(exc).__name__,
+                    "failure_message": str(exc),
+                    "force_kill": False,
+                }
+            )
+    return {
+        "owner": "CanonicalExperimentRunnerBinding",
+        "plan_fingerprint": plan_fingerprint,
+        "runner_quiescence_evidence": runner_quiescence_evidence,
+        "released_gpu_ids": tuple(sorted(released)),
+        "retained_gpu_ids": tuple(sorted(retained)),
+        "dispositions": tuple(dispositions),
+        "force_kill": False,
+        "cleanup_complete": not retained,
+    }
+
+
 def dispose_resources(
     plan: ExecutionResourcePlan,
     terminal: TerminalEvidence,
@@ -5107,7 +5309,61 @@ def dispose_resources(
     side_effects: list[Mapping[str, object]] = []
     leaks: list[Mapping[str, object]] = []
     released_gpu_ids: list[str] = []
+    disposer_by_id = dict(side_effect_disposers or {})
+    runner_lease_disposition: Mapping[str, object] | None = None
+    runner_lease_disposer = disposer_by_id.get("gpu-leases")
+    if runner_lease_disposer is not None:
+        try:
+            candidate_disposition = runner_lease_disposer(
+                {
+                    "plan": plan,
+                    "terminal": terminal,
+                    "runner_quiescence_evidence": runner_quiescence_evidence,
+                }
+            )
+            if not isinstance(candidate_disposition, Mapping):
+                raise TypeError("gpu-leases disposer must return a mapping")
+            runner_lease_disposition = candidate_disposition
+            released_gpu_ids.extend(
+                str(uuid)
+                for uuid in cast(
+                    Sequence[object], candidate_disposition.get("released_gpu_ids", ())
+                )
+            )
+            retained_gpu_ids.update(
+                str(uuid)
+                for uuid in cast(
+                    Sequence[object], candidate_disposition.get("retained_gpu_ids", ())
+                )
+            )
+            raw_dispositions = candidate_disposition.get("dispositions", ())
+            if isinstance(raw_dispositions, (tuple, list)):
+                side_effects.extend(
+                    cast(Mapping[str, object], disposition)
+                    for disposition in raw_dispositions
+                    if isinstance(disposition, Mapping)
+                )
+            if retained_gpu_ids:
+                leaks.append(candidate_disposition)
+        except Exception as exc:
+            runner_lease_disposition = {
+                "owner": "CanonicalExperimentRunnerBinding",
+                "released_gpu_ids": (),
+                "retained_gpu_ids": tuple(
+                    sorted(lease.uuid for lease in plan.gpu_allocation.leases)
+                ),
+                "cleanup_complete": False,
+                "failure_type": type(exc).__name__,
+                "failure_message": str(exc),
+                "force_kill": False,
+            }
+            retained_gpu_ids.update(
+                cast(Sequence[str], runner_lease_disposition["retained_gpu_ids"])
+            )
+            leaks.append(runner_lease_disposition)
     for lease in plan.gpu_allocation.leases:
+        if runner_lease_disposition is not None:
+            continue
         if not quiescence_valid:
             disposition = {
                 "uuid": lease.uuid,
@@ -5190,7 +5446,6 @@ def dispose_resources(
                 "force_kill": False,
             }
         )
-    disposer_by_id = dict(side_effect_disposers or {})
     for side_effect in plan.side_effect_inventory:
         side_effect_id = cast(str, side_effect["id"])
         disposal = str(side_effect.get("disposal", "record_only"))
@@ -5200,9 +5455,14 @@ def dispose_resources(
                 "owner": side_effect.get("owner", "ExecutionResourcePlan"),
                 "declared": side_effect,
                 "disposal_attempted": True,
-                "disposal_result": "retained_or_released_from_live_process_readback",
+                "disposal_result": (
+                    "runner_owned_disposer"
+                    if runner_lease_disposition is not None
+                    else "retained_or_released_from_live_process_readback"
+                ),
                 "retained_gpu_ids": retained,
                 "released_gpu_ids": tuple(released_gpu_ids),
+                "runner_owned_disposition": runner_lease_disposition,
                 "timestamp": utc_now(),
             }
             side_effects.append(outcome)
@@ -5581,5 +5841,6 @@ __all__ = [
     "managed_run_adapter_integration_contract",
     "plan_gpu_allocation",
     "record_terminal",
+    "release_runner_owned_gpu_leases",
     "verify_effective_environment",
 ]
