@@ -1035,6 +1035,14 @@ class ExecutionResourcePlan:
             raise PlanStateError("state history must be an exact ordered prefix")
         if self.gpu_allocation.plan_fingerprint != self.plan_fingerprint:
             raise PlanStateError("GPU allocation fingerprint must match the immutable plan")
+        tree_capability = self.container.get("tree_capability")
+        if (
+            self.container.get("structure_contract_ref") != STRUCTURE_CONTRACT_REF
+            or not isinstance(tree_capability, Mapping)
+            or tree_capability.get("structure_contract_ref")
+            != STRUCTURE_CONTRACT_REF
+        ):
+            raise PlanStateError("plan cannot override the canonical structure contract")
 
     def json_spec(self) -> dict[str, object]:
         """Return the immutable, non-secret-safe spec used by the fingerprint."""
@@ -1149,6 +1157,8 @@ class EnvironmentCertificate:
             raise PlanStateError("certificate must carry the verified plan")
         if self.plan_fingerprint != self.plan.plan_fingerprint:
             raise PlanStateError("certificate fingerprint mismatch")
+        if self.tree_capability.get("structure_contract_ref") != STRUCTURE_CONTRACT_REF:
+            raise PlanStateError("certificate cannot override the canonical structure contract")
         for name in (
             "tree_capability",
             "tool_availability",
@@ -1304,7 +1314,14 @@ class PreExecutionFailureTerminalEvidence:
     state: PlanState = PlanState.TERMINAL
 
     def __post_init__(self) -> None:
-        if self.state_history[-1:] != (PlanState.TERMINAL,):
+        pre_terminal_history = self.state_history[:-1]
+        if (
+            self.state_history[-1:] != (PlanState.TERMINAL,)
+            or not pre_terminal_history
+            or pre_terminal_history
+            != STATE_SEQUENCE[: len(pre_terminal_history)]
+            or PlanState.EXECUTE in pre_terminal_history
+        ):
             raise PlanStateError("pre-execution failure must terminate before cleanup")
         object.__setattr__(self, "failure_evidence", _freeze_mapping(self.failure_evidence))
         object.__setattr__(self, "state_history", tuple(self.state_history))
@@ -1574,6 +1591,31 @@ class CompletionCoverageAdapter:
                 _validation_failure_has_resolved_taxonomy_outcome(failure)
                 for failure in input.validation_failures
             )
+            taxonomy_summary = input.taxonomy_linked_validation_outcome
+            taxonomy_owner_values_valid = (
+                taxonomy_summary.get("taxonomy_owner") == VALIDATION_TAXONOMY_REF
+                and taxonomy_summary.get("taxonomy_reader_projection")
+                == VALIDATION_TAXONOMY_READER_REF
+            )
+            taxonomy_summary_valid = taxonomy_owner_values_valid and (
+                (
+                    bool(input.validation_failures)
+                    and _validation_failure_has_resolved_taxonomy_outcome(
+                        taxonomy_summary
+                    )
+                )
+                or (
+                    not input.validation_failures
+                    and taxonomy_summary.get("status") == "no_validation_failure"
+                )
+            )
+            if not taxonomy_summary_valid or not validation_history_complete:
+                raise CompletionCoverageFailure(
+                    "validation history must use the owner-defined taxonomy fields and intent route"
+                )
+            validation_history_complete = (
+                validation_history_complete and taxonomy_summary_valid
+            )
             required_evidence_present = bool(input.required_evidence) and all(
                 input.required_evidence.get(name) is True
                 for name in ("terminal", "partial", "cleanup", "closeout")
@@ -1766,17 +1808,26 @@ def _validation_failure_has_resolved_taxonomy_outcome(
         "intent_preservation",
         "evidence",
     )
+    owner_cause_classes = {
+        "implementation_bug",
+        "test_oracle_spec_mismatch",
+        "fixture_environment_issue",
+        "stale_generated_artifact",
+        "pre_existing_unrelated_failure",
+        "approved_design_user_request_conflict",
+    }
+    owner_intent_routes = {
+        "repair_same_intent",
+        "redesign_same_intent",
+        "escalate_design_conflict",
+    }
     return (
         all(failure.get(field) not in (None, "", (), {}) for field in required_fields)
         and failure.get("taxonomy_owner") == VALIDATION_TAXONOMY_REF
         and failure.get("taxonomy_reader_projection")
         == VALIDATION_TAXONOMY_READER_REF
-        and failure.get("resolution_outcome")
-        in {
-            "resolved_same_intent_repair",
-            "resolved_same_intent_redesign",
-            "resolved_escalation",
-        }
+        and failure.get("cause_classification") in owner_cause_classes
+        and failure.get("intent_preservation") in owner_intent_routes
     )
 
 
@@ -1792,6 +1843,16 @@ def _durable_dual_evidence_witness(value: object) -> bool:
             or not isinstance(witness.get("sha256"), str)
             or not isinstance(witness.get("bytes"), int)
             or witness.get("disposition") not in {"created", "existing_identical"}
+        ):
+            return False
+        path = Path(cast(str, witness["path"]))
+        try:
+            encoded = path.read_bytes()
+        except OSError:
+            return False
+        if (
+            len(encoded) != witness["bytes"]
+            or hashlib.sha256(encoded).hexdigest() != witness["sha256"]
         ):
             return False
     return True
@@ -1900,6 +1961,38 @@ def _persist_pre_execution_failure_record(
     )
 
 
+def _dispose_pre_execution_leases(
+    leases: Sequence[ReservationLease],
+    process_probe: Callable[[], Sequence[ProcessIdentity]] | None,
+) -> tuple[tuple[Mapping[str, object], ...], tuple[Mapping[str, object], ...]]:
+    dispositions: list[Mapping[str, object]] = []
+    leaks: list[Mapping[str, object]] = []
+    for lease in leases:
+        if process_probe is None:
+            disposition: Mapping[str, object] = {
+                "uuid": lease.uuid,
+                "reservation_id": lease.reservation_id,
+                "result": "retained_missing_process_probe",
+                "force_kill": False,
+            }
+        else:
+            try:
+                disposition = lease.release(gpu_processes=process_probe)
+            except Exception as exc:
+                disposition = {
+                    "uuid": lease.uuid,
+                    "reservation_id": lease.reservation_id,
+                    "result": "release_failed",
+                    "failure_type": type(exc).__name__,
+                    "failure_message": str(exc),
+                    "force_kill": False,
+                }
+        dispositions.append(disposition)
+        if disposition.get("result") not in {"released", "already_released"}:
+            leaks.append(disposition)
+    return tuple(dispositions), tuple(leaks)
+
+
 def handle_pre_execution_failure(
     failure: Exception,
     *,
@@ -1968,57 +2061,6 @@ def handle_pre_execution_failure(
         plan=plan,
         transaction_id=transaction_id,
     )
-    partial_payload = {
-        "schema_version": "partial-evidence/v1",
-        "plan_fingerprint": transaction_fingerprint,
-        "terminal_event_id": terminal_event_id,
-        "last_exact_state": source_state,
-        "disposition": "explicit_pre_execution_partial_not_completion",
-        "stop_reason": failure_code,
-        "failed_operation": failed_operation,
-        "failure_evidence": failure_evidence,
-        "partial_is_completion": False,
-        "fallback_attempted": False,
-    }
-    partial_witness = _persist_pre_execution_failure_record(
-        runtime_root,
-        projection_root,
-        PARTIAL_EVIDENCE_FILENAME,
-        partial_payload,
-    )
-    terminal_history = (*source_history, PlanState.TERMINAL)
-    terminal_payload = {
-        "schema_version": "terminal-evidence/v1",
-        "plan_fingerprint": transaction_fingerprint,
-        "terminal_event_id": terminal_event_id,
-        "failed_operation": failed_operation,
-        "failure_code": failure_code,
-        "failure_message": str(failure),
-        "failure_evidence": failure_evidence,
-        "state_history": terminal_history,
-        "partial_evidence": partial_witness,
-        "fallback_attempted": False,
-        "terminal_timestamp": utc_now(),
-    }
-    terminal_witness = _persist_pre_execution_failure_record(
-        runtime_root,
-        projection_root,
-        TERMINAL_EVIDENCE_FILENAME,
-        terminal_payload,
-    )
-    terminal = PreExecutionFailureTerminalEvidence(
-        transaction_fingerprint=transaction_fingerprint,
-        failed_operation=failed_operation,
-        failure_code=failure_code,
-        failure_message=str(failure),
-        failure_evidence=failure_evidence,
-        state_history=terminal_history,
-        persistence_witness={
-            "terminal": terminal_witness,
-            "partial": partial_witness,
-        },
-        terminal_event_id=terminal_event_id,
-    )
     leases_by_reservation = {
         lease.reservation_id: lease
         for lease in (
@@ -2035,31 +2077,76 @@ def handle_pre_execution_failure(
         if request is not None and request.resource_probe is not None
         else None
     )
-    lease_dispositions: list[Mapping[str, object]] = []
-    leaks: list[Mapping[str, object]] = []
-    for lease in leases_by_reservation.values():
-        if process_probe is None:
-            disposition = {
-                "uuid": lease.uuid,
-                "reservation_id": lease.reservation_id,
-                "result": "retained_missing_process_probe",
-                "force_kill": False,
-            }
-        else:
-            try:
-            disposition = lease.release(gpu_processes=process_probe)
-            except Exception as exc:
-                disposition = {
-                    "uuid": lease.uuid,
-                    "reservation_id": lease.reservation_id,
-                    "result": "release_failed",
-                    "failure_type": type(exc).__name__,
-                    "failure_message": str(exc),
-                    "force_kill": False,
-                }
-        lease_dispositions.append(disposition)
-        if disposition.get("result") != "released":
-            leaks.append(disposition)
+    partial_payload = {
+        "schema_version": "partial-evidence/v1",
+        "plan_fingerprint": transaction_fingerprint,
+        "terminal_event_id": terminal_event_id,
+        "last_exact_state": source_state,
+        "disposition": "explicit_pre_execution_partial_not_completion",
+        "stop_reason": failure_code,
+        "failed_operation": failed_operation,
+        "failure_evidence": failure_evidence,
+        "partial_is_completion": False,
+        "fallback_attempted": False,
+    }
+    terminal_history = (*source_history, PlanState.TERMINAL)
+    try:
+        partial_witness = _persist_pre_execution_failure_record(
+            runtime_root,
+            projection_root,
+            PARTIAL_EVIDENCE_FILENAME,
+            partial_payload,
+        )
+        terminal_payload = {
+            "schema_version": "terminal-evidence/v1",
+            "plan_fingerprint": transaction_fingerprint,
+            "terminal_event_id": terminal_event_id,
+            "failed_operation": failed_operation,
+            "failure_code": failure_code,
+            "failure_message": str(failure),
+            "failure_evidence": failure_evidence,
+            "state_history": terminal_history,
+            "partial_evidence": partial_witness,
+            "fallback_attempted": False,
+            "terminal_timestamp": utc_now(),
+        }
+        terminal_witness = _persist_pre_execution_failure_record(
+            runtime_root,
+            projection_root,
+            TERMINAL_EVIDENCE_FILENAME,
+            terminal_payload,
+        )
+    except Exception as persistence_failure:
+        lease_dispositions, leaks = _dispose_pre_execution_leases(
+            tuple(leases_by_reservation.values()),
+            process_probe,
+        )
+        raise TypedPreflightFailure(
+            "pre_execution_failure_evidence_persistence_failed",
+            "pre-execution evidence persistence failed after race-safe lease cleanup",
+            original_failure_code=failure_code,
+            failed_operation=failed_operation,
+            lease_dispositions=lease_dispositions,
+            leak_or_unknown=leaks,
+            fallback_attempted=False,
+        ) from persistence_failure
+    terminal = PreExecutionFailureTerminalEvidence(
+        transaction_fingerprint=transaction_fingerprint,
+        failed_operation=failed_operation,
+        failure_code=failure_code,
+        failure_message=str(failure),
+        failure_evidence=failure_evidence,
+        state_history=terminal_history,
+        persistence_witness={
+            "terminal": terminal_witness,
+            "partial": partial_witness,
+        },
+        terminal_event_id=terminal_event_id,
+    )
+    lease_dispositions, leaks = _dispose_pre_execution_leases(
+        tuple(leases_by_reservation.values()),
+        process_probe,
+    )
     cleanup_history = (*terminal_history, PlanState.CLEANUP_DISPOSED)
     cleanup_payload = {
         "schema_version": "cleanup-evidence/v1",
@@ -4213,6 +4300,19 @@ def dispose_resources(
         CLOSEOUT_INTENT_FILENAME,
         closeout_intent_payload,
     )
+    closeout_artifact_refs = dict(completion_coverage_input.required_evidence)
+    closeout_artifact_refs.update(
+        {
+            "design_artifact": DESIGN_AUTHORITY_ARTIFACT,
+            "design_manager_artifact": DESIGN_MANAGER_ARTIFACT,
+            "approved_design_revision": APPROVED_DESIGN_REVISION,
+            "organizer_context_id": ORGANIZER_CONTEXT_ID,
+            "implementation_artifact": "tools/experiments/execution_resource_plan.py",
+            "implementation_review_artifact": (
+                "reports/agents/w1-tool-env-routing-20260716/implementation_review.md"
+            ),
+        }
+    )
     closeout_payload = {
         "schema_version": "closeout-evidence/v1",
         "plan_fingerprint": plan.plan_fingerprint,
@@ -4224,7 +4324,7 @@ def dispose_resources(
         "completion_coverage_path": str(expected_completion_path),
         "completion_claim_owner": "CompletionCoverageAdapter.record_once",
         "completion_claim_status": "pending_after_durable_closeout",
-        "artifact_refs": completion_coverage_input.required_evidence,
+        "artifact_refs": closeout_artifact_refs,
         "next_owner": next_owner,
     }
     closeout_witness = _persist_runtime_and_projection_once(
@@ -4241,7 +4341,7 @@ def dispose_resources(
         and terminal.partial.disposition == "partial_not_completion"
         and bool(terminal.partial.stop_reason)
     )
-    required_evidence = dict(completion_coverage_input.required_evidence)
+    required_evidence = dict(closeout_artifact_refs)
     required_evidence.update(
         {
             "terminal": bool(terminal.persistence_witness.get("terminal")),
@@ -4255,6 +4355,14 @@ def dispose_resources(
             "cleanup_ref": cleanup_witness,
             "closeout_intent_ref": closeout_intent_witness,
             "closeout_ref": closeout_witness,
+            "design_artifact": DESIGN_AUTHORITY_ARTIFACT,
+            "design_manager_artifact": DESIGN_MANAGER_ARTIFACT,
+            "approved_design_revision": APPROVED_DESIGN_REVISION,
+            "organizer_context_id": ORGANIZER_CONTEXT_ID,
+            "implementation_artifact": "tools/experiments/execution_resource_plan.py",
+            "implementation_review_artifact": (
+                "reports/agents/w1-tool-env-routing-20260716/implementation_review.md"
+            ),
         }
     )
     allocation = cleanup_plan.gpu_allocation
@@ -4414,7 +4522,6 @@ __all__ = [
     "ResourceRequest",
     "SnapshotResourceProbe",
     "StaleReclaimEvidence",
-    "TARGETED_TEST_DEFERRAL",
     "TerminalEvidence",
     "TypedPreflightFailure",
     "UUIDReservationStore",
