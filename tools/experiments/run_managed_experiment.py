@@ -93,14 +93,14 @@ REGISTERED_COMMAND_KINDS = ("default", "formal")
 REVIEWED_W1_LINEAGE_ARTIFACT = (
     "W1-IMPLEMENTATION-RECHECK-EF2DE34A-20260716-READONLY"
 )
-REVIEWED_W1_LINEAGE_COMMIT = "ece3cd12a2a298660e7b1ad92346ab1f88ff2e6c"
-REVIEWED_W1_LINEAGE_TREE = "f06a683f3856b8e1ebfab128346e82b2a0888798"
+REVIEWED_W1_LINEAGE_COMMIT = "b829286c6a1c9de15f260199a44556e4f90be459"
+REVIEWED_W1_LINEAGE_TREE = "551abfa0a6e89f4a9218fc4fc0706b3addd2a84e"
 REVIEWED_W1_SOURCE_BLOBS = {
     "tools/experiments/execution_resource_plan.py": (
-        "fe24023335d824ebb1b5fbc4ca92dab87c3aa736"
+        "0a767491176530ecfe68a18e6b198de5d45f47fe"
     ),
     "tools/experiments/run_managed_experiment.py": (
-        "afc10c9bee64eb7cba699e0e3b7092f5ac151465"
+        "4de18aeb418423ac36152d6e8501b11c16e82e18"
     ),
 }
 LEGACY_REGISTERED_COMMAND_ALIASES = {"smoke": "default"}
