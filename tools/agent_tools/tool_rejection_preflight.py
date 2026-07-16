@@ -240,7 +240,7 @@ PYTHON_GATE_TEMPLATES = (
     GateTemplate(
         gate="oop_readability_guard",
         command_template=(
-            "python3 tools/oop/python/readability.py --root . --min-score 95 {path}"
+            "python3 tools/oop/python/readability.py --root . {path}"
         ),
         handoff=(
             "include OOP readability risk and repair plan before implementation edits"
@@ -287,7 +287,7 @@ CPP_GATE_TEMPLATES = (
     GateTemplate(
         gate="oop_readability_guard",
         command_template=(
-            "python3 tools/oop/cpp/readability.py --root . --min-score 95 {path}"
+            "python3 tools/oop/cpp/readability.py --root . {path}"
         ),
         handoff="include C/C++ OOP readability risk before edits",
     ),

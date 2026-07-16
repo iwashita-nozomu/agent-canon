@@ -23,6 +23,7 @@ from pathlib import Path
 from agent_team import resolve_report_root
 from report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
+    COMPLETION_COVERAGE_TAXONOMY_REFS,
     check_final_review_artifact,
     check_schedule_artifact,
     check_work_log_artifact,
@@ -344,10 +345,80 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         return {"ready": False, "reason": "artifact_is_not_object"}
     if artifact.get("schema") != COMPLETION_COVERAGE_SCHEMA:
         return {"ready": False, "reason": "schema_mismatch"}
+    source_binding = artifact.get("source_binding")
+    required_binding_fields = {
+        "run_id",
+        "context_id",
+        "organizer_context_id",
+        "parent",
+        "component_manager",
+        "assigned_unit",
+        "source_binding",
+        "source_refs",
+    }
+    if not isinstance(source_binding, dict) or not required_binding_fields.issubset(
+        source_binding
+    ):
+        return {"ready": False, "reason": "source_binding_incomplete"}
+    if not isinstance(source_binding.get("source_binding"), dict) or not source_binding.get(
+        "source_binding"
+    ):
+        return {"ready": False, "reason": "source_binding_reference_incomplete"}
+    if not isinstance(source_binding.get("source_refs"), list) or not source_binding.get(
+        "source_refs"
+    ):
+        return {"ready": False, "reason": "source_refs_incomplete"}
+    owner_evidence = artifact.get("owner_boundary_evidence")
+    if not isinstance(owner_evidence, list) or not owner_evidence or any(
+        not isinstance(item, dict)
+        or any(
+            not item.get(field)
+            for field in (
+                "owner",
+                "state_owner",
+                "api_owner",
+                "dependency_owner",
+                "evidence_refs",
+            )
+        )
+        for item in owner_evidence
+    ):
+        return {"ready": False, "reason": "typed_owner_boundary_incomplete"}
     coverage_check = artifact.get("coverage_check")
     completion_boundary = artifact.get("completion_boundary")
     if not isinstance(coverage_check, dict) or not isinstance(completion_boundary, dict):
         return {"ready": False, "reason": "checked_projection_fields_missing"}
+    if coverage_check.get("schema") != "agent-canon.completion-coverage-check.v1":
+        return {"ready": False, "reason": "coverage_check_schema_mismatch"}
+    error_sets = coverage_check.get("error_sets")
+    required_error_sets = {
+        "uncovered",
+        "multiply_mapped",
+        "orphan",
+        "redundant",
+        "empty",
+    }
+    if not isinstance(error_sets, dict) or set(error_sets) != required_error_sets:
+        return {"ready": False, "reason": "coverage_error_sets_incomplete"}
+    if any(value != [] for value in error_sets.values()):
+        return {"ready": False, "reason": "coverage_error_sets_nonempty"}
+    if coverage_check.get("ok") is not True:
+        return {"ready": False, "reason": "coverage_check_not_ok"}
+    if coverage_check.get("source_binding") != source_binding:
+        return {"ready": False, "reason": "coverage_source_binding_mismatch"}
+    if tuple(coverage_check.get("taxonomy_refs", ())) != COMPLETION_COVERAGE_TAXONOMY_REFS:
+        return {"ready": False, "reason": "coverage_taxonomy_refs_mismatch"}
+    if completion_boundary.get("schema") != "agent-canon.completion-boundary.v1":
+        return {"ready": False, "reason": "completion_boundary_schema_mismatch"}
+    if not all(
+        isinstance(completion_boundary.get(field), bool)
+        for field in ("all_planned_chunks_complete", "overall_delivery_complete")
+    ):
+        return {"ready": False, "reason": "completion_boundary_flags_invalid"}
+    if not isinstance(completion_boundary.get("control_topology_observation_ref"), str) or not completion_boundary.get(
+        "control_topology_observation_ref"
+    ):
+        return {"ready": False, "reason": "completion_boundary_topology_ref_missing"}
     try:
         return consume_checked_completion_coverage(
             artifact,

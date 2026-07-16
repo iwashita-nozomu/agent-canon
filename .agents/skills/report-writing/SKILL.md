@@ -19,6 +19,16 @@ downstream implementation ../../../tools/agent_tools/evaluate_report_quality.py 
 
 # Report Writing
 
+## CompletionCoverage Reader Projection
+
+Completion and closeout reporting reads the generated
+`agent-canon.completion-coverage.v1` artifact from the existing run-bundle
+logical ledger. Preserve source binding, typed owner/state/API/dependency
+evidence, W1 certificate references, the five mapping error sets, and the two
+independent completion predicates. `COMMUNICATION_PROTOCOL` and
+`CODEX_WORKFLOW` remain the schema/applicability owners; this skill only
+projects checked evidence for readers.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->

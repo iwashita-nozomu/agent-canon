@@ -58,7 +58,10 @@ STRICT_FAILURES_ENV = "AGENT_CANON_HOOK_STRICT_FAILURES"
 # ordinary shell/read/validation work. CI and hook development can opt into
 # strict blocking with AGENT_CANON_HOOK_STRICT_BLOCKS=1.
 CRITICAL_BLOCKING_CHILD_HOOKS = frozenset({"prompt_secret_guard.py", "branch_worktree_guard.py"})
-ADDITIONAL_CONTEXT_EVENTS = frozenset({"UserPromptSubmit", "PreToolUse", "PostToolUse"})
+OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
+ADDITIONAL_CONTEXT_EVENTS = frozenset(
+    {"UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"}
+)
 SAFE_GIT_READ_SUBCOMMANDS = {"log", "ls-files", "rev-parse", "show", "status"}
 SAFE_GIT_BRANCH_LIST_OPTIONS = {
     "--all",
@@ -662,6 +665,7 @@ def failure_payload(result: HookResult) -> dict[str, object]:
     ][:MAX_REASON_LINES]
     detail = "\n".join(detail_lines)
     return {
+        "schema": OFFICIAL_HOOK_SCHEMA,
         "decision": "block",
         "reason": (
             "Hook dispatcher child command failed. Fix the child hook or rerun "
@@ -690,6 +694,7 @@ def visible_context_payload(
             "Remediation:\n" + "\n".join(f"- {item}" for item in remediation)
         )
     payload: dict[str, object] = {
+        "schema": OFFICIAL_HOOK_SCHEMA,
         "systemMessage": reason.strip(),
     }
     if event in ADDITIONAL_CONTEXT_EVENTS:
@@ -728,6 +733,18 @@ def failure_warning_payload(event: str, result: HookResult) -> dict[str, object]
     )
 
 
+def official_event_payload(event: str, payload: dict[str, object]) -> dict[str, object]:
+    """Normalize one dispatcher-owned payload to the official wire schema."""
+    normalized = dict(payload)
+    normalized["schema"] = OFFICIAL_HOOK_SCHEMA
+    reason = normalized.get("reason") or normalized.get("systemMessage") or ""
+    normalized["hookSpecificOutput"] = {
+        "hookEventName": event,
+        "additionalContext": str(reason),
+    }
+    return normalized
+
+
 def should_preserve_block(result: HookResult) -> bool:
     """Return whether a child block is critical enough to keep blocking."""
     return result.spec.script in CRITICAL_BLOCKING_CHILD_HOOKS or env_truthy(STRICT_BLOCKS_ENV)
@@ -747,6 +764,7 @@ def critical_child_failure_payload(result: HookResult) -> dict[str, object]:
     if result.failed():
         return failure_payload(result)
     return {
+        "schema": OFFICIAL_HOOK_SCHEMA,
         "decision": "block",
         "reason": (
             "Critical hook child emitted nonempty output other than a valid "
@@ -872,27 +890,29 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
         )
         for spec in EVENT_COMMANDS[event]
     ]
-    if event == "PostToolUse":
-        return 0
     critical_failure = next((result for result in results if critical_child_invalid(result)), None)
     blocking = next((result for result in results if result.blocks()), None)
     failure = next((result for result in results if result.failed()), None)
     visible_payload = visible_output_payload(event, results)
 
     if critical_failure is not None:
-        emit_json_payload(critical_child_failure_payload(critical_failure))
+        emit_json_payload(
+            official_event_payload(
+                event,
+                critical_child_failure_payload(critical_failure),
+            )
+        )
         return 0
     if blocking is not None:
         if should_preserve_block(blocking):
-            sys.stdout.write(blocking.stdout)
-            if not blocking.stdout.endswith("\n"):
-                sys.stdout.write("\n")
+            blocking_payload = blocking.json_stdout() or failure_payload(blocking)
+            emit_json_payload(official_event_payload(event, blocking_payload))
         else:
             emit_json_payload(downgraded_block_payload(event, blocking))
         return 0
     if failure is not None:
         if env_truthy(STRICT_FAILURES_ENV):
-            emit_json_payload(failure_payload(failure))
+            emit_json_payload(official_event_payload(event, failure_payload(failure)))
         else:
             emit_json_payload(failure_warning_payload(event, failure))
         return 0

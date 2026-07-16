@@ -7,8 +7,8 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./coding-conventions-house-style.md shared implementation style contract
 upstream design ./coding-conventions-python.md Python convention entrypoint
 upstream design ./design/protocols.md Protocol and type-boundary placement contract
-downstream implementation ../tools/oop/python/readability.py Python OOP readability score gate
-downstream implementation ../tools/oop/cpp/readability.py C++ OOP readability score gate
+downstream implementation ../tools/oop/python/readability.py Python OOP typed-boundary evidence
+downstream implementation ../tools/oop/cpp/readability.py C++ OOP typed-boundary evidence
 downstream implementation ../tools/oop/python/rule_inventory.py inventories Python OOP rule surfaces
 downstream implementation ../tools/oop/cpp/rule_inventory.py inventories C++ OOP rule surfaces
 downstream implementation ../tools/catalog.yaml records OOP tool catalog status
@@ -33,8 +33,8 @@ Python 固有の型注釈、命名、`Protocol` 配置は
 
 - OOP は class を増やす技法ではなく、責務と契約の境界を明示するために使います。
 - まず関数、値オブジェクト、既存 `Protocol`、既存 class を再利用し、新しい class は最後に追加します。
-- 状態を持たない処理は class にせず、関数または focused module-level helper に保ちます。
-- helper は極力、使う関数の内側へ局所内包します。public / module-level helper は domain の射として読める名前と型を持つ場合だけ許可します。
+- 状態を持たない処理は class にせず、関数または既存の適切な module boundary に保ちます。
+- helper の配置は caller contract、state ownership、dependency direction の evidence で決めます。checker は private helper や機械的な関数分割を要求しません。
 - 不変の設定、結果、通知は `@dataclass(frozen=True)` などの値オブジェクトで表します。
 - 差し替え境界は具象 class ではなく、最小の振る舞い契約で受けます。
 - 継承は契約の特殊化に限定し、実装共有のための深い継承階層を禁止します。
@@ -154,7 +154,7 @@ public class、public dataclass、public `Protocol` は module docstring と `__
 - 純粋な変換 `A -> B` と、IO / mutation / process 起動のような副作用境界を 1 つの関数に混ぜない。
 - 合成可能な focused 変換を作り、巨大な手続きで複数の射を隠さない。
 - `None` による runtime routing を domain の一部として曖昧にせず、別型、別 constructor、別 entrypoint、`Protocol`、variant で表す。
-- helper は外へ増やすより、合成の内側でしか使わない局所関数や内包に閉じる。
+- helper の配置は責務と依存方向の evidence に合わせ、局所化や抽出を機械的に固定しない。
 - 数理的に情報を増やさない identity wrapper、pass-through wrapper、stateless callable class、薄い formatting wrapper は不要構造として扱います。
 - 表示用 formatting は domain contract を持つ presentation boundary の場合だけ関数化し、単なる `str(x)` / f-string / `to_string(x)` の包み直しは避けます。
 
@@ -177,14 +177,14 @@ OOP 的な可読性は reviewer の判断を必要としますが、危険な形
 Python surface では次を baseline として使います。
 
 ```bash
-python3 tools/oop/python/readability.py python tools tests --min-score 95
+python3 tools/oop/python/readability.py python tools tests
 python3 tools/oop/python/rule_inventory.py
 ```
 
 C++ surface では次を baseline として使います。
 
 ```bash
-python3 tools/oop/cpp/readability.py include src tests/cpp --min-score 95
+python3 tools/oop/cpp/readability.py include src tests/cpp
 python3 tools/oop/cpp/rule_inventory.py
 ```
 
@@ -208,14 +208,12 @@ terminal identity morphism、compact numeric scalar wrapper を意図的な境�
 これらの許容は `documents/tools/oop/cpp/readability.md` に固定し、behavior を持つ
 public state owner や domain contract のない wrapper の finding とは区別します。
 
-score は設計判断の補助であり、pass / fail の主判定ではありません。
 `OOP_READABILITY` は error / gate / review の signal class で決めます。
 `public_methods`、`parameters`、`instance_attributes`、`public_fields`、
 `cognitive_complexity` のような surface / control-flow finding は boundary
-review signal として扱い、数値だけで split / extract を要求しません。
-`--min-score 0` は survey 用に finding を出し切る pass mode として扱い、
-default は signal 判定を使います。明示的に default より高い score floor を
-指定した場合だけ strict score gate として扱います。分割は caller contract、
+review signal として扱い、数値だけで split / extract を要求しません。各 finding は
+owner overlap、state ownership、API boundary、dependency boundary のいずれか一つへ
+typed evidence として写像します。分割は caller contract、
 state ownership、既存責務語彙、または周辺 source shape から安定した境界が
 読める場合だけ行います。
 `OOP_READABILITY=pass` は behavior correctness や設計妥当性を保証しません。
@@ -242,7 +240,7 @@ OOP policy、analyzer、reviewer、test の配置確認は、言語別の
 CI の正本入口には戻しません。canonical analyzer と inventory の tool
 status は `tools/catalog.yaml` に記録し、`tool_catalog.py` の検査対象にします。
 
-`oop_readability_reviewer` は `oop_readability_report.md` を読み、score、threshold、count、path、line、pass/fail を変えずに文書化します。
+`oop_readability_reviewer` は `oop_readability_report.md` を読み、typed boundary evidence、count、path、line、status を変えずに文書化します。
 false positive / allowed warning は reviewer の推測ではなく、機械 finding に `path:line` で紐づけて design artifact に書きます。
 
 ## Finding から Decision への Triage
@@ -257,7 +255,7 @@ false positive / allowed warning は reviewer の推測ではなく、機械 fin
 - defer with rationale: 呼び出し contract、ownership、validation が足りない場合は、予定する境界変更を書かず、必要な evidence と owner を記録して defer する。
 
 decision record には、少なくとも `path:line`、finding kind、tool fact、agent judgment、選んだ outcome、根拠、validation または defer 理由を含めます。
-機械 finding を許容する場合も、許容理由を design artifact か run bundle に残し、score を改善した事実と混同しません。
+機械 finding を許容する場合も、許容理由を design artifact か run bundle に残し、境界 evidence と設計判断を混同しません。
 
 ## 例外
 

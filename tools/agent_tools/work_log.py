@@ -4,6 +4,8 @@
 # responsibility Provides run-local work log automation.
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md runtime preflight logging rules
 # upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md run bundle artifact placement contract
+# downstream implementation ./workflow_monitor.py projects semantic events into monitoring output
+# downstream implementation ./workflow_monitor.py projects semantic monitoring events here
 # downstream implementation ../../tests/agent_tools/test_work_log.py verifies work log behavior
 # @dependency-end
 """Append one timestamped run-local work-log entry."""
@@ -12,11 +14,86 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 
 from agent_team import resolve_report_root
 from task_authority import ACTIVE_RUN_POINTER
+
+LEDGER_SEMANTIC_KINDS = (
+    "request_clause",
+    "responsibility_unit",
+    "decision",
+    "change",
+    "review_finding",
+    "validation",
+    "failure",
+    "publication_state",
+    "deferral",
+)
+NON_GROUPABLE_SEMANTIC_KINDS = frozenset(
+    {"responsibility_unit", "decision", "failure", "deferral", "publication_state"}
+)
+
+
+def _required_ledger_text(event: Mapping[str, object], field: str) -> str:
+    """Return one required ledger text field."""
+    value = event.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"ledger event requires {field}")
+    return value.strip()
+
+
+def _required_ledger_refs(event: Mapping[str, object], field: str) -> tuple[str, ...]:
+    """Return non-empty evidence or artifact references."""
+    value = event.get(field)
+    if not isinstance(value, (list, tuple)) or not value:
+        raise ValueError(f"ledger event requires non-empty {field}")
+    refs = tuple(item.strip() for item in value if isinstance(item, str) and item.strip())
+    if len(refs) != len(value):
+        raise ValueError(f"ledger event {field} must contain only non-empty strings")
+    return refs
+
+
+def _validate_ledger_event(event: Mapping[str, object], report_dir: Path) -> str:
+    """Validate one append-only event and return its stable identity."""
+    if not isinstance(event, Mapping):
+        raise ValueError("ledger event must be an object")
+    run_id = _required_ledger_text(event, "run_id")
+    if run_id != report_dir.name:
+        raise ValueError("ledger event run_id does not match report directory")
+    _required_ledger_text(event, "context_id")
+    identity = event.get("event_id", event.get("sequence"))
+    if not isinstance(identity, str) or not identity.strip():
+        raise ValueError("ledger event requires event_id or sequence")
+    semantic_kind = _required_ledger_text(event, "semantic_kind")
+    if semantic_kind not in LEDGER_SEMANTIC_KINDS:
+        raise ValueError(f"unsupported semantic_kind: {semantic_kind}")
+    for field in (
+        "owner",
+        "state_owner",
+        "api_owner",
+        "dependency_owner",
+        "responsibility_unit",
+        "intent_id",
+        "outcome",
+    ):
+        _required_ledger_text(event, field)
+    for field in ("evidence_refs", "artifact_refs"):
+        _required_ledger_refs(event, field)
+    clause_id = event.get("clause_id")
+    if clause_id is not None and (not isinstance(clause_id, str) or not clause_id.strip()):
+        raise ValueError("ledger event clause_id must be null or non-empty text")
+    mapping_mode = event.get("mapping_mode", "direct")
+    if mapping_mode not in {"direct", "group"}:
+        raise ValueError("ledger event mapping_mode must be direct or group")
+    if mapping_mode == "group" and semantic_kind in NON_GROUPABLE_SEMANTIC_KINDS:
+        raise ValueError(f"{semantic_kind} ledger events cannot be grouped")
+    source_binding = event.get("source_binding")
+    if source_binding is not None and not isinstance(source_binding, Mapping):
+        raise ValueError("ledger event source_binding must be an object")
+    return str(identity).strip()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -79,11 +156,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def append_ledger_event(report_dir: Path, event: dict[str, object]) -> Path:
     """Append one semantic event to the existing run-local work ledger."""
-    for field in ("run_id", "context_id", "event_id", "semantic_kind"):
-        if not isinstance(event.get(field), str) or not str(event[field]).strip():
-            raise ValueError(f"ledger event requires {field}")
-    if event["run_id"] != report_dir.name:
-        raise ValueError("ledger event run_id does not match report directory")
+    event_identity = _validate_ledger_event(event, report_dir)
     report_dir.mkdir(parents=True, exist_ok=True)
     work_log_path = report_dir / "work_log.md"
     if not work_log_path.exists():
@@ -94,7 +167,6 @@ def append_ledger_event(report_dir: Path, event: dict[str, object]) -> Path:
         lines.extend(["", heading, ""])
     payload = json.dumps(event, sort_keys=True, separators=(",", ":"))
     line = f"- ledger_event={payload}"
-    event_id = str(event["event_id"])
     for existing_line in lines:
         if not existing_line.startswith("- ledger_event="):
             continue
@@ -102,9 +174,14 @@ def append_ledger_event(report_dir: Path, event: dict[str, object]) -> Path:
             existing = json.loads(existing_line.removeprefix("- ledger_event="))
         except json.JSONDecodeError:
             continue
-        if isinstance(existing, dict) and existing.get("event_id") == event_id:
+        if not isinstance(existing, dict):
+            continue
+        existing_identity = existing.get("event_id", existing.get("sequence"))
+        if existing_identity == event_identity:
             if existing != event:
-                raise ValueError(f"ledger event conflict for event_id={event_id}")
+                raise ValueError(
+                    f"ledger event conflict for event identity={event_identity}"
+                )
             return work_log_path
     if line not in lines:
         lines.append(line)
@@ -120,6 +197,7 @@ def read_ledger_snapshot(report_dir: Path, snapshot_identity: str) -> dict[str, 
     if not work_log_path.is_file():
         raise ValueError(f"missing work log: {work_log_path}")
     events: list[dict[str, object]] = []
+    identities: set[str] = set()
     for line in work_log_path.read_text(encoding="utf-8").splitlines():
         if not line.startswith("- ledger_event="):
             continue
@@ -129,8 +207,22 @@ def read_ledger_snapshot(report_dir: Path, snapshot_identity: str) -> dict[str, 
             raise ValueError("malformed ledger event") from exc
         if not isinstance(event, dict):
             raise ValueError("ledger event must be an object")
+        identity = _validate_ledger_event(event, report_dir)
+        if identity in identities:
+            raise ValueError(f"duplicate ledger event identity: {identity}")
+        identities.add(identity)
         events.append(event)
-    return {"snapshot_identity": snapshot_identity, "events": events}
+    events.sort(
+        key=lambda event: (
+            str(event.get("sequence", "")),
+            str(event.get("event_id", event.get("sequence", ""))),
+        )
+    )
+    return {
+        "snapshot_identity": snapshot_identity.strip(),
+        "events": events,
+        "event_identities": sorted(identities),
+    }
 
 
 def _resolve_active_report_dir(workspace_root: Path, report_root: Path) -> Path | None:

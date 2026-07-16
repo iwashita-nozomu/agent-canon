@@ -219,6 +219,7 @@ DEFAULT_QUALITY_CHECK_STAGES = (
 )
 DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
     "tools/bin/agent-canon docs check <changed-markdown-paths>",
+    "bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header",
 )
 CANONICAL_FORMAT_CHECK_ROUTE = "tools/bin/agent-canon docs check <changed-markdown-paths>"
 OFFICIAL_HOOK_DISPATCHER = ".codex/hooks/hook_dispatcher.py"

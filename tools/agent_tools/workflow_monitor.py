@@ -3,7 +3,9 @@
 # contract tool
 # responsibility Appends workflow monitoring evidence to run bundles.
 # upstream design ../../agents/templates/workflow_monitoring.md defines monitor sections
+# upstream implementation ./work_log.py owns canonical semantic-ledger append/read
 # upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
+# upstream implementation ./work_log.py appends canonical logical-ledger events
 # downstream implementation ../../tests/agent_tools/test_workflow_monitor.py tests it
 # @dependency-end
 """Append machine-readable workflow monitoring evidence to one run bundle."""
@@ -33,6 +35,7 @@ from mid_task_user_input_policy import (
     has_reuse_marker,
     is_empty_policy_value,
 )
+from work_log import append_ledger_event
 
 DECISION_KEYS = (
     "skill_improvement_decision",
@@ -96,11 +99,13 @@ COMPLETION_SEMANTIC_KINDS = {
 }
 SEMANTIC_EVENT_REQUIRED_KEYS = (
     "event_id",
+    "context_id",
     "semantic_kind",
     "owner",
     "state_owner",
     "api_owner",
     "dependency_owner",
+    "responsibility_unit",
     "intent_id",
     "outcome",
     "evidence_refs",
@@ -516,7 +521,44 @@ def normalize_semantic_event(entry: str) -> str:
             "semantic_kind must be one of: "
             + ",".join(sorted(COMPLETION_SEMANTIC_KINDS))
         )
-    return f"ledger_event=recorded {entry.strip()}"
+    return f"ledger_event=projected {entry.strip()}"
+
+
+def semantic_event_record(entry: str, report_dir: Path) -> dict[str, object]:
+    """Convert one monitor token event into the canonical work-ledger record."""
+    fields = parse_token_fields(entry.strip())
+    missing = [key for key in SEMANTIC_EVENT_REQUIRED_KEYS if not fields.get(key)]
+    if missing:
+        raise ValueError(
+            "semantic event must include required keys: " + ",".join(missing)
+        )
+    def refs(name: str) -> list[str]:
+        values = [item.strip() for item in fields.get(name, "").split(",") if item.strip()]
+        if not values:
+            raise ValueError(f"semantic event requires non-empty {name}")
+        return values
+
+    event: dict[str, object] = {
+        "run_id": report_dir.name,
+        "context_id": fields["context_id"],
+        "event_id": fields["event_id"],
+        "semantic_kind": fields["semantic_kind"],
+        "owner": fields["owner"],
+        "state_owner": fields["state_owner"],
+        "api_owner": fields["api_owner"],
+        "dependency_owner": fields["dependency_owner"],
+        "responsibility_unit": fields["responsibility_unit"],
+        "intent_id": fields["intent_id"],
+        "outcome": fields["outcome"],
+        "evidence_refs": refs("evidence_refs"),
+        "artifact_refs": refs("artifact_refs"),
+    }
+    for optional in ("sequence", "clause_id", "mapping_mode"):
+        if fields.get(optional):
+            event[optional] = fields[optional]
+    if fields.get("member_clause_ids"):
+        event["member_clause_ids"] = refs("member_clause_ids")
+    return event
 
 
 def parse_token_fields(entry: str) -> dict[str, str]:
@@ -1274,6 +1316,11 @@ def append_monitoring(
     """Append monitoring evidence and return the artifact path."""
     active_entries = entries_from_legacy(legacy_entries) if legacy_entries else entries
     report_dir.mkdir(parents=True, exist_ok=True)
+    for semantic_event in active_entries.semantic_events:
+        append_ledger_event(
+            report_dir,
+            semantic_event_record(semantic_event, report_dir),
+        )
     mid_task_rows, subagent_wave_rows = normalized_wave_rows(active_entries)
     append_wave_schedule_rows(report_dir, mid_task_rows, subagent_wave_rows)
     path = report_dir / "workflow_monitoring.md"

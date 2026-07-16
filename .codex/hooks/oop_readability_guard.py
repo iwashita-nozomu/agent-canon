@@ -58,7 +58,6 @@ class AnalyzerResult:
     command: tuple[str, ...]
     returncode: int
     output: str
-    min_score: int | None
 
 
 FindingKey = tuple[str, str, str, str, str, str, str]
@@ -191,25 +190,6 @@ def source_paths(root: Path, suffixes: set[str]) -> list[Path]:
     return [path for path in changed_paths(root) if is_source_path(path, suffixes)]
 
 
-def default_oop_min_score(root: Path) -> int | None:
-    """Return the analyzer-owned default min score."""
-    candidate_roots = (Path(__file__).resolve().parents[2], root)
-    for candidate in candidate_roots:
-        sys.path.insert(0, str(candidate))
-        try:
-            from tools.oop.shared.readability_core import DEFAULT_MIN_SCORE
-
-            return int(DEFAULT_MIN_SCORE)
-        except (ImportError, ValueError, TypeError):
-            continue
-        finally:
-            try:
-                sys.path.remove(str(candidate))
-            except ValueError:
-                pass
-    return None
-
-
 def check_mode_from_environment() -> CheckMode:
     """Return the OOP hook mode, defaulting to changed-finding checks."""
     mode = os.environ.get(MODE_ENV, MODE_DIFF).strip().casefold() or MODE_DIFF
@@ -231,15 +211,12 @@ def run_analyzer(
     if not analyzer.is_file() or not paths:
         return None
     relative_paths = [path.relative_to(root).as_posix() for path in paths]
-    min_score = default_oop_min_score(root)
     command_parts = [
         "python3",
         str(analyzer),
         "--root",
         str(root),
     ]
-    if min_score is not None:
-        command_parts.extend(("--min-score", str(min_score)))
     if check_mode.mode == MODE_DIFF and check_mode.baseline_ref is not None:
         command_parts.extend(("--baseline-ref", check_mode.baseline_ref))
     command_parts.extend(relative_paths)
@@ -256,7 +233,6 @@ def run_analyzer(
         command=command,
         returncode=result.returncode,
         output=(result.stdout + result.stderr).strip(),
-        min_score=min_score,
     )
     if result_record.returncode == 0:
         return result_record
@@ -279,8 +255,8 @@ def build_finding_key(finding: dict[str, object]) -> FindingKey:
         str(finding.get("severity", "")),
         str(finding.get("kind", "")),
         str(finding.get("symbol", "")),
-        str(finding.get("actual", "")),
-        str(finding.get("limit", "")),
+        str(finding.get("evidence", "")),
+        str(finding.get("contract", "")),
     )
 
 
@@ -320,8 +296,6 @@ def run_analyzer_finding_keys(
             str(root),
             "--format",
             "json",
-            "--min-score",
-            "0",
             *relative_paths,
         ],
         cwd=root,
@@ -402,7 +376,6 @@ def run_preexisting_finding_filter(
         command=result.command,
         returncode=0,
         output=f"{result.output}\nOOP_READABILITY_BASELINE=preexisting-only",
-        min_score=result.min_score,
     )
 
 
@@ -462,7 +435,7 @@ def emit_warning(results: list[AnalyzerResult]) -> None:
             "reason": (
                 "OOP readability hook found new or changed-source review findings. "
                 "This warning is a non-blocking boundary review signal; do not split code only "
-                "to satisfy the score. Run the listed checker(s) before closeout and "
+                "to satisfy a mechanical finding. Run the listed checker(s) before closeout and "
                 "either fix a true design risk or record why the current boundary is intended.\n\n"
                 + "\n\n".join(snippets)
             ),
@@ -542,7 +515,6 @@ def analyzer_log_payload(
 ) -> dict[str, object]:
     """Build one OOP hook invocation log payload."""
     failed = [result for result in results if result.returncode != 0]
-    min_score = next((result.min_score for result in results if result.min_score is not None), None)
     timestamp = utc_now()
     payload_fingerprint = fingerprint_json(payload)
     failure_fingerprint = fingerprint_json(
@@ -571,7 +543,6 @@ def analyzer_log_payload(
         "skip_reason": _log_skip_reason(payload, checked, results),
         "mode": check_mode.mode,
         "baseline_ref": check_mode.baseline_ref or "",
-        "min_score": min_score,
         "result_count": len(results),
         "failed_count": len(failed),
         "failure_fingerprint": failure_fingerprint if failed else "",
