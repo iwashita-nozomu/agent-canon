@@ -2,6 +2,8 @@
 # contract reference
 # responsibility Provides the template experiment entrypoint.
 # upstream design ../../documents/experiment-registry.md defines the command protocol.
+# upstream implementation ../../tools/experiments/execution_resource_plan.py owns GPU discovery/reservation and forbids direct template GPU routing.
+# upstream implementation ../../tools/experiments/run_managed_experiment.py is the only authorized ExperimentRunner GPU entrypoint.
 # upstream implementation ../../tools/experiments/create_experiment_topic.py copies this file.
 # upstream implementation visualize.ipynb renders the reader notebook artifact.
 # downstream implementation result stores per-run outputs for copied topics.
@@ -87,6 +89,8 @@ def execute_visualization_notebook(run_dir):
 
 def main() -> int:
     """Run one experiment invocation without CLI arguments."""
+    # This template has no planner or runner binding; GPU work belongs to the
+    # managed ExperimentRunner route, never this direct entrypoint.
     # IMPLEMENT HERE: keep main() as orchestration only. Put experiment logic in
     # run_experiment() and process-local work in run_case_worker().
     run_dir = resolve_run_dir()

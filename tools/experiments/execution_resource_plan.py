@@ -11,6 +11,7 @@
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
 # downstream integration ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
 # downstream integration ../../experiments/_template/run.py direct GPU launch is statically prohibited
+# static consumer closure: run_managed_experiment.py is the only authorized managed-run consumer; every GPU request enters NvidiaSMIResourceProbe.observe -> plan_gpu_allocation -> ExperimentRunnerPreLaunchAdapter
 # @dependency-end
 
 """Canonical execution resource planning for managed ExperimentRunner runs.
@@ -3654,7 +3655,10 @@ def _plan_gpu_allocation_impl(
             )
     except Exception as exc:
         raise _PlannerAttemptFailure(exc, tuple(leases)) from exc
-    observation_s_final = fresh_observation("S_final")
+    try:
+        observation_s_final = fresh_observation("S_final")
+    except Exception as exc:
+        raise _PlannerAttemptFailure(exc, tuple(leases)) from exc
     final_allocated = observation_s_final.caller_allocated_ids
     final_processes = observation_s_final.process_identities
     final_memory = observation_s_final.free_memory_bytes
@@ -4192,6 +4196,8 @@ def verify_effective_environment(
 def _verify_effective_environment_impl(
     plan: ExecutionResourcePlan,
     readback: EffectiveEnvironmentReadback,
+    *,
+    probe_observation: ResourceObservation | None = None,
 ) -> EnvironmentCertificate:
     """Prove effective env/cwd/argv/UUID equality before runner execution."""
     _require_state(plan, PlanState.ENV_MATERIALIZED)
@@ -4224,7 +4230,8 @@ def _verify_effective_environment_impl(
         plan.container.get("container_id", "")
     )
     allocation_id_equal = readback.allocation_id == plan.gpu_allocation.allocation_id
-    probe_observation = plan.resource_probe.observe()
+    if probe_observation is None:
+        probe_observation = plan.resource_probe.observe()
     caller_allocation_equal = tuple(readback.caller_allocated_ids) == tuple(
         plan.gpu_allocation.caller_allocated_ids
     )
@@ -4817,7 +4824,11 @@ class ExperimentRunnerPreLaunchAdapter:
             readback,
             readback_fingerprint=_effective_readback_fingerprint(readback),
         )
-        certificate = _verify_effective_environment_impl(plan, readback)
+        certificate = _verify_effective_environment_impl(
+            plan,
+            readback,
+            probe_observation=probe_observation,
+        )
         execute_plan = _transition_plan(
             certificate.plan,
             PlanState.EFFECTIVE_ENV_READBACK_VERIFIED,
@@ -5598,7 +5609,6 @@ __all__ = [
     "ResourceObservation",
     "ResourceProbe",
     "ResourceRequest",
-    "SnapshotResourceProbe",
     "StaleReclaimEvidence",
     "TerminalEvidence",
     "TypedPreflightFailure",

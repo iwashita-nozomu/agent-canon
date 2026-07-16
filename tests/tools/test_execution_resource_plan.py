@@ -31,7 +31,7 @@ from tools.experiments.execution_resource_plan import (
     SnapshotResourceProbe,
     TypedPreflightFailure,
     UUIDReservationStore,
-    discover_resources_from_probe,
+    discover_injected_test_resources,
     dispose_resources,
     freeze_resource_plan,
     materialize_environment,
@@ -77,13 +77,16 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             discovered_gpu_devices=(GPUDevice("GPU-0001", 4096, 8192),),
             discovered_container_id="container-1",
             discovered_structure_tool={"available": "true", "version": "tree-1"},
-            discovered_tool_availability={"tree": {"available": True}},
+            discovered_tool_availability={
+                "tree": {"available": True},
+                "nvidia-smi": {"available": True, "structured": True},
+            },
         )
 
     def build_plan(self, root: Path):
         """Build the public discovery and frozen-plan stages."""
         request = self.make_request(root)
-        discovered = discover_resources_from_probe(
+        discovered = discover_injected_test_resources(
             request,
             request.resource_probe,
             cpu_available_set=request.discovered_cpu_available_set,
@@ -119,6 +122,22 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             self.assertTrue(set(allocation.selected_ids).issubset(allocation.eligible_ids))
             self.assertEqual(tuple(allocation.selected_ids), tuple(sorted(allocation.selected_ids)))
             self.assertEqual(allocation.lock_readback["selected_cardinality"], 1)
+            self.assertEqual(
+                allocation.lock_readback["initial_observation"]["event"],
+                "S0",
+            )
+            self.assertEqual(
+                allocation.lock_readback["final_observation"]["event"],
+                "S_final",
+            )
+            self.assertEqual(
+                allocation.lock_readback["attempts"][0]["observation_event"],
+                "S_lock",
+            )
+            self.assertNotEqual(
+                allocation.lock_readback["initial_observation"]["fingerprint"],
+                allocation.lock_readback["final_observation"]["fingerprint"],
+            )
 
     def test_wrong_gpu_provenance_fails_before_planning(self) -> None:
         """A GPU request cannot enter the planner without caller/scheduler provenance."""
@@ -176,11 +195,23 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                     "container_id": "container-1",
                     "runtime_identity": "container-1",
                     "allocation_id": allocation.allocation_id,
+                    "caller_allocated_ids": allocation.caller_allocated_ids,
                     "reservation_ids": allocation.reservation_ids,
                     "free_memory_bytes": {"GPU-0001": 4096},
                     "process_identities": (),
                     "requested_memory_bytes": 1024,
-                    "readback_timestamp": "2026-07-16T00:00:00Z",
+                    "readback_timestamp": payload["prelaunch_observation"][
+                        "observation_timestamp"
+                    ],
+                    "probe_observation_timestamp": payload["prelaunch_observation"][
+                        "observation_timestamp"
+                    ],
+                    "probe_observation_fingerprint": payload["prelaunch_observation"][
+                        "observation_fingerprint"
+                    ],
+                    "probe_observation_event_id": payload["prelaunch_observation"][
+                        "observation_event_id"
+                    ],
                 }
 
             prelaunch = adapter.pre_launch(
@@ -229,6 +260,18 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 terminal,
                 completion_coverage_adapter=coverage_adapter,
                 completion_coverage_input=coverage_input,
+                runner_quiescence_evidence={
+                    "plan_fingerprint": terminal.plan_fingerprint,
+                    "quiescent": True,
+                    "process_tree_terminal": True,
+                    "can_create_gpu_context": False,
+                    "creation_barrier": "runner_process_tree_joined",
+                    "runner_root_pid": 1,
+                    "runner_root_process_start_identity": "test",
+                    "observed_at": "2026-07-16T00:00:00Z",
+                    "observation_fingerprint": "test-observation",
+                    "process_identities": (),
+                },
             )
             self.assertEqual(cleanup.plan.state, PlanState.CLEANUP_DISPOSED)
             self.assertEqual(cleanup.completion_coverage.delivery_ordinal, 1)
@@ -251,12 +294,16 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 boot_id="boot-1",
             )
             self.assertIsNotNone(lease)
-            lease.release(gpu_processes=lambda: ())
+            lease.release(
+                gpu_processes=lambda: (),
+                occupied_gpu_units=lambda _processes: (),
+            )
             evidence = store.reclaim_stale(
                 "GPU-0001",
                 current_boot_id=lambda: "boot-1",
                 gpu_processes=lambda: (),
                 process_start_identity=lambda _pid: None,
+                occupied_gpu_units=lambda _processes: (),
             )
             self.assertTrue(evidence.reclaimed)
             self.assertTrue(evidence.under_lock_proof["record_reread_under_lock"])

@@ -3,6 +3,8 @@
 # contract tool
 # responsibility Extracts JIT-canonical operational IR and backend witnesses from a lowered Python root.
 # upstream design ../../documents/tools/jit_canonical_ir.md defines StableHLO/backend witness extraction.
+# upstream implementation ../experiments/execution_resource_plan.py owns GPU discovery, reservation, and typed prohibition of alternate GPU routes.
+# upstream implementation ../experiments/run_managed_experiment.py owns the only managed ExperimentRunner GPU entrypoint.
 # downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers this JSON into Lean defs.
 # downstream implementation ../../tests/agent_tools/test_jit_canonical_ir.py validates the schema on a tiny JAX root.
 # @dependency-end
@@ -76,8 +78,6 @@ ENV_JIT_BACKEND_TARGET = "AGENT_CANON_JIT_BACKEND_TARGET"
 ENV_JIT_INPUT_DEVICE = "AGENT_CANON_JIT_INPUT_DEVICE"
 ENV_JIT_CUDA_VISIBLE_DEVICES = "AGENT_CANON_JIT_CUDA_VISIBLE_DEVICES"
 ENV_JIT_IREE_CUDA_TARGET = "AGENT_CANON_JIT_IREE_CUDA_TARGET"
-ENV_GPU_SLOT_MAX_MEMORY_MIB = "AGENT_CANON_GPU_SLOT_MAX_MEMORY_MIB"
-ENV_GPU_SLOT_MAX_UTILIZATION_PERCENT = "AGENT_CANON_GPU_SLOT_MAX_UTILIZATION_PERCENT"
 _GPU_PLATFORM_NAMES = frozenset({"cuda", "gpu"})
 _LLVM_DIS_CANDIDATES = (
     "llvm-dis",
@@ -134,95 +134,13 @@ def _required_env_text(name: str) -> str:
     return value
 
 
-def _env_int(name: str, default: int) -> int:
-    value = _env_text(name)
-    if value is None:
-        return default
-    try:
-        return int(value)
-    except ValueError as exc:
-        raise SystemExit(f"invalid_int_env={name}:{value}") from exc
-
-
-def _parse_gpu_slot_line(line: str) -> dict[str, int | str] | None:
-    cells = [cell.strip() for cell in line.split(",")]
-    if len(cells) != 3:
-        return None
-    try:
-        return {
-            "index": cells[0],
-            "memory_used_mib": int(cells[1]),
-            "utilization_percent": int(cells[2]),
-        }
-    except ValueError:
-        return None
-
-
-def _query_gpu_slots() -> list[dict[str, int | str]]:
-    command = [
-        "nvidia-smi",
-        "--query-gpu=index,memory.used,utilization.gpu",
-        "--format=csv,noheader,nounits",
-    ]
-    try:
-        result = subprocess.run(
-            command,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=5,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        raise SystemExit(f"gpu_slot_blocker=nvidia_smi_unavailable:{exc}") from exc
-    if result.returncode != 0:
-        reason = result.stderr.strip() or result.stdout.strip() or str(result.returncode)
-        raise SystemExit(f"gpu_slot_blocker=nvidia_smi_failed:{reason}")
-    slots = [
-        slot
-        for line in result.stdout.splitlines()
-        if (slot := _parse_gpu_slot_line(line)) is not None
-    ]
-    if not slots:
-        raise SystemExit("gpu_slot_blocker=no_parseable_nvidia_smi_slots")
-    return slots
-
-
-def _select_available_gpu_slot() -> str:
-    max_memory = _env_int(ENV_GPU_SLOT_MAX_MEMORY_MIB, 256)
-    max_utilization = _env_int(ENV_GPU_SLOT_MAX_UTILIZATION_PERCENT, 5)
-    for slot in _query_gpu_slots():
-        if (
-            int(slot["memory_used_mib"]) <= max_memory
-            and int(slot["utilization_percent"]) <= max_utilization
-        ):
-            return str(slot["index"])
-    raise SystemExit(
-        "gpu_slot_blocker=no_available_slot:"
-        f"memory_mib<={max_memory},utilization_percent<={max_utilization}"
-    )
-
-
 def resolve_cuda_visible_devices(requested: str | None) -> str:
-    """Return the explicit or selected CUDA slot for a GPU JIT child."""
-    standard = _env_text("CUDA_VISIBLE_DEVICES", keep_empty=True)
-    agent_value = _env_text(ENV_JIT_CUDA_VISIBLE_DEVICES, keep_empty=True)
-    if requested is not None:
-        agent_value = requested.strip()
-    if standard is not None and agent_value is not None and standard != agent_value:
-        raise SystemExit(
-            "gpu_slot_blocker=conflicting_cuda_visible_devices:"
-            f"CUDA_VISIBLE_DEVICES={standard!r},"
-            f"{ENV_JIT_CUDA_VISIBLE_DEVICES}={agent_value!r}"
-        )
-    selected = standard if standard is not None else agent_value
-    if selected is not None:
-        if not selected:
-            raise SystemExit("gpu_slot_blocker=empty_cuda_visible_devices")
-        return selected
-    nvidia_visible = _env_text("NVIDIA_VISIBLE_DEVICES")
-    if nvidia_visible and nvidia_visible.lower() != "all":
-        return nvidia_visible
-    return _select_available_gpu_slot()
+    """Reject direct GPU selection; managed ExperimentRunner owns GPU routing."""
+    del requested
+    raise SystemExit(
+        "gpu_route_blocked=canonical_managed_experiment_runner_required:"
+        "tools/experiments/run_managed_experiment.py"
+    )
 
 
 def resolve_runtime_backend_config(

@@ -7,6 +7,8 @@
 # upstream design ../../documents/experiment_runner.md external ExperimentRunner ownership and task boundary
 # upstream implementation ./execution_resource_plan.py canonical discovery/planning/prelaunch/terminal owner
 # downstream integration ../../reports/agents/w1-tool-env-routing-20260716/ordered_integration_interface.json ordered W2-W4 interface
+# static route evidence: run_cli -> execute_managed_run -> discover_resources -> plan_gpu_allocation -> freeze_resource_plan -> materialize_environment -> ExperimentRunnerPreLaunchAdapter.pre_launch -> execute_with_experiment_runner -> record_terminal -> dispose_resources
+# alternate managed GPU launch routes: none; default CLI rejects missing external ExperimentRunner bindings instead of launching directly
 # @dependency-end
 
 """Run one experiment while recording canonical server-side run metadata."""
@@ -79,6 +81,19 @@ FILE_READ_CHUNK_BYTES = 1024 * 1024
 PREFLIGHT_FAILURE_EXIT_CODE = 2
 DURATION_ROUND_DIGITS = 3
 REGISTERED_COMMAND_KINDS = ("default", "formal")
+REVIEWED_W1_LINEAGE_ARTIFACT = (
+    "W1-IMPLEMENTATION-RECHECK-EF2DE34A-20260716-READONLY"
+)
+REVIEWED_W1_LINEAGE_COMMIT = "ef2de34ad3cd7117f5703536d79419755b187fae"
+REVIEWED_W1_LINEAGE_TREE = "4bab43803897f52ed33daa992420cd7c97b19bf5"
+REVIEWED_W1_SOURCE_BLOBS = {
+    "tools/experiments/execution_resource_plan.py": (
+        "5f067e954f46f1128d6fa3eff977b2d71904d460"
+    ),
+    "tools/experiments/run_managed_experiment.py": (
+        "a1b8c5110eaaafb9163b35cad54608b2e6b83afe"
+    ),
+}
 LEGACY_REGISTERED_COMMAND_ALIASES = {"smoke": "default"}
 SENSITIVE_ENV_KEY_PARTS = (
     "API_KEY",
@@ -1664,14 +1679,16 @@ def _completion_input_for_managed_run(
     )
     raw_lineage = runtime_config.get("parent_certified_w1_lineage", {})
     lineage = raw_lineage if isinstance(raw_lineage, Mapping) else {}
+    raw_source_blobs = lineage.get("source_blobs", {})
+    source_blobs = (
+        dict(raw_source_blobs) if isinstance(raw_source_blobs, Mapping) else {}
+    )
     lineage_certified = (
         lineage.get("status") == "parent_certified"
-        and lineage.get("artifact")
-        == "reports/agents/w1-tool-env-routing-20260716/control_topology_ledger.md"
-        and all(
-            isinstance(lineage.get(name), str) and bool(lineage.get(name))
-            for name in ("commit", "tree", "source_blob")
-        )
+        and lineage.get("artifact") == REVIEWED_W1_LINEAGE_ARTIFACT
+        and lineage.get("commit") == REVIEWED_W1_LINEAGE_COMMIT
+        and lineage.get("tree") == REVIEWED_W1_LINEAGE_TREE
+        and source_blobs == REVIEWED_W1_SOURCE_BLOBS
     )
     return CompletionCoverageInput(
         schema_version=COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION,
