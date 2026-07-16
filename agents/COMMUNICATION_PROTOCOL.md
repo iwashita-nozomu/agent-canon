@@ -282,6 +282,51 @@ before editing. The `responsibility_scope` gate records the owning
 planned path, so the implementation surface stays inside the declared owner
 contract.
 
+## CompletionCoverage v1 Schema Contract
+
+`COMMUNICATION_PROTOCOL.md` owns the human-readable schema and evidence
+semantics for the deterministic completion read model. The canonical chain is
+the existing append-only logical run ledger, the generated
+`agent-canon.completion-coverage.v1` artifact, and its deterministic reader.
+No database, persistence service, second ledger, or closeout aggregation is
+introduced.
+
+The ledger accepts exactly these semantic kinds:
+`request_clause`, `responsibility_unit`, `decision`, `change`,
+`review_finding`, `validation`, `failure`, `publication_state`, and `deferral`.
+Every event is bound to `run_id`, `context_id`, an event identity or sequence,
+an `intent_id`, an owner, `state_owner`, `api_owner`, `dependency_owner`, an
+outcome, and source/artifact evidence references. Responsibility boundaries,
+decisions, failures, deferrals, and publication transitions cannot be grouped.
+
+The generated v1 artifact carries `source_binding`, deterministic projection
+metadata, semantic events, `coverage_map`, typed owner-boundary evidence, gate
+evidence, failure responses, and applicable W1 resource certificates. A
+coverage map has one direct or mechanically valid group mapping per active
+clause. Success requires `uncovered`, `multiply_mapped`, `orphan`, `redundant`,
+and `empty` to all be empty. Group mappings retain explicit member IDs and are
+allowed only for mechanically identical owner/unit/outcome facts.
+
+Typed OOP evidence consists only of owner overlap, state ownership, API
+boundary, and dependency-boundary facts. Line count, length, scalar score,
+`min_score`, and `final_score` are not schema fields or completion gates.
+Test-first, test-count/coverage, mutation, private-helper, and checker-retest
+rules are not evidence gates; each residual trust boundary has one canonical
+evidence owner.
+
+The single Markdown/math/Mermaid format/check route is
+`tools/bin/agent-canon docs check <changed-markdown-paths>`. The single
+PostToolUse/Stop hook contract is the existing dispatcher, with schema
+`agent-canon.posttooluse-stop.v1`; readers consume its evidence and do not add
+a second dispatcher or child-check path.
+
+Validation failures record `failing_contract`, `observation_level`,
+`cause_classification`, `intent_preservation`, `evidence`, the two taxonomy
+references (`documents/runtime-profiles-and-check-matrix.json` and its
+generated Markdown reader), same-intent repair or escalation, its owner and
+result, and result artifact references. The taxonomy text is not copied into
+this schema.
+
 ## Review Packet
 
 - `request_clause_ids`

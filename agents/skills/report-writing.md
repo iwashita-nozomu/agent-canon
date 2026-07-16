@@ -121,6 +121,27 @@ Before drafting, fix these inputs:
   responsibility, evidence gap, verification route, or prompt-defect
   classification
 
+## CompletionCoverage Reader Projection
+
+When a report presents completion or closeout evidence, it is a deterministic
+reader of `agent-canon.completion-coverage.v1`, not a policy owner. Preserve
+the source binding, semantic kinds, typed owner/state/API/dependency evidence,
+W1 certificate references, validation-failure response, and the independent
+`all_planned_chunks_complete` and `overall_delivery_complete` predicates.
+
+Expose the five mapping error sets—`uncovered`, `multiply_mapped`, `orphan`,
+`redundant`, and `empty`—without converting a failure into an empty success.
+Responsibility boundaries, decisions, failures, deferrals, and publication
+transitions remain distinct records. W2-12 is one broad
+`ExecutionResourcePlan` plan/actual/readback/failure consumer mapping; W2-19
+is one ordered nine-item GPU certificate mapping. The report does not implement
+resource production or GPU logic.
+
+Use the one canonical Markdown/math/Mermaid format/check route and consume the
+official PostToolUse/Stop JSON dispatcher evidence. Do not add a second CI,
+formatter, checker, dispatcher, score, line/length heuristic, test-count,
+coverage, mutation, private-helper, or checker-retest gate to a report.
+
 ## Report Quality Checklist
 
 Use this checklist before publishing or handing off a reader-facing report:
@@ -167,7 +188,8 @@ invalid.
    or `prompt-defect`.
 1. Rewrite the responsible section, paragraph, sentence, table, figure caption,
    or equation needed to remove every `fix-now` finding.
-1. Rerun the same checker and compare the finding set.
+1. Record the canonical result and route any unresolved finding to the owning
+   gate; do not create a second checker or retest gate.
 
 Do not accept a report merely because the loop hit an iteration budget. If the
 same finding class persists after repeated targeted rewrites, stop and record a

@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import re
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from mid_task_user_input_policy import (
@@ -85,6 +86,504 @@ MECHANICALLY_REGENERATED_REPORT_FILE_PATTERNS = (
 EVAL_TRANSIENT_CAPTURE_PATTERN = re.compile(
     r"^reports/agent-eval-runs/[^/]+/[^/]+\.(?:stdout|stderr)\.txt$"
 )
+
+# W2 completion coverage is a read model over the existing run ledger.  Keep
+# these contracts here, beside the artifact checker, so task_close remains a
+# consumer and no second persistence or closeout authority is introduced.
+COMPLETION_COVERAGE_SCHEMA = "agent-canon.completion-coverage.v1"
+COMPLETION_COVERAGE_TAXONOMY_REFS = (
+    "documents/runtime-profiles-and-check-matrix.json",
+    "documents/runtime-profiles-and-check-matrix.md",
+)
+COMPLETION_SEMANTIC_KINDS = (
+    "request_clause",
+    "responsibility_unit",
+    "decision",
+    "change",
+    "review_finding",
+    "validation",
+    "failure",
+    "publication_state",
+    "deferral",
+)
+NON_GROUPABLE_SEMANTIC_KINDS = frozenset(
+    {"responsibility_unit", "decision", "failure", "deferral", "publication_state"}
+)
+GPU_CERTIFICATE_SEQUENCE = (
+    "caller_candidate_uuid_set_A",
+    "process_held_O_t_pid_start_identities",
+    "active_reservations_R_t",
+    "selected_uuids",
+    "atomic_lock_lease_and_post_lock_readback",
+    "effective_environment",
+    "actual_terminal_gpu_process_identities",
+    "release_or_retained_for_descendant_disposition",
+    "typed_insufficient_eligible_or_mismatch_failure",
+)
+W1_CERTIFICATE_REQUIRED_FIELDS = (
+    "run_id",
+    "context_id",
+    "producer_owner",
+    "certificate_id",
+    "sequence",
+    "source_refs",
+    "artifact_refs",
+    "terminal_outcome",
+)
+
+
+@dataclass(frozen=True)
+class TypedOwnerBoundaryEvidence:
+    """Typed ownership evidence replacing scalar OOP heuristics."""
+
+    owner: str
+    state_owner: str
+    api_owner: str
+    dependency_owner: str
+    evidence_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ValidationFailureResponse:
+    """Canonical pointer-only validation failure response."""
+
+    failing_contract: str
+    observation_level: str
+    cause_classification: str
+    intent_preservation: str
+    evidence: tuple[str, ...]
+    taxonomy_refs: tuple[str, ...]
+    same_intent_repair_or_escalation: str
+    repair_or_escalation_owner: str
+    repair_or_escalation_result: str
+    result_artifact_refs: tuple[str, ...]
+
+
+def _nonempty_text(value: object) -> str:
+    """Return one required text field or raise a contract error."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("completion coverage required text is empty")
+    return value.strip()
+
+
+def _text_tuple(value: object, field_name: str) -> tuple[str, ...]:
+    """Return a deterministic tuple of non-empty string references."""
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"{field_name} must be a list of strings")
+    result = tuple(_nonempty_text(item) for item in value)
+    if not result:
+        raise ValueError(f"{field_name} must not be empty")
+    return result
+
+
+def _event_records(ledger_snapshot: object) -> tuple[dict[str, object], ...]:
+    """Read the existing logical ledger snapshot without creating a store."""
+    raw_events: object = ledger_snapshot
+    if isinstance(ledger_snapshot, Mapping):
+        raw_events = ledger_snapshot.get("events")
+    if not isinstance(raw_events, (list, tuple)):
+        raise ValueError("ledger_snapshot.events must be a list")
+    events: list[dict[str, object]] = []
+    for index, raw_event in enumerate(raw_events):
+        if not isinstance(raw_event, Mapping):
+            raise ValueError(f"ledger event {index} must be an object")
+        event = dict(raw_event)
+        _nonempty_text(event.get("event_id", event.get("sequence", "")))
+        semantic_kind = _nonempty_text(event.get("semantic_kind"))
+        if semantic_kind not in COMPLETION_SEMANTIC_KINDS:
+            raise ValueError(f"unsupported semantic_kind: {semantic_kind}")
+        events.append(event)
+    return tuple(
+        sorted(
+            events,
+            key=lambda event: (
+                str(event.get("sequence", "")),
+                str(event.get("event_id", "")),
+            ),
+        )
+    )
+
+
+def _owner_evidence(event: Mapping[str, object]) -> dict[str, object]:
+    """Project typed owner/state/API/dependency evidence from one event."""
+    evidence = TypedOwnerBoundaryEvidence(
+        owner=_nonempty_text(event.get("owner")),
+        state_owner=_nonempty_text(event.get("state_owner")),
+        api_owner=_nonempty_text(event.get("api_owner")),
+        dependency_owner=_nonempty_text(event.get("dependency_owner")),
+        evidence_refs=_text_tuple(event.get("evidence_refs"), "evidence_refs"),
+    )
+    return {
+        "owner": evidence.owner,
+        "state_owner": evidence.state_owner,
+        "api_owner": evidence.api_owner,
+        "dependency_owner": evidence.dependency_owner,
+        "evidence_refs": list(evidence.evidence_refs),
+    }
+
+
+def _mapping_from_event(event: Mapping[str, object]) -> dict[str, object] | None:
+    """Return one direct/group clause mapping when the event carries a clause."""
+    clause_id = event.get("clause_id")
+    if clause_id is None:
+        return None
+    mapping_mode = _nonempty_text(event.get("mapping_mode", "direct"))
+    member_clause_ids = event.get("member_clause_ids", [clause_id])
+    members = _text_tuple(member_clause_ids, "member_clause_ids")
+    semantic_kind = _nonempty_text(event.get("semantic_kind"))
+    if mapping_mode == "group" and semantic_kind in NON_GROUPABLE_SEMANTIC_KINDS:
+        raise ValueError(f"{semantic_kind} mappings cannot be grouped")
+    if mapping_mode not in {"direct", "group"}:
+        raise ValueError(f"unsupported mapping_mode: {mapping_mode}")
+    return {
+        "clause_id": _nonempty_text(clause_id),
+        "mapping_mode": mapping_mode,
+        "owner": _nonempty_text(event.get("owner")),
+        "responsibility_unit": _nonempty_text(event.get("responsibility_unit")),
+        "outcome": _nonempty_text(event.get("outcome")),
+        "member_clause_ids": list(members),
+        "semantic_kind": semantic_kind,
+        "evidence_refs": list(_text_tuple(event.get("evidence_refs"), "evidence_refs")),
+        "source_event_ref": _nonempty_text(
+            event.get("event_id", event.get("sequence", ""))
+        ),
+    }
+
+
+def _resource_certificate_errors(
+    certificate: Mapping[str, object],
+    source_binding: Mapping[str, object],
+) -> list[str]:
+    """Validate W1 certificate shape without recomputing resource semantics."""
+    errors: list[str] = []
+    for field in W1_CERTIFICATE_REQUIRED_FIELDS:
+        if not certificate.get(field):
+            errors.append(f"missing:{field}")
+    if certificate.get("producer_owner") != "W1":
+        errors.append("producer_owner")
+    for field in ("run_id", "context_id"):
+        if certificate.get(field) != source_binding.get(
+            "run_id" if field == "run_id" else "context_id"
+        ):
+            errors.append(f"binding:{field}")
+    for field in ("plan", "actual", "readback", "failure"):
+        if not isinstance(certificate.get(field), Mapping):
+            errors.append(f"missing:{field}")
+    gpu_items = certificate.get("gpu_semantics")
+    if gpu_items is not None:
+        if not isinstance(gpu_items, list):
+            errors.append("gpu_semantics")
+        else:
+            observed = [
+                item.get("item")
+                for item in gpu_items
+                if isinstance(item, Mapping)
+            ]
+            if observed != list(GPU_CERTIFICATE_SEQUENCE):
+                errors.append("gpu_semantics:ordered_nine_items")
+    return sorted(set(errors))
+
+
+def project_completion_coverage(
+    ledger_snapshot: object,
+    source_binding: Mapping[str, object],
+    schema_version: str = COMPLETION_COVERAGE_SCHEMA,
+) -> dict[str, object]:
+    """Generate the deterministic v1 reader model from one ledger snapshot."""
+    if schema_version != COMPLETION_COVERAGE_SCHEMA:
+        raise ValueError(f"unsupported completion coverage schema: {schema_version}")
+    binding = {key: value for key, value in source_binding.items()}
+    for field in (
+        "run_id",
+        "context_id",
+        "organizer_context_id",
+        "parent",
+        "component_manager",
+        "assigned_unit",
+        "source_binding",
+        "source_refs",
+    ):
+        if field == "source_refs":
+            binding[field] = list(_text_tuple(binding.get(field), field))
+        elif field == "source_binding":
+            if not isinstance(binding.get(field), Mapping) or not binding[field]:
+                raise ValueError("source_binding must be a non-empty object")
+        else:
+            binding[field] = _nonempty_text(binding.get(field))
+    events = _event_records(ledger_snapshot)
+    for event in events:
+        if event.get("run_id") != binding["run_id"]:
+            raise ValueError("ledger event run_id does not match source binding")
+        if event.get("context_id") != binding["context_id"]:
+            raise ValueError("ledger event context_id does not match source binding")
+    mappings = [mapping for event in events if (mapping := _mapping_from_event(event))]
+    resource_certificates = [
+        dict(event["resource_certificate"])
+        for event in events
+        if isinstance(event.get("resource_certificate"), Mapping)
+    ]
+    semantic_events = [
+        {
+            "event_id": _nonempty_text(event.get("event_id", event.get("sequence", ""))),
+            "sequence": str(event.get("sequence", "")),
+            "semantic_kind": _nonempty_text(event.get("semantic_kind")),
+            "owner_evidence": _owner_evidence(event),
+            "intent_id": _nonempty_text(event.get("intent_id")),
+            "outcome": _nonempty_text(event.get("outcome")),
+            "artifact_refs": list(_text_tuple(event.get("artifact_refs"), "artifact_refs")),
+        }
+        for event in events
+    ]
+    return {
+        "schema": COMPLETION_COVERAGE_SCHEMA,
+        "source_binding": binding,
+        "projection_metadata": {
+            "deterministic_order": "sequence,event_id",
+            "ledger_snapshot_identity": _nonempty_text(
+                ledger_snapshot.get("snapshot_identity")
+                if isinstance(ledger_snapshot, Mapping)
+                else "in_memory_snapshot"
+            ),
+            "generated_artifact_identity": f"{binding['run_id']}:{binding['context_id']}",
+        },
+        "semantic_events": semantic_events,
+        "coverage_map": mappings,
+        "owner_boundary_evidence": [
+            event["owner_evidence"] for event in semantic_events
+        ],
+        "gate_evidence": [
+            dict(event.get("gate_evidence", {}))
+            for event in events
+            if isinstance(event.get("gate_evidence"), Mapping)
+        ],
+        "failure_responses": [
+            dict(event["failure_response"])
+            for event in events
+            if isinstance(event.get("failure_response"), Mapping)
+        ],
+        "resource_certificates": resource_certificates,
+        "resource_certificate_errors": [
+            {
+                "certificate_id": certificate.get("certificate_id", ""),
+                "errors": _resource_certificate_errors(certificate, binding),
+            }
+            for certificate in resource_certificates
+        ],
+    }
+
+
+def _empty_error_sets() -> dict[str, list[str]]:
+    """Return the five explicit mapping error sets."""
+    return {
+        "uncovered": [],
+        "multiply_mapped": [],
+        "orphan": [],
+        "redundant": [],
+        "empty": [],
+    }
+
+
+def check_completion_coverage(
+    completion_coverage: Mapping[str, object],
+    active_clause_ids: Sequence[str],
+    owner_contract: Mapping[str, object],
+    taxonomy_refs: Sequence[str] = COMPLETION_COVERAGE_TAXONOMY_REFS,
+) -> dict[str, object]:
+    """Check exact mappings and typed gate evidence without scalar heuristics."""
+    errors = _empty_error_sets()
+    if completion_coverage.get("schema") != COMPLETION_COVERAGE_SCHEMA:
+        errors["empty"].append("schema")
+    if not isinstance(completion_coverage.get("source_binding"), Mapping):
+        errors["empty"].append("source_binding")
+    expected = tuple(_nonempty_text(clause_id) for clause_id in active_clause_ids)
+    expected_set = set(expected)
+    raw_mappings = completion_coverage.get("coverage_map", [])
+    if not isinstance(raw_mappings, list):
+        errors["empty"].append("coverage_map")
+        raw_mappings = []
+    by_clause: dict[str, list[Mapping[str, object]]] = {}
+    for raw_mapping in raw_mappings:
+        if not isinstance(raw_mapping, Mapping):
+            errors["empty"].append("mapping")
+            continue
+        clause_id = str(raw_mapping.get("clause_id", ""))
+        by_clause.setdefault(clause_id, []).append(raw_mapping)
+        required = ("owner", "responsibility_unit", "outcome", "evidence_refs")
+        if any(not raw_mapping.get(field) for field in required):
+            errors["empty"].append(clause_id or "mapping")
+        if clause_id not in expected_set:
+            errors["orphan"].append(clause_id or "mapping")
+        if raw_mapping.get("mapping_mode") == "group" and len(
+            raw_mapping.get("member_clause_ids", [])
+        ) <= 1:
+            errors["redundant"].append(clause_id or "mapping")
+    for clause_id in expected:
+        matches = by_clause.get(clause_id, [])
+        if not matches:
+            errors["uncovered"].append(clause_id)
+        elif len(matches) != 1:
+            errors["multiply_mapped"].append(clause_id)
+    owner_fields = ("state_owner", "api_owner", "dependency_owner")
+    if not all(_nonempty_text(owner_contract.get(field, "")) for field in owner_fields):
+        errors["empty"].append("owner_contract")
+    for evidence in completion_coverage.get("owner_boundary_evidence", []):
+        if isinstance(evidence, Mapping) and any(
+            not evidence.get(field) for field in ("owner", *owner_fields, "evidence_refs")
+        ):
+            errors["empty"].append("owner_boundary_evidence")
+    if tuple(taxonomy_refs) != COMPLETION_COVERAGE_TAXONOMY_REFS:
+        errors["empty"].append("taxonomy_refs")
+    for certificate_result in completion_coverage.get(
+        "resource_certificate_errors", []
+    ):
+        if isinstance(certificate_result, Mapping) and certificate_result.get("errors"):
+            errors["empty"].append(
+                f"resource_certificate:{certificate_result.get('certificate_id', '')}"
+            )
+    for response in completion_coverage.get("failure_responses", []):
+        if not isinstance(response, Mapping):
+            errors["empty"].append("failure_response")
+        elif tuple(response.get("taxonomy_refs", ())) != COMPLETION_COVERAGE_TAXONOMY_REFS:
+            errors["empty"].append("failure_response:taxonomy_refs")
+    errors = {key: sorted(set(value)) for key, value in errors.items()}
+    gate_results = {
+        "G1_CLAUSE_COVERAGE": not any(errors.values()),
+        "G2_OWNER_BOUNDARY": not errors["empty"],
+        "G3_STAGE_EVIDENCE": bool(completion_coverage.get("gate_evidence")),
+        "G4_VALIDATION_RESPONSE": all(
+            all(
+                response.get(field)
+                for field in (
+                    "failing_contract",
+                    "observation_level",
+                    "cause_classification",
+                    "intent_preservation",
+                    "evidence",
+                    "taxonomy_refs",
+                    "same_intent_repair_or_escalation",
+                    "repair_or_escalation_owner",
+                    "repair_or_escalation_result",
+                    "result_artifact_refs",
+                )
+            )
+            for response in completion_coverage.get("failure_responses", [])
+            if isinstance(response, Mapping)
+        ),
+        "G5_DELIVERY_BOUNDARY": False,
+    }
+    return {
+        "schema": "agent-canon.completion-coverage-check.v1",
+        "ok": not any(errors.values()) and all(gate_results[key] for key in gate_results if key != "G5_DELIVERY_BOUNDARY"),
+        "error_sets": errors,
+        "gate_results": gate_results,
+        "taxonomy_refs": list(COMPLETION_COVERAGE_TAXONOMY_REFS),
+        "owner_contract": dict(owner_contract),
+    }
+
+
+def record_validation_failure_response(
+    failing_contract: str,
+    observation_level: str,
+    cause_classification: str,
+    intent_preservation: str,
+    evidence: Sequence[str],
+    same_intent_repair_or_escalation: str,
+    repair_or_escalation_owner: str = "",
+    repair_or_escalation_result: str = "",
+    result_artifact_refs: Sequence[str] = (),
+) -> dict[str, object]:
+    """Create the canonical pointer-only validation failure record."""
+    response = ValidationFailureResponse(
+        failing_contract=_nonempty_text(failing_contract),
+        observation_level=_nonempty_text(observation_level),
+        cause_classification=_nonempty_text(cause_classification),
+        intent_preservation=_nonempty_text(intent_preservation),
+        evidence=_text_tuple(evidence, "evidence"),
+        taxonomy_refs=COMPLETION_COVERAGE_TAXONOMY_REFS,
+        same_intent_repair_or_escalation=_nonempty_text(
+            same_intent_repair_or_escalation
+        ),
+        repair_or_escalation_owner=_nonempty_text(repair_or_escalation_owner),
+        repair_or_escalation_result=_nonempty_text(repair_or_escalation_result),
+        result_artifact_refs=_text_tuple(result_artifact_refs, "result_artifact_refs"),
+    )
+    return {
+        "schema": "agent-canon.validation-failure-response.v1",
+        "failing_contract": response.failing_contract,
+        "observation_level": response.observation_level,
+        "cause_classification": response.cause_classification,
+        "intent_preservation": response.intent_preservation,
+        "evidence": list(response.evidence),
+        "taxonomy_refs": list(response.taxonomy_refs),
+        "same_intent_repair_or_escalation": response.same_intent_repair_or_escalation,
+        "repair_or_escalation_owner": response.repair_or_escalation_owner,
+        "repair_or_escalation_result": response.repair_or_escalation_result,
+        "result_artifact_refs": list(response.result_artifact_refs),
+    }
+
+
+def evaluate_completion_boundary(
+    coverage_check: Mapping[str, object],
+    schedule_state_non_routing: Mapping[str, object],
+    open_work_state_non_routing: Mapping[str, object],
+    repair_state_non_routing: Mapping[str, object],
+    crossing_edge_state_non_routing: Mapping[str, object],
+    control_topology_ledger_snapshot: Mapping[str, object],
+) -> dict[str, object]:
+    """Derive planned-work and delivery predicates from one topology snapshot."""
+    open_repairs = list(repair_state_non_routing.get("open_repairs", []))
+    open_edges = list(crossing_edge_state_non_routing.get("open_crossing_edges", []))
+    planned = bool(
+        schedule_state_non_routing.get("w2_implementation_complete")
+        and schedule_state_non_routing.get("w2_review_complete")
+        and open_work_state_non_routing.get("planned_work_complete")
+        and not open_repairs
+        and not open_edges
+        and control_topology_ledger_snapshot.get("writer_release_order_complete")
+    )
+    delivery = bool(
+        coverage_check.get("ok")
+        and control_topology_ledger_snapshot.get("global_publication_state")
+        == "publication_ready"
+        and control_topology_ledger_snapshot.get("final_review_approved")
+        and control_topology_ledger_snapshot.get("closeout_unlocked")
+        and schedule_state_non_routing.get("formatter_and_static_checks_pass")
+        and not open_repairs
+        and not open_edges
+    )
+    return {
+        "schema": "agent-canon.completion-boundary.v1",
+        "all_planned_chunks_complete": planned,
+        "overall_delivery_complete": delivery,
+        "open_repairs": open_repairs,
+        "open_crossing_edges": open_edges,
+        "control_topology_observation_ref": _nonempty_text(
+            control_topology_ledger_snapshot.get("observation_ref")
+        ),
+    }
+
+
+def consume_checked_completion_coverage(
+    completion_coverage_v1: Mapping[str, object],
+    coverage_check: Mapping[str, object],
+    completion_boundary: Mapping[str, object],
+) -> dict[str, object]:
+    """Consume the checked projection without rebuilding coverage or state."""
+    if completion_coverage_v1.get("schema") != COMPLETION_COVERAGE_SCHEMA:
+        raise ValueError("closeout requires agent-canon.completion-coverage.v1")
+    if not coverage_check.get("ok"):
+        return {"ready": False, "reason": "coverage_check_failed"}
+    return {
+        "ready": bool(completion_boundary.get("overall_delivery_complete")),
+        "all_planned_chunks_complete": bool(
+            completion_boundary.get("all_planned_chunks_complete")
+        ),
+        "overall_delivery_complete": bool(
+            completion_boundary.get("overall_delivery_complete")
+        ),
+        "coverage_check": dict(coverage_check),
+        "completion_boundary": dict(completion_boundary),
+    }
 
 
 def is_placeholder_only_section(text: str) -> bool:

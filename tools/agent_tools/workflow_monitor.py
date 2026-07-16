@@ -83,6 +83,29 @@ SUBAGENT_WAVE_EVENT_KINDS = {
     "skipped",
     "authority_blocker",
 }
+COMPLETION_SEMANTIC_KINDS = {
+    "request_clause",
+    "responsibility_unit",
+    "decision",
+    "change",
+    "review_finding",
+    "validation",
+    "failure",
+    "publication_state",
+    "deferral",
+}
+SEMANTIC_EVENT_REQUIRED_KEYS = (
+    "event_id",
+    "semantic_kind",
+    "owner",
+    "state_owner",
+    "api_owner",
+    "dependency_owner",
+    "intent_id",
+    "outcome",
+    "evidence_refs",
+    "artifact_refs",
+)
 SUBAGENT_WAVE_EMPTY_OK_STATUSES = {
     "blocked",
     "blocked_authority_required",
@@ -151,14 +174,8 @@ STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
         "tool_call=run_repo_dependency_review.sh repo_dependency_review=pass "
         "scope=repo-wide"
     ),
-    "tool_call=make ci static_analysis=pass scope=repo-wide",
-    "tool_call=pyright code_checker=pass checker=pyright scope=repo-wide",
-    "tool_call=ruff code_checker=pass checker=ruff scope=repo-wide",
-    (
-        "tool_call=oop-readability-check code_checker=pass "
-        "checker=oop-readability scope=changed-paths"
-    ),
-    "tool_call=check_convention_compliance.py CONVENTION_COMPLIANCE=pass",
+    "tool_call=canonical-format-check code_checker=pass checker=markdown-math-mermaid scope=changed-paths",
+    "hook_dispatcher=official schema=agent-canon.posttooluse-stop.v1 events=PostToolUse,Stop",
     "static_analysis_feedback=recorded target=review-backlog-scan",
     (
         "hook_tool_feedback=reviewed parent_protocol_update=not_required "
@@ -197,6 +214,7 @@ class MonitoringEntries:
 
     signals: tuple[str, ...] = ()
     behavior_events: tuple[str, ...] = ()
+    semantic_events: tuple[str, ...] = ()
     runtime_feedback: tuple[str, ...] = ()
     tool_warnings: tuple[str, ...] = ()
     tool_warning_status: str = ""
@@ -211,6 +229,7 @@ EMPTY_MONITORING_ENTRIES = MonitoringEntries()
 MONITORING_LEGACY_KEYS = {
     "signals",
     "behavior_events",
+    "semantic_events",
     "runtime_feedback",
     "tool_warnings",
     "tool_warning_status",
@@ -297,6 +316,16 @@ def add_monitoring_entry_arguments(parser: argparse.ArgumentParser) -> None:
         help=(
             "Agent behavior event to append, such as skill invocation, subagent routing, "
             "tool call, review decision, prompt eval result, or feedback action."
+        ),
+    )
+    parser.add_argument(
+        "--semantic-event",
+        action="append",
+        default=[],
+        help=(
+            "Append one typed logical-ledger event. Required keys: event_id, "
+            "semantic_kind, owner, state_owner, api_owner, dependency_owner, "
+            "intent_id, outcome, evidence_refs, artifact_refs."
         ),
     )
     parser.add_argument(
@@ -472,6 +501,22 @@ def normalize_runtime_feedback(entry: str) -> str:
     if "target=" not in stripped or "action=" not in stripped:
         raise ValueError("runtime feedback must include target=... and action=...")
     return f"runtime_feedback=observed {stripped}"
+
+
+def normalize_semantic_event(entry: str) -> str:
+    """Validate one semantic ledger event before monitoring records it."""
+    fields = parse_token_fields(entry.strip())
+    missing = [key for key in SEMANTIC_EVENT_REQUIRED_KEYS if not fields.get(key)]
+    if missing:
+        raise ValueError(
+            "semantic event must include required keys: " + ",".join(missing)
+        )
+    if fields["semantic_kind"] not in COMPLETION_SEMANTIC_KINDS:
+        raise ValueError(
+            "semantic_kind must be one of: "
+            + ",".join(sorted(COMPLETION_SEMANTIC_KINDS))
+        )
+    return f"ledger_event=recorded {entry.strip()}"
 
 
 def parse_token_fields(entry: str) -> dict[str, str]:
@@ -1119,6 +1164,7 @@ def entries_from_legacy(kwargs: dict[str, object]) -> MonitoringEntries:
         signals=string_entries(kwargs.get("signals")),
         behavior_events=string_entries(kwargs.get("behavior_events")),
         runtime_feedback=string_entries(kwargs.get("runtime_feedback")),
+        semantic_events=string_entries(kwargs.get("semantic_events")),
         tool_warnings=string_entries(kwargs.get("tool_warnings")),
         tool_warning_status=str(kwargs.get("tool_warning_status", "")),
         mid_task_user_inputs=string_entries(kwargs.get("mid_task_user_inputs")),
@@ -1170,6 +1216,10 @@ def append_monitoring_sections(
         normalize_entry(item, entries.timestamp)
         for item in entries.behavior_events
     ]
+    behavior_entries.extend(
+        normalize_entry(normalize_semantic_event(item), entries.timestamp)
+        for item in entries.semantic_events
+    )
     behavior_entries.extend(
         normalize_entry(normalize_runtime_feedback(item), entries.timestamp)
         for item in entries.runtime_feedback
@@ -1258,6 +1308,7 @@ def main() -> int:
         MonitoringEntries(
             signals=tuple(signals),
             behavior_events=tuple(behavior_events),
+            semantic_events=tuple(args.semantic_event),
             runtime_feedback=tuple(args.runtime_feedback),
             tool_warnings=tuple(args.tool_warning),
             tool_warning_status=str(args.tool_warning_status),

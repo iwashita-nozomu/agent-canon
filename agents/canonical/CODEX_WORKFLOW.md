@@ -399,7 +399,9 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
   または escalation の authority と、保持された request clause が artifact に残っている
 - deferred findings は今回の completion readiness への影響、理由、escalation を artifact に記録している
 
-`closeout_gate.md` の `spec_product_coverage_complete=yes`、`review_findings_integrated=yes`、`post_fix_full_review_complete=yes` が揃った時点で、`user_completion_report=unlocked` にできます。
+`closeout_gate.md` の CompletionCoverage consumer、typed owner boundary、
+canonical formatter/dispatcher、validation-response、review integration が
+揃った時点で、`user_completion_report=unlocked` にできます。
 
 ## Mechanical Completion Loop
 
@@ -407,9 +409,9 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 
 1. `user_request_contract.md` の active clause、`schedule.md` の planned work unit、直近 review findings、validation blockers、commit / push、shared canon sync、follow-up 判断を一覧化します。
 1. 最新 diff と tracked / untracked state を確認し、変更対象 file の dependency manifest、downstream edge、旧参照、copy / snapshot / backup path を見ます。
-1. 必要な repo-wide dependency review、静的解析、読み取り確認、docs / targeted
-   tests / agent checks を実行します。動作確認や broad execution だけでは loop を
-   閉じません。
+1. 必要な dependency review、canonical formatter/check、選択した非 Python
+   static evidence、読み取り確認を記録します。別 checker の再実行や別 CI を
+   追加して loop を閉じることはしません。
 1. read-only の diff-check agent を起動し、run bundle、request contract、schedule、latest diff、validation evidence、dependency evidence を渡します。
 1. diff-check agent の decision が `approve` 以外なら、fix-now finding を実装して loop の 1 に戻ります。`escalate` は該当する設計・計画 stage へ戻します。
    この修正 loop では、review finding への応答を、同じ意図を保つ修正、
@@ -529,9 +531,9 @@ goal-driven task では `/goal` 確定前でも provisional bundle を作り、r
 - 長めの task で run 単位の記録が必要
 - subagent と parent の責務を分けたい
 
-full staged route では、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、active gate の場合の `document_flow_reviewer`、`test_designer` を標準構成とします。
+full staged route では、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、active gate の場合の `document_flow_reviewer` を標準構成とします。W2 は typed contract evidence を使い、`test_designer` を completion gate にしません。
 owner-bounded route では、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ full staged route へ昇格します。
-Codex subagent では、`requirements_organizer`、`manager_reviewer`、`execution_planner`、`plan_reviewer`、`detailed_designer`、`detailed_design_reviewer`、`document_flow_reviewer`、`test_designer`、`worker`、`spark_worker` を workflow family に応じて stage ごとに明示します。
+Codex subagent では、`requirements_organizer`、`manager_reviewer`、`execution_planner`、`plan_reviewer`、`detailed_designer`、`detailed_design_reviewer`、`document_flow_reviewer`、`worker`、`spark_worker` を workflow family に応じて stage ごとに明示します。behavior-specific な test design は W2 の completion predicate ではありません。
 Agent Wave の標準順序は `計画 -> レビュー -> 編集` です。bootstrap は
 `team_manifest.yaml` に `run.standard_wave_sequence` を出し、parent は
 plan artifact、review gate decision、edit handoff evidence をこの順で
@@ -543,7 +545,7 @@ survey、stale-surface scan、dependency expansion を通してから
 `review_gate` の handoff scope にします。
 `task_start.py` と `bootstrap_agent_run.py` は
 `run.default_quality_check_policy` も出します。この policy は active な
-`test_designer`、`change_reviewer`、`docs_workflow_steward`、
+`change_reviewer`、`docs_workflow_steward`、
 `python_reviewer`、`cpp_reviewer` と、それらから展開される Codex
 `agent_type`、task-default / changed-path / manual enable / review-pack
 provenance、軽量 static check command を記録します。review と edit の
@@ -642,7 +644,6 @@ run bundle を起こしたら、`user_request_contract.md` を planning 前に�
 - `detailed_designer`
 - `detailed_design_reviewer`
 - `document_flow_reviewer`
-- `test_designer`
 - `project_reviewer`
 - `docs_workflow_steward`
 - `prompt_config_reviewer`
@@ -693,8 +694,10 @@ cost を無視して review coverage を優先する run では、research-drive
 - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書で reader-facing 構成を変える場合は `long-form-writing` を DSL-to-prose adapter として読み、docs-impact が高い場合だけ別 reviewer で `docs-completeness-review` も通す
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を読み、`notation_definition_reviewer`、`logic_gap_reviewer`、必要に応じて別 reviewer の `docs-completeness-review` を通す
 - 投稿論文や thesis chapter の draft では `paper-writing` を読み、`citation_evidence_reviewer` も別 instance で通す
-- high-risk code 変更、新規 behavior、または regression-prone な修正では `test-design` を読み、実装前に `test_designer` で nasty case と regression case を固定する
-- contract-only wrapper や checker-owned validation だけの変更では、static contract validation と canonical command evidence を validation route に置く。pytest smoke、execution-only test、no-crash test、数値 smoke は behavior trigger がある場合に採用する
+- contract-only wrapper や checker-owned validation だけの変更では、typed
+  contract evidence と canonical command evidence を validation route に置く。
+  Test-first、test-count、coverage、mutation、private-helper、checker-retest
+  は completion criteria ではない。
 - validation tool の autofix は changed contract、changed lines、または task plan が名指しした checker-owned property に結び付く finding に適用し、広い validation で出た既存 style debt は residual evidence と repair route に分ける
 - 研究・実験系の変更では active experiment profile の risk に応じて `report_reviewer` と research perspective reviewers を選ぶ
 - JAX export / native runtime の task では、対象 implementation slice で `generic callable path`、`specialized coeff path`、`export-based generic path` のどれを触るか宣言する。generic path は `jax.export` artifact producer と consumer/runtime smoke を完了条件に含める
@@ -712,38 +715,67 @@ cost を無視して review coverage を優先する run では、research-drive
 - runtime entrypoint は薄く保つ
 - skill は repo 正本を置き換えず、導線だけを担う
 
+### CompletionCoverage Applicability And State Contract
+
+`CODEX_WORKFLOW.md` owns applicability and state transitions for the checked
+CompletionCoverage read model. Existing ledger owners append facts; the W2
+projection/check boundary derives the read model; `task_close` and
+`report_artifact_checks` consume it. No reader may write back to the schema
+owner or become a second state machine.
+
+The minimal state is `context_binding`, `coverage_map`, `gate_evidence`,
+`failure_response`, `completion_boundary`, and `projection_metadata`. State
+transitions are `context_bound` → `design_pending` → `design_approved` →
+`writer_release_pending` → `writer_released` → `source_freeze_pending` →
+`source_frozen` → `change_review_pending` → `change_review_approved` →
+`integration_pending` → `publication_ready` → `delivered`. A validation
+failure enters `repair_pending`; same-intent repair returns to the owning gate,
+and unresolved or intent-changing work enters `escalation_pending`.
+
+`evaluate_completion_boundary` accepts one
+`control_topology_ledger.json` snapshot for all routing/publication facts. Its
+other inputs are schedule, open-work, repair, and crossing-edge state only;
+parent-route or global-publication state is never passed as a second direct
+argument. It derives the independent predicates
+`all_planned_chunks_complete` and `overall_delivery_complete`. A chunk, slice,
+checkpoint, or subpass cannot set either predicate.
+
+W2-20 is ordered as W2 design `APPROVE`, exactly one isolated-branch writer
+release with collision preservation and
+`branch_creation_reason=convergence_w2_gate_completion_authority`, source
+freeze/review, then W3/parent integration. `routing_gate=verified` is only a
+later integration/publication observation and never authorizes writer release.
+
+W1 remains the producer of `ExecutionResourcePlan`. W2 consumes one broad
+W2-12 plan/actual/readback/failure certificate mapping and one W2-19 ordered
+GPU consumer mapping: candidate UUID set `A`, process-held `O_t` PID/start
+identities, active reservations `R_t`, selected UUIDs, atomic lock/lease plus
+post-lock readback, effective environment, terminal GPU identities, release
+versus retained-for-descendant disposition, and typed insufficient-eligible or
+mismatch failure. W2 does not parse NVML, select, reserve, construct the
+environment, produce resources, or duplicate tests/gates.
+
 ### 6. Validation
 
-- Validation starts with lightweight evidence: static analysis, dependency
-  checks, docs checks, route checks, and changed-file targeted tests. Full CI,
-  long test suites, benchmarks, experiments, GPU / CPU numerical runs, solver
-  sweeps, and randomized large cases use a task-linked approval note with
-  request clause, expected signal, runtime / resource budget, stop condition,
-  artifact path, and owner.
-- After any validation test/check failure, prohibited actions are simplifying,
-  reverting, deleting intended behavior/tests, weakening the oracle, or
-  downscoping required validation just to pass. First record the five machine
-  fields: `failing_contract`, `observation_level`, `cause_classification`,
-  `intent_preservation`, and `evidence`. The canonical token-safe
-  `cause_classification` and `intent_preservation` slug lists are owned by
+- Validation uses one canonical formatter/check path for Markdown, math, and
+  Mermaid plus selected non-Python static evidence. Duplicate CI, format,
+  check, and synthetic retest paths are not additional completion predicates.
+- After any validation failure, record `failing_contract`,
+  `observation_level`, `cause_classification`, `intent_preservation`, and
+  `evidence`. The canonical token-safe slug lists are owned by
   `documents/runtime-profiles-and-check-matrix.json` and projected into
-  `documents/runtime-profiles-and-check-matrix.md`; this workflow section only
-  states when Codex must apply that taxonomy. Repair with approved intent
-  preserved through the owner route named by the taxonomy, route unrelated
-  failures as residual evidence, and escalate approved-design / user-request
-  conflicts before changing intent.
+  `documents/runtime-profiles-and-check-matrix.md`; this workflow only points
+  to that taxonomy. Preserve intent through the owning repair route or record
+  escalation; an unresolved response cannot advance completion.
 - Shared canon、Large delivery、高 risk 変更では差分限定ではなく全 repo 対象で `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。Routine docs / Focused code は changed-file dependency checks と relevant downstream review を evidence にできる
-- Large delivery、explicit comprehensive validation、高 risk 変更では user-facing completion 前に `make ci` または同等の full local confidence gate を通し、pytest、pyright、pydocstyle、ruff を全 repo 設定で確認する。Shared canon 変更では active profile が指定する `make agent-canon-pr-check` または等価な AgentCanon PR gate を使い、Routine docs / Focused code は active profile の targeted checks を evidence にできる
-- Python / C++ 実装変更では `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を通し、裸の非自明数値を名前付き定数、typed configuration、API input、または根拠付き `hardcoded-number-ok` へ解消する
-- Python のログ出力 helper を変更した場合は `python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports` を通し、ログ helper 名を `_log...` に揃える
+- Source freeze 後は canonical formatter/check path と選択した非 Python static
+  evidence を一度記録する。別 CI、別 formatter、別 checker、checker-retest
+  は W2 completion gate にならない。
 - Hook、tool、skill、workflow、agent protocol、GitHub workflow、dependency manifest に触る前には `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、`TOOL_REJECTION_PREDICTED_GATE` を write-capable subagent handoff に渡す。parent 直編集に渡す場合は先に `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` と `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を記録する。予測 gate が出た場合は、gate-specific command と repair plan を実装前に固定する
 - tool / checker / hook / reviewer / subagent feedback から実装へ進む場合は `$tool-finding-report` で finding packet を作り、raw artifact、structured artifact、impact、prompt feedback decision を handoff に渡す。`handoff_prompt_gap` または `shared_skill_or_workflow_gap` は次の write-capable subagent 起動前に prompt を修正し、`workflow_monitor.py --runtime-feedback ... action=prompt_repair` で記録する
 - agent runtime / skill 変更では active profile に応じて `make agent-checks` または relevant subchecks を使う
-- checkpoint では `make ci-quick` を使ってよい。final closeout は risk class に応じて `make ci`、`make agent-checks`、または targeted checks を選ぶ
-- full confidence が必要な場合は `make ci`
-- Python 変更では `pyright`、`pytest tests/`、`ruff check python tests --select D,E,F,I,UP --ignore E501` を確認する
-- C / C++ 変更では project-native configure / build / test evidence を確認し、CMake project なら `cmake -S . -B build`、`cmake --build build`、`ctest --test-dir build` を既定候補にする
-- 文書変更では markdown / link check を使う
+- 文書変更では canonical formatter/check path が Markdown、math、Mermaid の
+  format/check を一つの証跡として記録する。
 - report を閉じる前には `documents/experiment-report-style.md` を確認する
 - 研究系 task では `critical-review` と `report-review` の decision state を確認し、必要なら `research-perspective-review` を追加する
 
@@ -760,8 +792,11 @@ cost を無視して review coverage を優先する run では、research-drive
 - `closeout_gate.md` の `unfinished_tasks_absent=yes` で、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断の完了状態を示す
 - `closeout_gate.md` の `dependency_headers_complete=yes` で、作成・編集した text file の依存 file header coverage を示す
 - Shared canon、Large delivery、高 risk 変更では `closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` とともに、checkpoint / final review で全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` と header 修正 evidence を残す。Routine docs / Focused code は targeted dependency evidence を残す
-- Full local confidence gate が選択された変更では `closeout_gate.md` の `repo_wide_static_analysis_complete=yes` とともに、全 repo 対象の `make ci`、または `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501` の static analysis evidence を残す。Routine docs / Focused code / profile-specific gate は `repo_wide_static_analysis_complete=profile_selected` と targeted static evidence を残し、`make_ci_status` を `targeted` または `not_applicable` にする
-- `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` で、仕様 coverage と review finding disposition を示す
+- `closeout_gate.md` の `canonical_format_check_status=pass` と選択した非 Python
+  static evidence で、canonical validation を示す。別 CI は W2 gate ではない。
+- `closeout_gate.md` の `completion_coverage_consumer=yes`、
+  `mapping_error_sets_empty=yes`、`typed_owner_boundary_status=pass`、
+  `review_findings_integrated=yes` で、仕様 coverage と review disposition を示す
 - `closeout_gate.md` の `review_findings_integrated=yes` は、review reject /
   requested-change への応答として、user request と design intent が保持された
   evidence を要求します。revert / discard が含まれる場合は、撤回、置換、owner
@@ -772,7 +807,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - `closeout_gate.md` の `canonical_tree_head_complete=yes` で、設計文書、implementation surface、snapshot tree、backup path の正本状態を示す
 - `workflow_monitoring.md` の signals / behavior events / interventions / improvement decisions を埋め、skill / config / workflow / memory の改善判断を `applied`、`recorded`、`not_applicable` のいずれかにする
 - hook、code checker、static analysis、CI、review tool の結果が parent protocol または subagent protocol を変えるべきかを確認し、`workflow_monitoring.md` に `hook_tool_feedback=reviewed`、`parent_protocol_update=<applied|recorded|not_required>`、`subagent_protocol_update=<applied|recorded|not_required>`、`protocol_feedback_reason=...` を残す
-- evidence を確認済みの closeout では、`python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id> --closeout-token-preset` で `evaluate_agent_run.py` が消費する standard behavior tokens を記録できます。この preset は記録 shortcut であり、`make ci`、dependency review、diff-check approval、review finding resolution は個別 evidence として残します。
+- evidence を確認済みの closeout では、`python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id> --closeout-token-preset` で `evaluate_agent_run.py` が消費する standard behavior tokens を記録できます。この preset は記録 shortcut であり、canonical formatter/check、dependency review、diff-check approval、review finding resolution は個別 evidence として残します。
 - `tools/agent_tools/evaluate_agent_run.py --report-dir reports/agents/<run-id> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write` が pass し、`closeout_gate.md` の `agent_evaluation_complete=yes` と `agent_evaluation.md` の `feedback_actions_resolved: yes` が揃ったら、agent behavior evaluation と feedback resolution を complete にする
 - `schedule.md` を TODO 正本として埋め、`work_log.md` に execution trail を残す
 - `notes/guardrails/engineering_avoidances.md` の log-derived avoid に当たる変更は、修正または reviewer escalation の対象にする

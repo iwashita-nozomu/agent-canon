@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -49,6 +50,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="User request clause id covered by this log entry. Repeat to add multiple ids.",
     )
     parser.add_argument(
+        "--design-ref",
+        action="append",
+        default=[],
+        help="Approved design section or artifact clause used by this entry.",
+    )
+    parser.add_argument(
         "--allow-missing-request-clause-id",
         action="store_true",
         help=(
@@ -68,6 +75,62 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional path or artifact reference. Repeat to add multiple refs.",
     )
     return parser
+
+
+def append_ledger_event(report_dir: Path, event: dict[str, object]) -> Path:
+    """Append one semantic event to the existing run-local work ledger."""
+    for field in ("run_id", "context_id", "event_id", "semantic_kind"):
+        if not isinstance(event.get(field), str) or not str(event[field]).strip():
+            raise ValueError(f"ledger event requires {field}")
+    if event["run_id"] != report_dir.name:
+        raise ValueError("ledger event run_id does not match report directory")
+    report_dir.mkdir(parents=True, exist_ok=True)
+    work_log_path = report_dir / "work_log.md"
+    if not work_log_path.exists():
+        _log_run_work_entry(report_dir, "ledger_event=bootstrap")
+    lines = work_log_path.read_text(encoding="utf-8").splitlines()
+    heading = "## Ledger Events"
+    if heading not in lines:
+        lines.extend(["", heading, ""])
+    payload = json.dumps(event, sort_keys=True, separators=(",", ":"))
+    line = f"- ledger_event={payload}"
+    event_id = str(event["event_id"])
+    for existing_line in lines:
+        if not existing_line.startswith("- ledger_event="):
+            continue
+        try:
+            existing = json.loads(existing_line.removeprefix("- ledger_event="))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(existing, dict) and existing.get("event_id") == event_id:
+            if existing != event:
+                raise ValueError(f"ledger event conflict for event_id={event_id}")
+            return work_log_path
+    if line not in lines:
+        lines.append(line)
+        work_log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return work_log_path
+
+
+def read_ledger_snapshot(report_dir: Path, snapshot_identity: str) -> dict[str, object]:
+    """Reconstruct one immutable logical-ledger snapshot from the run log."""
+    if not snapshot_identity.strip():
+        raise ValueError("snapshot_identity must not be empty")
+    work_log_path = report_dir / "work_log.md"
+    if not work_log_path.is_file():
+        raise ValueError(f"missing work log: {work_log_path}")
+    events: list[dict[str, object]] = []
+    for line in work_log_path.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("- ledger_event="):
+            continue
+        try:
+            event = json.loads(line.removeprefix("- ledger_event="))
+        except json.JSONDecodeError as exc:
+            raise ValueError("malformed ledger event") from exc
+        if not isinstance(event, dict):
+            raise ValueError("ledger event must be an object")
+        events.append(event)
+    return {"snapshot_identity": snapshot_identity, "events": events}
 
 
 def _resolve_active_report_dir(workspace_root: Path, report_root: Path) -> Path | None:
@@ -164,10 +227,16 @@ def main() -> int:
     ref_suffix = ""
     if args.ref:
         ref_suffix = " | refs: " + ", ".join(args.ref)
+    design_suffix = ""
+    if args.design_ref:
+        design_suffix = " | design_refs: " + ", ".join(args.design_ref)
     next_suffix = ""
     if args.next:
         next_suffix = f" | next: {args.next}"
-    entry = f"`{timestamp} | {args.kind} | {args.message}{clause_suffix}{ref_suffix}{next_suffix}`"
+    entry = (
+        f"`{timestamp} | {args.kind} | {args.message}"
+        f"{clause_suffix}{design_suffix}{ref_suffix}{next_suffix}`"
+    )
     work_log_path = _log_run_work_entry(report_dir, entry)
     print(f"WORK_LOG={work_log_path}")
     print(entry)

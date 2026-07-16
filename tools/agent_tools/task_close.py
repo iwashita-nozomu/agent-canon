@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import re
 import subprocess
 from collections.abc import Sequence
@@ -21,16 +22,17 @@ from pathlib import Path
 
 from agent_team import resolve_report_root
 from report_artifact_checks import (
+    COMPLETION_COVERAGE_SCHEMA,
     check_final_review_artifact,
     check_schedule_artifact,
     check_work_log_artifact,
+    consume_checked_completion_coverage,
     report_artifact_placement_blockers,
     token_fields,
     wave_reconciliation_blockers,
 )
 
 STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
-MAKE_CI_READY_STATUSES = {"pass", "targeted", "not_applicable"}
 MECHANICAL_STATIC_ANALYSIS_READY_STATUSES = {"pass", "targeted", "not_applicable"}
 DOCUMENT_STRUCTURE_MISSING_VALUES = {"", "missing", "none", "not_applicable"}
 DOCUMENT_SPLIT_DECISION_PREFIXES = (
@@ -41,6 +43,7 @@ DOCUMENT_SPLIT_DECISION_PREFIXES = (
     "rename:",
 )
 DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
+COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -328,6 +331,33 @@ def active_run_matches(active_run: str | None, report_dir: Path) -> bool:
     return active_run in {report_dir.name, str(report_dir.resolve())}
 
 
+def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
+    """Consume the generated v1 projection without rebuilding its ledger state."""
+    artifact_path = report_dir / COMPLETION_COVERAGE_ARTIFACT_NAME
+    if not artifact_path.is_file():
+        return {"ready": False, "reason": f"missing:{artifact_path}"}
+    try:
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"ready": False, "reason": f"unreadable:{exc}"}
+    if not isinstance(artifact, dict):
+        return {"ready": False, "reason": "artifact_is_not_object"}
+    if artifact.get("schema") != COMPLETION_COVERAGE_SCHEMA:
+        return {"ready": False, "reason": "schema_mismatch"}
+    coverage_check = artifact.get("coverage_check")
+    completion_boundary = artifact.get("completion_boundary")
+    if not isinstance(coverage_check, dict) or not isinstance(completion_boundary, dict):
+        return {"ready": False, "reason": "checked_projection_fields_missing"}
+    try:
+        return consume_checked_completion_coverage(
+            artifact,
+            coverage_check,
+            completion_boundary,
+        )
+    except ValueError as exc:
+        return {"ready": False, "reason": str(exc)}
+
+
 def main() -> int:
     """Run the closeout check."""
     args = build_parser().parse_args()
@@ -379,7 +409,13 @@ def main() -> int:
         closeout_path, "Subagent Lifecycle Evidence"
     )
     agent_canon_latest = parse_markdown_status_section(
-        closeout_path, "AgentCanon Latest And CI Gate Evidence"
+        closeout_path, "AgentCanon Latest Evidence"
+    )
+    canonical_evidence = parse_markdown_status_section(
+        closeout_path, "Canonical Formatter And Static Evidence"
+    )
+    completion_coverage_evidence = parse_markdown_status_section(
+        closeout_path, "CompletionCoverage And Failure Response Evidence"
     )
     runtime_log_archive = parse_markdown_status_section(
         closeout_path, "Runtime Log Archive Evidence"
@@ -421,6 +457,7 @@ def main() -> int:
         else ["final_review.md:missing"]
     )
     report_artifact_blockers = report_artifact_placement_blockers(workspace, report_dir)
+    completion_decision = completion_coverage_consumer(report_dir)
     wave_reconciliation = wave_reconciliation_blockers(
         schedule_text,
         workflow_monitoring_text,
@@ -437,8 +474,15 @@ def main() -> int:
         "required_reviews_complete": closeout.get("required_reviews_complete") == "yes",
         "validation_complete": closeout.get("validation_complete") == "yes",
         "request_contract_complete": closeout.get("request_contract_complete") == "yes",
-        "all_planned_chunks_complete": closeout.get("all_planned_chunks_complete") == "yes",
-        "overall_delivery_complete": closeout.get("overall_delivery_complete") == "yes",
+        "completion_coverage_consumer": completion_decision.get("ready") is True,
+        "all_planned_chunks_complete": (
+            completion_decision.get("all_planned_chunks_complete") is True
+            and closeout.get("all_planned_chunks_complete") == "yes"
+        ),
+        "overall_delivery_complete": (
+            completion_decision.get("overall_delivery_complete") is True
+            and closeout.get("overall_delivery_complete") == "yes"
+        ),
         "unfinished_tasks_absent": closeout.get("unfinished_tasks_absent") == "yes",
         "dependency_headers_complete": closeout.get("dependency_headers_complete") == "yes",
         "repo_wide_dependency_tools_complete": closeout.get("repo_wide_dependency_tools_complete")
@@ -462,9 +506,22 @@ def main() -> int:
         not in {"", "missing", "none"},
         "agent_canon_parent_pin": agent_canon_latest.get("agent_canon_parent_pin", "")
         not in {"", "missing", "none"},
-        "make_ci_status": closeout.get("make_ci_status") in MAKE_CI_READY_STATUSES,
-        "spec_product_coverage_complete": closeout.get("spec_product_coverage_complete")
-        == "yes",
+        "mapping_error_sets_empty": closeout.get("mapping_error_sets_empty") == "yes",
+        "typed_owner_boundary_status": closeout.get("typed_owner_boundary_status")
+        == "pass",
+        "canonical_format_check_status": canonical_evidence.get(
+            "canonical_format_check_status", closeout.get("canonical_format_check_status", "")
+        )
+        == "pass",
+        "canonical_dispatcher_schema_status": closeout.get(
+            "canonical_dispatcher_schema_status"
+        )
+        == "pass",
+        "validation_failure_response_status": completion_coverage_evidence.get(
+            "validation_failure_response_status",
+            closeout.get("validation_failure_response_status", ""),
+        )
+        == "pass",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
         "post_fix_full_review_complete": closeout.get("post_fix_full_review_complete") == "yes",
         "tool_warnings_resolved": closeout.get("tool_warnings_resolved") == "yes",
@@ -638,6 +695,23 @@ def main() -> int:
     print(f"REQUEST_CONTRACT_COMPLETE={closeout.get('request_contract_complete', '')}")
     print(f"ALL_PLANNED_CHUNKS_COMPLETE={closeout.get('all_planned_chunks_complete', '')}")
     print(f"OVERALL_DELIVERY_COMPLETE={closeout.get('overall_delivery_complete', '')}")
+    print(f"COMPLETION_COVERAGE_ARTIFACT={report_dir / COMPLETION_COVERAGE_ARTIFACT_NAME}")
+    print(f"COMPLETION_COVERAGE_CONSUMER_READY={completion_decision.get('ready', False)}")
+    print(f"COMPLETION_COVERAGE_CONSUMER_REASON={completion_decision.get('reason', '')}")
+    print(f"MAPPING_ERROR_SETS_EMPTY={closeout.get('mapping_error_sets_empty', '')}")
+    print(f"TYPED_OWNER_BOUNDARY_STATUS={closeout.get('typed_owner_boundary_status', '')}")
+    print(
+        "CANONICAL_FORMAT_CHECK_STATUS="
+        f"{canonical_evidence.get('canonical_format_check_status', '')}"
+    )
+    print(
+        "CANONICAL_DISPATCHER_SCHEMA_STATUS="
+        f"{closeout.get('canonical_dispatcher_schema_status', '')}"
+    )
+    print(
+        "VALIDATION_FAILURE_RESPONSE_STATUS="
+        f"{completion_coverage_evidence.get('validation_failure_response_status', '')}"
+    )
     print(f"UNFINISHED_TASKS_ABSENT={closeout.get('unfinished_tasks_absent', '')}")
     print(f"DEPENDENCY_HEADERS_COMPLETE={closeout.get('dependency_headers_complete', '')}")
     print(
@@ -671,11 +745,6 @@ def main() -> int:
     print(
         "AGENT_CANON_PARENT_PIN="
         f"{agent_canon_latest.get('agent_canon_parent_pin', '')}"
-    )
-    print(f"MAKE_CI_STATUS={closeout.get('make_ci_status', '')}")
-    print(
-        "SPEC_PRODUCT_COVERAGE_COMPLETE="
-        f"{closeout.get('spec_product_coverage_complete', '')}"
     )
     print(f"REVIEW_FINDINGS_INTEGRATED={closeout.get('review_findings_integrated', '')}")
     print(
