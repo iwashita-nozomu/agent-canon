@@ -24,6 +24,7 @@ from tools.experiments.execution_resource_plan import (
     EffectiveEnvironmentReadback,
     ExperimentRunnerPreLaunchAdapter,
     GPUDevice,
+    managed_run_adapter_integration_contract,
     PlanState,
     ProcessIdentity,
     ResourceRequest,
@@ -52,6 +53,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             argv=("/workspace/experiment", "--run", "chunk-1"),
             cwd=Path("/workspace"),
             environment={"RUN_MODE": "managed"},
+            integration_contract=managed_run_adapter_integration_contract(),
             run_id="resource-plan-contract",
             requested_chunks=("chunk-1",),
             cpu_requested_set=(0,),
@@ -129,6 +131,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 argv=("/bin/true",),
                 cwd=Path("/workspace"),
                 environment={},
+                integration_contract=managed_run_adapter_integration_contract(),
                 gpu_requested_count=1,
             )
 
@@ -153,7 +156,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 process_identities=(),
                 requested_memory_bytes=1024,
             )
-            adapter = ExperimentRunnerPreLaunchAdapter()
+            adapter = ExperimentRunnerPreLaunchAdapter(
+                managed_run_adapter_integration_contract()
+            )
 
             def transport(payload):
                 return {

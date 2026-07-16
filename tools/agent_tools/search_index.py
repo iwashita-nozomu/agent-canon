@@ -4,7 +4,7 @@
 # responsibility Builds repo-local semantic search cards for coordinated AgentCanon search.
 # upstream design ../../documents/search-coordination.md coordinated search provider contract
 # upstream implementation ./vector_search.py scans shared text surfaces
-# downstream implementation ./search.py consumes search cards as the LLM search provider
+# downstream implementation ./search.py consumes search cards as the coordinated search provider
 # downstream implementation ../../tests/agent_tools/test_search.py validates semantic-card generation through the coordinated search surface
 # @dependency-end
 """Build repo-local search cards for first-class LLM-backed search."""
