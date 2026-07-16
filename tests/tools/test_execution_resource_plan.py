@@ -15,6 +15,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tests.tools.resource_plan_test_evidence import (
+    SnapshotResourceProbe,
+    discover_test_resources,
+)
+
 from tools.experiments.execution_resource_plan import (
     CALLER_ALLOCATION_PROVENANCE,
     COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION,
@@ -28,10 +33,9 @@ from tools.experiments.execution_resource_plan import (
     PlanState,
     ProcessIdentity,
     ResourceRequest,
-    SnapshotResourceProbe,
+    ResourceObservation,
     TypedPreflightFailure,
     UUIDReservationStore,
-    discover_injected_test_resources,
     dispose_resources,
     freeze_resource_plan,
     materialize_environment,
@@ -86,7 +90,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
     def build_plan(self, root: Path):
         """Build the public discovery and frozen-plan stages."""
         request = self.make_request(root)
-        discovered = discover_injected_test_resources(
+        discovered = discover_test_resources(
             request,
             request.resource_probe,
             cpu_available_set=request.discovered_cpu_available_set,
@@ -298,12 +302,19 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 gpu_processes=lambda: (),
                 occupied_gpu_units=lambda _processes: (),
             )
+            observation = ResourceObservation(
+                caller_allocated_ids=frozenset({"GPU-0001"}),
+                process_identities=(),
+                gpu_devices=(GPUDevice("GPU-0001", 4096, 8192),),
+                free_memory_bytes={"GPU-0001": 4096},
+                boot_id="boot-1",
+                container_visible_ids=frozenset({"GPU-0001"}),
+                observed_at="reclaim-observation",
+            )
             evidence = store.reclaim_stale(
                 "GPU-0001",
-                current_boot_id=lambda: "boot-1",
-                gpu_processes=lambda: (),
+                observation_supplier=lambda: observation,
                 process_start_identity=lambda _pid: None,
-                occupied_gpu_units=lambda _processes: (),
             )
             self.assertTrue(evidence.reclaimed)
             self.assertTrue(evidence.under_lock_proof["record_reread_under_lock"])

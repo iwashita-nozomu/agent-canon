@@ -87,10 +87,17 @@ def execute_visualization_notebook(run_dir):
     return run_dir / EXECUTED_NOTEBOOK_NAME
 
 
+def require_managed_runner_route() -> None:
+    """Reject direct topic execution outside the managed ExperimentRunner."""
+    if not os.environ.get("EXPERIMENT_RUN_MANIFEST"):
+        raise RuntimeError(
+            "managed_runner_required=tools/experiments/run_managed_experiment.py"
+        )
+
+
 def main() -> int:
     """Run one experiment invocation without CLI arguments."""
-    # This template has no planner or runner binding; GPU work belongs to the
-    # managed ExperimentRunner route, never this direct entrypoint.
+    require_managed_runner_route()
     # IMPLEMENT HERE: keep main() as orchestration only. Put experiment logic in
     # run_experiment() and process-local work in run_case_worker().
     run_dir = resolve_run_dir()

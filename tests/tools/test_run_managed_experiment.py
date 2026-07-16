@@ -5,6 +5,7 @@
 # upstream design ../../documents/experiment_runner.md ExperimentRunner owner boundary
 # upstream implementation ../../tools/experiments/execution_resource_plan.py canonical resource-plan/prelaunch owner
 # upstream implementation ../../tools/experiments/run_managed_experiment.py canonical managed CLI owner
+# upstream implementation ./resource_plan_test_evidence.py deterministic test-only injection boundary
 # upstream implementation ../../tools/ci/check_experiment_registry.py checker under test
 # downstream integration ../../reports/agents/w1-tool-env-routing-20260716/integration_bundle_selector.json W1 public selectors
 # @dependency-end
@@ -18,15 +19,18 @@ import sys
 import tomllib
 from pathlib import Path
 
+from tests.tools.resource_plan_test_evidence import (
+    SnapshotResourceProbe,
+    discover_test_resources,
+)
+
 from tools.experiments.execution_resource_plan import (
     GPUDevice,
     ProcessIdentity,
     ResourceObservation,
     ResourceRequest,
-    SnapshotResourceProbe,
     TypedPreflightFailure,
     UUIDReservationStore,
-    discover_injected_test_resources,
     discover_resources,
     managed_run_adapter_integration_contract,
     plan_gpu_allocation,
@@ -258,7 +262,35 @@ def test_managed_public_route_has_one_canonical_prelaunch_owner() -> None:
     assert "plan_gpu_allocation(request, discovered)" in source
     assert "ExperimentRunnerPreLaunchAdapter" in source
     assert "execute_with_experiment_runner" in source
+    assert "CanonicalExperimentRunnerBinding" in source
+    assert "frozen_plan.gpu_allocation" in source
+    assert "side_effect_disposers" in source
+    assert 'failed_operation="terminal_persistence"' in source
     assert "direct command launch is not an authorized route" in source
+
+
+def test_public_alternate_gpu_routes_are_typed_or_managed() -> None:
+    """Template and JIT entrypoints cannot launch GPU work beside the managed owner."""
+    template_source = (
+        Path(__file__).resolve().parents[2] / "experiments" / "_template" / "run.py"
+    ).read_text(encoding="utf-8")
+    jit_source = (
+        Path(__file__).resolve().parents[2]
+        / "tools"
+        / "agent_tools"
+        / "jit_canonical_ir.py"
+    ).read_text(encoding="utf-8")
+    planner_source = (
+        Path(__file__).resolve().parents[2]
+        / "tools"
+        / "experiments"
+        / "execution_resource_plan.py"
+    ).read_text(encoding="utf-8")
+    assert "managed_runner_required=tools/experiments/run_managed_experiment.py" in template_source
+    assert "gpu_route_blocked=canonical_managed_experiment_runner_required" in jit_source
+    assert "gpu_structured_probe_unavailable" in planner_source
+    assert "discover_injected_test_resources" not in planner_source
+    assert '    "SnapshotResourceProbe",' not in planner_source
 
 
 def test_public_gpu_plan_excludes_compute_and_graphics_contexts_with_fresh_readbacks(
@@ -305,7 +337,7 @@ def test_public_gpu_plan_excludes_compute_and_graphics_contexts_with_fresh_readb
         observation_sequence=observations,
     )
     request = make_resource_request(tmp_path, probe)
-    discovered = discover_injected_test_resources(
+    discovered = discover_test_resources(
         request,
         probe,
         cpu_available_set=(0,),

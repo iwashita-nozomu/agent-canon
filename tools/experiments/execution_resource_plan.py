@@ -558,6 +558,15 @@ def _parse_structured_gpu_processes(
     device_by_uuid: Mapping[str, GPUDevice],
     parent_map: Mapping[ET.Element, ET.Element],
 ) -> tuple[ProcessIdentity, ...]:
+    process_containers = tuple(
+        root.findall(path)
+        for path in (".//processes", ".//compute_processes", ".//graphics_processes")
+    )
+    if not any(process_containers):
+        raise TypedPreflightFailure(
+            "gpu_process_identity_unproven",
+            "structured GPU XML omitted the process inventory required to prove O_t",
+        )
     processes: list[ProcessIdentity] = []
     for process_info in root.findall(".//process_info"):
         pid_text = _xml_text(process_info.find("pid"), "process_info.pid")
@@ -822,6 +831,7 @@ class _NvidiaSMIObservationAdapter:
                 "container_identity_unavailable",
                 "container identity is unavailable",
             ) from exc
+        observation_event_id = f"nvidia-smi-{secrets.token_hex(12)}"
         fingerprint = hashlib.sha256(
             _canonical_json(
                 {
@@ -839,6 +849,7 @@ class _NvidiaSMIObservationAdapter:
                     "boot_id": boot_id,
                     "visible": tuple(sorted(allocated)),
                     "observed_at": observed_at,
+                    "observation_event_id": observation_event_id,
                 }
             ).encode("utf-8")
         ).hexdigest()
@@ -857,7 +868,7 @@ class _NvidiaSMIObservationAdapter:
             current_boot_id=boot_id,
             visible=allocated,
             observed_at=observed_at,
-            observation_event_id=f"nvidia-smi-{secrets.token_hex(12)}",
+            observation_event_id=observation_event_id,
             fingerprint=fingerprint,
             cpu_set=cpu_set,
             host_memory=host_memory,
@@ -1126,44 +1137,27 @@ class UUIDReservationStore:
         self,
         uuid: str,
         *,
-        current_boot_id: Callable[[], str],
-        gpu_processes: Callable[[], Sequence[ProcessIdentity]],
+        observation_supplier: Callable[[], ResourceObservation],
         process_start_identity: Callable[[int], str | None],
-        observation_supplier: Callable[[], ResourceObservation] | None = None,
-        occupied_gpu_units: Callable[[Sequence[ProcessIdentity]], Sequence[str]]
-        | None = None,
     ) -> StaleReclaimEvidence:
         """Repeat every stale proof under the UUID lock and persist the result."""
-        if observation_supplier is None and occupied_gpu_units is None:
-            raise TypedPreflightFailure(
-                "gpu_occupancy_mapping_required",
-                "stale GPU reclaim requires the canonical physical/MIG occupancy mapping",
-                uuid=uuid,
-            )
-
         def capture_observation() -> tuple[
             str,
             tuple[ProcessIdentity, ...],
             tuple[GPUDevice, ...],
         ]:
-            if observation_supplier is not None:
-                observation = observation_supplier()
-                return (
-                    observation.boot_id,
-                    observation.process_identities,
-                    observation.gpu_devices,
-                )
-            return current_boot_id(), tuple(gpu_processes()), ()
+            observation = observation_supplier()
+            return (
+                observation.boot_id,
+                observation.process_identities,
+                observation.gpu_devices,
+            )
 
         def holds_uuid(
             processes: Sequence[ProcessIdentity],
             devices: Sequence[GPUDevice],
         ) -> bool:
-            if observation_supplier is not None:
-                return uuid in _occupied_gpu_units(processes, devices, (uuid,))
-            if occupied_gpu_units is not None:
-                return uuid in occupied_gpu_units(processes)
-            return False
+            return uuid in _occupied_gpu_units(processes, devices, (uuid,))
 
         path = self.root / f"gpu-{_safe_uuid_filename(uuid)}.lock"
         recorded_at = utc_now()
@@ -1943,6 +1937,12 @@ class ExperimentRunnerExecutionPort(Protocol):
         plan: ExecutionResourcePlan,
     ) -> Mapping[str, object]: ...
 
+    def side_effect_disposers(
+        self,
+        *,
+        plan: ExecutionResourcePlan,
+    ) -> Mapping[str, object]: ...
+
 
 class RunnerTransport(Protocol):
     def __call__(self, payload: Mapping[str, object]) -> Mapping[str, object]: ...
@@ -2702,7 +2702,6 @@ def _persist_pre_execution_failure_record(
 def _dispose_pre_execution_leases(
     leases: Sequence[ReservationLease],
     observation_probe: Callable[[], ResourceObservation] | None,
-    fallback_devices: Sequence[GPUDevice] = (),
 ) -> tuple[tuple[Mapping[str, object], ...], tuple[Mapping[str, object], ...]]:
     dispositions: list[Mapping[str, object]] = []
     leaks: list[Mapping[str, object]] = []
@@ -2719,7 +2718,6 @@ def _dispose_pre_execution_leases(
                 disposition = _release_lease_with_observation(
                     lease,
                     observation_probe,
-                    fallback_devices,
                 )
             except Exception as exc:
                 disposition = {
@@ -2815,16 +2813,12 @@ def handle_pre_execution_failure(
         observation_probe: Callable[[], ResourceObservation] | None = (
             plan.resource_probe.observe
         )
-        fallback_devices: Sequence[GPUDevice] = ()
     elif discovered is not None:
         observation_probe = discovered.probe.observe
-        fallback_devices = discovered.observation.gpu_devices
     elif request is not None and isinstance(request.resource_probe, NvidiaSMIResourceProbe):
         observation_probe = request.resource_probe.observe
-        fallback_devices = ()
     else:
         observation_probe = None
-        fallback_devices = ()
     partial_payload = {
         "schema_version": "partial-evidence/v1",
         "plan_fingerprint": transaction_fingerprint,
@@ -2868,7 +2862,6 @@ def handle_pre_execution_failure(
         lease_dispositions, leaks = _dispose_pre_execution_leases(
             tuple(leases_by_reservation.values()),
             observation_probe,
-            fallback_devices,
         )
         raise TypedPreflightFailure(
             "pre_execution_failure_evidence_persistence_failed",
@@ -2895,7 +2888,6 @@ def handle_pre_execution_failure(
     lease_dispositions, leaks = _dispose_pre_execution_leases(
         tuple(leases_by_reservation.values()),
         observation_probe,
-        fallback_devices,
     )
     cleanup_history = (*terminal_history, PlanState.CLEANUP_DISPOSED)
     cleanup_payload = {
@@ -3191,52 +3183,6 @@ def _discover_resources_impl(request: ResourceRequest) -> DiscoveredResources:
     )
 
 
-def discover_injected_test_resources(
-    request: ResourceRequest,
-    probe: ResourceProbe,
-    *,
-    cpu_available_set: Sequence[int] = (),
-    gpu_devices: Sequence[GPUDevice] = (),
-    reserved_ids: frozenset[str] = frozenset(),
-    host_memory_bytes: int = 0,
-    temp_bytes: int = 0,
-    ports: Sequence[Mapping[str, object]] = (),
-    container_id: str = "",
-    structure_tool: Mapping[str, str] | None = None,
-    tool_availability: Mapping[str, object] | None = None,
-) -> DiscoveredResources:
-    """Build deterministic injected evidence; never use as production discovery."""
-    try:
-        if not isinstance(probe, SnapshotResourceProbe):
-            raise TypedPreflightFailure(
-                "injected_probe_must_be_snapshot",
-                "the injected discovery API accepts SnapshotResourceProbe only",
-            )
-        observation = probe.observe()
-        return _discover_resources_from_probe_impl(
-            request,
-            probe,
-            observation,
-            cpu_available_set=cpu_available_set,
-            gpu_devices=gpu_devices,
-            reserved_ids=reserved_ids,
-            host_memory_bytes=host_memory_bytes,
-            temp_bytes=temp_bytes,
-            ports=ports,
-            container_id=container_id,
-            structure_tool=structure_tool,
-            tool_availability=tool_availability,
-        )
-    except Exception as exc:
-        cleanup = handle_pre_execution_failure(
-            exc,
-            failed_operation="resource_discovery",
-            source_state=PlanState.RESOURCE_DISCOVERED,
-            request=request,
-        )
-        raise _failure_after_durable_cleanup(exc, cleanup) from exc
-
-
 def _discover_resources_from_probe_impl(
     request: ResourceRequest,
     probe: ResourceProbe,
@@ -3334,11 +3280,17 @@ def _occupied_gpu_units(
 def _release_lease_with_observation(
     lease: ReservationLease,
     observation_supplier: Callable[[], ResourceObservation],
-    fallback_devices: Sequence[GPUDevice] = (),
 ) -> Mapping[str, object]:
     """Release against one coherent live-holder observation and frozen mapping."""
     observation = observation_supplier()
-    devices = observation.gpu_devices or tuple(fallback_devices)
+    if not observation.gpu_devices:
+        raise TypedPreflightFailure(
+            "gpu_structured_probe_unavailable",
+            "lease release requires a fresh structured GPU device observation",
+            observation_event_id=observation.observation_event_id,
+            observation_fingerprint=observation.fingerprint,
+        )
+    devices = observation.gpu_devices
     return lease.release(
         gpu_processes=lambda: observation.process_identities,
         occupied_gpu_units=lambda processes: _occupied_gpu_units(
@@ -3394,6 +3346,7 @@ def _plan_gpu_allocation_impl(
     provenance = discovered.allocation_provenance
     observation_s0 = discovered.observation
     observation_events = {observation_s0.observation_event_id}
+    observation_fingerprints = {observation_s0.fingerprint}
 
     def fresh_observation(event: str) -> ResourceObservation:
         observation = discovered.probe.observe()
@@ -3404,7 +3357,16 @@ def _plan_gpu_allocation_impl(
                 event=event,
                 observation_event_id=observation.observation_event_id,
             )
+        if not observation.fingerprint or observation.fingerprint in observation_fingerprints:
+            raise _gpu_preflight(
+                "gpu_observation_fingerprint_reused",
+                "resource probe returned a repeated or empty observation fingerprint",
+                event=event,
+                observation_event_id=observation.observation_event_id,
+                observation_fingerprint=observation.fingerprint,
+            )
         observation_events.add(observation.observation_event_id)
+        observation_fingerprints.add(observation.fingerprint)
         return observation
     if requested == 0:
         lock_readback = {
@@ -3505,15 +3467,8 @@ def _plan_gpu_allocation_impl(
             if lease is None:
                 reclaim = discovered.reservation_store.reclaim_stale(
                     uuid,
-                    current_boot_id=lambda: observation_s0.boot_id,
-                    gpu_processes=lambda: observation_s0.process_identities,
-                    process_start_identity=_process_start_identity,
                     observation_supplier=lambda: fresh_observation("stale_reclaim"),
-                    occupied_gpu_units=lambda processes: _occupied_gpu_units(
-                        processes,
-                        observation_s0.gpu_devices,
-                        (uuid,),
-                    ),
+                    process_start_identity=_process_start_identity,
                 )
                 if reclaim.reclaimed:
                     lease = discovered.reservation_store.acquire(
@@ -3581,6 +3536,7 @@ def _plan_gpu_allocation_impl(
                     "observation_timestamp": observation_s_lock.observed_at,
                     "observation_fingerprint": observation_s_lock.fingerprint,
                     "observation_event": "S_lock",
+                    "observation_event_id": observation_s_lock.observation_event_id,
                     "raced": raced,
                 }
             )
@@ -3588,7 +3544,6 @@ def _plan_gpu_allocation_impl(
                 release_witness = _release_lease_with_observation(
                     lease,
                     lambda: fresh_observation(f"release_race:{uuid}"),
-                    observation_s_lock.gpu_devices,
                 )
                 if release_witness.get("result") != "released":
                     raise _gpu_preflight(
@@ -3625,7 +3580,6 @@ def _plan_gpu_allocation_impl(
                             lambda: fresh_observation(
                                 f"release_selected:{selected_lease.uuid}"
                             ),
-                            observation_s_selected.gpu_devices,
                         )
                         if release_witness.get("result") != "released":
                             raise _gpu_preflight(
@@ -3722,11 +3676,13 @@ def _plan_gpu_allocation_impl(
             "timestamp": observation_s0.observed_at,
             "fingerprint": observation_s0.fingerprint,
             "event": "S0",
+            "event_id": observation_s0.observation_event_id,
         },
         "final_observation": {
             "timestamp": observation_s_final.observed_at,
             "fingerprint": observation_s_final.fingerprint,
             "event": "S_final",
+            "event_id": observation_s_final.observation_event_id,
         },
         "final_eligible_ids": final_eligible_ids,
         "reservation_ids": tuple(lease.reservation_id for lease in leases),
@@ -4643,6 +4599,7 @@ class ExperimentRunnerPreLaunchAdapter:
             gpu_allocation,
         )
         probe_observation = plan.resource_probe.observe()
+        cpu_resources = cast(Mapping[str, object], plan.resources["cpu"])
         payload = {
             "scheduler_policy": "transport_only_no_reselection_no_rewrite",
             "canonical_environment": {
@@ -4702,6 +4659,8 @@ class ExperimentRunnerPreLaunchAdapter:
                 "observation_timestamp": probe_observation.observed_at,
                 "observation_fingerprint": probe_observation.fingerprint,
                 "observation_event_id": probe_observation.observation_event_id,
+                "cpu_set": tuple(cast(Sequence[int], cpu_resources["allocated_set"])),
+                "container_id": str(plan.container["container_id"]),
             },
         }
         with self._transport_lock:
@@ -5614,7 +5573,6 @@ __all__ = [
     "TypedPreflightFailure",
     "UUIDReservationStore",
     "discover_resources",
-    "discover_injected_test_resources",
     "dispose_resources",
     "execute_with_experiment_runner",
     "freeze_resource_plan",

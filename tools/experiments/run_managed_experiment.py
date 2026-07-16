@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
+import importlib.util
 import json
 import os
 import platform
@@ -47,10 +49,13 @@ from tools.experiments.execution_resource_plan import (
     dispose_resources,
     execute_with_experiment_runner,
     freeze_resource_plan,
+    handle_pre_execution_failure,
     managed_run_adapter_integration_contract,
     materialize_environment,
     plan_gpu_allocation,
+    PlanState,
     record_terminal,
+    _failure_after_durable_cleanup,
 )
 
 DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
@@ -194,6 +199,138 @@ class RunContext:
     command: CommandSelection
     created_at: str
     git: GitSnapshot
+
+
+class CanonicalExperimentRunnerBinding:
+    """Concrete lazy binding to the external StandardRunner contract."""
+
+    def __init__(self, context: RunContext, run_config: Mapping[str, object]) -> None:
+        self.context = context
+        self.run_config = run_config
+        self._runner: object | None = None
+
+    def _topic_module(self) -> object:
+        entrypoint = self.context.topic_dir / "run.py"
+        spec = importlib.util.spec_from_file_location(
+            f"agent_canon_topic_{self.context.identity.run_name}",
+            entrypoint,
+        )
+        if spec is None or spec.loader is None:
+            raise TypedPreflightFailure(
+                "experiment_runner_binding_unavailable",
+                "topic entrypoint cannot be bound to the external ExperimentRunner",
+                entrypoint=str(entrypoint),
+            )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _runner_callable(self, module: object, name: str) -> Callable[..., object]:
+        value = getattr(module, name, None)
+        if not callable(value):
+            raise TypedPreflightFailure(
+                "experiment_runner_binding_unavailable",
+                "topic entrypoint omitted a documented ExperimentRunner callable",
+                callable_name=name,
+                entrypoint=str(self.context.topic_dir / "run.py"),
+            )
+        return cast(Callable[..., object], value)
+
+    def prelaunch_transport(self, payload: Mapping[str, object]) -> Mapping[str, object]:
+        """Transport the exact packet without scheduler reselection or rewrite."""
+        canonical = cast(Mapping[str, object], payload["canonical_environment"])
+        allocation = cast(Mapping[str, object], payload["gpu_allocation"])
+        observation = cast(Mapping[str, object], payload["prelaunch_observation"])
+        handoff = cast(Mapping[str, object], payload["handoff_metadata"])
+        return {
+            "accepted": True,
+            "canonical_environment": canonical,
+            "gpu_allocation": allocation,
+            "scheduler_policy": payload["scheduler_policy"],
+            "plan_fingerprint": handoff["plan_fingerprint"],
+            "readback_fingerprint": handoff["readback_fingerprint"],
+            "effective_environment": canonical["exact_env_map"],
+            "cwd": canonical["cwd"],
+            "argv": canonical["argv"],
+            "visible_gpu_ids": allocation["selected_ids"],
+            "cpu_set": observation["cpu_set"],
+            "container_id": observation["container_id"],
+            "runtime_identity": observation["container_id"],
+            "allocation_id": allocation["allocation_id"],
+            "caller_allocated_ids": allocation["caller_allocated_ids"],
+            "reservation_ids": allocation["reservation_ids"],
+            "free_memory_bytes": observation["free_memory_bytes"],
+            "process_identities": observation["process_identities"],
+            "requested_memory_bytes": allocation["requested_memory_bytes"],
+            "readback_timestamp": observation["observation_timestamp"],
+            "probe_observation_timestamp": observation["observation_timestamp"],
+            "probe_observation_fingerprint": observation["observation_fingerprint"],
+            "probe_observation_event_id": observation["observation_event_id"],
+        }
+
+    def execute(
+        self,
+        *,
+        plan: object,
+        task: Callable[..., object],
+        cases: list[object],
+        context_builder: Callable[..., object],
+        initializer: Callable[..., object],
+        resource_estimator: Callable[..., object],
+        skip_controller: object | None,
+    ) -> object:
+        del task, cases, context_builder, initializer, resource_estimator, skip_controller
+        try:
+            runner_module = importlib.import_module("experiment_runner")
+            topic_module = self._topic_module()
+            standard_worker = getattr(runner_module, "StandardWorker")
+            scheduler_type = getattr(runner_module, "StandardFullResourceScheduler")
+            runner_type = getattr(runner_module, "StandardRunner")
+            cases_value = getattr(topic_module, "cases")
+            worker = standard_worker(
+                task=self._runner_callable(topic_module, "task"),
+                resource_estimator=self._runner_callable(topic_module, "resource_estimate"),
+                initializer=self._runner_callable(topic_module, "initializer"),
+            )
+            scheduler = scheduler_type.from_worker(
+                cases=cases_value,
+                worker=worker,
+                context_builder=self._runner_callable(topic_module, "context_builder"),
+                skip_controller=getattr(topic_module, "skip_controller", None),
+                resource_capacity=getattr(plan, "resources"),
+            )
+            self._runner = runner_type(scheduler)
+            return self._runner.run(worker)
+        except Exception as exc:
+            raise TypedPreflightFailure(
+                "experiment_runner_binding_unavailable",
+                "the canonical ExperimentRunner components could not be bound",
+                failure_type=type(exc).__name__,
+                failure_message=str(exc),
+            ) from exc
+
+    def quiescence_evidence(self, *, plan: object) -> Mapping[str, object]:
+        if self._runner is None:
+            raise TypedPreflightFailure(
+                "runner_quiescence_evidence_unavailable",
+                "ExperimentRunner binding has no live runner for quiescence evidence",
+                plan_fingerprint=getattr(plan, "plan_fingerprint", ""),
+            )
+        evidence = getattr(self._runner, "quiescence_evidence", None)
+        if not callable(evidence):
+            raise TypedPreflightFailure(
+                "runner_quiescence_evidence_unavailable",
+                "external ExperimentRunner omitted quiescence evidence",
+            )
+        return cast(Mapping[str, object], evidence(plan=plan))
+
+    def side_effect_disposers(self, *, plan: object) -> Mapping[str, object]:
+        if self._runner is None:
+            return {}
+        disposers = getattr(self._runner, "side_effect_disposers", None)
+        if not callable(disposers):
+            return {}
+        return cast(Mapping[str, object], disposers(plan=plan))
 
 
 def repo_root_from_script() -> Path:
@@ -1568,7 +1705,7 @@ def execute_managed_run(
     ).pre_launch(
         materialized.plan,
         materialized,
-        allocation,
+        frozen_plan.gpu_allocation,
         runner_port.prelaunch_transport,
     )
     execution_result: object | None = None
@@ -1637,27 +1774,53 @@ def execute_managed_run(
             run_log_path=str(context.paths.log_path),
             artifact_manifest_path=str(context.paths.artifact_manifest_path),
         )
-    finally:
-        if terminal is not None:
-            quiescence_evidence = _runner_quiescence_evidence(
-                runner_port,
-                terminal.plan,
-            )
-            completion_input = _completion_input_for_managed_run(
-                terminal,
-                materialized,
-                run_config,
-            )
-            dispose_resources(
-                terminal.plan,
-                terminal,
-                completion_coverage_adapter=CompletionCoverageAdapter(
-                    Path(cast(str, terminal.plan.container["source_projection_root"]))
-                    / COMPLETION_COVERAGE_FILENAME
-                ),
-                completion_coverage_input=completion_input,
-                runner_quiescence_evidence=quiescence_evidence,
-            )
+    except Exception as exc:
+        cleanup = handle_pre_execution_failure(
+            exc,
+            failed_operation="terminal_persistence",
+            source_state=PlanState.ENV_MATERIALIZED,
+            plan=materialized.plan,
+        )
+        raise _failure_after_durable_cleanup(exc, cleanup) from exc
+    quiescence_evidence = _runner_quiescence_evidence(
+        runner_port,
+        terminal.plan,
+    )
+    completion_input = _completion_input_for_managed_run(
+        terminal,
+        materialized,
+        run_config,
+    )
+    disposer_failure: Mapping[str, object] = {}
+    try:
+        raw_disposers = runner_port.side_effect_disposers(plan=terminal.plan)
+    except Exception as exc:
+        raw_disposers = {}
+        disposer_failure = {
+            "side_effect_disposer_failure": {
+                "failure_type": type(exc).__name__,
+                "failure_message": str(exc),
+                "disposition": "cleanup_without_owner_disposers",
+            }
+        }
+    if disposer_failure:
+        quiescence_evidence = {**quiescence_evidence, **disposer_failure}
+    side_effect_disposers = (
+        cast(Mapping[str, Callable[[Mapping[str, object]], Mapping[str, object]]], raw_disposers)
+        if isinstance(raw_disposers, Mapping)
+        else {}
+    )
+    dispose_resources(
+        terminal.plan,
+        terminal,
+        completion_coverage_adapter=CompletionCoverageAdapter(
+            Path(cast(str, terminal.plan.container["source_projection_root"]))
+            / COMPLETION_COVERAGE_FILENAME
+        ),
+        completion_coverage_input=completion_input,
+        runner_quiescence_evidence=quiescence_evidence,
+        side_effect_disposers=side_effect_disposers,
+    )
     if runner_failure is not None:
         raise runner_failure
     if execution_result is None:
@@ -1776,6 +1939,8 @@ def run_cli(
 
     manifest = build_manifest(context, "running")
     run_config = build_run_config(context, explicit_config)
+    if runner_port is None:
+        runner_port = CanonicalExperimentRunnerBinding(context, run_config)
     manifest["config_path"] = str(context.paths.config_path)
     manifest["config"] = run_config
     start_monotonic = time.monotonic()
@@ -1809,15 +1974,9 @@ def run_cli(
         )
         return PREFLIGHT_FAILURE_EXIT_CODE
 
-    bindings = (
-        runner_port,
-        task,
-        cases,
-        context_builder,
-        initializer,
-        resource_estimator,
-    )
-    if any(binding is None for binding in bindings):
+    canonical_binding = isinstance(runner_port, CanonicalExperimentRunnerBinding)
+    bindings = (task, cases, context_builder, initializer, resource_estimator)
+    if not canonical_binding and any(binding is None for binding in bindings):
         message = (
             "managed execution requires the external ExperimentRunner port and "
             "task/cases/context/initializer/resource-estimator bindings; direct command "
