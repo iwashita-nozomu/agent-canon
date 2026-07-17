@@ -25,12 +25,12 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
+import agent_team  # noqa: E402
 from agent_team import (  # noqa: E402
     AgentTypeSelection,
     load_team_config,
     validate_agent_type_selections,
 )
-import agent_team  # noqa: E402
 from report_artifact_checks import write_completion_coverage_artifact  # noqa: E402
 from work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
 
