@@ -1013,9 +1013,16 @@ class WorkflowMonitorTest(unittest.TestCase):
             text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
             self.assertIn("skill_invocation=$agent-orchestration", text)
             self.assertIn("repo_dependency_review=pass", text)
-            self.assertIn("tool_call=pyright code_checker=pass", text)
-            self.assertIn("tool_call=ruff code_checker=pass", text)
-            self.assertIn("tool_call=oop-readability-check code_checker=pass", text)
+            self.assertIn(
+                "tool_call=canonical-format-check code_checker=pass "
+                "checker=markdown-math-mermaid scope=changed-paths",
+                text,
+            )
+            self.assertIn(
+                "hook_dispatcher=official schema=agent-canon.posttooluse-stop.v1 "
+                "events=PostToolUse,Stop",
+                text,
+            )
             self.assertIn("static_analysis_feedback=recorded", text)
             self.assertIn("hook_tool_feedback=reviewed", text)
             self.assertIn("parent_protocol_update=not_required", text)
