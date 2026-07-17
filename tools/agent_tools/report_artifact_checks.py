@@ -23,7 +23,9 @@ import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import cast
 
+from artifact_identity import canonical_body_sha256, canonical_json_bytes, git_blob_oid
 from mid_task_user_input_policy import (
     MID_TASK_CLASSIFICATION_ACTIONS,
     MID_TASK_CLASSIFICATION_SCOPE_STATUS,
@@ -36,9 +38,6 @@ from mid_task_user_input_policy import (
     has_reuse_marker,
     is_empty_policy_value,
 )
-
-from artifact_identity import canonical_body_sha256, canonical_json_bytes
-from artifact_identity import git_blob_oid
 
 PLACEHOLDER_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
 APPROVE_DECISION_PATTERN = re.compile(
@@ -103,6 +102,21 @@ EVAL_TRANSIENT_CAPTURE_PATTERN = re.compile(
 COMPLETION_COVERAGE_SCHEMA = "agent-canon.completion-coverage.v1"
 VALIDATION_RESULT_SCHEMA = "agent-canon.validation-result-projection.v1"
 VALIDATION_ROUTE_ID = "python.ruff.full"
+VALIDATION_OWNER_PATHS = (
+    ".codex/hooks/completion_review_guard.py",
+    "tools/agent_tools/artifact_identity.py",
+    "tools/agent_tools/external_artifact_binding.py",
+    "tools/agent_tools/publication_integrator.py",
+    "tools/agent_tools/report_artifact_checks.py",
+    "tools/agent_tools/review_dispatch.py",
+    "tools/agent_tools/work_log.py",
+    "tests/agent_tools/test_artifact_identity.py",
+    "tests/agent_tools/test_codex_hooks.py",
+    "tests/agent_tools/test_external_artifact_binding.py",
+    "tests/agent_tools/test_publication_integrator.py",
+    "tests/agent_tools/test_review_dispatch.py",
+    "tests/agent_tools/test_work_log.py",
+)
 VALIDATION_LEAVES = (
     "result_manifest.json",
     "validation.stderr",
@@ -110,12 +124,12 @@ VALIDATION_LEAVES = (
     "version.stderr",
     "version.stdout",
 )
-VALIDATION_ROUTE_ARGV_TAIL = (
+VALIDATION_ROUTE_ARGV_PREFIX = (
     "-m",
     "ruff",
     "check",
-    "python",
-    "tests",
+)
+VALIDATION_ROUTE_ARGV_SUFFIX = (
     "--select",
     "D,E,F,I,UP",
     "--ignore",
@@ -438,6 +452,16 @@ def _validation_producer_evidence(
     )
 
 
+def _validation_owner_paths(workspace: Path) -> tuple[str, ...]:
+    """Return existing W2 AgentCanon Python owner paths in canonical order."""
+    roots = tuple(
+        path for path in VALIDATION_OWNER_PATHS if (workspace / path).is_file()
+    )
+    if roots != VALIDATION_OWNER_PATHS:
+        raise ValidationMaterializerError("validation_route:owner_paths_missing")
+    return roots
+
+
 def _validation_route_record(
     workspace: Path,
     locator: Mapping[str, object],
@@ -447,7 +471,13 @@ def _validation_route_record(
 ) -> dict[str, object]:
     """Derive the closed registered Python Ruff route without caller input."""
     executable = str(Path(sys.executable).resolve())
-    argv = [executable, *VALIDATION_ROUTE_ARGV_TAIL]
+    owner_paths = _validation_owner_paths(workspace)
+    argv = [
+        executable,
+        *VALIDATION_ROUTE_ARGV_PREFIX,
+        *owner_paths,
+        *VALIDATION_ROUTE_ARGV_SUFFIX,
+    ]
     core: dict[str, object] = {
         "schema": "agent-canon.registered-validation-route.v2",
         "schema_version": 2,
@@ -837,7 +867,7 @@ def materialize_required_validation(workspace: Path) -> dict[str, object]:
         f"pending-event-id={pending['event_id']}\0"
         f"pending-event-sha256={pending_event_sha256}\0"
         "end\0"
-    ).encode("utf-8")
+    ).encode()
     artifact_digest = hashlib.sha256(seed).hexdigest()
     artifact_id = f"validation-result:{artifact_digest}"
     artifact_root = report_dir / "results" / "validation" / artifact_digest
@@ -1102,6 +1132,12 @@ def _nonempty_text(value: object) -> str:
     return value.strip()
 
 
+def _mapping_has_nonempty_text(mapping: Mapping[str, object], field: str) -> bool:
+    """Return whether one mapping field contains non-empty text."""
+    value = mapping.get(field)
+    return isinstance(value, str) and bool(value.strip())
+
+
 def _text_tuple(value: object, field_name: str) -> tuple[str, ...]:
     """Return a deterministic tuple of non-empty string references."""
     if not isinstance(value, (list, tuple)):
@@ -1225,7 +1261,7 @@ def _topology_errors(snapshot: object) -> list[str]:
                 not isinstance(value, Mapping)
                 or not value
                 or not any(
-                    isinstance(value.get(key), str) and value.get(key).strip()
+                    _mapping_has_nonempty_text(value, key)
                     for key in ("status", "release", "retained")
                 )
             ):
@@ -1262,8 +1298,7 @@ def _open_state_errors(value: object, field: str) -> list[str]:
         if isinstance(item, str) and item.strip():
             continue
         if isinstance(item, Mapping) and any(
-            isinstance(item.get(key), str) and item.get(key).strip()
-            for key in ("id", "ref", "identity")
+            _mapping_has_nonempty_text(item, key) for key in ("id", "ref", "identity")
         ):
             continue
         errors.append(f"{field}:item:{index}")
@@ -1582,8 +1617,8 @@ def project_completion_coverage(
                 raise ValueError("source_binding must be a non-empty object")
         else:
             binding[field] = _nonempty_text(binding.get(field))
-    binding["source_binding"] = dict(binding["source_binding"])
-    nested_binding = binding["source_binding"]
+    nested_binding = cast(Mapping[str, object], binding["source_binding"])
+    binding["source_binding"] = dict(nested_binding)
     if nested_binding.get("run_id") != binding["run_id"]:
         raise ValueError("source_binding.run_id does not match run_id")
     if nested_binding.get("context_id") != binding["context_id"]:
@@ -1747,7 +1782,7 @@ def project_completion_coverage(
             "ledger_snapshot_digest": snapshot_digest,
             "generated_artifact_identity": f"{binding['run_id']}:{binding['context_id']}",
             "semantic_kinds": list(COMPLETION_SEMANTIC_KINDS),
-            "source_refs": list(binding["source_refs"]),
+            "source_refs": list(cast(list[str], binding["source_refs"])),
         },
         "semantic_events": semantic_events,
         "coverage_map": mappings,
@@ -1763,7 +1798,7 @@ def project_completion_coverage(
         ],
         "failure_responses": [
             {
-                **dict(event["failure_response"]),
+                **dict(cast(Mapping[str, object], event["failure_response"])),
                 "source_event_ref": _nonempty_text(
                     event.get("event_id", event.get("sequence", ""))
                 ),
@@ -1893,20 +1928,21 @@ def check_completion_coverage(
             errors["multiply_mapped"].append(clause_id)
     owner_fields = ("owner", "state_owner", "api_owner", "dependency_owner")
     if not all(
-        isinstance(owner_contract_for_check.get(field), str)
-        and owner_contract_for_check.get(field).strip()
+        _mapping_has_nonempty_text(owner_contract_for_check, field)
         for field in owner_fields
     ):
         errors["empty"].append("owner_contract")
     owner_evidence = completion_coverage.get("owner_boundary_evidence", [])
+    owner_evidence_items = (
+        cast(list[object], owner_evidence) if isinstance(owner_evidence, list) else []
+    )
     if not isinstance(owner_evidence, list) or not owner_evidence:
         errors["empty"].append("owner_boundary_evidence")
-    for evidence in owner_evidence if isinstance(owner_evidence, list) else []:
+    for evidence in owner_evidence_items:
         if (
             not isinstance(evidence, Mapping)
             or any(
-                not isinstance(evidence.get(field), str)
-                or not evidence.get(field).strip()
+                not _mapping_has_nonempty_text(evidence, field)
                 for field in ("owner", "state_owner", "api_owner", "dependency_owner")
             )
             or not _mapping_text_list(evidence.get("evidence_refs"))
@@ -1915,8 +1951,7 @@ def check_completion_coverage(
     if (
         isinstance(owner_evidence, list)
         and all(
-            isinstance(owner_contract_for_check.get(field), str)
-            and owner_contract_for_check.get(field).strip()
+            _mapping_has_nonempty_text(owner_contract_for_check, field)
             for field in ("owner", "state_owner", "api_owner", "dependency_owner")
         )
         and not any(
@@ -1925,20 +1960,22 @@ def check_completion_coverage(
                 evidence.get(field) == owner_contract_for_check.get(field)
                 for field in owner_fields
             )
-            for evidence in owner_evidence
+            for evidence in owner_evidence_items
         )
     ):
         errors["empty"].append("owner_contract:correspondence")
     gate_evidence = completion_coverage.get("gate_evidence", [])
+    gate_evidence_items = (
+        cast(list[object], gate_evidence) if isinstance(gate_evidence, list) else []
+    )
     if not isinstance(gate_evidence, list) or not gate_evidence:
         errors["empty"].append("gate_evidence")
     gate_ids: set[str] = set()
-    for evidence in gate_evidence if isinstance(gate_evidence, list) else []:
+    for evidence in gate_evidence_items:
         if (
             not isinstance(evidence, Mapping)
             or any(
-                not isinstance(evidence.get(field), str)
-                or not evidence.get(field).strip()
+                not _mapping_has_nonempty_text(evidence, field)
                 for field in ("gate_id", "stage", "owner", "outcome")
             )
             or not _mapping_text_list(evidence.get("artifact_refs"))
@@ -1979,17 +2016,20 @@ def check_completion_coverage(
         if isinstance(mapping, Mapping)
     }
     semantic_events = completion_coverage.get("semantic_events", [])
+    semantic_event_items = (
+        cast(list[object], semantic_events) if isinstance(semantic_events, list) else []
+    )
     if not isinstance(semantic_events, list) or not semantic_events:
         errors["empty"].append("semantic_events")
     events_by_id = {
         str(event.get("event_id")): event
-        for event in semantic_events
+        for event in semantic_event_items
         if isinstance(event, Mapping) and event.get("event_id")
     }
     if isinstance(semantic_events, list):
         if len(events_by_id) != len(semantic_events):
             errors["redundant"].append("semantic_event_identity")
-        for event in semantic_events:
+        for event in semantic_event_items:
             if not isinstance(event, Mapping):
                 errors["empty"].append("semantic_event")
                 continue
@@ -2001,15 +2041,16 @@ def check_completion_coverage(
                 "source_binding"
             ):
                 errors["empty"].append("semantic_event:source_binding")
-    for evidence in gate_evidence if isinstance(gate_evidence, list) else []:
+    for evidence in gate_evidence_items:
         if not isinstance(evidence, Mapping):
             continue
         refs = evidence.get("source_event_refs")
         if not _mapping_text_list(refs):
             continue
-        if len(set(refs)) != len(refs):
+        refs_text = cast(list[str], refs)
+        if len(set(refs_text)) != len(refs_text):
             errors["redundant"].append(f"gate_evidence:{evidence.get('gate_id', '')}")
-        for event_ref in refs:
+        for event_ref in refs_text:
             if event_ref not in events_by_id:
                 errors["empty"].append(f"gate_evidence:source_event:{event_ref}")
     projected_monitor_evidence = completion_coverage.get("monitor_evidence", [])
@@ -2023,16 +2064,12 @@ def check_completion_coverage(
         source_event_ref = evidence.get("source_event_ref")
         if source_event_ref is not None and source_event_ref not in events_by_id:
             errors["empty"].append(f"monitor_evidence:source_event:{source_event_ref}")
-    oop_signals = (
-        [
-            evidence
-            for evidence in gate_evidence
-            if isinstance(evidence, Mapping)
-            and evidence.get("gate_id") in OOP_REVIEW_SIGNAL_GATE_IDS
-        ]
-        if isinstance(gate_evidence, list)
-        else []
-    )
+    oop_signals = [
+        evidence
+        for evidence in gate_evidence_items
+        if isinstance(evidence, Mapping)
+        and evidence.get("gate_id") in OOP_REVIEW_SIGNAL_GATE_IDS
+    ]
     if not oop_signals:
         errors["empty"].append("oop_review_signal")
     source_event_owners: dict[str, str] = {}
@@ -2115,7 +2152,13 @@ def check_completion_coverage(
     ]
     if len(certificate_source_refs) != len(set(certificate_source_refs)):
         errors["redundant"].append("resource_certificate:source_event_ref")
-    for certificate in completion_coverage.get("resource_certificates", []):
+    resource_certificates_value = completion_coverage.get("resource_certificates", [])
+    resource_certificate_items = (
+        cast(list[object], resource_certificates_value)
+        if isinstance(resource_certificates_value, list)
+        else []
+    )
+    for certificate in resource_certificate_items:
         if not isinstance(certificate, Mapping):
             continue
         source_event_ref = str(certificate.get("source_event_ref", ""))
@@ -2150,7 +2193,7 @@ def check_completion_coverage(
         certificate = next(
             (
                 item
-                for item in completion_coverage.get("resource_certificates", [])
+                for item in resource_certificate_items
                 if isinstance(item, Mapping)
                 and item.get("source_event_ref") == source_event_ref
             ),
@@ -2240,15 +2283,11 @@ def check_completion_coverage(
         errors["empty"].append("failure_event_refs:item")
     if len(failure_event_refs) != len(set(failure_event_refs)):
         errors["redundant"].append("failure_event_refs")
-    expected_failure_refs = (
-        {
-            str(event.get("event_id"))
-            for event in semantic_events
-            if isinstance(event, Mapping) and event.get("semantic_kind") == "failure"
-        }
-        if isinstance(semantic_events, list)
-        else set()
-    )
+    expected_failure_refs = {
+        str(event.get("event_id"))
+        for event in semantic_event_items
+        if isinstance(event, Mapping) and event.get("semantic_kind") == "failure"
+    }
     if set(failure_event_refs) != expected_failure_refs:
         errors["empty"].append("failure_event_refs:source_ownership")
     for event_ref in failure_event_refs:
@@ -2276,7 +2315,7 @@ def check_completion_coverage(
     gate_results = {
         "G1_CLAUSE_COVERAGE": not any(errors.values()),
         "G2_OWNER_BOUNDARY": not owner_boundary_error,
-        "G3_STAGE_EVIDENCE": bool(gate_evidence)
+        "G3_STAGE_EVIDENCE": bool(gate_evidence_items)
         and not any(
             item == "gate_evidence"
             or item.startswith("gate_evidence:")
@@ -2310,7 +2349,7 @@ def check_completion_coverage(
     }
     gate_ids = {
         str(evidence.get("gate_id"))
-        for evidence in gate_evidence
+        for evidence in gate_evidence_items
         if isinstance(evidence, Mapping)
     }
     if not OOP_REVIEW_SIGNAL_GATE_IDS.issubset(gate_ids):
@@ -2350,7 +2389,9 @@ def check_completion_coverage(
     )
     return {
         "schema": "agent-canon.completion-coverage-check.v1",
-        "source_binding": dict(completion_coverage.get("source_binding", {})),
+        "source_binding": dict(
+            cast(Mapping[str, object], completion_coverage.get("source_binding", {}))
+        ),
         "ok": not any(errors.values()) and all(gate_results.values()),
         "error_sets": errors,
         "gate_results": gate_results,
@@ -2398,9 +2439,10 @@ def write_completion_coverage_artifact(
         gate_results["G5_DELIVERY_BOUNDARY"] = bool(
             completion_boundary.get("overall_delivery_complete")
         )
-        coverage_check["ok"] = not any(
-            coverage_check.get("error_sets", {}).values()
-        ) and all(bool(value) for value in gate_results.values())
+        error_sets = cast(Mapping[str, object], coverage_check.get("error_sets", {}))
+        coverage_check["ok"] = not any(error_sets.values()) and all(
+            bool(value) for value in gate_results.values()
+        )
     artifact = {
         **coverage,
         "coverage_check": coverage_check,

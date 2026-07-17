@@ -29,8 +29,8 @@ import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-import yaml
 
+import yaml
 from artifact_identity import (
     canonical_body_sha256,
     canonical_json_bytes,
