@@ -246,7 +246,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 "vendor/agent-canon/tools",
             )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotEqual(result.returncode, 0)
             self.assertIn("OOP_READABILITY_FILES=1", result.stdout)
             self.assertEqual(result.stdout.count("module_helper_name"), 1)
 
@@ -461,9 +461,12 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             result = self.run_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("optional_boundary:choose:1>0", result.stdout)
             self.assertIn(
-                "none_runtime_branch:choose:1>typed-variant-boundary",
+                "optional_boundary:choose:evidence=1:contract=0",
+                result.stdout,
+            )
+            self.assertIn(
+                "none_runtime_branch:choose:evidence=1:contract=typed-variant-boundary",
                 result.stdout,
             )
 
@@ -568,8 +571,14 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("cpp:warn:vague_class_name:SolverManager", result.stdout)
-            self.assertIn("cpp:warn:public_fields:SolverManager:9>8", result.stdout)
-            self.assertIn("cpp:warn:parameters:run:7>6", result.stdout)
+            self.assertIn(
+                "cpp:warn:public_fields:SolverManager:evidence=9:contract=8",
+                result.stdout,
+            )
+            self.assertIn(
+                "cpp:warn:parameters:run:evidence=7:contract=6",
+                result.stdout,
+            )
 
     def test_language_all_analyzes_python_and_cpp_by_suffix(self) -> None:
         """The shared analyzer should select Python and C++ files by suffix."""
@@ -604,7 +613,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 str(cpp_source),
             )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotEqual(result.returncode, 0)
             self.assertIn(":python:warn:", result.stdout)
             self.assertIn(":cpp:warn:null_runtime_branch:route", result.stdout)
 
@@ -632,11 +641,11 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "cpp:error:syntax_error:Broken:unmatched-brace>parseable-cpp",
+                "cpp:error:syntax_error:Broken:evidence=unmatched-brace:contract=parseable-cpp",
                 result.stdout,
             )
             self.assertIn(
-                "cpp:error:syntax_error:route:unmatched-brace>parseable-cpp",
+                "cpp:error:syntax_error:route:evidence=unmatched-brace:contract=parseable-cpp",
                 result.stdout,
             )
 
@@ -900,7 +909,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "cpp:warn:null_runtime_branch:route:1>typed-reference-or-variant-boundary",
+                "cpp:warn:null_runtime_branch:route:evidence=1:contract=typed-reference-or-variant-boundary",
                 result.stdout,
             )
 
@@ -1383,11 +1392,11 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "cpp:warn:identity_function:project_value:returns value",
+                "cpp:warn:identity_function:project_value:evidence=returns value:contract=non-identity-domain-transform",
                 result.stdout,
             )
             self.assertIn(
-                "cpp:warn:pass_through_function:forward_sum:compute_sum/2",
+                "cpp:warn:pass_through_function:forward_sum:evidence=compute_sum/2:contract=adds-domain-or-adapter-contract",
                 result.stdout,
             )
 
@@ -1414,7 +1423,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "cpp:warn:mixed_morphism_effect:collect:return+effect",
+                "cpp:warn:mixed_morphism_effect:collect:evidence=return+effect:contract=pure-or-effect-boundary",
                 result.stdout,
             )
 
@@ -1508,7 +1517,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 str(source),
             )
 
-            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
             self.assertEqual(
                 payload["summary"]["solid_counts"]["single responsibility"],
@@ -1564,7 +1573,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 str(source),
             )
 
-            self.assertNotEqual(json_result.returncode, 0)
+            self.assertEqual(json_result.returncode, 0, json_result.stdout + json_result.stderr)
             json_payload = json.loads(json_result.stdout)
             solid_counts = json_payload["summary"]["solid_counts"]
             self.assertEqual(set(solid_counts), expected_principles)
@@ -1580,7 +1589,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 str(source),
             )
 
-            self.assertNotEqual(markdown_result.returncode, 0)
+            self.assertEqual(markdown_result.returncode, 0, markdown_result.stdout + markdown_result.stderr)
             self.assertIn("- `liskov substitution`: 0", markdown_result.stdout)
 
     def test_exclude_skips_vendored_or_report_surfaces(self) -> None:
@@ -1682,7 +1691,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("solid_principles: `single responsibility`", result.stdout)
             self.assertIn("trivial_format_function", result.stdout)
             self.assertIn(
-                "This report is generated by static heuristics",
+                "This report is generated by static boundary observations",
                 result.stdout,
             )
             self.assertTrue(prompt.exists())

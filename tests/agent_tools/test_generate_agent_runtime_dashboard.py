@@ -15,8 +15,6 @@ import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
-
-UTC = timezone.utc
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -1097,7 +1095,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """Write mixed old and recent evidence for recent-mode assertions."""
         hook_dir = mounted_log_archive_root(root) / "hook-runs" / repo_log_key(root) / "test-container"
         hook_dir.mkdir(parents=True)
-        recent_timestamp = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        recent_timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         (hook_dir / "skill_usage.jsonl").write_text(
             json.dumps(
                 {

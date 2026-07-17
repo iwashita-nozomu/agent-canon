@@ -424,7 +424,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             )
 
     def test_workflow_level_credentials_fail(self) -> None:
-        """AgentCanon credentials must stay on the checkout-helper step."""
+        """Credentials for AgentCanon must stay on the checkout-helper step."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_valid_workflow(root)

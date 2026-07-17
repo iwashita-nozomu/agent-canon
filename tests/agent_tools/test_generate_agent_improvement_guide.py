@@ -89,7 +89,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("Hook Quality Findings", guide)
         self.assertIn("Protocol Feedback Coverage", guide)
         self.assertIn("hook_tool_feedback=reviewed", guide)
-        self.assertIn("failure-a", guide)
+        self.assertNotIn("failure-a", guide)
         self.assertIn("memory/AGENT_PHILOSOPHY.md", guide)
         self.assertIn("Local Codex", guide)
 
