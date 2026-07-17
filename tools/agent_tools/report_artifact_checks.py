@@ -646,6 +646,10 @@ def _verify_validation_replay(
         or isinstance(validation_returncode, bool)
     ):
         raise ValidationMaterializerError("validation_result:stream_mismatch")
+    if terminal_event.get("outcome") == "pass" and (
+        version_returncode != 0 or validation_returncode != 0
+    ):
+        raise ValidationMaterializerError("validation_result:stream_mismatch")
     stream_paths = {
         "version": {"stdout": "version.stdout", "stderr": "version.stderr"},
         "validation": {
