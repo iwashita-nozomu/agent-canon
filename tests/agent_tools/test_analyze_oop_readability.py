@@ -29,7 +29,7 @@ EMPTY_ENV: Mapping[str, str] = MappingProxyType({})
 
 
 class AnalyzeOopReadabilityTest(unittest.TestCase):
-    """Verify analyzer scoring and finding output."""
+    """Verify analyzer typed evidence and finding output."""
 
     def run_analyzer(
         self,
@@ -67,7 +67,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
         self.git(root, "commit", "-m", "baseline")
 
     def test_small_python_value_object_passes(self) -> None:
-        """A small dataclass-style value object should pass the default score gate."""
+        """A small dataclass-style value object should pass typed OOP review."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "model.py"
@@ -156,7 +156,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertNotIn("thin_class:SolverPort", result.stdout)
@@ -187,7 +187,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_analyzer(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("public_methods:Collector", result.stdout)
@@ -244,8 +244,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 root,
                 "tools",
                 "vendor/agent-canon/tools",
-                "--min-score",
-                "0",
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -281,8 +279,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 root,
                 "--baseline-ref",
                 "HEAD",
-                "--min-score",
-                "100",
                 str(source),
             )
 
@@ -321,8 +317,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 root,
                 "--baseline-ref",
                 "HEAD",
-                "--min-score",
-                "100",
                 str(source),
             )
 
@@ -382,7 +376,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("vague_class_name:DataHelper", result.stdout)
@@ -390,7 +384,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("missing_public_annotations:calculate", result.stdout)
 
     def test_python_vague_static_namespace_fails_default_gate(self) -> None:
-        """The default OOP score gate should not pass namespace-class findings."""
+        """Namespace-class findings remain typed gate evidence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "helpers.py"
@@ -410,7 +404,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             result = self.run_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("OOP_READABILITY_SCORE=", result.stdout)
+            self.assertIn("OOP_READABILITY_GATE_SIGNAL_FINDINGS=", result.stdout)
             self.assertIn("OOP_READABILITY=fail", result.stdout)
 
     def test_python_review_signal_findings_do_not_fail_default_gate(self) -> None:
@@ -442,9 +436,9 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("parameters:process_items", result.stdout)
             self.assertIn("OOP_READABILITY_GATE_SIGNAL_FINDINGS=0", result.stdout)
             self.assertIn("OOP_READABILITY_REVIEW_SIGNAL_FINDINGS=1", result.stdout)
-            self.assertIn("OOP_READABILITY_SCORE_STATUS=fail", result.stdout)
-            self.assertIn("OOP_READABILITY_STATUS_REASON=review-only", result.stdout)
-            self.assertIn("OOP_READABILITY=pass", result.stdout)
+            self.assertIn("OOP_READABILITY_ERROR_SIGNAL_FINDINGS=", result.stdout)
+            self.assertIn("OOP_READABILITY_STATUS_REASON=review-signal", result.stdout)
+            self.assertIn("OOP_READABILITY=review", result.stdout)
 
     def test_python_optional_none_boundary_is_flagged(self) -> None:
         """Optional public boundaries and None routing are reported."""
@@ -464,7 +458,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("optional_boundary:choose:1>0", result.stdout)
@@ -489,7 +483,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("module_helper_name:calculate_helper", result.stdout)
@@ -513,7 +507,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_analyzer(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("mixed_morphism_effect:render_lines", result.stdout)
@@ -535,7 +529,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("mixed_morphism_effect:collect", result.stdout)
@@ -570,7 +564,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("cpp:warn:vague_class_name:SolverManager", result.stdout)
@@ -606,8 +600,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 root,
                 "--language",
                 "all",
-                "--min-score",
-                "0",
                 str(python_source),
                 str(cpp_source),
             )
@@ -636,7 +628,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
@@ -672,7 +664,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("public_fields:Model", result.stdout)
@@ -700,7 +692,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("public_fields:RunConfig", result.stdout)
@@ -723,7 +715,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("public_fields:PacketRecord", result.stdout)
@@ -748,7 +740,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("state_heavy_public_surface:MutableModel", result.stdout)
@@ -781,7 +773,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("parameters:primitive_vjp", result.stdout)
@@ -808,7 +800,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("parameters:__nad_ep_impl_example", result.stdout)
@@ -833,7 +825,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("identity_function:apply_compile_bindings", result.stdout)
@@ -879,7 +871,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("public_methods:float32x2", result.stdout)
@@ -904,7 +896,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
@@ -938,7 +930,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertNotIn("FixtureInput", result.stdout)
@@ -966,7 +958,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("state_heavy_public_surface:RealInput", result.stdout)
@@ -991,7 +983,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("state_heavy_public_surface:RealInput", result.stdout)
@@ -1016,7 +1008,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
@@ -1042,8 +1034,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             result = self.run_cpp_analyzer(
                 root,
-                "--min-score",
-                "100",
                 str(source),
             )
 
@@ -1070,7 +1060,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("state_heavy_public_surface:RealInput", result.stdout)
@@ -1101,7 +1091,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("stateless_callable_class:Projection", result.stdout)
@@ -1149,7 +1139,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             )
             model = package / "model.py"
 
-            result = self.run_analyzer(root, "--min-score", "100", str(model))
+            result = self.run_analyzer(root, str(model))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("redundant_class_boundary:Projection", result.stdout)
@@ -1191,8 +1181,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             result = self.run_analyzer(
                 library,
-                "--min-score",
-                "100",
                 "--usage-root",
                 str(consumer),
                 str(model),
@@ -1237,8 +1225,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             result = self.run_analyzer(
                 library,
-                "--min-score",
-                "100",
                 "--dependency-module",
                 "downstream",
                 str(model),
@@ -1291,7 +1277,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(header))
+            result = self.run_cpp_analyzer(root, str(header))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("redundant_class_boundary:Projection", result.stdout)
@@ -1334,8 +1320,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             result = self.run_cpp_analyzer(
                 library,
-                "--min-score",
-                "100",
                 "--usage-root",
                 str(consumer),
                 str(header),
@@ -1362,7 +1346,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
@@ -1395,7 +1379,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
@@ -1426,7 +1410,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
@@ -1454,7 +1438,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("mixed_morphism_effect:collect_value", result.stdout)
@@ -1480,8 +1464,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 "--format",
                 "json",
                 "--include-snippets",
-                "--min-score",
-                "100",
                 str(source),
             )
 
@@ -1491,7 +1473,11 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             finding = payload["findings"][0]
             self.assertEqual(finding["dimension"], "mathematical redundancy")
             self.assertIn("snippet", finding)
-            self.assertIn("mechanical_grade", payload["summary"])
+            self.assertIn("typed_boundary_counts", payload["summary"])
+            self.assertEqual(
+                payload["summary"]["typed_evidence_owner"],
+                "oop-readability-checker",
+            )
 
     def test_json_report_projects_findings_to_solid_principles(self) -> None:
         """JSON output includes SOLID principle signals for review grouping."""
@@ -1519,8 +1505,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 "json",
                 "--max-public-methods",
                 "1",
-                "--min-score",
-                "100",
                 str(source),
             )
 
@@ -1577,8 +1561,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 "json",
                 "--max-public-methods",
                 "1",
-                "--min-score",
-                "100",
                 str(source),
             )
 
@@ -1595,8 +1577,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 "markdown",
                 "--max-public-methods",
                 "1",
-                "--min-score",
-                "100",
                 str(source),
             )
 
@@ -1646,8 +1626,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 "vendor",
                 "--exclude",
                 "reports",
-                "--min-score",
-                "100",
                 ".",
             )
 
@@ -1661,8 +1639,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 "vendor",
                 "--exclude",
                 "reports",
-                "--min-score",
-                "100",
                 "--format",
                 "markdown",
                 ".",
@@ -1696,8 +1672,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 "--include-snippets",
                 "--review-prompt-out",
                 str(prompt),
-                "--min-score",
-                "100",
                 str(source),
             )
 

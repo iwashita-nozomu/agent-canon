@@ -4,7 +4,7 @@
 contract reference
 responsibility Documents C++ OOP readability checker behavior in Japanese.
 upstream implementation ../../../../tools/oop/cpp/readability.py C++ OOP readability checker
-upstream implementation ../../../../tools/oop/shared/readability_core.py shared readability heuristics
+upstream implementation ../../../../tools/oop/shared/readability_core.py shared typed-boundary evidence
 upstream design ../../../object-oriented-design.md OOP policy source
 downstream design ../../tool-docs.toml one-to-one tool/document manifest
 @dependency-end
@@ -76,10 +76,8 @@ python3 tools/oop/python/readability.py --language all --format markdown python 
 ```
 
 この checker は build evidence ではありません。C++ 変更では project-native configure / build / test と併せて、OOP readability report を review 補助として扱います。
-既定の `OOP_READABILITY` は score threshold ではなく signal class で判定します。
+既定の `OOP_READABILITY` は scalar threshold ではなく signal class で判定します。
 size / public surface / parameter count / complexity は boundary review signal として扱い、
 数値だけで分割を要求しません。`nullptr` routing、public state owner、不要 wrapper、
-継承境界などの gate signal と分けて読みます。`--min-score 0` は survey 用に finding
-を出し切る pass mode です。default より高い `--min-score` を明示した場合だけ strict
-score floor として扱います。accepted boundary、false positive、改善方針は review
-artifact に残します。
+継承境界などの gate signal と分けて読みます。各 finding は一つの typed evidence owner
+へ写像し、accepted boundary、false positive、改善方針は review artifact に残します。

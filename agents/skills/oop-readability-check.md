@@ -152,13 +152,13 @@ Only include this section in `analyze-existing` or `run-and-analyze` mode.
 
 - Keep "tool reported" separate from "agent judgment".
 - Prioritize by design risk and user relevance, not count alone.
-- Treat `score` as a diagnostic index. Use `status`, `status_reason`,
-  `gate_signal_findings`, `review_signal_findings`, and `score_status` together
-  instead of turning the numeric score into the design judgment.
-- Treat size, public-surface, parameter-count, and complexity findings as
-  boundary review signals, not automatic split/extract instructions. Recommend
-  a boundary change only after caller contracts, ownership, or surrounding
-  source shape show a stable split point.
+- Treat `typed_boundary_evidence` as mechanical evidence owned by the checker.
+  Use `status`, `status_reason`, boundary counts, and evidence refs together;
+  never turn a scalar heuristic into the design judgment.
+- Treat public-surface, parameter-count, and complexity findings as boundary
+  review signals, not automatic split/extract or private-helper instructions.
+  Recommend a boundary change only after caller contracts, ownership, or
+  surrounding source shape show a stable split point.
 - Treat test-only files, generated files, value objects, protocol contracts,
   and adapter functions as likely false-positive candidates until code reading
   says otherwise.

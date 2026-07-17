@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Provides shared OOP readability heuristics for language-specific tools.
+# responsibility Provides shared OOP boundary observations for language-specific tools.
 # upstream design ../../../documents/object-oriented-design.md OOP boundary policy
 # upstream design ../../../documents/coding-conventions-house-style.md shared readability rules
-# upstream design ../../../agents/workflows/comprehensive-refactoring-workflow.md static score gate
+# upstream design ../../../agents/workflows/comprehensive-refactoring-workflow.md static boundary evidence
 # downstream implementation ../python/readability.py Python OOP readability entrypoint
 # downstream implementation ../cpp/readability.py C++ OOP readability entrypoint
 # downstream implementation ../../../.codex/agents/oop_readability_reviewer.toml report output
 # downstream implementation ../../../tests/agent_tools/test_analyze_oop_readability.py tests analyzer
 # @dependency-end
-"""Evaluate OOP readability risks for Python and C++ source files.
+"""Evaluate OOP boundary observations for Python and C++ source files.
 
-The score is a review aid, not a substitute for human design review. It focuses on
-signals that are fast to compute and aligned with the local OOP policy: focused
-responsibility boundaries, explicit state ownership, role-specific public surfaces, and
-avoiding vague class shapes.
+The analyzer reports typed evidence for responsibility, state, API, and dependency
+boundaries. It is a mechanical review input, not a design-decision authority.
 """
 
 from __future__ import annotations
@@ -62,7 +60,6 @@ CPP_LOCAL_MUTATION_METHODS = {
 EFFECT_ADAPTER_NAMES = {
     "agent_canon_update_surface_status",
     "default_log_path",
-    "default_oop_min_score",
     "is_git_worktree",
     "main",
     "project_root_from_script",
@@ -83,7 +80,6 @@ EFFECT_ADAPTER_PREFIXES = (
     "write_",
 )
 PARAMETER_AGGREGATE_FUNCTIONS = {"add_finding"}
-DEFAULT_MIN_SCORE = 95
 DEFAULT_SNIPPET_CONTEXT_LINES = 2
 DEFAULT_MAX_REPORT_FINDINGS = 80
 DEFAULT_MAX_PUBLIC_METHODS = 12
@@ -94,12 +90,8 @@ DEFAULT_MAX_PUBLIC_FIELDS = 8
 DEFAULT_MAX_BASE_CLASSES = 2
 DEFAULT_MAX_MODULE_HELPERS = 8
 GIT_BASELINE_TIMEOUT_SECONDS = 20
-MAX_READABILITY_SCORE = 100
 UNKNOWN_SEVERITY_FINDING_RANK = 9
-KLOC_NORMALIZER = 1000
 MILLISECONDS_PER_SECOND = 1000
-MODERATE_RISK_WARN_OR_ERROR_PER_KLOC = 3
-HIGH_RISK_WARN_OR_ERROR_PER_KLOC = 6
 WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
 WORKFLOW_MONITOR_TIMEOUT_SECONDS = 5
 TOP_FILES_SUMMARY_LIMIT = 20
@@ -195,6 +187,7 @@ SIGNAL_CLASS_GATE = "gate"
 SIGNAL_CLASS_REVIEW = "review"
 STATUS_PASS = "pass"
 STATUS_FAIL = "fail"
+STATUS_REVIEW = "review"
 REVIEW_SIGNAL_KINDS = frozenset(
     {
         "cognitive_complexity",
@@ -382,7 +375,7 @@ class Thresholds:
 
 @dataclass(frozen=True)
 class Finding:
-    """One OOP readability finding."""
+    """One OOP boundary observation."""
 
     path: str
     line: int
@@ -390,8 +383,8 @@ class Finding:
     severity: str
     kind: str
     symbol: str
-    actual: int | str
-    limit: int | str
+    evidence: int | str
+    contract: int | str
     guidance: str
 
     def render(self) -> str:
@@ -399,7 +392,7 @@ class Finding:
         return (
             f"OOP_READABILITY_FINDING={self.path}:{self.line}:"
             f"{self.language}:{self.severity}:{self.kind}:{self.symbol}:"
-            f"{self.actual}>{self.limit}:{self.guidance}"
+            f"evidence={self.evidence}:contract={self.contract}:{self.guidance}"
         )
 
 
@@ -600,8 +593,6 @@ class MarkdownReportSpec:
     root: Path
     files: list[Path]
     findings: list[Finding]
-    final_score: int
-    min_score: int
     include_snippets: bool
     snippet_context: int
     max_report_findings: int
@@ -615,7 +606,6 @@ class AnalyzerRun:
     root: Path
     files: list[Path]
     findings: list[Finding]
-    final_score: int
     summary: dict[str, object]
 
 
@@ -632,7 +622,7 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
 
 
 def add_target_arguments(parser: argparse.ArgumentParser, default_language: str) -> None:
-    """Add source selection and scoring arguments."""
+    """Add source selection and boundary-observation arguments."""
     parser.add_argument("paths", nargs="*", help="Files or directories to analyze.")
     parser.add_argument("--root", default=".", help="Repository root. Defaults to cwd.")
     parser.add_argument(
@@ -641,13 +631,6 @@ def add_target_arguments(parser: argparse.ArgumentParser, default_language: str)
         default=default_language,
         help="Source language to analyze. Language-specific wrappers set this.",
     )
-    parser.add_argument(
-        "--min-score",
-        type=int,
-        default=DEFAULT_MIN_SCORE,
-        help="Minimum accepted score.",
-    )
-
 
 def add_report_arguments(parser: argparse.ArgumentParser) -> None:
     """Add output formatting arguments."""
@@ -838,17 +821,6 @@ def iter_source_files(
     return sorted(set(files))
 
 
-def source_loc(text: str) -> int:
-    """Count nonblank noncomment-ish source lines for normalized metrics."""
-    count = 0
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith(("#", "//", "/*", "*")):
-            continue
-        count += 1
-    return count
-
-
 def python_cognitive_complexity(node: ast.AST) -> int:
     """Estimate cognitive complexity for Python using branch and nesting signals."""
     branch_nodes = (
@@ -866,14 +838,14 @@ def python_cognitive_complexity(node: ast.AST) -> int:
     )
 
     def visit(current: ast.AST, nesting: int) -> int:
-        score = 0
+        complexity = 0
         is_branch = isinstance(current, branch_nodes)
         if is_branch:
-            score += 1 + nesting
+            complexity += 1 + nesting
             nesting += 1
         for child in ast.iter_child_nodes(current):
-            score += visit(child, nesting)
-        return score
+            complexity += visit(child, nesting)
+        return complexity
 
     return visit(node, 0)
 
@@ -1352,8 +1324,8 @@ def add_finding(
     severity: str,
     kind: str,
     symbol: str,
-    actual: int | str,
-    limit: int | str,
+    evidence: int | str,
+    contract: int | str,
     guidance: str,
 ) -> None:
     """Append a normalized finding."""
@@ -1365,8 +1337,8 @@ def add_finding(
             severity=severity,
             kind=kind,
             symbol=symbol,
-            actual=actual,
-            limit=limit,
+            evidence=evidence,
+            contract=contract,
             guidance=guidance,
         )
     )
@@ -3008,17 +2980,17 @@ def cpp_parameter_name(param: str) -> str | None:
 
 def cpp_cognitive_complexity(body: str) -> int:
     """Estimate C++ cognitive complexity from control-flow tokens and nesting."""
-    score = 0
+    complexity = 0
     nesting = 0
     for raw in body.splitlines():
         line = raw.split("//", 1)[0]
         stripped = line.strip()
         if re.search(r"\b(if|for|while|switch|case|catch)\b", stripped):
-            score += 1 + nesting
-        score += stripped.count("&&") + stripped.count("||") + stripped.count("?")
+            complexity += 1 + nesting
+        complexity += stripped.count("&&") + stripped.count("||") + stripped.count("?")
         nesting += stripped.count("{")
         nesting = max(0, nesting - stripped.count("}"))
-    return score
+    return complexity
 
 
 def cpp_null_runtime_checks(body: str) -> int:
@@ -3591,63 +3563,17 @@ def signal_counts(findings: Sequence[Finding]) -> Counter[str]:
 
 
 def status_from_signal_counts(counts: Counter[str]) -> tuple[str, str]:
-    """Return pass/fail status and a stable reason from signal classes."""
+    """Return a structural status and stable reason from signal classes."""
     if counts.get(SIGNAL_CLASS_ERROR, 0):
         return STATUS_FAIL, "error-signal"
     if counts.get(SIGNAL_CLASS_GATE, 0):
         return STATUS_FAIL, "gate-signal"
     if counts.get(SIGNAL_CLASS_REVIEW, 0):
-        return STATUS_PASS, "review-only"
+        return STATUS_REVIEW, "review-signal"
     return STATUS_PASS, "clean"
 
 
-def status_from_score_and_signals(
-    counts: Counter[str],
-    final_score: int,
-    min_score: int,
-) -> tuple[str, str]:
-    """Return status using signal classes, with explicit survey and strict-score modes."""
-    if min_score <= 0:
-        return STATUS_PASS, "survey-score-floor"
-    if min_score > DEFAULT_MIN_SCORE and final_score < min_score:
-        return STATUS_FAIL, "score-floor"
-    return status_from_signal_counts(counts)
-
-
-def score_floor_status(final_score: int, min_score: int) -> str:
-    """Return whether the diagnostic score clears the requested floor."""
-    return STATUS_PASS if final_score >= min_score else STATUS_FAIL
-
-
-def score(findings: list[Finding]) -> int:
-    """Calculate a diagnostic signal score independent of pass/fail status."""
-    counts = signal_counts(findings)
-    if not findings:
-        return MAX_READABILITY_SCORE
-    review_kinds = {
-        finding.kind
-        for finding in findings
-        if finding_signal_class(finding) == SIGNAL_CLASS_REVIEW
-    }
-    gate_kinds = {
-        finding.kind
-        for finding in findings
-        if finding_signal_class(finding) == SIGNAL_CLASS_GATE
-    }
-    hotspot_count = len({finding.path for finding in findings})
-    if counts.get(SIGNAL_CLASS_ERROR, 0):
-        base = 40
-        penalty = counts[SIGNAL_CLASS_ERROR] * 10 + len(gate_kinds) * 4 + hotspot_count
-    elif counts.get(SIGNAL_CLASS_GATE, 0):
-        base = 80
-        penalty = counts[SIGNAL_CLASS_GATE] * 4 + len(gate_kinds) * 3 + len(review_kinds)
-    else:
-        base = 95
-        penalty = counts[SIGNAL_CLASS_REVIEW] + len(review_kinds) * 2 + hotspot_count
-    return max(0, base - min(base, penalty))
-
-
-def finding_identity(finding: Finding) -> tuple[str, str, str, str, str, str, str, str]:
+def finding_identity(finding: Finding) -> tuple[str, str, str, str, str, str]:
     """Return a line-stable identity for baseline finding comparison."""
     return (
         finding.path,
@@ -3655,8 +3581,6 @@ def finding_identity(finding: Finding) -> tuple[str, str, str, str, str, str, st
         finding.severity,
         finding.kind,
         finding.symbol,
-        str(finding.actual),
-        str(finding.limit),
         finding.guidance,
     )
 
@@ -3702,6 +3626,46 @@ def finding_facts(finding: Finding) -> dict[str, str]:
     }
 
 
+TYPED_BOUNDARY_BY_KIND: dict[str, str] = {
+    "vague_class_name": "owner_overlap",
+    "public_methods": "owner_overlap",
+    "module_helper_name": "owner_overlap",
+    "module_helper_bucket": "owner_overlap",
+    "static_method_namespace": "owner_overlap",
+    "thin_class": "owner_overlap",
+    "method_without_self_use": "owner_overlap",
+    "public_fields": "state_ownership",
+    "state_heavy_public_surface": "state_ownership",
+    "instance_attributes": "state_ownership",
+    "parameters": "api_boundary",
+    "missing_public_annotations": "api_boundary",
+    "optional_boundary": "api_boundary",
+    "none_runtime_branch": "api_boundary",
+    "null_runtime_branch": "api_boundary",
+    "cognitive_complexity": "api_boundary",
+    "base_classes": "dependency_boundary",
+    "redundant_class_boundary": "dependency_boundary",
+    "mixed_morphism_effect": "dependency_boundary",
+    "identity_function": "dependency_boundary",
+    "pass_through_function": "dependency_boundary",
+    "stateless_callable_class": "owner_overlap",
+    "trivial_format_function": "api_boundary",
+    "syntax_error": "api_boundary",
+}
+
+
+def typed_boundary_evidence(finding: Finding) -> dict[str, str]:
+    """Attach one typed evidence owner to one static observation."""
+    return {
+        "property": finding.kind,
+        "boundary": TYPED_BOUNDARY_BY_KIND.get(finding.kind, "api_boundary"),
+        "evidence_owner": "oop-readability-checker",
+        "source_ref": f"{finding.path}:{finding.line}",
+        "observation": str(finding.evidence),
+        "contract": str(finding.contract),
+    }
+
+
 def solid_principles_for_kind(kind: str) -> tuple[str, ...]:
     """Return SOLID principle names mechanically associated with a finding kind."""
     principle_keys = SOLID_PRINCIPLES_BY_KIND.get(kind, ())
@@ -3717,6 +3681,7 @@ def finding_payload(finding: Finding) -> dict[str, object]:
     """Return JSON payload with mechanical interpretation attached."""
     payload = asdict(finding)
     payload.update(finding_facts(finding))
+    payload["typed_boundary_evidence"] = typed_boundary_evidence(finding)
     payload["solid_principles"] = list(solid_principles_for_finding(finding))
     return payload
 
@@ -3753,25 +3718,13 @@ def summarize_findings(
     root: Path,
     files: list[Path],
     findings: list[Finding],
-    final_score: int,
-    min_score: int,
     exclude_patterns: Sequence[str] = (),
 ) -> dict[str, object]:
-    """Build deterministic summary metrics for report output."""
-    loc = 0
-    for path in files:
-        try:
-            loc += source_loc(path.read_text(encoding="utf-8", errors="ignore"))
-        except OSError:
-            continue
+    """Build deterministic typed-boundary evidence for report output."""
     severity_counts = Counter(finding.severity for finding in findings)
     kind_counts = Counter(finding.kind for finding in findings)
     decision_counts = signal_counts(findings)
-    status, status_reason = status_from_score_and_signals(
-        decision_counts,
-        final_score,
-        min_score,
-    )
+    status, status_reason = status_from_signal_counts(decision_counts)
     review_signal_count = decision_counts.get(SIGNAL_CLASS_REVIEW, 0)
     gate_signal_count = decision_counts.get(SIGNAL_CLASS_GATE, 0)
     error_signal_count = decision_counts.get(SIGNAL_CLASS_ERROR, 0)
@@ -3785,33 +3738,16 @@ def summarize_findings(
         principle: solid_signal_counts.get(principle, 0)
         for principle in SOLID_PRINCIPLES.values()
     }
-    warn_or_error = sum(
-        1 for finding in findings if finding.severity in {"error", "warn"}
+    typed_boundary_counts = Counter(
+        typed_boundary_evidence(finding)["boundary"] for finding in findings
     )
-    per_kloc = warn_or_error / max(1.0, loc / KLOC_NORMALIZER)
-    if severity_counts.get("error", 0):
-        grade = "parse-blocked"
-    elif per_kloc <= 1:
-        grade = "low-risk"
-    elif per_kloc <= MODERATE_RISK_WARN_OR_ERROR_PER_KLOC:
-        grade = "moderate-risk"
-    elif per_kloc <= HIGH_RISK_WARN_OR_ERROR_PER_KLOC:
-        grade = "high-risk"
-    else:
-        grade = "severe-risk"
     return {
         "files": len(files),
         "scanned_paths": selected_relative_paths(root, files),
-        "source_loc": loc,
         "findings": len(findings),
-        "score": final_score,
-        "min_score": min_score,
-        "score_status": score_floor_status(final_score, min_score),
         "excluded_patterns": list(exclude_patterns or []),
         "status": status,
         "status_reason": status_reason,
-        "mechanical_grade": grade,
-        "warn_or_error_per_kloc": round(per_kloc, 2),
         "severity_counts": dict(severity_counts),
         "kind_counts": dict(kind_counts),
         "review_signal_findings": review_signal_count,
@@ -3819,6 +3755,8 @@ def summarize_findings(
         "error_signal_findings": error_signal_count,
         "signal_counts": dict(decision_counts),
         "dimension_counts": dict(dimension_counts),
+        "typed_boundary_counts": dict(typed_boundary_counts),
+        "typed_evidence_owner": "oop-readability-checker",
         "solid_counts": dict(solid_counts),
         "top_files": [
             {"path": path, "findings": count}
@@ -3835,8 +3773,6 @@ def render_markdown_report(spec: MarkdownReportSpec) -> str:
         spec.root,
         spec.files,
         spec.findings,
-        spec.final_score,
-        spec.min_score,
         exclude_patterns=spec.exclude_patterns,
     )
     snippets = (
@@ -3862,25 +3798,21 @@ def markdown_summary_lines(summary: dict[str, object]) -> list[str]:
         "# OOP Readability Mechanical Report",
         "",
         (
-            "This report is generated by static heuristics. Findings are reported "
-            "signals, not agent judgment or accepted design defects."
+            "This report is generated by static boundary observations. Findings are "
+            "evidence for owner review, not automatic design decisions."
         ),
         "",
         "## Summary",
         "",
         f"- status: `{summary['status']}`",
         f"- status_reason: `{summary['status_reason']}`",
-        f"- mechanical_grade: `{summary['mechanical_grade']}`",
-        f"- score: `{summary['score']}` / floor `{summary['min_score']}`",
-        f"- score_status: `{summary['score_status']}`",
         f"- files: `{summary['files']}`",
         f"- scanned_paths: `{', '.join(scanned_paths) or 'none'}`",
-        f"- source_loc: `{summary['source_loc']}`",
         f"- findings: `{summary['findings']}`",
         f"- error_signal_findings: `{summary['error_signal_findings']}`",
         f"- gate_signal_findings: `{summary['gate_signal_findings']}`",
         f"- review_signal_findings: `{summary['review_signal_findings']}`",
-        f"- warn_or_error_per_kloc: `{summary['warn_or_error_per_kloc']}`",
+        f"- typed_evidence_owner: `{summary['typed_evidence_owner']}`",
         f"- excluded_patterns: `{', '.join(excluded_patterns_summary) or 'none'}`",
         "",
     ]
@@ -3901,11 +3833,17 @@ def markdown_solid_lines(summary: dict[str, object]) -> list[str]:
 def markdown_dimension_lines(summary: dict[str, object]) -> list[str]:
     """Render dimension and finding-kind sections."""
     dimension_counts = cast(dict[str, int], summary["dimension_counts"])
+    typed_boundary_counts = cast(dict[str, int], summary["typed_boundary_counts"])
     kind_counts = cast(dict[str, int], summary["kind_counts"])
     lines = [
         "## Dimensions",
         "",
     ]
+    lines.append("### Typed Boundary Evidence")
+    lines.append("")
+    for boundary, count in Counter(typed_boundary_counts).most_common():
+        lines.append(f"- `{boundary}`: {count}")
+    lines.append("")
     for dimension, count in Counter(dimension_counts).most_common():
         lines.append(f"- `{dimension}`: {count}")
     lines.extend(["", "## Finding Kinds", ""])
@@ -3946,8 +3884,11 @@ def markdown_finding_detail_lines(
                 "",
                 f"- symbol: `{finding.symbol}`",
                 f"- dimension: `{facts['dimension']}`",
+                f"- typed_boundary: `{typed_boundary_evidence(finding)['boundary']}`",
+                f"- evidence_owner: `{typed_boundary_evidence(finding)['evidence_owner']}`",
                 f"- solid_principles: `{solid_principles}`",
-                f"- actual_vs_limit: `{finding.actual}` > `{finding.limit}`",
+                f"- observation: `{finding.evidence}`",
+                f"- boundary_contract: `{finding.contract}`",
                 f"- mechanical_explanation: {facts['explanation']}",
                 f"- reported_action_signal: {facts['recommended_action']}",
             ]
@@ -3979,7 +3920,7 @@ def write_review_prompt(path: Path, report_path: str) -> None:
                 "",
                 "Rules:",
                 "- Do not invent new findings that are not present in the mechanical report.",
-                "- Do not change the pass/fail status, score, thresholds, or counts.",
+                "- Do not change the checker status, thresholds, or counts.",
                 (
                     "- Treat mechanical findings as reported signals; preserve tool "
                     "facts separately from reviewer judgment."
@@ -4019,7 +3960,7 @@ def main(argv: Sequence[str] | None = None, *, default_language: str = "all") ->
         write_review_prompt(Path(args.review_prompt_out), "")
     status = str(run.summary["status"])
     append_workflow_monitor_timing(root, args, status, started_at)
-    return 0 if status == STATUS_PASS else 1
+    return 0 if status in {STATUS_PASS, STATUS_REVIEW} else 1
 
 
 def append_workflow_monitor_timing(
@@ -4104,20 +4045,16 @@ def build_analyzer_run(root: Path, args: argparse.Namespace) -> AnalyzerRun:
         )
         if baseline_findings is not None:
             findings = new_findings_since_baseline(findings, baseline_findings)
-    final_score = score(findings)
     summary = summarize_findings(
         root,
         files,
         findings,
-        final_score,
-        args.min_score,
         exclude_patterns=args.exclude,
     )
     return AnalyzerRun(
         root=root,
         files=files,
         findings=findings,
-        final_score=final_score,
         summary=summary,
     )
 
@@ -4312,8 +4249,6 @@ def emit_markdown_report(run: AnalyzerRun, args: argparse.Namespace) -> None:
                 root=run.root,
                 files=run.files,
                 findings=run.findings,
-                final_score=run.final_score,
-                min_score=args.min_score,
                 include_snippets=args.include_snippets,
                 snippet_context=args.snippet_context,
                 max_report_findings=args.max_report_findings,
@@ -4330,14 +4265,14 @@ def emit_text_report(run: AnalyzerRun) -> None:
         print(finding.render())
     print(f"OOP_READABILITY_FILES={len(run.files)}")
     print(f"OOP_READABILITY_FINDINGS={len(run.findings)}")
-    print(f"OOP_READABILITY_SCORE={run.final_score}")
-    print(f"OOP_READABILITY_SCORE_STATUS={run.summary['score_status']}")
-    print(f"OOP_READABILITY_GRADE={run.summary['mechanical_grade']}")
     print(f"OOP_READABILITY_STATUS_REASON={run.summary['status_reason']}")
-    print(f"OOP_READABILITY_WARN_OR_ERROR_PER_KLOC={run.summary['warn_or_error_per_kloc']}")
     print(f"OOP_READABILITY_ERROR_SIGNAL_FINDINGS={run.summary['error_signal_findings']}")
     print(f"OOP_READABILITY_GATE_SIGNAL_FINDINGS={run.summary['gate_signal_findings']}")
     print(f"OOP_READABILITY_REVIEW_SIGNAL_FINDINGS={run.summary['review_signal_findings']}")
+    print(
+        "OOP_READABILITY_TYPED_BOUNDARY_COUNTS="
+        + json.dumps(run.summary["typed_boundary_counts"], sort_keys=True)
+    )
     print(f"OOP_READABILITY={run.summary['status']}")
 
 

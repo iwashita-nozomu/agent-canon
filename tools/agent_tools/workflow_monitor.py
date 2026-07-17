@@ -3,7 +3,9 @@
 # contract tool
 # responsibility Appends workflow monitoring evidence to run bundles.
 # upstream design ../../agents/templates/workflow_monitoring.md defines monitor sections
+# upstream implementation ./work_log.py owns canonical semantic-ledger append/read
 # upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
+# upstream implementation ./work_log.py appends canonical logical-ledger events
 # downstream implementation ../../tests/agent_tools/test_workflow_monitor.py tests it
 # @dependency-end
 """Append machine-readable workflow monitoring evidence to one run bundle."""
@@ -33,6 +35,7 @@ from mid_task_user_input_policy import (
     has_reuse_marker,
     is_empty_policy_value,
 )
+from work_log import MONITOR_PASSTHROUGH_FIELDS, append_ledger_event
 
 DECISION_KEYS = (
     "skill_improvement_decision",
@@ -83,6 +86,31 @@ SUBAGENT_WAVE_EVENT_KINDS = {
     "skipped",
     "authority_blocker",
 }
+COMPLETION_SEMANTIC_KINDS = {
+    "request_clause",
+    "responsibility_unit",
+    "decision",
+    "change",
+    "review_finding",
+    "validation",
+    "failure",
+    "publication_state",
+    "deferral",
+}
+SEMANTIC_EVENT_REQUIRED_KEYS = (
+    "event_id",
+    "context_id",
+    "semantic_kind",
+    "owner",
+    "state_owner",
+    "api_owner",
+    "dependency_owner",
+    "responsibility_unit",
+    "intent_id",
+    "outcome",
+    "evidence_refs",
+    "artifact_refs",
+)
 SUBAGENT_WAVE_EMPTY_OK_STATUSES = {
     "blocked",
     "blocked_authority_required",
@@ -151,14 +179,8 @@ STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
         "tool_call=run_repo_dependency_review.sh repo_dependency_review=pass "
         "scope=repo-wide"
     ),
-    "tool_call=make ci static_analysis=pass scope=repo-wide",
-    "tool_call=pyright code_checker=pass checker=pyright scope=repo-wide",
-    "tool_call=ruff code_checker=pass checker=ruff scope=repo-wide",
-    (
-        "tool_call=oop-readability-check code_checker=pass "
-        "checker=oop-readability scope=changed-paths"
-    ),
-    "tool_call=check_convention_compliance.py CONVENTION_COMPLIANCE=pass",
+    "tool_call=canonical-format-check code_checker=pass checker=markdown-math-mermaid scope=changed-paths",
+    "hook_dispatcher=official schema=agent-canon.posttooluse-stop.v1 events=PostToolUse,Stop",
     "static_analysis_feedback=recorded target=review-backlog-scan",
     (
         "hook_tool_feedback=reviewed parent_protocol_update=not_required "
@@ -197,6 +219,7 @@ class MonitoringEntries:
 
     signals: tuple[str, ...] = ()
     behavior_events: tuple[str, ...] = ()
+    semantic_events: tuple[str, ...] = ()
     runtime_feedback: tuple[str, ...] = ()
     tool_warnings: tuple[str, ...] = ()
     tool_warning_status: str = ""
@@ -211,6 +234,7 @@ EMPTY_MONITORING_ENTRIES = MonitoringEntries()
 MONITORING_LEGACY_KEYS = {
     "signals",
     "behavior_events",
+    "semantic_events",
     "runtime_feedback",
     "tool_warnings",
     "tool_warning_status",
@@ -297,6 +321,16 @@ def add_monitoring_entry_arguments(parser: argparse.ArgumentParser) -> None:
         help=(
             "Agent behavior event to append, such as skill invocation, subagent routing, "
             "tool call, review decision, prompt eval result, or feedback action."
+        ),
+    )
+    parser.add_argument(
+        "--semantic-event",
+        action="append",
+        default=[],
+        help=(
+            "Append one typed logical-ledger event. Required keys: event_id, "
+            "semantic_kind, owner, state_owner, api_owner, dependency_owner, "
+            "intent_id, outcome, evidence_refs, artifact_refs."
         ),
     )
     parser.add_argument(
@@ -472,6 +506,81 @@ def normalize_runtime_feedback(entry: str) -> str:
     if "target=" not in stripped or "action=" not in stripped:
         raise ValueError("runtime feedback must include target=... and action=...")
     return f"runtime_feedback=observed {stripped}"
+
+
+def normalize_semantic_event(entry: str) -> str:
+    """Validate one semantic ledger event before monitoring records it."""
+    fields = parse_token_fields(entry.strip())
+    missing = [key for key in SEMANTIC_EVENT_REQUIRED_KEYS if not fields.get(key)]
+    if missing:
+        raise ValueError(
+            "semantic event must include required keys: " + ",".join(missing)
+        )
+    if fields["semantic_kind"] not in COMPLETION_SEMANTIC_KINDS:
+        raise ValueError(
+            "semantic_kind must be one of: "
+            + ",".join(sorted(COMPLETION_SEMANTIC_KINDS))
+        )
+    for field in MONITOR_PASSTHROUGH_FIELDS:
+        _structured_semantic_field(fields, field)
+    return f"ledger_event=projected {entry.strip()}"
+
+
+def semantic_event_record(entry: str, report_dir: Path) -> dict[str, object]:
+    """Convert one monitor token event into the canonical work-ledger record."""
+    fields = parse_token_fields(entry.strip())
+    missing = [key for key in SEMANTIC_EVENT_REQUIRED_KEYS if not fields.get(key)]
+    if missing:
+        raise ValueError(
+            "semantic event must include required keys: " + ",".join(missing)
+        )
+    def refs(name: str) -> list[str]:
+        values = [item.strip() for item in fields.get(name, "").split(",") if item.strip()]
+        if not values:
+            raise ValueError(f"semantic event requires non-empty {name}")
+        return values
+
+    event: dict[str, object] = {
+        "run_id": report_dir.name,
+        "context_id": fields["context_id"],
+        "event_id": fields["event_id"],
+        "semantic_kind": fields["semantic_kind"],
+        "owner": fields["owner"],
+        "state_owner": fields["state_owner"],
+        "api_owner": fields["api_owner"],
+        "dependency_owner": fields["dependency_owner"],
+        "responsibility_unit": fields["responsibility_unit"],
+        "intent_id": fields["intent_id"],
+        "outcome": fields["outcome"],
+        "evidence_refs": refs("evidence_refs"),
+        "artifact_refs": refs("artifact_refs"),
+    }
+    for optional in ("sequence", "clause_id", "mapping_mode"):
+        if fields.get(optional):
+            event[optional] = fields[optional]
+    if fields.get("member_clause_ids"):
+        event["member_clause_ids"] = refs("member_clause_ids")
+    for field in MONITOR_PASSTHROUGH_FIELDS:
+        value = _structured_semantic_field(fields, field)
+        if value is not None:
+            event[field] = value
+    return event
+
+
+def _structured_semantic_field(
+    fields: Mapping[str, str], field: str
+) -> Mapping[str, object] | list[object] | None:
+    """Decode schema-owned structured evidence without dropping it at the monitor boundary."""
+    raw = fields.get(field, "").strip()
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"semantic event {field} must be compact JSON") from exc
+    if not isinstance(value, (dict, list)):
+        raise ValueError(f"semantic event {field} must be an object or list")
+    return cast(Mapping[str, object] | list[object], value)
 
 
 def parse_token_fields(entry: str) -> dict[str, str]:
@@ -1119,6 +1228,7 @@ def entries_from_legacy(kwargs: dict[str, object]) -> MonitoringEntries:
         signals=string_entries(kwargs.get("signals")),
         behavior_events=string_entries(kwargs.get("behavior_events")),
         runtime_feedback=string_entries(kwargs.get("runtime_feedback")),
+        semantic_events=string_entries(kwargs.get("semantic_events")),
         tool_warnings=string_entries(kwargs.get("tool_warnings")),
         tool_warning_status=str(kwargs.get("tool_warning_status", "")),
         mid_task_user_inputs=string_entries(kwargs.get("mid_task_user_inputs")),
@@ -1170,6 +1280,10 @@ def append_monitoring_sections(
         normalize_entry(item, entries.timestamp)
         for item in entries.behavior_events
     ]
+    behavior_entries.extend(
+        normalize_entry(normalize_semantic_event(item), entries.timestamp)
+        for item in entries.semantic_events
+    )
     behavior_entries.extend(
         normalize_entry(normalize_runtime_feedback(item), entries.timestamp)
         for item in entries.runtime_feedback
@@ -1224,6 +1338,11 @@ def append_monitoring(
     """Append monitoring evidence and return the artifact path."""
     active_entries = entries_from_legacy(legacy_entries) if legacy_entries else entries
     report_dir.mkdir(parents=True, exist_ok=True)
+    for semantic_event in active_entries.semantic_events:
+        append_ledger_event(
+            report_dir,
+            semantic_event_record(semantic_event, report_dir),
+        )
     mid_task_rows, subagent_wave_rows = normalized_wave_rows(active_entries)
     append_wave_schedule_rows(report_dir, mid_task_rows, subagent_wave_rows)
     path = report_dir / "workflow_monitoring.md"
@@ -1258,6 +1377,7 @@ def main() -> int:
         MonitoringEntries(
             signals=tuple(signals),
             behavior_events=tuple(behavior_events),
+            semantic_events=tuple(args.semantic_event),
             runtime_feedback=tuple(args.runtime_feedback),
             tool_warnings=tuple(args.tool_warning),
             tool_warning_status=str(args.tool_warning_status),

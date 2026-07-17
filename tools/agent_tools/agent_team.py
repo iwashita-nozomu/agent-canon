@@ -15,7 +15,11 @@ import hashlib
 import json
 import re
 import subprocess
-import tomllib
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -208,7 +212,6 @@ DEFAULT_QUALITY_CHECK_POLICY_SOURCE = (
     "agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default"
 )
 DEFAULT_QUALITY_CHECK_ROLE_IDS = (
-    "test_designer",
     "docs_workflow_steward",
     "python_reviewer",
     "cpp_reviewer",
@@ -219,14 +222,20 @@ DEFAULT_QUALITY_CHECK_STAGES = (
     "post_edit_review",
 )
 DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
+    "tools/bin/agent-canon docs check <changed-markdown-paths>",
     "python3 tools/agent_tools/check_convention_compliance.py",
     "python3 tools/agent_tools/check_dependency_headers.py --changed",
     "bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing",
     "bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header",
-    "python3 tools/agent_tools/helper_function_inventory.py --root . --changed --baseline-ref HEAD",
-    "python3 tools/oop/python/readability.py --root . --min-score 95 <changed-python-paths>",
-    "python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>",
-    "tools/bin/agent-canon docs check <changed-markdown-paths>",
+)
+CANONICAL_FORMAT_CHECK_ROUTE = "tools/bin/agent-canon docs check <changed-markdown-paths>"
+OFFICIAL_HOOK_DISPATCHER = ".codex/hooks/hook_dispatcher.py"
+OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
+OOP_EVIDENCE_DIMENSIONS = (
+    "owner_overlap",
+    "state_ownership",
+    "api_boundary",
+    "dependency_boundary",
 )
 def validation_failure_response_policy() -> dict[str, object]:
     """Return validation-failure response taxonomy from the JSON owner."""
@@ -943,6 +952,10 @@ def default_quality_check_policy_output_lines(
         "DEFAULT_QUALITY_CHECK_AGENT_TYPES="
         f"{','.join(default_quality_check_agent_types(roles)) or '-'}",
         f"DEFAULT_QUALITY_CHECK_STAGES={','.join(DEFAULT_QUALITY_CHECK_STAGES)}",
+        f"DEFAULT_QUALITY_CHECK_EVIDENCE={','.join(OOP_EVIDENCE_DIMENSIONS)}",
+        f"DEFAULT_FORMAT_CHECK_ROUTE={CANONICAL_FORMAT_CHECK_ROUTE}",
+        f"OFFICIAL_HOOK_DISPATCHER={OFFICIAL_HOOK_DISPATCHER}",
+        f"OFFICIAL_HOOK_SCHEMA={OFFICIAL_HOOK_SCHEMA}",
         "DEFAULT_QUALITY_CHECK_TASK_DEFAULT_SPECIALISTS="
         f"{','.join(task_default_specialists) or '-'}",
         "DEFAULT_QUALITY_CHECK_AUTO_LANGUAGE_REVIEWERS="

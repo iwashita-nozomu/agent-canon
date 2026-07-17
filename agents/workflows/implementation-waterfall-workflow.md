@@ -723,7 +723,7 @@ exit 条件:
 - `verification.txt` の `status=pass`
 - `closeout_gate.md` の `auditor_status=resolved` と `user_completion_report=unlocked`
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
-- `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes`
+- `closeout_gate.md` の `completion_coverage_consumer=yes`、`coverage_check.ok=true`、および `completion_boundary.topology_errors=[]`
 - `closeout_gate.md` の `post_fix_full_review_complete=yes`
 - `closeout_gate.md` の `mechanical_completion_loop_complete=yes` と構造化 loop evidence
 - `closeout_gate.md` の `diff_check_agent_complete=yes` と run-local diff-check artifact evidence

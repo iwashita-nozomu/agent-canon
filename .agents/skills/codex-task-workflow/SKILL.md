@@ -29,6 +29,23 @@ upstream design ../../../agents/skills/tool-finding-report.md defines tool findi
 - Boundary: this workflow coordinates execution; selected task-shape skills own
   domain-specific rules.
 
+## CompletionCoverage Reader Projection
+
+Closeout reports consume the generated `agent-canon.completion-coverage.v1`
+projection from the existing run-bundle logical ledger. `COMMUNICATION_PROTOCOL`
+owns its schema, `CODEX_WORKFLOW` owns applicability/state, and
+`report_artifact_checks` plus `task_close` own checking/consumption. Preserve
+the five mapping error sets, typed owner/state/API/dependency evidence, W1
+certificate references, and the independent planned-work and delivery
+predicates. This projection does not re-aggregate coverage or unlock delivery
+from a chunk or checkpoint.
+
+Use `tools/bin/agent-canon docs check <changed-markdown-paths>` as the one
+Markdown/math/Mermaid route and consume the official
+`agent-canon.posttooluse-stop.v1` PostToolUse/Stop dispatcher output. No scalar
+OOP score, line/length, test-count, coverage, mutation, private-helper, or
+checker-retest rule is a completion gate.
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->

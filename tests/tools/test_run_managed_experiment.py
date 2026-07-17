@@ -16,7 +16,11 @@ from __future__ import annotations
 
 import subprocess
 import sys
-import tomllib
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 from pathlib import Path
 
 from tests.tools.resource_plan_test_evidence import (

@@ -4,7 +4,6 @@
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
 // upstream design ../../../agents/skills/md-style-check.md Markdown style check skill contract
 // downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
-// downstream implementation ../../../tools/ci/run_docs_checks.sh forwards legacy docs-check calls
 // @dependency-end
 
 use serde_json::Value;

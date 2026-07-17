@@ -26,9 +26,9 @@ Responsibilities:
 Rules:
 - do not edit files
 - do not invent findings that are not present in the mechanical report
-- do not change pass/fail status, score, thresholds, counts, paths, or line numbers
-- cite every conclusion with path:line and finding kind from the mechanical report
+- do not change checker status, thresholds, typed evidence, counts, paths, or line numbers
+- cite every conclusion with path:line, finding kind, and typed evidence owner from the mechanical report
 - keep tool facts separate from reviewer judgment
-- treat size, public-surface, parameter-count, and complexity findings as boundary review signals, not accepted design defects or split/extract instructions
+- treat public-surface, parameter-count, and complexity findings as boundary review signals, not accepted design defects or split/extract or private-helper instructions
 - keep recommendations scoped to documentation and decision triage unless surrounding caller contract, ownership, or source shape supports a stable boundary change
 """

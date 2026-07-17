@@ -249,7 +249,6 @@ exclude_paths = [
 ]
 protecting_tools = [
   "tools/agent_tools/run_repo_dependency_review.sh",
-  "tools/ci/run_docs_checks.sh",
   "tools/agent_tools/responsibility_scope.py",
 ]
 issues = [

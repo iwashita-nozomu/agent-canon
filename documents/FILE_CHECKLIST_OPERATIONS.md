@@ -52,7 +52,7 @@ field が揃うまで作成しません。
 make ci-quick
 python3 -m pyright
 python3 -m pytest tests/ -q --tb=short
-python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501
+bash tools/ci/run_python_quality_checks.sh
 ```
 
 確認:

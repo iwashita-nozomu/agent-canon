@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import re
 import subprocess
 from collections.abc import Sequence
@@ -21,16 +22,19 @@ from pathlib import Path
 
 from agent_team import resolve_report_root
 from report_artifact_checks import (
+    COMPLETION_COVERAGE_SCHEMA,
+    COMPLETION_COVERAGE_TAXONOMY_REFS,
     check_final_review_artifact,
     check_schedule_artifact,
     check_work_log_artifact,
+    consume_checked_completion_coverage,
+    generated_completion_coverage_errors,
     report_artifact_placement_blockers,
     token_fields,
     wave_reconciliation_blockers,
 )
 
 STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
-MAKE_CI_READY_STATUSES = {"pass", "targeted", "not_applicable"}
 MECHANICAL_STATIC_ANALYSIS_READY_STATUSES = {"pass", "targeted", "not_applicable"}
 DOCUMENT_STRUCTURE_MISSING_VALUES = {"", "missing", "none", "not_applicable"}
 DOCUMENT_SPLIT_DECISION_PREFIXES = (
@@ -41,6 +45,7 @@ DOCUMENT_SPLIT_DECISION_PREFIXES = (
     "rename:",
 )
 DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
+COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -328,6 +333,283 @@ def active_run_matches(active_run: str | None, report_dir: Path) -> bool:
     return active_run in {report_dir.name, str(report_dir.resolve())}
 
 
+def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
+    """Consume the generated v1 projection without rebuilding its ledger state."""
+    artifact_path = report_dir / COMPLETION_COVERAGE_ARTIFACT_NAME
+    if not artifact_path.is_file():
+        return {"ready": False, "reason": f"missing:{artifact_path}"}
+    try:
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"ready": False, "reason": f"unreadable:{exc}"}
+    if not isinstance(artifact, dict):
+        return {"ready": False, "reason": "artifact_is_not_object"}
+    generated_errors = generated_completion_coverage_errors(report_dir, artifact)
+    if generated_errors:
+        return {
+            "ready": False,
+            "reason": "hand_written_or_stale_artifact:" + ",".join(generated_errors),
+        }
+    if artifact.get("schema") != COMPLETION_COVERAGE_SCHEMA:
+        return {"ready": False, "reason": "schema_mismatch"}
+    source_binding = artifact.get("source_binding")
+    required_binding_fields = {
+        "run_id",
+        "context_id",
+        "organizer_context_id",
+        "parent",
+        "component_manager",
+        "assigned_unit",
+        "source_binding",
+        "source_refs",
+    }
+    if not isinstance(source_binding, dict) or not required_binding_fields.issubset(
+        source_binding
+    ):
+        return {"ready": False, "reason": "source_binding_incomplete"}
+    if source_binding.get("run_id") != report_dir.name:
+        return {"ready": False, "reason": "source_binding_run_id_mismatch"}
+    if not isinstance(source_binding.get("context_id"), str) or not source_binding.get(
+        "context_id"
+    ).strip():
+        return {"ready": False, "reason": "source_binding_context_id_missing"}
+    nested_binding = source_binding.get("source_binding")
+    if not isinstance(nested_binding, dict) or not nested_binding:
+        return {"ready": False, "reason": "source_binding_reference_incomplete"}
+    if nested_binding.get("run_id") != source_binding.get("run_id"):
+        return {"ready": False, "reason": "nested_source_binding_run_id_mismatch"}
+    if nested_binding.get("context_id") != source_binding.get("context_id"):
+        return {"ready": False, "reason": "nested_source_binding_context_id_mismatch"}
+    if not isinstance(source_binding.get("source_refs"), list) or not source_binding.get(
+        "source_refs"
+    ):
+        return {"ready": False, "reason": "source_refs_incomplete"}
+    if any(
+        not isinstance(source_ref, str) or not source_ref.strip()
+        for source_ref in source_binding["source_refs"]
+    ):
+        return {"ready": False, "reason": "source_refs_item_invalid"}
+    if any(
+        not isinstance(nested_binding.get(field), str)
+        or not nested_binding.get(field).strip()
+        for field in ("run_id", "context_id")
+    ):
+        return {"ready": False, "reason": "nested_source_binding_incomplete"}
+    owner_evidence = artifact.get("owner_boundary_evidence")
+    if not isinstance(owner_evidence, list) or not owner_evidence or any(
+        not isinstance(item, dict)
+        or any(
+            not isinstance(item.get(field), str) or not item.get(field).strip()
+            for field in (
+                "owner",
+                "state_owner",
+                "api_owner",
+                "dependency_owner",
+            )
+        )
+        or not isinstance(item.get("evidence_refs"), list)
+        or not item.get("evidence_refs")
+        or any(
+            not isinstance(ref, str) or not ref.strip()
+            for ref in item.get("evidence_refs", [])
+        )
+        for item in owner_evidence
+    ):
+        return {"ready": False, "reason": "typed_owner_boundary_incomplete"}
+    projection_metadata = artifact.get("projection_metadata")
+    if not isinstance(projection_metadata, dict):
+        return {"ready": False, "reason": "projection_metadata_missing"}
+    if projection_metadata.get("generated_artifact_identity") != (
+        f"{source_binding['run_id']}:{source_binding['context_id']}"
+    ):
+        return {"ready": False, "reason": "generated_artifact_identity_mismatch"}
+    if not isinstance(projection_metadata.get("ledger_snapshot_identity"), str) or not projection_metadata.get(
+        "ledger_snapshot_identity"
+    ).strip():
+        return {"ready": False, "reason": "ledger_snapshot_identity_missing"}
+    if projection_metadata.get("source_refs") != source_binding.get("source_refs"):
+        return {"ready": False, "reason": "projection_source_refs_mismatch"}
+    coverage_check = artifact.get("coverage_check")
+    completion_boundary = artifact.get("completion_boundary")
+    if not isinstance(coverage_check, dict) or not isinstance(completion_boundary, dict):
+        return {"ready": False, "reason": "checked_projection_fields_missing"}
+    if coverage_check.get("schema") != "agent-canon.completion-coverage-check.v1":
+        return {"ready": False, "reason": "coverage_check_schema_mismatch"}
+    error_sets = coverage_check.get("error_sets")
+    required_error_sets = {
+        "uncovered",
+        "multiply_mapped",
+        "orphan",
+        "redundant",
+        "empty",
+    }
+    if not isinstance(error_sets, dict) or set(error_sets) != required_error_sets:
+        return {"ready": False, "reason": "coverage_error_sets_incomplete"}
+    if any(value != [] for value in error_sets.values()):
+        return {"ready": False, "reason": "coverage_error_sets_nonempty"}
+    gate_results = coverage_check.get("gate_results")
+    required_gate_results = {
+        "G1_CLAUSE_COVERAGE",
+        "G2_OWNER_BOUNDARY",
+        "G3_STAGE_EVIDENCE",
+        "G4_VALIDATION_RESPONSE",
+        "G5_DELIVERY_BOUNDARY",
+    }
+    if not isinstance(gate_results, dict) or set(gate_results) != required_gate_results:
+        return {"ready": False, "reason": "coverage_gate_results_incomplete"}
+    if any(gate_results.get(gate) is not True for gate in required_gate_results):
+        return {"ready": False, "reason": "coverage_gate_results_not_ready"}
+    if coverage_check.get("ok") is not True:
+        return {"ready": False, "reason": "coverage_check_not_ok"}
+    if coverage_check.get("source_binding") != source_binding:
+        return {"ready": False, "reason": "coverage_source_binding_mismatch"}
+    if tuple(coverage_check.get("taxonomy_refs", ())) != COMPLETION_COVERAGE_TAXONOMY_REFS:
+        return {"ready": False, "reason": "coverage_taxonomy_refs_mismatch"}
+    if completion_boundary.get("schema") != "agent-canon.completion-boundary.v1":
+        return {"ready": False, "reason": "completion_boundary_schema_mismatch"}
+    if not all(
+        isinstance(completion_boundary.get(field), bool)
+        for field in ("all_planned_chunks_complete", "overall_delivery_complete")
+    ):
+        return {"ready": False, "reason": "completion_boundary_flags_invalid"}
+    if gate_results.get("G5_DELIVERY_BOUNDARY") is not completion_boundary.get(
+        "overall_delivery_complete"
+    ):
+        return {"ready": False, "reason": "coverage_delivery_gate_mismatch"}
+    if completion_boundary.get("topology_errors") != []:
+        return {"ready": False, "reason": "completion_boundary_topology_invalid"}
+    if not isinstance(completion_boundary.get("control_topology_observation_ref"), str) or not completion_boundary.get(
+        "control_topology_observation_ref"
+    ):
+        return {"ready": False, "reason": "completion_boundary_topology_ref_missing"}
+    for field in ("open_repairs", "open_crossing_edges"):
+        values = completion_boundary.get(field)
+        if not isinstance(values, list):
+            return {"ready": False, "reason": f"{field}_schema_invalid"}
+        for value in values:
+            if isinstance(value, str) and value.strip():
+                continue
+            if isinstance(value, dict) and any(
+                isinstance(value.get(key), str) and value.get(key).strip()
+                for key in ("id", "ref", "identity")
+            ):
+                continue
+            return {"ready": False, "reason": f"{field}_item_schema_invalid"}
+        if values:
+            return {"ready": False, "reason": f"{field}_nonempty"}
+    semantic_events = artifact.get("semantic_events")
+    if not isinstance(semantic_events, list) or not semantic_events:
+        return {"ready": False, "reason": "semantic_events_missing"}
+    events_by_id: dict[str, dict[str, object]] = {}
+    for event in semantic_events:
+        if not isinstance(event, dict):
+            return {"ready": False, "reason": "semantic_event_invalid"}
+        event_id = event.get("event_id")
+        if not isinstance(event_id, str) or not event_id.strip() or event_id in events_by_id:
+            return {"ready": False, "reason": "semantic_event_identity_invalid"}
+        if event.get("run_id") != source_binding.get("run_id"):
+            return {"ready": False, "reason": "semantic_event_run_id_mismatch"}
+        if event.get("context_id") != source_binding.get("context_id"):
+            return {"ready": False, "reason": "semantic_event_context_id_mismatch"}
+        if event.get("source_binding") != nested_binding:
+            return {"ready": False, "reason": "semantic_event_source_binding_mismatch"}
+        events_by_id[event_id] = event
+    coverage_map = artifact.get("coverage_map")
+    if not isinstance(coverage_map, list):
+        return {"ready": False, "reason": "coverage_map_missing"}
+    source_event_refs: set[str] = set()
+    for mapping in coverage_map:
+        if not isinstance(mapping, dict):
+            return {"ready": False, "reason": "coverage_mapping_invalid"}
+        source_event_ref = mapping.get("source_event_ref")
+        if not isinstance(source_event_ref, str) or source_event_ref in source_event_refs:
+            return {"ready": False, "reason": "coverage_source_event_identity_invalid"}
+        if source_event_ref not in events_by_id:
+            return {"ready": False, "reason": "coverage_source_event_missing"}
+        source_event_refs.add(source_event_ref)
+    monitor_evidence = artifact.get("monitor_evidence")
+    if not isinstance(monitor_evidence, list):
+        return {"ready": False, "reason": "monitor_evidence_invalid"}
+    for evidence in monitor_evidence:
+        if not isinstance(evidence, dict):
+            return {"ready": False, "reason": "monitor_evidence_item_invalid"}
+        if evidence.get("run_id") != source_binding.get("run_id") or evidence.get(
+            "context_id"
+        ) != source_binding.get("context_id"):
+            return {"ready": False, "reason": "monitor_evidence_binding_invalid"}
+        source_event_ref = evidence.get("source_event_ref")
+        if source_event_ref is not None and source_event_ref not in events_by_id:
+            return {"ready": False, "reason": "monitor_evidence_source_event_missing"}
+    gate_evidence = artifact.get("gate_evidence")
+    if not isinstance(gate_evidence, list) or not gate_evidence:
+        return {"ready": False, "reason": "gate_evidence_missing"}
+    gate_ids: set[str] = set()
+    for evidence in gate_evidence:
+        if not isinstance(evidence, dict):
+            return {"ready": False, "reason": "gate_evidence_invalid"}
+        gate_id = evidence.get("gate_id")
+        refs = evidence.get("source_event_refs")
+        if not isinstance(gate_id, str) or not gate_id.strip() or gate_id in gate_ids:
+            return {"ready": False, "reason": "gate_evidence_identity_invalid"}
+        if not isinstance(refs, list) or not refs or any(
+            not isinstance(ref, str) or ref not in events_by_id for ref in refs
+        ):
+            return {"ready": False, "reason": "gate_evidence_source_invalid"}
+        gate_ids.add(gate_id)
+    if not {"oop_readability_guard", "solid_evidence_gate"}.issubset(gate_ids):
+        return {"ready": False, "reason": "oop_review_signal_missing"}
+    resource_certificates = artifact.get("resource_certificates")
+    if not isinstance(resource_certificates, list):
+        return {"ready": False, "reason": "resource_certificates_invalid"}
+    resource_certificate_refs: set[str] = set()
+    for certificate in resource_certificates:
+        if not isinstance(certificate, dict):
+            return {"ready": False, "reason": "resource_certificate_invalid"}
+        source_event_ref = certificate.get("source_event_ref")
+        if not isinstance(source_event_ref, str) or source_event_ref in resource_certificate_refs:
+            return {"ready": False, "reason": "resource_certificate_source_invalid"}
+        if source_event_ref not in events_by_id:
+            return {"ready": False, "reason": "resource_certificate_source_missing"}
+        if certificate.get("run_id") != source_binding.get("run_id") or certificate.get(
+            "context_id"
+        ) != source_binding.get("context_id"):
+            return {"ready": False, "reason": "resource_certificate_binding_mismatch"}
+        resource_certificate_refs.add(source_event_ref)
+    failure_event_refs = artifact.get("failure_event_refs")
+    failure_responses = artifact.get("failure_responses")
+    if not isinstance(failure_event_refs, list) or not isinstance(failure_responses, list):
+        return {"ready": False, "reason": "failure_response_projection_invalid"}
+    expected_failure_refs = {
+        event_id
+        for event_id, event in events_by_id.items()
+        if event.get("semantic_kind") == "failure"
+    }
+    if set(failure_event_refs) != expected_failure_refs or any(
+        not isinstance(ref, str) for ref in failure_event_refs
+    ):
+        return {"ready": False, "reason": "failure_event_source_binding_invalid"}
+    response_refs: list[str] = []
+    for response in failure_responses:
+        if not isinstance(response, dict):
+            return {"ready": False, "reason": "failure_response_invalid"}
+        response_ref = response.get("source_event_ref")
+        if not isinstance(response_ref, str) or response_ref in response_refs:
+            return {"ready": False, "reason": "failure_response_identity_invalid"}
+        if response_ref not in expected_failure_refs:
+            return {"ready": False, "reason": "failure_response_source_invalid"}
+        response_refs.append(response_ref)
+    if set(response_refs) != expected_failure_refs:
+        return {"ready": False, "reason": "failure_response_exact_once_invalid"}
+    try:
+        return consume_checked_completion_coverage(
+            artifact,
+            coverage_check,
+            completion_boundary,
+        )
+    except ValueError as exc:
+        return {"ready": False, "reason": str(exc)}
+
+
 def main() -> int:
     """Run the closeout check."""
     args = build_parser().parse_args()
@@ -379,7 +661,13 @@ def main() -> int:
         closeout_path, "Subagent Lifecycle Evidence"
     )
     agent_canon_latest = parse_markdown_status_section(
-        closeout_path, "AgentCanon Latest And CI Gate Evidence"
+        closeout_path, "AgentCanon Latest Evidence"
+    )
+    canonical_evidence = parse_markdown_status_section(
+        closeout_path, "Canonical Formatter And Static Evidence"
+    )
+    completion_coverage_evidence = parse_markdown_status_section(
+        closeout_path, "CompletionCoverage And Failure Response Evidence"
     )
     runtime_log_archive = parse_markdown_status_section(
         closeout_path, "Runtime Log Archive Evidence"
@@ -421,6 +709,7 @@ def main() -> int:
         else ["final_review.md:missing"]
     )
     report_artifact_blockers = report_artifact_placement_blockers(workspace, report_dir)
+    completion_decision = completion_coverage_consumer(report_dir)
     wave_reconciliation = wave_reconciliation_blockers(
         schedule_text,
         workflow_monitoring_text,
@@ -437,8 +726,15 @@ def main() -> int:
         "required_reviews_complete": closeout.get("required_reviews_complete") == "yes",
         "validation_complete": closeout.get("validation_complete") == "yes",
         "request_contract_complete": closeout.get("request_contract_complete") == "yes",
-        "all_planned_chunks_complete": closeout.get("all_planned_chunks_complete") == "yes",
-        "overall_delivery_complete": closeout.get("overall_delivery_complete") == "yes",
+        "completion_coverage_consumer": completion_decision.get("ready") is True,
+        "all_planned_chunks_complete": (
+            completion_decision.get("all_planned_chunks_complete") is True
+            and closeout.get("all_planned_chunks_complete") == "yes"
+        ),
+        "overall_delivery_complete": (
+            completion_decision.get("overall_delivery_complete") is True
+            and closeout.get("overall_delivery_complete") == "yes"
+        ),
         "unfinished_tasks_absent": closeout.get("unfinished_tasks_absent") == "yes",
         "dependency_headers_complete": closeout.get("dependency_headers_complete") == "yes",
         "repo_wide_dependency_tools_complete": closeout.get("repo_wide_dependency_tools_complete")
@@ -462,9 +758,22 @@ def main() -> int:
         not in {"", "missing", "none"},
         "agent_canon_parent_pin": agent_canon_latest.get("agent_canon_parent_pin", "")
         not in {"", "missing", "none"},
-        "make_ci_status": closeout.get("make_ci_status") in MAKE_CI_READY_STATUSES,
-        "spec_product_coverage_complete": closeout.get("spec_product_coverage_complete")
-        == "yes",
+        "mapping_error_sets_empty": closeout.get("mapping_error_sets_empty") == "yes",
+        "typed_owner_boundary_status": closeout.get("typed_owner_boundary_status")
+        == "pass",
+        "canonical_format_check_status": canonical_evidence.get(
+            "canonical_format_check_status", closeout.get("canonical_format_check_status", "")
+        )
+        == "pass",
+        "canonical_dispatcher_schema_status": closeout.get(
+            "canonical_dispatcher_schema_status"
+        )
+        == "pass",
+        "validation_failure_response_status": completion_coverage_evidence.get(
+            "validation_failure_response_status",
+            closeout.get("validation_failure_response_status", ""),
+        )
+        == "pass",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
         "post_fix_full_review_complete": closeout.get("post_fix_full_review_complete") == "yes",
         "tool_warnings_resolved": closeout.get("tool_warnings_resolved") == "yes",
@@ -638,6 +947,23 @@ def main() -> int:
     print(f"REQUEST_CONTRACT_COMPLETE={closeout.get('request_contract_complete', '')}")
     print(f"ALL_PLANNED_CHUNKS_COMPLETE={closeout.get('all_planned_chunks_complete', '')}")
     print(f"OVERALL_DELIVERY_COMPLETE={closeout.get('overall_delivery_complete', '')}")
+    print(f"COMPLETION_COVERAGE_ARTIFACT={report_dir / COMPLETION_COVERAGE_ARTIFACT_NAME}")
+    print(f"COMPLETION_COVERAGE_CONSUMER_READY={completion_decision.get('ready', False)}")
+    print(f"COMPLETION_COVERAGE_CONSUMER_REASON={completion_decision.get('reason', '')}")
+    print(f"MAPPING_ERROR_SETS_EMPTY={closeout.get('mapping_error_sets_empty', '')}")
+    print(f"TYPED_OWNER_BOUNDARY_STATUS={closeout.get('typed_owner_boundary_status', '')}")
+    print(
+        "CANONICAL_FORMAT_CHECK_STATUS="
+        f"{canonical_evidence.get('canonical_format_check_status', '')}"
+    )
+    print(
+        "CANONICAL_DISPATCHER_SCHEMA_STATUS="
+        f"{closeout.get('canonical_dispatcher_schema_status', '')}"
+    )
+    print(
+        "VALIDATION_FAILURE_RESPONSE_STATUS="
+        f"{completion_coverage_evidence.get('validation_failure_response_status', '')}"
+    )
     print(f"UNFINISHED_TASKS_ABSENT={closeout.get('unfinished_tasks_absent', '')}")
     print(f"DEPENDENCY_HEADERS_COMPLETE={closeout.get('dependency_headers_complete', '')}")
     print(
@@ -671,11 +997,6 @@ def main() -> int:
     print(
         "AGENT_CANON_PARENT_PIN="
         f"{agent_canon_latest.get('agent_canon_parent_pin', '')}"
-    )
-    print(f"MAKE_CI_STATUS={closeout.get('make_ci_status', '')}")
-    print(
-        "SPEC_PRODUCT_COVERAGE_COMPLETE="
-        f"{closeout.get('spec_product_coverage_complete', '')}"
     )
     print(f"REVIEW_FINDINGS_INTEGRATED={closeout.get('review_findings_integrated', '')}")
     print(

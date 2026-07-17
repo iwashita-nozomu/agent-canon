@@ -20,6 +20,7 @@
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
 # upstream implementation ../../.codex/hooks/codex_runtime_summary_logger.py exports bounded Codex runtime summaries
 # upstream implementation ../../.codex/hooks/runtime_log_auto_sync.py runs unattended runtime log archive sync
+# upstream implementation ../../.codex/hooks/completion_review_guard.py blocks unresolved automatic review at Stop
 # upstream implementation ../../.codex/hooks/log_archive_mount_warning.py warns when log archive is not mounted
 # upstream implementation ../../.codex/hooks/branch_worktree_guard.py blocks unconfirmed shared-checkout Git mutations
 # upstream implementation ../../.codex/hooks/direct_rg_context_guard.py warns on context-polluting direct rg usage
@@ -55,32 +56,56 @@ GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_gua
 OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_guard.py"
 HELPER_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_inventory_guard.py"
 MODULE_BOUNDARY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "module_boundary_guard.py"
-LIBRARY_IMPLEMENTATION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "library_implementation_guard.py"
-FIRST_PARTY_LIBRARY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "first_party_library_guard.py"
+LIBRARY_IMPLEMENTATION_GUARD = (
+    PROJECT_ROOT / ".codex" / "hooks" / "library_implementation_guard.py"
+)
+FIRST_PARTY_LIBRARY_GUARD = (
+    PROJECT_ROOT / ".codex" / "hooks" / "first_party_library_guard.py"
+)
 HELPER_FIRST_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_first_guard.py"
-TASK_AUTHORITY_SCHEMA_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "task_authority_schema_guard.py"
-ROLE_WRITE_POLICY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "role_write_policy_guard.py"
-CAUSE_INVESTIGATION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "cause_investigation_guard.py"
-LOG_SURFACE_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "log_surface_inventory_guard.py"
+TASK_AUTHORITY_SCHEMA_GUARD = (
+    PROJECT_ROOT / ".codex" / "hooks" / "task_authority_schema_guard.py"
+)
+ROLE_WRITE_POLICY_GUARD = (
+    PROJECT_ROOT / ".codex" / "hooks" / "role_write_policy_guard.py"
+)
+CAUSE_INVESTIGATION_GUARD = (
+    PROJECT_ROOT / ".codex" / "hooks" / "cause_investigation_guard.py"
+)
+LOG_SURFACE_INVENTORY_GUARD = (
+    PROJECT_ROOT / ".codex" / "hooks" / "log_surface_inventory_guard.py"
+)
 NOTEBOOK_QUALITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "notebook_quality_guard.py"
 STYLE_CHECKER_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "style_checker_guard.py"
 SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
-CODEX_RUNTIME_SUMMARY_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "codex_runtime_summary_logger.py"
+CODEX_RUNTIME_SUMMARY_LOGGER = (
+    PROJECT_ROOT / ".codex" / "hooks" / "codex_runtime_summary_logger.py"
+)
 RUNTIME_LOG_AUTO_SYNC = PROJECT_ROOT / ".codex" / "hooks" / "runtime_log_auto_sync.py"
-LOG_ARCHIVE_MOUNT_WARNING = PROJECT_ROOT / ".codex" / "hooks" / "log_archive_mount_warning.py"
+COMPLETION_REVIEW_GUARD = (
+    PROJECT_ROOT / ".codex" / "hooks" / "completion_review_guard.py"
+)
+LOG_ARCHIVE_MOUNT_WARNING = (
+    PROJECT_ROOT / ".codex" / "hooks" / "log_archive_mount_warning.py"
+)
 BRANCH_WORKTREE_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "branch_worktree_guard.py"
-DIRECT_RG_CONTEXT_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "direct_rg_context_guard.py"
-REFERENCE_CAPTURE_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "reference_capture_guard.py"
+DIRECT_RG_CONTEXT_GUARD = (
+    PROJECT_ROOT / ".codex" / "hooks" / "direct_rg_context_guard.py"
+)
+REFERENCE_CAPTURE_GUARD = (
+    PROJECT_ROOT / ".codex" / "hooks" / "reference_capture_guard.py"
+)
 NOTEBOOK_MAJOR_VERSION = 4
 NOTEBOOK_MINOR_VERSION = 5
-OOP_READABILITY_MIN_SCORE = 95
 EXPECTED_PROMPT_FEEDBACK_MIN = 3
 EXPECTED_HOOK_EVENT_COUNT = 4
 
 
 def write_sha256_baseline(path: Path, baseline_path: Path) -> None:
     """Write a test baseline sidecar for a runtime authority file."""
-    baseline_path.write_text(hashlib.sha256(path.read_bytes()).hexdigest() + "\n", encoding="utf-8")
+    baseline_path.write_text(
+        hashlib.sha256(path.read_bytes()).hexdigest() + "\n", encoding="utf-8"
+    )
 
 
 class CodexHooksTest(unittest.TestCase):
@@ -96,7 +121,9 @@ class CodexHooksTest(unittest.TestCase):
         """Run the OOP guard against one changed Python file in a temp repo."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -119,10 +146,21 @@ class CodexHooksTest(unittest.TestCase):
                 encoding="utf-8",
             )
             source = temp_root / "bad.py"
-            source.write_text("def helper_value(value):\n    return value\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
-            source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
+            source.write_text(
+                "def helper_value(value):\n    return value\n", encoding="utf-8"
+            )
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            source.write_text(
+                "def helper_value(value):\n    return value + 1\n", encoding="utf-8"
+            )
             log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
 
             result = subprocess.run(
@@ -179,7 +217,9 @@ class CodexHooksTest(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -196,10 +236,21 @@ class CodexHooksTest(unittest.TestCase):
             analyzer.parent.mkdir(parents=True)
             analyzer.write_text(analyzer_text, encoding="utf-8")
             source = temp_root / "bad.py"
-            source.write_text("def helper_value(value):\n    return value\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
-            source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
+            source.write_text(
+                "def helper_value(value):\n    return value\n", encoding="utf-8"
+            )
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            source.write_text(
+                "def helper_value(value):\n    return value + 1\n", encoding="utf-8"
+            )
             log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
 
             result = subprocess.run(
@@ -244,7 +295,9 @@ class CodexHooksTest(unittest.TestCase):
         """Run the helper inventory guard against one changed Python file."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -257,7 +310,9 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
             )
-            inventory = temp_root / "tools" / "agent_tools" / "helper_function_inventory.py"
+            inventory = (
+                temp_root / "tools" / "agent_tools" / "helper_function_inventory.py"
+            )
             inventory.parent.mkdir(parents=True)
             inventory.write_text(inventory_text, encoding="utf-8")
             if policy_payload is None:
@@ -280,8 +335,15 @@ class CodexHooksTest(unittest.TestCase):
                 policy.write_text(json.dumps(policy_payload), encoding="utf-8")
             source = temp_root / "changed.py"
             source.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             source.write_text("def value() -> int:\n    return 2\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "helper.jsonl"
 
@@ -342,7 +404,9 @@ class CodexHooksTest(unittest.TestCase):
         """Run notebook guard against one changed notebook in a temp repo."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -358,9 +422,9 @@ class CodexHooksTest(unittest.TestCase):
             checker = temp_root / "tools" / "validation" / "notebook_quality.py"
             checker.parent.mkdir(parents=True)
             checker.write_text(
-                (PROJECT_ROOT / "tools" / "validation" / "notebook_quality.py").read_text(
-                    encoding="utf-8"
-                ),
+                (
+                    PROJECT_ROOT / "tools" / "validation" / "notebook_quality.py"
+                ).read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             notebook_path = temp_root / "jupyter" / "demo.ipynb"
@@ -371,8 +435,15 @@ class CodexHooksTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             notebook_path.write_text(self._notebook_payload(source), encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "notebook.jsonl"
 
@@ -408,6 +479,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(CODEX_RUNTIME_SUMMARY_LOGGER.exists())
         self.assertTrue(RUNTIME_LOG_AUTO_SYNC.exists())
         self.assertTrue(DIRECT_RG_CONTEXT_GUARD.exists())
+        self.assertTrue(COMPLETION_REVIEW_GUARD.exists())
 
     def test_hooks_json_uses_codex_supported_top_level_keys(self) -> None:
         """Codex hook configuration should keep only runtime-supported top-level keys."""
@@ -453,9 +525,14 @@ class CodexHooksTest(unittest.TestCase):
         stop_scripts = self._dispatcher_scripts("Stop")
 
         self.assertFalse(
-            any("mcp_session_context.sh" in command for command in session_start_commands)
+            any(
+                "mcp_session_context.sh" in command
+                for command in session_start_commands
+            )
         )
-        self.assertFalse(any("mcp_session_context.sh" in command for command in prompt_commands))
+        self.assertFalse(
+            any("mcp_session_context.sh" in command for command in prompt_commands)
+        )
         self.assertEqual(len(prompt_commands), 1)
         self.assertIn("hook_dispatcher.py", prompt_commands[0])
         self.assertEqual(
@@ -507,6 +584,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(
             stop_scripts,
             [
+                "completion_review_guard.py",
                 "goal_completion_guard.py",
                 "task_authority_schema_guard.py",
                 "role_write_policy_guard.py",
@@ -602,7 +680,9 @@ class CodexHooksTest(unittest.TestCase):
             )
             candidate_skills = cast("list[str]", entry["candidate_skills"])
             candidate_workflows = cast("list[str]", entry["candidate_workflows"])
-            candidate_skill_reasons = cast("list[str]", entry["candidate_skill_reasons"])
+            candidate_skill_reasons = cast(
+                "list[str]", entry["candidate_skill_reasons"]
+            )
 
         self.assertEqual(result.stdout, "")
         self.assertIn("codex-task-workflow", candidate_skills)
@@ -614,12 +694,13 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("codex-task-workflow", candidate_workflows)
         self.assertTrue(
             any(
-                "tests_are=validation_control_surface_not_default_work_owner"
-                in reason
+                "tests_are=validation_control_surface_not_default_work_owner" in reason
                 for reason in candidate_skill_reasons
             )
         )
-        self.assertIn("test-design:related_to=codex-task-workflow", candidate_skill_reasons)
+        self.assertIn(
+            "test-design:related_to=codex-task-workflow", candidate_skill_reasons
+        )
 
     def test_skill_usage_logger_filters_reasons_for_declared_skills(self) -> None:
         """Candidate reasons should describe only final candidate_skills."""
@@ -647,7 +728,9 @@ class CodexHooksTest(unittest.TestCase):
                 json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
             )
             candidate_skills = cast("list[str]", entry["candidate_skills"])
-            candidate_skill_reasons = cast("list[str]", entry["candidate_skill_reasons"])
+            candidate_skill_reasons = cast(
+                "list[str]", entry["candidate_skill_reasons"]
+            )
             selected_skills = cast("list[str]", entry["skills"])
 
         self.assertEqual(result.stdout, "")
@@ -713,7 +796,9 @@ class CodexHooksTest(unittest.TestCase):
                 json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
             )
             candidate_skills = cast("list[str]", entry["candidate_skills"])
-            candidate_skill_reasons = cast("list[str]", entry["candidate_skill_reasons"])
+            candidate_skill_reasons = cast(
+                "list[str]", entry["candidate_skill_reasons"]
+            )
 
         self.assertEqual(result.stdout, "")
         self.assertIn("user-guided-debugging", candidate_skills)
@@ -724,7 +809,9 @@ class CodexHooksTest(unittest.TestCase):
             )
         )
 
-    def test_skill_usage_logger_ignores_no_validation_preference_for_user_guided_debugging(self) -> None:
+    def test_skill_usage_logger_ignores_no_validation_preference_for_user_guided_debugging(
+        self,
+    ) -> None:
         """Hook routing should not treat validation preference as debugging cadence."""
         with tempfile.TemporaryDirectory() as temp_dir:
             log_path = Path(temp_dir) / "skill_usage.jsonl"
@@ -747,7 +834,9 @@ class CodexHooksTest(unittest.TestCase):
                 json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
             )
             candidate_skills = cast("list[str]", entry["candidate_skills"])
-            candidate_skill_reasons = cast("list[str]", entry["candidate_skill_reasons"])
+            candidate_skill_reasons = cast(
+                "list[str]", entry["candidate_skill_reasons"]
+            )
 
         self.assertEqual(result.stdout, "")
         self.assertNotIn("user-guided-debugging", candidate_skills)
@@ -781,7 +870,9 @@ class CodexHooksTest(unittest.TestCase):
                 json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
             )
             candidate_skills = cast("list[str]", entry["candidate_skills"])
-            candidate_skill_reasons = cast("list[str]", entry["candidate_skill_reasons"])
+            candidate_skill_reasons = cast(
+                "list[str]", entry["candidate_skill_reasons"]
+            )
 
         self.assertEqual(result.stdout, "")
         self.assertIn("task-routing", candidate_skills)
@@ -838,7 +929,9 @@ class CodexHooksTest(unittest.TestCase):
             source_root = Path(temp_dir) / "project"
             canon_root = Path(temp_dir) / "missing-canon"
             source_root.mkdir()
-            subprocess.run(["git", "init"], cwd=source_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=source_root, check=True, capture_output=True
+            )
 
             result = subprocess.run(
                 [sys.executable, str(RUNTIME_LOG_AUTO_SYNC)],
@@ -864,9 +957,7 @@ class CodexHooksTest(unittest.TestCase):
         }
         commands_by_event = {
             event: [
-                hook["command"]
-                for group in groups
-                for hook in group.get("hooks", [])
+                hook["command"] for group in groups for hook in group.get("hooks", [])
             ]
             for event, groups in hooks["hooks"].items()
         }
@@ -883,7 +974,9 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(sum(counts.values()), EXPECTED_HOOK_EVENT_COUNT)
         for event, commands in commands_by_event.items():
             self.assertEqual(len(commands), len(set(commands)), event)
-            self.assertTrue(all("hook_dispatcher.py" in command for command in commands))
+            self.assertTrue(
+                all("hook_dispatcher.py" in command for command in commands)
+            )
 
     def test_hook_dispatcher_runs_all_children_and_returns_first_block(self) -> None:
         """Dispatcher should preserve order while still giving every child a log chance."""
@@ -894,9 +987,15 @@ class CodexHooksTest(unittest.TestCase):
             log_path = temp_root / "invocations.txt"
             child_payloads = {
                 "log_archive_mount_warning.py": None,
-                "prompt_secret_guard.py": {"decision": "block", "reason": "first block"},
+                "prompt_secret_guard.py": {
+                    "decision": "block",
+                    "reason": "first block",
+                },
                 "skill_usage_logger.py": None,
-                "reference_capture_guard.py": {"decision": "block", "reason": "later block"},
+                "reference_capture_guard.py": {
+                    "decision": "block",
+                    "reason": "later block",
+                },
             }
             for script_name, output_payload in child_payloads.items():
                 output_json = json.dumps(output_payload) if output_payload else ""
@@ -951,15 +1050,30 @@ class CodexHooksTest(unittest.TestCase):
     def test_hook_dispatcher_promotes_trace_alias_to_child_thread_env(self) -> None:
         """Dispatcher should make trace aliases available to child hooks."""
         cases: tuple[tuple[str, dict[str, object], dict[str, str], str], ...] = (
-            ("payload_thread", {"thread_id": "thread-from-payload"}, {}, "thread-from-payload"),
-            ("payload_session", {"session_id": "session-from-payload"}, {}, "session-from-payload"),
+            (
+                "payload_thread",
+                {"thread_id": "thread-from-payload"},
+                {},
+                "thread-from-payload",
+            ),
+            (
+                "payload_session",
+                {"session_id": "session-from-payload"},
+                {},
+                "session-from-payload",
+            ),
             (
                 "payload_conversation",
                 {"conversation_id": "conversation-from-payload"},
                 {},
                 "conversation-from-payload",
             ),
-            ("env_session", {}, {"CODEX_SESSION_ID": "session-from-env"}, "session-from-env"),
+            (
+                "env_session",
+                {},
+                {"CODEX_SESSION_ID": "session-from-env"},
+                "session-from-env",
+            ),
             (
                 "env_thread_wins",
                 {"session_id": "session-from-payload"},
@@ -1081,10 +1195,14 @@ class CodexHooksTest(unittest.TestCase):
             payload = cast("dict[str, object]", json.loads(result.stdout))
 
         self.assertNotIn("decision", payload)
-        self.assertEqual(payload["next_action"], "address_guardrail_finding_before_closeout")
+        self.assertEqual(
+            payload["next_action"], "address_guardrail_finding_before_closeout"
+        )
         self.assertIn("downgraded it to a warning", cast(str, payload["systemMessage"]))
         self.assertIn("reference_capture_guard.py", cast(str, payload["systemMessage"]))
-        self.assertIn("register the reference", cast("list[str]", payload["remediation"]))
+        self.assertIn(
+            "register the reference", cast("list[str]", payload["remediation"])
+        )
 
     def test_hook_dispatcher_preserves_branch_worktree_guard_blocks(self) -> None:
         """Dispatcher should preserve the branch/worktree creation stop."""
@@ -1140,7 +1258,9 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(payload["decision"], "block")
         self.assertEqual(payload["reason"], "branch worktree stop")
 
-    def test_hook_dispatcher_critical_launch_failure_blocks_after_later_hooks(self) -> None:
+    def test_hook_dispatcher_critical_launch_failure_blocks_after_later_hooks(
+        self,
+    ) -> None:
         """Dispatcher fails closed for a critical launch failure after later hooks run."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
@@ -1313,7 +1433,7 @@ class CodexHooksTest(unittest.TestCase):
                         "import os",
                         "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
                         "    stream.write('called\\n')",
-                        "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                        'print(\'{"decision":"block","reason":"should not run"}\')',
                         "",
                     ]
                 ),
@@ -1356,7 +1476,7 @@ class CodexHooksTest(unittest.TestCase):
                         "import os",
                         "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
                         "    stream.write('called\\n')",
-                        "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                        'print(\'{"decision":"block","reason":"should not run"}\')',
                         "",
                     ]
                 ),
@@ -1407,7 +1527,11 @@ class CodexHooksTest(unittest.TestCase):
             text=True,
             env={**os.environ, **(extra_env or {})},
         )
-        return cast("dict[str, object]", json.loads(result.stdout)) if result.stdout else None
+        return (
+            cast("dict[str, object]", json.loads(result.stdout))
+            if result.stdout
+            else None
+        )
 
     def test_shared_checkout_guard_blocks_destructive_git_parser_table(self) -> None:
         """Protected Git stays visible through prefixes, wrappers, options, and grouping."""
@@ -1436,8 +1560,13 @@ class CodexHooksTest(unittest.TestCase):
             with self.subTest(command=command):
                 payload = self._run_shared_checkout_guard(command)
                 self.assertIsNotNone(payload)
-                self.assertEqual(cast("dict[str, object]", payload)["decision"], "block")
-                self.assertIn("DESTRUCTIVE_GIT_GUARD=block", cast(str, cast("dict[str, object]", payload)["reason"]))
+                self.assertEqual(
+                    cast("dict[str, object]", payload)["decision"], "block"
+                )
+                self.assertIn(
+                    "DESTRUCTIVE_GIT_GUARD=block",
+                    cast(str, cast("dict[str, object]", payload)["reason"]),
+                )
 
     def test_shared_checkout_guard_authority_is_same_segment_and_one_shot(self) -> None:
         """Ambient, incomplete, and earlier-segment authority never leaks to Git."""
@@ -1445,23 +1574,38 @@ class CodexHooksTest(unittest.TestCase):
             "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
             "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved"
         )
-        self.assertIsNone(self._run_shared_checkout_guard(f"{destructive} git restore file.py"))
-        self.assertIsNone(self._run_shared_checkout_guard(f"env {destructive} git reset HEAD"))
-        self.assertIsNotNone(self._run_shared_checkout_guard("git restore file.py", extra_env={
-            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
-            "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "ambient must not count",
-        }))
-        self.assertIsNotNone(self._run_shared_checkout_guard(
-            "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved git restore file.py"
-        ))
-        self.assertIsNotNone(self._run_shared_checkout_guard(
-            f"{destructive} git restore file.py && git reset HEAD"
-        ))
-        self.assertIsNotNone(self._run_shared_checkout_guard(
-            f"{destructive}; git restore file.py"
-        ))
+        self.assertIsNone(
+            self._run_shared_checkout_guard(f"{destructive} git restore file.py")
+        )
+        self.assertIsNone(
+            self._run_shared_checkout_guard(f"env {destructive} git reset HEAD")
+        )
+        self.assertIsNotNone(
+            self._run_shared_checkout_guard(
+                "git restore file.py",
+                extra_env={
+                    "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
+                    "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "ambient must not count",
+                },
+            )
+        )
+        self.assertIsNotNone(
+            self._run_shared_checkout_guard(
+                "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved git restore file.py"
+            )
+        )
+        self.assertIsNotNone(
+            self._run_shared_checkout_guard(
+                f"{destructive} git restore file.py && git reset HEAD"
+            )
+        )
+        self.assertIsNotNone(
+            self._run_shared_checkout_guard(f"{destructive}; git restore file.py")
+        )
 
-    def test_shared_checkout_guard_checks_opaque_protected_git_per_segment(self) -> None:
+    def test_shared_checkout_guard_checks_opaque_protected_git_per_segment(
+        self,
+    ) -> None:
         """A parsed safe Git segment never hides opaque protected Git elsewhere."""
         commands = [
             "git status && sudo git reset --hard",
@@ -1544,15 +1688,35 @@ class CodexHooksTest(unittest.TestCase):
         for command in normal_create:
             with self.subTest(command=command, route="normal"):
                 self.assertIsNotNone(self._run_shared_checkout_guard(command))
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"{creation} {command}"))
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"{workflow} {command}"))
-                self.assertIsNone(self._run_shared_checkout_guard(f"{creation} {destructive} {command}"))
-                self.assertIsNone(self._run_shared_checkout_guard(f"{workflow} {destructive} {command}"))
+                self.assertIsNotNone(
+                    self._run_shared_checkout_guard(f"{creation} {command}")
+                )
+                self.assertIsNotNone(
+                    self._run_shared_checkout_guard(f"{workflow} {command}")
+                )
+                self.assertIsNone(
+                    self._run_shared_checkout_guard(
+                        f"{creation} {destructive} {command}"
+                    )
+                )
+                self.assertIsNone(
+                    self._run_shared_checkout_guard(
+                        f"{workflow} {destructive} {command}"
+                    )
+                )
         for command in force_create:
             with self.subTest(command=command, route="force"):
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"{creation} {command}"))
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"{destructive} {command}"))
-                self.assertIsNone(self._run_shared_checkout_guard(f"{creation} {destructive} {command}"))
+                self.assertIsNotNone(
+                    self._run_shared_checkout_guard(f"{creation} {command}")
+                )
+                self.assertIsNotNone(
+                    self._run_shared_checkout_guard(f"{destructive} {command}")
+                )
+                self.assertIsNone(
+                    self._run_shared_checkout_guard(
+                        f"{creation} {destructive} {command}"
+                    )
+                )
 
     def test_shared_checkout_guard_protects_agent_canon_update_wrappers(self) -> None:
         """Update wrappers inherit the creation plus destructive authority profile."""
@@ -1590,7 +1754,9 @@ class CodexHooksTest(unittest.TestCase):
                 payload = self._run_shared_checkout_guard(command)
                 self.assertIsNotNone(payload)
                 assert payload is not None
-                self.assertIn("DESTRUCTIVE_GIT_GUARD=block", cast(str, payload["reason"]))
+                self.assertIn(
+                    "DESTRUCTIVE_GIT_GUARD=block", cast(str, payload["reason"])
+                )
                 self.assertIn(
                     "BRANCH_WORKTREE_CREATION_GUARD=block", cast(str, payload["reason"])
                 )
@@ -1598,7 +1764,9 @@ class CodexHooksTest(unittest.TestCase):
                     payload["next_action"],
                     "request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason",
                 )
-                self.assertIsNone(self._run_shared_checkout_guard(f"{approved} {command}"))
+                self.assertIsNone(
+                    self._run_shared_checkout_guard(f"{approved} {command}")
+                )
 
     def test_shared_checkout_guard_wrapper_authority_does_not_leak(self) -> None:
         """Prior segments and ambient variables never authorize an update wrapper."""
@@ -1635,8 +1803,7 @@ class CodexHooksTest(unittest.TestCase):
                 )
                 self.assertIsNotNone(
                     self._run_shared_checkout_guard(
-                        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
-                        + command
+                        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request " + command
                     )
                 )
                 self.assertIsNone(
@@ -1649,7 +1816,9 @@ class CodexHooksTest(unittest.TestCase):
             )
         )
 
-    def test_shared_checkout_guard_blocks_generic_branch_worktree_mutation(self) -> None:
+    def test_shared_checkout_guard_blocks_generic_branch_worktree_mutation(
+        self,
+    ) -> None:
         """Only explicit branch/worktree read-only allowlists stay quiet."""
         commands = [
             "git branch --set-upstream-to=origin/main topic",
@@ -1664,16 +1833,22 @@ class CodexHooksTest(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertIsNotNone(self._run_shared_checkout_guard(command))
 
-    def test_hook_dispatcher_exact_incident_command_surfaces_critical_block(self) -> None:
+    def test_hook_dispatcher_exact_incident_command_surfaces_critical_block(
+        self,
+    ) -> None:
         """The dispatcher must surface the real child block for the observed incident."""
         result = subprocess.run(
             [sys.executable, str(HOOK_DISPATCHER), "PreToolUse"],
             cwd=PROJECT_ROOT,
-            input=json.dumps({
-                "hookEventName": "PreToolUse",
-                "tool_name": "Bash",
-                "tool_input": {"cmd": "git -C vendor/agent-canon restore --worktree ."},
-            }),
+            input=json.dumps(
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "Bash",
+                    "tool_input": {
+                        "cmd": "git -C vendor/agent-canon restore --worktree ."
+                    },
+                }
+            ),
             check=True,
             capture_output=True,
             text=True,
@@ -1682,7 +1857,9 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(payload["decision"], "block")
         self.assertIn("DESTRUCTIVE_GIT_GUARD=block", cast(str, payload["reason"]))
 
-    def test_hook_dispatcher_critical_child_failures_fail_closed_but_empty_allows(self) -> None:
+    def test_hook_dispatcher_critical_child_failures_fail_closed_but_empty_allows(
+        self,
+    ) -> None:
         """Launch, exit, timeout, and malformed failures block; empty output allows."""
         cases = {
             "missing": None,
@@ -1691,7 +1868,7 @@ class CodexHooksTest(unittest.TestCase):
             "non_json": "print('not-json')\n",
             "array": "print('[]')\n",
             "empty_object": "print('{}')\n",
-            "approve": "print('{\"decision\":\"approve\"}')\n",
+            "approve": 'print(\'{"decision":"approve"}\')\n',
             "empty": "",
         }
         for mode, branch_script in cases.items():
@@ -1704,19 +1881,26 @@ class CodexHooksTest(unittest.TestCase):
                 ):
                     (hook_dir / script_name).write_text("", encoding="utf-8")
                 if branch_script is not None:
-                    (hook_dir / "branch_worktree_guard.py").write_text(branch_script, encoding="utf-8")
+                    (hook_dir / "branch_worktree_guard.py").write_text(
+                        branch_script, encoding="utf-8"
+                    )
                 result = subprocess.run(
                     [sys.executable, str(HOOK_DISPATCHER), "PreToolUse"],
                     cwd=PROJECT_ROOT,
-                    input=json.dumps({
-                        "hookEventName": "PreToolUse",
-                        "tool_name": "Bash",
-                        "tool_input": {"cmd": "git restore file.py"},
-                    }),
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PreToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": "git restore file.py"},
+                        }
+                    ),
                     check=True,
                     capture_output=True,
                     text=True,
-                    env={**os.environ, "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir)},
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    },
                 )
                 if mode == "empty":
                     self.assertEqual(result.stdout, "")
@@ -1750,7 +1934,9 @@ class CodexHooksTest(unittest.TestCase):
 
                 payload = cast("dict[str, object]", json.loads(result.stdout))
                 self.assertEqual(payload["decision"], "approve")
-                self.assertIn("DIRECT_RG_CONTEXT_RISK=warn", cast(str, payload["reason"]))
+                self.assertIn(
+                    "DIRECT_RG_CONTEXT_RISK=warn", cast(str, payload["reason"])
+                )
                 self.assertEqual(
                     payload["next_action"],
                     "replace_broad_rg_with_structure_first_git_grep",
@@ -1805,7 +1991,9 @@ class CodexHooksTest(unittest.TestCase):
         )
 
         payload = cast("dict[str, object]", json.loads(result.stdout))
-        self.assertIn("DIRECT_RG_CONTEXT_RISK=warn", cast(str, payload["systemMessage"]))
+        self.assertIn(
+            "DIRECT_RG_CONTEXT_RISK=warn", cast(str, payload["systemMessage"])
+        )
         self.assertIn("hookSpecificOutput", payload)
 
     def test_hook_dispatcher_skips_git_push_tool_payloads(self) -> None:
@@ -1822,7 +2010,7 @@ class CodexHooksTest(unittest.TestCase):
                         "import os",
                         "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
                         "    stream.write('called\\n')",
-                        "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                        'print(\'{"decision":"block","reason":"should not run"}\')',
                         "",
                     ]
                 ),
@@ -1859,7 +2047,10 @@ class CodexHooksTest(unittest.TestCase):
             "python3 tools/agent_tools/github_publish.py publish-pr --user-task task --repo owner/repo --title T --body-file body.md",
         ]
         for command in commands:
-            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                self.subTest(command=command),
+                tempfile.TemporaryDirectory() as temp_dir,
+            ):
                 temp_root = Path(temp_dir)
                 hook_dir = temp_root / "hooks"
                 hook_dir.mkdir()
@@ -1871,7 +2062,7 @@ class CodexHooksTest(unittest.TestCase):
                             "import os",
                             "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
                             "    stream.write('called\\n')",
-                            "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                            'print(\'{"decision":"block","reason":"should not run"}\')',
                             "",
                         ]
                     ),
@@ -1915,7 +2106,7 @@ class CodexHooksTest(unittest.TestCase):
                         "import os",
                         "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
                         "    stream.write('called\\n')",
-                        "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                        'print(\'{"decision":"block","reason":"should not run"}\')',
                         "",
                     ]
                 ),
@@ -1958,7 +2149,10 @@ class CodexHooksTest(unittest.TestCase):
             "make agent-canon-latest-check agent-surface-checks",
         ]
         for command in commands:
-            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                self.subTest(command=command),
+                tempfile.TemporaryDirectory() as temp_dir,
+            ):
                 temp_root = Path(temp_dir)
                 hook_dir = temp_root / "hooks"
                 hook_dir.mkdir()
@@ -1970,7 +2164,7 @@ class CodexHooksTest(unittest.TestCase):
                             "import os",
                             "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
                             "    stream.write('called\\n')",
-                            "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                            'print(\'{"decision":"block","reason":"should not run"}\')',
                             "",
                         ]
                     ),
@@ -2028,7 +2222,10 @@ class CodexHooksTest(unittest.TestCase):
             "bash tools/agent_tools/runtime_log_archive_git.py archive-agent-reports",
         ]
         for command in commands:
-            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                self.subTest(command=command),
+                tempfile.TemporaryDirectory() as temp_dir,
+            ):
                 temp_root = Path(temp_dir)
                 hook_dir = temp_root / "hooks"
                 hook_dir.mkdir()
@@ -2041,7 +2238,7 @@ class CodexHooksTest(unittest.TestCase):
                             "import os",
                             "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
                             "    stream.write('called\\n')",
-                            "print('{\"decision\":\"block\",\"reason\":\"child ran\"}')",
+                            'print(\'{"decision":"block","reason":"child ran"}\')',
                             "",
                         ]
                     ),
@@ -2075,7 +2272,9 @@ class CodexHooksTest(unittest.TestCase):
         """Style hook should select Markdown checks and log changed files without a checker."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -2092,22 +2291,36 @@ class CodexHooksTest(unittest.TestCase):
             bin_dir.mkdir(parents=True)
             agent_canon = bin_dir / "agent-canon"
             agent_canon.write_text(
-                "#!/usr/bin/env sh\n"
-                "echo STYLE_TEST_CHECKER_OK=\"$*\"\n",
+                '#!/usr/bin/env sh\necho STYLE_TEST_CHECKER_OK="$*"\n',
                 encoding="utf-8",
             )
             agent_canon.chmod(0o755)
             readme = temp_root / "README.md"
             data = temp_root / "data.lock"
             root_jsonl = temp_root / "runtime.jsonl"
-            hook_jsonl = temp_root / "agents" / "evals" / "results" / "hook-runs" / "run" / "hook.jsonl"
+            hook_jsonl = (
+                temp_root
+                / "agents"
+                / "evals"
+                / "results"
+                / "hook-runs"
+                / "run"
+                / "hook.jsonl"
+            )
             readme.write_text("# Title\n\nInitial text.\n", encoding="utf-8")
             data.write_text("initial\n", encoding="utf-8")
             root_jsonl.write_text('{"event": "initial"}\n', encoding="utf-8")
             hook_jsonl.parent.mkdir(parents=True)
             hook_jsonl.write_text('{"event": "initial"}\n', encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             readme.write_text("# Title\n\nChanged text.\n", encoding="utf-8")
             data.write_text("changed\n", encoding="utf-8")
             root_jsonl.write_text('{"event": "changed"}\n', encoding="utf-8")
@@ -2146,11 +2359,15 @@ class CodexHooksTest(unittest.TestCase):
             ["data.lock"],
         )
 
-    def test_style_checker_guard_routes_generated_codex_guide_to_split_validator(self) -> None:
+    def test_style_checker_guard_routes_generated_codex_guide_to_split_validator(
+        self,
+    ) -> None:
         """Generated Codex guide Markdown should use split validation, not prose lint."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -2182,8 +2399,15 @@ class CodexHooksTest(unittest.TestCase):
             )
             section.parent.mkdir(parents=True)
             section.write_text("# Generated section\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             section.write_text("# Generated section\n\nChanged.\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "style.jsonl"
 
@@ -2215,11 +2439,15 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["selected_checkers"], ["codex_cli_guide_split"])
         self.assertEqual(log_entry["unchecked_count"], 0)
 
-    def test_module_boundary_guard_blocks_public_surface_change_without_evidence(self) -> None:
+    def test_module_boundary_guard_blocks_public_surface_change_without_evidence(
+        self,
+    ) -> None:
         """Module hook should block forced module rewrites without tests or docs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -2236,8 +2464,15 @@ class CodexHooksTest(unittest.TestCase):
             module = temp_root / "app" / "module.py"
             module.parent.mkdir()
             module.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             module.write_text("def renamed() -> int:\n    return 1\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "module.jsonl"
 
@@ -2266,7 +2501,10 @@ class CodexHooksTest(unittest.TestCase):
             )
 
         self.assertEqual(payload["decision"], "block")
-        self.assertIn("public-surface-change-without-evidence", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertIn(
+            "public-surface-change-without-evidence",
+            "\n".join(cast("list[str]", payload["findings"])),
+        )
         self.assertIn("next_action", payload)
         self.assertIn("remediation", payload)
         self.assertEqual(log_entry["status"], "fail")
@@ -2276,7 +2514,9 @@ class CodexHooksTest(unittest.TestCase):
         """Module hook should surface import responsibility failures immediately."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -2293,8 +2533,15 @@ class CodexHooksTest(unittest.TestCase):
             module = temp_root / "app" / "module.py"
             module.parent.mkdir()
             module.write_text("VALUE = 1\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             module.write_text("import sys\n\nVALUE = 1\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "module.jsonl"
 
@@ -2323,18 +2570,26 @@ class CodexHooksTest(unittest.TestCase):
             )
 
         self.assertEqual(payload["decision"], "block")
-        self.assertIn("IMPORT_RESPONSIBILITY_FINDING=unused-import", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertIn(
+            "IMPORT_RESPONSIBILITY_FINDING=unused-import",
+            "\n".join(cast("list[str]", payload["findings"])),
+        )
         self.assertEqual(log_entry["status"], "fail")
-        self.assertEqual(cast("list[dict[str, object]]", log_entry["import_checks"])[0]["returncode"], 1)
+        self.assertEqual(
+            cast("list[dict[str, object]]", log_entry["import_checks"])[0][
+                "returncode"
+            ],
+            1,
+        )
 
     def _write_module_boundary_fixture(self, root: Path) -> None:
         """Write fixture files needed by the module boundary hook."""
         checker = root / "tools" / "agent_tools" / "import_responsibility.py"
         checker.parent.mkdir(parents=True)
         checker.write_text(
-            (PROJECT_ROOT / "tools" / "agent_tools" / "import_responsibility.py").read_text(
-                encoding="utf-8"
-            ),
+            (
+                PROJECT_ROOT / "tools" / "agent_tools" / "import_responsibility.py"
+            ).read_text(encoding="utf-8"),
             encoding="utf-8",
         )
         (root / "responsibility-scope.toml").write_text(
@@ -2367,7 +2622,9 @@ class CodexHooksTest(unittest.TestCase):
         """Library guard should block direct rewrites under vendored dependency paths."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -2382,10 +2639,21 @@ class CodexHooksTest(unittest.TestCase):
             )
             library_file = temp_root / "vendor" / "thirdparty" / "lib.py"
             library_file.parent.mkdir(parents=True)
-            library_file.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
-            library_file.write_text("def value() -> int:\n    return 2\n", encoding="utf-8")
+            library_file.write_text(
+                "def value() -> int:\n    return 1\n", encoding="utf-8"
+            )
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            library_file.write_text(
+                "def value() -> int:\n    return 2\n", encoding="utf-8"
+            )
             log_path = temp_root / "reports" / "hooks" / "library.jsonl"
 
             result = subprocess.run(
@@ -2413,7 +2681,10 @@ class CodexHooksTest(unittest.TestCase):
             )
 
         self.assertEqual(payload["decision"], "block")
-        self.assertIn("library-implementation-rewrite", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertIn(
+            "library-implementation-rewrite",
+            "\n".join(cast("list[str]", payload["findings"])),
+        )
         self.assertEqual(log_entry["status"], "fail")
         self.assertEqual(log_entry["changed_library_file_count"], 1)
 
@@ -2421,23 +2692,44 @@ class CodexHooksTest(unittest.TestCase):
         """Task authority schema guard should reject malformed authority files."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=temp_root, check=True
+            )
             module = temp_root / "app.py"
             module.write_text("VALUE = 1\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             module.write_text("VALUE = 2\n", encoding="utf-8")
-            authority = temp_root / "reports" / "agents" / "run-1" / "task_authority.yaml"
+            authority = (
+                temp_root / "reports" / "agents" / "run-1" / "task_authority.yaml"
+            )
             authority.parent.mkdir(parents=True)
-            authority.write_text("version: 2\nallowed_paths: {}\nroles: []\n", encoding="utf-8")
+            authority.write_text(
+                "version: 2\nallowed_paths: {}\nroles: []\n", encoding="utf-8"
+            )
             log_path = temp_root / "reports" / "hooks" / "authority.jsonl"
 
             result = subprocess.run(
                 [sys.executable, str(TASK_AUTHORITY_SCHEMA_GUARD)],
                 cwd=temp_root,
-                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                input=json.dumps(
+                    {"hookEventName": "PostToolUse", "tool_name": "apply_patch"}
+                ),
                 check=True,
                 capture_output=True,
                 text=True,
@@ -2449,10 +2741,16 @@ class CodexHooksTest(unittest.TestCase):
             )
 
             payload = cast("dict[str, object]", json.loads(result.stdout))
-            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
 
         self.assertEqual(payload["decision"], "block")
-        self.assertIn("TASK_AUTHORITY_FINDING=invalid-version", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertIn(
+            "TASK_AUTHORITY_FINDING=invalid-version",
+            "\n".join(cast("list[str]", payload["findings"])),
+        )
         self.assertIn("next_action", payload)
         self.assertEqual(log_entry["status"], "fail")
 
@@ -2460,12 +2758,22 @@ class CodexHooksTest(unittest.TestCase):
         """Task authority schema guard should accept a valid schema."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=temp_root, check=True
+            )
             module = temp_root / "app.py"
             module.write_text("VALUE = 1\n", encoding="utf-8")
-            authority = temp_root / "reports" / "agents" / "run-1" / "task_authority.yaml"
+            authority = (
+                temp_root / "reports" / "agents" / "run-1" / "task_authority.yaml"
+            )
             authority.parent.mkdir(parents=True)
             authority.write_text(
                 "version: 1\n"
@@ -2487,15 +2795,24 @@ class CodexHooksTest(unittest.TestCase):
                 "    can_modify_repo: true\n",
                 encoding="utf-8",
             )
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             module.write_text("VALUE = 2\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "authority.jsonl"
 
             result = subprocess.run(
                 [sys.executable, str(TASK_AUTHORITY_SCHEMA_GUARD)],
                 cwd=temp_root,
-                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                input=json.dumps(
+                    {"hookEventName": "PostToolUse", "tool_name": "apply_patch"}
+                ),
                 check=True,
                 capture_output=True,
                 text=True,
@@ -2505,7 +2822,10 @@ class CodexHooksTest(unittest.TestCase):
                     "AGENT_CANON_TASK_AUTHORITY_HOOK_LOG_PATH": str(log_path),
                 },
             )
-            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(log_entry["status"], "pass")
@@ -2514,9 +2834,17 @@ class CodexHooksTest(unittest.TestCase):
         """Role write policy guard should block artifact-only roles editing repo files."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=temp_root, check=True
+            )
             module = temp_root / "app.py"
             module.write_text("VALUE = 1\n", encoding="utf-8")
             report_dir = temp_root / "reports" / "agents" / "run-1"
@@ -2529,15 +2857,24 @@ class CodexHooksTest(unittest.TestCase):
                 "roles: {change_reviewer: {can_modify_repo: false}}\n",
                 encoding="utf-8",
             )
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             module.write_text("VALUE = 2\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "role.jsonl"
 
             result = subprocess.run(
                 [sys.executable, str(ROLE_WRITE_POLICY_GUARD)],
                 cwd=temp_root,
-                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                input=json.dumps(
+                    {"hookEventName": "PostToolUse", "tool_name": "apply_patch"}
+                ),
                 check=True,
                 capture_output=True,
                 text=True,
@@ -2548,11 +2885,18 @@ class CodexHooksTest(unittest.TestCase):
                 },
             )
             payload = cast("dict[str, object]", json.loads(result.stdout))
-            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
 
         self.assertEqual(payload["decision"], "block")
-        self.assertIn("write-scope-violation", "\n".join(cast("list[str]", payload["findings"])))
-        self.assertNotIn("WORKTREE_SCOPE", "\n".join(cast("list[str]", payload["remediation"])))
+        self.assertIn(
+            "write-scope-violation", "\n".join(cast("list[str]", payload["findings"]))
+        )
+        self.assertNotIn(
+            "WORKTREE_SCOPE", "\n".join(cast("list[str]", payload["remediation"]))
+        )
         self.assertEqual(log_entry["status"], "fail")
 
     def test_role_write_policy_guard_allows_implementer_allowed_path_without_scope_file(
@@ -2561,9 +2905,17 @@ class CodexHooksTest(unittest.TestCase):
         """Implementer writes should use task authority paths, not WORKTREE_SCOPE.md."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=temp_root, check=True
+            )
             module = temp_root / "app.py"
             module.write_text("VALUE = 1\n", encoding="utf-8")
             report_dir = temp_root / "reports" / "agents" / "run-1"
@@ -2582,15 +2934,24 @@ class CodexHooksTest(unittest.TestCase):
                 "roles: {implementer: {can_modify_repo: true}}\n",
                 encoding="utf-8",
             )
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             module.write_text("VALUE = 2\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "role.jsonl"
 
             result = subprocess.run(
                 [sys.executable, str(ROLE_WRITE_POLICY_GUARD)],
                 cwd=temp_root,
-                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                input=json.dumps(
+                    {"hookEventName": "PostToolUse", "tool_name": "apply_patch"}
+                ),
                 check=True,
                 capture_output=True,
                 text=True,
@@ -2600,7 +2961,10 @@ class CodexHooksTest(unittest.TestCase):
                     "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(log_path),
                 },
             )
-            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(log_entry["status"], "pass")
@@ -2611,9 +2975,17 @@ class CodexHooksTest(unittest.TestCase):
         """Task authority allowed_paths should be an active runtime write boundary."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=temp_root, check=True
+            )
             module = temp_root / "app.py"
             module.write_text("VALUE = 1\n", encoding="utf-8")
             other = temp_root / "other.py"
@@ -2634,15 +3006,24 @@ class CodexHooksTest(unittest.TestCase):
                 "roles: {implementer: {can_modify_repo: true}}\n",
                 encoding="utf-8",
             )
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             other.write_text("VALUE = 2\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "role.jsonl"
 
             result = subprocess.run(
                 [sys.executable, str(ROLE_WRITE_POLICY_GUARD)],
                 cwd=temp_root,
-                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                input=json.dumps(
+                    {"hookEventName": "PostToolUse", "tool_name": "apply_patch"}
+                ),
                 check=True,
                 capture_output=True,
                 text=True,
@@ -2653,7 +3034,10 @@ class CodexHooksTest(unittest.TestCase):
                 },
             )
             payload = cast("dict[str, object]", json.loads(result.stdout))
-            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn(
@@ -2666,16 +3050,26 @@ class CodexHooksTest(unittest.TestCase):
         """Authority edits cannot authorize repo edits in the same hook cycle."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=temp_root, check=True
+            )
             (temp_root / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
             other = temp_root / "other.py"
             other.write_text("VALUE = 1\n", encoding="utf-8")
             report_root = temp_root / "reports" / "agents"
             report_dir = report_root / "run-1"
             report_dir.mkdir(parents=True)
-            (report_root / ".active_run").write_text("reports/agents/run-1\n", encoding="utf-8")
+            (report_root / ".active_run").write_text(
+                "reports/agents/run-1\n", encoding="utf-8"
+            )
             authority = report_dir / "task_authority.yaml"
             base_authority = (
                 "version: 1\nrun_id: run-1\nactive_role: implementer\n"
@@ -2686,10 +3080,20 @@ class CodexHooksTest(unittest.TestCase):
                 "roles: {implementer: {can_modify_repo: true}}\n"
             )
             authority.write_text(base_authority, encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             authority.write_text(
-                base_authority.replace("allowed_paths:\n", "allowed_paths:\n  - path: other.py\n    actions: [modify]\n"),
+                base_authority.replace(
+                    "allowed_paths:\n",
+                    "allowed_paths:\n  - path: other.py\n    actions: [modify]\n",
+                ),
                 encoding="utf-8",
             )
             other.write_text("VALUE = 2\n", encoding="utf-8")
@@ -2703,14 +3107,20 @@ class CodexHooksTest(unittest.TestCase):
                 result = subprocess.run(
                     [sys.executable, str(hook_script)],
                     cwd=temp_root,
-                    input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                    input=json.dumps(
+                        {"hookEventName": "PostToolUse", "tool_name": "apply_patch"}
+                    ),
                     check=True,
                     capture_output=True,
                     text=True,
                     env={
                         **hook_env,
-                        "AGENT_CANON_TASK_AUTHORITY_HOOK_LOG_PATH": str(temp_root / "reports" / "hooks" / log_name),
-                        "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(temp_root / "reports" / "hooks" / log_name),
+                        "AGENT_CANON_TASK_AUTHORITY_HOOK_LOG_PATH": str(
+                            temp_root / "reports" / "hooks" / log_name
+                        ),
+                        "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(
+                            temp_root / "reports" / "hooks" / log_name
+                        ),
                     },
                 )
                 payload = cast("dict[str, object]", json.loads(result.stdout))
@@ -2724,15 +3134,32 @@ class CodexHooksTest(unittest.TestCase):
         """Ignored run-bundle authority edits cannot authorize repo edits."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
-            (temp_root / ".gitignore").write_text("reports/agents/\nreports/hooks/\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=temp_root, check=True
+            )
+            (temp_root / ".gitignore").write_text(
+                "reports/agents/\nreports/hooks/\n", encoding="utf-8"
+            )
             (temp_root / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
             other = temp_root / "other.py"
             other.write_text("VALUE = 1\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
 
             report_root = temp_root / "reports" / "agents"
             report_dir = report_root / "run-1"
@@ -2752,7 +3179,10 @@ class CodexHooksTest(unittest.TestCase):
             write_sha256_baseline(active_pointer, report_root / ".active_run.sha256")
             write_sha256_baseline(authority, report_dir / "task_authority.yaml.sha256")
             authority.write_text(
-                base_authority.replace("allowed_paths:\n", "allowed_paths:\n  - path: other.py\n    actions: [modify]\n"),
+                base_authority.replace(
+                    "allowed_paths:\n",
+                    "allowed_paths:\n  - path: other.py\n    actions: [modify]\n",
+                ),
                 encoding="utf-8",
             )
             other.write_text("VALUE = 2\n", encoding="utf-8")
@@ -2766,14 +3196,20 @@ class CodexHooksTest(unittest.TestCase):
                 result = subprocess.run(
                     [sys.executable, str(hook_script)],
                     cwd=temp_root,
-                    input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                    input=json.dumps(
+                        {"hookEventName": "PostToolUse", "tool_name": "apply_patch"}
+                    ),
                     check=True,
                     capture_output=True,
                     text=True,
                     env={
                         **hook_env,
-                        "AGENT_CANON_TASK_AUTHORITY_HOOK_LOG_PATH": str(temp_root / "reports" / "hooks" / log_name),
-                        "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(temp_root / "reports" / "hooks" / log_name),
+                        "AGENT_CANON_TASK_AUTHORITY_HOOK_LOG_PATH": str(
+                            temp_root / "reports" / "hooks" / log_name
+                        ),
+                        "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(
+                            temp_root / "reports" / "hooks" / log_name
+                        ),
                     },
                 )
                 payload = cast("dict[str, object]", json.loads(result.stdout))
@@ -2787,14 +3223,31 @@ class CodexHooksTest(unittest.TestCase):
         """Ignored active-run pointer edits cannot be paired with repo edits."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
-            (temp_root / ".gitignore").write_text("reports/agents/\nreports/hooks/\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=temp_root, check=True
+            )
+            (temp_root / ".gitignore").write_text(
+                "reports/agents/\nreports/hooks/\n", encoding="utf-8"
+            )
             app = temp_root / "app.py"
             app.write_text("VALUE = 1\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
 
             report_root = temp_root / "reports" / "agents"
             report_dir = report_root / "run-1"
@@ -2823,14 +3276,20 @@ class CodexHooksTest(unittest.TestCase):
                 result = subprocess.run(
                     [sys.executable, str(hook_script)],
                     cwd=temp_root,
-                    input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                    input=json.dumps(
+                        {"hookEventName": "PostToolUse", "tool_name": "apply_patch"}
+                    ),
                     check=True,
                     capture_output=True,
                     text=True,
                     env={
                         **hook_env,
-                        "AGENT_CANON_TASK_AUTHORITY_HOOK_LOG_PATH": str(temp_root / "reports" / "hooks" / log_name),
-                        "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(temp_root / "reports" / "hooks" / log_name),
+                        "AGENT_CANON_TASK_AUTHORITY_HOOK_LOG_PATH": str(
+                            temp_root / "reports" / "hooks" / log_name
+                        ),
+                        "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(
+                            temp_root / "reports" / "hooks" / log_name
+                        ),
                     },
                 )
                 payload = cast("dict[str, object]", json.loads(result.stdout))
@@ -2840,13 +3299,23 @@ class CodexHooksTest(unittest.TestCase):
                     "\n".join(cast("list[str]", payload["findings"])),
                 )
 
-    def test_first_party_library_guard_blocks_api_rewrite_without_authority(self) -> None:
+    def test_first_party_library_guard_blocks_api_rewrite_without_authority(
+        self,
+    ) -> None:
         """First-party guard should block reusable API edits without task authority."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=temp_root, check=True
+            )
             api = temp_root / "python" / "pkg" / "api.py"
             api.parent.mkdir(parents=True)
             api.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
@@ -2860,15 +3329,24 @@ class CodexHooksTest(unittest.TestCase):
                 'paths = ["python/**"]\n',
                 encoding="utf-8",
             )
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             api.write_text("def value() -> int:\n    return 2\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "first-party.jsonl"
 
             result = subprocess.run(
                 [sys.executable, str(FIRST_PARTY_LIBRARY_GUARD)],
                 cwd=temp_root,
-                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                input=json.dumps(
+                    {"hookEventName": "PostToolUse", "tool_name": "apply_patch"}
+                ),
                 check=True,
                 capture_output=True,
                 text=True,
@@ -2878,32 +3356,57 @@ class CodexHooksTest(unittest.TestCase):
                 },
             )
             payload = cast("dict[str, object]", json.loads(result.stdout))
-            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
 
         self.assertEqual(payload["decision"], "block")
-        self.assertIn("first-party-library-change-without-authority", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertIn(
+            "first-party-library-change-without-authority",
+            "\n".join(cast("list[str]", payload["findings"])),
+        )
         self.assertEqual(log_entry["status"], "fail")
 
     def test_first_party_library_guard_reports_malformed_scope_manifest(self) -> None:
         """First-party guard should report malformed scope manifests instead of crashing."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=temp_root, check=True
+            )
             api = temp_root / "python" / "pkg" / "api.py"
             api.parent.mkdir(parents=True)
             api.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
-            (temp_root / "responsibility-scope.toml").write_text("[[scope]\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            (temp_root / "responsibility-scope.toml").write_text(
+                "[[scope]\n", encoding="utf-8"
+            )
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             api.write_text("def value() -> int:\n    return 2\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "first-party.jsonl"
 
             result = subprocess.run(
                 [sys.executable, str(FIRST_PARTY_LIBRARY_GUARD)],
                 cwd=temp_root,
-                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                input=json.dumps(
+                    {"hookEventName": "PostToolUse", "tool_name": "apply_patch"}
+                ),
                 check=True,
                 capture_output=True,
                 text=True,
@@ -2914,7 +3417,10 @@ class CodexHooksTest(unittest.TestCase):
                 },
             )
             payload = cast("dict[str, object]", json.loads(result.stdout))
-            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
 
         rendered = "\n".join(cast("list[str]", payload["findings"]))
         self.assertEqual(payload["decision"], "block")
@@ -2926,7 +3432,9 @@ class CodexHooksTest(unittest.TestCase):
         """Cause guard should block code edits before cause evidence exists."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -2940,9 +3448,18 @@ class CodexHooksTest(unittest.TestCase):
                 capture_output=True,
             )
             (temp_root / "app").mkdir()
-            (temp_root / "app" / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            (temp_root / "app" / "module.py").write_text(
+                "VALUE = 1\n", encoding="utf-8"
+            )
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             log_path = temp_root / "reports" / "hooks" / "cause.jsonl"
 
             result = subprocess.run(
@@ -2980,7 +3497,10 @@ class CodexHooksTest(unittest.TestCase):
             )
 
         self.assertEqual(payload["decision"], "block")
-        self.assertIn("CAUSE_INVESTIGATION_FINDING=", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertIn(
+            "CAUSE_INVESTIGATION_FINDING=",
+            "\n".join(cast("list[str]", payload["findings"])),
+        )
         self.assertIn(
             "VALIDATION_FAILURE_CAUSE_CLASSIFICATION_REQUIRED=",
             "\n".join(cast("list[str]", payload["findings"])),
@@ -2996,7 +3516,9 @@ class CodexHooksTest(unittest.TestCase):
         """Cause guard should accept code edits when cause evidence is already recorded."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -3010,8 +3532,12 @@ class CodexHooksTest(unittest.TestCase):
                 capture_output=True,
             )
             (temp_root / "app").mkdir()
-            (temp_root / "app" / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
-            evidence = temp_root / "reports" / "agents" / "run-1" / "cause_investigation.md"
+            (temp_root / "app" / "module.py").write_text(
+                "VALUE = 1\n", encoding="utf-8"
+            )
+            evidence = (
+                temp_root / "reports" / "agents" / "run-1" / "cause_investigation.md"
+            )
             evidence.parent.mkdir(parents=True)
             evidence.write_text(
                 "Observation: app/module.py returns stale value.\n"
@@ -3020,8 +3546,15 @@ class CodexHooksTest(unittest.TestCase):
                 "Validation Before Edit: run unit smoke after edit.\n",
                 encoding="utf-8",
             )
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             log_path = temp_root / "reports" / "hooks" / "cause.jsonl"
 
             result = subprocess.run(
@@ -3063,11 +3596,15 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(log_entry["code_edit_detected"])
         self.assertEqual(log_entry["cause_evidence_status"], "pass")
 
-    def test_cause_investigation_guard_prioritizes_cause_evidence_over_many_logs(self) -> None:
+    def test_cause_investigation_guard_prioritizes_cause_evidence_over_many_logs(
+        self,
+    ) -> None:
         """Cause guard should not drop task cause evidence when many run logs exist."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -3081,12 +3618,26 @@ class CodexHooksTest(unittest.TestCase):
                 capture_output=True,
             )
             (temp_root / "app").mkdir()
-            (temp_root / "app" / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+            (temp_root / "app" / "module.py").write_text(
+                "VALUE = 1\n", encoding="utf-8"
+            )
             for index in range(60):
-                work_log = temp_root / "reports" / "agents" / f"run-{index:02d}" / "work_log.md"
+                work_log = (
+                    temp_root
+                    / "reports"
+                    / "agents"
+                    / f"run-{index:02d}"
+                    / "work_log.md"
+                )
                 work_log.parent.mkdir(parents=True)
                 work_log.write_text(f"# Work Log {index}\n", encoding="utf-8")
-            evidence = temp_root / "reports" / "agents" / "run-current" / "cause_investigation.md"
+            evidence = (
+                temp_root
+                / "reports"
+                / "agents"
+                / "run-current"
+                / "cause_investigation.md"
+            )
             evidence.parent.mkdir(parents=True)
             evidence.write_text(
                 "Observation: app/module.py returns stale value.\n"
@@ -3095,8 +3646,15 @@ class CodexHooksTest(unittest.TestCase):
                 "Validation Before Edit: run unit smoke after edit.\n",
                 encoding="utf-8",
             )
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             log_path = temp_root / "reports" / "hooks" / "cause.jsonl"
 
             result = subprocess.run(
@@ -3135,16 +3693,25 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertEqual(log_entry["status"], "pass")
         self.assertEqual(log_entry["cause_evidence_status"], "pass")
-        evidence_files = cast("list[dict[str, object]]", log_entry["cause_evidence_files"])
+        evidence_files = cast(
+            "list[dict[str, object]]", log_entry["cause_evidence_files"]
+        )
         self.assertTrue(
-            any(file["path"] == "reports/agents/run-current/cause_investigation.md" for file in evidence_files)
+            any(
+                file["path"] == "reports/agents/run-current/cause_investigation.md"
+                for file in evidence_files
+            )
         )
 
-    def test_cause_investigation_guard_uses_only_active_workflow_monitoring(self) -> None:
+    def test_cause_investigation_guard_uses_only_active_workflow_monitoring(
+        self,
+    ) -> None:
         """Cause guard should not treat stale run workflow logs as current evidence."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -3158,8 +3725,12 @@ class CodexHooksTest(unittest.TestCase):
                 capture_output=True,
             )
             (temp_root / "app").mkdir()
-            (temp_root / "app" / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
-            stale = temp_root / "reports" / "agents" / "run-old" / "workflow_monitoring.md"
+            (temp_root / "app" / "module.py").write_text(
+                "VALUE = 1\n", encoding="utf-8"
+            )
+            stale = (
+                temp_root / "reports" / "agents" / "run-old" / "workflow_monitoring.md"
+            )
             stale.parent.mkdir(parents=True)
             stale.write_text(
                 "Observation: app/module.py returns stale value.\n"
@@ -3168,7 +3739,13 @@ class CodexHooksTest(unittest.TestCase):
                 "Validation Before Edit: old run evidence must not authorize new edits.\n",
                 encoding="utf-8",
             )
-            active = temp_root / "reports" / "agents" / "run-current" / "workflow_monitoring.md"
+            active = (
+                temp_root
+                / "reports"
+                / "agents"
+                / "run-current"
+                / "workflow_monitoring.md"
+            )
             active.parent.mkdir(parents=True)
             active.write_text(
                 "Observation: app/module.py returns stale value.\n"
@@ -3177,8 +3754,15 @@ class CodexHooksTest(unittest.TestCase):
                 "Validation Before Edit: run unit smoke after edit.\n",
                 encoding="utf-8",
             )
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             log_path = temp_root / "reports" / "hooks" / "cause.jsonl"
 
             result = subprocess.run(
@@ -3217,19 +3801,29 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(log_entry["status"], "pass")
-        evidence_files = cast("list[dict[str, object]]", log_entry["cause_evidence_files"])
+        evidence_files = cast(
+            "list[dict[str, object]]", log_entry["cause_evidence_files"]
+        )
         self.assertTrue(
-            any(file["path"] == "reports/agents/run-current/workflow_monitoring.md" for file in evidence_files)
+            any(
+                file["path"] == "reports/agents/run-current/workflow_monitoring.md"
+                for file in evidence_files
+            )
         )
         self.assertFalse(
-            any(file["path"] == "reports/agents/run-old/workflow_monitoring.md" for file in evidence_files)
+            any(
+                file["path"] == "reports/agents/run-old/workflow_monitoring.md"
+                for file in evidence_files
+            )
         )
 
     def test_helper_first_guard_blocks_helper_without_boundary_evidence(self) -> None:
         """Helper-first guard should block helper-like additions before ownership evidence."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -3242,7 +3836,9 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
             )
-            inventory = temp_root / "tools" / "agent_tools" / "helper_function_inventory.py"
+            inventory = (
+                temp_root / "tools" / "agent_tools" / "helper_function_inventory.py"
+            )
             inventory.parent.mkdir(parents=True)
             inventory.write_text(
                 "#!/usr/bin/env python3\n"
@@ -3258,9 +3854,19 @@ class CodexHooksTest(unittest.TestCase):
             module = temp_root / "app" / "module.py"
             module.parent.mkdir()
             module.write_text("VALUE = 1\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
-            module.write_text("def _format_value(value: int) -> str:\n    return str(value)\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            module.write_text(
+                "def _format_value(value: int) -> str:\n    return str(value)\n",
+                encoding="utf-8",
+            )
             log_path = temp_root / "reports" / "hooks" / "helper-first.jsonl"
 
             result = subprocess.run(
@@ -3289,7 +3895,9 @@ class CodexHooksTest(unittest.TestCase):
             )
 
         self.assertEqual(payload["decision"], "block")
-        self.assertIn("HELPER_FIRST_FINDING=", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertIn(
+            "HELPER_FIRST_FINDING=", "\n".join(cast("list[str]", payload["findings"]))
+        )
         self.assertEqual(log_entry["status"], "fail")
         self.assertEqual(log_entry["hook_log_namespace"], "test-container")
         self.assertEqual(log_entry["helper_candidate_record_count"], 1)
@@ -3300,7 +3908,9 @@ class CodexHooksTest(unittest.TestCase):
         """Helper-first guard should record candidates while accepting boundary evidence."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -3313,7 +3923,9 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
             )
-            inventory = temp_root / "tools" / "agent_tools" / "helper_function_inventory.py"
+            inventory = (
+                temp_root / "tools" / "agent_tools" / "helper_function_inventory.py"
+            )
             inventory.parent.mkdir(parents=True)
             inventory.write_text(
                 "#!/usr/bin/env python3\n"
@@ -3332,7 +3944,9 @@ class CodexHooksTest(unittest.TestCase):
             doc = temp_root / "documents" / "module-boundary.md"
             doc.parent.mkdir()
             doc.write_text("boundary evidence\n", encoding="utf-8")
-            authority = temp_root / "reports" / "agents" / "run-1" / "task_authority.yaml"
+            authority = (
+                temp_root / "reports" / "agents" / "run-1" / "task_authority.yaml"
+            )
             authority.parent.mkdir(parents=True)
             authority.write_text(
                 "version: 1\n"
@@ -3356,9 +3970,19 @@ class CodexHooksTest(unittest.TestCase):
                 "roles: {}\n",
                 encoding="utf-8",
             )
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
-            module.write_text("def _format_value(value: int) -> str:\n    return str(value)\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            module.write_text(
+                "def _format_value(value: int) -> str:\n    return str(value)\n",
+                encoding="utf-8",
+            )
             doc.write_text("boundary evidence\n\nformat ownership\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "helper-first.jsonl"
 
@@ -3392,14 +4016,20 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["hook_log_namespace"], "test-container")
         self.assertEqual(log_entry["helper_candidate_record_count"], 1)
         self.assertEqual(log_entry["helper_first_candidate_count"], 0)
-        self.assertTrue(cast("list[dict[str, object]]", log_entry["helper_authority_checks"])[0]["matched"])
+        self.assertTrue(
+            cast("list[dict[str, object]]", log_entry["helper_authority_checks"])[0][
+                "matched"
+            ]
+        )
         self.assertTrue(log_entry["boundary_evidence_changed"])
 
     def test_style_checker_guard_selects_cpp_and_notebook_checkers(self) -> None:
         """Style hook should route changed C++ and notebook files to existing checkers."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -3413,7 +4043,9 @@ class CodexHooksTest(unittest.TestCase):
                 capture_output=True,
             )
             cpp_checker = temp_root / "tools" / "oop" / "cpp" / "readability.py"
-            notebook_checker = temp_root / "tools" / "validation" / "notebook_quality.py"
+            notebook_checker = (
+                temp_root / "tools" / "validation" / "notebook_quality.py"
+            )
             cpp_checker.parent.mkdir(parents=True)
             notebook_checker.parent.mkdir(parents=True)
             pass_checker = "#!/usr/bin/env python3\nprint('STYLE_TEST_CHECKER_OK=1')\n"
@@ -3425,8 +4057,15 @@ class CodexHooksTest(unittest.TestCase):
             notebook.parent.mkdir()
             source.write_text("int value() { return 1; }\n", encoding="utf-8")
             notebook.write_text(self._notebook_payload("display(1)"), encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             source.write_text("int value() { return 2; }\n", encoding="utf-8")
             notebook.write_text(self._notebook_payload("display(2)"), encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "style.jsonl"
@@ -3465,7 +4104,9 @@ class CodexHooksTest(unittest.TestCase):
         """Style hook should block when the selected Python checker fails."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -3480,8 +4121,15 @@ class CodexHooksTest(unittest.TestCase):
             )
             source = temp_root / "sample.py"
             source.write_text("VALUE = 1\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             source.write_text("import os\n\nVALUE = 2\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "style.jsonl"
 
@@ -3511,7 +4159,9 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("Style checker hook", cast(str, payload["reason"]))
-        self.assertEqual(payload["next_action"], "run_selected_style_checkers_and_fix_findings")
+        self.assertEqual(
+            payload["next_action"], "run_selected_style_checkers_and_fix_findings"
+        )
         self.assertTrue(payload["remediation"])
         self.assertEqual(log_entry["status"], "fail")
         self.assertEqual(log_entry["selected_checkers"], ["ruff"])
@@ -3526,9 +4176,14 @@ class CodexHooksTest(unittest.TestCase):
             "python3 -m ruff format sample.py",
         )
         for command in commands:
-            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                self.subTest(command=command),
+                tempfile.TemporaryDirectory() as temp_dir,
+            ):
                 temp_root = Path(temp_dir)
-                subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+                subprocess.run(
+                    ["git", "init"], cwd=temp_root, check=True, capture_output=True
+                )
                 source = temp_root / "sample.py"
                 source.write_text("import os\n\nVALUE = 1\n", encoding="utf-8")
                 log_path = temp_root / "reports" / "hooks" / "style.jsonl"
@@ -3587,7 +4242,10 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("API key", payload["reason"])
-        self.assertEqual(payload["next_action"], "remove_secret_or_use_redacted_placeholder_then_retry")
+        self.assertEqual(
+            payload["next_action"],
+            "remove_secret_or_use_redacted_placeholder_then_retry",
+        )
         self.assertTrue(payload["remediation"])
 
     def test_goal_completion_guard_blocks_active_goal_completion(self) -> None:
@@ -3618,7 +4276,9 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("NEXT_ACTION=run_next_iteration", payload["reason"])
-        self.assertEqual(payload["next_action"], "run_next_goal_iteration_or_update_goal_evidence")
+        self.assertEqual(
+            payload["next_action"], "run_next_goal_iteration_or_update_goal_evidence"
+        )
         self.assertTrue(payload["remediation"])
 
     def test_oop_readability_guard_warns_changed_python_findings(self) -> None:
@@ -3632,11 +4292,10 @@ class CodexHooksTest(unittest.TestCase):
             ),
             analyzer_text=(
                 "#!/usr/bin/env python3\n"
-                "import sys\n"
-                f"if sys.argv[sys.argv.index('--min-score') + 1] != '{OOP_READABILITY_MIN_SCORE}':\n"
-                "    raise SystemExit(0)\n"
-                "print('OOP_READABILITY=fail')\n"
-                "raise SystemExit(1)\n"
+                "print('OOP_READABILITY_REVIEW_SIGNAL_FINDINGS=1')\n"
+                "print('OOP_READABILITY_STATUS_REASON=review-signal')\n"
+                "print('OOP_READABILITY_TYPED_BOUNDARY_COUNTS={\\\"api_boundary\\\": 1}')\n"
+                "print('OOP_READABILITY=review')\n"
             ),
         )
         self.assertEqual(payload["decision"], "approve")
@@ -3645,20 +4304,22 @@ class CodexHooksTest(unittest.TestCase):
             self.fail("OOP guard reason must be a string")
         self.assertIn("OOP readability hook", reason)
         self.assertIn("warning", reason)
-        self.assertIn("--min-score 95", reason)
         self.assertIn("--baseline-ref HEAD", reason)
         self.assertEqual(log_entry["event"], "PostToolUse")
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["mode"], "diff")
         self.assertEqual(log_entry["baseline_ref"], "HEAD")
-        self.assertEqual(log_entry["min_score"], OOP_READABILITY_MIN_SCORE)
-        self.assertEqual(log_entry["failed_count"], 1)
+        self.assertEqual(log_entry["failed_count"], 0)
+        self.assertEqual(log_entry["review_signal_count"], 1)
+        self.assertEqual(log_entry["status"], "warn")
 
     def test_oop_readability_guard_defaults_to_agentcanon_hook_result(self) -> None:
         """OOP guard should append to the AgentCanon hook result surface by default."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -3680,15 +4341,21 @@ class CodexHooksTest(unittest.TestCase):
                 encoding="utf-8",
             )
             source = temp_root / "bad.py"
-            source.write_text("def helper_value(value):\n    return value\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            source.write_text(
+                "def helper_value(value):\n    return value\n", encoding="utf-8"
+            )
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "commit", "-m", "initial"],
                 cwd=temp_root,
                 check=True,
                 capture_output=True,
             )
-            source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
+            source.write_text(
+                "def helper_value(value):\n    return value + 1\n", encoding="utf-8"
+            )
 
             result = subprocess.run(
                 [sys.executable, str(OOP_READABILITY_GUARD)],
@@ -3711,13 +4378,15 @@ class CodexHooksTest(unittest.TestCase):
                 },
             )
             durable_logs = sorted(
-                (temp_root / ".agent-canon" / "archive" / "test-env" / "hook-runs").glob(
-                    "*/test-container/oop_readability_guard-*.jsonl"
-                )
+                (
+                    temp_root / ".agent-canon" / "archive" / "test-env" / "hook-runs"
+                ).glob("*/test-container/oop_readability_guard-*.jsonl")
             )
             durable_log = durable_logs[0]
             durable_log_exists = durable_log.exists()
-            log_entry = json.loads(durable_log.read_text(encoding="utf-8").splitlines()[0])
+            log_entry = json.loads(
+                durable_log.read_text(encoding="utf-8").splitlines()[0]
+            )
 
         self.assertIn("decision", json.loads(result.stdout))
         self.assertEqual(len(durable_logs), 1)
@@ -3730,7 +4399,9 @@ class CodexHooksTest(unittest.TestCase):
         """OOP guard should not infer PostToolUse from empty stdin."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -3752,15 +4423,21 @@ class CodexHooksTest(unittest.TestCase):
                 encoding="utf-8",
             )
             source = temp_root / "bad.py"
-            source.write_text("def helper_value(value):\n    return value\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            source.write_text(
+                "def helper_value(value):\n    return value\n", encoding="utf-8"
+            )
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "commit", "-m", "initial"],
                 cwd=temp_root,
                 check=True,
                 capture_output=True,
             )
-            source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
+            source.write_text(
+                "def helper_value(value):\n    return value + 1\n", encoding="utf-8"
+            )
             log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
 
             result = subprocess.run(
@@ -3780,7 +4457,9 @@ class CodexHooksTest(unittest.TestCase):
         """Payloadless OOP invocations with no source changes must not dirty logs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
             result = subprocess.run(
                 [sys.executable, str(OOP_READABILITY_GUARD)],
@@ -3827,7 +4506,9 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("HEAD", command_args)
         self.assertIn("OOP_READABILITY_BASELINE=preexisting-only", output_snippet)
 
-    def test_oop_readability_guard_warns_preexisting_findings_in_full_mode(self) -> None:
+    def test_oop_readability_guard_warns_preexisting_findings_in_full_mode(
+        self,
+    ) -> None:
         """OOP guard should retain full-mode behavior when explicitly requested."""
         payload, log_entry = self._run_oop_guard_with_preexisting_finding(
             extra_env={"AGENT_CANON_OOP_HOOK_MODE": "full"}
@@ -3849,7 +4530,9 @@ class CodexHooksTest(unittest.TestCase):
         """Bash tool names alone should not re-run OOP checks for read-only commands."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
             result = subprocess.run(
                 [sys.executable, str(OOP_READABILITY_GUARD)],
@@ -3869,7 +4552,7 @@ class CodexHooksTest(unittest.TestCase):
                     "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path),
                     "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
                 },
-        )
+            )
 
         self.assertEqual(result.stdout, "")
 
@@ -3878,15 +4561,20 @@ class CodexHooksTest(unittest.TestCase):
         commands = (
             (
                 "python3 /workspace/tools/oop/python/readability.py "
-                "--root /workspace --min-score 95 python/pkg/module.py"
+                "--root /workspace python/pkg/module.py"
             ),
             "python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
             "python3 -m ruff check .codex/hooks/oop_readability_guard.py",
         )
         for command in commands:
-            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                self.subTest(command=command),
+                tempfile.TemporaryDirectory() as temp_dir,
+            ):
                 temp_root = Path(temp_dir)
-                subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+                subprocess.run(
+                    ["git", "init"], cwd=temp_root, check=True, capture_output=True
+                )
                 log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
                 result = subprocess.run(
                     [sys.executable, str(OOP_READABILITY_GUARD)],
@@ -3960,7 +4648,9 @@ class CodexHooksTest(unittest.TestCase):
         )
 
         self.assertEqual(payload["decision"], "block")
-        self.assertIn("role-token-review:converter_normalizer", cast(str, payload["reason"]))
+        self.assertIn(
+            "role-token-review:converter_normalizer", cast(str, payload["reason"])
+        )
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["records"], 1)
         self.assertEqual(log_entry["violations"], 1)
@@ -3976,11 +4666,18 @@ class CodexHooksTest(unittest.TestCase):
             "python3 -m ruff check changed.py",
         )
         for command in commands:
-            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                self.subTest(command=command),
+                tempfile.TemporaryDirectory() as temp_dir,
+            ):
                 temp_root = Path(temp_dir)
-                subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+                subprocess.run(
+                    ["git", "init"], cwd=temp_root, check=True, capture_output=True
+                )
                 source = temp_root / "changed.py"
-                source.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
+                source.write_text(
+                    "def value() -> int:\n    return 1\n", encoding="utf-8"
+                )
                 log_path = temp_root / "reports" / "hooks" / "helper.jsonl"
 
                 result = subprocess.run(
@@ -4027,8 +4724,12 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertEqual(log_entry["policy_status"], "error")
-        self.assertIn("helper inventory policy is required", str(log_entry["policy_error"]))
-        self.assertIn("repair_helper_inventory_policy", cast(str, payload["next_action"]))
+        self.assertIn(
+            "helper inventory policy is required", str(log_entry["policy_error"])
+        )
+        self.assertIn(
+            "repair_helper_inventory_policy", cast(str, payload["next_action"])
+        )
 
     def test_helper_inventory_guard_repo_policy_can_select_report_mode(self) -> None:
         """Repo-local policy may loosen the default blocking behavior explicitly."""
@@ -4064,7 +4765,9 @@ class CodexHooksTest(unittest.TestCase):
         """Helper guard should not infer PostToolUse from empty stdin."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "test@example.invalid"],
                 cwd=temp_root,
@@ -4081,7 +4784,9 @@ class CodexHooksTest(unittest.TestCase):
             policy.write_text(json.dumps({"enabled": True}), encoding="utf-8")
             source = temp_root / "changed.py"
             source.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=temp_root, check=True, capture_output=True
+            )
             subprocess.run(
                 ["git", "commit", "-m", "initial"],
                 cwd=temp_root,
@@ -4130,7 +4835,9 @@ class CodexHooksTest(unittest.TestCase):
         """Read-only Bash payloads should not run notebook quality checks."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "notebook.jsonl"
             result = subprocess.run(
                 [sys.executable, str(NOTEBOOK_QUALITY_GUARD)],
@@ -4158,7 +4865,9 @@ class CodexHooksTest(unittest.TestCase):
         """Skill usage hook should append local JSONL records when skills are observed."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             env = {
                 **os.environ,
@@ -4233,7 +4942,9 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[1]["workflow_selection_kind"], "declared_workflow")
         self.assertEqual(entries[1]["selected_workflow_count"], 1)
         self.assertEqual(entries[2]["skills"], ["skill-creator"])
-        self.assertTrue(all(entry["hook_run_id"].startswith("hook-") for entry in entries))
+        self.assertTrue(
+            all(entry["hook_run_id"].startswith("hook-") for entry in entries)
+        )
         self.assertTrue(all(entry["payload_fingerprint"] for entry in entries))
         self.assertEqual(entries[0]["skill_source_fields"], ["prompt"])
         self.assertEqual(entries[0]["prompt_capture_status"], "present")
@@ -4250,7 +4961,9 @@ class CodexHooksTest(unittest.TestCase):
         """Default skill hook output should live under AgentCanon hook results."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
                 cwd=temp_root,
@@ -4272,12 +4985,15 @@ class CodexHooksTest(unittest.TestCase):
                 },
             )
             log_paths = sorted(
-                (temp_root / ".agent-canon" / "archive" / "test-env" / "hook-runs").glob(
-                    "*/test-container/skill_usage-no-git-head.jsonl"
-                )
+                (
+                    temp_root / ".agent-canon" / "archive" / "test-env" / "hook-runs"
+                ).glob("*/test-container/skill_usage-no-git-head.jsonl")
             )
             log_path = log_paths[0]
-            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+            entries = [
+                json.loads(line)
+                for line in log_path.read_text(encoding="utf-8").splitlines()
+            ]
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(len(log_paths), 1)
@@ -4288,20 +5004,51 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[0]["skill_source_fields"], ["prompt"])
         self.assertEqual(entries[0]["observed_text_field_count"], 1)
 
-    def test_skill_usage_logger_ensures_archive_branch_before_durable_write(self) -> None:
+    def test_skill_usage_logger_ensures_archive_branch_before_durable_write(
+        self,
+    ) -> None:
         """Durable hook output should select the archive branch before appending logs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             archive_root = temp_root / ".agent-canon" / "archive"
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             archive_root.mkdir(parents=True)
-            subprocess.run(["git", "init"], cwd=archive_root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=archive_root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=archive_root, check=True)
-            (archive_root / "README.md").write_text("# Runtime Log Archive\n", encoding="utf-8")
-            subprocess.run(["git", "add", "README.md"], cwd=archive_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "Initial"], cwd=archive_root, check=True, capture_output=True)
-            subprocess.run(["git", "branch", "-M", "main"], cwd=archive_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=archive_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=archive_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=archive_root,
+                check=True,
+            )
+            (archive_root / "README.md").write_text(
+                "# Runtime Log Archive\n", encoding="utf-8"
+            )
+            subprocess.run(
+                ["git", "add", "README.md"],
+                cwd=archive_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "Initial"],
+                cwd=archive_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "branch", "-M", "main"],
+                cwd=archive_root,
+                check=True,
+                capture_output=True,
+            )
             subprocess.run(
                 ["git", "switch", "-c", "logs/test-env-other-thread"],
                 cwd=archive_root,
@@ -4357,13 +5104,33 @@ class CodexHooksTest(unittest.TestCase):
             source_root = temp_root / "agent-canon"
             active_root.mkdir()
             source_root.mkdir()
-            subprocess.run(["git", "init"], cwd=active_root, check=True, capture_output=True)
-            subprocess.run(["git", "init"], cwd=source_root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=source_root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=source_root, check=True)
+            subprocess.run(
+                ["git", "init"], cwd=active_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "init"], cwd=source_root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=source_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=source_root, check=True
+            )
             (source_root / "README.md").write_text("# Source\n", encoding="utf-8")
-            subprocess.run(["git", "add", "README.md"], cwd=source_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "Initial"], cwd=source_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "README.md"],
+                cwd=source_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "Initial"],
+                cwd=source_root,
+                check=True,
+                capture_output=True,
+            )
             source_head = subprocess.run(
                 ["git", "-C", str(source_root), "rev-parse", "--verify", "HEAD"],
                 check=True,
@@ -4419,9 +5186,14 @@ class CodexHooksTest(unittest.TestCase):
             },
         )
         for payload in payloads:
-            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                self.subTest(payload=payload),
+                tempfile.TemporaryDirectory() as temp_dir,
+            ):
                 temp_root = Path(temp_dir)
-                subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+                subprocess.run(
+                    ["git", "init"], cwd=temp_root, check=True, capture_output=True
+                )
                 log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
                 result = subprocess.run(
                     [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -4440,7 +5212,9 @@ class CodexHooksTest(unittest.TestCase):
         """Plain user prompts should be captured as redacted bounded evidence."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -4462,7 +5236,9 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["prompt_capture_status"], "present")
         self.assertIn("plain consultation", entry["prompt_excerpt_redacted"])
         self.assertIn("[REDACTED_API_KEY]", entry["prompt_excerpt_redacted"])
-        self.assertNotIn("sk-abcdefghijklmnopqrstuvwxyz1234567890", entry["prompt_excerpt_redacted"])
+        self.assertNotIn(
+            "sk-abcdefghijklmnopqrstuvwxyz1234567890", entry["prompt_excerpt_redacted"]
+        )
         self.assertEqual(entry["skills"], [])
         self.assertEqual(entry["candidate_skills"], [])
         self.assertEqual(entry["candidate_tools"], [])
@@ -4471,7 +5247,9 @@ class CodexHooksTest(unittest.TestCase):
         """Tool selection logging should record PostToolUse metadata for later analysis."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -4480,7 +5258,9 @@ class CodexHooksTest(unittest.TestCase):
                     {
                         "hookEventName": "PostToolUse",
                         "tool_name": "Bash",
-                        "tool_input": {"cmd": "python3 -m pytest tests/agent_tools/test_codex_hooks.py"},
+                        "tool_input": {
+                            "cmd": "python3 -m pytest tests/agent_tools/test_codex_hooks.py"
+                        },
                     }
                 ),
                 check=True,
@@ -4504,7 +5284,9 @@ class CodexHooksTest(unittest.TestCase):
         """The PostToolUse logs inherit the last declared workflow context."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             context_path = temp_root / "reports" / "hooks" / "skill_context.json"
             env = {
@@ -4544,7 +5326,10 @@ class CodexHooksTest(unittest.TestCase):
                 text=True,
                 env=env,
             )
-            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+            entries = [
+                json.loads(line)
+                for line in log_path.read_text(encoding="utf-8").splitlines()
+            ]
 
         self.assertEqual(declared.stdout, "")
         self.assertEqual(post_tool.stdout, "")
@@ -4557,7 +5342,9 @@ class CodexHooksTest(unittest.TestCase):
         """Bash variables in tool input should not become selected skills."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             command = (
                 "latest=$(ls reports/*.md | tail -n 1); "
@@ -4595,11 +5382,15 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["skill_source_fields"], ["tool_input"])
         self.assertTrue(entry["tool_input_fingerprint"])
 
-    def test_skill_usage_logger_does_not_treat_tool_input_search_as_routing_candidate(self) -> None:
+    def test_skill_usage_logger_does_not_treat_tool_input_search_as_routing_candidate(
+        self,
+    ) -> None:
         """Tool input mentions are execution evidence, not prompt-derived routing candidates."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -4610,7 +5401,7 @@ class CodexHooksTest(unittest.TestCase):
                         "tool_name": "Bash",
                         "tool_input": {
                             "command": (
-                                "rg -n \"skill_usage_logger.py|agent-log-analysis\" "
+                                'rg -n "skill_usage_logger.py|agent-log-analysis" '
                                 ".codex/hooks tests"
                             )
                         },
@@ -4633,7 +5424,9 @@ class CodexHooksTest(unittest.TestCase):
         """Direct hook script execution should remain selected repo-tool evidence."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -4658,11 +5451,15 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["candidate_tools"], [])
         self.assertEqual(entry["selected_tools"], ["skill_usage_logger.py"])
 
-    def test_skill_usage_logger_does_not_count_prompt_shell_variables_as_skills(self) -> None:
+    def test_skill_usage_logger_does_not_count_prompt_shell_variables_as_skills(
+        self,
+    ) -> None:
         """Prompt dollar tokens should be known skills, not shell variable lookalikes."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
 
             result = subprocess.run(
@@ -4693,7 +5490,9 @@ class CodexHooksTest(unittest.TestCase):
         """Subagent lifecycle logging should record spawn metadata without prompt text."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -4728,7 +5527,10 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["subagent_reasoning_effort"], "high")
         self.assertTrue(entry["subagent_fork_context"])
         self.assertTrue(entry["subagent_prompt_fingerprint"])
-        self.assertEqual(entry["subagent_prompt_char_count"], len("Design tests for the changed hook."))
+        self.assertEqual(
+            entry["subagent_prompt_char_count"],
+            len("Design tests for the changed hook."),
+        )
         self.assertEqual(entry["subagent_item_count"], 1)
         self.assertNotIn("Design tests", json.dumps(entry, sort_keys=True))
 
@@ -4763,7 +5565,9 @@ class CodexHooksTest(unittest.TestCase):
                 },
             )
             entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
-            monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(entry["workflow_monitor_subagent_event_count"], 1)
@@ -4804,20 +5608,26 @@ class CodexHooksTest(unittest.TestCase):
                 },
             )
             entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
-            monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(entry["workflow_monitor_subagent_event_count"], 1)
         self.assertEqual(entry["workflow_monitor_report_dir"], str(report_dir))
         self.assertIn("subagent_lifecycle_event=close", monitoring)
 
-    def test_skill_usage_logger_prefers_parent_active_run_for_vendored_agentcanon(self) -> None:
+    def test_skill_usage_logger_prefers_parent_active_run_for_vendored_agentcanon(
+        self,
+    ) -> None:
         """Vendored AgentCanon hook runs should not write workflow evidence to stale submodule reports."""
         with tempfile.TemporaryDirectory() as temp_dir:
             parent_root = Path(temp_dir) / "project_template"
             source_root = parent_root / "vendor" / "agent-canon"
             source_root.mkdir(parents=True)
-            subprocess.run(["git", "init"], cwd=source_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=source_root, check=True, capture_output=True
+            )
 
             parent_report = parent_root / "reports" / "agents" / "run-current"
             parent_report.mkdir(parents=True)
@@ -4862,7 +5672,9 @@ class CodexHooksTest(unittest.TestCase):
         """Subagent close logging should record lifecycle target metadata."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -4891,7 +5703,9 @@ class CodexHooksTest(unittest.TestCase):
         """Selection logging should parse workflow and skills from start declarations."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -4917,13 +5731,17 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["selected_workflow"], "Comprehensive Development")
         self.assertEqual(entry["selected_workflows"], ["Comprehensive Development"])
         self.assertEqual(entry["workflow_selection_kind"], "declared_workflow")
-        self.assertEqual(entry["selected_skills"], ["agent-orchestration", "codex-task-workflow"])
+        self.assertEqual(
+            entry["selected_skills"], ["agent-orchestration", "codex-task-workflow"]
+        )
 
     def test_skill_usage_logger_records_markdown_docs_signals(self) -> None:
         """Markdown prompts and docs-check commands should be measurable later."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             env = {**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)}
             prompt = subprocess.run(
@@ -4947,7 +5765,9 @@ class CodexHooksTest(unittest.TestCase):
                     {
                         "hookEventName": "PostToolUse",
                         "tool_name": "Bash",
-                        "tool_input": {"cmd": "tools/bin/agent-canon docs check README.md"},
+                        "tool_input": {
+                            "cmd": "tools/bin/agent-canon docs check README.md"
+                        },
                     }
                 ),
                 check=True,
@@ -4955,7 +5775,10 @@ class CodexHooksTest(unittest.TestCase):
                 text=True,
                 env=env,
             )
-            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+            entries = [
+                json.loads(line)
+                for line in log_path.read_text(encoding="utf-8").splitlines()
+            ]
 
         self.assertEqual(prompt.stdout, "")
         self.assertEqual(tool.stdout, "")
@@ -4966,11 +5789,15 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[1]["candidate_tools"], [])
         self.assertIn("agent-canon-cli", entries[1]["selected_tools"])
 
-    def test_skill_usage_logger_records_computational_optimization_signals(self) -> None:
+    def test_skill_usage_logger_records_computational_optimization_signals(
+        self,
+    ) -> None:
         """Optimization prompts should route to the computational optimization skill."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -4995,7 +5822,9 @@ class CodexHooksTest(unittest.TestCase):
         """GPU execution prompts should route to the GPU execution skill."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -5020,7 +5849,9 @@ class CodexHooksTest(unittest.TestCase):
         """Tool events should inherit the latest declared workflow in the same log shard."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             env = {**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)}
             subprocess.run(
@@ -5044,7 +5875,9 @@ class CodexHooksTest(unittest.TestCase):
                     {
                         "hookEventName": "PostToolUse",
                         "tool_name": "Bash",
-                        "tool_input": {"cmd": "tools/bin/agent-canon docs check README.md"},
+                        "tool_input": {
+                            "cmd": "tools/bin/agent-canon docs check README.md"
+                        },
                     }
                 ),
                 check=True,
@@ -5052,7 +5885,10 @@ class CodexHooksTest(unittest.TestCase):
                 text=True,
                 env=env,
             )
-            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+            entries = [
+                json.loads(line)
+                for line in log_path.read_text(encoding="utf-8").splitlines()
+            ]
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(entries[1]["selected_workflows"], ["Scoped Change"])
@@ -5060,11 +5896,15 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[1]["workflow_context_source"], "recent_log")
         self.assertIn("agent-canon-cli", entries[1]["selected_tools"])
 
-    def test_skill_usage_logger_treats_plain_prompt_skill_names_as_selected(self) -> None:
+    def test_skill_usage_logger_treats_plain_prompt_skill_names_as_selected(
+        self,
+    ) -> None:
         """Plain public skill ids in user prompts should become selected skill evidence."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -5093,7 +5933,9 @@ class CodexHooksTest(unittest.TestCase):
         """New AgentCanon skill shims should be counted without hand-editing the hook list."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -5112,14 +5954,20 @@ class CodexHooksTest(unittest.TestCase):
             entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
 
         self.assertEqual(result.stdout, "")
-        self.assertEqual(entry["selected_skills"], ["agent-log-analysis", "prose-reasoning-graph"])
+        self.assertEqual(
+            entry["selected_skills"], ["agent-log-analysis", "prose-reasoning-graph"]
+        )
         self.assertEqual(entry["skill_selection_kind"], "declared_skill")
 
-    def test_skill_usage_logger_does_not_route_standalone_toolcall_prompt_to_log_analysis(self) -> None:
+    def test_skill_usage_logger_does_not_route_standalone_toolcall_prompt_to_log_analysis(
+        self,
+    ) -> None:
         """Standalone ToolCall implementation text should not imply log-analysis routing."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -5170,7 +6018,9 @@ class CodexHooksTest(unittest.TestCase):
                 },
             )
             entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
-            monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
 
         self.assertEqual(result.stdout, "")
         self.assertIn("結果書き出し", entry["prompt_excerpt_redacted"])
@@ -5198,7 +6048,9 @@ class CodexHooksTest(unittest.TestCase):
         """Explicit overrides can route hook logs to a temporary local path."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_dir = temp_root / "reports" / "hooks"
             result = subprocess.run(
                 [sys.executable, str(SKILL_USAGE_LOGGER)],
@@ -5219,14 +6071,19 @@ class CodexHooksTest(unittest.TestCase):
                 },
             )
             log_path = log_dir / "test-container" / "skill_usage-no-git-head.jsonl"
-            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+            entries = [
+                json.loads(line)
+                for line in log_path.read_text(encoding="utf-8").splitlines()
+            ]
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(entries[0]["skills"], ["agent-orchestration"])
         self.assertTrue(entries[0]["hook_run_id"].startswith("hook-"))
         self.assertEqual(entries[0]["payload_key_count"], 2)
 
-    def test_skill_usage_logger_records_workflow_monitor_events_when_report_dir_is_set(self) -> None:
+    def test_skill_usage_logger_records_workflow_monitor_events_when_report_dir_is_set(
+        self,
+    ) -> None:
         """Skill usage hook should reuse workflow_monitor.py for run-bundle evidence."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -5253,7 +6110,9 @@ class CodexHooksTest(unittest.TestCase):
                 env=env,
             )
             entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
-            monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(entry["workflow_monitor_event_count"], 1)
@@ -5268,7 +6127,9 @@ class CodexHooksTest(unittest.TestCase):
         """Reference hook should log prompt URL capture requirements."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "references.jsonl"
 
             result = subprocess.run(
@@ -5283,7 +6144,10 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
-                env={**os.environ, "AGENT_CANON_REFERENCE_CAPTURE_HOOK_LOG_PATH": str(log_path)},
+                env={
+                    **os.environ,
+                    "AGENT_CANON_REFERENCE_CAPTURE_HOOK_LOG_PATH": str(log_path),
+                },
             )
             entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
 
@@ -5297,7 +6161,9 @@ class CodexHooksTest(unittest.TestCase):
         """Reference hook should block completion when cited URLs are not captured."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "references.jsonl"
 
             result = subprocess.run(
@@ -5312,14 +6178,19 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
-                env={**os.environ, "AGENT_CANON_REFERENCE_CAPTURE_HOOK_LOG_PATH": str(log_path)},
+                env={
+                    **os.environ,
+                    "AGENT_CANON_REFERENCE_CAPTURE_HOOK_LOG_PATH": str(log_path),
+                },
             )
             payload = json.loads(result.stdout)
             entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("reference_materializer.py", payload["reason"])
-        self.assertEqual(payload["next_action"], "materialize_external_references_then_retry")
+        self.assertEqual(
+            payload["next_action"], "materialize_external_references_then_retry"
+        )
         self.assertTrue(payload["remediation"])
         self.assertEqual(entry["missing_count"], 1)
         self.assertEqual(entry["status"], "fail")
@@ -5328,7 +6199,9 @@ class CodexHooksTest(unittest.TestCase):
         """Reference hook should pass when references contains the observed URL."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             reference = temp_root / "references" / "external" / "report.md"
             reference.parent.mkdir(parents=True)
             reference.write_text(
@@ -5349,7 +6222,10 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
-                env={**os.environ, "AGENT_CANON_REFERENCE_CAPTURE_HOOK_LOG_PATH": str(log_path)},
+                env={
+                    **os.environ,
+                    "AGENT_CANON_REFERENCE_CAPTURE_HOOK_LOG_PATH": str(log_path),
+                },
             )
             entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
 
@@ -5362,7 +6238,9 @@ class CodexHooksTest(unittest.TestCase):
         """Reference hook should ignore GitHub PR plumbing URLs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
             log_path = temp_root / "reports" / "hooks" / "references.jsonl"
 
             result = subprocess.run(
@@ -5377,7 +6255,10 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
-                env={**os.environ, "AGENT_CANON_REFERENCE_CAPTURE_HOOK_LOG_PATH": str(log_path)},
+                env={
+                    **os.environ,
+                    "AGENT_CANON_REFERENCE_CAPTURE_HOOK_LOG_PATH": str(log_path),
+                },
             )
 
         self.assertEqual(result.stdout, "")

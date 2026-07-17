@@ -14,7 +14,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -556,7 +558,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         )
         self.assertNotIn("| `tool` | `docs check` |", dashboard)
         self.assertNotIn("| `tool` | `docs format` |", dashboard)
-        self.assertNotIn("| `tool` | `run_docs_checks.sh` |", dashboard)
 
     def test_selection_metrics_ignore_related_only_skill_candidates(self) -> None:
         """Related skill hints should not inflate missed skill selections."""
@@ -931,7 +932,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                         "status": "pass",
                         "payload_fingerprint": "payload-tool-alias-candidate",
                         "timestamp": "2026-05-17T01:02:04Z",
-                        "candidate_tools": ["run_docs_checks.sh", "docs check", "docs format"],
+                        "candidate_tools": ["docs check", "docs format"],
                     }
                 )
                 + "\n"

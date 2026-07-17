@@ -13,7 +13,9 @@ JSON Schema と TypeScript 型定義で監査ログの形式を厳密に定義�
 
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from typing import TypeAlias, cast
 
 JsonScalar: TypeAlias = str | int | float | bool | None
