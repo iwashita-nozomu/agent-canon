@@ -9,6 +9,7 @@ set -euo pipefail
 
 runtime_root="${AGENT_CANON_RUNTIME_ROOT:-/var/lib/agent-canon/runtime}"
 source_projection_root="${AGENT_CANON_SOURCE_PROJECTION_ROOT:-/workspace/reports/agents/devcontainer/runtime}"
+readback_receipt="${runtime_root}/receipts/shared-runtime-readback.v4.json"
 
 gpu_device_visible() {
   [ -e /dev/nvidia0 ] && return 0
@@ -108,6 +109,7 @@ echo "secret-mount: ${secret_mount_status} (${secret_mount_target}, mode=${AGENT
 echo "docker-socket: ${docker_socket_status}"
 echo "host-codex-home: ${codex_home_status}"
 echo "runtime-root: ${runtime_root} ($(if [ -d "$runtime_root" ]; then echo available; else echo missing; fi))"
+echo "runtime-readback: ${readback_receipt} ($(if [ -f "$readback_receipt" ]; then echo published; else echo missing; fi))"
 echo "source-projection: ${source_projection_root} ($(if [ -f "$runtime_root/tool-availability.json" ]; then echo cataloged-tools-readback; else echo missing; fi))"
 echo "codex-login: ${codex_login_status}"
 echo "host-gh-config: ${gh_config_status}"

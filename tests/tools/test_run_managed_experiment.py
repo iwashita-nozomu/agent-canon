@@ -1,19 +1,20 @@
 # @dependency-start
 # contract test
 # responsibility Tests test run managed experiment behavior.
-# upstream design ../../reports/agents/w1-tool-env-routing-20260716/design_brief.md approved W1-DESIGN-20260716-R3-GPU-COMPLETIONCOVERAGE-REPAIR
+# upstream design ../../documents/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 managed-route test frame
 # upstream design ../../documents/experiment_runner.md ExperimentRunner owner boundary
-# upstream implementation ../../tools/experiments/execution_resource_plan.py canonical resource-plan/prelaunch owner
+# upstream implementation ../../tools/experiments/execution_resource_plan.py canonical resource-plan/admission owner
 # upstream implementation ../../tools/experiments/run_managed_experiment.py canonical managed CLI owner
 # upstream implementation ./resource_plan_test_evidence.py deterministic test-only injection boundary
 # upstream implementation ../../tools/ci/check_experiment_registry.py checker under test
-# downstream integration ../../reports/agents/w1-tool-env-routing-20260716/integration_bundle_selector.json W1 public selectors
+# downstream implementation ../../documents/gpu-admission-r5-ordered-integration-interface.json W1 public selectors
 # @dependency-end
 
 """Tests for the managed experiment run helper."""
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 
@@ -33,9 +34,7 @@ from tools.experiments.execution_resource_plan import (
     ProcessIdentity,
     ResourceObservation,
     ResourceRequest,
-    TypedPreflightFailure,
     UUIDReservationStore,
-    discover_resources,
     managed_run_adapter_integration_contract,
     plan_gpu_allocation,
 )
@@ -258,19 +257,73 @@ def make_observation(
     )
 
 
-def test_managed_public_route_has_one_canonical_prelaunch_owner() -> None:
-    """The managed entrypoint exposes one planner/runner route and no direct launch."""
+def test_managed_public_route_has_one_canonical_admission_owner() -> None:
+    """The managed entrypoint exposes the fixed owner graph and no legacy route."""
     source = SCRIPT.read_text(encoding="utf-8")
     assert "execute_managed_run" in source
-    assert "discover_resources(request)" in source
-    assert "plan_gpu_allocation(request, discovered)" in source
-    assert "ExperimentRunnerPreLaunchAdapter" in source
-    assert "execute_with_experiment_runner" in source
-    assert "CanonicalExperimentRunnerBinding" in source
-    assert "frozen_plan.gpu_allocation" in source
-    assert "side_effect_disposers" in source
-    assert 'failed_operation="terminal_persistence"' in source
-    assert "direct command launch is not an authorized route" in source
+    assert "NvidiaSMIResourceProbe.discover" in source
+    assert "GpuProcessOccupancyProbe" in source
+    assert "GpuReservationTransaction" in source
+    assert "freeze_resource_plan" in source
+    assert "ManagedGpuOutcomeReducer().reduce_terminal" in source
+    assert "CompletionCoverageAdapter(coverage_path).record_once" in source
+    assert "PostToolUseProjectionReducer().project" in source
+    assert "discover_resources(request)" not in source
+    assert "plan_gpu_allocation(request, discovered)" not in source
+    assert "UUIDReservationStore" not in source
+    assert "ExperimentRunner" + "PreLaunchAdapter" not in source
+    assert "execute_with_" + "experiment_runner" not in source
+    assert "RunGpuAdmissionContext" in source
+    assert "StandardFullResourceScheduler.from_worker" in source
+    assert "StandardRunner(" in source
+    assert "scheduler=scheduler" in source
+    assert "Canonical" + "ExperimentRunnerBinding" not in source
+    assert "_W1" + "UUIDScheduler" not in source
+    assert "materialized.plan" not in source
+    assert "side_effect_disposers" not in source
+    assert "launch is not an authorized route" in source
+
+
+def test_r5_admitted_environment_and_context_are_composition_only() -> None:
+    """The composition surface freezes UUID env and only orders context state."""
+    runner_root = (
+        Path(__file__).resolve().parents[2].parent
+        / "experiment_runner-w1-r4-lifecycle-design"
+        / "python"
+    )
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = os.pathsep.join(
+        [str(runner_root), str(Path(__file__).resolve().parents[2])]
+    )
+    check = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from types import SimpleNamespace\n"
+                "from tools.experiments.run_managed_experiment import (\n"
+                "    RunGpuAdmissionContext, build_admitted_environment,\n"
+                ")\n"
+                "uuid = 'GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n"
+                "plan = SimpleNamespace(\n"
+                "    gpu_allocation=SimpleNamespace(selected_ids=(uuid,)),\n"
+                "    execution={'env': {'CUDA_VISIBLE_DEVICES': uuid, 'NVIDIA_VISIBLE_DEVICES': uuid}},\n"
+                ")\n"
+                "env = build_admitted_environment(plan, object())\n"
+                "assert dict(env.exact_env_map)['CUDA_VISIBLE_DEVICES'] == uuid\n"
+                "ctx = RunGpuAdmissionContext.create(plan)\n"
+                "assert ctx.state == 'CREATED'\n"
+                "with ctx:\n"
+                "    assert ctx.state == 'ACTIVE'\n"
+                "assert ctx.state == 'CLOSED'\n"
+            ),
+        ],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert check.returncode == 0, check.stderr
 
 
 def test_public_alternate_gpu_routes_are_typed_or_managed() -> None:
@@ -392,16 +445,23 @@ def test_public_lease_retains_busy_context_then_releases_after_readback(
         parent_pid=4001,
         relationship="descendant",
     )
+    retained_observation = make_observation(
+        devices=(GPUDevice("GPU-HELD", 4096, 8192),),
+        processes=(process,),
+        event_number=1,
+    )
     retained = lease.release(
-        gpu_processes=lambda: (process,),
-        occupied_gpu_units=lambda _processes: ("GPU-HELD",),
+        observation_supplier=lambda: retained_observation,
     )
     assert retained["result"] == "retained_live_gpu_holder"
     assert lease.active
 
     released = lease.release(
-        gpu_processes=lambda: (),
-        occupied_gpu_units=lambda _processes: (),
+        observation_supplier=lambda: make_observation(
+            devices=(GPUDevice("GPU-HELD", 4096, 8192),),
+            processes=(),
+            event_number=2,
+        ),
     )
     assert released["result"] == "released"
     assert not lease.active

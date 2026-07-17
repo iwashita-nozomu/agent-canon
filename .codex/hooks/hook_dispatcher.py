@@ -223,6 +223,7 @@ EVENT_COMMANDS: dict[str, tuple[HookCommandSpec, ...]] = {
         ),
     ),
     "PostToolUse": (
+        HookCommandSpec("execution_resource_plan_projection_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec(
             "reference_capture_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS
@@ -946,6 +947,15 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
         )
         for spec in EVENT_COMMANDS[event]
     ]
+    if event == "PostToolUse":
+        projection_result = next(
+            result
+            for result in results
+            if result.spec.script == "execution_resource_plan_projection_guard.py"
+        )
+        if projection_result.returncode == 0 and projection_result.stdout:
+            sys.stdout.write(projection_result.stdout)
+            return 0
     critical_failure = next(
         (result for result in results if critical_child_invalid(result)), None
     )

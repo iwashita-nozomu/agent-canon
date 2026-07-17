@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nvidia_smi_log>
+  <driver_version>570.124.06</driver_version>
+  <gpu>
+    <uuid>GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</uuid>
+    <mig_device>
+      <parent_uuid>GPU-cccccccccccccccccccccccccccccccc</parent_uuid>
+      <device_ordinal>0</device_ordinal>
+      <uuid>MIG-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</uuid>
+    </mig_device>
+  </gpu>
+</nvidia_smi_log>

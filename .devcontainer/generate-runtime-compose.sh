@@ -82,6 +82,11 @@ else
 fi
 
 volume_lines=("      - ..:${workspace_mount}:cached")
+volume_lines+=(
+  "      - type: bind"
+  "        source: /var/lib/agent-canon/runtime"
+  "        target: /var/lib/agent-canon/runtime"
+)
 for pack_mount in "${pack_mounts[@]}"; do
   volume_lines+=("      - ${pack_mount}")
 done
@@ -186,8 +191,9 @@ environment_lines=(
   "      DEVCONTAINER_GPU_REQUEST: \"${gpu_request}\""
   "      AGENT_CANON_SECRET_MOUNT: \"${secret_target}\""
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
-  '      AGENT_CANON_RUNTIME_ROOT: "/var/lib/agent-canon/runtime"'
-  '      AGENT_CANON_SOURCE_PROJECTION_ROOT: "/workspace/reports/agents/devcontainer/runtime"'
+  '      AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"'
+  '      AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"'
+  '      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/receipts/shared-runtime-provision.v4.json"'
   "${pack_environment_lines[@]}"
 )
 if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
@@ -204,6 +210,9 @@ fi
   printf 'name: %s\n' "$compose_project_name"
   printf 'services:\n'
   printf '  workspace:\n'
+  printf '    user: "${LOCAL_UID}:${LOCAL_GID}"\n'
+  printf '    group_add:\n'
+  printf '      - "${AGENT_CANON_RUNTIME_GID}"\n'
   if [ "$compose_mode" = "repo-docker-pack" ]; then
     printf '    build:\n'
     printf '      context: ..\n'

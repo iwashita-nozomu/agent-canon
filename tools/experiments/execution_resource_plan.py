@@ -2,18 +2,20 @@
 # @dependency-start
 # contract tool
 # responsibility Owns the immutable ExecutionResourcePlan transaction, canonical GPU allocation, ExperimentRunner handoff, and completion coverage.
-# upstream design ../../reports/agents/w1-tool-env-routing-20260716/design_brief.md approved W1-DESIGN-20260716-R3-GPU-COMPLETIONCOVERAGE-REPAIR
+# upstream design ../../documents/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 U-18 implementation frame and exact packet identity
 # upstream design ../../documents/experiment_runner.md ExperimentRunner lifecycle and scheduler boundary
 # upstream design ../../agents/skills/gpu-execution.md UUID GPU and readback contract
 # upstream design ../../documents/repo-structure-contract.toml tree capability authority
 # upstream design ../../documents/runtime-profiles-and-check-matrix.json validation failure taxonomy authority
 # upstream design ../../documents/runtime-profiles-and-check-matrix.md validation failure reader projection
-# upstream evidence ../../reports/agents/w1-tool-env-routing-20260716/nvidia_primary_process_visibility_review.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
+# upstream design ../../documents/gpu-admission-r5-nvidia-visibility.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
-# downstream integration ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
-# downstream integration ../../experiments/_template/run.py direct GPU launch is statically prohibited
-# static consumer closure: run_managed_experiment.py is the only authorized managed-run consumer; every GPU request enters NvidiaSMIResourceProbe.observe -> plan_gpu_allocation -> ExperimentRunnerPreLaunchAdapter
+# downstream implementation ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
+# downstream implementation ../../experiments/_template/run.py direct GPU launch is statically prohibited
 # @dependency-end
+
+# Static consumer closure: run_managed_experiment.py is the only managed-run
+# consumer; generic lifecycle remains in the fixed ff97 ExperimentRunner source.
 
 """Canonical execution resource planning for managed ExperimentRunner runs.
 
@@ -26,9 +28,13 @@ mode when the requested allocation is unavailable.
 from __future__ import annotations
 
 import hashlib
+import errno
+import ctypes
 import json
 import os
+import re
 import secrets
+import stat
 import shutil
 import subprocess
 import threading
@@ -38,7 +44,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
-from typing import Callable, Mapping, Protocol, Sequence, cast
+from typing import Callable, Literal, Mapping, Protocol, Sequence, TypeAlias, cast
 
 try:
     import fcntl
@@ -48,8 +54,10 @@ except ImportError:  # pragma: no cover - this owner is Unix/container-only.
 
 PLAN_SCHEMA_VERSION = "execution-resource-plan/v1"
 ENVIRONMENT_CERTIFICATE_SCHEMA_VERSION = "environment-certificate/v1"
-COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION = "completion-coverage-input/v1"
-RUNTIME_ROOT = Path("/var/lib/agent-canon/runtime")
+COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION = "completion-coverage/v2"
+HOST_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+CONTAINER_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+RUNTIME_ROOT = Path(HOST_RUNTIME_ROOT)
 LOCK_ROOT = RUNTIME_ROOT / "locks"
 SOURCE_PROJECTION_TEMPLATE = "/workspace/reports/agents/{run_id}/runtime"
 STRUCTURE_CONTRACT_REF = "documents/repo-structure-contract.toml"
@@ -157,12 +165,1576 @@ class _PlannerAttemptFailure(ResourcePlanError):
         self.leases = tuple(leases)
 
 
+RuntimeRoute: TypeAlias = Literal["MANAGED_CONTAINER", "HOST_DIRECT"]
+VisibilityDisposition: TypeAlias = Literal["explicit", "all", "unset"]
+JsonScalar: TypeAlias = str | int | float | bool | None
+JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
+Sha256Hex: TypeAlias = str
+AbsolutePosixPath: TypeAlias = str
+RelativePosixPath: TypeAlias = str
+FullGpuUuid: TypeAlias = str
+FullMigUuid: TypeAlias = str
+EvidenceAbsenceField: TypeAlias = Literal[
+    "source_freeze_evidence",
+    "lock_readback",
+    "effective_environment",
+    "actual_gpu_processes",
+    "concurrent_run_evidence",
+    "mig_evidence",
+    "container_visible_uuid_mapping",
+    "os_safe_lock_placement",
+    "descendant_retention_evidence",
+]
+EvidenceDisposition: TypeAlias = Literal["not_reached", "failed"]
+_EVIDENCE_ABSENCE_FIELD_ORDER = (
+    "source_freeze_evidence",
+    "lock_readback",
+    "effective_environment",
+    "actual_gpu_processes",
+    "concurrent_run_evidence",
+    "mig_evidence",
+    "container_visible_uuid_mapping",
+    "os_safe_lock_placement",
+    "descendant_retention_evidence",
+)
+
+SOURCE_FREEZE_SCHEMA_VERSION = "source-freeze/v2"
+RUNTIME_IDENTITY_SCHEMA_VERSION = "runtime-identity/v1"
+SHARED_RUNTIME_PROVISION_SCHEMA_VERSION = "shared-runtime-provision/v1"
+SHARED_RUNTIME_READBACK_SCHEMA_VERSION = "shared-runtime-readback/v1"
+PROCESS_UMASK = 0o0007
+_AT_EMPTY_PATH = 0x1000
+
+
+@dataclass(frozen=True)
+class EvidenceAbsence:
+    """Typed absence for one pre-active coverage evidence field."""
+
+    field_name: EvidenceAbsenceField
+    disposition: EvidenceDisposition
+    failure_kind: str | None
+    fingerprint: Sha256Hex
+
+
+def validate_absolute_posix_path(raw: str) -> AbsolutePosixPath:
+    """Validate an absolute path without following any symlink component."""
+    if not isinstance(raw, str) or not raw or "\x00" in raw:
+        raise TypedPreflightFailure(
+            "runtime_path_invalid",
+            "runtime paths must be non-empty NUL-free strings",
+        )
+    if not raw.startswith("/") or raw == "/":
+        raise TypedPreflightFailure(
+            "runtime_path_invalid",
+            "runtime paths must be absolute POSIX paths with components",
+            path=raw,
+        )
+    components = raw.split("/")[1:]
+    if any(component in {"", ".", ".."} for component in components):
+        raise TypedPreflightFailure(
+            "runtime_path_invalid",
+            "runtime paths must not contain empty, dot, or traversal components",
+            path=raw,
+        )
+    current = Path("/")
+    for component in components:
+        current /= component
+        try:
+            mode = os.lstat(current).st_mode
+        except FileNotFoundError:
+            break
+        except OSError as exc:
+            raise TypedPreflightFailure(
+                "runtime_path_unreadable",
+                "runtime path component could not be inspected",
+                path=raw,
+                component=str(current),
+                errno=exc.errno,
+            ) from exc
+        if stat.S_ISLNK(mode):
+            raise TypedPreflightFailure(
+                "runtime_path_symlink",
+                "runtime paths must not contain symlink components",
+                path=raw,
+                component=str(current),
+            )
+    return raw
+
+
+def _canonical_fingerprint(payload: Mapping[str, object], field_name: str) -> Sha256Hex:
+    without_fingerprint = {
+        key: value for key, value in payload.items() if key != field_name
+    }
+    return hashlib.sha256(
+        (_canonical_json(_json_safe(without_fingerprint))).encode("utf-8")
+    ).hexdigest()
+
+
+def _strict_json_object(raw: bytes, *, path: str) -> dict[str, JsonValue]:
+    """Decode one canonical JSON object while rejecting duplicate keys."""
+    duplicate = object()
+
+    def pairs(items: list[tuple[str, JsonValue]]) -> dict[str, JsonValue]:
+        result: dict[str, JsonValue] = {}
+        for key, value in items:
+            if key in result:
+                raise TypedPreflightFailure(
+                    "runtime_receipt_invalid",
+                    "runtime receipts must not contain duplicate JSON keys",
+                    path=path,
+                    key=key,
+                )
+            result[key] = value
+        return result
+
+    del duplicate
+    try:
+        decoded = json.loads(raw.decode("utf-8"), object_pairs_hook=pairs)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise TypedPreflightFailure(
+            "runtime_receipt_invalid",
+            "runtime receipts must be UTF-8 JSON",
+            path=path,
+        ) from exc
+    if not isinstance(decoded, dict):
+        raise TypedPreflightFailure(
+            "runtime_receipt_invalid",
+            "runtime receipts must contain one JSON object",
+            path=path,
+        )
+    return decoded
+
+
+def _read_runtime_receipt(path: AbsolutePosixPath) -> dict[str, JsonValue]:
+    validate_absolute_posix_path(path)
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise TypedPreflightFailure(
+            "runtime_receipt_unavailable",
+            "runtime receipt could not be opened with no-follow flags",
+            path=path,
+            errno=exc.errno,
+        ) from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise TypedPreflightFailure(
+                "runtime_receipt_invalid",
+                "runtime receipt must be a regular file",
+                path=path,
+            )
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+        if (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+        ) != (after.st_dev, after.st_ino, after.st_size):
+            raise TypedPreflightFailure(
+                "runtime_receipt_raced",
+                "runtime receipt identity changed while reading",
+                path=path,
+            )
+        return _strict_json_object(b"".join(chunks), path=path)
+    finally:
+        os.close(descriptor)
+
+
+def _write_all(descriptor: int, payload: bytes) -> None:
+    offset = 0
+    while offset < len(payload):
+        try:
+            written = os.write(descriptor, payload[offset:])
+        except InterruptedError:
+            raise TypedPreflightFailure(
+                "runtime_receipt_write_ambiguous",
+                "receipt write was interrupted and is not retried",
+            )
+        if written <= 0:
+            raise TypedPreflightFailure(
+                "runtime_receipt_write_failed",
+                "receipt write made no progress",
+            )
+        offset += written
+
+
+def _link_tmpfile(descriptor: int, directory: int, name: bytes) -> None:
+    libc = __import__("ctypes").CDLL(None, use_errno=True)
+    linkat = libc.linkat
+    linkat.argtypes = [
+        __import__("ctypes").c_int,
+        __import__("ctypes").c_char_p,
+        __import__("ctypes").c_int,
+        __import__("ctypes").c_char_p,
+        __import__("ctypes").c_int,
+    ]
+    linkat.restype = __import__("ctypes").c_int
+    if linkat(descriptor, b"", directory, name, _AT_EMPTY_PATH) != 0:
+        error_number = __import__("ctypes").get_errno()
+        raise TypedPreflightFailure(
+            "runtime_receipt_publish_failed",
+            "temporary runtime receipt could not be linked atomically",
+            errno=error_number,
+        )
+
+
+def write_runtime_receipt_atomic(
+    path: AbsolutePosixPath,
+    payload: Mapping[str, JsonValue],
+) -> None:
+    """Publish one canonical receipt through O_TMPFILE and linkat."""
+    validate_absolute_posix_path(path)
+    parent = os.path.dirname(path)
+    name = os.path.basename(path).encode("utf-8")
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+    temporary_flags = os.O_WRONLY | os.O_TMPFILE | os.O_CLOEXEC
+    directory = os.open(parent, directory_flags)
+    descriptor = -1
+    try:
+        descriptor = os.open(parent, temporary_flags, 0o660)
+        encoded = (_canonical_json(_json_safe(payload)) + "\n").encode("utf-8")
+        _write_all(descriptor, encoded)
+        os.fsync(descriptor)
+        _link_tmpfile(descriptor, directory, name)
+        os.fsync(directory)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        os.close(directory)
+
+
+@dataclass(frozen=True)
+class GpuRunRequest:
+    gpu_count: int
+    minimum_memory_bytes_per_unit: int
+    max_workers: int
+    host_memory_bytes: int
+    cuda_runtime_library_path: str | None
+    environment: Mapping[str, str]
+    source_root: AbsolutePosixPath
+    runtime_route: RuntimeRoute
+    source_paths: tuple[RelativePosixPath, ...]
+    planned_chunk_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SharedRuntimeProvisionReceipt:
+    schema_version: Literal["shared-runtime-provision/v1"]
+    runtime_route: RuntimeRoute
+    host_uid: int
+    host_gid: int
+    host_supplementary_gids: tuple[int, ...]
+    host_umask: int
+    bind_source_path: AbsolutePosixPath
+    bind_source_dev: int
+    bind_source_ino: int
+    provision_fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class SourceFileRecord:
+    relative_path: RelativePosixPath
+    source_kind: Literal["tracked", "dirty", "untracked"]
+    st_dev: int
+    st_ino: int
+    st_mode: int
+    st_size: int
+    st_mtime_ns: int
+    st_ctime_ns: int
+    sha256: Sha256Hex
+    byte_count: int
+
+
+@dataclass(frozen=True)
+class SourceSnapshotRecord:
+    relative_path: RelativePosixPath
+    source_dev: int
+    source_ino: int
+    source_byte_count: int
+    source_sha256: Sha256Hex
+    snapshot_relative_path: RelativePosixPath
+    snapshot_dev: int
+    snapshot_ino: int
+    snapshot_byte_count: int
+    snapshot_sha256: Sha256Hex
+
+
+@dataclass(frozen=True)
+class SourceSnapshotManifest:
+    schema_version: Literal["source-snapshot/v2"]
+    source_root_dev: int
+    source_root_ino: int
+    source_commit: str
+    source_tree: str
+    records: tuple[SourceSnapshotRecord, ...]
+    manifest_fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class SourceFreezeReceipt:
+    schema_version: Literal["source-freeze/v2"]
+    runtime_route: RuntimeRoute
+    source_root_path: AbsolutePosixPath
+    source_root_dev: int
+    source_root_ino: int
+    source_commit: str
+    source_tree: str
+    files: tuple[SourceFileRecord, ...]
+    source_paths: tuple[RelativePosixPath, ...]
+    snapshot_root_relative_path: RelativePosixPath
+    snapshot_relative_path: RelativePosixPath
+    snapshot_manifest_fingerprint: Sha256Hex
+    receipt_fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class SharedRuntimeReadbackReceipt:
+    schema_version: Literal["shared-runtime-readback/v1"]
+    runtime_route: RuntimeRoute
+    container_uid: int
+    container_gid: int
+    container_supplementary_gids: tuple[int, ...]
+    container_umask: int
+    bind_target_path: AbsolutePosixPath
+    bind_target_dev: int
+    bind_target_ino: int
+    namespace_inode: int
+    mount_id: int
+    mount_parent_id: int
+    mount_root: str
+    probe_fd_disposition: Literal["closed"]
+    readback_fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class RuntimeIdentityReceipt:
+    schema_version: Literal["runtime-identity/v1"]
+    runtime_route: RuntimeRoute
+    namespace_inode: int
+    uid: int
+    gid: int
+    supplementary_gids: tuple[int, ...]
+    umask: int
+    bind_source_dev: int
+    bind_source_ino: int
+    bind_target_dev: int
+    bind_target_ino: int
+    provision_fingerprint: Sha256Hex
+    readback_fingerprint: Sha256Hex
+    receipt_fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class CudaRuntimeCapabilityReceipt:
+    """The capability obtained from one exact configured CUDA library fd."""
+
+    schema_version: Literal["cuda-runtime-capability/v1"]
+    library_realpath: str
+    library_sha256: Sha256Hex
+    cuda_runtime_get_version_raw: int
+    cuda_runtime_major: int
+    cuda_runtime_minor: int
+    receipt_fingerprint: Sha256Hex
+
+
+def _receipt_field(
+    payload: Mapping[str, JsonValue],
+    name: str,
+    expected_type: type[object],
+    *,
+    path: str,
+) -> object:
+    value = payload.get(name)
+    if expected_type is int:
+        valid = type(value) is int
+    else:
+        valid = isinstance(value, expected_type)
+    if not valid:
+        raise TypedPreflightFailure(
+            "runtime_receipt_invalid",
+            "runtime receipt field has the wrong type",
+            path=path,
+            field=name,
+        )
+    return value
+
+
+def _receipt_gids(
+    payload: Mapping[str, JsonValue],
+    name: str,
+    *,
+    path: str,
+) -> tuple[int, ...]:
+    value = _receipt_field(payload, name, list, path=path)
+    if any(type(item) is not int or item < 0 for item in cast(list[object], value)):
+        raise TypedPreflightFailure(
+            "runtime_receipt_invalid",
+            "runtime supplementary groups must be non-negative integers",
+            path=path,
+            field=name,
+        )
+    groups = tuple(cast(list[int], value))
+    if groups != tuple(sorted(set(groups))):
+        raise TypedPreflightFailure(
+            "runtime_receipt_invalid",
+            "runtime supplementary groups must be sorted and unique",
+            path=path,
+            field=name,
+        )
+    return groups
+
+
+def _require_receipt_shape(
+    payload: Mapping[str, JsonValue],
+    fields: frozenset[str],
+    *,
+    path: str,
+) -> None:
+    if set(payload) != fields:
+        raise TypedPreflightFailure(
+            "runtime_receipt_invalid",
+            "runtime receipt schema contains missing or extra fields",
+            path=path,
+            expected_fields=tuple(sorted(fields)),
+            observed_fields=tuple(sorted(payload)),
+        )
+
+
+def read_shared_runtime_provision(
+    path: AbsolutePosixPath,
+) -> SharedRuntimeProvisionReceipt:
+    payload = _read_runtime_receipt(path)
+    _require_receipt_shape(
+        payload,
+        frozenset(
+            {
+                "schema_version",
+                "runtime_route",
+                "host_uid",
+                "host_gid",
+                "host_supplementary_gids",
+                "host_umask",
+                "bind_source_path",
+                "bind_source_dev",
+                "bind_source_ino",
+                "provision_fingerprint",
+            }
+        ),
+        path=path,
+    )
+    schema_version = _receipt_field(payload, "schema_version", str, path=path)
+    route = _receipt_field(payload, "runtime_route", str, path=path)
+    bind_source_path = _receipt_field(payload, "bind_source_path", str, path=path)
+    if schema_version != SHARED_RUNTIME_PROVISION_SCHEMA_VERSION:
+        raise TypedPreflightFailure(
+            "runtime_receipt_invalid",
+            "runtime provision receipt schema version is unsupported",
+            path=path,
+        )
+    if route not in {"MANAGED_CONTAINER", "HOST_DIRECT"}:
+        raise TypedPreflightFailure(
+            "runtime_receipt_invalid",
+            "runtime provision receipt route is unsupported",
+            path=path,
+        )
+    validate_absolute_posix_path(cast(str, bind_source_path))
+    typed_payload = {
+        "schema_version": schema_version,
+        "runtime_route": route,
+        "host_uid": _receipt_field(payload, "host_uid", int, path=path),
+        "host_gid": _receipt_field(payload, "host_gid", int, path=path),
+        "host_supplementary_gids": _receipt_gids(
+            payload,
+            "host_supplementary_gids",
+            path=path,
+        ),
+        "host_umask": _receipt_field(payload, "host_umask", int, path=path),
+        "bind_source_path": bind_source_path,
+        "bind_source_dev": _receipt_field(payload, "bind_source_dev", int, path=path),
+        "bind_source_ino": _receipt_field(payload, "bind_source_ino", int, path=path),
+        "provision_fingerprint": _receipt_field(
+            payload,
+            "provision_fingerprint",
+            str,
+            path=path,
+        ),
+    }
+    expected = _canonical_fingerprint(typed_payload, "provision_fingerprint")
+    if typed_payload["provision_fingerprint"] != expected:
+        raise TypedPreflightFailure(
+            "runtime_receipt_fingerprint_mismatch",
+            "runtime provision receipt fingerprint does not match its payload",
+            path=path,
+        )
+    return SharedRuntimeProvisionReceipt(
+        schema_version=cast(
+            Literal["shared-runtime-provision/v1"],
+            typed_payload["schema_version"],
+        ),
+        runtime_route=cast(RuntimeRoute, typed_payload["runtime_route"]),
+        host_uid=cast(int, typed_payload["host_uid"]),
+        host_gid=cast(int, typed_payload["host_gid"]),
+        host_supplementary_gids=cast(
+            tuple[int, ...],
+            typed_payload["host_supplementary_gids"],
+        ),
+        host_umask=cast(int, typed_payload["host_umask"]),
+        bind_source_path=cast(
+            AbsolutePosixPath,
+            typed_payload["bind_source_path"],
+        ),
+        bind_source_dev=cast(int, typed_payload["bind_source_dev"]),
+        bind_source_ino=cast(int, typed_payload["bind_source_ino"]),
+        provision_fingerprint=cast(
+            Sha256Hex,
+            typed_payload["provision_fingerprint"],
+        ),
+    )
+
+
+def read_shared_runtime_readback(
+    path: AbsolutePosixPath,
+) -> SharedRuntimeReadbackReceipt:
+    payload = _read_runtime_receipt(path)
+    _require_receipt_shape(
+        payload,
+        frozenset(
+            {
+                "schema_version",
+                "runtime_route",
+                "container_uid",
+                "container_gid",
+                "container_supplementary_gids",
+                "container_umask",
+                "bind_target_path",
+                "bind_target_dev",
+                "bind_target_ino",
+                "namespace_inode",
+                "mount_id",
+                "mount_parent_id",
+                "mount_root",
+                "probe_fd_disposition",
+                "readback_fingerprint",
+            }
+        ),
+        path=path,
+    )
+    schema_version = _receipt_field(payload, "schema_version", str, path=path)
+    route = _receipt_field(payload, "runtime_route", str, path=path)
+    bind_target_path = _receipt_field(payload, "bind_target_path", str, path=path)
+    mount_root = _receipt_field(payload, "mount_root", str, path=path)
+    probe_disposition = _receipt_field(
+        payload,
+        "probe_fd_disposition",
+        str,
+        path=path,
+    )
+    if schema_version != SHARED_RUNTIME_READBACK_SCHEMA_VERSION:
+        raise TypedPreflightFailure(
+            "runtime_receipt_invalid",
+            "runtime readback receipt schema version is unsupported",
+            path=path,
+        )
+    if route not in {"MANAGED_CONTAINER", "HOST_DIRECT"}:
+        raise TypedPreflightFailure(
+            "runtime_receipt_invalid",
+            "runtime readback receipt route is unsupported",
+            path=path,
+        )
+    if probe_disposition != "closed":
+        raise TypedPreflightFailure(
+            "runtime_receipt_invalid",
+            "runtime readback receipt must report a closed probe",
+            path=path,
+        )
+    validate_absolute_posix_path(cast(str, bind_target_path))
+    typed_payload = {
+        "schema_version": schema_version,
+        "runtime_route": route,
+        "container_uid": _receipt_field(payload, "container_uid", int, path=path),
+        "container_gid": _receipt_field(payload, "container_gid", int, path=path),
+        "container_supplementary_gids": _receipt_gids(
+            payload,
+            "container_supplementary_gids",
+            path=path,
+        ),
+        "container_umask": _receipt_field(payload, "container_umask", int, path=path),
+        "bind_target_path": bind_target_path,
+        "bind_target_dev": _receipt_field(payload, "bind_target_dev", int, path=path),
+        "bind_target_ino": _receipt_field(payload, "bind_target_ino", int, path=path),
+        "namespace_inode": _receipt_field(payload, "namespace_inode", int, path=path),
+        "mount_id": _receipt_field(payload, "mount_id", int, path=path),
+        "mount_parent_id": _receipt_field(payload, "mount_parent_id", int, path=path),
+        "mount_root": mount_root,
+        "probe_fd_disposition": probe_disposition,
+        "readback_fingerprint": _receipt_field(
+            payload,
+            "readback_fingerprint",
+            str,
+            path=path,
+        ),
+    }
+    expected = _canonical_fingerprint(typed_payload, "readback_fingerprint")
+    if typed_payload["readback_fingerprint"] != expected:
+        raise TypedPreflightFailure(
+            "runtime_receipt_fingerprint_mismatch",
+            "runtime readback receipt fingerprint does not match its payload",
+            path=path,
+        )
+    return SharedRuntimeReadbackReceipt(
+        schema_version=cast(
+            Literal["shared-runtime-readback/v1"],
+            typed_payload["schema_version"],
+        ),
+        runtime_route=cast(RuntimeRoute, typed_payload["runtime_route"]),
+        container_uid=cast(int, typed_payload["container_uid"]),
+        container_gid=cast(int, typed_payload["container_gid"]),
+        container_supplementary_gids=cast(
+            tuple[int, ...],
+            typed_payload["container_supplementary_gids"],
+        ),
+        container_umask=cast(int, typed_payload["container_umask"]),
+        bind_target_path=cast(
+            AbsolutePosixPath,
+            typed_payload["bind_target_path"],
+        ),
+        bind_target_dev=cast(int, typed_payload["bind_target_dev"]),
+        bind_target_ino=cast(int, typed_payload["bind_target_ino"]),
+        namespace_inode=cast(int, typed_payload["namespace_inode"]),
+        mount_id=cast(int, typed_payload["mount_id"]),
+        mount_parent_id=cast(int, typed_payload["mount_parent_id"]),
+        mount_root=cast(str, typed_payload["mount_root"]),
+        probe_fd_disposition=cast(
+            Literal["closed"],
+            typed_payload["probe_fd_disposition"],
+        ),
+        readback_fingerprint=cast(
+            Sha256Hex,
+            typed_payload["readback_fingerprint"],
+        ),
+    )
+
+
+class RuntimeIdentityReader:
+    """Validate script-owned runtime receipts without mutating runtime state."""
+
+    def read(
+        self,
+        provision: SharedRuntimeProvisionReceipt,
+        readback: SharedRuntimeReadbackReceipt,
+    ) -> RuntimeIdentityReceipt:
+        if provision.runtime_route != readback.runtime_route:
+            raise TypedPreflightFailure(
+                "runtime_identity_mismatch",
+                "provision and readback routes differ",
+            )
+        if (
+            provision.host_uid != readback.container_uid
+            or provision.host_gid != readback.container_gid
+            or provision.host_supplementary_gids
+            != readback.container_supplementary_gids
+            or provision.host_umask != readback.container_umask
+            or provision.bind_source_dev != readback.bind_target_dev
+            or provision.bind_source_ino != readback.bind_target_ino
+            or readback.probe_fd_disposition != "closed"
+            or readback.namespace_inode <= 0
+            or readback.mount_id <= 0
+            or readback.mount_parent_id < 0
+        ):
+            raise TypedPreflightFailure(
+                "runtime_identity_mismatch",
+                "runtime provision/readback identity is not exact",
+            )
+        if provision.host_uid == 0:
+            raise TypedPreflightFailure(
+                "runtime_identity_invalid",
+                "UID 0 is not a valid managed runtime identity",
+            )
+        receipt_payload = {
+            "schema_version": RUNTIME_IDENTITY_SCHEMA_VERSION,
+            "runtime_route": provision.runtime_route,
+            "namespace_inode": readback.namespace_inode,
+            "uid": provision.host_uid,
+            "gid": provision.host_gid,
+            "supplementary_gids": provision.host_supplementary_gids,
+            "umask": provision.host_umask,
+            "bind_source_dev": provision.bind_source_dev,
+            "bind_source_ino": provision.bind_source_ino,
+            "bind_target_dev": readback.bind_target_dev,
+            "bind_target_ino": readback.bind_target_ino,
+            "provision_fingerprint": provision.provision_fingerprint,
+            "readback_fingerprint": readback.readback_fingerprint,
+        }
+        receipt_fingerprint = _canonical_fingerprint(
+            receipt_payload,
+            "receipt_fingerprint",
+        )
+        return RuntimeIdentityReceipt(
+            schema_version=cast(
+                Literal["runtime-identity/v1"],
+                receipt_payload["schema_version"],
+            ),
+            runtime_route=cast(RuntimeRoute, receipt_payload["runtime_route"]),
+            namespace_inode=cast(int, receipt_payload["namespace_inode"]),
+            uid=cast(int, receipt_payload["uid"]),
+            gid=cast(int, receipt_payload["gid"]),
+            supplementary_gids=cast(
+                tuple[int, ...],
+                receipt_payload["supplementary_gids"],
+            ),
+            umask=cast(int, receipt_payload["umask"]),
+            bind_source_dev=cast(int, receipt_payload["bind_source_dev"]),
+            bind_source_ino=cast(int, receipt_payload["bind_source_ino"]),
+            bind_target_dev=cast(int, receipt_payload["bind_target_dev"]),
+            bind_target_ino=cast(int, receipt_payload["bind_target_ino"]),
+            provision_fingerprint=cast(
+                Sha256Hex,
+                receipt_payload["provision_fingerprint"],
+            ),
+            readback_fingerprint=cast(
+                Sha256Hex,
+                receipt_payload["readback_fingerprint"],
+            ),
+            receipt_fingerprint=receipt_fingerprint,
+        )
+
+
+def capture_cuda_runtime_capability(
+    path: str,
+) -> CudaRuntimeCapabilityReceipt:
+    """Read CUDA runtime capability from one exact configured library path."""
+    if not isinstance(path, str) or not path.startswith("/") or "\x00" in path:
+        raise TypedPreflightFailure(
+            "cuda_runtime_library_path_invalid",
+            "CUDA runtime capability requires one absolute configured library path",
+        )
+    descriptor = -1
+    library: object | None = None
+    library_handle = 0
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise TypedPreflightFailure(
+                "cuda_runtime_library_invalid",
+                "configured CUDA runtime path is not a regular file",
+            )
+        content, before_hash = _pread_hash_all(descriptor)
+        after = os.fstat(descriptor)
+        if _source_stat_changed(before, after, len(content)):
+            raise TypedPreflightFailure(
+                "cuda_runtime_library_raced",
+                "configured CUDA runtime changed during fd-bound hashing",
+            )
+        realpath = os.path.realpath(path)
+        try:
+            library = ctypes.CDLL(
+                realpath,
+                mode=ctypes.RTLD_LOCAL | ctypes.RTLD_NOW,
+            )
+            library_handle = int(getattr(library, "_handle", 0))
+            if library_handle <= 0:
+                raise AttributeError("CUDA runtime handle is missing")
+            function = getattr(library, "cudaRuntimeGetVersion")
+            function.argtypes = [ctypes.POINTER(ctypes.c_int)]
+            function.restype = ctypes.c_int
+            raw_version = ctypes.c_int(0)
+            status = int(function(ctypes.byref(raw_version)))
+            if status != 0 or raw_version.value <= 0:
+                raise TypedPreflightFailure(
+                    "cuda_runtime_capability_unproven",
+                    "cudaRuntimeGetVersion did not return a positive successful value",
+                    status=status,
+                    raw_version=raw_version.value,
+                )
+            content_after, after_hash = _pread_hash_all(descriptor)
+            final = os.fstat(descriptor)
+            if (
+                content_after != content
+                or after_hash != before_hash
+                or _source_stat_changed(after, final, len(content_after))
+            ):
+                raise TypedPreflightFailure(
+                    "cuda_runtime_library_raced",
+                    "configured CUDA runtime changed during capability lookup",
+                )
+            payload = {
+                "schema_version": "cuda-runtime-capability/v1",
+                "library_realpath": realpath,
+                "library_sha256": before_hash,
+                "cuda_runtime_get_version_raw": raw_version.value,
+                "cuda_runtime_major": raw_version.value // 1000,
+                "cuda_runtime_minor": (raw_version.value % 1000) // 10,
+            }
+            return CudaRuntimeCapabilityReceipt(
+                schema_version="cuda-runtime-capability/v1",
+                library_realpath=realpath,
+                library_sha256=before_hash,
+                cuda_runtime_get_version_raw=raw_version.value,
+                cuda_runtime_major=raw_version.value // 1000,
+                cuda_runtime_minor=(raw_version.value % 1000) // 10,
+                receipt_fingerprint=_canonical_fingerprint(
+                    payload,
+                    "receipt_fingerprint",
+                ),
+            )
+        except (AttributeError, OSError) as exc:
+            raise TypedPreflightFailure(
+                "cuda_runtime_capability_unproven",
+                "configured CUDA runtime could not be loaded exactly",
+            ) from exc
+    finally:
+        if library_handle:
+            dlclose = getattr(ctypes, "_dlclose", None)
+            if not callable(dlclose):
+                raise TypedPreflightFailure(
+                    "cuda_runtime_dlclose_unavailable",
+                    "exact CUDA runtime handle closure is unavailable",
+                )
+            try:
+                dlclose(library_handle)
+                if library is not None:
+                    setattr(library, "_handle", 0)
+            except OSError as exc:
+                raise TypedPreflightFailure(
+                    "cuda_runtime_dlclose_failed",
+                    "CUDA runtime handle closure failed",
+                ) from exc
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except OSError as exc:
+                raise TypedPreflightFailure(
+                    "cuda_runtime_library_close_ambiguous",
+                    "CUDA runtime library fd close was ambiguous",
+                ) from exc
+
+
+class SourceFreezeOwner:
+    """Own one fd-bound source freeze and its retained evidence descriptors."""
+
+    def __init__(self, snapshot_result_root: AbsolutePosixPath) -> None:
+        self._snapshot_result_root = validate_absolute_posix_path(snapshot_result_root)
+        self._owned_fds: list[int] = []
+        self._source_root_fd: int | None = None
+        self._source_root_stat: tuple[int, int] | None = None
+        self._source_root_path: AbsolutePosixPath | None = None
+        self._closed = False
+        self._frozen = False
+
+    @staticmethod
+    def fingerprint(record: Mapping[str, object]) -> Sha256Hex:
+        return _canonical_fingerprint(record, "fingerprint")
+
+    def freeze(self, request: GpuRunRequest) -> SourceFreezeReceipt:
+        """Freeze exactly ``request.source_paths`` through retained source fds."""
+        if self._closed:
+            raise TypedPreflightFailure(
+                "gpu_source_freeze_closed",
+                "a closed source-freeze owner cannot be reused",
+            )
+        if self._frozen:
+            raise TypedPreflightFailure(
+                "gpu_source_freeze_repeated",
+                "a source-freeze owner accepts exactly one freeze operation",
+            )
+        source_root = validate_absolute_posix_path(request.source_root)
+        if request.runtime_route not in {"MANAGED_CONTAINER", "HOST_DIRECT"}:
+            raise TypedPreflightFailure(
+                "gpu_source_freeze_route_invalid",
+                "source freeze runtime route is unsupported",
+            )
+        source_paths = _normalize_source_paths(request.source_paths)
+        root_fd = self._register_fd(
+            _open_source_root(source_root),
+        )
+        self._source_root_fd = root_fd
+        root_stat = os.fstat(root_fd)
+        if not stat.S_ISDIR(root_stat.st_mode):
+            raise TypedPreflightFailure(
+                "gpu_source_freeze_root_invalid",
+                "source root must be a directory",
+                source_root=source_root,
+            )
+        self._source_root_stat = (root_stat.st_dev, root_stat.st_ino)
+        self._source_root_path = source_root
+        identity_fd = -1
+        try:
+            identity_fd = os.dup(root_fd)
+            os.set_inheritable(identity_fd, True)
+            source_commit, source_tree = _read_git_identity(identity_fd)
+            result_dir_fd = self._open_destination_chain(self._snapshot_result_root)
+            snapshot_dir_fd = self._open_or_create_directory(
+                result_dir_fd,
+                "source_snapshot",
+            )
+            records: list[SourceSnapshotRecord] = []
+            files: list[SourceFileRecord] = []
+            for relative_path in source_paths:
+                source_fd = self._open_source_file(root_fd, relative_path)
+                source_before = os.fstat(source_fd)
+                if not stat.S_ISREG(source_before.st_mode):
+                    raise TypedPreflightFailure(
+                        "gpu_source_freeze_non_regular",
+                        "source freeze accepts regular files only",
+                        relative_path=relative_path,
+                    )
+                source_bytes, source_sha256 = _pread_hash_all(source_fd)
+                source_after = os.fstat(source_fd)
+                if _source_stat_changed(
+                    source_before,
+                    source_after,
+                    len(source_bytes),
+                ):
+                    raise TypedPreflightFailure(
+                        "gpu_source_freeze_raced",
+                        "source identity changed during fd-bound read",
+                        relative_path=relative_path,
+                    )
+                source_kind = _git_source_kind(identity_fd, relative_path)
+                snapshot_relative_path = f"source_snapshot/{relative_path}"
+                snapshot_fd, snapshot_stat = self._copy_to_snapshot(
+                    snapshot_dir_fd,
+                    relative_path,
+                    source_bytes,
+                )
+                try:
+                    snapshot_bytes, snapshot_sha256 = _pread_hash_all(snapshot_fd)
+                finally:
+                    os.close(snapshot_fd)
+                if (
+                    len(snapshot_bytes) != len(source_bytes)
+                    or snapshot_sha256 != source_sha256
+                ):
+                    raise TypedPreflightFailure(
+                        "gpu_source_snapshot_mismatch",
+                        "snapshot bytes do not match the retained source fd",
+                        relative_path=relative_path,
+                    )
+                records.append(
+                    SourceSnapshotRecord(
+                        relative_path=relative_path,
+                        source_dev=source_before.st_dev,
+                        source_ino=source_before.st_ino,
+                        source_byte_count=len(source_bytes),
+                        source_sha256=source_sha256,
+                        snapshot_relative_path=snapshot_relative_path,
+                        snapshot_dev=snapshot_stat.st_dev,
+                        snapshot_ino=snapshot_stat.st_ino,
+                        snapshot_byte_count=len(snapshot_bytes),
+                        snapshot_sha256=snapshot_sha256,
+                    )
+                )
+                files.append(
+                    SourceFileRecord(
+                        relative_path=relative_path,
+                        source_kind=source_kind,
+                        st_dev=source_before.st_dev,
+                        st_ino=source_before.st_ino,
+                        st_mode=source_before.st_mode,
+                        st_size=source_before.st_size,
+                        st_mtime_ns=source_before.st_mtime_ns,
+                        st_ctime_ns=source_before.st_ctime_ns,
+                        sha256=source_sha256,
+                        byte_count=len(source_bytes),
+                    )
+                )
+            manifest_payload: dict[str, object] = {
+                "schema_version": "source-snapshot/v2",
+                "source_root_dev": root_stat.st_dev,
+                "source_root_ino": root_stat.st_ino,
+                "source_commit": source_commit,
+                "source_tree": source_tree,
+                "records": tuple(
+                    _source_snapshot_record_payload(record) for record in records
+                ),
+            }
+            manifest_fingerprint = _canonical_fingerprint(
+                manifest_payload,
+                "manifest_fingerprint",
+            )
+            manifest = SourceSnapshotManifest(
+                schema_version="source-snapshot/v2",
+                source_root_dev=root_stat.st_dev,
+                source_root_ino=root_stat.st_ino,
+                source_commit=source_commit,
+                source_tree=source_tree,
+                records=tuple(records),
+                manifest_fingerprint=manifest_fingerprint,
+            )
+            self._write_manifest(
+                result_dir_fd,
+                manifest,
+            )
+            os.fsync(snapshot_dir_fd)
+            os.fsync(result_dir_fd)
+            receipt_payload: dict[str, object] = {
+                "schema_version": "source-freeze/v2",
+                "runtime_route": request.runtime_route,
+                "source_root_path": source_root,
+                "source_root_dev": root_stat.st_dev,
+                "source_root_ino": root_stat.st_ino,
+                "source_commit": source_commit,
+                "source_tree": source_tree,
+                "files": tuple(
+                    _source_file_record_payload(record) for record in files
+                ),
+                "source_paths": source_paths,
+                "snapshot_root_relative_path": "source_snapshot",
+                "snapshot_relative_path": "source_snapshot.json",
+                "snapshot_manifest_fingerprint": manifest_fingerprint,
+            }
+            receipt_fingerprint = _canonical_fingerprint(
+                receipt_payload,
+                "receipt_fingerprint",
+            )
+            receipt = SourceFreezeReceipt(
+                schema_version="source-freeze/v2",
+                runtime_route=request.runtime_route,
+                source_root_path=source_root,
+                source_root_dev=root_stat.st_dev,
+                source_root_ino=root_stat.st_ino,
+                source_commit=source_commit,
+                source_tree=source_tree,
+                files=tuple(files),
+                source_paths=source_paths,
+                snapshot_root_relative_path="source_snapshot",
+                snapshot_relative_path="source_snapshot.json",
+                snapshot_manifest_fingerprint=manifest_fingerprint,
+                receipt_fingerprint=receipt_fingerprint,
+            )
+            self._frozen = True
+            return receipt
+        except BaseException as primary:
+            close_failure = self._close_owned_fds_without_revalidation()
+            if close_failure is not None:
+                raise primary from close_failure
+            raise
+        finally:
+            if identity_fd >= 0:
+                os.close(identity_fd)
+
+    def revalidate(self) -> None:
+        """Re-check the opened source-root identity without reopening source files."""
+        if self._closed:
+            raise TypedPreflightFailure(
+                "gpu_source_freeze_closed",
+                "a closed source-freeze owner cannot be revalidated",
+            )
+        if self._source_root_fd is None or self._source_root_stat is None:
+            raise TypedPreflightFailure(
+                "gpu_source_freeze_not_started",
+                "source root is not retained for revalidation",
+            )
+        current_fd = -1
+        try:
+            current_fd = _open_source_root(cast(AbsolutePosixPath, self._source_root_path))
+            current = os.fstat(current_fd)
+            if (current.st_dev, current.st_ino) != self._source_root_stat:
+                raise TypedPreflightFailure(
+                    "gpu_source_freeze_raced",
+                    "source-root identity changed before release",
+                )
+        except OSError as exc:
+            raise TypedPreflightFailure(
+                "gpu_source_freeze_raced",
+                "source root could not be revalidated",
+                errno=exc.errno,
+            ) from exc
+        finally:
+            if current_fd >= 0:
+                os.close(current_fd)
+
+    def close(self) -> None:
+        """Close retained source and snapshot fds once, in reverse order."""
+        if self._closed:
+            raise TypedPreflightFailure(
+                "gpu_descriptor_double_close",
+                "source-freeze descriptors were closed more than once",
+            )
+        race: TypedPreflightFailure | None = None
+        try:
+            self.revalidate()
+        except TypedPreflightFailure as exc:
+            race = exc
+        close_failure = self._close_owned_fds_without_revalidation()
+        if race is not None:
+            if close_failure is not None:
+                raise race from close_failure
+            raise race
+        if close_failure is not None:
+            raise close_failure
+
+    def _register_fd(self, descriptor: int) -> int:
+        self._owned_fds.append(descriptor)
+        return descriptor
+
+    def _close_transient_fds(self, descriptors: Sequence[int]) -> None:
+        for descriptor in reversed(tuple(descriptors)):
+            try:
+                self._owned_fds.remove(descriptor)
+                os.close(descriptor)
+            except OSError as exc:
+                raise TypedPreflightFailure(
+                    "gpu_descriptor_close_ambiguous",
+                    "a transient source-freeze descriptor failed to close",
+                    errno=exc.errno,
+                ) from exc
+
+    def _close_owned_fds_without_revalidation(
+        self,
+    ) -> TypedPreflightFailure | None:
+        """Attempt every owned fd once and return typed ambiguity evidence."""
+        self._closed = True
+        dispositions: list[Mapping[str, object]] = []
+        close_errors: list[OSError] = []
+        for descriptor in reversed(self._owned_fds):
+            try:
+                os.close(descriptor)
+            except OSError as exc:
+                close_errors.append(exc)
+                dispositions.append(
+                    {
+                        "fd": descriptor,
+                        "disposition": "close_ambiguous",
+                        "attempted_once": True,
+                        "errno": exc.errno,
+                    }
+                )
+            else:
+                dispositions.append(
+                    {
+                        "fd": descriptor,
+                        "disposition": "closed",
+                        "attempted_once": True,
+                    }
+                )
+        self._owned_fds.clear()
+        if not close_errors:
+            return None
+        return TypedPreflightFailure(
+            "gpu_descriptor_close_ambiguous",
+            "one or more source-freeze descriptors failed to close",
+            attempted_once=True,
+            release_order="reverse_registration",
+            release_dispositions=tuple(dispositions),
+            errno=close_errors[0].errno,
+        )
+
+    def _open_source_file(self, root_fd: int, relative_path: RelativePosixPath) -> int:
+        components = relative_path.split("/")
+        parent_fds: list[int] = []
+        parent_fd = root_fd
+        try:
+            for component in components[:-1]:
+                parent_fd = self._register_fd(
+                    os.open(
+                        component,
+                        os.O_PATH | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                        dir_fd=parent_fd,
+                    )
+                )
+                parent_fds.append(parent_fd)
+            return self._register_fd(
+                os.open(
+                    components[-1],
+                    os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                    dir_fd=parent_fd,
+                )
+            )
+        finally:
+            self._close_transient_fds(parent_fds)
+
+    def _open_destination_chain(self, absolute_path: AbsolutePosixPath) -> int:
+        current_fd = self._register_fd(
+            os.open(
+                "/",
+                os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            )
+        )
+        for component in absolute_path.split("/")[1:]:
+            if not component:
+                continue
+            try:
+                os.mkdir(component, 0o2770, dir_fd=current_fd)
+            except FileExistsError:
+                pass
+            current_fd = self._register_fd(
+                os.open(
+                    component,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                    dir_fd=current_fd,
+                )
+            )
+        return current_fd
+
+    def _open_or_create_directory(self, parent_fd: int, name: str) -> int:
+        try:
+            os.mkdir(name, 0o2770, dir_fd=parent_fd)
+        except FileExistsError:
+            pass
+        return self._register_fd(
+            os.open(
+                name,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                dir_fd=parent_fd,
+            )
+        )
+
+    def _copy_to_snapshot(
+        self,
+        snapshot_root_fd: int,
+        relative_path: RelativePosixPath,
+        source_bytes: bytes,
+    ) -> tuple[int, os.stat_result]:
+        components = relative_path.split("/")
+        parent_fd = snapshot_root_fd
+        parent_fds: list[int] = []
+        try:
+            for component in components[:-1]:
+                parent_fd = self._open_or_create_directory(parent_fd, component)
+                parent_fds.append(parent_fd)
+            try:
+                temporary_fd = self._register_fd(
+                    os.open(
+                        ".",
+                        os.O_WRONLY | os.O_TMPFILE | os.O_CLOEXEC,
+                        0o660,
+                        dir_fd=parent_fd,
+                    )
+                )
+            except OSError as exc:
+                if exc.errno in {errno.EINVAL, errno.EOPNOTSUPP, errno.ENOTSUP}:
+                    raise TypedPreflightFailure(
+                        "gpu_source_snapshot_unsupported",
+                        "the snapshot filesystem lacks O_TMPFILE support",
+                        errno=exc.errno,
+                    ) from exc
+                raise TypedPreflightFailure(
+                    "gpu_source_snapshot_open_failed",
+                    "the snapshot temporary file could not be opened",
+                    errno=exc.errno,
+                ) from exc
+            _write_all(temporary_fd, source_bytes)
+            os.fsync(temporary_fd)
+            _link_tmpfile(temporary_fd, parent_fd, components[-1].encode("utf-8"))
+            os.fsync(parent_fd)
+            snapshot_fd = os.open(
+                components[-1],
+                os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                dir_fd=parent_fd,
+            )
+            snapshot_stat = os.fstat(snapshot_fd)
+            if not stat.S_ISREG(snapshot_stat.st_mode):
+                os.close(snapshot_fd)
+                raise TypedPreflightFailure(
+                    "gpu_source_snapshot_invalid",
+                    "the linked snapshot is not a regular file",
+                    relative_path=relative_path,
+                )
+            return snapshot_fd, snapshot_stat
+        finally:
+            self._close_transient_fds(parent_fds)
+
+    def _write_manifest(
+        self,
+        result_dir_fd: int,
+        manifest: SourceSnapshotManifest,
+    ) -> None:
+        payload = {
+            "schema_version": manifest.schema_version,
+            "source_root_dev": manifest.source_root_dev,
+            "source_root_ino": manifest.source_root_ino,
+            "source_commit": manifest.source_commit,
+            "source_tree": manifest.source_tree,
+            "records": tuple(
+                _source_snapshot_record_payload(record)
+                for record in manifest.records
+            ),
+            "manifest_fingerprint": manifest.manifest_fingerprint,
+        }
+        try:
+            temporary_fd = self._register_fd(
+                os.open(
+                    ".",
+                    os.O_WRONLY | os.O_TMPFILE | os.O_CLOEXEC,
+                    0o660,
+                    dir_fd=result_dir_fd,
+                )
+            )
+        except OSError as exc:
+            if exc.errno in {errno.EINVAL, errno.EOPNOTSUPP, errno.ENOTSUP}:
+                raise TypedPreflightFailure(
+                    "gpu_source_snapshot_unsupported",
+                    "the manifest filesystem lacks O_TMPFILE support",
+                    errno=exc.errno,
+                ) from exc
+            raise TypedPreflightFailure(
+                "gpu_source_snapshot_open_failed",
+                "the manifest temporary file could not be opened",
+                errno=exc.errno,
+            ) from exc
+        _write_all(
+            temporary_fd,
+            (_canonical_json(_json_safe(payload)) + "\n").encode("utf-8"),
+        )
+        os.fsync(temporary_fd)
+        _link_tmpfile(temporary_fd, result_dir_fd, b"source_snapshot.json")
+        os.fsync(result_dir_fd)
+
+
+def freeze_source_tree(request: GpuRunRequest) -> SourceFreezeReceipt:
+    """Execute one standalone source freeze through the canonical owner."""
+    snapshot_root = os.environ.get("AGENT_CANON_SOURCE_SNAPSHOT_ROOT")
+    if snapshot_root is None:
+        raise TypedPreflightFailure(
+            "gpu_source_snapshot_root_missing",
+            "AGENT_CANON_SOURCE_SNAPSHOT_ROOT is required for source freeze",
+        )
+    owner = SourceFreezeOwner(validate_absolute_posix_path(snapshot_root))
+    try:
+        receipt = owner.freeze(request)
+        owner.close()
+        return receipt
+    except BaseException as primary:
+        if not owner._closed:
+            close_failure = owner._close_owned_fds_without_revalidation()
+            if close_failure is not None:
+                raise primary from close_failure
+        raise
+
+
+def _open_source_root(source_root: AbsolutePosixPath) -> int:
+    try:
+        return os.open(
+            source_root,
+            os.O_PATH | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+        )
+    except OSError as exc:
+        raise TypedPreflightFailure(
+            "gpu_source_freeze_root_open_failed",
+            "source root could not be opened with fd-bound no-follow flags",
+            source_root=source_root,
+            errno=exc.errno,
+        ) from exc
+
+
+def _normalize_source_paths(
+    source_paths: Sequence[RelativePosixPath],
+) -> tuple[RelativePosixPath, ...]:
+    normalized: list[RelativePosixPath] = []
+    seen: set[str] = set()
+    for raw in source_paths:
+        if (
+            not isinstance(raw, str)
+            or not raw
+            or raw.startswith("/")
+            or "\x00" in raw
+            or any(component in {"", ".", ".."} for component in raw.split("/"))
+        ):
+            raise TypedPreflightFailure(
+                "gpu_source_freeze_path_invalid",
+                "source paths must be relative, normalized POSIX paths",
+                source_path=raw,
+            )
+        if raw in seen:
+            raise TypedPreflightFailure(
+                "gpu_source_freeze_path_duplicate",
+                "source paths must be unique",
+                source_path=raw,
+            )
+        seen.add(raw)
+        normalized.append(raw)
+    return tuple(sorted(normalized, key=lambda value: value.encode("utf-8")))
+
+
+def _read_git_identity(identity_fd: int) -> tuple[str, str]:
+    commit = _run_git_identity_command(identity_fd, "HEAD")
+    tree = _run_git_identity_command(identity_fd, "HEAD^{tree}")
+    if len(commit) != 40 or len(tree) != 40:
+        raise TypedPreflightFailure(
+            "gpu_source_freeze_git_identity_invalid",
+            "Git source identity must contain exact commit and tree hashes",
+        )
+    return commit, tree
+
+
+def _run_git_identity_command(identity_fd: int, revision: str) -> str:
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                f"/proc/self/fd/{identity_fd}",
+                "rev-parse",
+                "--verify",
+                revision,
+            ],
+            check=False,
+            capture_output=True,
+            close_fds=True,
+            pass_fds=(identity_fd,),
+            text=True,
+            encoding="utf-8",
+        )
+    except (OSError, UnicodeError) as exc:
+        raise TypedPreflightFailure(
+            "gpu_source_freeze_git_identity_failed",
+            "Git identity could not be read through the retained root identity fd",
+        ) from exc
+    if result.returncode != 0:
+        raise TypedPreflightFailure(
+            "gpu_source_freeze_git_identity_failed",
+            "Git identity command failed",
+            stderr=result.stderr.strip(),
+        )
+    return result.stdout.strip()
+
+
+def _git_source_kind(identity_fd: int, relative_path: RelativePosixPath) -> Literal[
+    "tracked", "dirty", "untracked"
+]:
+    tracked = _run_git_path_command(
+        identity_fd,
+        ("ls-files", "--error-unmatch", "--", relative_path),
+    )
+    if tracked:
+        status = _run_git_path_command(
+            identity_fd,
+            ("status", "--porcelain=v1", "--untracked-files=all", "--", relative_path),
+        )
+        return "dirty" if status else "tracked"
+    untracked = _run_git_path_command(
+        identity_fd,
+        ("ls-files", "--others", "--exclude-standard", "--", relative_path),
+    )
+    if untracked:
+        return "untracked"
+    raise TypedPreflightFailure(
+        "gpu_source_freeze_unlisted_path",
+        "source path is neither tracked nor non-ignored untracked content",
+        relative_path=relative_path,
+    )
+
+
+def _run_git_path_command(
+    identity_fd: int,
+    arguments: Sequence[str],
+) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "-C", f"/proc/self/fd/{identity_fd}", *arguments],
+            check=False,
+            capture_output=True,
+            close_fds=True,
+            pass_fds=(identity_fd,),
+            text=True,
+            encoding="utf-8",
+        )
+    except (OSError, UnicodeError) as exc:
+        raise TypedPreflightFailure(
+            "gpu_source_freeze_git_membership_failed",
+            "Git source membership could not be read through the identity fd",
+        ) from exc
+    if result.returncode not in {0, 1}:
+        raise TypedPreflightFailure(
+            "gpu_source_freeze_git_membership_failed",
+            "Git source membership command failed",
+            stderr=result.stderr.strip(),
+        )
+    return result.stdout.strip()
+
+
+def _pread_hash_all(descriptor: int) -> tuple[bytes, Sha256Hex]:
+    chunks: list[bytes] = []
+    digest = hashlib.sha256()
+    offset = 0
+    while True:
+        try:
+            chunk = os.pread(descriptor, 1024 * 1024, offset)
+        except OSError as exc:
+            raise TypedPreflightFailure(
+                "gpu_source_freeze_read_failed",
+                "source bytes could not be read through the retained fd",
+                errno=exc.errno,
+            ) from exc
+        if not chunk:
+            break
+        chunks.append(chunk)
+        digest.update(chunk)
+        offset += len(chunk)
+    return b"".join(chunks), digest.hexdigest()
+
+
+def _source_stat_changed(
+    before: os.stat_result,
+    after: os.stat_result,
+    byte_count: int,
+) -> bool:
+    return (
+        before.st_dev != after.st_dev
+        or before.st_ino != after.st_ino
+        or before.st_size != after.st_size
+        or before.st_mode != after.st_mode
+        or before.st_mtime_ns != after.st_mtime_ns
+        or before.st_ctime_ns != after.st_ctime_ns
+        or byte_count != before.st_size
+    )
+
+
+def _source_snapshot_record_payload(
+    record: SourceSnapshotRecord,
+) -> Mapping[str, object]:
+    return {
+        "relative_path": record.relative_path,
+        "source_dev": record.source_dev,
+        "source_ino": record.source_ino,
+        "source_byte_count": record.source_byte_count,
+        "source_sha256": record.source_sha256,
+        "snapshot_relative_path": record.snapshot_relative_path,
+        "snapshot_dev": record.snapshot_dev,
+        "snapshot_ino": record.snapshot_ino,
+        "snapshot_byte_count": record.snapshot_byte_count,
+        "snapshot_sha256": record.snapshot_sha256,
+    }
+
+
+def _source_file_record_payload(
+    record: SourceFileRecord,
+) -> Mapping[str, object]:
+    return {
+        "relative_path": record.relative_path,
+        "source_kind": record.source_kind,
+        "st_dev": record.st_dev,
+        "st_ino": record.st_ino,
+        "st_mode": record.st_mode,
+        "st_size": record.st_size,
+        "st_mtime_ns": record.st_mtime_ns,
+        "st_ctime_ns": record.st_ctime_ns,
+        "sha256": record.sha256,
+        "byte_count": record.byte_count,
+    }
+
+
 def utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _canonical_json(value: object) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return json.dumps(
+        _json_safe(value),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    )
 
 
 def _freeze_value(value: object) -> object:
@@ -288,6 +1860,7 @@ class ResourceObservation:
     structure_tool: Mapping[str, str] = field(default_factory=dict)
     tool_availability: Mapping[str, object] = field(default_factory=dict)
     container_id: str = ""
+    nvidia_inventory: "NvidiaInventory | None" = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "caller_allocated_ids", frozenset(self.caller_allocated_ids))
@@ -735,8 +2308,1677 @@ def _parse_structured_gpu_processes(
 
 
 @dataclass(frozen=True)
-class _NvidiaSMIObservationAdapter:
-    """Production structured NVIDIA XML probe selected by the canonical planner."""
+class EvidenceFd:
+    """Retained fd identity used by one strict NVIDIA evidence parser."""
+
+    fd: int
+    source_name: str
+    st_dev: int
+    st_ino: int
+    byte_count: int
+    sha256: Sha256Hex
+
+
+_CLOSED_EVIDENCE_FDS: set[int] = set()
+_EVIDENCE_FD_CLOSE_LOCK = threading.Lock()
+
+
+def _capture_evidence_fd(
+    command: Sequence[str],
+    source_name: str,
+) -> EvidenceFd:
+    """Capture one parser producer into a retained, hashed evidence fd."""
+    if not command or not source_name or any(
+        not isinstance(item, str) or not item for item in command
+    ):
+        raise TypedPreflightFailure(
+            "gpu_evidence_command_invalid",
+            "structured evidence capture requires a non-empty string command",
+        )
+    memfd_create = getattr(os, "memfd_create", None)
+    if not callable(memfd_create):
+        raise TypedPreflightFailure(
+            "gpu_evidence_fd_unavailable",
+            "structured evidence requires memfd_create support",
+            source_name=source_name,
+        )
+    try:
+        result = subprocess.run(
+            tuple(command),
+            check=False,
+            capture_output=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise TypedPreflightFailure(
+            "gpu_evidence_capture_failed",
+            "structured evidence producer could not be executed",
+            source_name=source_name,
+        ) from exc
+    if result.returncode != 0:
+        raise TypedPreflightFailure(
+            "gpu_evidence_capture_failed",
+            "structured evidence producer returned a failure",
+            source_name=source_name,
+            returncode=result.returncode,
+        )
+    payload = bytes(result.stdout)
+    try:
+        descriptor = int(memfd_create(f"agent-canon-{source_name}", os.MFD_CLOEXEC))
+        _write_all(descriptor, payload)
+        os.fsync(descriptor)
+        identity = os.fstat(descriptor)
+    except OSError as exc:
+        if "descriptor" in locals():
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        raise TypedPreflightFailure(
+            "gpu_evidence_fd_unavailable",
+            "structured evidence could not be retained in a memfd",
+            source_name=source_name,
+        ) from exc
+    return EvidenceFd(
+        fd=descriptor,
+        source_name=source_name,
+        st_dev=identity.st_dev,
+        st_ino=identity.st_ino,
+        byte_count=identity.st_size,
+        sha256=hashlib.sha256(payload).hexdigest(),
+    )
+
+
+def _close_evidence_fd(evidence: EvidenceFd) -> FdDisposition:
+    """Close one parser input exactly once; never retry an ambiguous close."""
+    with _EVIDENCE_FD_CLOSE_LOCK:
+        if evidence.fd in _CLOSED_EVIDENCE_FDS:
+            raise TypedPreflightFailure(
+                "gpu_evidence_fd_closed_twice",
+                "structured evidence fd close was attempted twice",
+                fd=evidence.fd,
+                source_name=evidence.source_name,
+            )
+        _CLOSED_EVIDENCE_FDS.add(evidence.fd)
+    try:
+        os.close(evidence.fd)
+    except OSError as exc:
+        raise TypedPreflightFailure(
+            "gpu_evidence_fd_close_ambiguous",
+            "structured evidence fd close was ambiguous",
+            fd=evidence.fd,
+            source_name=evidence.source_name,
+            errno=exc.errno,
+        ) from exc
+    return "released"
+
+
+def build_source_path_set(
+    root: AbsolutePosixPath,
+    topic_name: str,
+    command_argv: Sequence[str],
+) -> tuple[RelativePosixPath, ...]:
+    """Build the deterministic, bounded source membership for one topic run."""
+    source_root = Path(validate_absolute_posix_path(root))
+    if not topic_name or "/" in topic_name or "\\" in topic_name:
+        raise TypedPreflightFailure(
+            "gpu_source_path_topic_invalid",
+            "source path selection requires one simple topic name",
+        )
+    fixed_core = (
+        "tools/experiments/execution_resource_plan.py",
+        "tools/experiments/run_managed_experiment.py",
+        "tools/experiments/registry_lib.py",
+        "tools/experiments/experiments_registry.toml",
+        "tools/agent_tools/jit_canonical_ir.py",
+    )
+    result: list[str] = []
+    for relative_path in fixed_core:
+        candidate = source_root / relative_path
+        if relative_path.endswith("experiments_registry.toml") and not candidate.is_file():
+            continue
+        if not candidate.is_file():
+            raise TypedPreflightFailure(
+                "gpu_source_path_missing",
+                "a fixed managed source path is missing",
+                relative_path=relative_path,
+            )
+        result.append(relative_path)
+    try:
+        listed = subprocess.run(
+            ["git", "-C", str(source_root), "ls-files", "-z", "--", f"experiments/{topic_name}/**"],
+            check=False,
+            capture_output=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise TypedPreflightFailure(
+            "gpu_source_path_membership_failed",
+            "git source membership could not be captured",
+        ) from exc
+    if listed.returncode != 0:
+        raise TypedPreflightFailure(
+            "gpu_source_path_membership_failed",
+            "git source membership command failed",
+            returncode=listed.returncode,
+        )
+    excluded_parts = {"result", ".venv", "__pycache__", ".cache", "runtime"}
+    for raw_path in bytes(listed.stdout).split(b"\0"):
+        if not raw_path:
+            continue
+        try:
+            relative_path = raw_path.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise TypedPreflightFailure(
+                "gpu_source_path_membership_failed",
+                "git source membership was not UTF-8",
+            ) from exc
+        if any(part in excluded_parts for part in Path(relative_path).parts):
+            continue
+        if (source_root / relative_path).is_symlink():
+            raise TypedPreflightFailure(
+                "gpu_source_path_symlink",
+                "source membership cannot include a symlink",
+                relative_path=relative_path,
+            )
+        result.append(relative_path)
+    supported_extensions = {".py", ".pyi", ".toml", ".yaml", ".yml", ".json"}
+    command_paths: list[str] = []
+    for token in command_argv:
+        if not isinstance(token, str) or token.startswith("-"):
+            continue
+        candidate = Path(token)
+        if candidate.is_absolute():
+            try:
+                relative = candidate.relative_to(source_root)
+            except ValueError:
+                continue
+        else:
+            relative = candidate
+        if any(part in {"", ".", ".."} for part in relative.parts):
+            continue
+        relative_text = relative.as_posix()
+        if Path(relative_text).suffix not in supported_extensions:
+            continue
+        if (source_root / relative).is_file():
+            command_paths.append(relative_text)
+    result.extend(command_paths)
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for path in result:
+        if path not in seen:
+            seen.add(path)
+            ordered.append(path)
+    return tuple(ordered)
+
+
+@dataclass(frozen=True)
+class NvidiaDriverVersion:
+    """The only accepted NVIDIA driver-version representation."""
+
+    major: int
+    minor: int
+    patch: int | None
+    raw: str
+
+
+@dataclass(frozen=True)
+class NvidiaTopologyJoin:
+    """One exact full-UUID physical-to-MIG topology join."""
+
+    parent_uuid: FullGpuUuid
+    ordinal: int
+    mig_uuid: FullMigUuid
+
+
+@dataclass(frozen=True)
+class NvidiaListEvidence:
+    """Strict, fd-backed physical and MIG records from ``nvidia-smi -L``."""
+
+    schema_version: Literal["nvidia-list/v1"]
+    physical_uuids: tuple[FullGpuUuid, ...]
+    mig_uuids: tuple[FullMigUuid, ...]
+    joins: tuple[NvidiaTopologyJoin, ...]
+    evidence_fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class ParsedNvidiaXml:
+    """Strict XML topology plus process-container completeness witness.
+
+    Process identity and occupancy are deliberately not represented here; the
+    separate occupancy owner consumes the completeness witness in its slice.
+    """
+
+    schema_version: Literal["nvidia-xml/v1"]
+    physical_uuids: tuple[FullGpuUuid, ...]
+    mig_uuids: tuple[FullMigUuid, ...]
+    joins: tuple[NvidiaTopologyJoin, ...]
+    processing_instructions: tuple[str, ...]
+    comments: tuple[str, ...]
+    process_inventory_disposition: Literal["COMPLETE", "COMPLETE_EMPTY"]
+    evidence_fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class NvidiaInventory:
+    """Candidate topology produced only by the NVIDIA evidence owner."""
+
+    schema_version: Literal["nvidia-inventory/v1"]
+    physical_uuids: tuple[FullGpuUuid, ...]
+    mig_uuids: tuple[FullMigUuid, ...]
+    joins: tuple[NvidiaTopologyJoin, ...]
+    driver_version: NvidiaDriverVersion | None
+    evidence_fingerprint: Sha256Hex
+
+
+_NVIDIA_DRIVER_VERSION_RE = re.compile(
+    r"^(0|[1-9][0-9]*)\.([0-9]+)(?:\.([0-9]+))?$"
+)
+_NVIDIA_PHYSICAL_LINE_RE = re.compile(
+    r"^GPU ([0-9]+): ([^\n]+) \(UUID: (GPU-[A-Za-z0-9-]+)\)$"
+)
+_NVIDIA_MIG_LINE_RE = re.compile(
+    r"^[ ]{2,}MIG ([0-9]+c\.)?[0-9]+g\.[0-9]+gb[ ]{2,}Device[ ]{2}([0-9]+): \(UUID: (MIG-[A-Za-z0-9-]+)\)$"
+)
+_NVIDIA_UUID_RE = re.compile(r"^(GPU|MIG)-[A-Za-z0-9-]+$")
+_NVIDIA_UNSAFE_XML_RE = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+_NVIDIA_PROCESS_CONTAINER_TAGS = frozenset(
+    {"processes", "compute_processes", "graphics_processes"}
+)
+_NVIDIA_PROCESS_RECORD_TAGS = frozenset(
+    {"process_info", "pid", "process_name", "used_memory", "type"}
+)
+
+
+def _nvidia_parser_failure(
+    code: str,
+    message: str,
+    *,
+    evidence: EvidenceFd | None = None,
+    **details: object,
+) -> TypedPreflightFailure:
+    if evidence is not None:
+        details.update({"source_name": evidence.source_name, "fd": evidence.fd})
+    return TypedPreflightFailure(code, message, **details)
+
+
+def _read_evidence_fd(evidence: EvidenceFd) -> bytes:
+    """Load one retained evidence fd and revalidate it before returning bytes."""
+    try:
+        before = os.fstat(evidence.fd)
+    except OSError as exc:
+        raise _nvidia_parser_failure(
+            "gpu_evidence_unreadable",
+            "NVIDIA evidence fd could not be inspected",
+            evidence=evidence,
+            errno=exc.errno,
+        ) from exc
+    if not stat.S_ISREG(before.st_mode):
+        raise _nvidia_parser_failure(
+            "gpu_evidence_not_regular",
+            "NVIDIA evidence fd must reference a regular file",
+            evidence=evidence,
+        )
+    if (
+        before.st_dev != evidence.st_dev
+        or before.st_ino != evidence.st_ino
+        or before.st_size != evidence.byte_count
+    ):
+        raise _nvidia_parser_failure(
+            "gpu_evidence_raced",
+            "NVIDIA evidence identity or length changed before parsing",
+            evidence=evidence,
+            before_dev=before.st_dev,
+            before_ino=before.st_ino,
+            before_size=before.st_size,
+        )
+    chunks: list[bytes] = []
+    offset = 0
+    while offset < before.st_size:
+        try:
+            chunk = os.pread(evidence.fd, min(1024 * 1024, before.st_size - offset), offset)
+        except OSError as exc:
+            raise _nvidia_parser_failure(
+                "gpu_evidence_unreadable",
+                "NVIDIA evidence fd could not be read",
+                evidence=evidence,
+                errno=exc.errno,
+            ) from exc
+        if not chunk:
+            raise _nvidia_parser_failure(
+                "gpu_evidence_raced",
+                "NVIDIA evidence fd ended before its captured length",
+                evidence=evidence,
+                offset=offset,
+            )
+        chunks.append(chunk)
+        offset += len(chunk)
+    data = b"".join(chunks)
+    try:
+        after = os.fstat(evidence.fd)
+    except OSError as exc:
+        raise _nvidia_parser_failure(
+            "gpu_evidence_unreadable",
+            "NVIDIA evidence fd could not be revalidated",
+            evidence=evidence,
+            errno=exc.errno,
+        ) from exc
+    if (
+        not stat.S_ISREG(after.st_mode)
+        or after.st_dev != before.st_dev
+        or after.st_ino != before.st_ino
+        or after.st_size != before.st_size
+        or after.st_mode != before.st_mode
+        or len(data) != after.st_size
+        or hashlib.sha256(data).hexdigest() != evidence.sha256
+    ):
+        raise _nvidia_parser_failure(
+            "gpu_evidence_raced",
+            "NVIDIA evidence identity, mode, length, or hash changed during parsing",
+            evidence=evidence,
+            before_mode=before.st_mode,
+            after_mode=after.st_mode,
+            after_dev=after.st_dev,
+            after_ino=after.st_ino,
+            after_size=after.st_size,
+        )
+    return data
+
+
+def _evidence_fingerprint(
+    evidence: EvidenceFd,
+    *,
+    payload: Mapping[str, object],
+) -> Sha256Hex:
+    return hashlib.sha256(
+        _canonical_json(
+            {
+                "source_name": evidence.source_name,
+                "st_dev": evidence.st_dev,
+                "st_ino": evidence.st_ino,
+                "byte_count": evidence.byte_count,
+                "sha256": evidence.sha256,
+                "payload": payload,
+            }
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _nvidia_join_payload(join: NvidiaTopologyJoin) -> Mapping[str, object]:
+    return {
+        "parent_uuid": join.parent_uuid,
+        "ordinal": join.ordinal,
+        "mig_uuid": join.mig_uuid,
+    }
+
+
+def _nvidia_driver_payload(driver: NvidiaDriverVersion | None) -> object:
+    if driver is None:
+        return None
+    return {
+        "major": driver.major,
+        "minor": driver.minor,
+        "patch": driver.patch,
+        "raw": driver.raw,
+    }
+
+
+def _decode_nvidia_utf8(data: bytes, evidence: EvidenceFd) -> str:
+    if data.startswith(b"\xef\xbb\xbf") or b"\x00" in data:
+        raise _nvidia_parser_failure(
+            "gpu_structured_probe_malformed",
+            "NVIDIA evidence must be UTF-8 without BOM or NUL bytes",
+            evidence=evidence,
+        )
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise _nvidia_parser_failure(
+            "gpu_structured_probe_malformed",
+            "NVIDIA evidence is not strict UTF-8",
+            evidence=evidence,
+        ) from exc
+
+
+def _parse_driver_version(evidence: EvidenceFd) -> NvidiaDriverVersion:
+    raw = _decode_nvidia_utf8(_read_evidence_fd(evidence), evidence)
+    if not raw.endswith("\n") or raw.count("\n") != 1:
+        raise _nvidia_parser_failure(
+            "gpu_driver_version_malformed",
+            "driver version evidence must contain one LF-terminated value",
+            evidence=evidence,
+        )
+    value = raw[:-1]
+    match = _NVIDIA_DRIVER_VERSION_RE.fullmatch(value)
+    if match is None:
+        raise _nvidia_parser_failure(
+            "gpu_driver_version_malformed",
+            "driver version does not match the approved grammar",
+            evidence=evidence,
+            value=value,
+        )
+    patch = match.group(3)
+    return NvidiaDriverVersion(
+        major=int(match.group(1)),
+        minor=int(match.group(2)),
+        patch=int(patch) if patch is not None else None,
+        raw=value,
+    )
+
+
+def _parse_nvidia_smi_list(evidence: EvidenceFd) -> NvidiaListEvidence:
+    data = _read_evidence_fd(evidence)
+    text = _decode_nvidia_utf8(data, evidence)
+    if not text.endswith("\n") or "\r" in text or "\t" in text:
+        raise _nvidia_parser_failure(
+            "gpu_list_probe_malformed",
+            "nvidia-smi -L evidence must be strict LF output",
+            evidence=evidence,
+        )
+    lines = text.split("\n")
+    if lines[-1] != "" or any(not line for line in lines[:-1]):
+        raise _nvidia_parser_failure(
+            "gpu_list_probe_malformed",
+            "nvidia-smi -L evidence must have one final LF and no empty lines",
+            evidence=evidence,
+        )
+    physical: list[FullGpuUuid] = []
+    mig: list[FullMigUuid] = []
+    joins: list[NvidiaTopologyJoin] = []
+    seen_physical: set[str] = set()
+    seen_mig: set[str] = set()
+    seen_joins: set[tuple[str, int]] = set()
+    current_parent: FullGpuUuid | None = None
+    for line in lines[:-1]:
+        if line.endswith(" "):
+            raise _nvidia_parser_failure(
+                "gpu_list_probe_malformed",
+                "nvidia-smi -L evidence must not contain trailing spaces",
+                evidence=evidence,
+                line=line,
+            )
+        physical_match = _NVIDIA_PHYSICAL_LINE_RE.fullmatch(line)
+        if physical_match is not None:
+            uuid = physical_match.group(3)
+            if uuid in seen_physical:
+                raise _nvidia_parser_failure(
+                    "gpu_uuid_duplicate",
+                    "nvidia-smi -L evidence repeats a physical UUID",
+                    evidence=evidence,
+                    gpu_uuid=uuid,
+                )
+            seen_physical.add(uuid)
+            physical.append(uuid)
+            current_parent = uuid
+            continue
+        mig_match = _NVIDIA_MIG_LINE_RE.fullmatch(line)
+        if mig_match is None:
+            raise _nvidia_parser_failure(
+                "gpu_list_probe_malformed",
+                "nvidia-smi -L evidence contains an unmatched line",
+                evidence=evidence,
+                line=line,
+            )
+        if current_parent is None:
+            raise _nvidia_parser_failure(
+                "gpu_mig_parent_missing",
+                "MIG list evidence has no immediately preceding physical parent",
+                evidence=evidence,
+                line=line,
+            )
+        ordinal = int(mig_match.group(2))
+        mig_uuid = mig_match.group(3)
+        join_key = (current_parent, ordinal)
+        if mig_uuid in seen_mig:
+            raise _nvidia_parser_failure(
+                "gpu_uuid_duplicate",
+                "nvidia-smi -L evidence repeats a MIG UUID",
+                evidence=evidence,
+                mig_uuid=mig_uuid,
+            )
+        if join_key in seen_joins:
+            raise _nvidia_parser_failure(
+                "gpu_mig_parent_ordinal_duplicate",
+                "nvidia-smi -L evidence repeats a parent/ordinal join",
+                evidence=evidence,
+                parent_uuid=current_parent,
+                ordinal=ordinal,
+            )
+        seen_mig.add(mig_uuid)
+        seen_joins.add(join_key)
+        mig.append(mig_uuid)
+        joins.append(NvidiaTopologyJoin(current_parent, ordinal, mig_uuid))
+    return NvidiaListEvidence(
+        schema_version="nvidia-list/v1",
+        physical_uuids=tuple(physical),
+        mig_uuids=tuple(mig),
+        joins=tuple(joins),
+        evidence_fingerprint=_evidence_fingerprint(
+            evidence,
+            payload={
+                "physical_uuids": tuple(physical),
+                "mig_uuids": tuple(mig),
+                "joins": tuple(_nvidia_join_payload(join) for join in joins),
+            },
+        ),
+    )
+
+
+def _xml_local_name_strict(element: ET.Element) -> str:
+    return element.tag.rsplit("}", 1)[-1] if isinstance(element.tag, str) else ""
+
+
+def _xml_required_child_text(element: ET.Element, tag: str, evidence: EvidenceFd) -> str:
+    child = next(
+        (candidate for candidate in list(element) if _xml_local_name_strict(candidate) == tag),
+        None,
+    )
+    value = child.text.strip() if child is not None and child.text else ""
+    if not value:
+        raise _nvidia_parser_failure(
+            "gpu_structured_probe_malformed",
+            "NVIDIA XML omitted a required topology field",
+            evidence=evidence,
+            field=tag,
+        )
+    return value
+
+
+def _parse_nvidia_smi_xml(evidence: EvidenceFd) -> ParsedNvidiaXml:
+    data = _read_evidence_fd(evidence)
+    if _NVIDIA_UNSAFE_XML_RE.search(data.decode("ascii", errors="ignore")):
+        raise _nvidia_parser_failure(
+            "gpu_structured_probe_unsafe_xml",
+            "NVIDIA XML must not contain DTD or entity declarations",
+            evidence=evidence,
+        )
+    _decode_nvidia_utf8(data, evidence)
+    try:
+        parser = ET.XMLPullParser(events=("start", "end", "comment", "pi"))
+        parser.feed(data)
+        parser_events = tuple(parser.read_events())
+        parser.close()
+        root = next(node for event, node in parser_events if event == "start")
+    except ET.ParseError as exc:
+        raise _nvidia_parser_failure(
+            "gpu_structured_probe_malformed",
+            "NVIDIA XML could not be parsed",
+            evidence=evidence,
+        ) from exc
+    physical: list[FullGpuUuid] = []
+    mig: list[FullMigUuid] = []
+    joins: list[NvidiaTopologyJoin] = []
+    seen_physical: set[str] = set()
+    seen_mig: set[str] = set()
+    seen_joins: set[tuple[str, int]] = set()
+    for element in root.iter():
+        if _xml_local_name_strict(element) != "gpu":
+            continue
+        uuid = _xml_required_child_text(element, "uuid", evidence)
+        if _NVIDIA_UUID_RE.fullmatch(uuid) is None or not uuid.startswith("GPU-"):
+            raise _nvidia_parser_failure(
+                "gpu_structured_probe_malformed",
+                "NVIDIA XML physical UUID is not full and opaque",
+                evidence=evidence,
+                gpu_uuid=uuid,
+            )
+        if uuid in seen_physical:
+            raise _nvidia_parser_failure(
+                "gpu_uuid_duplicate",
+                "NVIDIA XML repeats a physical UUID",
+                evidence=evidence,
+                gpu_uuid=uuid,
+            )
+        seen_physical.add(uuid)
+        physical.append(uuid)
+        for child in element.iter():
+            if child is element or _xml_local_name_strict(child) not in {"mig_device", "mig_instance"}:
+                continue
+            mig_uuid = _xml_required_child_text(child, "uuid", evidence)
+            if _NVIDIA_UUID_RE.fullmatch(mig_uuid) is None or not mig_uuid.startswith("MIG-"):
+                raise _nvidia_parser_failure(
+                    "gpu_structured_probe_malformed",
+                    "NVIDIA XML MIG UUID is not full and opaque",
+                    evidence=evidence,
+                    mig_uuid=mig_uuid,
+                )
+            ordinal_text = _xml_required_child_text(child, "device_ordinal", evidence)
+            if not ordinal_text.isdecimal():
+                raise _nvidia_parser_failure(
+                    "gpu_mig_join_conflict",
+                    "NVIDIA XML MIG device ordinal is not decimal",
+                    evidence=evidence,
+                    value=ordinal_text,
+                )
+            ordinal = int(ordinal_text)
+            declared_parent = next(
+                (
+                    candidate.text.strip()
+                    for candidate in list(child)
+                    if _xml_local_name_strict(candidate) == "parent_uuid" and candidate.text
+                ),
+                uuid,
+            )
+            if declared_parent != uuid:
+                raise _nvidia_parser_failure(
+                    "gpu_mig_join_conflict",
+                    "NVIDIA XML MIG topology parent does not match its physical GPU",
+                    evidence=evidence,
+                    parent_uuid=uuid,
+                    declared_parent=declared_parent,
+                    mig_uuid=mig_uuid,
+                )
+            join_key = (uuid, ordinal)
+            if mig_uuid in seen_mig or join_key in seen_joins:
+                raise _nvidia_parser_failure(
+                    "gpu_mig_join_conflict",
+                    "NVIDIA XML repeats a MIG UUID or parent/ordinal join",
+                    evidence=evidence,
+                    parent_uuid=uuid,
+                    ordinal=ordinal,
+                    mig_uuid=mig_uuid,
+                )
+            seen_mig.add(mig_uuid)
+            seen_joins.add(join_key)
+            mig.append(mig_uuid)
+            joins.append(NvidiaTopologyJoin(uuid, ordinal, mig_uuid))
+    if not physical:
+        raise _nvidia_parser_failure(
+            "gpu_structured_probe_malformed",
+            "NVIDIA XML contains no physical GPU topology",
+            evidence=evidence,
+        )
+    containers = tuple(
+        element
+        for element in root.iter()
+        if _xml_local_name_strict(element) in _NVIDIA_PROCESS_CONTAINER_TAGS
+    )
+    for element in root.iter():
+        tag = _xml_local_name_strict(element)
+        if "process" in tag and tag not in _NVIDIA_PROCESS_CONTAINER_TAGS | _NVIDIA_PROCESS_RECORD_TAGS:
+            raise _nvidia_parser_failure(
+                "gpu_process_scope_unproven",
+                "NVIDIA XML contains an unsupported process scope",
+                evidence=evidence,
+                tag=tag,
+            )
+    if not containers:
+        raise _nvidia_parser_failure(
+            "gpu_process_inventory_unproven",
+            "NVIDIA XML omitted supported process inventory containers",
+            evidence=evidence,
+        )
+    inventory_text = " ".join(
+        text_value.strip().lower()
+        for container in containers
+        for text_value in container.itertext()
+        if text_value.strip()
+    )
+    hidden_marker = next(
+        (
+            marker
+            for marker in ("permission denied", "insufficient permission", "not supported", "unknown error")
+            if marker in inventory_text
+        ),
+        None,
+    )
+    if hidden_marker is not None:
+        raise _nvidia_parser_failure(
+            "gpu_process_inventory_unproven",
+            "NVIDIA XML process inventory is hidden or unsupported",
+            evidence=evidence,
+            marker=hidden_marker,
+        )
+    process_records = tuple(
+        element
+        for container in containers
+        for element in container.iter()
+        if _xml_local_name_strict(element) == "process_info"
+    )
+    disposition: Literal["COMPLETE", "COMPLETE_EMPTY"] = (
+        "COMPLETE_EMPTY" if not process_records else "COMPLETE"
+    )
+    processing_instructions = tuple(
+        str(element.text or "") for event, element in parser_events if event == "pi"
+    )
+    comments = tuple(
+        str(element.text or "") for event, element in parser_events if event == "comment"
+    )
+    return ParsedNvidiaXml(
+        schema_version="nvidia-xml/v1",
+        physical_uuids=tuple(physical),
+        mig_uuids=tuple(mig),
+        joins=tuple(joins),
+        processing_instructions=processing_instructions,
+        comments=comments,
+        process_inventory_disposition=disposition,
+        evidence_fingerprint=_evidence_fingerprint(
+            evidence,
+            payload={
+                "physical_uuids": tuple(physical),
+                "mig_uuids": tuple(mig),
+                "joins": tuple(_nvidia_join_payload(join) for join in joins),
+                "processing_instructions": processing_instructions,
+                "comments": comments,
+                "process_inventory_disposition": disposition,
+            },
+        ),
+    )
+
+
+class NvidiaInventoryProbe:
+    """Own only fd-backed NVIDIA driver, list, and topology evidence."""
+
+    def __init__(
+        self,
+        list_evidence: EvidenceFd,
+        xml_evidence: EvidenceFd,
+        driver_evidence: EvidenceFd | None = None,
+    ) -> None:
+        self._list_evidence = list_evidence
+        self._xml_evidence = xml_evidence
+        self._driver_evidence = driver_evidence
+
+    @staticmethod
+    def parse_nvidia_driver_version(evidence: EvidenceFd) -> NvidiaDriverVersion:
+        return _parse_driver_version(evidence)
+
+    @staticmethod
+    def parse_nvidia_smi_list(evidence: EvidenceFd) -> NvidiaListEvidence:
+        return _parse_nvidia_smi_list(evidence)
+
+    @staticmethod
+    def parse_nvidia_smi_xml(evidence: EvidenceFd) -> ParsedNvidiaXml:
+        return _parse_nvidia_smi_xml(evidence)
+
+    def observe(self) -> NvidiaInventory:
+        list_evidence = self.parse_nvidia_smi_list(self._list_evidence)
+        xml_evidence = self.parse_nvidia_smi_xml(self._xml_evidence)
+        if (
+            list_evidence.physical_uuids != xml_evidence.physical_uuids
+            or list_evidence.mig_uuids != xml_evidence.mig_uuids
+            or list_evidence.joins != xml_evidence.joins
+        ):
+            raise TypedPreflightFailure(
+                "gpu_mig_join_conflict",
+                "NVIDIA list and XML topology evidence disagree",
+                list_source=self._list_evidence.source_name,
+                xml_source=self._xml_evidence.source_name,
+            )
+        driver = (
+            self.parse_nvidia_driver_version(self._driver_evidence)
+            if self._driver_evidence is not None
+            else None
+        )
+        return NvidiaInventory(
+            schema_version="nvidia-inventory/v1",
+            physical_uuids=list_evidence.physical_uuids,
+            mig_uuids=list_evidence.mig_uuids,
+            joins=list_evidence.joins,
+            driver_version=driver,
+            evidence_fingerprint=hashlib.sha256(
+                _canonical_json(
+                    {
+                        "list": list_evidence.evidence_fingerprint,
+                        "xml": xml_evidence.evidence_fingerprint,
+                        "driver": _nvidia_driver_payload(driver),
+                    }
+                ).encode("utf-8")
+            ).hexdigest(),
+        )
+
+
+def parse_nvidia_driver_version(evidence: EvidenceFd) -> NvidiaDriverVersion:
+    """Parse driver evidence through the sole NVIDIA inventory owner."""
+    return NvidiaInventoryProbe.parse_nvidia_driver_version(evidence)
+
+
+def parse_nvidia_smi_list(evidence: EvidenceFd) -> NvidiaListEvidence:
+    """Parse strict list evidence through the sole NVIDIA inventory owner."""
+    return NvidiaInventoryProbe.parse_nvidia_smi_list(evidence)
+
+
+def parse_nvidia_smi_xml(evidence: EvidenceFd) -> ParsedNvidiaXml:
+    """Parse strict XML evidence through the sole NVIDIA inventory owner."""
+    return NvidiaInventoryProbe.parse_nvidia_smi_xml(evidence)
+
+
+@dataclass(frozen=True)
+class ProcessOccupancyEvidence:
+    """Conservative process occupancy for one proven local namespace."""
+
+    schema_version: Literal["gpu-process-occupancy/v1"]
+    namespace_inode: int
+    processes: tuple[ProcessIdentity, ...]
+    occupied_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    inventory_scope: Literal["local-namespace-complete"]
+    evidence_fingerprint: Sha256Hex
+
+
+class GpuProcessOccupancyProbe:
+    """Own process/namespace occupancy, separate from topology and locks."""
+
+    def __init__(
+        self,
+        *,
+        inventory: NvidiaInventory,
+        namespace_inode: int,
+        processes: Sequence[ProcessIdentity],
+        process_inventory_disposition: str,
+    ) -> None:
+        self._inventory = inventory
+        self._namespace_inode = namespace_inode
+        self._processes = tuple(processes)
+        self._process_inventory_disposition = process_inventory_disposition
+        self._state: Literal["UNPROVEN", "OBSERVING", "PROVEN", "FAILED"] = "UNPROVEN"
+
+    def observe(self) -> ProcessOccupancyEvidence:
+        """Prove one complete process inventory and close its occupied UUID set."""
+        if self._state != "UNPROVEN":
+            raise TypedPreflightFailure(
+                "gpu_process_observation_repeated",
+                "GPU process occupancy is a one-shot observation",
+                state=self._state,
+            )
+        self._state = "OBSERVING"
+        try:
+            evidence = self._observe_once()
+        except TypedPreflightFailure:
+            self._state = "FAILED"
+            raise
+        self._state = "PROVEN"
+        return evidence
+
+    def _observe_once(self) -> ProcessOccupancyEvidence:
+        if self._namespace_inode <= 0:
+            raise TypedPreflightFailure(
+                "gpu_namespace_identity_unproven",
+                "GPU process occupancy requires a positive local namespace inode",
+                namespace_inode=self._namespace_inode,
+            )
+        if self._process_inventory_disposition not in {"COMPLETE", "COMPLETE_EMPTY"}:
+            raise TypedPreflightFailure(
+                "gpu_process_inventory_unproven",
+                "GPU process inventory is not proven complete",
+                disposition=self._process_inventory_disposition,
+            )
+        if self._process_inventory_disposition == "COMPLETE_EMPTY" and self._processes:
+            raise TypedPreflightFailure(
+                "gpu_process_inventory_conflict",
+                "complete-empty process evidence contains process identities",
+                process_count=len(self._processes),
+            )
+        physical_uuids = tuple(self._inventory.physical_uuids)
+        mig_uuids = tuple(self._inventory.mig_uuids)
+        physical_set = set(physical_uuids)
+        mig_set = set(mig_uuids)
+        if (
+            len(physical_set) != len(physical_uuids)
+            or len(mig_set) != len(mig_uuids)
+            or physical_set & mig_set
+            or any(
+                _NVIDIA_UUID_RE.fullmatch(uuid) is None or not uuid.startswith("GPU-")
+                for uuid in physical_uuids
+            )
+            or any(
+                _NVIDIA_UUID_RE.fullmatch(uuid) is None or not uuid.startswith("MIG-")
+                for uuid in mig_uuids
+            )
+        ):
+            raise TypedPreflightFailure(
+                "gpu_process_topology_unproven",
+                "GPU process occupancy received duplicate or non-opaque inventory UUIDs",
+            )
+        known_uuids = physical_set | mig_set
+        children_by_parent: dict[str, tuple[str, ...]] = {}
+        seen_join_keys: set[tuple[str, int]] = set()
+        seen_join_mig_uuids: set[str] = set()
+        for join in self._inventory.joins:
+            join_key = (join.parent_uuid, join.ordinal)
+            if (
+                join.parent_uuid not in physical_set
+                or join.mig_uuid not in mig_set
+                or join.ordinal < 0
+                or join_key in seen_join_keys
+                or join.mig_uuid in seen_join_mig_uuids
+            ):
+                raise TypedPreflightFailure(
+                    "gpu_process_topology_unproven",
+                    "GPU process occupancy received a topology join outside inventory",
+                    parent_uuid=join.parent_uuid,
+                    mig_uuid=join.mig_uuid,
+                )
+            seen_join_keys.add(join_key)
+            seen_join_mig_uuids.add(join.mig_uuid)
+            children_by_parent[join.parent_uuid] = tuple(
+                sorted((*children_by_parent.get(join.parent_uuid, ()), join.mig_uuid))
+            )
+        ordered_processes = tuple(
+            sorted(
+                self._processes,
+                key=lambda process: (
+                    process.gpu_uuid,
+                    process.kind,
+                    process.pid,
+                    process.process_start_identity,
+                ),
+            )
+        )
+        seen_processes: set[tuple[int, str, str, str]] = set()
+        seen_pid_starts: dict[int, str] = {}
+        occupied: set[str] = set()
+        expected_namespace = f"pid:[{self._namespace_inode}]"
+        for process in ordered_processes:
+            identity_key = (
+                process.pid,
+                process.process_start_identity,
+                process.gpu_uuid,
+                process.kind,
+            )
+            if identity_key in seen_processes:
+                raise TypedPreflightFailure(
+                    "gpu_process_identity_ambiguous",
+                    "GPU process inventory repeats one process identity",
+                    pid=process.pid,
+                    gpu_uuid=process.gpu_uuid,
+                )
+            seen_processes.add(identity_key)
+            previous_start = seen_pid_starts.setdefault(process.pid, process.process_start_identity)
+            if previous_start != process.process_start_identity:
+                raise TypedPreflightFailure(
+                    "gpu_process_identity_ambiguous",
+                    "GPU process PID has conflicting process-start identities",
+                    pid=process.pid,
+                    first_start_identity=previous_start,
+                    second_start_identity=process.process_start_identity,
+                )
+            if not process.kind:
+                raise TypedPreflightFailure(
+                    "gpu_process_identity_unproven",
+                    "GPU process identity has no conservative process kind",
+                    pid=process.pid,
+                )
+            if process.container_namespace_identity != expected_namespace:
+                raise TypedPreflightFailure(
+                    "gpu_process_namespace_mismatch",
+                    "GPU process identity is not proven in the local namespace",
+                    pid=process.pid,
+                    observed_namespace=process.container_namespace_identity,
+                    expected_namespace=expected_namespace,
+                )
+            if process.gpu_uuid not in known_uuids or _NVIDIA_UUID_RE.fullmatch(process.gpu_uuid) is None:
+                raise TypedPreflightFailure(
+                    "gpu_process_uuid_visibility_unproven",
+                    "GPU process identity is not bound to an observed full UUID",
+                    pid=process.pid,
+                    gpu_uuid=process.gpu_uuid,
+                )
+            if process.gpu_uuid in physical_set:
+                occupied.add(process.gpu_uuid)
+                occupied.update(children_by_parent.get(process.gpu_uuid, ()))
+            else:
+                occupied.add(process.gpu_uuid)
+        occupied_uuids = tuple(sorted(occupied))
+        fingerprint = hashlib.sha256(
+            _canonical_json(
+                _json_safe(
+                    {
+                        "schema_version": "gpu-process-occupancy/v1",
+                        "namespace_inode": self._namespace_inode,
+                        "processes": tuple(_process_record(process) for process in ordered_processes),
+                        "occupied_uuids": occupied_uuids,
+                        "inventory_scope": "local-namespace-complete",
+                    }
+                )
+            ).encode("utf-8")
+        ).hexdigest()
+        return ProcessOccupancyEvidence(
+            schema_version="gpu-process-occupancy/v1",
+            namespace_inode=self._namespace_inode,
+            processes=ordered_processes,
+            occupied_uuids=occupied_uuids,
+            inventory_scope="local-namespace-complete",
+            evidence_fingerprint=fingerprint,
+        )
+
+
+FdDisposition: TypeAlias = Literal[
+    "busy_candidate",
+    "reserved",
+    "released",
+    "rolled_back",
+    "close_ambiguous",
+]
+DescendantQuiescenceStatus: TypeAlias = Literal["PROVEN", "UNPROVEN"]
+
+
+@dataclass(frozen=True)
+class LockReadback:
+    """One fd-bound lock identity readback owned by the reservation transaction."""
+
+    runtime_root: Literal["/var/lib/agent-canon/runtime"]
+    filesystem_type: Literal["btrfs", "ext4", "xfs"]
+    device: int
+    inode: int
+    selected: tuple["ReservationEvidence", ...]
+    fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class ReservationEvidence:
+    """The immutable result of one candidate-local admission attempt."""
+
+    schema_version: Literal["gpu-reservation/v1"]
+    selected_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    locks: tuple[LockReadback, ...]
+    disposition: Literal["ACQUIRED", "BUSY_CANDIDATE", "ROLLED_BACK"]
+    evidence_fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class ConcurrentRunEvidence:
+    initial_snapshot_fingerprint: Sha256Hex
+    admission_snapshot_fingerprint: Sha256Hex
+    final_snapshot_fingerprint: Sha256Hex
+    initial_event_id: str
+    admission_event_id: str
+    final_event_id: str
+    fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class MigEvidence:
+    parent_by_uuid: Mapping[FullMigUuid, FullGpuUuid]
+    executable_leaf_uuids: tuple[FullMigUuid, ...]
+    selected_physical_uuids: tuple[FullGpuUuid, ...]
+    fingerprint: Sha256Hex
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "parent_by_uuid", _freeze_mapping(self.parent_by_uuid))
+        object.__setattr__(self, "executable_leaf_uuids", tuple(self.executable_leaf_uuids))
+        object.__setattr__(self, "selected_physical_uuids", tuple(self.selected_physical_uuids))
+
+
+@dataclass(frozen=True)
+class UuidVisibilityEvidence:
+    cuda_visible_devices: str | None
+    nvidia_visible_devices: str | None
+    disposition: VisibilityDisposition
+    visible_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class LockPlacementEvidence:
+    runtime_root: Literal["/var/lib/agent-canon/runtime"]
+    filesystem_type: Literal["btrfs", "ext4", "xfs"]
+    filesystem_source: str
+    device: int
+    inode: int
+    group_name: Literal["agent-canon-runtime"]
+    mode: Literal["02770", "0660"]
+    local_flock_filesystem: Literal[True]
+    fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class DescendantRetentionEvidence:
+    child_process_ids: tuple[int, ...]
+    process_group_ids: tuple[int, ...]
+    descendant_quiescence: DescendantQuiescenceStatus
+    retained_gpu_process_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    release_blocked: bool
+    fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class RunGpuAdmissionReceipt:
+    """The immutable join of independent discovery, occupancy, and lock owners."""
+
+    schema_version: Literal["gpu-admission/v1"]
+    candidate_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    occupied_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    reserved_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    selected_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    inventory_fingerprint: Sha256Hex
+    occupancy_fingerprint: Sha256Hex
+    reservation_fingerprint: Sha256Hex
+    runtime_identity_fingerprint: Sha256Hex
+    plan_fingerprint: Sha256Hex | None
+    admission_fingerprint: Sha256Hex
+    lock_readback: LockReadback | None = None
+    effective_environment: Mapping[str, str] | None = None
+    actual_gpu_processes: tuple[ProcessOccupancyEvidence, ...] | None = None
+    concurrent_run_evidence: ConcurrentRunEvidence | None = None
+    mig_evidence: MigEvidence | None = None
+    container_visible_uuid_mapping: UuidVisibilityEvidence | None = None
+    os_safe_lock_placement: LockPlacementEvidence | None = None
+    descendant_retention_evidence: DescendantRetentionEvidence | None = None
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "candidate_uuids",
+            "occupied_uuids",
+            "reserved_uuids",
+            "selected_uuids",
+        ):
+            object.__setattr__(self, field_name, tuple(getattr(self, field_name)))
+        if not self.admission_fingerprint:
+            object.__setattr__(
+                self,
+                "admission_fingerprint",
+                hashlib.sha256(
+                    _canonical_json(_admission_receipt_payload(self)).encode("utf-8")
+                ).hexdigest(),
+            )
+
+
+def _admission_receipt_payload(value: RunGpuAdmissionReceipt) -> dict[str, object]:
+    return {
+        "schema_version": value.schema_version,
+        "candidate_uuids": value.candidate_uuids,
+        "occupied_uuids": value.occupied_uuids,
+        "reserved_uuids": value.reserved_uuids,
+        "selected_uuids": value.selected_uuids,
+        "inventory_fingerprint": value.inventory_fingerprint,
+        "occupancy_fingerprint": value.occupancy_fingerprint,
+        "reservation_fingerprint": value.reservation_fingerprint,
+        "runtime_identity_fingerprint": value.runtime_identity_fingerprint,
+        "plan_fingerprint": value.plan_fingerprint,
+    }
+
+
+@dataclass(frozen=True)
+class FdReleaseEvidence:
+    """Exactly-one-attempt release evidence for one transaction-owned fd."""
+
+    component: str
+    uuid: FullGpuUuid | FullMigUuid | None
+    disposition: FdDisposition
+    close_attempts: Literal[1]
+    error_kind: str | None
+    fingerprint: Sha256Hex
+
+
+def _reservation_evidence_payload(value: ReservationEvidence) -> dict[str, object]:
+    return {
+        "schema_version": value.schema_version,
+        "selected_uuids": value.selected_uuids,
+        "locks": tuple(_lock_readback_payload(lock) for lock in value.locks),
+        "disposition": value.disposition,
+    }
+
+
+def _lock_readback_payload(value: LockReadback) -> dict[str, object]:
+    return {
+        "runtime_root": value.runtime_root,
+        "filesystem_type": value.filesystem_type,
+        "device": value.device,
+        "inode": value.inode,
+        "selected": tuple(_reservation_evidence_payload(item) for item in value.selected),
+    }
+
+
+def _fd_release_payload(value: FdReleaseEvidence) -> dict[str, object]:
+    return {
+        "component": value.component,
+        "uuid": value.uuid,
+        "disposition": value.disposition,
+        "close_attempts": value.close_attempts,
+        "error_kind": value.error_kind,
+    }
+
+
+class GpuReservationTransaction:
+    """Own atomic candidate locks, readback, and total reverse rollback."""
+
+    def __init__(
+        self,
+        lock_root: AbsolutePosixPath | Path = LOCK_ROOT,
+        *,
+        runtime_root: AbsolutePosixPath = HOST_RUNTIME_ROOT,
+    ) -> None:
+        if fcntl is None:
+            raise TypedPreflightFailure(
+                "gpu_reservation_unavailable",
+                "GPU reservation requires the Unix flock interface",
+            )
+        if runtime_root != HOST_RUNTIME_ROOT:
+            raise TypedPreflightFailure(
+                "gpu_lock_namespace_not_canonical",
+                "GPU reservation must use the canonical shared runtime root",
+                runtime_root=runtime_root,
+            )
+        self._lock_root = Path(validate_absolute_posix_path(str(lock_root)))
+        self._runtime_root: Literal["/var/lib/agent-canon/runtime"] = HOST_RUNTIME_ROOT
+        try:
+            self._root_fd = os.open(
+                self._lock_root,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            )
+            root_stat = os.fstat(self._root_fd)
+        except OSError as exc:
+            raise TypedPreflightFailure(
+                "gpu_lock_namespace_unavailable",
+                "GPU lock namespace could not be opened with fd-bound no-follow flags",
+                lock_root=str(self._lock_root),
+                errno=exc.errno,
+            ) from exc
+        if not stat.S_ISDIR(root_stat.st_mode):
+            os.close(self._root_fd)
+            raise TypedPreflightFailure(
+                "gpu_lock_namespace_invalid",
+                "GPU lock namespace is not a directory",
+                lock_root=str(self._lock_root),
+            )
+        self._root_device = root_stat.st_dev
+        self._filesystem_type: Literal["btrfs", "ext4", "xfs"] = (
+            self._read_filesystem_type(self._lock_root)
+        )
+        self._held: list[tuple[str, int, os.stat_result]] = []
+        self._reservation_ids: dict[str, str] = {}
+        self._release_dispositions: list[FdReleaseEvidence] = []
+        self._state: Literal["CREATED", "ACQUIRING", "HELD", "ROLLING_BACK", "CLOSED"] = "CREATED"
+
+    @staticmethod
+    def _read_filesystem_type(path: Path) -> Literal["btrfs", "ext4", "xfs"]:
+        try:
+            result = subprocess.run(
+                ["stat", "-f", "-c", "%T", str(path)],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise TypedPreflightFailure(
+                "gpu_lock_filesystem_unavailable",
+                "lock filesystem type could not be read",
+                path=str(path),
+            ) from exc
+        filesystem_type = result.stdout.strip()
+        if result.returncode != 0 or filesystem_type not in {"btrfs", "ext4", "xfs"}:
+            raise TypedPreflightFailure(
+                "gpu_lock_filesystem_unproved",
+                "GPU lock filesystem must be btrfs, ext4, or xfs",
+                path=str(path),
+                filesystem_type=filesystem_type,
+                returncode=result.returncode,
+            )
+        return cast(Literal["btrfs", "ext4", "xfs"], filesystem_type)
+
+    def try_reserve(
+        self,
+        candidate_uuids: Sequence[FullGpuUuid | FullMigUuid],
+        *,
+        occupied_uuids: Sequence[FullGpuUuid | FullMigUuid] = (),
+        requested_count: int = 1,
+    ) -> ReservationEvidence:
+        """Scan candidates; busy closes only its fd, infrastructure rolls back all."""
+        if self._state != "CREATED":
+            raise TypedPreflightFailure(
+                "gpu_reservation_transaction_repeated",
+                "GPU reservation transaction is one-shot",
+                state=self._state,
+            )
+        if requested_count <= 0:
+            raise TypedPreflightFailure(
+                "gpu_reservation_cardinality_invalid",
+                "GPU reservation requested count must be positive",
+                requested_count=requested_count,
+            )
+        candidates = tuple(candidate_uuids)
+        if len(set(candidates)) != len(candidates):
+            raise TypedPreflightFailure(
+                "gpu_reservation_candidate_ambiguous",
+                "GPU reservation candidates must be unique",
+            )
+        occupied = frozenset(occupied_uuids)
+        if any(_NVIDIA_UUID_RE.fullmatch(uuid) is None for uuid in candidates):
+            raise TypedPreflightFailure(
+                "gpu_reservation_uuid_unproven",
+                "GPU reservation requires complete opaque UUIDs",
+            )
+        self._state = "ACQUIRING"
+        busy_count = 0
+        try:
+            for uuid in candidates:
+                if uuid in occupied:
+                    busy_count += 1
+                    continue
+                descriptor, lock_stat = self._open_candidate(uuid)
+                try:
+                    if not self._try_lock(descriptor):
+                        busy_evidence = self._close_busy_candidate(descriptor, uuid)
+                        if busy_evidence.error_kind is not None:
+                            raise TypedPreflightFailure(
+                                "gpu_busy_candidate_close_ambiguous",
+                                "busy GPU candidate lock close was ambiguous",
+                                attempted_once=True,
+                                close_error_kind=busy_evidence.error_kind,
+                            )
+                        busy_count += 1
+                        continue
+                    self._verify_candidate_identity(uuid, descriptor, lock_stat)
+                    previous = os.pread(descriptor, 65536, 0)
+                    if previous:
+                        record = _strict_json_object(
+                            previous,
+                            path=str(self._lock_root / f"gpu-{_safe_uuid_filename(uuid)}.lock"),
+                        )
+                        if record.get("schema_version") not in {
+                            "gpu-reservation-released/v1",
+                            "gpu-reservation-reclaimed/v1",
+                        }:
+                            raise TypedPreflightFailure(
+                                "gpu_lock_record_tampered",
+                                "an acquired lock contains a non-released record",
+                                uuid=uuid,
+                            )
+                    self._write_active_record(descriptor, uuid)
+                    self._held.append((uuid, descriptor, lock_stat))
+                except BaseException:
+                    if descriptor not in {held[1] for held in self._held}:
+                        self._close_descriptor_once(descriptor, uuid, "rolled_back")
+                    raise
+                if len(self._held) >= requested_count:
+                    self._state = "HELD"
+                    return self._evidence("ACQUIRED")
+            self._state = "CLOSED"
+            self._close_root()
+            return self._evidence("BUSY_CANDIDATE")
+        except BaseException as primary:
+            self._state = "ROLLING_BACK"
+            dispositions = self.close()
+            if any(item.disposition == "close_ambiguous" for item in dispositions):
+                raise TypedPreflightFailure(
+                    "gpu_reservation_rollback_ambiguous",
+                    "GPU reservation rollback had an ambiguous close",
+                    primary_failure=type(primary).__name__,
+                    release_dispositions=tuple(_fd_release_payload(item) for item in dispositions),
+                ) from primary
+            if any(item.error_kind is not None for item in dispositions):
+                raise TypedPreflightFailure(
+                    "gpu_reservation_rollback_failed",
+                    "GPU reservation rollback recorded a release failure",
+                    primary_failure=type(primary).__name__,
+                    release_dispositions=tuple(_fd_release_payload(item) for item in dispositions),
+                ) from primary
+            if isinstance(primary, TypedPreflightFailure):
+                raise
+            raise TypedPreflightFailure(
+                "gpu_reservation_infrastructure_failed",
+                "GPU reservation infrastructure failed",
+                failure=type(primary).__name__,
+            ) from primary
+
+    @property
+    def reservation_ids(self) -> tuple[str, ...]:
+        """Return reservation identities in the stable selected-UUID order."""
+        return tuple(
+            self._reservation_ids[uuid]
+            for uuid, _, _ in self._held
+            if uuid in self._reservation_ids
+        )
+
+    def _open_candidate(self, uuid: str) -> tuple[int, os.stat_result]:
+        name = f"gpu-{_safe_uuid_filename(uuid)}.lock"
+        try:
+            descriptor = os.open(
+                name,
+                os.O_RDWR | os.O_CREAT | os.O_CLOEXEC | os.O_NOFOLLOW,
+                0o660,
+                dir_fd=self._root_fd,
+            )
+            lock_stat = os.fstat(descriptor)
+            path_stat = os.stat(name, dir_fd=self._root_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise TypedPreflightFailure(
+                "gpu_lock_open_failed",
+                "GPU candidate lock could not be opened",
+                uuid=uuid,
+                errno=exc.errno,
+            ) from exc
+        if not stat.S_ISREG(lock_stat.st_mode) or not stat.S_ISREG(path_stat.st_mode):
+            self._close_descriptor_once(descriptor, uuid, "rolled_back")
+            raise TypedPreflightFailure(
+                "gpu_lock_not_regular",
+                "GPU candidate lock must be a regular file",
+                uuid=uuid,
+            )
+        if (lock_stat.st_dev, lock_stat.st_ino) != (path_stat.st_dev, path_stat.st_ino):
+            self._close_descriptor_once(descriptor, uuid, "rolled_back")
+            raise TypedPreflightFailure(
+                "gpu_lock_identity_changed",
+                "GPU candidate lock path identity differs from its fd",
+                uuid=uuid,
+            )
+        if lock_stat.st_dev != self._root_device:
+            self._close_descriptor_once(descriptor, uuid, "rolled_back")
+            raise TypedPreflightFailure(
+                "gpu_lock_device_changed",
+                "GPU candidate lock is outside the shared lock filesystem",
+                uuid=uuid,
+            )
+        return descriptor, lock_stat
+
+    @staticmethod
+    def _try_lock(descriptor: int) -> bool:
+        try:
+            assert fcntl is not None
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            if exc.errno in {errno.EACCES, errno.EAGAIN}:
+                return False
+            raise TypedPreflightFailure(
+                "gpu_lock_acquire_failed",
+                "GPU candidate flock failed",
+                errno=exc.errno,
+            ) from exc
+        return True
+
+    def _verify_candidate_identity(
+        self,
+        uuid: str,
+        descriptor: int,
+        initial_stat: os.stat_result,
+    ) -> None:
+        name = f"gpu-{_safe_uuid_filename(uuid)}.lock"
+        final_stat = os.fstat(descriptor)
+        path_stat = os.stat(name, dir_fd=self._root_fd, follow_symlinks=False)
+        if (initial_stat.st_dev, initial_stat.st_ino) != (
+            final_stat.st_dev,
+            final_stat.st_ino,
+        ) or (final_stat.st_dev, final_stat.st_ino) != (
+            path_stat.st_dev,
+            path_stat.st_ino,
+        ):
+            raise TypedPreflightFailure(
+                "gpu_lock_readback_tampered",
+                "GPU candidate lock identity changed during admission",
+                uuid=uuid,
+            )
+        if not stat.S_ISREG(final_stat.st_mode) or stat.S_IMODE(final_stat.st_mode) != 0o660:
+            raise TypedPreflightFailure(
+                "gpu_lock_readback_invalid",
+                "GPU candidate lock mode or type is invalid",
+                uuid=uuid,
+            )
+
+    def _write_active_record(self, descriptor: int, uuid: str) -> None:
+        reservation_id = f"reservation-{secrets.token_hex(12)}"
+        record = {
+            "schema_version": "gpu-reservation/v1",
+            "reservation_id": reservation_id,
+            "uuid": uuid,
+            "owner_pid": os.getpid(),
+            "owner_process_start_identity": _process_start_identity(os.getpid()),
+            "boot_id": Path("/proc/sys/kernel/random/boot_id").read_text(encoding="ascii").strip(),
+            "lock_namespace": str(self._lock_root),
+        }
+        payload = (_canonical_json(record) + "\n").encode("utf-8")
+        os.ftruncate(descriptor, 0)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        offset = 0
+        while offset < len(payload):
+            written = os.write(descriptor, payload[offset:])
+            if written <= 0:
+                raise TypedPreflightFailure(
+                    "gpu_lock_record_write_failed",
+                    "GPU candidate lock record write made no progress",
+                    uuid=uuid,
+                )
+            offset += written
+        os.fsync(descriptor)
+        self._reservation_ids[uuid] = reservation_id
+
+    def _evidence(
+        self,
+        disposition: Literal["ACQUIRED", "BUSY_CANDIDATE", "ROLLED_BACK"],
+    ) -> ReservationEvidence:
+        locks = tuple(
+            LockReadback(
+                runtime_root=self._runtime_root,
+                filesystem_type=self._filesystem_type,
+                device=lock_stat.st_dev,
+                inode=lock_stat.st_ino,
+                selected=(),
+                fingerprint="",
+            )
+            for _, _, lock_stat in self._held
+        )
+        locks = tuple(
+            replace(
+                lock,
+                fingerprint=hashlib.sha256(
+                    _canonical_json(_lock_readback_payload(lock)).encode("utf-8")
+                ).hexdigest(),
+            )
+            for lock in locks
+        )
+        evidence = ReservationEvidence(
+            schema_version="gpu-reservation/v1",
+            selected_uuids=tuple(uuid for uuid, _, _ in self._held),
+            locks=locks,
+            disposition=disposition,
+            evidence_fingerprint="",
+        )
+        return replace(
+            evidence,
+            evidence_fingerprint=hashlib.sha256(
+                _canonical_json(_reservation_evidence_payload(evidence)).encode("utf-8")
+            ).hexdigest(),
+        )
+
+    def _close_busy_candidate(
+        self,
+        descriptor: int,
+        uuid: str,
+    ) -> FdReleaseEvidence:
+        return self._close_descriptor_once(descriptor, uuid, "busy_candidate")
+
+    def _close_descriptor_once(
+        self,
+        descriptor: int,
+        uuid: str | None,
+        disposition: FdDisposition,
+    ) -> FdReleaseEvidence:
+        error_kind: str | None = None
+        try:
+            os.close(descriptor)
+        except OSError as exc:
+            error_kind = error_kind or "close_ambiguous"
+            del exc
+        if error_kind is not None:
+            disposition = "close_ambiguous"
+        evidence = FdReleaseEvidence(
+            component="gpu-reservation-lock",
+            uuid=uuid,
+            disposition=disposition,
+            close_attempts=1,
+            error_kind=error_kind,
+            fingerprint="",
+        )
+        evidence = replace(
+            evidence,
+            fingerprint=hashlib.sha256(
+                _canonical_json(_fd_release_payload(evidence)).encode("utf-8")
+            ).hexdigest(),
+        )
+        self._release_dispositions.append(evidence)
+        return evidence
+
+    def _write_release_record(self, descriptor: int, uuid: str) -> None:
+        record = {
+            "schema_version": "gpu-reservation-released/v1",
+            "uuid": uuid,
+            "released_at": utc_now(),
+        }
+        payload = (_canonical_json(record) + "\n").encode("utf-8")
+        os.ftruncate(descriptor, 0)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        offset = 0
+        while offset < len(payload):
+            written = os.write(descriptor, payload[offset:])
+            if written <= 0:
+                raise TypedPreflightFailure(
+                    "gpu_lock_release_record_failed",
+                    "GPU release record write made no progress",
+                    uuid=uuid,
+                )
+            offset += written
+        os.fsync(descriptor)
+
+    def close(self) -> tuple[FdReleaseEvidence, ...]:
+        """Release all transaction-owned descriptors once, in reverse order."""
+        if self._state == "CLOSED":
+            return tuple(self._release_dispositions)
+        self._state = "ROLLING_BACK"
+        for uuid, descriptor, _ in reversed(self._held):
+            release_error: str | None = None
+            try:
+                self._write_release_record(descriptor, uuid)
+            except BaseException as exc:
+                release_error = type(exc).__name__
+            evidence = self._close_descriptor_once(descriptor, uuid, "released")
+            if release_error is not None:
+                evidence = replace(
+                    evidence,
+                    error_kind=release_error,
+                    fingerprint="",
+                )
+                evidence = replace(
+                    evidence,
+                    fingerprint=hashlib.sha256(
+                        _canonical_json(_fd_release_payload(evidence)).encode("utf-8")
+                    ).hexdigest(),
+                )
+                self._release_dispositions[-1] = evidence
+        self._held.clear()
+        self._close_root()
+        self._state = "CLOSED"
+        return tuple(self._release_dispositions)
+
+    def _close_root(self) -> None:
+        root_fd = getattr(self, "_root_fd", -1)
+        if root_fd == -1:
+            return
+        self._root_fd = -1
+        try:
+            os.close(root_fd)
+        except OSError as exc:
+            raise TypedPreflightFailure(
+                "gpu_lock_root_close_ambiguous",
+                "GPU lock namespace close was ambiguous",
+                attempted_once=True,
+                errno=exc.errno,
+            ) from exc
+
+
+@dataclass(frozen=True)
+class _NvidiaSMIObservation:
+    """Read-only transport observation returned by the NVIDIA resource probe."""
 
     allocated: frozenset[str]
     processes: tuple[ProcessIdentity, ...]
@@ -752,6 +3994,7 @@ class _NvidiaSMIObservationAdapter:
     structure_capability: Mapping[str, str]
     tool_capability: Mapping[str, object]
     container_identity: str
+    inventory: NvidiaInventory | None = None
 
     @classmethod
     def discover(
@@ -760,7 +4003,7 @@ class _NvidiaSMIObservationAdapter:
         *,
         gpu_requested_count: int,
         runtime_root: Path,
-    ) -> "_NvidiaSMIObservationAdapter":
+    ) -> "_NvidiaSMIObservation":
         observed_at = utc_now()
         try:
             cpu_set = tuple(sorted(os.sched_getaffinity(0)))
@@ -783,6 +4026,7 @@ class _NvidiaSMIObservationAdapter:
         allocated = frozenset()
         devices: tuple[GPUDevice, ...] = ()
         processes: tuple[ProcessIdentity, ...] = ()
+        inventory: NvidiaInventory | None = None
         tool_capability: dict[str, object] = {
             "tree": {
                 "available": shutil.which("tree") is not None,
@@ -797,22 +4041,35 @@ class _NvidiaSMIObservationAdapter:
                     "gpu_structured_probe_unavailable",
                     "GPU request requires the structured nvidia-smi XML probe",
                 )
-            result = subprocess.run(
-                [nvidia_smi, "-q", "-x"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=30,
+            list_evidence = _capture_evidence_fd(
+                (nvidia_smi, "-L"),
+                "nvidia_smi_list",
             )
-            if result.returncode != 0 or not result.stdout.strip():
-                raise TypedPreflightFailure(
-                    "gpu_structured_probe_failed",
-                    "nvidia-smi XML observation failed",
-                    returncode=result.returncode,
-                    stderr=result.stderr[-1024:],
-                )
+            xml_evidence = _capture_evidence_fd(
+                (nvidia_smi, "-q", "-x"),
+                "nvidia_smi_xml",
+            )
+            driver_evidence = _capture_evidence_fd(
+                (
+                    nvidia_smi,
+                    "--id=0",
+                    "--query-gpu=driver_version",
+                    "--format=csv,noheader,nounits",
+                ),
+                "nvidia_driver_version",
+            )
             try:
-                root = ET.fromstring(result.stdout)
+                inventory = NvidiaInventoryProbe(
+                    list_evidence,
+                    xml_evidence,
+                    driver_evidence,
+                ).observe()
+                xml_payload = _read_evidence_fd(xml_evidence)
+            finally:
+                for evidence in (driver_evidence, xml_evidence, list_evidence):
+                    _close_evidence_fd(evidence)
+            try:
+                root = ET.fromstring(xml_payload)
             except ET.ParseError as exc:
                 raise TypedPreflightFailure(
                     "gpu_structured_probe_malformed",
@@ -864,6 +4121,13 @@ class _NvidiaSMIObservationAdapter:
                     "structured GPU observation does not cover every allocated UUID/MIG UUID",
                     allocated=tuple(sorted(allocated)),
                     observed=tuple(sorted(parsed_devices)),
+                )
+            if set(inventory.physical_uuids).difference(parsed_devices) or set(
+                inventory.mig_uuids
+            ).difference(parsed_devices):
+                raise TypedPreflightFailure(
+                    "gpu_structured_discovery_cardinality_incomplete",
+                    "strict NVIDIA inventory and memory observation disagree",
                 )
             process_inventory_visibility = (
                 _prove_allocated_process_inventory_visibility(
@@ -961,6 +4225,7 @@ class _NvidiaSMIObservationAdapter:
             structure_capability=structure_capability,
             tool_capability=tool_capability,
             container_identity=container_identity,
+            inventory=inventory if gpu_requested_count else None,
         )
 
 @dataclass(frozen=True)
@@ -986,7 +4251,7 @@ class NvidiaSMIResourceProbe:
         )
 
     def observe(self) -> ResourceObservation:
-        snapshot = _NvidiaSMIObservationAdapter.discover(
+        snapshot = _NvidiaSMIObservation.discover(
             self.environment,
             gpu_requested_count=self.gpu_requested_count,
             runtime_root=self.runtime_root,
@@ -1009,6 +4274,7 @@ class NvidiaSMIResourceProbe:
             structure_tool=snapshot.structure_capability,
             tool_availability=snapshot.tool_capability,
             container_id=snapshot.container_identity,
+            nvidia_inventory=snapshot.inventory,
         )
 
 
@@ -1107,8 +4373,6 @@ class ReservationLease:
         os.lseek(self._descriptor, 0, os.SEEK_SET)
         os.write(self._descriptor, encoded)
         os.fsync(self._descriptor)
-        if fcntl is not None:
-            fcntl.flock(self._descriptor, fcntl.LOCK_UN)
         os.close(self._descriptor)
         self._released.set()
         return MappingProxyType(dict(release_record))
@@ -1199,7 +4463,6 @@ class UUIDReservationStore:
             "gpu-reservation-reclaimed/v1",
         }
         if not overwrite_allowed:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
             os.close(descriptor)
             return None
         reservation_id = f"reservation-{secrets.token_hex(12)}"
@@ -1433,7 +4696,6 @@ class UUIDReservationStore:
                 os.write(descriptor, encoded)
                 os.fsync(descriptor)
         finally:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
             os.close(descriptor)
         return self._persist_reclaim_evidence(
             uuid=uuid,
@@ -1507,8 +4769,8 @@ class ManagedRunAdapterIntegrationContract:
     organizer_conclusion_prior_hash: str = "none"
     organizer_conclusion_hash_assigned: bool = False
     downstream_adapter_path: str = MANAGED_RUN_ADAPTER_PATH
-    canonical_planner: str = "plan_gpu_allocation"
-    canonical_pre_launch_adapter: str = "ExperimentRunnerPreLaunchAdapter"
+    canonical_planner: str = "GpuReservationTransaction"
+    composition_owner: str = "RunGpuAdmissionContext"
     scheduler_role: str = "transport_only_no_reselection_no_rewrite"
     alternate_gpu_routes: tuple[str, ...] = ALTERNATE_GPU_ROUTE_STATIC_CONTRACT
     alternate_gpu_route_policy: str = (
@@ -1531,8 +4793,8 @@ class ManagedRunAdapterIntegrationContract:
             "none",
             False,
             MANAGED_RUN_ADAPTER_PATH,
-            "plan_gpu_allocation",
-            "ExperimentRunnerPreLaunchAdapter",
+            "GpuReservationTransaction",
+            "RunGpuAdmissionContext",
             "transport_only_no_reselection_no_rewrite",
             ALTERNATE_GPU_ROUTE_STATIC_CONTRACT,
             "canonical_managed_transaction_or_typed_gpu_prohibition",
@@ -1552,7 +4814,7 @@ class ManagedRunAdapterIntegrationContract:
             self.organizer_conclusion_hash_assigned,
             self.downstream_adapter_path,
             self.canonical_planner,
-            self.canonical_pre_launch_adapter,
+            self.composition_owner,
             self.scheduler_role,
             self.alternate_gpu_routes,
             self.alternate_gpu_route_policy,
@@ -1577,7 +4839,7 @@ class ManagedRunAdapterIntegrationContract:
                 "organizer_conclusion_hash_assigned": self.organizer_conclusion_hash_assigned,
                 "downstream_adapter_path": self.downstream_adapter_path,
                 "canonical_planner": self.canonical_planner,
-                "canonical_pre_launch_adapter": self.canonical_pre_launch_adapter,
+                "composition_owner": self.composition_owner,
                 "scheduler_role": self.scheduler_role,
                 "alternate_gpu_routes": self.alternate_gpu_routes,
                 "alternate_gpu_route_policy": self.alternate_gpu_route_policy,
@@ -1707,7 +4969,7 @@ class DiscoveredResources:
     boot_id: str
     probe: ResourceProbe
     observation: ResourceObservation
-    reservation_store: UUIDReservationStore
+    reservation_store: UUIDReservationStore | None
     tool_availability: Mapping[str, object] = field(default_factory=dict)
     allocation_provenance: str = ""
     observed_at: str = field(default_factory=utc_now)
@@ -1806,7 +5068,12 @@ class GPUAllocation:
             raise PlanStateError("GPU allocation cardinality does not match the request")
         if len(self.reservation_ids) != self.requested_count:
             raise PlanStateError("GPU reservation cardinality does not match the request")
-        if len(self.leases) != self.requested_count:
+        r5_transactional = (
+            isinstance(self.lock_readback, Mapping)
+            and self.lock_readback.get("reservation_owner")
+            == "GpuReservationTransaction"
+        )
+        if not r5_transactional and len(self.leases) != self.requested_count:
             raise PlanStateError("GPU lease cardinality does not match the request")
         if any(
             self.free_memory_bytes.get(uuid, -1) < self.requested_memory_bytes
@@ -2004,61 +5271,6 @@ class EnvironmentCertificate:
                 for item in self.redacted_secret_witness
             ),
         )
-
-
-@dataclass(frozen=True)
-class PreLaunchContext:
-    plan: ExecutionResourcePlan
-    certificate: EnvironmentCertificate
-    plan_fingerprint: str
-    transport_payload: Mapping[str, object]
-    readback_fingerprint: str
-    state: PlanState = PlanState.EXECUTE
-
-    def __post_init__(self) -> None:
-        if self.plan.state != PlanState.EXECUTE:
-            raise PlanStateError("pre-launch context must carry the execute-state plan")
-        if self.plan_fingerprint != self.plan.plan_fingerprint:
-            raise PlanStateError("pre-launch fingerprint mismatch")
-        object.__setattr__(self, "transport_payload", _freeze_mapping(self.transport_payload))
-
-
-class ExperimentRunnerExecutionPort(Protocol):
-    def prelaunch_transport(
-        self,
-        payload: Mapping[str, object],
-    ) -> Mapping[str, object]: ...
-
-    def execute(
-        self,
-        *,
-        plan: ExecutionResourcePlan,
-        task: Callable[..., object],
-        cases: list[object],
-        context_builder: Callable[..., object],
-        initializer: Callable[..., object],
-        resource_estimator: Callable[..., object],
-        skip_controller: object | None,
-    ) -> object: ...
-
-    def quiescence_evidence(
-        self,
-        *,
-        plan: ExecutionResourcePlan,
-    ) -> Mapping[str, object]: ...
-
-    def side_effect_disposers(
-        self,
-        *,
-        plan: ExecutionResourcePlan,
-    ) -> Mapping[str, Callable[[Mapping[str, object]], Mapping[str, object]]]: ...
-
-
-class RunnerTransport(Protocol):
-    def __call__(self, payload: Mapping[str, object]) -> Mapping[str, object]: ...
-
-
-SideEffectDisposer = Callable[[Mapping[str, object]], Mapping[str, object]]
 
 
 @dataclass(frozen=True)
@@ -2265,24 +5477,412 @@ class CloseoutEvidence:
 
 
 @dataclass(frozen=True)
+class FailureRecord:
+    """Normalized terminal failure without traceback or secret-bearing reprs."""
+
+    schema_version: Literal["gpu-failure/v1"]
+    kind: str
+    operation: str
+    message: str
+    evidence: Mapping[str, JsonValue]
+    fingerprint: Sha256Hex
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "evidence", _freeze_mapping(self.evidence))
+
+
+def _normalize_failure(exc: BaseException, operation: str) -> FailureRecord:
+    """Normalize one terminal exception without moving authority to the caller."""
+    kind = getattr(exc, "code", type(exc).__name__)
+    message = str(exc)
+    raw_evidence = getattr(exc, "evidence", {})
+    evidence = (
+        cast(Mapping[str, JsonValue], raw_evidence)
+        if isinstance(raw_evidence, Mapping)
+        else {}
+    )
+    payload = {
+        "schema_version": "gpu-failure/v1",
+        "kind": str(kind),
+        "operation": operation,
+        "message": message,
+        "evidence": evidence,
+    }
+    return FailureRecord(
+        schema_version="gpu-failure/v1",
+        kind=str(kind),
+        operation=operation,
+        message=message,
+        evidence=evidence,
+        fingerprint=hashlib.sha256(
+            _canonical_json(payload).encode("utf-8")
+        ).hexdigest(),
+    )
+
+
+@dataclass(frozen=True)
+class ManagedGpuOutcome:
+    """Total terminal outcome produced after context state is closed."""
+
+    schema_version: Literal["managed-gpu-outcome/v1"]
+    run_id: str
+    source_freeze_fingerprint: Sha256Hex | None
+    plan_fingerprint: Sha256Hex | None
+    admission_fingerprint: Sha256Hex | None
+    planned_chunk_ids: tuple[str, ...]
+    runner_lifecycle: object | None
+    runner_lifecycle_fingerprint: Sha256Hex | None
+    primary_failure: FailureRecord | None
+    secondary_failures: tuple[FailureRecord, ...]
+    release_disposition: tuple[FdReleaseEvidence, ...]
+    context_state: Literal["closed"]
+    exit_code: int
+    outcome_fingerprint: Sha256Hex
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "planned_chunk_ids", tuple(self.planned_chunk_ids))
+        object.__setattr__(self, "secondary_failures", tuple(self.secondary_failures))
+        object.__setattr__(self, "release_disposition", tuple(self.release_disposition))
+
+
+@dataclass(frozen=True)
+class AdmittedEnvironment:
+    """Immutable exact UUID environment produced before generic runner creation."""
+
+    schema_version: Literal["admitted-environment/v1"]
+    exact_env_map: tuple[tuple[str, str], ...]
+    cuda_visible_devices: str
+    nvidia_visible_devices: str
+    environment_fingerprint: Sha256Hex
+
+
+def _failure_record_payload(value: FailureRecord) -> dict[str, object]:
+    return {
+        "schema_version": value.schema_version,
+        "kind": value.kind,
+        "operation": value.operation,
+        "message": value.message,
+        "evidence": value.evidence,
+    }
+
+
+def _outcome_payload(value: ManagedGpuOutcome) -> dict[str, object]:
+    return {
+        "schema_version": value.schema_version,
+        "run_id": value.run_id,
+        "source_freeze_fingerprint": value.source_freeze_fingerprint,
+        "plan_fingerprint": value.plan_fingerprint,
+        "admission_fingerprint": value.admission_fingerprint,
+        "planned_chunk_ids": value.planned_chunk_ids,
+        "runner_lifecycle_fingerprint": value.runner_lifecycle_fingerprint,
+        "primary_failure": (
+            _failure_record_payload(value.primary_failure)
+            if value.primary_failure is not None
+            else None
+        ),
+        "secondary_failures": tuple(
+            _failure_record_payload(item) for item in value.secondary_failures
+        ),
+        "release_disposition": tuple(
+            _fd_release_payload(item) for item in value.release_disposition
+        ),
+        "context_state": value.context_state,
+        "exit_code": value.exit_code,
+    }
+
+
+class ManagedGpuOutcomeReducer:
+    """Own terminal failure normalization and outcome fingerprints only."""
+
+    def reduce_terminal(
+        self,
+        *,
+        run_id: str,
+        planned_chunk_ids: tuple[str, ...],
+        admission: object | None,
+        source_freeze: SourceFreezeReceipt | None,
+        runtime_identity: RuntimeIdentityReceipt | None,
+        runner_lifecycle: object | None,
+        primary_failure: FailureRecord | None,
+        secondary_failures: tuple[FailureRecord, ...],
+        release_disposition: tuple[FdReleaseEvidence, ...],
+        context_state: Literal["closed"],
+        exit_code: int,
+    ) -> ManagedGpuOutcome:
+        if context_state != "closed":
+            raise TypedPreflightFailure(
+                "gpu_outcome_context_not_closed",
+                "terminal outcome requires closed composition context",
+                context_state=context_state,
+            )
+        source_fingerprint = (
+            source_freeze.receipt_fingerprint if source_freeze is not None else None
+        )
+        del runtime_identity
+        admission_fingerprint = (
+            getattr(admission, "admission_fingerprint", None)
+            if admission is not None
+            else None
+        )
+        plan_fingerprint = (
+            getattr(admission, "plan_fingerprint", None)
+            if admission is not None
+            else None
+        )
+        lifecycle_fingerprint = (
+            hashlib.sha256(
+                _canonical_json(_json_safe(runner_lifecycle)).encode("utf-8")
+            ).hexdigest()
+            if runner_lifecycle is not None
+            else None
+        )
+        outcome = ManagedGpuOutcome(
+            schema_version="managed-gpu-outcome/v1",
+            run_id=run_id,
+            source_freeze_fingerprint=source_fingerprint,
+            plan_fingerprint=plan_fingerprint,
+            admission_fingerprint=admission_fingerprint,
+            planned_chunk_ids=tuple(planned_chunk_ids),
+            runner_lifecycle=runner_lifecycle,
+            runner_lifecycle_fingerprint=lifecycle_fingerprint,
+            primary_failure=primary_failure,
+            secondary_failures=tuple(secondary_failures),
+            release_disposition=tuple(release_disposition),
+            context_state="closed",
+            exit_code=exit_code,
+            outcome_fingerprint="",
+        )
+        return replace(
+            outcome,
+            outcome_fingerprint=hashlib.sha256(
+                _canonical_json(_outcome_payload(outcome)).encode("utf-8")
+            ).hexdigest(),
+        )
+
+
+@dataclass(frozen=True)
 class CompletionCoverageInput:
+    schema_version: Literal["completion-coverage/v2"]
+    outcome: ManagedGpuOutcome
+    planned_chunk_ids: tuple[str, ...]
+    candidate_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    occupied_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    reserved_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    selected_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    lock_readback: LockReadback | None
+    effective_environment: Mapping[str, str] | None
+    actual_gpu_processes: tuple[ProcessOccupancyEvidence, ...] | None
+    concurrent_run_evidence: ConcurrentRunEvidence | None
+    mig_evidence: MigEvidence | None
+    container_visible_uuid_mapping: UuidVisibilityEvidence | None
+    os_safe_lock_placement: LockPlacementEvidence | None
+    descendant_retention_evidence: DescendantRetentionEvidence | None
+    source_freeze_evidence: SourceFreezeReceipt | None
+    absence_dispositions: tuple[EvidenceAbsence, ...]
+    input_fingerprint: Sha256Hex = ""
+
+    def __post_init__(self) -> None:
+        if self.schema_version != COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION:
+            raise ValueError("unsupported CompletionCoverageInput schema")
+        object.__setattr__(self, "planned_chunk_ids", tuple(self.planned_chunk_ids))
+        object.__setattr__(self, "candidate_uuids", tuple(self.candidate_uuids))
+        object.__setattr__(self, "occupied_uuids", tuple(self.occupied_uuids))
+        object.__setattr__(self, "reserved_uuids", tuple(self.reserved_uuids))
+        object.__setattr__(self, "selected_uuids", tuple(self.selected_uuids))
+        object.__setattr__(self, "absence_dispositions", tuple(self.absence_dispositions))
+        optional_values: Mapping[str, object | None] = {
+            "source_freeze_evidence": self.source_freeze_evidence,
+            "lock_readback": self.lock_readback,
+            "effective_environment": self.effective_environment,
+            "actual_gpu_processes": self.actual_gpu_processes,
+            "concurrent_run_evidence": self.concurrent_run_evidence,
+            "mig_evidence": self.mig_evidence,
+            "container_visible_uuid_mapping": self.container_visible_uuid_mapping,
+            "os_safe_lock_placement": self.os_safe_lock_placement,
+            "descendant_retention_evidence": self.descendant_retention_evidence,
+        }
+        absence_names = tuple(item.field_name for item in self.absence_dispositions)
+        expected_absence_names = tuple(
+            name for name in _EVIDENCE_ABSENCE_FIELD_ORDER if optional_values[name] is None
+        )
+        if absence_names != expected_absence_names:
+            raise ValueError(
+                "CompletionCoverageInput absence dispositions do not match optional evidence"
+            )
+        for item in self.absence_dispositions:
+            if item.disposition == "not_reached" and item.failure_kind is not None:
+                raise ValueError("not_reached evidence absence cannot carry a failure kind")
+            if item.disposition == "failed" and not item.failure_kind:
+                raise ValueError("failed evidence absence requires a failure kind")
+            expected_fingerprint = hashlib.sha256(
+                _canonical_json(
+                    {
+                        "field_name": item.field_name,
+                        "disposition": item.disposition,
+                        "failure_kind": item.failure_kind,
+                    }
+                ).encode("utf-8")
+            ).hexdigest()
+            if item.fingerprint != expected_fingerprint:
+                raise ValueError("evidence absence fingerprint mismatch")
+        if not self.input_fingerprint:
+            payload = _completion_v2_input_payload(self)
+            object.__setattr__(
+                self,
+                "input_fingerprint",
+                hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest(),
+            )
+
+
+def build_completion_coverage_input(
+    outcome: ManagedGpuOutcome,
+    admission: RunGpuAdmissionReceipt | None,
+    source_freeze: SourceFreezeReceipt | None,
+    runtime_identity: RuntimeIdentityReceipt | None,
+    evidence_absence: tuple[EvidenceAbsence, ...],
+) -> CompletionCoverageInput:
+    """Assemble one exact coverage input without becoming a second owner."""
+    del runtime_identity
+    return CompletionCoverageInput(
+        schema_version=COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION,
+        outcome=outcome,
+        planned_chunk_ids=outcome.planned_chunk_ids,
+        candidate_uuids=(admission.candidate_uuids if admission is not None else ()),
+        occupied_uuids=(admission.occupied_uuids if admission is not None else ()),
+        reserved_uuids=(admission.reserved_uuids if admission is not None else ()),
+        selected_uuids=(admission.selected_uuids if admission is not None else ()),
+        lock_readback=(admission.lock_readback if admission is not None else None),
+        effective_environment=(
+            admission.effective_environment if admission is not None else None
+        ),
+        actual_gpu_processes=(
+            admission.actual_gpu_processes if admission is not None else None
+        ),
+        concurrent_run_evidence=(
+            admission.concurrent_run_evidence if admission is not None else None
+        ),
+        mig_evidence=admission.mig_evidence if admission is not None else None,
+        container_visible_uuid_mapping=(
+            admission.container_visible_uuid_mapping if admission is not None else None
+        ),
+        os_safe_lock_placement=(
+            admission.os_safe_lock_placement if admission is not None else None
+        ),
+        descendant_retention_evidence=(
+            admission.descendant_retention_evidence if admission is not None else None
+        ),
+        source_freeze_evidence=source_freeze,
+        absence_dispositions=evidence_absence,
+    )
+
+
+def _terminal_evidence_fingerprint(value: object | None) -> str | None:
+    if value is None:
+        return None
+    for name in (
+        "evidence_fingerprint",
+        "receipt_fingerprint",
+        "readback_fingerprint",
+        "fingerprint",
+    ):
+        candidate = getattr(value, name, None)
+        if isinstance(candidate, str):
+            return candidate
+    return hashlib.sha256(
+        _canonical_json(_json_safe(getattr(value, "__dict__", value))).encode("utf-8")
+    ).hexdigest()
+
+
+def _completion_v2_input_payload(value: CompletionCoverageInput) -> dict[str, object]:
+    return {
+        "schema_version": "completion-coverage/v2",
+        "outcome_fingerprint": (
+            value.outcome.outcome_fingerprint if value.outcome is not None else None
+        ),
+        "planned_chunk_ids": value.planned_chunk_ids,
+        "candidate_uuids": value.candidate_uuids,
+        "occupied_uuids": value.occupied_uuids,
+        "reserved_uuids": value.reserved_uuids,
+        "selected_uuids": value.selected_uuids,
+        "lock_readback": _terminal_evidence_fingerprint(value.lock_readback),
+        "effective_environment": value.effective_environment,
+        "actual_gpu_processes": tuple(
+            _terminal_evidence_fingerprint(item)
+            for item in (value.actual_gpu_processes or ())
+        ),
+        "concurrent_run_evidence": _terminal_evidence_fingerprint(value.concurrent_run_evidence),
+        "mig_evidence": _terminal_evidence_fingerprint(value.mig_evidence),
+        "container_visible_uuid_mapping": _terminal_evidence_fingerprint(
+            value.container_visible_uuid_mapping
+        ),
+        "os_safe_lock_placement": _terminal_evidence_fingerprint(
+            value.os_safe_lock_placement
+        ),
+        "descendant_retention_evidence": _terminal_evidence_fingerprint(
+            value.descendant_retention_evidence
+        ),
+        "source_freeze_evidence": _terminal_evidence_fingerprint(value.source_freeze_evidence),
+        "absence_dispositions": tuple(
+            {
+                "field_name": item.field_name,
+                "disposition": item.disposition,
+                "failure_kind": item.failure_kind,
+                "fingerprint": item.fingerprint,
+            }
+            for item in value.absence_dispositions
+        ),
+    }
+
+
+@dataclass(frozen=True)
+class CompletionCoverage:
     schema_version: str
     plan_fingerprint: str
     terminal_event_id: str
-    candidate_gpu_ids: tuple[str, ...]
-    occupied_gpu_ids: tuple[Mapping[str, object], ...]
-    reserved_gpu_ids: tuple[str, ...]
-    selected_gpu_ids: tuple[str, ...]
-    lock_readback: Mapping[str, object]
-    effective_env: Mapping[str, object]
-    actual_gpu_processes: tuple[Mapping[str, object], ...]
-    release_retention_disposition: Mapping[str, object]
-    concurrent_run_evidence: Mapping[str, object]
-    mig_evidence: Mapping[str, object]
-    container_visible_uuid_mapping: Mapping[str, object]
-    os_safe_lock_placement: Mapping[str, object]
-    descendant_retention_evidence: Mapping[str, object]
-    taxonomy_linked_validation_outcome: Mapping[str, object]
+    delivery_ordinal: int
+    input_record: CompletionCoverageInput | _LegacyPlannerCoverageRecord
+    recorded_at: str
+    all_planned_chunks_complete: bool
+    overall_delivery_complete: bool
+    unresolved_blockers: tuple[str, ...]
+    persistence_witness: Mapping[str, object]
+    input_fingerprint: Sha256Hex = ""
+    terminal_complete: bool = False
+    partial_complete: bool = False
+    cleanup_complete: bool = False
+    closeout_complete: bool = False
+    failure_kind: str | None = None
+    coverage_fingerprint: Sha256Hex = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "persistence_witness",
+            _freeze_mapping(self.persistence_witness),
+        )
+
+
+@dataclass(frozen=True)
+class _LegacyPlannerCoverageRecord:
+    """Private historical planner record; never accepted by the R5 public gate."""
+
+    schema_version: str = COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION
+    plan_fingerprint: str = ""
+    terminal_event_id: str = ""
+    candidate_gpu_ids: tuple[str, ...] = ()
+    occupied_gpu_ids: tuple[Mapping[str, object], ...] = ()
+    reserved_gpu_ids: tuple[str, ...] = ()
+    selected_gpu_ids: tuple[str, ...] = ()
+    lock_readback: Mapping[str, object] = field(default_factory=dict)
+    effective_env: Mapping[str, object] = field(default_factory=dict)
+    actual_gpu_processes: tuple[Mapping[str, object], ...] = ()
+    release_retention_disposition: Mapping[str, object] = field(default_factory=dict)
+    concurrent_run_evidence: Mapping[str, object] = field(default_factory=dict)
+    mig_evidence: Mapping[str, object] = field(default_factory=dict)
+    container_visible_uuid_mapping: Mapping[str, object] = field(default_factory=dict)
+    os_safe_lock_placement: Mapping[str, object] = field(default_factory=dict)
+    descendant_retention_evidence: Mapping[str, object] = field(default_factory=dict)
+    taxonomy_linked_validation_outcome: Mapping[str, object] = field(default_factory=dict)
     eligible_gpu_ids: tuple[str, ...] = ()
     planned_chunk_ids: tuple[str, ...] = ()
     terminal_chunk_ids: tuple[str, ...] = ()
@@ -2295,69 +5895,6 @@ class CompletionCoverageInput:
     unresolved_design_issue_blockers: tuple[str, ...] = ()
     unresolved_validation_failures: tuple[Mapping[str, object], ...] = ()
 
-    def __post_init__(self) -> None:
-        if self.schema_version != COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION:
-            raise ValueError("unsupported CompletionCoverageInput schema")
-        for name in (
-            "lock_readback",
-            "effective_env",
-            "release_retention_disposition",
-            "concurrent_run_evidence",
-            "mig_evidence",
-            "container_visible_uuid_mapping",
-            "os_safe_lock_placement",
-            "descendant_retention_evidence",
-            "taxonomy_linked_validation_outcome",
-            "required_evidence",
-        ):
-            object.__setattr__(self, name, _freeze_mapping(cast(Mapping[str, object], getattr(self, name))))
-        for name in (
-            "occupied_gpu_ids",
-            "actual_gpu_processes",
-            "terminal_chunk_records",
-            "validation_failures",
-            "unresolved_validation_failures",
-        ):
-            object.__setattr__(
-                self,
-                name,
-                tuple(
-                    cast(Mapping[str, object], _freeze_value(item))
-                    for item in cast(
-                        Sequence[Mapping[str, object]],
-                        getattr(self, name),
-                    )
-                ),
-            )
-        object.__setattr__(self, "candidate_gpu_ids", tuple(self.candidate_gpu_ids))
-        object.__setattr__(self, "eligible_gpu_ids", tuple(self.eligible_gpu_ids))
-        object.__setattr__(self, "reserved_gpu_ids", tuple(self.reserved_gpu_ids))
-        object.__setattr__(self, "selected_gpu_ids", tuple(self.selected_gpu_ids))
-        object.__setattr__(self, "planned_chunk_ids", tuple(self.planned_chunk_ids))
-        object.__setattr__(self, "terminal_chunk_ids", tuple(self.terminal_chunk_ids))
-        object.__setattr__(self, "unresolved_design_issue_blockers", tuple(self.unresolved_design_issue_blockers))
-
-
-@dataclass(frozen=True)
-class CompletionCoverage:
-    schema_version: str
-    plan_fingerprint: str
-    terminal_event_id: str
-    delivery_ordinal: int
-    input_record: CompletionCoverageInput
-    recorded_at: str
-    all_planned_chunks_complete: bool
-    overall_delivery_complete: bool
-    unresolved_blockers: tuple[str, ...]
-    persistence_witness: Mapping[str, object]
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "persistence_witness",
-            _freeze_mapping(self.persistence_witness),
-        )
-
 
 @dataclass
 class CompletionCoverageAdapter:
@@ -2368,6 +5905,94 @@ class CompletionCoverageAdapter:
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def record_once(self, input: CompletionCoverageInput) -> CompletionCoverage:
+        if input.outcome is not None:
+            outcome = input.outcome
+            key = (outcome.run_id, outcome.outcome_fingerprint)
+            with self._lock:
+                if key in self._records:
+                    raise CompletionCoverageFailure(
+                        "duplicate CompletionCoverage delivery",
+                    )
+                if self.evidence_path is None:
+                    raise CompletionCoverageFailure(
+                        "CompletionCoverage requires a durable evidence path",
+                    )
+                terminal_complete = True
+                cleanup_complete = (
+                    outcome.context_state == "closed"
+                    and all(
+                        item.close_attempts == 1 and item.error_kind is None
+                        for item in outcome.release_disposition
+                    )
+                )
+                all_planned_chunks_complete = (
+                    outcome.primary_failure is None and outcome.exit_code == 0
+                )
+                partial_complete = True
+                closeout_complete = cleanup_complete
+                overall_delivery_complete = (
+                    terminal_complete
+                    and partial_complete
+                    and cleanup_complete
+                    and all_planned_chunks_complete
+                )
+                failure_kind = (
+                    outcome.primary_failure.kind
+                    if outcome.primary_failure is not None
+                    else None
+                )
+                coverage_payload = {
+                    "schema_version": "completion-coverage/v2",
+                    "input_fingerprint": input.input_fingerprint,
+                    "terminal_complete": terminal_complete,
+                    "partial_complete": partial_complete,
+                    "cleanup_complete": cleanup_complete,
+                    "closeout_complete": closeout_complete,
+                    "all_planned_chunks_complete": all_planned_chunks_complete,
+                    "overall_delivery_complete": overall_delivery_complete,
+                    "failure_kind": failure_kind,
+                }
+                coverage_fingerprint = hashlib.sha256(
+                    _canonical_json(coverage_payload).encode("utf-8")
+                ).hexdigest()
+                recorded_at = utc_now()
+                persistence_witness = _write_json_once(
+                    self.evidence_path,
+                    {**coverage_payload, "coverage_fingerprint": coverage_fingerprint},
+                    allow_identical=False,
+                )
+                record = CompletionCoverage(
+                    schema_version="completion-coverage/v2",
+                    plan_fingerprint=outcome.plan_fingerprint or "",
+                    terminal_event_id=outcome.outcome_fingerprint,
+                    delivery_ordinal=1,
+                    input_record=input,
+                    recorded_at=recorded_at,
+                    all_planned_chunks_complete=all_planned_chunks_complete,
+                    overall_delivery_complete=overall_delivery_complete,
+                    unresolved_blockers=(
+                        (f"failure:{failure_kind}",) if failure_kind is not None else ()
+                    ),
+                    persistence_witness=persistence_witness,
+                    input_fingerprint=input.input_fingerprint,
+                    terminal_complete=terminal_complete,
+                    partial_complete=partial_complete,
+                    cleanup_complete=cleanup_complete,
+                    closeout_complete=closeout_complete,
+                    failure_kind=failure_kind,
+                    coverage_fingerprint=coverage_fingerprint,
+                )
+                self._records[key] = record
+                return record
+        raise CompletionCoverageFailure(
+            "R5 CompletionCoverageAdapter.record_once accepts only the exact public input"
+        )
+
+    def _record_legacy_once(
+        self,
+        input: _LegacyPlannerCoverageRecord,
+    ) -> CompletionCoverage:
+        """Record only the historical deterministic planner closeout path."""
         key = (input.plan_fingerprint, input.terminal_event_id)
         with self._lock:
             if key in self._records:
@@ -2501,33 +6126,23 @@ class CompletionCoverageAdapter:
                 and validation_history_complete
             )
             unresolved_blockers = (
-                *input.unresolved_design_issue_blockers,
-                *(
+                tuple(input.unresolved_design_issue_blockers)
+                + tuple(
                     f"validation_failure:{index}"
                     for index, _failure in enumerate(input.unresolved_validation_failures)
-                ),
-                *("cleanup_unresolved_leak_or_unknown",)
-                if input.cleanup_has_unresolved_leak_or_unknown
-                else (),
-                *("validation_history_incomplete",)
-                if not validation_history_complete
-                else (),
-                *("required_evidence_missing",)
-                if not required_evidence_present
-                else (),
-                *("closeout_artifact_refs_missing",)
-                if not closeout_artifact_refs_present
-                else (),
-                *(
-                    ("effective_environment_certificate_mismatch",)
-                    if not input.effective_env_certificate_matches
-                    else ()
-                ),
-                *(
-                    ("review_gate_unresolved",)
-                    if not input.required_review_gates_passed
-                    else ()
-                ),
+                )
+                + (("cleanup_unresolved_leak_or_unknown",)
+                   if input.cleanup_has_unresolved_leak_or_unknown else ())
+                + (("validation_history_incomplete",)
+                   if not validation_history_complete else ())
+                + (("required_evidence_missing",)
+                   if not required_evidence_present else ())
+                + (("closeout_artifact_refs_missing",)
+                   if not closeout_artifact_refs_present else ())
+                + (("effective_environment_certificate_mismatch",)
+                   if not input.effective_env_certificate_matches else ())
+                + (("review_gate_unresolved",)
+                   if not input.required_review_gates_passed else ())
             )
             recorded_at = utc_now()
             payload = {
@@ -2573,6 +6188,60 @@ class CompletionCoverageAdapter:
             raise CompletionCoverageFailure(
                 "missing CompletionCoverage delivery",
             ) from exc
+
+
+class PostToolUseProjectionReducer:
+    """Produce the exact nine-key projection; the Hook only validates it."""
+
+    def project(self, outcome: ManagedGpuOutcome, coverage: CompletionCoverage) -> bytes:
+        plan_fingerprint = outcome.plan_fingerprint or hashlib.sha256(
+            outcome.outcome_fingerprint.encode("utf-8")
+        ).hexdigest()
+        exact_input = cast(CompletionCoverageInput, coverage.input_record)
+        admission_source = exact_input.container_visible_uuid_mapping
+        selected = tuple(exact_input.selected_uuids)
+        if isinstance(admission_source, Mapping):
+            namespace_value = admission_source.get("namespace_id", "managed-runtime")
+            provision_value = admission_source.get("provision_receipt_fingerprint", "")
+        else:
+            namespace_value = getattr(admission_source, "namespace_id", "managed-runtime")
+            provision_value = getattr(admission_source, "provision_receipt_fingerprint", "")
+        namespace_id = str(namespace_value)
+        provision_fingerprint = str(provision_value)
+        if not provision_fingerprint:
+            provision_fingerprint = hashlib.sha256(
+                b"runtime-provision-absence"
+            ).hexdigest()
+        admission = None
+        if outcome.admission_fingerprint is not None:
+            admission = {
+                "admission_fingerprint": outcome.admission_fingerprint,
+                "guarantee": "run-level-opaque-uuid-admission",
+                "namespace_id": namespace_id,
+                "provision_receipt_fingerprint": provision_fingerprint,
+                "selected_uuids": selected,
+            }
+        error = None
+        if outcome.primary_failure is not None:
+            error = {
+                "kind": outcome.primary_failure.kind,
+                "message": outcome.primary_failure.message,
+                "operation": outcome.primary_failure.operation,
+            }
+        projection = {
+            "admission": admission,
+            "completion_coverage_path": (
+                f"reports/agents/{outcome.run_id}/runtime/completion_coverage.json"
+            ),
+            "error": error,
+            "exit_code": outcome.exit_code,
+            "plan_fingerprint": plan_fingerprint,
+            "plan_path": f"reports/agents/{outcome.run_id}/runtime/execution_resource_plan.json",
+            "projection": "post_tool_use",
+            "run_id": outcome.run_id,
+            "schema_version": "execution-resource-plan/v1",
+        }
+        return (_canonical_json(projection) + "\n").encode("utf-8")
 
 
 def _json_safe(value: object) -> object:
@@ -2708,7 +6377,9 @@ def _durable_dual_evidence_witness(value: object) -> bool:
     return True
 
 
-def _completion_input_record(input: CompletionCoverageInput) -> Mapping[str, object]:
+def _completion_input_record(
+    input: _LegacyPlannerCoverageRecord,
+) -> Mapping[str, object]:
     return MappingProxyType(
         {
             "schema_version": input.schema_version,
@@ -3063,7 +6734,7 @@ def handle_pre_execution_failure(
             ),
             "validation_artifacts": "pre_execution_failure_evidence_only",
         }
-        failure_coverage_input = CompletionCoverageInput(
+        failure_coverage_input = _LegacyPlannerCoverageRecord(
             schema_version=COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION,
             plan_fingerprint=transaction_fingerprint,
             terminal_event_id=terminal_event_id,
@@ -3133,7 +6804,7 @@ def handle_pre_execution_failure(
         )
         completion_coverage = CompletionCoverageAdapter(
             evidence_path=completion_path
-        ).record_once(failure_coverage_input)
+        )._record_legacy_once(failure_coverage_input)
         closeout_witness = _persist_pre_execution_failure_record(
             runtime_root,
             projection_root,
@@ -3351,19 +7022,23 @@ def _discover_resources_from_probe_impl(
         boot_id=observation.boot_id,
         probe=probe,
         observation=observation,
-        reservation_store=UUIDReservationStore(
-            request.lock_root,
-            shared_across_schedulers=(
-                request.lock_namespace_shared_across_schedulers
-                or not request.gpu_requested_count
-            ),
-            host_safe=request.lock_namespace_host_safe or not request.gpu_requested_count,
-            visibility_witness=(
-                request.lock_namespace_visibility_witness
-                or "not-applicable-no-gpu"
-                if not request.gpu_requested_count
-                else request.lock_namespace_visibility_witness
-            ),
+        reservation_store=(
+            None
+            if isinstance(probe, NvidiaSMIResourceProbe)
+            else UUIDReservationStore(
+                request.lock_root,
+                shared_across_schedulers=(
+                    request.lock_namespace_shared_across_schedulers
+                    or not request.gpu_requested_count
+                ),
+                host_safe=request.lock_namespace_host_safe or not request.gpu_requested_count,
+                visibility_witness=(
+                    request.lock_namespace_visibility_witness
+                    or "not-applicable-no-gpu"
+                    if not request.gpu_requested_count
+                    else request.lock_namespace_visibility_witness
+                ),
+            )
         ),
         tool_availability=MappingProxyType(dict(tool_availability or {})),
         allocation_provenance=request.gpu_allocation_provenance,
@@ -3451,6 +7126,11 @@ def _plan_gpu_allocation_impl(
     """
     if discovered.state != PlanState.RESOURCE_DISCOVERED:
         raise PlanStateError("GPU planning requires resource_discovered state")
+    if discovered.reservation_store is None:
+        raise TypedPreflightFailure(
+            "legacy_gpu_planner_unavailable",
+            "the legacy lease planner is not an admission route",
+        )
     requested = request.gpu_requested_count
     provenance = discovered.allocation_provenance
     observation_s0 = discovered.observation
@@ -3882,7 +7562,15 @@ def _freeze_resource_plan_impl(
             requested_cpu_set=request.cpu_requested_set,
             discovered_cpu_set=discovered.cpu_available_set,
         )
-    if gpu_allocation._planner_provenance is not _PLANNER_PROVENANCE:
+    r5_transactional = (
+        isinstance(gpu_allocation.lock_readback, Mapping)
+        and gpu_allocation.lock_readback.get("reservation_owner")
+        == "GpuReservationTransaction"
+    )
+    if (
+        gpu_allocation._planner_provenance is not _PLANNER_PROVENANCE
+        and not r5_transactional
+    ):
         raise TypedPreflightFailure(
             "gpu_planner_provenance_invalid",
             "GPUAllocation was not produced by canonical plan_gpu_allocation",
@@ -3909,7 +7597,10 @@ def _freeze_resource_plan_impl(
         allocation_valid = (
             len(gpu_allocation.selected_ids) == request.gpu_requested_count
             and len(gpu_allocation.reservation_ids) == request.gpu_requested_count
-            and len(gpu_allocation.leases) == request.gpu_requested_count
+            and (
+                len(gpu_allocation.leases) == request.gpu_requested_count
+                or r5_transactional
+            )
             and set(gpu_allocation.selected_ids).issubset(
                 gpu_allocation.caller_allocated_ids
             )
@@ -4008,8 +7699,6 @@ def _freeze_resource_plan_impl(
                 if device.uuid in gpu_allocation.candidate_ids
             },
             "slot_id": gpu_allocation.slot_id,
-            "requested_count": gpu_allocation.requested_count,
-            "requested_memory_bytes": gpu_allocation.requested_memory_bytes,
             "readback_fingerprint": gpu_allocation.readback_fingerprint,
             "allocation_provenance": discovered.allocation_provenance,
             "lock_readback": gpu_allocation.lock_readback,
@@ -4090,7 +7779,7 @@ def _freeze_resource_plan_impl(
         {"id": "log-root", "owner": "ExecutionResourcePlan", "target": str(log_root), "policy": "container-local", "disposal": "record_only"},
         {"id": "source-projection", "owner": "ExecutionResourcePlan", "target": str(source_projection), "policy": "controlled_source_bound", "disposal": "record_only"},
         {"id": "runner-process-tree", "owner": "ExperimentRunner", "target": plan_id, "policy": "runner_owned_descendant_lifecycle", "disposal": "dispose_after_terminal"},
-        {"id": "gpu-leases", "owner": "CanonicalExperimentRunnerBinding", "target": str(request.lock_root), "policy": "shared_scheduler_visibility", "disposal": "owner_callback_after_runner_join"},
+        {"id": "gpu-leases", "owner": "GpuReservationTransaction", "target": str(request.lock_root), "policy": "shared_scheduler_visibility", "disposal": "owner_callback_after_runner_join"},
         {"id": "cpu-affinity", "owner": "ExperimentRunner", "target": request.cpu_requested_set, "policy": "runner_owned", "disposal": "dispose_if_applied"},
         {"id": "gpu-slot", "owner": "ExperimentRunner", "target": gpu_allocation.slot_id, "policy": "runner_owned", "disposal": "dispose_if_allocated"},
         {"id": "temp-handle", "owner": "ExperimentRunner", "target": str(run_root), "policy": "retain_evidence_remove_transient", "disposal": "owner_callback"},
@@ -4644,322 +8333,6 @@ def _readback_processes(raw: object) -> tuple[ProcessIdentity, ...]:
     return tuple(processes)
 
 
-@dataclass
-class ExperimentRunnerPreLaunchAdapter:
-    """The sole pre-launch transport adapter; it never selects or rewrites GPUs."""
-
-    integration_contract: ManagedRunAdapterIntegrationContract
-    _transported_plan_fingerprints: set[str] = field(default_factory=set)
-    _transport_lock: threading.Lock = field(
-        default_factory=threading.Lock,
-        repr=False,
-        compare=False,
-    )
-
-    def pre_launch(
-        self,
-        plan: ExecutionResourcePlan,
-        canonical_environment: MaterializedEnvironment,
-        gpu_allocation: GPUAllocation,
-        runner_transport: RunnerTransport,
-    ) -> PreLaunchContext:
-        try:
-            return self._pre_launch_impl(
-                plan,
-                canonical_environment,
-                gpu_allocation,
-                runner_transport,
-            )
-        except Exception as exc:
-            cleanup = handle_pre_execution_failure(
-                exc,
-                failed_operation="runner_pre_launch",
-                source_state=PlanState.ENV_MATERIALIZED,
-                plan=plan,
-            )
-            raise failure_after_durable_cleanup(exc, cleanup) from exc
-
-    def _pre_launch_impl(
-        self,
-        plan: ExecutionResourcePlan,
-        canonical_environment: MaterializedEnvironment,
-        gpu_allocation: GPUAllocation,
-        runner_transport: RunnerTransport,
-    ) -> PreLaunchContext:
-        _require_state(plan, PlanState.ENV_MATERIALIZED)
-        if (
-            self.integration_contract._provenance
-            is not _MANAGED_RUN_INTEGRATION_PROVENANCE
-            or plan.owner.get("managed_run_integration")
-            != self.integration_contract.record()
-        ):
-            raise PlanStateError("ExperimentRunner pre-launch bypassed the managed-run interface")
-        if canonical_environment.plan_fingerprint != plan.plan_fingerprint:
-            raise EnvironmentReadbackMismatch("environment packet fingerprint mismatch")
-        if canonical_environment.plan != plan:
-            raise PlanStateError("materialized environment is not the current plan snapshot")
-        if gpu_allocation != plan.gpu_allocation:
-            raise PlanStateError("pre-launch allocation is not the frozen allocation")
-        readback_fingerprint = _environment_readback_fingerprint(
-            canonical_environment,
-            gpu_allocation,
-        )
-        probe_observation = plan.resource_probe.observe()
-        final_observation = gpu_allocation.lock_readback.get("final_observation", {})
-        if gpu_allocation.selected_ids and (
-            not isinstance(final_observation, Mapping)
-            or not probe_observation.observation_event_id
-            or not probe_observation.fingerprint
-            or probe_observation.observation_event_id
-            == final_observation.get("event_id")
-            or probe_observation.fingerprint == final_observation.get("fingerprint")
-        ):
-            raise TypedPreflightFailure(
-                "gpu_observation_fingerprint_reused",
-                "prelaunch requires a fresh observation after S_final",
-                s_final=final_observation,
-                prelaunch_event_id=probe_observation.observation_event_id,
-                prelaunch_fingerprint=probe_observation.fingerprint,
-            )
-        cpu_resources = cast(Mapping[str, object], plan.resources["cpu"])
-        payload = {
-            "scheduler_policy": "transport_only_no_reselection_no_rewrite",
-            "canonical_environment": {
-                "plan_fingerprint": plan.plan_fingerprint,
-                "exact_env_map": dict(canonical_environment.exact_env_map),
-                "cuda_visible_devices_uuid_list": canonical_environment.cuda_visible_devices_uuid_list,
-                "xla_jax_preallocation_values": dict(canonical_environment.xla_jax_preallocation_values),
-                "cwd": str(canonical_environment.cwd),
-                "argv": canonical_environment.argv,
-            },
-            "gpu_allocation": {
-                "plan_fingerprint": plan.plan_fingerprint,
-                "caller_allocated_ids": gpu_allocation.caller_allocated_ids,
-                "candidate_ids": gpu_allocation.candidate_ids,
-                "occupied_ids": gpu_allocation.occupied_ids,
-                "reserved_ids": gpu_allocation.reserved_ids,
-                "eligible_ids": gpu_allocation.eligible_ids,
-                "selected_ids": gpu_allocation.selected_ids,
-                "reservation_ids": gpu_allocation.reservation_ids,
-                "allocation_id": gpu_allocation.allocation_id,
-                "allocation_provenance": gpu_allocation.allocation_provenance,
-                "lock_root": str(gpu_allocation.lock_root),
-                "selection_order": gpu_allocation.selection_order,
-                "slot_id": gpu_allocation.slot_id,
-                "free_memory_bytes": gpu_allocation.free_memory_bytes,
-                "memory_bytes": gpu_allocation.memory_bytes,
-                "occupied_process_identities": tuple(
-                    _process_record(process)
-                    for process in gpu_allocation.occupied_process_identities
-                ),
-                "process_identities": tuple(
-                    _process_record(process)
-                    for process in gpu_allocation.process_identities
-                ),
-                "requested_count": gpu_allocation.requested_count,
-                "requested_memory_bytes": gpu_allocation.requested_memory_bytes,
-                "planner_readback_fingerprint": gpu_allocation.readback_fingerprint,
-                "lock_readback": gpu_allocation.lock_readback,
-            },
-            "handoff_metadata": {
-                "plan_fingerprint": plan.plan_fingerprint,
-                "allocation_id": gpu_allocation.allocation_id,
-                "reservation_ids": gpu_allocation.reservation_ids,
-                "readback_fingerprint": readback_fingerprint,
-                "probe_observation_timestamp": probe_observation.observed_at,
-                "probe_observation_fingerprint": probe_observation.fingerprint,
-                "probe_observation_event_id": probe_observation.observation_event_id,
-            },
-            "prelaunch_observation": {
-                "caller_allocated_ids": tuple(sorted(probe_observation.caller_allocated_ids)),
-                "visible_gpu_ids": tuple(sorted(probe_observation.container_visible_ids)),
-                "free_memory_bytes": dict(probe_observation.free_memory_bytes),
-                "process_identities": tuple(
-                    _process_record(process)
-                    for process in probe_observation.process_identities
-                ),
-                "observation_timestamp": probe_observation.observed_at,
-                "observation_fingerprint": probe_observation.fingerprint,
-                "observation_event_id": probe_observation.observation_event_id,
-                "cpu_set": tuple(cast(Sequence[int], cpu_resources["allocated_set"])),
-                "container_id": str(plan.container["container_id"]),
-            },
-        }
-        with self._transport_lock:
-            if plan.plan_fingerprint in self._transported_plan_fingerprints:
-                raise PlanStateError("ExperimentRunner pre-launch adapter called twice")
-            self._transported_plan_fingerprints.add(plan.plan_fingerprint)
-        acknowledgement = runner_transport(payload)
-        if acknowledgement.get("accepted") is not True:
-            raise EnvironmentReadbackMismatch("runner transport did not accept the canonical packet")
-        if acknowledgement.get("canonical_environment") != payload["canonical_environment"]:
-            raise EnvironmentReadbackMismatch("runner transport rewrote the canonical environment")
-        if acknowledgement.get("gpu_allocation") != payload["gpu_allocation"]:
-            raise EnvironmentReadbackMismatch("runner transport rewrote the GPU allocation")
-        if acknowledgement.get("plan_fingerprint") != plan.plan_fingerprint:
-            raise EnvironmentReadbackMismatch("runner transport changed the plan fingerprint")
-        if acknowledgement.get("readback_fingerprint") != readback_fingerprint:
-            raise EnvironmentReadbackMismatch("runner transport changed the environment packet")
-        if acknowledgement.get("scheduler_policy") != payload["scheduler_policy"]:
-            raise EnvironmentReadbackMismatch("runner transport changed the scheduler policy")
-        required_acknowledgement_fields = (
-            "scheduler_policy",
-            "effective_environment",
-            "cwd",
-            "argv",
-            "visible_gpu_ids",
-            "cpu_set",
-            "container_id",
-            "runtime_identity",
-            "allocation_id",
-            "caller_allocated_ids",
-            "reservation_ids",
-            "free_memory_bytes",
-            "process_identities",
-            "requested_memory_bytes",
-            "readback_timestamp",
-            "probe_observation_timestamp",
-            "probe_observation_fingerprint",
-            "probe_observation_event_id",
-        )
-        missing_fields = tuple(
-            field_name
-            for field_name in required_acknowledgement_fields
-            if field_name not in acknowledgement
-        )
-        if missing_fields:
-            raise EnvironmentReadbackMismatch(
-                f"runner transport omitted readback fields: {missing_fields}"
-            )
-        effective_environment = acknowledgement["effective_environment"]
-        free_memory_bytes = acknowledgement["free_memory_bytes"]
-        if not isinstance(effective_environment, Mapping) or not isinstance(
-            free_memory_bytes, Mapping
-        ):
-            raise EnvironmentReadbackMismatch("runner environment/memory readback is malformed")
-        readback_processes = _readback_processes(acknowledgement["process_identities"])
-        probe_processes = probe_observation.process_identities
-        probe_memory = probe_observation.free_memory_bytes
-        probe_allocated = probe_observation.caller_allocated_ids
-        probe_visible = probe_observation.container_visible_ids
-        if (
-            probe_allocated != frozenset(gpu_allocation.caller_allocated_ids)
-            or tuple(cast(Sequence[str], acknowledgement["caller_allocated_ids"]))
-            != tuple(gpu_allocation.caller_allocated_ids)
-            or probe_processes != readback_processes
-            or tuple(cast(Sequence[str], acknowledgement["visible_gpu_ids"]))
-            != tuple(sorted(probe_visible))
-            or acknowledgement["probe_observation_timestamp"]
-            != probe_observation.observed_at
-            or acknowledgement["probe_observation_fingerprint"]
-            != probe_observation.fingerprint
-            or acknowledgement["probe_observation_event_id"]
-            != probe_observation.observation_event_id
-            or any(
-                cast(Mapping[str, int], free_memory_bytes).get(uuid, -1)
-                != probe_memory.get(uuid, -2)
-                for uuid in gpu_allocation.selected_ids
-            )
-        ):
-            raise EnvironmentReadbackMismatch(
-                "runner readback differs from allocation/process/memory/visibility probe"
-            )
-        readback = EffectiveEnvironmentReadback(
-            environment=cast(Mapping[str, str], effective_environment),
-            cwd=Path(cast(str, acknowledgement["cwd"])),
-            argv=tuple(cast(Sequence[str], acknowledgement["argv"])),
-            visible_gpu_ids=tuple(
-                cast(Sequence[str], acknowledgement["visible_gpu_ids"])
-            ),
-            cpu_set=tuple(cast(Sequence[int], acknowledgement["cpu_set"])),
-            container_id=cast(str, acknowledgement["container_id"]),
-            runtime_identity=cast(str, acknowledgement["runtime_identity"]),
-            allocation_id=cast(str, acknowledgement["allocation_id"]),
-            caller_allocated_ids=tuple(
-                cast(Sequence[str], acknowledgement["caller_allocated_ids"])
-            ),
-            reservation_ids=tuple(
-                cast(Sequence[str], acknowledgement["reservation_ids"])
-            ),
-            free_memory_bytes=cast(Mapping[str, int], free_memory_bytes),
-            process_identities=readback_processes,
-            requested_memory_bytes=cast(
-                int,
-                acknowledgement["requested_memory_bytes"],
-            ),
-            probe_observation_timestamp=cast(
-                str,
-                acknowledgement["probe_observation_timestamp"],
-            ),
-            probe_observation_fingerprint=cast(
-                str,
-                acknowledgement["probe_observation_fingerprint"],
-            ),
-            probe_observation_event_id=cast(
-                str,
-                acknowledgement["probe_observation_event_id"],
-            ),
-            readback_timestamp=cast(str, acknowledgement["readback_timestamp"]),
-        )
-        readback = replace(
-            readback,
-            readback_fingerprint=_effective_readback_fingerprint(readback),
-        )
-        certificate = _verify_effective_environment_impl(
-            plan,
-            readback,
-            probe_observation=probe_observation,
-        )
-        execute_plan = _transition_plan(
-            certificate.plan,
-            PlanState.EFFECTIVE_ENV_READBACK_VERIFIED,
-            PlanState.EXECUTE,
-            evidence={
-                "pre_launch_transport": {
-                    "readback_fingerprint": readback_fingerprint,
-                    "transported_exactly_once": True,
-                    "scheduler_policy": payload["scheduler_policy"],
-                }
-            },
-        )
-        return PreLaunchContext(
-            plan=execute_plan,
-            certificate=certificate,
-            plan_fingerprint=plan.plan_fingerprint,
-            transport_payload=payload,
-            readback_fingerprint=readback_fingerprint,
-        )
-
-
-def execute_with_experiment_runner(
-    plan: ExecutionResourcePlan,
-    pre_launch_context: PreLaunchContext,
-    runner_port: ExperimentRunnerExecutionPort,
-    *,
-    task: Callable[..., object],
-    cases: list[object],
-    context_builder: Callable[..., object],
-    initializer: Callable[..., object],
-    resource_estimator: Callable[..., object],
-    skip_controller: object | None = None,
-) -> object:
-    """Execute through the external ExperimentRunner port only."""
-    _require_state(plan, PlanState.EXECUTE)
-    if pre_launch_context.plan_fingerprint != plan.plan_fingerprint:
-        raise PlanStateError("runner context does not belong to the frozen plan")
-    if pre_launch_context.plan != plan:
-        raise PlanStateError("runner context is not the current execute snapshot")
-    return runner_port.execute(
-        plan=plan,
-        task=task,
-        cases=cases,
-        context_builder=context_builder,
-        initializer=initializer,
-        resource_estimator=resource_estimator,
-        skip_controller=skip_controller,
-    )
-
-
 def record_terminal(
     plan: ExecutionResourcePlan,
     execution_result: object | None,
@@ -5219,7 +8592,7 @@ def release_runner_owned_gpu_leases(
                 }
             )
     return {
-        "owner": "CanonicalExperimentRunnerBinding",
+        "owner": "GpuReservationTransaction",
         "plan_fingerprint": plan_fingerprint,
         "runner_quiescence_evidence": runner_quiescence_evidence,
         "released_gpu_ids": tuple(sorted(released)),
@@ -5235,9 +8608,9 @@ def dispose_resources(
     terminal: TerminalEvidence,
     *,
     completion_coverage_adapter: CompletionCoverageAdapter,
-    completion_coverage_input: CompletionCoverageInput,
+    completion_coverage_input: _LegacyPlannerCoverageRecord,
     runner_quiescence_evidence: Mapping[str, object],
-    side_effect_disposers: Mapping[str, SideEffectDisposer] | None = None,
+    side_effect_disposers: Mapping[str, object] | None = None,
     next_owner: str = "CompletionCoverage",
 ) -> CleanupEvidence:
     """Release only resources proven free; retain descendants without force-kill."""
@@ -5342,7 +8715,7 @@ def dispose_resources(
                 leaks.append(candidate_disposition)
         except Exception as exc:
             runner_lease_disposition = {
-                "owner": "CanonicalExperimentRunnerBinding",
+                "owner": "GpuReservationTransaction",
                 "released_gpu_ids": (),
                 "retained_gpu_ids": tuple(
                     sorted(lease.uuid for lease in plan.gpu_allocation.leases)
@@ -5712,7 +9085,9 @@ def dispose_resources(
         effective_env_certificate_matches=certificate_matches,
         cleanup_has_unresolved_leak_or_unknown=bool(leaks),
     )
-    completion_coverage = completion_coverage_adapter.record_once(final_coverage_input)
+    completion_coverage = completion_coverage_adapter._record_legacy_once(
+        final_coverage_input
+    )
     closeout_payload = {
         "schema_version": "closeout-evidence/v1",
         "plan_fingerprint": plan.plan_fingerprint,
@@ -5791,52 +9166,105 @@ def _require_state(plan: ExecutionResourcePlan, state: PlanState) -> None:
 
 
 __all__ = [
+    "AbsolutePosixPath",
     "ALTERNATE_GPU_ROUTE_STATIC_CONTRACT",
+    "AdmittedEnvironment",
     "CALLER_ALLOCATION_PROVENANCE",
     "COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION",
+    "CONTAINER_RUNTIME_ROOT",
     "CleanupEvidence",
     "CloseoutEvidence",
     "CompletionCoverage",
     "CompletionCoverageAdapter",
     "CompletionCoverageFailure",
     "CompletionCoverageInput",
+    "ConcurrentRunEvidence",
+    "CudaRuntimeCapabilityReceipt",
     "DiscoveredResources",
     "EffectiveEnvironmentReadback",
     "EnvironmentCertificate",
     "EnvironmentReadbackMismatch",
+    "EvidenceAbsence",
+    "EvidenceAbsenceField",
+    "EvidenceDisposition",
+    "EvidenceFd",
+    "FailureRecord",
     "ExecutionResourcePlan",
-    "ExperimentRunnerExecutionPort",
-    "ExperimentRunnerPreLaunchAdapter",
+    "FdDisposition",
+    "FdReleaseEvidence",
     "GPUAllocation",
     "GPUDevice",
+    "GpuProcessOccupancyProbe",
+    "GpuReservationTransaction",
+    "GpuRunRequest",
+    "HOST_RUNTIME_ROOT",
+    "JsonScalar",
+    "JsonValue",
     "ManagedRunAdapterIntegrationContract",
+    "ManagedGpuOutcome",
+    "ManagedGpuOutcomeReducer",
     "MaterializedEnvironment",
+    "NvidiaDriverVersion",
+    "NvidiaInventory",
+    "NvidiaInventoryProbe",
+    "NvidiaListEvidence",
     "NvidiaSMIResourceProbe",
+    "NvidiaTopologyJoin",
+    "ParsedNvidiaXml",
     "PlanState",
     "PlanStateError",
     "PartialEvidence",
     "PreExecutionFailureCleanupEvidence",
     "PreExecutionFailureTerminalEvidence",
-    "PreLaunchContext",
+    "ProcessOccupancyEvidence",
     "ProcessIdentity",
+    "PostToolUseProjectionReducer",
     "ResourcePlanError",
     "ResourceObservation",
     "ResourceProbe",
     "ResourceRequest",
+    "ReservationEvidence",
+    "RunGpuAdmissionReceipt",
+    "RuntimeIdentityReader",
+    "RuntimeIdentityReceipt",
+    "RuntimeRoute",
+    "DescendantRetentionEvidence",
+    "MigEvidence",
+    "UuidVisibilityEvidence",
+    "LockPlacementEvidence",
+    "SharedRuntimeProvisionReceipt",
+    "SharedRuntimeReadbackReceipt",
+    "Sha256Hex",
+    "LockReadback",
+    "SourceFileRecord",
+    "SourceFreezeOwner",
+    "SourceFreezeReceipt",
+    "SourceSnapshotManifest",
+    "SourceSnapshotRecord",
     "StaleReclaimEvidence",
     "TerminalEvidence",
     "TypedPreflightFailure",
     "UUIDReservationStore",
     "discover_resources",
+    "build_completion_coverage_input",
+    "build_source_path_set",
+    "capture_cuda_runtime_capability",
     "dispose_resources",
-    "execute_with_experiment_runner",
     "failure_after_durable_cleanup",
+    "freeze_source_tree",
     "freeze_resource_plan",
     "handle_pre_execution_failure",
     "materialize_environment",
     "managed_run_adapter_integration_contract",
     "plan_gpu_allocation",
+    "parse_nvidia_driver_version",
+    "parse_nvidia_smi_list",
+    "parse_nvidia_smi_xml",
     "record_terminal",
+    "read_shared_runtime_provision",
+    "read_shared_runtime_readback",
     "release_runner_owned_gpu_leases",
+    "validate_absolute_posix_path",
     "verify_effective_environment",
+    "write_runtime_receipt_atomic",
 ]

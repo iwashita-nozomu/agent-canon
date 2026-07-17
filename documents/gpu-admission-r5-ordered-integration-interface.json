@@ -1,0 +1,22 @@
+{
+  "schema": "agent-canon.gpu-admission-r5.ordered-integration-interface.v1",
+  "source_packet_sha256": "23294f2606214157ed04e822128e29ece07ffd9f52223962199c87d3c0ce8d0d",
+  "fixed_experiment_runner_commit": "ff97eccd9c3044566cd50b950e9b9717eb4b77bd",
+  "route": [
+    "SourceFreezeOwner.freeze",
+    "RuntimeIdentityReader.read",
+    "NvidiaInventoryProbe.observe",
+    "GpuProcessOccupancyProbe.observe",
+    "GpuReservationTransaction.try_reserve",
+    "immutable_plan",
+    "AdmittedEnvironmentBuilder.build",
+    "StandardFullResourceScheduler.from_worker",
+    "StandardRunner.run",
+    "RunGpuAdmissionContext.reverse_release",
+    "ManagedGpuOutcomeReducer.reduce_terminal",
+    "CompletionCoverageAdapter.record_once",
+    "PostToolUseProjectionReducer.project"
+  ],
+  "composition_root": "execute_managed_run",
+  "alternate_managed_routes": []
+}

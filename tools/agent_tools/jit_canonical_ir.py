@@ -3,8 +3,8 @@
 # contract tool
 # responsibility Extracts JIT-canonical operational IR and backend witnesses from a lowered Python root.
 # upstream design ../../documents/tools/jit_canonical_ir.md defines StableHLO/backend witness extraction.
-# upstream implementation ../experiments/execution_resource_plan.py owns GPU discovery, reservation, and typed prohibition of alternate GPU routes.
-# upstream implementation ../experiments/run_managed_experiment.py owns the only managed ExperimentRunner GPU entrypoint.
+# upstream implementation ../experiments/execution_resource_plan.py owns GPU discovery, reservation, and the frozen admission plan.
+# upstream implementation ../experiments/run_managed_experiment.py owns the only managed ExperimentRunner entrypoint and applies the admitted environment.
 # downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers this JSON into Lean defs.
 # downstream implementation ../../tests/agent_tools/test_jit_canonical_ir.py validates the schema on a tiny JAX root.
 # @dependency-end

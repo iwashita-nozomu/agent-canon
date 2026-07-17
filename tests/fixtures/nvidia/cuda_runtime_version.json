@@ -1,0 +1,9 @@
+{
+  "schema_version": "cuda-runtime-version/v1",
+  "library_realpath": "/usr/local/cuda/lib64/libcudart.so",
+  "library_sha256": "fixture-only",
+  "cuda_runtime_get_version_raw": 12040,
+  "cuda_runtime_major": 12,
+  "cuda_runtime_minor": 4,
+  "receipt_fingerprint": "fixture-only"
+}

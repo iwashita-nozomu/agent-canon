@@ -41,6 +41,16 @@ HOST_CODEX_HOME = Path.home() / ".codex"
 HOST_GH_CONFIG = Path.home() / ".config" / "gh"
 HOST_SSH_DIR = Path.home() / ".ssh"
 BUILDER_INFO_TIMEOUT_SECONDS = 15
+HOST_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+CONTAINER_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+RUNTIME_GROUP_NAME = "agent-canon-runtime"
+PROCESS_UMASK = 0o0007
+DIRECTORY_MODE = 0o2770
+FILE_MODE = 0o0660
+LOCAL_FLOCK_FILESYSTEMS = ("btrfs", "ext4", "xfs")
+PROVISION_RECEIPT_NAME = "shared-runtime-provision.v4.json"
+READBACK_RECEIPT_NAME = "shared-runtime-readback.v4.json"
+RUNTIME_ROUTE = "MANAGED_CONTAINER"
 
 
 @dataclass(frozen=True)

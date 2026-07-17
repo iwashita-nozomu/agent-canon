@@ -564,6 +564,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(
             post_tool_scripts,
             [
+                "execution_resource_plan_projection_guard.py",
                 "skill_usage_logger.py",
                 "reference_capture_guard.py",
                 "task_authority_schema_guard.py",

@@ -228,7 +228,7 @@ def write_valid_devcontainer_files(root: Path) -> None:
             [
                 "{",
                 '  "name": "${localWorkspaceFolderBasename}-devcontainer",',
-                '  "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",',
+                '  "initializeCommand": "bash .devcontainer/bootstrap-shared-runtime.sh && bash .devcontainer/generate-runtime-compose.sh",',
                 '  "dockerComposeFile": "docker-compose.generated.yml",',
                 '  "service": "workspace",',
                 '  "workspaceFolder": "/workspace",',
@@ -241,10 +241,34 @@ def write_valid_devcontainer_files(root: Path) -> None:
     )
     write_file(
         root,
+        ".devcontainer/finalize-shared-runtime.sh",
+        "\n".join(
+            [
+                "shared-runtime-readback/v1",
+                "shared-runtime-readback.v4.json",
+                "os.O_NOFOLLOW",
+                "os.fstat(probe_fd)",
+                "os.stat(probe_path, follow_symlinks=False)",
+                "stat.S_ISREG",
+                "stat.S_IMODE",
+                "candidate.st_dev",
+                "candidate.st_ino",
+                "candidate.st_gid",
+                "/proc/self/mountinfo",
+                "/proc/self/ns/mnt",
+                "O_TMPFILE",
+                "libc.linkat",
+                "",
+            ]
+        ),
+    )
+    write_file(
+        root,
         ".devcontainer/post-create.sh",
         "\n".join(
             [
                 "#!/usr/bin/env bash",
+                "finalize-shared-runtime.sh",
                 "run_as_root",
                 "apt_install gh",
                 "bash /workspace/docker/register_safe_directories.sh /workspace",
@@ -294,6 +318,14 @@ def write_valid_devcontainer_files(root: Path) -> None:
                 "AGENT_CANON_SECRET_DIR",
                 "AGENT_CANON_SECRET_MOUNT",
                 "AGENT_CANON_SECRET_DIR_MODE",
+                'user: "${LOCAL_UID}:${LOCAL_GID}"',
+                "group_add:",
+                '"${AGENT_CANON_RUNTIME_GID}"',
+                "source: /var/lib/agent-canon/runtime",
+                "target: /var/lib/agent-canon/runtime",
+                'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
+                'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
+                'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/receipts/shared-runtime-provision.v4.json"',
                 "printf '%s\\n' \"$pack\" \"$output\" \"$DEVCONTAINER_PROJECT_NAME\"",
                 "",
             ]
@@ -311,7 +343,7 @@ def write_valid_devcontainer_only(root: Path) -> None:
             [
                 "{",
                 '  "name": "${localWorkspaceFolderBasename}-devcontainer",',
-                '  "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",',
+                '  "initializeCommand": "bash .devcontainer/bootstrap-shared-runtime.sh && bash .devcontainer/generate-runtime-compose.sh",',
                 '  "dockerComposeFile": "docker-compose.generated.yml",',
                 '  "service": "workspace",',
                 '  "workspaceFolder": "/workspace",',
@@ -324,10 +356,34 @@ def write_valid_devcontainer_only(root: Path) -> None:
     )
     write_file(
         root,
+        ".devcontainer/finalize-shared-runtime.sh",
+        "\n".join(
+            [
+                "shared-runtime-readback/v1",
+                "shared-runtime-readback.v4.json",
+                "os.O_NOFOLLOW",
+                "os.fstat(probe_fd)",
+                "os.stat(probe_path, follow_symlinks=False)",
+                "stat.S_ISREG",
+                "stat.S_IMODE",
+                "candidate.st_dev",
+                "candidate.st_ino",
+                "candidate.st_gid",
+                "/proc/self/mountinfo",
+                "/proc/self/ns/mnt",
+                "O_TMPFILE",
+                "libc.linkat",
+                "",
+            ]
+        ),
+    )
+    write_file(
+        root,
         ".devcontainer/post-create.sh",
         "\n".join(
             [
                 "#!/usr/bin/env bash",
+                "finalize-shared-runtime.sh",
                 "run_as_root",
                 "apt_install gh",
                 "docker/register_safe_directories.sh",
@@ -377,6 +433,14 @@ def write_valid_devcontainer_only(root: Path) -> None:
                 "AGENT_CANON_SECRET_DIR",
                 "AGENT_CANON_SECRET_MOUNT",
                 "AGENT_CANON_SECRET_DIR_MODE",
+                'user: "${LOCAL_UID}:${LOCAL_GID}"',
+                "group_add:",
+                '"${AGENT_CANON_RUNTIME_GID}"',
+                "source: /var/lib/agent-canon/runtime",
+                "target: /var/lib/agent-canon/runtime",
+                'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
+                'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
+                'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/receipts/shared-runtime-provision.v4.json"',
                 "printf '%s\\n' \"$pack\" \"$output\" \"$DEVCONTAINER_PROJECT_NAME\" \"$compose_mode\" \"$image\"",
                 "",
             ]

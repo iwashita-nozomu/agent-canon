@@ -74,6 +74,7 @@ FORBIDDEN_DOCKERFILE_PATTERNS = (
     ),
 )
 REQUIRED_POST_CREATE_SNIPPETS = (
+    "finalize-shared-runtime.sh",
     "run_as_root",
     "docker/register_safe_directories.sh",
     "docker/install_python_dependencies.sh",
@@ -443,6 +444,39 @@ def validate_post_create(root: Path) -> list[Finding]:
     return findings
 
 
+def validate_finalize_shared_runtime_script(devcontainer_dir: Path) -> list[Finding]:
+    """Validate the readback-only shared-runtime finalizer contract."""
+    path = devcontainer_dir / "finalize-shared-runtime.sh"
+    relative = ".devcontainer/finalize-shared-runtime.sh"
+    if not path.is_file():
+        return [Finding("missing_file", relative, "missing")]
+    script = path.read_text(encoding="utf-8")
+    findings = [
+        Finding("dependency_contract_violation", relative, f"missing:{snippet}")
+        for snippet in (
+            "shared-runtime-readback/v1",
+            "shared-runtime-readback.v4.json",
+            "os.O_NOFOLLOW",
+            "os.fstat(probe_fd)",
+            "os.stat(probe_path, follow_symlinks=False)",
+            "stat.S_ISREG",
+            "stat.S_IMODE",
+            "candidate.st_dev",
+            "candidate.st_ino",
+            "candidate.st_gid",
+            "/proc/self/mountinfo",
+            "/proc/self/ns/mnt",
+            "O_TMPFILE",
+            "libc.linkat",
+        )
+        if snippet not in script
+    ]
+    for snippet in ("run_as_root", "chown", "O_TRUNC", "O_CREAT"):
+        if snippet in script:
+            findings.append(Finding("inconsistency", relative, f"forbidden:{snippet}"))
+    return findings
+
+
 def validate_python_dependency_installer(root: Path) -> list[Finding]:
     """Validate the central Python dependency installer script."""
     path = root / "docker" / "install_python_dependencies.sh"
@@ -481,7 +515,7 @@ def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
     findings: list[Finding] = []
     expected_json = {
         "name": "${localWorkspaceFolderBasename}-devcontainer",
-        "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",
+        "initializeCommand": "bash .devcontainer/bootstrap-shared-runtime.sh && bash .devcontainer/generate-runtime-compose.sh",
         "dockerComposeFile": "docker-compose.generated.yml",
         "service": "workspace",
         "postCreateCommand": "bash .devcontainer/post-create.sh /workspace",
@@ -525,6 +559,14 @@ def validate_generate_runtime_compose_script(devcontainer_dir: Path) -> list[Fin
         "AGENT_CANON_SECRET_DIR",
         "AGENT_CANON_SECRET_MOUNT",
         "AGENT_CANON_SECRET_DIR_MODE",
+        'user: "${LOCAL_UID}:${LOCAL_GID}"',
+        'group_add:',
+        '"${AGENT_CANON_RUNTIME_GID}"',
+        "source: /var/lib/agent-canon/runtime",
+        "target: /var/lib/agent-canon/runtime",
+        'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
+        'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
+        'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/receipts/shared-runtime-provision.v4.json"',
         "vendor/agent-canon",
     ):
         findings.extend(validate_generate_runtime_compose_snippet(script, snippet))
@@ -558,10 +600,19 @@ def validate_generated_compose(devcontainer_dir: Path, pack: PackConfig) -> list
         "name:",
         "services:",
         "workspace:",
+        'user: "${LOCAL_UID}:${LOCAL_GID}"',
+        "group_add:",
+        '- "${AGENT_CANON_RUNTIME_GID}"',
         "context: ..",
         f"dockerfile: {pack.dockerfile}",
         f"working_dir: {pack.workdir}",
         f"- ..:{pack.workspace_mount}:cached",
+        "type: bind",
+        "source: /var/lib/agent-canon/runtime",
+        "target: /var/lib/agent-canon/runtime",
+        'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
+        'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
+        'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/receipts/shared-runtime-provision.v4.json"',
     )
     findings = [
         Finding("inconsistency", ".devcontainer/docker-compose.generated.yml", f"missing:{snippet}")
@@ -591,6 +642,7 @@ def validate_devcontainer(root: Path) -> list[Finding]:
         return findings
 
     findings.extend(validate_devcontainer_json(config))
+    findings.extend(validate_finalize_shared_runtime_script(devcontainer_dir))
     post_attach = devcontainer_dir / "post-attach.sh"
     if not post_attach.is_file():
         findings.append(Finding("missing_file", ".devcontainer/post-attach.sh", "missing"))

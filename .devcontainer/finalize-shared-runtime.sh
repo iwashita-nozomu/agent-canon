@@ -1,0 +1,264 @@
+#!/usr/bin/env bash
+# @dependency-start
+# contract environment
+# responsibility Reads back the container shared AgentCanon runtime namespace after Compose bind.
+# upstream design ../CONTAINER_OPERATIONS.md exact shared-runtime identity and namespace contract
+# upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
+# upstream implementation bootstrap-shared-runtime.sh publishes the host provision receipt
+# downstream implementation post-attach.sh reports the readback receipt observationally
+# @dependency-end
+
+set -euo pipefail
+
+runtime_root="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-/var/lib/agent-canon/runtime}"
+runtime_route="${AGENT_CANON_RUNTIME_ROUTE:-MANAGED_CONTAINER}"
+provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/receipts/shared-runtime-provision.v4.json}"
+readback_receipt="${runtime_root}/receipts/shared-runtime-readback.v4.json"
+locks_root="${runtime_root}/locks"
+receipts_root="${runtime_root}/receipts"
+probe_path="${locks_root}/bootstrap-probe.lock"
+
+fail() {
+  printf 'shared runtime finalize failed: %s\n' "$1" >&2
+  exit 1
+}
+
+[ "$runtime_route" = "MANAGED_CONTAINER" ] || fail "runtime route is not MANAGED_CONTAINER"
+[ "$runtime_root" = "/var/lib/agent-canon/runtime" ] || fail "shared runtime target is not canonical"
+[ "$provision_receipt" = "${runtime_root}/receipts/shared-runtime-provision.v4.json" ] || fail "provision receipt path is not canonical"
+
+container_uid="$(id -u)"
+container_gid="$(id -g)"
+[ "$container_uid" -ne 0 ] || fail "UID 0 is not a valid managed runtime identity"
+container_supplementary_gids="$(id -G | tr ' ' '\n' | sort -n | uniq | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+
+for directory in "$runtime_root" "$locks_root" "$receipts_root"; do
+  [ ! -L "$directory" ] || fail "runtime directory must not be a symlink: $directory"
+  [ -d "$directory" ] || fail "runtime directory is missing: $directory"
+  [ "$(stat -c '%a' "$directory")" = "2770" ] || fail "runtime directory mode is not 02770: $directory"
+done
+
+runtime_gid="$(stat -c '%g' "$runtime_root")"
+[ "$runtime_gid" -ne 0 ] || fail "runtime group GID must not be zero"
+case " $container_supplementary_gids " in
+  *" $runtime_gid "*) ;;
+  *) fail "container session is missing runtime group $runtime_gid" ;;
+esac
+
+python3 - "$provision_receipt" "$readback_receipt" "$runtime_root" "$probe_path" "$runtime_route" "$runtime_gid" "$container_uid" "$container_gid" "$container_supplementary_gids" <<'PY'
+from __future__ import annotations
+
+import ctypes
+import fcntl
+import hashlib
+import json
+import os
+import stat
+import sys
+
+(
+    provision_path,
+    readback_path,
+    runtime_root,
+    probe_path,
+    runtime_route,
+    raw_runtime_gid,
+    raw_container_uid,
+    raw_container_gid,
+    raw_container_groups,
+) = sys.argv[1:]
+runtime_gid = int(raw_runtime_gid)
+container_uid = int(raw_container_uid)
+container_gid = int(raw_container_gid)
+container_groups = tuple(int(value) for value in raw_container_groups.split())
+
+
+def canonical_bytes(value: object) -> bytes:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    ).encode("utf-8")
+
+
+def read_receipt(path: str) -> dict[str, object]:
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        descriptor = os.fstat(fd)
+        if not stat.S_ISREG(descriptor.st_mode):
+            raise OSError(f"receipt is not a regular file: {path}")
+        if stat.S_IMODE(descriptor.st_mode) != 0o660:
+            raise OSError(f"receipt mode is not 0660: {path}")
+        if descriptor.st_gid != runtime_gid or descriptor.st_uid != container_uid:
+            raise OSError(f"receipt identity differs: {path}")
+        if descriptor.st_size <= 0 or descriptor.st_size > 65536:
+            raise OSError(f"receipt size is outside the bounded range: {path}")
+        raw = os.pread(fd, descriptor.st_size, 0)
+        if len(raw) != descriptor.st_size:
+            raise OSError(f"receipt read was incomplete: {path}")
+    finally:
+        os.close(fd)
+    value = json.loads(raw.decode("utf-8"))
+    if not isinstance(value, dict):
+        raise OSError(f"receipt JSON is not an object: {path}")
+    return value
+
+
+provision = read_receipt(provision_path)
+provision_keys = {
+    "schema_version",
+    "runtime_route",
+    "host_uid",
+    "host_gid",
+    "host_supplementary_gids",
+    "host_umask",
+    "bind_source_path",
+    "bind_source_dev",
+    "bind_source_ino",
+    "provision_fingerprint",
+}
+if set(provision) != provision_keys:
+    raise OSError("provision receipt fields are not exact")
+provision_without_fingerprint = dict(provision)
+fingerprint = provision_without_fingerprint.pop("provision_fingerprint")
+if not isinstance(fingerprint, str) or hashlib.sha256(
+    canonical_bytes(provision_without_fingerprint)
+).hexdigest() != fingerprint:
+    raise OSError("provision receipt fingerprint does not match")
+if provision["schema_version"] != "shared-runtime-provision/v1":
+    raise OSError("provision receipt schema is not shared-runtime-provision/v1")
+if provision["runtime_route"] != runtime_route:
+    raise OSError("provision receipt route differs")
+if provision["host_uid"] != container_uid or provision["host_gid"] != container_gid:
+    raise OSError("Compose user identity differs from host provision identity")
+if tuple(provision["host_supplementary_gids"]) != container_groups:
+    raise OSError("Compose supplementary groups differ from host provision identity")
+if provision["host_umask"] != 0o0007:
+    raise OSError("host provision umask is not 0007")
+
+root_stat = os.stat(runtime_root, follow_symlinks=False)
+if provision["bind_source_path"] != runtime_root:
+    raise OSError("provision bind source path differs")
+if provision["bind_source_dev"] != root_stat.st_dev or provision["bind_source_ino"] != root_stat.st_ino:
+    raise OSError("provision bind source identity differs")
+
+mount_record: tuple[int, int, str] | None = None
+with open("/proc/self/mountinfo", encoding="utf-8") as mountinfo:
+    for line in mountinfo:
+        before_separator, _, _ = line.rstrip("\n").partition(" - ")
+        fields = before_separator.split()
+        if len(fields) >= 5 and fields[4] == runtime_root:
+            mount_record = (int(fields[0]), int(fields[1]), fields[3])
+            break
+if mount_record is None:
+    raise OSError("shared runtime bind target is absent from mountinfo")
+mount_id, mount_parent_id, mount_root = mount_record
+if mount_root != "/":
+    raise OSError("shared runtime bind target mount root is not /")
+namespace_inode = os.stat("/proc/self/ns/mnt", follow_symlinks=False).st_ino
+if namespace_inode <= 0 or mount_id <= 0 or mount_parent_id <= 0:
+    raise OSError("shared runtime namespace or mount identity is invalid")
+
+probe_fd = os.open(probe_path, os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW)
+try:
+    probe_descriptor = os.fstat(probe_fd)
+    probe_path_stat = os.stat(probe_path, follow_symlinks=False)
+    for label, candidate in (("fd", probe_descriptor), ("path", probe_path_stat)):
+        if not stat.S_ISREG(candidate.st_mode):
+            raise OSError(f"probe {label} is not a regular file")
+        if candidate.st_dev != root_stat.st_dev:
+            raise OSError(f"probe {label} is on a different device")
+        if candidate.st_ino <= 0:
+            raise OSError(f"probe {label} has no valid inode")
+        if stat.S_IMODE(candidate.st_mode) != 0o660:
+            raise OSError(f"probe {label} mode is not 0660")
+        if candidate.st_gid != runtime_gid:
+            raise OSError(f"probe {label} group differs")
+        if candidate.st_uid != container_uid:
+            raise OSError(f"probe {label} owner differs")
+    if (probe_descriptor.st_dev, probe_descriptor.st_ino) != (
+        probe_path_stat.st_dev,
+        probe_path_stat.st_ino,
+    ):
+        raise OSError("probe path identity differs from opened fd")
+    fcntl.flock(probe_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    fcntl.flock(probe_fd, fcntl.LOCK_UN)
+finally:
+    os.close(probe_fd)
+
+with open("/proc/self/status", encoding="ascii") as status_file:
+    status_umask = next(
+        line.split(":", 1)[1].strip()
+        for line in status_file
+        if line.startswith("Umask:")
+    )
+container_umask = int(status_umask, 8)
+if container_umask != 0o0007:
+    raise OSError("container umask is not 0007")
+
+readback = {
+    "schema_version": "shared-runtime-readback/v1",
+    "runtime_route": runtime_route,
+    "container_uid": container_uid,
+    "container_gid": container_gid,
+    "container_supplementary_gids": container_groups,
+    "container_umask": container_umask,
+    "bind_target_path": runtime_root,
+    "bind_target_dev": root_stat.st_dev,
+    "bind_target_ino": root_stat.st_ino,
+    "namespace_inode": namespace_inode,
+    "mount_id": mount_id,
+    "mount_parent_id": mount_parent_id,
+    "mount_root": mount_root,
+    "probe_fd_disposition": "closed",
+}
+readback["readback_fingerprint"] = hashlib.sha256(canonical_bytes(readback)).hexdigest()
+data = canonical_bytes(readback) + b"\n"
+
+parent_path = os.path.dirname(readback_path)
+if not hasattr(os, "O_TMPFILE"):
+    raise OSError("atomic shared runtime readback publication requires O_TMPFILE")
+parent_fd = os.open(parent_path, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+temporary_fd = os.open(parent_path, os.O_TMPFILE | os.O_WRONLY | os.O_CLOEXEC, 0o660)
+try:
+    os.fchmod(temporary_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
+    view = memoryview(data)
+    while view:
+        written = os.write(temporary_fd, view)
+        if written <= 0:
+            raise OSError("shared runtime readback write made no progress")
+        view = view[written:]
+    os.fsync(temporary_fd)
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.linkat.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+    ]
+    libc.linkat.restype = ctypes.c_int
+    if libc.linkat(temporary_fd, b"", -100, os.fsencode(readback_path), 0x1000) != 0:
+        error_number = ctypes.get_errno()
+        raise OSError(error_number, os.strerror(error_number), readback_path)
+    os.fsync(parent_fd)
+finally:
+    os.close(temporary_fd)
+    os.close(parent_fd)
+
+published = os.stat(readback_path, follow_symlinks=False)
+if not stat.S_ISREG(published.st_mode):
+    raise OSError("published readback receipt is not a regular file")
+if published.st_dev != root_stat.st_dev or published.st_ino <= 0:
+    raise OSError("published readback receipt identity is invalid")
+if stat.S_IMODE(published.st_mode) != 0o660 or published.st_gid != runtime_gid:
+    raise OSError("published readback receipt mode or group differs")
+if published.st_uid != container_uid:
+    raise OSError("published readback receipt owner differs")
+PY
+
+printf 'SHARED_RUNTIME_FINALIZE=pass route=%s target=%s readback=%s group=%s\n' \
+  "$runtime_route" "$runtime_root" "$readback_receipt" "$runtime_gid"
+printf 'AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT=%s\n' "$readback_receipt"

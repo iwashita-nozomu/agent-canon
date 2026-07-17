@@ -14,6 +14,8 @@
 set -euo pipefail
 
 workspace="${1:-/workspace}"
+devcontainer_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"${devcontainer_dir}/finalize-shared-runtime.sh"
 node_version="${NODE_VERSION:-22.14.0}"
 rust_toolchain="${RUST_TOOLCHAIN:-stable}"
 lean_toolchain="${AGENT_CANON_LEAN_TOOLCHAIN:-leanprover/lean4:v4.30.0}"
