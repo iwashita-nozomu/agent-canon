@@ -353,6 +353,7 @@ def resolve_publication_authority(workspace: Path) -> dict[str, object]:
                     expected_target,
                     source_commit,
                 ],
+                code="publication_authority:target_not_source_successor",
             ).returncode
             != 0
         ):
