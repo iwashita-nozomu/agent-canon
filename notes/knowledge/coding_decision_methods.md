@@ -84,7 +84,7 @@ upstream design README.md notes lifecycle index
 - Before coding: run the required startup checks, fill `user_request_contract.md`, and search local docs/code for reuse candidates.
 - During coding: keep implementation tied to clause IDs and avoid mixing unrelated refactors, protocol changes, runtime flags, or performance experiments into the same change unless the contract requires it.
 - During review: require review artifacts to state spec-to-product gaps and unapplied findings; the implementation is not complete while such gaps remain.
-- During closeout: `closeout_gate.md` must have `spec_product_coverage_complete: yes` and `review_findings_integrated: yes`; `task_close.py` should be the mechanical final gate.
+- During closeout: `closeout_gate.md` must have `completion_coverage_consumer: yes`, `coverage_check.ok: true`, and an empty `completion_boundary.topology_errors`; `task_close.py` should be the mechanical final gate.
 
 ## Practical Commands Or Paths
 

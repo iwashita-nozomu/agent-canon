@@ -16,9 +16,7 @@
 # upstream implementation ../../.codex/hooks/cause_investigation_guard.py blocks code edits without cause evidence
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py blocks OOP readability failures
 # upstream implementation ../../.codex/hooks/library_implementation_guard.py blocks library implementation rewrites
-# upstream implementation ../../.codex/hooks/helper_first_guard.py blocks helper-first implementation drift
 # upstream implementation ../../.codex/hooks/style_checker_guard.py blocks selected style checker failures
-# upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
 # upstream implementation ./responsibility_scope.py validates responsibility owner scopes
 # downstream implementation ../../tools/agent_tools/agent_team.py injects preflight protocol into team manifests
 # downstream implementation ../../tests/agent_tools/test_tool_rejection_preflight.py validates predicted gate routing
@@ -226,24 +224,14 @@ PYTHON_GATE_TEMPLATES = (
         ),
     ),
     GateTemplate(
-        gate="helper_first_guard",
-        command_template=(
-            "printf '%s' "
-            "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
-            "| python3 .codex/hooks/helper_first_guard.py"
-        ),
-        handoff=(
-            "include ownership, module boundary, issue, docs, or test evidence "
-            "before adding helper-like functions"
-        ),
-    ),
-    GateTemplate(
         gate="oop_readability_guard",
         command_template=(
-            "python3 tools/oop/python/readability.py --root . --min-score 95 {path}"
+            "python3 tools/oop/python/readability.py --root . {path}"
         ),
         handoff=(
-            "include OOP readability risk and repair plan before implementation edits"
+            "include OOP readability risk, repair plan, and the non-blocking "
+            "review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS "
+            "disposition before implementation edits"
         ),
     ),
     GateTemplate(
@@ -255,17 +243,6 @@ PYTHON_GATE_TEMPLATES = (
         handoff=(
             "attach a path-covered OOP readability JSON or Markdown report for "
             "SOLID-sensitive Python boundaries before closeout"
-        ),
-    ),
-    GateTemplate(
-        gate="helper_inventory_guard",
-        command_template=(
-            "python3 tools/agent_tools/helper_function_inventory.py "
-            "--root . --changed --baseline-ref HEAD"
-        ),
-        handoff=(
-            "avoid ad hoc helper creation or state why existing helper surfaces "
-            "cannot be reused"
         ),
     ),
 )
@@ -287,7 +264,7 @@ CPP_GATE_TEMPLATES = (
     GateTemplate(
         gate="oop_readability_guard",
         command_template=(
-            "python3 tools/oop/cpp/readability.py --root . --min-score 95 {path}"
+            "python3 tools/oop/cpp/readability.py --root . {path}"
         ),
         handoff="include C/C++ OOP readability risk before edits",
     ),

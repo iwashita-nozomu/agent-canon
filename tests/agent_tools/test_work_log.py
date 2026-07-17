@@ -125,7 +125,9 @@ class WorkLogTest(unittest.TestCase):
                 (report_dir / "work_log.md").read_text(encoding="utf-8"),
             )
 
-    def test_report_dir_allows_explicit_pre_contract_entry_without_clause_id(self) -> None:
+    def test_report_dir_allows_explicit_pre_contract_entry_without_clause_id(
+        self,
+    ) -> None:
         """Run-bundle preflight notes can be recorded before clauses exist."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -157,7 +159,9 @@ class WorkLogTest(unittest.TestCase):
             work_log_text = (report_dir / "work_log.md").read_text(encoding="utf-8")
             self.assertIn("checked MCP inventory", work_log_text)
             self.assertIn("request_clause_ids: unassigned", work_log_text)
-            self.assertIn("missing_request_clause_reason: contract not created yet", work_log_text)
+            self.assertIn(
+                "missing_request_clause_reason: contract not created yet", work_log_text
+            )
 
     def test_missing_clause_id_still_requires_explicit_reason(self) -> None:
         """Clause-free logging must be an explicit exception."""

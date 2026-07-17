@@ -125,11 +125,11 @@ expected_skills = ["md-style-check"]
 expected_tools = ["agent-canon-cli"]
 limit = 25
 prompt_templates = [
-  "agent-canon docs check と run_docs_checks.sh で {subject} の markdown heading と link を直して",
-  "agent-canon docs check と run_docs_checks.sh を通して {subject} のマークダウン体裁を修正して",
-  "repo-changing docs patch として agent-canon docs format と run_docs_checks.sh で {subject} の markdownlint を確認して修正して",
-  "agent-canon docs check と run_docs_checks.sh を使い、{subject} の markdown link と heading を直して",
-  "agent-canon docs format と run_docs_checks.sh で {subject} のフォーマット周辺を確認して修正して",
+  "agent-canon docs check で {subject} の markdown heading と link を直して",
+  "agent-canon docs check を通して {subject} のマークダウン体裁を修正して",
+  "repo-changing docs patch として agent-canon docs format で {subject} の markdownlint を確認して修正して",
+  "agent-canon docs check を使い、{subject} の markdown link と heading を直して",
+  "agent-canon docs format で {subject} のフォーマット周辺を確認して修正して",
 ]
 subjects = [
   "workflow README",

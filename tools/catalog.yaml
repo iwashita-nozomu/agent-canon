@@ -1395,25 +1395,6 @@ entries:
     tests:
       - tests/agent_tools/test_evaluate_codex_agent_roles.py
 
-  - id: run-docs-checks
-    summary: Legacy shell forwarder for the unified Rust documentation check.
-    path: tools/ci/run_docs_checks.sh
-    family: ci
-    role: runner
-    status: compatibility_wrapper
-    audience: internal
-    placement: compatibility_wrapper
-    command: tools/bin/agent-canon docs check
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests: []
-    test_exempt_reason: Orchestrates individual Markdown tooling tests.
-
   - id: check-experiment-registry
     summary: Validates the shared experiment registry contract.
     path: tools/ci/check_experiment_registry.py

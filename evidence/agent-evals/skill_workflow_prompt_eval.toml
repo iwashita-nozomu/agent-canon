@@ -1771,7 +1771,7 @@ required_regex = ["OOP Analysis Scope", "Paths", "Excludes", "Markdown report", 
 id = "OOP-ROUTE-3"
 critical = true
 description = "Separates survey execution from closeout signal-class and human-review execution."
-required_regex = ["--min-score 0", "signal class outcome", "human review gate"]
+required_regex = ["typed_boundary_evidence", "signal class outcome", "human review gate"]
 
 [[evals]]
 id = "oop-readability-skill-artifact"

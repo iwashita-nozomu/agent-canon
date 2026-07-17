@@ -304,7 +304,7 @@
           "workflow_monitoring",
           "retrospective"
         ],
-        "notes": "Audit closeout is recorded in the closeout gate, workflow monitoring, agent evaluation, and retrospective artifacts. The auditor may unlock completion only after spec_product_coverage_complete=yes, review_findings_integrated=yes, post_fix_full_review_complete=yes, mechanical_completion_loop_complete=yes with structured loop evidence, diff_check_agent_complete=yes with a run-local independent read-only diff-check artifact, workflow monitoring decisions are resolved, and agent evaluation feedback is resolved."
+        "notes": "Audit closeout is recorded in the closeout gate, CompletionCoverage, workflow monitoring, agent evaluation, and retrospective artifacts. The auditor may unlock completion only after completion_coverage_consumer=yes, coverage_check.ok=true, completion_boundary.topology_errors=[], post_fix_full_review_complete=yes, mechanical_completion_loop_complete=yes with structured loop evidence, diff_check_agent_complete=yes with a run-local independent read-only diff-check artifact, workflow monitoring decisions are resolved, and agent evaluation feedback is resolved."
       }
     }
   ],

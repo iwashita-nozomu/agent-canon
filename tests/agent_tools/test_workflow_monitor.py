@@ -163,6 +163,68 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("status=open", text)
             self.assertIn("- tool_warnings_status: open", text)
 
+    def test_monitor_preserves_schema_owned_completion_evidence(self) -> None:
+        """Monitor projection must retain typed gate, failure, resource, and binding fields."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            semantic_event = " ".join(
+                [
+                    "event_id=event-1",
+                    "context_id=context-1",
+                    "semantic_kind=validation",
+                    "owner=writer",
+                    "state_owner=writer",
+                    "api_owner=writer",
+                    "dependency_owner=writer",
+                    "responsibility_unit=completion-coverage",
+                    "intent_id=intent-1",
+                    "outcome=pass",
+                    "evidence_refs=source.md",
+                    "artifact_refs=completion_coverage.json",
+                    'gate_evidence={"gate_id":"oop_readability_guard","outcome":"pass"}',
+                    'failure_response={"status":"none"}',
+                    'resource_certificate={"certificate_id":"none","status":"none"}',
+                    'source_binding={"run_id":"run-1","context_id":"context-1"}',
+                ]
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--semantic-event",
+                    semantic_event,
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            work_log = (report_dir / "work_log.md").read_text(encoding="utf-8")
+            ledger_line = next(
+                line
+                for line in work_log.splitlines()
+                if line.startswith("- ledger_event=")
+            )
+            event = json.loads(ledger_line.removeprefix("- ledger_event="))
+            self.assertEqual(
+                event["gate_evidence"],
+                {"gate_id": "oop_readability_guard", "outcome": "pass"},
+            )
+            self.assertEqual(event["failure_response"], {"status": "none"})
+            self.assertEqual(
+                event["resource_certificate"],
+                {"certificate_id": "none", "status": "none"},
+            )
+            self.assertEqual(
+                event["source_binding"],
+                {"run_id": "run-1", "context_id": "context-1"},
+            )
+
     def test_monitor_sets_no_tool_warning_status(self) -> None:
         """Runs with no observed warning should mark the ledger explicitly none."""
         with tempfile.TemporaryDirectory() as tmp_dir:
