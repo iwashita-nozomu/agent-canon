@@ -11,7 +11,9 @@
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from pathlib import Path
 
 VISUALIZE_NOTEBOOK_NAME = "visualize.ipynb"

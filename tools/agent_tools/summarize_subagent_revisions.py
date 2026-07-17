@@ -17,7 +17,9 @@ import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from pathlib import Path
 
 SCHEMA = "subagent_revision_summary.v1"

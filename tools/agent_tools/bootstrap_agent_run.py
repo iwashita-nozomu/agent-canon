@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from pathlib import Path
 
 from agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
