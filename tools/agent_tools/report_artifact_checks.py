@@ -15,8 +15,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
 import subprocess
+import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -33,6 +36,9 @@ from mid_task_user_input_policy import (
     has_reuse_marker,
     is_empty_policy_value,
 )
+
+from artifact_identity import canonical_body_sha256, canonical_json_bytes
+from artifact_identity import git_blob_oid
 
 PLACEHOLDER_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
 APPROVE_DECISION_PATTERN = re.compile(
@@ -95,6 +101,26 @@ EVAL_TRANSIENT_CAPTURE_PATTERN = re.compile(
 # these contracts here, beside the artifact checker, so task_close remains a
 # consumer and no second persistence or closeout authority is introduced.
 COMPLETION_COVERAGE_SCHEMA = "agent-canon.completion-coverage.v1"
+VALIDATION_RESULT_SCHEMA = "agent-canon.validation-result-projection.v1"
+VALIDATION_ROUTE_ID = "python.ruff.full"
+VALIDATION_LEAVES = (
+    "result_manifest.json",
+    "validation.stderr",
+    "validation.stdout",
+    "version.stderr",
+    "version.stdout",
+)
+VALIDATION_ROUTE_ARGV_TAIL = (
+    "-m",
+    "ruff",
+    "check",
+    "python",
+    "tests",
+    "--select",
+    "D,E,F,I,UP",
+    "--ignore",
+    "E501",
+)
 COMPLETION_COVERAGE_TAXONOMY_REFS = (
     "documents/runtime-profiles-and-check-matrix.json",
     "documents/runtime-profiles-and-check-matrix.md",
@@ -179,9 +205,7 @@ TOPOLOGY_REQUIRED_FIELDS = (
     "topology_schema",
     "topology_order",
 )
-OOP_REVIEW_SIGNAL_GATE_IDS = frozenset(
-    {"oop_readability_guard", "solid_evidence_gate"}
-)
+OOP_REVIEW_SIGNAL_GATE_IDS = frozenset({"oop_readability_guard", "solid_evidence_gate"})
 BRANCH_CREATION_REASON = "convergence_w2_writer_owned_after_git_index_blocker"
 TOPOLOGY_SCHEMA = "agent-canon.control-topology.v1"
 
@@ -213,6 +237,794 @@ class ValidationFailureResponse:
     result_artifact_refs: tuple[str, ...]
 
 
+class ValidationMaterializerError(ValueError):
+    """Typed failure from the canonical validation materializer."""
+
+    def __init__(self, code: str, detail: str = "") -> None:
+        """Initialize one stable materializer failure."""
+        self.code = code
+        self.detail = detail
+        super().__init__(code if not detail else f"{code}:{detail}")
+
+
+def _validation_stable_bytes(path: Path) -> bytes:
+    """Read one no-follow regular file and prove its identity stayed stable."""
+    try:
+        before = path.lstat()
+    except OSError as exc:
+        raise ValidationMaterializerError(
+            "canonical_run_locator:missing",
+            str(path),
+        ) from exc
+    if not stat.S_ISREG(before.st_mode):
+        raise ValidationMaterializerError("canonical_run_locator:non_regular")
+    descriptor = -1
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        opened = os.fstat(descriptor)
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+    except OSError as exc:
+        raise ValidationMaterializerError(
+            "canonical_run_locator:readback_failed",
+            str(path),
+        ) from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+    before_identity = (before.st_dev, before.st_ino, before.st_mode, before.st_size)
+    opened_identity = (opened.st_dev, opened.st_ino, opened.st_mode, opened.st_size)
+    after_identity = (after.st_dev, after.st_ino, after.st_mode, after.st_size)
+    data = b"".join(chunks)
+    if before_identity != opened_identity or opened_identity != after_identity:
+        raise ValidationMaterializerError(
+            "canonical_run_locator:moved_during_operation"
+        )
+    if len(data) != after.st_size:
+        raise ValidationMaterializerError("canonical_run_locator:short_read")
+    return data
+
+
+def _validation_locator(workspace: Path) -> dict[str, object]:
+    """Construct the workspace-only canonical run locator."""
+    root = workspace.resolve()
+    report_root = (root / "reports" / "agents").resolve()
+    pointer_path = report_root / ".active_run"
+    baseline_path = report_root / ".active_run.sha256"
+    pointer_bytes = _validation_stable_bytes(pointer_path)
+    baseline_bytes = _validation_stable_bytes(baseline_path)
+    try:
+        pointer_text = pointer_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValidationMaterializerError(
+            "canonical_run_locator:pointer_encoding"
+        ) from exc
+    if not pointer_text.endswith("\n") or "\n" in pointer_text[:-1]:
+        raise ValidationMaterializerError("canonical_run_locator:pointer_framing")
+    pointer_value = pointer_text[:-1]
+    if not pointer_value or not os.path.isabs(pointer_value):
+        raise ValidationMaterializerError("canonical_run_locator:pointer_not_absolute")
+    normalized = os.path.normpath(pointer_value)
+    if normalized != pointer_value:
+        raise ValidationMaterializerError(
+            "canonical_run_locator:pointer_not_normalized"
+        )
+    report_dir = Path(pointer_value)
+    if report_dir.parent != report_root or report_dir.name in {"", ".", ".."}:
+        raise ValidationMaterializerError("canonical_run_locator:report_dir_invalid")
+    try:
+        report_stat = report_dir.lstat()
+    except OSError as exc:
+        raise ValidationMaterializerError(
+            "canonical_run_locator:report_dir_missing"
+        ) from exc
+    if not stat.S_ISDIR(report_stat.st_mode):
+        raise ValidationMaterializerError("canonical_run_locator:report_dir_invalid")
+    if not baseline_bytes.endswith(b"\n") or len(baseline_bytes) != 65:
+        raise ValidationMaterializerError("canonical_run_locator:baseline_invalid")
+    baseline = baseline_bytes[:-1].decode("ascii", errors="replace")
+    if not re.fullmatch(r"[0-9a-f]{64}", baseline):
+        raise ValidationMaterializerError("canonical_run_locator:baseline_invalid")
+    if hashlib.sha256(pointer_bytes).hexdigest() != baseline:
+        raise ValidationMaterializerError("canonical_run_locator:baseline_mismatch")
+    for leaf in (report_dir / "task_authority.yaml", report_dir / "work_log.md"):
+        _validation_stable_bytes(leaf)
+    core: dict[str, object] = {
+        "schema": "agent-canon.canonical-run-locator.v1",
+        "schema_version": 1,
+        "workspace_repository_id": root.name,
+        "report_root_repo_relative": "reports/agents",
+        "report_dir_repo_relative": report_dir.relative_to(root).as_posix(),
+        "run_id": report_dir.name,
+        "pointer_path": "reports/agents/.active_run",
+        "pointer_sha256": hashlib.sha256(pointer_bytes).hexdigest(),
+        "baseline_path": "reports/agents/.active_run.sha256",
+    }
+    locator_id = "run-locator:" + hashlib.sha256(canonical_json_bytes(core)).hexdigest()
+    locator = {
+        **core,
+        "run_locator_id": locator_id,
+        "run_locator_body_sha256": "",
+    }
+    locator["run_locator_body_sha256"] = canonical_body_sha256(
+        locator,
+        "run_locator_body_sha256",
+    )
+    return {**locator, "report_dir": report_dir}
+
+
+def _validation_ledger_events(report_dir: Path) -> list[dict[str, object]]:
+    """Read the current logical ledger through its canonical work-log owner."""
+    from work_log import read_ledger_snapshot
+
+    snapshot = read_ledger_snapshot(
+        report_dir,
+        f"validation-materializer-ledger:{report_dir.name}",
+    )
+    events = snapshot.get("events")
+    if not isinstance(events, list):
+        raise ValidationMaterializerError("validation_result:ledger_mismatch")
+    return [event for event in events if isinstance(event, dict)]
+
+
+def _current_validation_candidate(
+    events: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Return the highest immutable candidate already present in canonical L."""
+    candidates: list[dict[str, object]] = []
+    for event in events:
+        payload = event.get("automatic_review")
+        if isinstance(payload, Mapping) and payload.get("record_kind") == "candidate":
+            candidates.append(dict(payload))
+    if not candidates:
+        raise ValidationMaterializerError("validation_result:candidate_missing")
+    candidates_with_revision: list[tuple[int, dict[str, object]]] = []
+    for candidate in candidates:
+        revision = candidate.get("candidate_revision")
+        if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
+            raise ValidationMaterializerError("validation_result:candidate_mismatch")
+        candidates_with_revision.append((revision, candidate))
+    candidates_with_revision.sort(key=lambda item: item[0])
+    candidate = candidates_with_revision[-1][1]
+    if not isinstance(candidate.get("candidate_revision"), int):
+        raise ValidationMaterializerError("validation_result:candidate_mismatch")
+    if candidate.get("candidate_body_sha256") != canonical_body_sha256(
+        candidate,
+        "candidate_body_sha256",
+    ):
+        raise ValidationMaterializerError(
+            "validation_result:candidate_body_hash_mismatch"
+        )
+    return candidate
+
+
+def _validation_producer_evidence(
+    events: Sequence[Mapping[str, object]],
+    candidate_id: str,
+) -> tuple[str | None, str | None]:
+    """Read producer identity evidence without evaluating reviewer eligibility."""
+    frame: Mapping[str, object] | None = None
+    for event in events:
+        payload = event.get("automatic_review")
+        if (
+            isinstance(payload, Mapping)
+            and payload.get("record_kind") == "frame"
+            and payload.get("candidate_id") == candidate_id
+            and payload.get("review_role_id") == "change_reviewer"
+        ):
+            frame = payload
+    if frame is None:
+        return None, None
+    runtime_id = frame.get("assigned_runtime_agent_id")
+    for event in events:
+        payload = event.get("automatic_review")
+        if (
+            isinstance(payload, Mapping)
+            and payload.get("record_kind") == "resume_event"
+            and payload.get("candidate_id") == candidate_id
+            and payload.get("review_frame_id") == frame.get("review_frame_id")
+        ):
+            observed = payload.get("observed_result")
+            if isinstance(observed, Mapping):
+                runtime_id = observed.get("nested_runtime_agent_id")
+    return (
+        "change_reviewer" if isinstance(runtime_id, str) and runtime_id else None,
+        runtime_id if isinstance(runtime_id, str) and runtime_id else None,
+    )
+
+
+def _validation_route_record(
+    workspace: Path,
+    locator: Mapping[str, object],
+    candidate: Mapping[str, object],
+    logical_key_sha256: str,
+    attempt_ordinal: int,
+) -> dict[str, object]:
+    """Derive the closed registered Python Ruff route without caller input."""
+    executable = str(Path(sys.executable).resolve())
+    argv = [executable, *VALIDATION_ROUTE_ARGV_TAIL]
+    core: dict[str, object] = {
+        "schema": "agent-canon.registered-validation-route.v2",
+        "schema_version": 2,
+        "route_id": VALIDATION_ROUTE_ID,
+        "requirement_id": VALIDATION_ROUTE_ID,
+        "run_locator_ref": {
+            "run_locator_id": locator["run_locator_id"],
+            "run_locator_body_sha256": locator["run_locator_body_sha256"],
+        },
+        "candidate": {
+            "candidate_id": candidate.get("candidate_id"),
+            "candidate_revision": candidate.get("candidate_revision"),
+            "candidate_body_sha256": candidate.get("candidate_body_sha256"),
+            "commit": candidate.get("candidate_commit"),
+            "tree": candidate.get("candidate_tree"),
+        },
+        "logical_key_sha256": logical_key_sha256,
+        "attempt_ordinal": attempt_ordinal,
+        "command": {
+            "argv": argv,
+            "argv_sha256": hashlib.sha256(canonical_json_bytes(argv)).hexdigest(),
+            "cwd_repository_id": workspace.name,
+            "cwd_repo_relative": ".",
+            "cwd_absolute": str(workspace),
+            "cwd_absolute_sha256": hashlib.sha256(str(workspace).encode()).hexdigest(),
+            "environment_profile": {},
+            "execution_identity_contract": {
+                "launcher": executable,
+                "module": "ruff",
+            },
+        },
+        "artifact_derivation": {
+            "root_parent_run_relative": "results/validation",
+            "artifact_id_prefix": "validation-result:",
+            "attempt_encoding": "16-lowercase-hex",
+            "pending_event_binding": "id-and-canonical-sha256",
+            "leaf_set": list(VALIDATION_LEAVES),
+        },
+        "version_policy": {"required": True},
+        "success_rule": {
+            "termination_kind": "exited",
+            "exit_code": 0,
+            "signal": None,
+            "spawn_error": None,
+            "stdout_complete": True,
+            "stderr_complete": True,
+        },
+    }
+    route_id = (
+        "validation-route:" + hashlib.sha256(canonical_json_bytes(core)).hexdigest()
+    )
+    route = {**core, "route_record_id": route_id, "route_record_body_sha256": ""}
+    route["route_record_body_sha256"] = canonical_body_sha256(
+        route,
+        "route_record_body_sha256",
+    )
+    return route
+
+
+def _validation_stream(
+    data: bytes, returncode: int | None, state: str
+) -> dict[str, object]:
+    """Materialize one complete stream observation."""
+    return {
+        "state": state,
+        "complete": state == "eof_complete",
+        "size_bytes": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "returncode": returncode,
+    }
+
+
+def _write_validation_leaf(path: Path, data: bytes) -> None:
+    """Create one deterministic leaf once, or accept exact replay bytes."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        descriptor = os.open(
+            path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+    except FileExistsError:
+        if _validation_stable_bytes(path) != data:
+            raise ValidationMaterializerError("validation_artifact:byte_mismatch")
+        return
+    try:
+        offset = 0
+        while offset < len(data):
+            offset += os.write(descriptor, data[offset:])
+        os.fsync(descriptor)
+    except OSError as exc:
+        raise ValidationMaterializerError("validation_artifact:write_failed") from exc
+    finally:
+        os.close(descriptor)
+
+
+def _validation_event_hash(event: Mapping[str, object]) -> str:
+    """Hash one canonical logical-ledger event without inventing a receipt."""
+    return hashlib.sha256(canonical_json_bytes(event)).hexdigest()
+
+
+def _verify_validation_replay(
+    report_dir: Path,
+    locator: Mapping[str, object],
+    candidate: Mapping[str, object],
+    terminal_event: Mapping[str, object],
+    manifest_path: Path,
+    manifest: Mapping[str, object],
+) -> None:
+    """Verify every stored identity before accepting a pass replay."""
+    artifact = terminal_event.get("artifact")
+    if not isinstance(artifact, Mapping):
+        raise ValidationMaterializerError("validation_artifact:manifest_mismatch")
+    try:
+        manifest_relative = manifest_path.relative_to(report_dir).as_posix()
+    except ValueError as exc:
+        raise ValidationMaterializerError("validation_artifact:root_mismatch") from exc
+    if artifact.get("manifest_path") != manifest_relative:
+        raise ValidationMaterializerError("validation_artifact:manifest_mismatch")
+    manifest_bytes = _validation_stable_bytes(manifest_path)
+    if artifact.get("manifest_sha256") != hashlib.sha256(manifest_bytes).hexdigest():
+        raise ValidationMaterializerError("validation_artifact:manifest_mismatch")
+    if artifact.get("manifest_blob") != git_blob_oid(manifest_bytes):
+        raise ValidationMaterializerError("validation_artifact:manifest_mismatch")
+    artifact_id = artifact.get("artifact_id")
+    if not isinstance(artifact_id, str) or manifest.get("artifact_id") != artifact_id:
+        raise ValidationMaterializerError("validation_artifact:id_mismatch")
+    if manifest.get("leaves") != list(VALIDATION_LEAVES):
+        raise ValidationMaterializerError("validation_artifact:leaf_set_mismatch")
+    run_locator_ref = manifest.get("run_locator_ref")
+    expected_locator_ref = {
+        "run_locator_id": locator["run_locator_id"],
+        "run_locator_body_sha256": locator["run_locator_body_sha256"],
+    }
+    if run_locator_ref != expected_locator_ref:
+        raise ValidationMaterializerError("validation_result:locator_mismatch")
+    manifest_candidate = manifest.get("candidate")
+    expected_candidate = {
+        "candidate_id": candidate.get("candidate_id"),
+        "candidate_revision": candidate.get("candidate_revision"),
+        "candidate_body_sha256": candidate.get("candidate_body_sha256"),
+        "commit": candidate.get("candidate_commit"),
+        "tree": candidate.get("candidate_tree"),
+    }
+    if manifest_candidate != expected_candidate:
+        raise ValidationMaterializerError("validation_result:candidate_mismatch")
+    manifest_route_ref = manifest.get("route_record_ref")
+    expected_route_ref = {
+        "route_record_id": terminal_event.get("route_record_id"),
+        "route_record_body_sha256": terminal_event.get("route_record_body_sha256"),
+    }
+    if manifest_route_ref != expected_route_ref:
+        raise ValidationMaterializerError("validation_result:route_mismatch")
+    manifest_attempt = manifest.get("attempt")
+    expected_attempt = {
+        "logical_key_sha256": terminal_event.get("logical_key_sha256"),
+        "attempt_ordinal": terminal_event.get("attempt_ordinal"),
+        "pending_event_id": terminal_event.get("pending_event_id"),
+        "pending_event_sha256": terminal_event.get("pending_event_sha256"),
+    }
+    if manifest_attempt != expected_attempt:
+        raise ValidationMaterializerError("validation_result:attempt_mismatch")
+    try:
+        children = list(manifest_path.parent.iterdir())
+    except OSError as exc:
+        raise ValidationMaterializerError("validation_artifact:root_mismatch") from exc
+    child_names = sorted(
+        (child.name for child in children), key=lambda item: item.encode()
+    )
+    if child_names != list(VALIDATION_LEAVES):
+        raise ValidationMaterializerError("validation_artifact:leaf_set_mismatch")
+    streams = manifest.get("streams")
+    if not isinstance(streams, Mapping):
+        raise ValidationMaterializerError("validation_result:stream_mismatch")
+    stream_paths = {
+        "version": {"stdout": "version.stdout", "stderr": "version.stderr"},
+        "validation": {
+            "stdout": "validation.stdout",
+            "stderr": "validation.stderr",
+        },
+    }
+    for group, names in stream_paths.items():
+        group_streams = streams.get(group)
+        if not isinstance(group_streams, Mapping):
+            raise ValidationMaterializerError("validation_result:stream_mismatch")
+        for stream_name, leaf_name in names.items():
+            stream = group_streams.get(stream_name)
+            if not isinstance(stream, Mapping):
+                raise ValidationMaterializerError("validation_result:stream_mismatch")
+            leaf_bytes = _validation_stable_bytes(manifest_path.parent / leaf_name)
+            if stream.get("size_bytes") != len(leaf_bytes):
+                raise ValidationMaterializerError(
+                    "validation_result:output_hash_mismatch"
+                )
+            if stream.get("sha256") != hashlib.sha256(leaf_bytes).hexdigest():
+                raise ValidationMaterializerError(
+                    "validation_result:output_hash_mismatch"
+                )
+
+
+def materialize_required_validation(workspace: Path) -> dict[str, object]:
+    """Materialize or replay the sole active-profile validation result."""
+    locator = _validation_locator(workspace)
+    report_dir = locator["report_dir"]
+    if not isinstance(report_dir, Path):
+        raise ValidationMaterializerError("canonical_run_locator:report_dir_invalid")
+    events = _validation_ledger_events(report_dir)
+    candidate = _current_validation_candidate(events)
+    candidate_id = candidate.get("candidate_id")
+    candidate_revision = candidate.get("candidate_revision")
+    if not isinstance(candidate_id, str) or not isinstance(candidate_revision, int):
+        raise ValidationMaterializerError("validation_result:candidate_mismatch")
+    producer_role_id, producer_runtime_agent_id = _validation_producer_evidence(
+        events,
+        candidate_id,
+    )
+    logical_key_sha256 = hashlib.sha256(
+        canonical_json_bytes(
+            {"candidate_id": candidate_id, "route_id": VALIDATION_ROUTE_ID}
+        )
+    ).hexdigest()
+    prior = [
+        event
+        for event in events
+        if event.get("semantic_kind") == "validation"
+        and event.get("subject_id") == VALIDATION_ROUTE_ID
+        and event.get("logical_key_sha256") == logical_key_sha256
+    ]
+    terminal = [event for event in prior if event.get("outcome") in {"pass", "fail"}]
+    latest_terminal = terminal[-1] if terminal else None
+    replay_producer_matches = latest_terminal is not None and (
+        latest_terminal.get("producer_role_id") == producer_role_id
+        and latest_terminal.get("producer_runtime_agent_id")
+        == producer_runtime_agent_id
+    )
+    if latest_terminal is not None and replay_producer_matches:
+        artifact = latest_terminal.get("artifact")
+        if not isinstance(artifact, Mapping):
+            raise ValidationMaterializerError("validation_artifact:manifest_mismatch")
+        manifest_reference = artifact.get("manifest_path")
+        if not isinstance(manifest_reference, str) or not manifest_reference:
+            raise ValidationMaterializerError("validation_artifact:manifest_mismatch")
+        manifest_path = report_dir / manifest_reference
+        manifest_bytes = _validation_stable_bytes(manifest_path)
+        try:
+            manifest = json.loads(manifest_bytes.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValidationMaterializerError(
+                "validation_artifact:manifest_mismatch"
+            ) from exc
+        if not isinstance(manifest, Mapping):
+            raise ValidationMaterializerError("validation_artifact:manifest_mismatch")
+        _verify_validation_replay(
+            report_dir,
+            locator,
+            candidate,
+            latest_terminal,
+            manifest_path,
+            manifest,
+        )
+        return _validation_projection(
+            locator,
+            candidate,
+            latest_terminal,
+            manifest_path,
+            manifest,
+        )
+    attempts: list[int] = []
+    for event in prior:
+        attempt_value = event.get("attempt_ordinal")
+        if isinstance(attempt_value, int) and not isinstance(attempt_value, bool):
+            attempts.append(attempt_value)
+    attempt_ordinal = max(attempts, default=0) + 1
+    route = _validation_route_record(
+        workspace.resolve(),
+        locator,
+        candidate,
+        logical_key_sha256,
+        attempt_ordinal,
+    )
+    route_id = str(route["route_record_id"])
+    pending = next(
+        (
+            event
+            for event in prior
+            if event.get("outcome") == "pending"
+            and event.get("attempt_ordinal") == attempt_ordinal
+        ),
+        None,
+    )
+    if pending is None:
+        pending_id = f"validation-pending:{logical_key_sha256}:{attempt_ordinal:016x}"
+        pending = {
+            "run_id": report_dir.name,
+            "context_id": report_dir.name,
+            "event_id": pending_id,
+            "semantic_kind": "validation",
+            "event_kind": "validation",
+            "subject_id": VALIDATION_ROUTE_ID,
+            "owner": "completion_authority",
+            "state_owner": "tools/agent_tools/work_log.py",
+            "api_owner": "tools/agent_tools/report_artifact_checks.py",
+            "dependency_owner": "agents/COMMUNICATION_PROTOCOL.md",
+            "responsibility_unit": "existing materializer-backed validation route",
+            "intent_id": "W2-v16-runtime-recovery",
+            "outcome": "pending",
+            "evidence_refs": ["tools/agent_tools/report_artifact_checks.py"],
+            "artifact_refs": ["work_log.md"],
+            "source_binding": {
+                "run_id": report_dir.name,
+                "context_id": report_dir.name,
+            },
+            "logical_key_sha256": logical_key_sha256,
+            "attempt_ordinal": attempt_ordinal,
+            "route_record_id": route_id,
+            "route_record_body_sha256": route["route_record_body_sha256"],
+            "producer_role_id": producer_role_id,
+            "producer_runtime_agent_id": producer_runtime_agent_id,
+        }
+        from work_log import append_ledger_event
+
+        append_ledger_event(report_dir, pending)
+    pending_event_sha256 = _validation_event_hash(pending)
+    seed = (
+        "agent-canon.validation-result-artifact.v1\0"
+        f"logical-key-sha256={logical_key_sha256}\0"
+        f"attempt-ordinal={attempt_ordinal:016x}\0"
+        f"pending-event-id-size={len(str(pending['event_id']).encode('utf-8')):016x}\0"
+        f"pending-event-id={pending['event_id']}\0"
+        f"pending-event-sha256={pending_event_sha256}\0"
+        "end\0"
+    ).encode("utf-8")
+    artifact_digest = hashlib.sha256(seed).hexdigest()
+    artifact_id = f"validation-result:{artifact_digest}"
+    artifact_root = report_dir / "results" / "validation" / artifact_digest
+    route_command = route["command"]
+    if not isinstance(route_command, Mapping):
+        raise ValidationMaterializerError("validation_route:schema_mismatch")
+    argv = route_command.get("argv")
+    if not isinstance(argv, list) or any(not isinstance(item, str) for item in argv):
+        raise ValidationMaterializerError("validation_route:argv_mismatch")
+    version = subprocess.run(
+        [str(item) for item in argv[:1]] + ["--version"],
+        cwd=workspace.resolve(),
+        check=False,
+        capture_output=True,
+    )
+    version_stdout = bytes(version.stdout)
+    version_stderr = bytes(version.stderr)
+    if version.returncode == 0:
+        validation = subprocess.run(
+            [str(item) for item in argv],
+            cwd=workspace.resolve(),
+            check=False,
+            capture_output=True,
+        )
+        validation_stdout = bytes(validation.stdout)
+        validation_stderr = bytes(validation.stderr)
+        validation_state = "eof_complete"
+        validation_returncode: int | None = validation.returncode
+    else:
+        validation_stdout = b""
+        validation_stderr = b""
+        validation_state = "not_created"
+        validation_returncode = None
+    version_state = "eof_complete"
+    streams = {
+        "version": {
+            "stdout": _validation_stream(
+                version_stdout, version.returncode, version_state
+            ),
+            "stderr": _validation_stream(
+                version_stderr, version.returncode, version_state
+            ),
+        },
+        "validation": {
+            "stdout": _validation_stream(
+                validation_stdout,
+                validation_returncode,
+                validation_state,
+            ),
+            "stderr": _validation_stream(
+                validation_stderr,
+                validation_returncode,
+                validation_state,
+            ),
+        },
+    }
+    outcome = (
+        "pass" if version.returncode == 0 and validation_returncode == 0 else "fail"
+    )
+    failure_codes = [] if outcome == "pass" else ["validation_route:command_failed"]
+    manifest: dict[str, object] = {
+        "schema": "agent-canon.validation-result-manifest.v1",
+        "schema_version": 1,
+        "artifact_id": artifact_id,
+        "artifact_root_run_relative": f"results/validation/{artifact_digest}",
+        "artifact_root_repo_relative": (
+            f"reports/agents/{report_dir.name}/results/validation/{artifact_digest}"
+        ),
+        "leaves": list(VALIDATION_LEAVES),
+        "run_locator_ref": {
+            "run_locator_id": locator["run_locator_id"],
+            "run_locator_body_sha256": locator["run_locator_body_sha256"],
+        },
+        "candidate": {
+            "candidate_id": candidate_id,
+            "candidate_revision": candidate_revision,
+            "candidate_body_sha256": candidate["candidate_body_sha256"],
+            "commit": candidate["candidate_commit"],
+            "tree": candidate["candidate_tree"],
+        },
+        "route_record_ref": {
+            "route_record_id": route_id,
+            "route_record_body_sha256": route["route_record_body_sha256"],
+        },
+        "attempt": {
+            "logical_key_sha256": logical_key_sha256,
+            "attempt_ordinal": attempt_ordinal,
+            "pending_event_id": pending["event_id"],
+            "pending_event_sha256": pending_event_sha256,
+        },
+        "streams": streams,
+        "observations": [
+            "before_version_spawn",
+            "after_version_capture_before_validation",
+            "after_validation_capture",
+        ],
+        "termination": {
+            "version_returncode": version.returncode,
+            "validation_returncode": validation_returncode,
+        },
+        "failure_codes": failure_codes,
+    }
+    manifest_bytes = canonical_json_bytes(manifest)
+    for name, data in (
+        ("version.stdout", version_stdout),
+        ("version.stderr", version_stderr),
+        ("validation.stdout", validation_stdout),
+        ("validation.stderr", validation_stderr),
+    ):
+        _write_validation_leaf(artifact_root / name, data)
+    _write_validation_leaf(artifact_root / "result_manifest.json", manifest_bytes)
+    terminal_id = f"validation-terminal:{artifact_id}:{outcome}"
+    terminal_event = {
+        **pending,
+        "event_id": terminal_id,
+        "outcome": outcome,
+        "pending_event_id": pending["event_id"],
+        "pending_event_sha256": pending_event_sha256,
+        "current_event_id": terminal_id,
+        "producer_role_id": producer_role_id,
+        "producer_runtime_agent_id": producer_runtime_agent_id,
+        "artifact": {
+            "artifact_id": artifact_id,
+            "manifest_path": f"results/validation/{artifact_digest}/result_manifest.json",
+            "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+            "manifest_blob": git_blob_oid(manifest_bytes),
+        },
+        "evidence_refs": [
+            f"results/validation/{artifact_digest}/{name}" for name in VALIDATION_LEAVES
+        ],
+        "completed_at_utc": "materialized",
+    }
+    from work_log import append_ledger_event
+
+    append_ledger_event(report_dir, terminal_event)
+    return _validation_projection(
+        locator,
+        candidate,
+        terminal_event,
+        artifact_root / "result_manifest.json",
+        manifest,
+    )
+
+
+def _validation_projection(
+    locator: Mapping[str, object],
+    candidate: Mapping[str, object],
+    terminal_event: Mapping[str, object],
+    manifest_path: Path,
+    manifest: Mapping[str, object],
+) -> dict[str, object]:
+    """Project one materializer-owned terminal event into ValidationResult v1."""
+    artifact_id = manifest.get("artifact_id")
+    manifest_bytes = _validation_stable_bytes(manifest_path)
+    outcome = terminal_event.get("outcome")
+    if outcome not in {"pass", "fail"} or not isinstance(artifact_id, str):
+        raise ValidationMaterializerError("validation_result:stored_outcome_mismatch")
+    artifact_digest = artifact_id.removeprefix("validation-result:")
+    artifact = {
+        "artifact_id": artifact_id,
+        "root_repo_relative": (
+            f"reports/agents/{manifest_path.parents[3].name}/results/validation/{artifact_digest}"
+        ),
+        "manifest_path": (f"results/validation/{artifact_digest}/result_manifest.json"),
+        "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "manifest_blob": git_blob_oid(manifest_bytes),
+    }
+    attempt = {
+        "logical_key_sha256": terminal_event.get("logical_key_sha256"),
+        "attempt_ordinal": terminal_event.get("attempt_ordinal"),
+        "pending_event_id": terminal_event.get("pending_event_id"),
+        "pending_event_sha256": terminal_event.get("pending_event_sha256"),
+        "current_event_id": terminal_event.get(
+            "current_event_id", terminal_event.get("event_id")
+        ),
+        "current_event_sha256": _validation_event_hash(terminal_event),
+    }
+    writer = candidate.get("writer")
+    writer_runtime_agent_id = (
+        writer.get("runtime_agent_id") if isinstance(writer, Mapping) else None
+    )
+    failure_value = manifest.get("failure_codes", [])
+    failure_codes = (
+        [item for item in failure_value if isinstance(item, str)]
+        if isinstance(failure_value, list)
+        else []
+    )
+    producer = {
+        "producer_role_id": terminal_event.get("producer_role_id"),
+        "producer_runtime_agent_id": terminal_event.get("producer_runtime_agent_id"),
+        "writer_runtime_agent_id": writer_runtime_agent_id,
+    }
+    core: dict[str, object] = {
+        "schema": VALIDATION_RESULT_SCHEMA,
+        "schema_version": 1,
+        "run_locator_ref": {
+            "run_locator_id": locator["run_locator_id"],
+            "run_locator_body_sha256": locator["run_locator_body_sha256"],
+        },
+        "aggregate_identity": locator["run_id"],
+        "candidate": {
+            "candidate_id": candidate.get("candidate_id"),
+            "candidate_revision": candidate.get("candidate_revision"),
+            "candidate_body_sha256": candidate.get("candidate_body_sha256"),
+            "commit": candidate.get("candidate_commit"),
+            "tree": candidate.get("candidate_tree"),
+        },
+        "route_record_ref": {
+            "route_record_id": terminal_event.get("route_record_id"),
+            "route_record_body_sha256": terminal_event.get("route_record_body_sha256"),
+        },
+        "attempt": attempt,
+        "artifact": artifact,
+        "producer_evidence": producer,
+        "outcome": outcome,
+        "failure_codes": sorted(failure_codes, key=lambda item: item.encode("utf-8")),
+        "validation_result_body_sha256": "",
+    }
+    core["validation_result_id"] = (
+        "validation-result-projection:"
+        + hashlib.sha256(
+            canonical_json_bytes(
+                {
+                    "run_locator_id": locator["run_locator_id"],
+                    "logical_key_sha256": attempt["logical_key_sha256"],
+                    "attempt_ordinal": attempt["attempt_ordinal"],
+                    "current_event_id": attempt["current_event_id"],
+                    "outcome": outcome,
+                    "failure_codes": core["failure_codes"],
+                }
+            )
+        ).hexdigest()
+    )
+    core["validation_result_body_sha256"] = canonical_body_sha256(
+        core,
+        "validation_result_body_sha256",
+    )
+    return core
+
+
+def resolve_validation_result(workspace: Path) -> dict[str, object]:
+    """Regenerate the materializer-only validation projection from canonical L."""
+    return materialize_required_validation(workspace)
+
+
 def _nonempty_text(value: object) -> str:
     """Return one required text field or raise a contract error."""
     if not isinstance(value, str) or not value.strip():
@@ -238,8 +1050,10 @@ def _source_binding_errors(binding: object) -> list[str]:
     for field in SOURCE_BINDING_REQUIRED_FIELDS:
         if field == "source_refs":
             value = binding.get(field)
-            if not isinstance(value, list) or not value or any(
-                not isinstance(ref, str) or not ref.strip() for ref in value
+            if (
+                not isinstance(value, list)
+                or not value
+                or any(not isinstance(ref, str) or not ref.strip() for ref in value)
             ):
                 errors.append(field)
             continue
@@ -266,8 +1080,10 @@ def _source_binding_errors(binding: object) -> list[str]:
 
 def _mapping_text_list(value: object) -> bool:
     """Return whether a value is a non-empty list of non-empty text."""
-    return isinstance(value, list) and bool(value) and all(
-        isinstance(item, str) and item.strip() for item in value
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(isinstance(item, str) and item.strip() for item in value)
     )
 
 
@@ -335,9 +1151,13 @@ def _topology_errors(snapshot: object) -> list[str]:
             if not _mapping_text_list(value):
                 errors.append(field)
         elif field == "descendant_disposition":
-            if not isinstance(value, Mapping) or not value or not any(
-                isinstance(value.get(key), str) and value.get(key).strip()
-                for key in ("status", "release", "retained")
+            if (
+                not isinstance(value, Mapping)
+                or not value
+                or not any(
+                    isinstance(value.get(key), str) and value.get(key).strip()
+                    for key in ("status", "release", "retained")
+                )
             ):
                 errors.append(field)
         elif field == "writer_collision_state":
@@ -477,9 +1297,7 @@ def _mapping_from_event(event: Mapping[str, object]) -> dict[str, object] | None
         raise ValueError("direct mappings must contain exactly their clause_id")
     if mapping_mode == "group" and len(set(members)) < 2:
         raise ValueError("group mappings require at least two distinct member clauses")
-    source_event_ref = _nonempty_text(
-        event.get("event_id", event.get("sequence", ""))
-    )
+    source_event_ref = _nonempty_text(event.get("event_id", event.get("sequence", "")))
     group_identity = _nonempty_text(
         event.get("group_identity", event.get("group_id", source_event_ref))
     )
@@ -562,7 +1380,9 @@ def _resource_certificate_errors(
         else:
             if any(not isinstance(item, Mapping) for item in gpu_items):
                 errors.append("gpu_semantics:item_shape")
-            observed = [item.get("item") for item in gpu_items if isinstance(item, Mapping)]
+            observed = [
+                item.get("item") for item in gpu_items if isinstance(item, Mapping)
+            ]
             if observed != list(GPU_CERTIFICATE_SEQUENCE) or len(gpu_items) != len(
                 GPU_CERTIFICATE_SEQUENCE
             ):
@@ -570,13 +1390,22 @@ def _resource_certificate_errors(
             for item in gpu_items:
                 if not isinstance(item, Mapping) or any(
                     not item.get(field)
-                    for field in ("item", "semantic_identity", "consumer_rule", "evidence_refs")
+                    for field in (
+                        "item",
+                        "semantic_identity",
+                        "consumer_rule",
+                        "evidence_refs",
+                    )
                 ):
                     errors.append("gpu_semantics:item_evidence")
-                elif not isinstance(item.get("evidence_refs"), list) or any(
-                    not isinstance(ref, str) or not ref.strip()
-                    for ref in item.get("evidence_refs", [])
-                ) or not item.get("evidence_refs"):
+                elif (
+                    not isinstance(item.get("evidence_refs"), list)
+                    or any(
+                        not isinstance(ref, str) or not ref.strip()
+                        for ref in item.get("evidence_refs", [])
+                    )
+                    or not item.get("evidence_refs")
+                ):
                     errors.append("gpu_semantics:item_evidence_refs")
     return sorted(set(errors))
 
@@ -691,9 +1520,7 @@ def project_completion_coverage(
         raise ValueError("source_binding.context_id does not match context_id")
     binding_errors = _source_binding_errors(binding)
     if binding_errors:
-        raise ValueError(
-            "source_binding contract errors: " + ",".join(binding_errors)
-        )
+        raise ValueError("source_binding contract errors: " + ",".join(binding_errors))
     events = _event_records(ledger_snapshot)
     for event in events:
         if event.get("run_id") != binding["run_id"]:
@@ -702,7 +1529,9 @@ def project_completion_coverage(
             raise ValueError("ledger event context_id does not match source binding")
         event_binding = event.get("source_binding")
         if event_binding is not None and event_binding != binding["source_binding"]:
-            raise ValueError("ledger event source_binding does not match source binding")
+            raise ValueError(
+                "ledger event source_binding does not match source binding"
+            )
     mappings = [mapping for event in events if (mapping := _mapping_from_event(event))]
     resource_certificates = []
     for event in events:
@@ -730,8 +1559,12 @@ def project_completion_coverage(
             "responsibility_unit": _nonempty_text(event.get("responsibility_unit")),
             "intent_id": _nonempty_text(event.get("intent_id")),
             "outcome": _nonempty_text(event.get("outcome")),
-            "evidence_refs": list(_text_tuple(event.get("evidence_refs"), "evidence_refs")),
-            "artifact_refs": list(_text_tuple(event.get("artifact_refs"), "artifact_refs")),
+            "evidence_refs": list(
+                _text_tuple(event.get("evidence_refs"), "evidence_refs")
+            ),
+            "artifact_refs": list(
+                _text_tuple(event.get("artifact_refs"), "artifact_refs")
+            ),
             "source_binding": dict(binding["source_binding"]),
         }
         if event.get("clause_id") is not None:
@@ -775,7 +1608,9 @@ def project_completion_coverage(
                 raise ValueError("ledger gate_evidence entries must be objects")
             gate = dict(raw_gate)
             gate["source_event_refs"] = list(
-                _text_tuple(gate.get("source_event_refs", [event_id]), "source_event_refs")
+                _text_tuple(
+                    gate.get("source_event_refs", [event_id]), "source_event_refs"
+                )
             )
             gate_evidence.append(gate)
 
@@ -789,20 +1624,21 @@ def project_completion_coverage(
                 else []
             )
             if raw_monitor is not None and not monitor_records:
-                raise ValueError(
-                    f"ledger {monitor_field} must be an object or list"
-                )
+                raise ValueError(f"ledger {monitor_field} must be an object or list")
             for raw_record in monitor_records:
                 if not isinstance(raw_record, Mapping):
                     raise ValueError(f"ledger {monitor_field} entries must be objects")
                 record = dict(raw_record)
-                record["run_id"] = _nonempty_text(record.get("run_id", binding["run_id"]))
+                record["run_id"] = _nonempty_text(
+                    record.get("run_id", binding["run_id"])
+                )
                 record["context_id"] = _nonempty_text(
                     record.get("context_id", binding["context_id"])
                 )
-                if record["run_id"] != binding["run_id"] or record["context_id"] != binding[
-                    "context_id"
-                ]:
+                if (
+                    record["run_id"] != binding["run_id"]
+                    or record["context_id"] != binding["context_id"]
+                ):
                     raise ValueError("ledger monitor evidence binding mismatch")
                 record["source_event_ref"] = event_id
                 projected_monitor_evidence.append(record)
@@ -814,9 +1650,10 @@ def project_completion_coverage(
         record["context_id"] = _nonempty_text(
             record.get("context_id", binding["context_id"])
         )
-        if record["run_id"] != binding["run_id"] or record["context_id"] != binding[
-            "context_id"
-        ]:
+        if (
+            record["run_id"] != binding["run_id"]
+            or record["context_id"] != binding["context_id"]
+        ):
             raise ValueError("monitor evidence binding mismatch")
         projected_monitor_evidence.append(record)
     snapshot_digest = (
@@ -929,8 +1766,12 @@ def check_completion_coverage(
         members = raw_mapping.get("member_clause_ids")
         mode = raw_mapping.get("mapping_mode")
         group_identity = raw_mapping.get("group_identity")
-        if not isinstance(members, list) or not members or any(
-            not isinstance(member, str) or not member.strip() for member in members
+        if (
+            not isinstance(members, list)
+            or not members
+            or any(
+                not isinstance(member, str) or not member.strip() for member in members
+            )
         ):
             errors["empty"].append(clause_id or "mapping")
             members = []
@@ -991,22 +1832,31 @@ def check_completion_coverage(
     if not isinstance(owner_evidence, list) or not owner_evidence:
         errors["empty"].append("owner_boundary_evidence")
     for evidence in owner_evidence if isinstance(owner_evidence, list) else []:
-        if not isinstance(evidence, Mapping) or any(
-            not isinstance(evidence.get(field), str) or not evidence.get(field).strip()
-            for field in ("owner", "state_owner", "api_owner", "dependency_owner")
-        ) or not _mapping_text_list(evidence.get("evidence_refs")):
+        if (
+            not isinstance(evidence, Mapping)
+            or any(
+                not isinstance(evidence.get(field), str)
+                or not evidence.get(field).strip()
+                for field in ("owner", "state_owner", "api_owner", "dependency_owner")
+            )
+            or not _mapping_text_list(evidence.get("evidence_refs"))
+        ):
             errors["empty"].append("owner_boundary_evidence")
-    if isinstance(owner_evidence, list) and all(
-        isinstance(owner_contract_for_check.get(field), str)
-        and owner_contract_for_check.get(field).strip()
-        for field in ("owner", "state_owner", "api_owner", "dependency_owner")
-    ) and not any(
-        isinstance(evidence, Mapping)
+    if (
+        isinstance(owner_evidence, list)
         and all(
-            evidence.get(field) == owner_contract_for_check.get(field)
-            for field in owner_fields
+            isinstance(owner_contract_for_check.get(field), str)
+            and owner_contract_for_check.get(field).strip()
+            for field in ("owner", "state_owner", "api_owner", "dependency_owner")
         )
-        for evidence in owner_evidence
+        and not any(
+            isinstance(evidence, Mapping)
+            and all(
+                evidence.get(field) == owner_contract_for_check.get(field)
+                for field in owner_fields
+            )
+            for evidence in owner_evidence
+        )
     ):
         errors["empty"].append("owner_contract:correspondence")
     gate_evidence = completion_coverage.get("gate_evidence", [])
@@ -1014,11 +1864,15 @@ def check_completion_coverage(
         errors["empty"].append("gate_evidence")
     gate_ids: set[str] = set()
     for evidence in gate_evidence if isinstance(gate_evidence, list) else []:
-        if not isinstance(evidence, Mapping) or any(
-            not isinstance(evidence.get(field), str) or not evidence.get(field).strip()
-            for field in ("gate_id", "stage", "owner", "outcome")
-        ) or not _mapping_text_list(evidence.get("artifact_refs")) or not _mapping_text_list(
-            evidence.get("source_event_refs")
+        if (
+            not isinstance(evidence, Mapping)
+            or any(
+                not isinstance(evidence.get(field), str)
+                or not evidence.get(field).strip()
+                for field in ("gate_id", "stage", "owner", "outcome")
+            )
+            or not _mapping_text_list(evidence.get("artifact_refs"))
+            or not _mapping_text_list(evidence.get("source_event_refs"))
         ):
             errors["empty"].append("gate_evidence")
             continue
@@ -1073,7 +1927,9 @@ def check_completion_coverage(
                 errors["empty"].append("semantic_event:run_id_binding")
             if event.get("context_id") != binding_for_comparison.get("context_id"):
                 errors["empty"].append("semantic_event:context_id_binding")
-            if event.get("source_binding") != binding_for_comparison.get("source_binding"):
+            if event.get("source_binding") != binding_for_comparison.get(
+                "source_binding"
+            ):
                 errors["empty"].append("semantic_event:source_binding")
     for evidence in gate_evidence if isinstance(gate_evidence, list) else []:
         if not isinstance(evidence, Mapping):
@@ -1096,15 +1952,17 @@ def check_completion_coverage(
             continue
         source_event_ref = evidence.get("source_event_ref")
         if source_event_ref is not None and source_event_ref not in events_by_id:
-            errors["empty"].append(
-                f"monitor_evidence:source_event:{source_event_ref}"
-            )
-    oop_signals = [
-        evidence
-        for evidence in gate_evidence
-        if isinstance(evidence, Mapping)
-        and evidence.get("gate_id") in OOP_REVIEW_SIGNAL_GATE_IDS
-    ] if isinstance(gate_evidence, list) else []
+            errors["empty"].append(f"monitor_evidence:source_event:{source_event_ref}")
+    oop_signals = (
+        [
+            evidence
+            for evidence in gate_evidence
+            if isinstance(evidence, Mapping)
+            and evidence.get("gate_id") in OOP_REVIEW_SIGNAL_GATE_IDS
+        ]
+        if isinstance(gate_evidence, list)
+        else []
+    )
     if not oop_signals:
         errors["empty"].append("oop_review_signal")
     source_event_owners: dict[str, str] = {}
@@ -1120,14 +1978,17 @@ def check_completion_coverage(
         source_event_owners[source_event_ref] = clause_id
         if raw_mapping.get("mapping_mode") == "group":
             group_identity = str(raw_mapping.get("group_identity", ""))
-            facts = tuple(raw_mapping.get(field) for field in (
-                "owner",
-                "state_owner",
-                "api_owner",
-                "dependency_owner",
-                "responsibility_unit",
-                "outcome",
-            ))
+            facts = tuple(
+                raw_mapping.get(field)
+                for field in (
+                    "owner",
+                    "state_owner",
+                    "api_owner",
+                    "dependency_owner",
+                    "responsibility_unit",
+                    "outcome",
+                )
+            )
             prior_facts = group_facts.get(group_identity)
             if prior_facts is not None and prior_facts != facts:
                 errors["empty"].append(f"group_identity:{group_identity}:member_facts")
@@ -1136,7 +1997,9 @@ def check_completion_coverage(
             raw_members = raw_mapping.get("member_clause_ids")
             if isinstance(raw_members, list):
                 if member_set.intersection(raw_members):
-                    errors["redundant"].append(f"group_identity:{group_identity}:members")
+                    errors["redundant"].append(
+                        f"group_identity:{group_identity}:members"
+                    )
                 member_set.update(str(member) for member in raw_members)
         source_event = events_by_id.get(source_event_ref)
         if source_event is None:
@@ -1195,7 +2058,9 @@ def check_completion_coverage(
         if certificate.get("run_id") != binding_for_comparison.get("run_id"):
             errors["empty"].append(f"resource_certificate:{source_event_ref}:run_id")
         if certificate.get("context_id") != binding_for_comparison.get("context_id"):
-            errors["empty"].append(f"resource_certificate:{source_event_ref}:context_id")
+            errors["empty"].append(
+                f"resource_certificate:{source_event_ref}:context_id"
+            )
         if certificate.get("source_clause_id") != source_event.get("clause_id"):
             errors["empty"].append(
                 f"resource_certificate:{source_event_ref}:source_clause"
@@ -1221,7 +2086,10 @@ def check_completion_coverage(
             ),
             None,
         )
-        if not isinstance(certificate, Mapping) or certificate.get("source_clause_id") != clause_id:
+        if (
+            not isinstance(certificate, Mapping)
+            or certificate.get("source_clause_id") != clause_id
+        ):
             errors["empty"].append(f"resource_mapping:{clause_id}:source_clause")
         if clause_id == "W2-19":
             if not isinstance(certificate, Mapping) or not isinstance(
@@ -1234,9 +2102,10 @@ def check_completion_coverage(
                 if isinstance(item, Mapping)
             ] != list(GPU_CERTIFICATE_SEQUENCE):
                 errors["empty"].append("resource_mapping:W2-19:ordered_gpu_semantics")
-    if len(resource_mapping_event_refs) == 2 and len(
-        set(resource_mapping_event_refs.values())
-    ) != 2:
+    if (
+        len(resource_mapping_event_refs) == 2
+        and len(set(resource_mapping_event_refs.values())) != 2
+    ):
         errors["empty"].append("resource_mapping:distinct_source_events")
     responses = completion_coverage.get("failure_responses", [])
     if not isinstance(responses, list):
@@ -1246,7 +2115,10 @@ def check_completion_coverage(
         if not isinstance(response, Mapping):
             errors["empty"].append("failure_response")
             continue
-        if tuple(response.get("taxonomy_refs", ())) != COMPLETION_COVERAGE_TAXONOMY_REFS:
+        if (
+            tuple(response.get("taxonomy_refs", ()))
+            != COMPLETION_COVERAGE_TAXONOMY_REFS
+        ):
             errors["empty"].append("failure_response:taxonomy_refs")
         try:
             _validate_failure_taxonomy_values(
@@ -1291,15 +2163,22 @@ def check_completion_coverage(
     if not isinstance(failure_event_refs, list):
         errors["empty"].append("failure_event_refs")
         failure_event_refs = []
-    if any(not isinstance(event_ref, str) or not event_ref.strip() for event_ref in failure_event_refs):
+    if any(
+        not isinstance(event_ref, str) or not event_ref.strip()
+        for event_ref in failure_event_refs
+    ):
         errors["empty"].append("failure_event_refs:item")
     if len(failure_event_refs) != len(set(failure_event_refs)):
         errors["redundant"].append("failure_event_refs")
-    expected_failure_refs = {
-        str(event.get("event_id"))
-        for event in semantic_events
-        if isinstance(event, Mapping) and event.get("semantic_kind") == "failure"
-    } if isinstance(semantic_events, list) else set()
+    expected_failure_refs = (
+        {
+            str(event.get("event_id"))
+            for event in semantic_events
+            if isinstance(event, Mapping) and event.get("semantic_kind") == "failure"
+        }
+        if isinstance(semantic_events, list)
+        else set()
+    )
     if set(failure_event_refs) != expected_failure_refs:
         errors["empty"].append("failure_event_refs:source_ownership")
     for event_ref in failure_event_refs:
@@ -1336,7 +2215,8 @@ def check_completion_coverage(
             or item.startswith("solid_evidence_gate:")
             for item in errors["empty"]
         ),
-        "G4_VALIDATION_RESPONSE": not failure_response_errors and all(
+        "G4_VALIDATION_RESPONSE": not failure_response_errors
+        and all(
             all(
                 response.get(field)
                 for field in (
@@ -1366,9 +2246,7 @@ def check_completion_coverage(
     if not OOP_REVIEW_SIGNAL_GATE_IDS.issubset(gate_ids):
         errors["empty"].append("oop_solid_evidence_contract")
         gate_results["G3_STAGE_EVIDENCE"] = False
-    if not any(
-        "format" in gate_id or "static" in gate_id for gate_id in gate_ids
-    ):
+    if not any("format" in gate_id or "static" in gate_id for gate_id in gate_ids):
         errors["empty"].append("formatter_static_events")
         gate_results["G3_STAGE_EVIDENCE"] = False
     errors = {key: sorted(set(value)) for key, value in errors.items()}
@@ -1450,9 +2328,9 @@ def write_completion_coverage_artifact(
         gate_results["G5_DELIVERY_BOUNDARY"] = bool(
             completion_boundary.get("overall_delivery_complete")
         )
-        coverage_check["ok"] = not any(coverage_check.get("error_sets", {}).values()) and all(
-            bool(value) for value in gate_results.values()
-        )
+        coverage_check["ok"] = not any(
+            coverage_check.get("error_sets", {}).values()
+        ) and all(bool(value) for value in gate_results.values())
     artifact = {
         **coverage,
         "coverage_check": coverage_check,
@@ -1531,9 +2409,9 @@ def evaluate_completion_boundary(
         if isinstance(crossing_edge_state_non_routing, Mapping)
         else None
     )
-    open_state_errors = _open_state_errors(raw_repairs, "open_repairs") + _open_state_errors(
-        raw_edges, "open_crossing_edges"
-    )
+    open_state_errors = _open_state_errors(
+        raw_repairs, "open_repairs"
+    ) + _open_state_errors(raw_edges, "open_crossing_edges")
     open_repairs = list(raw_repairs) if isinstance(raw_repairs, list) else []
     open_edges = list(raw_edges) if isinstance(raw_edges, list) else []
     topology_errors = _topology_errors(control_topology_ledger_snapshot)
@@ -1551,7 +2429,9 @@ def evaluate_completion_boundary(
         topology_errors.append("coverage_source_binding")
     elif isinstance(control_topology_ledger_snapshot, Mapping):
         for field in ("run_id", "context_id"):
-            if control_topology_ledger_snapshot.get(field) != coverage_binding.get(field):
+            if control_topology_ledger_snapshot.get(field) != coverage_binding.get(
+                field
+            ):
                 topology_errors.append(f"binding:{field}")
     topology_valid = not topology_errors
     typed_schedule = all(
@@ -1565,24 +2445,28 @@ def evaluate_completion_boundary(
             "formatter_and_static_checks_pass",
         )
     )
-    typed_open_work = isinstance(
-        open_work_state_non_routing.get("planned_work_complete"), bool
-    ) if isinstance(open_work_state_non_routing, Mapping) else False
+    typed_open_work = (
+        isinstance(open_work_state_non_routing.get("planned_work_complete"), bool)
+        if isinstance(open_work_state_non_routing, Mapping)
+        else False
+    )
     typed_coverage = isinstance(coverage_check, Mapping)
     coverage_gate_results = (
         coverage_check.get("gate_results")
         if isinstance(coverage_check, Mapping)
         else None
     )
-    coverage_ready_before_delivery = typed_coverage and isinstance(
-        coverage_gate_results, Mapping
-    ) and all(
-        coverage_gate_results.get(gate) is True
-        for gate in (
-            "G1_CLAUSE_COVERAGE",
-            "G2_OWNER_BOUNDARY",
-            "G3_STAGE_EVIDENCE",
-            "G4_VALIDATION_RESPONSE",
+    coverage_ready_before_delivery = (
+        typed_coverage
+        and isinstance(coverage_gate_results, Mapping)
+        and all(
+            coverage_gate_results.get(gate) is True
+            for gate in (
+                "G1_CLAUSE_COVERAGE",
+                "G2_OWNER_BOUNDARY",
+                "G3_STAGE_EVIDENCE",
+                "G4_VALIDATION_RESPONSE",
+            )
         )
     )
     planned = bool(
@@ -1604,8 +2488,7 @@ def evaluate_completion_boundary(
         and typed_schedule
         and typed_open_work
         and coverage_ready_before_delivery
-        and topology.get("global_publication_state")
-        == "publication_ready"
+        and topology.get("global_publication_state") == "publication_ready"
         and topology.get("final_review_approved")
         and topology.get("closeout_unlocked")
         and topology.get("routing_gate") == "verified"
@@ -1625,7 +2508,9 @@ def evaluate_completion_boundary(
         },
         "control_topology_observation_ref": _nonempty_text(
             topology.get("observation_ref")
-        ) if "observation_ref" not in topology_errors else "",
+        )
+        if "observation_ref" not in topology_errors
+        else "",
     }
 
 
@@ -1651,7 +2536,10 @@ def consume_checked_completion_coverage(
         "G4_VALIDATION_RESPONSE",
         "G5_DELIVERY_BOUNDARY",
     }
-    if not isinstance(gate_results, Mapping) or set(gate_results) != required_gate_results:
+    if (
+        not isinstance(gate_results, Mapping)
+        or set(gate_results) != required_gate_results
+    ):
         return {"ready": False, "reason": "coverage_gate_results_incomplete"}
     if any(gate_results.get(gate) is not True for gate in required_gate_results):
         return {"ready": False, "reason": "coverage_gate_results_not_ready"}
@@ -1708,7 +2596,9 @@ def section_has_content(text: str, heading: str) -> bool:
     if not in_section:
         return False
     body_text = PLACEHOLDER_PATTERN.sub("", "\n".join(body))
-    body_text = "\n".join(line for line in body_text.splitlines() if line.strip()).strip()
+    body_text = "\n".join(
+        line for line in body_text.splitlines() if line.strip()
+    ).strip()
     return bool(body_text)
 
 
@@ -1727,7 +2617,8 @@ def table_body_rows(text: str, heading: str) -> list[str]:
         if not cells or all(not cell or set(cell) <= {"-"} for cell in cells):
             continue
         if any(
-            cell in {"Clause ID", "Source Bucket", "Stage", "Unit ID", "Wave ID", "Time"}
+            cell
+            in {"Clause ID", "Source Bucket", "Stage", "Unit ID", "Wave ID", "Time"}
             for cell in cells
         ):
             continue
@@ -1896,7 +2787,9 @@ def report_artifact_placement_blockers(workspace: Path, report_dir: Path) -> lis
     report_paths = {}
     for path in _git_report_paths(workspace, ()):
         normalized = _normalized_git_path(path)
-        if normalized.startswith("reports/agents/") or is_mechanically_regenerated_report_path(path):
+        if normalized.startswith(
+            "reports/agents/"
+        ) or is_mechanically_regenerated_report_path(path):
             report_paths[path] = "tracked"
     for path in _git_report_paths(
         workspace,
@@ -2125,8 +3018,9 @@ def _mid_task_user_input_blockers(
             f"{wave_id}:expected={expected_scope}"
         )
     target_agents = actual.get("target_agents", "").strip()
-    if classification in MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS and is_empty_policy_value(
-        target_agents
+    if (
+        classification in MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS
+        and is_empty_policy_value(target_agents)
     ):
         blockers.append(
             f"workflow_monitoring.md:mid_task_user_input_field_missing:{wave_id}:target_agents"
@@ -2188,17 +3082,20 @@ def _actual_wave_mismatch_blockers(
         planned_value = planned.get(schedule_field, "").strip()
         if planned_value and planned_value != actual.get(event_field, "").strip():
             blockers.append(
-                "workflow_monitoring.md:actual_wave_mismatch:"
-                f"{wave_id}:{event_field}"
+                f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:{event_field}"
             )
     if _split_csv_field(planned.get("Spawned Roles", "")) != _split_csv_field(
         actual.get("spawned_roles", "")
     ):
-        blockers.append(f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:spawned_roles")
+        blockers.append(
+            f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:spawned_roles"
+        )
     if _split_csv_field(planned.get("Role Instances", "")) != _split_csv_field(
         actual.get("role_instances", "")
     ):
-        blockers.append(f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:role_instances")
+        blockers.append(
+            f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:role_instances"
+        )
     return blockers
 
 
@@ -2221,7 +3118,9 @@ def wave_reconciliation_blockers(
     if lifecycle_status.get("agent_wave_ledger_status") == "not_applicable":
         actual_rows = actual_wave_event_fields(workflow_monitoring_text)
         if planned_by_id or actual_rows:
-            blockers.append("subagent_lifecycle:not_applicable_but_wave_evidence_present")
+            blockers.append(
+                "subagent_lifecycle:not_applicable_but_wave_evidence_present"
+            )
         return blockers
 
     actual_by_id, actual_id_blockers = _actual_waves_by_id(
@@ -2289,7 +3188,10 @@ def final_review_decision_lines(text: str) -> list[str]:
 
 def has_approve_decision(text: str) -> bool:
     """Return whether a final-review Decision section contains an exact approve decision."""
-    return any(APPROVE_DECISION_PATTERN.fullmatch(line) for line in final_review_decision_lines(text))
+    return any(
+        APPROVE_DECISION_PATTERN.fullmatch(line)
+        for line in final_review_decision_lines(text)
+    )
 
 
 def check_final_review_artifact(text: str) -> list[str]:

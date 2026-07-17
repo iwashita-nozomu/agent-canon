@@ -14,11 +14,16 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
+import errno
 import hashlib
 import json
+import os
+import stat
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 from agent_team import resolve_report_root
 from task_authority import ACTIVE_RUN_POINTER
@@ -48,6 +53,405 @@ MONITOR_PASSTHROUGH_FIELDS = frozenset(
     }
 )
 
+NO_REPLACE_PUBLICATION_PRIMITIVE = "renameat2_RENAME_NOREPLACE"
+NO_REPLACE_TARGET_BASENAME = "creation_owner.json"
+NO_REPLACE_OUTCOMES = frozenset({"published", "target_exists", "io_failed"})
+RACED_OWNER_STATES = frozenset(
+    {"complete_regular", "complete_non_regular", "unstable_or_unreadable"}
+)
+RACED_OWNER_FAILURES = frozenset(
+    {
+        "vanished",
+        "lstat_failed",
+        "open_failed",
+        "fstat_changed",
+        "read_failed",
+        "short_read",
+    }
+)
+
+
+class MaterializerError(ValueError):
+    """Typed canonical materializer failure."""
+
+    def __init__(self, code: str, detail: str = "") -> None:
+        """Initialize one stable materializer error."""
+        self.code = code
+        self.detail = detail
+        super().__init__(code if not detail else f"{code}:{detail}")
+
+
+def _git_blob_oid(data: bytes) -> str:
+    """Return the Git SHA-1 blob identity for exact bytes."""
+    return hashlib.sha1(
+        f"blob {len(data)}\0".encode("ascii") + data,
+        usedforsecurity=False,
+    ).hexdigest()
+
+
+def _json_sha256(value: object) -> str:
+    """Hash one canonical JSON value in the repository's integer/string domain."""
+    return hashlib.sha256(
+        json.dumps(
+            value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _node_kind(mode: int) -> str:
+    """Map one lstat mode to the closed raced-owner node union."""
+    if stat.S_ISREG(mode):
+        return "regular"
+    if stat.S_ISDIR(mode):
+        return "directory"
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    if stat.S_ISFIFO(mode):
+        return "fifo"
+    if stat.S_ISSOCK(mode):
+        return "socket"
+    if stat.S_ISBLK(mode):
+        return "block_device"
+    if stat.S_ISCHR(mode):
+        return "character_device"
+    return "unknown"
+
+
+def _read_raced_owner(directory_fd: int, basename: str) -> dict[str, object]:
+    """Read the raced owner entry without authorizing any namespace mutation."""
+    common: dict[str, object] = {
+        "schema": "agent-canon.raced-owner-readback.v1",
+        "path_basename": basename,
+        "node_kind": None,
+        "device": None,
+        "inode": None,
+        "mode": None,
+        "size_bytes": None,
+        "content_sha256": None,
+        "content_git_blob": None,
+        "readback_failure": None,
+    }
+    try:
+        before = os.stat(basename, dir_fd=directory_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        common["state"] = "unstable_or_unreadable"
+        common["readback_failure"] = "vanished"
+        return common
+    except OSError:
+        common["state"] = "unstable_or_unreadable"
+        common["readback_failure"] = "lstat_failed"
+        return common
+    common.update(
+        {
+            "node_kind": _node_kind(before.st_mode),
+            "device": before.st_dev,
+            "inode": before.st_ino,
+            "mode": before.st_mode,
+            "size_bytes": before.st_size,
+        }
+    )
+    if not stat.S_ISREG(before.st_mode):
+        common["state"] = "complete_non_regular"
+        return common
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            basename,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=directory_fd,
+        )
+    except FileNotFoundError:
+        common["state"] = "unstable_or_unreadable"
+        common["readback_failure"] = "vanished"
+        return common
+    except OSError:
+        common["state"] = "unstable_or_unreadable"
+        common["readback_failure"] = "open_failed"
+        return common
+    try:
+        opened = os.fstat(descriptor)
+        if (before.st_dev, before.st_ino, before.st_mode, before.st_size) != (
+            opened.st_dev,
+            opened.st_ino,
+            opened.st_mode,
+            opened.st_size,
+        ):
+            common["state"] = "unstable_or_unreadable"
+            common["readback_failure"] = "fstat_changed"
+            return common
+        chunks: list[bytes] = []
+        while True:
+            try:
+                chunk = os.read(descriptor, 1024 * 1024)
+            except OSError:
+                common["state"] = "unstable_or_unreadable"
+                common["readback_failure"] = "read_failed"
+                return common
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino, opened.st_mode, opened.st_size) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_mode,
+            after.st_size,
+        ):
+            common["state"] = "unstable_or_unreadable"
+            common["readback_failure"] = "fstat_changed"
+            return common
+        content = b"".join(chunks)
+        if len(content) != after.st_size:
+            common["state"] = "unstable_or_unreadable"
+            common["readback_failure"] = "short_read"
+            return common
+        common["state"] = "complete_regular"
+        common["content_sha256"] = hashlib.sha256(content).hexdigest()
+        common["content_git_blob"] = _git_blob_oid(content)
+        return common
+    finally:
+        os.close(descriptor)
+
+
+def _temp_identity(directory_fd: int, basename: str) -> dict[str, object]:
+    """Read one deterministic temp identity with complete regular-file bytes."""
+    absent: dict[str, object] = {
+        "state": "absent",
+        "classification": "no_candidate",
+        "basename": None,
+        "node_kind": None,
+        "device": None,
+        "inode": None,
+        "link_count": None,
+        "uid": None,
+        "mode": None,
+        "size_bytes": None,
+        "sha256": None,
+        "blob": None,
+    }
+    try:
+        observed = os.stat(basename, dir_fd=directory_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return {**absent, "identity_sha256": _json_sha256(absent)}
+    except OSError as exc:
+        raise MaterializerError(
+            "validation_creation_owner_recovery:temp_identity_read_failed",
+            str(exc),
+        ) from exc
+    if not stat.S_ISREG(observed.st_mode):
+        raise MaterializerError("validation_creation_owner_recovery:temp_not_regular")
+    descriptor = os.open(
+        basename,
+        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+        dir_fd=directory_fd,
+    )
+    try:
+        opened = os.fstat(descriptor)
+        data = bytearray()
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            data.extend(chunk)
+        closed = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    if (observed.st_dev, observed.st_ino, observed.st_mode, observed.st_size) != (
+        opened.st_dev,
+        opened.st_ino,
+        opened.st_mode,
+        opened.st_size,
+    ) or (opened.st_dev, opened.st_ino, opened.st_mode, opened.st_size) != (
+        closed.st_dev,
+        closed.st_ino,
+        closed.st_mode,
+        closed.st_size,
+    ):
+        raise MaterializerError(
+            "validation_creation_owner_recovery:temp_identity_changed"
+        )
+    content = bytes(data)
+    if len(content) != closed.st_size:
+        raise MaterializerError(
+            "validation_creation_owner_recovery:temp_readback_failed"
+        )
+    identity: dict[str, object] = {
+        "state": "present",
+        "classification": "exact_complete_reusable",
+        "basename": basename,
+        "node_kind": "regular",
+        "device": closed.st_dev,
+        "inode": closed.st_ino,
+        "link_count": closed.st_nlink,
+        "uid": closed.st_uid,
+        "mode": closed.st_mode,
+        "size_bytes": closed.st_size,
+        "sha256": hashlib.sha256(content).hexdigest(),
+        "blob": _git_blob_oid(content),
+    }
+    return {**identity, "identity_sha256": _json_sha256(identity)}
+
+
+def _renameat2_no_replace(
+    directory_fd: int,
+    source_basename: str,
+    target_basename: str,
+) -> tuple[Literal["published", "target_exists", "io_failed"], str | None]:
+    """Perform one Linux atomic renameat2(RENAME_NOREPLACE) operation."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    renameat2 = getattr(libc, "renameat2", None)
+    if renameat2 is None:
+        return "io_failed", "renameat2_unavailable"
+    renameat2.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    renameat2.restype = ctypes.c_int
+    result = renameat2(
+        directory_fd,
+        source_basename.encode("utf-8"),
+        directory_fd,
+        target_basename.encode("utf-8"),
+        1,
+    )
+    if result == 0:
+        return "published", None
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        return "target_exists", None
+    return "io_failed", os.strerror(error_number)
+
+
+def _owner_target_conflict_result(
+    context: Mapping[str, object],
+    temp_before_publish: Mapping[str, object],
+    temp_after_conflict: Mapping[str, object],
+    raced_owner_readback: Mapping[str, object],
+) -> dict[str, object]:
+    """Construct the closed v16 target-exists result without writing state."""
+    side_effects = {
+        "no_replace_attempted": True,
+        "no_replace_succeeded": False,
+        "temp_unlinked": False,
+        "temp_replaced": False,
+        "temp_rewritten_after_readback": False,
+        "owner_unlinked": False,
+        "owner_overwritten": False,
+        "owner_adopted": False,
+        "cleanup_attempted": False,
+        "artifact_directory_fsync_attempted": False,
+        "terminal_event_written": False,
+        "settlement_written": False,
+        "successor_aggregate_written": False,
+        "current_pointer_updated": False,
+    }
+    result: dict[str, object] = {
+        "schema": "agent-canon.validation-creation-owner-recovery-io-result.v1",
+        "kind": "owner_target_conflict",
+        "code": "validation_creation_owner_recovery_io:owner_target_conflict",
+        "run_id": context["run_id"],
+        "logical_key": context["logical_key"],
+        "attempt": context["attempt"],
+        "aggregate_id": context["aggregate_id"],
+        "aggregate_revision": context["aggregate_revision"],
+        "current_intent_revision_id": context["current_intent_revision_id"],
+        "pending_event_id": context["pending_event_id"],
+        "lock_id": context["lock_id"],
+        "permit_sha256": context["permit_sha256"],
+        "q3_sha256": context["q3_sha256"],
+        "source_basename": temp_before_publish["basename"],
+        "target_basename": NO_REPLACE_TARGET_BASENAME,
+        "publication_primitive": NO_REPLACE_PUBLICATION_PRIMITIVE,
+        "publication_outcome": "target_exists",
+        "temp_before_publish": dict(temp_before_publish),
+        "temp_after_conflict": dict(temp_after_conflict),
+        "raced_owner_readback": dict(raced_owner_readback),
+        "side_effects": side_effects,
+        "body_sha256": "",
+    }
+    result["body_sha256"] = _json_sha256(
+        {key: value for key, value in result.items() if key != "body_sha256"}
+    )
+    return result
+
+
+def _publish_creation_owner_no_replace(
+    directory_fd: int,
+    source_basename: str,
+    temp_before_publish: Mapping[str, object],
+    context: Mapping[str, object],
+) -> dict[str, object]:
+    """Publish the owner leaf exactly once using the v16 no-replace primitive."""
+    outcome, detail = _renameat2_no_replace(
+        directory_fd,
+        source_basename,
+        NO_REPLACE_TARGET_BASENAME,
+    )
+    if outcome == "target_exists":
+        temp_after = _temp_identity(directory_fd, source_basename)
+        if temp_after != temp_before_publish:
+            raise MaterializerError(
+                "validation_creation_owner_recovery_io:temp_readback_failed"
+            )
+        raced_owner = _read_raced_owner(directory_fd, NO_REPLACE_TARGET_BASENAME)
+        raced_owner_after = _read_raced_owner(
+            directory_fd,
+            NO_REPLACE_TARGET_BASENAME,
+        )
+        if raced_owner_after != raced_owner:
+            raise MaterializerError(
+                "validation_creation_owner_recovery_io:owner_readback_failed"
+            )
+        return _owner_target_conflict_result(
+            context,
+            temp_before_publish,
+            temp_after,
+            raced_owner,
+        )
+    if outcome == "io_failed":
+        raise MaterializerError(
+            "validation_creation_owner_recovery_io:rename_failed",
+            detail or "renameat2_RENAME_NOREPLACE_failed",
+        )
+    try:
+        os.fsync(directory_fd)
+    except OSError as exc:
+        raise MaterializerError(
+            "validation_creation_owner_recovery_io:directory_fsync_failed",
+            str(exc),
+        ) from exc
+    owner_readback = _read_raced_owner(directory_fd, NO_REPLACE_TARGET_BASENAME)
+    if owner_readback.get("state") != "complete_regular":
+        raise MaterializerError(
+            "validation_creation_owner_recovery_io:owner_readback_failed"
+        )
+    return {
+        "publication_primitive": NO_REPLACE_PUBLICATION_PRIMITIVE,
+        "publication_outcome": "published",
+        "source_basename": source_basename,
+        "target_basename": NO_REPLACE_TARGET_BASENAME,
+        "owner_readback": owner_readback,
+        "side_effects": {
+            "no_replace_attempted": True,
+            "no_replace_succeeded": True,
+            "temp_unlinked": False,
+            "temp_replaced": False,
+            "temp_rewritten_after_readback": False,
+            "owner_unlinked": False,
+            "owner_overwritten": False,
+            "owner_adopted": False,
+            "cleanup_attempted": False,
+            "artifact_directory_fsync_attempted": True,
+            "terminal_event_written": False,
+            "settlement_written": False,
+            "successor_aggregate_written": False,
+            "current_pointer_updated": False,
+        },
+    }
+
 
 def _required_ledger_text(event: Mapping[str, object], field: str) -> str:
     """Return one required ledger text field."""
@@ -62,7 +466,9 @@ def _required_ledger_refs(event: Mapping[str, object], field: str) -> tuple[str,
     value = event.get(field)
     if not isinstance(value, (list, tuple)) or not value:
         raise ValueError(f"ledger event requires non-empty {field}")
-    refs = tuple(item.strip() for item in value if isinstance(item, str) and item.strip())
+    refs = tuple(
+        item.strip() for item in value if isinstance(item, str) and item.strip()
+    )
     if len(refs) != len(value):
         raise ValueError(f"ledger event {field} must contain only non-empty strings")
     return refs
@@ -95,7 +501,9 @@ def _validate_ledger_event(event: Mapping[str, object], report_dir: Path) -> str
     for field in ("evidence_refs", "artifact_refs"):
         _required_ledger_refs(event, field)
     clause_id = event.get("clause_id")
-    if clause_id is not None and (not isinstance(clause_id, str) or not clause_id.strip()):
+    if clause_id is not None and (
+        not isinstance(clause_id, str) or not clause_id.strip()
+    ):
         raise ValueError("ledger event clause_id must be null or non-empty text")
     mapping_mode = event.get("mapping_mode", "direct")
     if not isinstance(mapping_mode, str) or not mapping_mode.strip():
@@ -205,7 +613,7 @@ def append_ledger_event(report_dir: Path, event: dict[str, object]) -> Path:
     report_dir.mkdir(parents=True, exist_ok=True)
     work_log_path = report_dir / "work_log.md"
     if not work_log_path.exists():
-        _log_run_work_entry(report_dir, "ledger_event=bootstrap")
+        _log_run_work_entry(report_dir, "ledger-bootstrap")
     lines = work_log_path.read_text(encoding="utf-8").splitlines()
     heading = "## Ledger Events"
     if heading not in lines:
