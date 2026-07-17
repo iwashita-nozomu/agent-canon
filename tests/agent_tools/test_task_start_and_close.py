@@ -3254,6 +3254,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_final_review(report_dir)
             write_ready_completion_coverage(report_dir, run_id)
             write_ready_diff_check_artifact(report_dir)
+            write_ready_closeout_bundle(report_dir, run_id)
 
             result = subprocess.run(
                 [
@@ -3526,6 +3527,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_final_review(report_dir)
             write_ready_completion_coverage(report_dir, run_id)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+            write_ready_closeout_bundle(
+                report_dir,
+                run_id,
+                workspace=workspace_root,
+            )
 
             result = subprocess.run(
                 [

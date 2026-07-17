@@ -758,17 +758,31 @@ def main() -> int:
         not in {"", "missing", "none"},
         "agent_canon_parent_pin": agent_canon_latest.get("agent_canon_parent_pin", "")
         not in {"", "missing", "none"},
-        "mapping_error_sets_empty": closeout.get("mapping_error_sets_empty") == "yes",
-        "typed_owner_boundary_status": closeout.get("typed_owner_boundary_status")
-        == "pass",
+        "mapping_error_sets_empty": (
+            closeout.get(
+                "mapping_error_sets_empty",
+                canonical_evidence.get("mapping_error_sets_empty", ""),
+            )
+            == "yes"
+        ),
+        "typed_owner_boundary_status": (
+            closeout.get(
+                "typed_owner_boundary_status",
+                canonical_evidence.get("typed_owner_boundary_status", ""),
+            )
+            == "pass"
+        ),
         "canonical_format_check_status": canonical_evidence.get(
             "canonical_format_check_status", closeout.get("canonical_format_check_status", "")
         )
         == "pass",
-        "canonical_dispatcher_schema_status": closeout.get(
-            "canonical_dispatcher_schema_status"
-        )
-        == "pass",
+        "canonical_dispatcher_schema_status": (
+            closeout.get(
+                "canonical_dispatcher_schema_status",
+                canonical_evidence.get("canonical_dispatcher_schema_status", ""),
+            )
+            == "pass"
+        ),
         "validation_failure_response_status": completion_coverage_evidence.get(
             "validation_failure_response_status",
             closeout.get("validation_failure_response_status", ""),
@@ -950,15 +964,21 @@ def main() -> int:
     print(f"COMPLETION_COVERAGE_ARTIFACT={report_dir / COMPLETION_COVERAGE_ARTIFACT_NAME}")
     print(f"COMPLETION_COVERAGE_CONSUMER_READY={completion_decision.get('ready', False)}")
     print(f"COMPLETION_COVERAGE_CONSUMER_REASON={completion_decision.get('reason', '')}")
-    print(f"MAPPING_ERROR_SETS_EMPTY={closeout.get('mapping_error_sets_empty', '')}")
-    print(f"TYPED_OWNER_BOUNDARY_STATUS={closeout.get('typed_owner_boundary_status', '')}")
+    print(
+        "MAPPING_ERROR_SETS_EMPTY="
+        f"{closeout.get('mapping_error_sets_empty', canonical_evidence.get('mapping_error_sets_empty', ''))}"
+    )
+    print(
+        "TYPED_OWNER_BOUNDARY_STATUS="
+        f"{closeout.get('typed_owner_boundary_status', canonical_evidence.get('typed_owner_boundary_status', ''))}"
+    )
     print(
         "CANONICAL_FORMAT_CHECK_STATUS="
         f"{canonical_evidence.get('canonical_format_check_status', '')}"
     )
     print(
         "CANONICAL_DISPATCHER_SCHEMA_STATUS="
-        f"{closeout.get('canonical_dispatcher_schema_status', '')}"
+        f"{closeout.get('canonical_dispatcher_schema_status', canonical_evidence.get('canonical_dispatcher_schema_status', ''))}"
     )
     print(
         "VALIDATION_FAILURE_RESPONSE_STATUS="
@@ -973,6 +993,10 @@ def main() -> int:
     print(
         "REPO_WIDE_STATIC_ANALYSIS_COMPLETE="
         f"{closeout.get('repo_wide_static_analysis_complete', '')}"
+    )
+    print(
+        "MAKE_CI_STATUS="
+        f"{mechanical_loop.get('mechanical_loop_static_analysis_status', '')}"
     )
     print(
         "AGENT_CANON_LATEST_COMPLETE="

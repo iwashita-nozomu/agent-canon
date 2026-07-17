@@ -2918,6 +2918,7 @@ def report_artifact_placement_blockers(workspace: Path, report_dir: Path) -> lis
     report_root_metadata = {
         (report_dir.parent / ".active_run").resolve(),
         (report_dir.parent / ".active_run.sha256").resolve(),
+        (report_dir.parent / ".run_bundle_materialization.lock").resolve(),
     }
     for path, state in sorted(report_paths.items()):
         candidate = workspace / path
