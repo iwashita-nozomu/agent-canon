@@ -18,7 +18,11 @@ import json
 import re
 import subprocess
 import tempfile
-import tomllib
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime

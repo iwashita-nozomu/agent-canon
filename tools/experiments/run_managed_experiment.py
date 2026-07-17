@@ -21,7 +21,11 @@ import subprocess
 import sys
 import threading
 import time
-import tomllib
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
