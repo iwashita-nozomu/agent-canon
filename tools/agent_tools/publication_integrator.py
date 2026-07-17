@@ -323,15 +323,45 @@ def resolve_publication_authority(workspace: Path) -> dict[str, object]:
     parents = _git_text(
         root, ["rev-list", "--parents", "-n", "1", candidate_commit]
     ).split()
-    if len(parents) != 2:
+    if len(parents) not in {2, 3}:
         raise PublicationError("publication_authority:candidate_parent_invalid")
-    source_commit = _hex_oid(parents[1], "source_commit")
+    target = _target_tuple(candidate)
+    expected_target = _hex_oid(target["expected_target_oid"], "expected_target_oid")
+    parent_commits = tuple(_hex_oid(parent, "source_commit") for parent in parents[1:])
+    if len(parent_commits) == 1:
+        source_commit = parent_commits[0]
+    else:
+        source_candidates = tuple(
+            parent for parent in parent_commits if parent != expected_target
+        )
+        if expected_target not in parent_commits or len(source_candidates) != 1:
+            raise PublicationError("publication_authority:candidate_parent_invalid")
+        source_commit = source_candidates[0]
+    if target["route"] == "local_ref" and target["mode"] == "direct_head":
+        if expected_target != source_commit:
+            raise PublicationError("publication_authority:target_not_source_successor")
+    elif target["route"] == "pull_request":
+        if (
+            _run(
+                subprocess_runner,
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "merge-base",
+                    "--is-ancestor",
+                    expected_target,
+                    source_commit,
+                ],
+            ).returncode
+            != 0
+        ):
+            raise PublicationError("publication_authority:target_not_source_successor")
     source_tree = _hex_oid(
         _git_text(root, ["rev-parse", f"{source_commit}^{{tree}}"]),
         "source_tree",
     )
     delta = observe_git_tree_delta(root, source_tree, candidate_tree)
-    target = _target_tuple(candidate)
     attestation_core = {
         "repository_id": root.name,
         "owner_identity": "completion_authority",
@@ -550,6 +580,8 @@ def _construct_result_commit(
     expected = _hex_oid(target_map["expected_target_oid"], "expected_target_oid")
     candidate_commit = _hex_oid(candidate_map["candidate_commit"], "candidate_commit")
     source_commit = _hex_oid(source_map["commit"], "source_commit")
+    if target_map["route"] == "pull_request":
+        return candidate_commit
     if mode == "direct_head":
         if expected != source_commit:
             raise PublicationError("publication_authority:target_not_source_successor")
@@ -725,8 +757,13 @@ def integrate_publication(
         )
         if response.get("status") != "merged":
             raise PublicationError("integration_target_moved")
-        observed_result = str(response.get("result_oid", ""))
-    if observed_result != result_commit:
+        observed_result = _hex_oid(response.get("result_oid"), "result_oid")
+        post_cas_ref_oid = _hex_oid(
+            response.get("post_cas_ref_oid"), "post_cas_ref_oid"
+        )
+        if post_cas_ref_oid != observed_result:
+            raise PublicationError("publication_integrator:post_cas_readback_mismatch")
+    if route != "pull_request" and observed_result != result_commit:
         raise PublicationError("publication_integrator:post_cas_readback_mismatch")
     status_after = _worktree_status(root, runner=runner)
     if status_after != status_before:
@@ -740,7 +777,7 @@ def integrate_publication(
         "candidate_oid": cast(Mapping[str, object], authority["candidate_authority"])[
             "candidate_commit"
         ],
-        "result_oid": result_commit,
+        "result_oid": observed_result,
         "post_cas_ref_oid": observed_result,
         "checkout_status_before_sha256": hashlib.sha256(
             status_before.encode()
