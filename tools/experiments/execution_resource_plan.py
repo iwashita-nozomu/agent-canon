@@ -44,7 +44,10 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
-from typing import Callable, Literal, Mapping, Protocol, Sequence, TypeAlias, cast
+from typing import TYPE_CHECKING, Callable, Literal, Mapping, Protocol, Sequence, TypeAlias, cast
+
+if TYPE_CHECKING:
+    from experiment_runner import RunnerLifecycleEvidence
 
 try:
     import fcntl
@@ -2429,14 +2432,11 @@ def build_source_path_set(
         "tools/experiments/execution_resource_plan.py",
         "tools/experiments/run_managed_experiment.py",
         "tools/experiments/registry_lib.py",
-        "tools/experiments/experiments_registry.toml",
         "tools/agent_tools/jit_canonical_ir.py",
     )
     result: list[str] = []
     for relative_path in fixed_core:
         candidate = source_root / relative_path
-        if relative_path.endswith("experiments_registry.toml") and not candidate.is_file():
-            continue
         if not candidate.is_file():
             raise TypedPreflightFailure(
                 "gpu_source_path_missing",
@@ -2444,9 +2444,23 @@ def build_source_path_set(
                 relative_path=relative_path,
             )
         result.append(relative_path)
+    registry_path = source_root / "experiments/registry.toml"
+    if registry_path.is_file():
+        result.append("experiments/registry.toml")
     try:
         listed = subprocess.run(
-            ["git", "-C", str(source_root), "ls-files", "-z", "--", f"experiments/{topic_name}/**"],
+            [
+                "git",
+                "-C",
+                str(source_root),
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "-z",
+                "--",
+                f"experiments/{topic_name}/**",
+            ],
             check=False,
             capture_output=True,
             timeout=10,
@@ -2561,6 +2575,15 @@ class ParsedNvidiaXml:
 
 
 @dataclass(frozen=True)
+class _ParsedNvidiaXmlDocument:
+    """Canonical fd-bound XML parse plus its parser-owned element graph."""
+
+    parsed: ParsedNvidiaXml
+    root: ET.Element
+    parent_map: Mapping[ET.Element, ET.Element]
+
+
+@dataclass(frozen=True)
 class NvidiaInventory:
     """Candidate topology produced only by the NVIDIA evidence owner."""
 
@@ -2570,6 +2593,16 @@ class NvidiaInventory:
     joins: tuple[NvidiaTopologyJoin, ...]
     driver_version: NvidiaDriverVersion | None
     evidence_fingerprint: Sha256Hex
+
+
+@dataclass(frozen=True)
+class NvidiaStructuredObservation:
+    """One canonical fd-bound topology/process observation for admission."""
+
+    inventory: NvidiaInventory
+    devices: tuple[GPUDevice, ...]
+    processes: tuple[ProcessIdentity, ...]
+    process_inventory_visibility: Mapping[str, object]
 
 
 _NVIDIA_DRIVER_VERSION_RE = re.compile(
@@ -2885,7 +2918,7 @@ def _xml_required_child_text(element: ET.Element, tag: str, evidence: EvidenceFd
     return value
 
 
-def _parse_nvidia_smi_xml(evidence: EvidenceFd) -> ParsedNvidiaXml:
+def _parse_nvidia_smi_xml_document(evidence: EvidenceFd) -> _ParsedNvidiaXmlDocument:
     data = _read_evidence_fd(evidence)
     if _NVIDIA_UNSAFE_XML_RE.search(data.decode("ascii", errors="ignore")):
         raise _nvidia_parser_failure(
@@ -3045,7 +3078,7 @@ def _parse_nvidia_smi_xml(evidence: EvidenceFd) -> ParsedNvidiaXml:
     comments = tuple(
         str(element.text or "") for event, element in parser_events if event == "comment"
     )
-    return ParsedNvidiaXml(
+    parsed = ParsedNvidiaXml(
         schema_version="nvidia-xml/v1",
         physical_uuids=tuple(physical),
         mig_uuids=tuple(mig),
@@ -3065,6 +3098,84 @@ def _parse_nvidia_smi_xml(evidence: EvidenceFd) -> ParsedNvidiaXml:
             },
         ),
     )
+    return _ParsedNvidiaXmlDocument(
+        parsed=parsed,
+        root=root,
+        parent_map=_xml_parent_map(root),
+    )
+
+
+def _parse_nvidia_smi_xml(evidence: EvidenceFd) -> ParsedNvidiaXml:
+    """Parse XML once through the canonical retained-fd parser."""
+    return _parse_nvidia_smi_xml_document(evidence).parsed
+
+
+def _structured_gpu_devices(
+    document: _ParsedNvidiaXmlDocument,
+    inventory: NvidiaInventory,
+    allocated: frozenset[str],
+) -> dict[str, GPUDevice]:
+    """Materialize memory-bearing devices from the canonical parsed XML graph."""
+    root = document.root
+    parent_map = document.parent_map
+    parsed_devices: dict[str, GPUDevice] = {}
+    for gpu in root.iter():
+        if _xml_local_name(gpu) != "gpu":
+            continue
+        uuid = _xml_text(gpu.find("uuid"), "gpu.uuid")
+        memory = gpu.find("fb_memory_usage")
+        if memory is None:
+            continue
+        parsed_devices[uuid] = GPUDevice(
+            uuid=uuid,
+            free_memory_bytes=_xml_memory_bytes(
+                memory.find("free"), "gpu.fb_memory_usage.free"
+            ),
+            memory_bytes=_xml_memory_bytes(
+                memory.find("total"), "gpu.fb_memory_usage.total"
+            ),
+        )
+    for element in root.iter():
+        if _xml_local_name(element) not in {
+            "mig_device",
+            "gpu_instance",
+            "compute_instance",
+        }:
+            continue
+        uuid = _structured_unit_uuid(element, parent_map)
+        if not uuid or uuid in parsed_devices:
+            continue
+        parent_element = _nearest_xml_ancestor(element, parent_map, frozenset({"gpu"}))
+        parent_value = parent_element.find("uuid") if parent_element is not None else None
+        parent = parent_value.text.strip() if parent_value is not None and parent_value.text else None
+        memory = element.find("fb_memory_usage")
+        if memory is None:
+            continue
+        parsed_devices[uuid] = GPUDevice(
+            uuid=uuid,
+            free_memory_bytes=_xml_memory_bytes(
+                memory.find("free"), "mig.fb_memory_usage.free"
+            ),
+            memory_bytes=_xml_memory_bytes(
+                memory.find("total"), "mig.fb_memory_usage.total"
+            ),
+            mig_parent_uuid=parent,
+        )
+    if not parsed_devices or not allocated.issubset(parsed_devices):
+        raise TypedPreflightFailure(
+            "gpu_structured_discovery_cardinality_incomplete",
+            "structured GPU observation does not cover every allocated UUID/MIG UUID",
+            allocated=tuple(sorted(allocated)),
+            observed=tuple(sorted(parsed_devices)),
+        )
+    if set(inventory.physical_uuids).difference(parsed_devices) or set(
+        inventory.mig_uuids
+    ).difference(parsed_devices):
+        raise TypedPreflightFailure(
+            "gpu_structured_discovery_cardinality_incomplete",
+            "strict NVIDIA inventory and memory observation disagree",
+        )
+    return parsed_devices
 
 
 class NvidiaInventoryProbe:
@@ -3126,6 +3237,64 @@ class NvidiaInventoryProbe:
                     }
                 ).encode("utf-8")
             ).hexdigest(),
+        )
+
+    def observe_structured(
+        self,
+        allocated: frozenset[str],
+    ) -> NvidiaStructuredObservation:
+        """Return all admission values from one retained-fd XML parse."""
+        list_evidence = self.parse_nvidia_smi_list(self._list_evidence)
+        xml_document = _parse_nvidia_smi_xml_document(self._xml_evidence)
+        xml_evidence = xml_document.parsed
+        if (
+            list_evidence.physical_uuids != xml_evidence.physical_uuids
+            or list_evidence.mig_uuids != xml_evidence.mig_uuids
+            or list_evidence.joins != xml_evidence.joins
+        ):
+            raise TypedPreflightFailure(
+                "gpu_mig_join_conflict",
+                "NVIDIA list and XML topology evidence disagree",
+                list_source=self._list_evidence.source_name,
+                xml_source=self._xml_evidence.source_name,
+            )
+        driver = (
+            self.parse_nvidia_driver_version(self._driver_evidence)
+            if self._driver_evidence is not None
+            else None
+        )
+        inventory = NvidiaInventory(
+            schema_version="nvidia-inventory/v1",
+            physical_uuids=list_evidence.physical_uuids,
+            mig_uuids=list_evidence.mig_uuids,
+            joins=list_evidence.joins,
+            driver_version=driver,
+            evidence_fingerprint=hashlib.sha256(
+                _canonical_json(
+                    {
+                        "list": list_evidence.evidence_fingerprint,
+                        "xml": xml_evidence.evidence_fingerprint,
+                        "driver": _nvidia_driver_payload(driver),
+                    }
+                ).encode("utf-8")
+            ).hexdigest(),
+        )
+        parsed_devices = _structured_gpu_devices(xml_document, inventory, allocated)
+        process_visibility = _prove_allocated_process_inventory_visibility(
+            xml_document.root,
+            allocated,
+            xml_document.parent_map,
+        )
+        processes = _parse_structured_gpu_processes(
+            xml_document.root,
+            parsed_devices,
+            xml_document.parent_map,
+        )
+        return NvidiaStructuredObservation(
+            inventory=inventory,
+            devices=tuple(sorted(parsed_devices.values(), key=lambda device: device.uuid)),
+            processes=processes,
+            process_inventory_visibility=process_visibility,
         )
 
 
@@ -3406,6 +3575,8 @@ class UuidVisibilityEvidence:
     nvidia_visible_devices: str | None
     disposition: VisibilityDisposition
     visible_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
+    namespace_id: str
+    provision_receipt_fingerprint: Sha256Hex
     fingerprint: Sha256Hex
 
 
@@ -3573,6 +3744,8 @@ class GpuReservationTransaction:
                 lock_root=str(self._lock_root),
             )
         self._root_device = root_stat.st_dev
+        self._root_uid = root_stat.st_uid
+        self._root_gid = root_stat.st_gid
         self._filesystem_type: Literal["btrfs", "ext4", "xfs"] = (
             self._read_filesystem_type(self._lock_root)
         )
@@ -3799,10 +3972,17 @@ class GpuReservationTransaction:
                 "GPU candidate lock identity changed during admission",
                 uuid=uuid,
             )
-        if not stat.S_ISREG(final_stat.st_mode) or stat.S_IMODE(final_stat.st_mode) != 0o660:
+        if (
+            not stat.S_ISREG(final_stat.st_mode)
+            or stat.S_IMODE(final_stat.st_mode) != 0o660
+            or final_stat.st_uid != self._root_uid
+            or final_stat.st_gid != self._root_gid
+            or path_stat.st_uid != self._root_uid
+            or path_stat.st_gid != self._root_gid
+        ):
             raise TypedPreflightFailure(
                 "gpu_lock_readback_invalid",
-                "GPU candidate lock mode or type is invalid",
+                "GPU candidate lock type, mode, or ownership is invalid",
                 uuid=uuid,
             )
 
@@ -4027,6 +4207,7 @@ class _NvidiaSMIObservation:
         devices: tuple[GPUDevice, ...] = ()
         processes: tuple[ProcessIdentity, ...] = ()
         inventory: NvidiaInventory | None = None
+        process_inventory_visibility: Mapping[str, object] | None = None
         tool_capability: dict[str, object] = {
             "tree": {
                 "available": shutil.which("tree") is not None,
@@ -4059,85 +4240,18 @@ class _NvidiaSMIObservation:
                 "nvidia_driver_version",
             )
             try:
-                inventory = NvidiaInventoryProbe(
+                structured = NvidiaInventoryProbe(
                     list_evidence,
                     xml_evidence,
                     driver_evidence,
-                ).observe()
-                xml_payload = _read_evidence_fd(xml_evidence)
+                ).observe_structured(allocated)
+                inventory = structured.inventory
+                devices = structured.devices
+                processes = structured.processes
+                process_inventory_visibility = structured.process_inventory_visibility
             finally:
                 for evidence in (driver_evidence, xml_evidence, list_evidence):
                     _close_evidence_fd(evidence)
-            try:
-                root = ET.fromstring(xml_payload)
-            except ET.ParseError as exc:
-                raise TypedPreflightFailure(
-                    "gpu_structured_probe_malformed",
-                    "nvidia-smi XML observation could not be parsed structurally",
-                ) from exc
-            parent_map = _xml_parent_map(root)
-            parsed_devices: dict[str, GPUDevice] = {}
-            for gpu in root.findall(".//gpu"):
-                uuid = _xml_text(gpu.find("uuid"), "gpu.uuid")
-                memory = gpu.find("fb_memory_usage")
-                parsed_devices[uuid] = GPUDevice(
-                    uuid=uuid,
-                    free_memory_bytes=_xml_memory_bytes(
-                        memory.find("free") if memory is not None else None,
-                        "gpu.fb_memory_usage.free",
-                    ),
-                    memory_bytes=_xml_memory_bytes(
-                        memory.find("total") if memory is not None else None,
-                        "gpu.fb_memory_usage.total",
-                    ),
-                )
-            for mig in (
-                root.findall(".//mig_device")
-                + root.findall(".//gpu_instance")
-                + root.findall(".//compute_instance")
-            ):
-                uuid = _structured_unit_uuid(mig, parent_map)
-                if not uuid or uuid in parsed_devices:
-                    continue
-                parent_element = _nearest_xml_ancestor(mig, parent_map, frozenset({"gpu"}))
-                parent_value = parent_element.find("uuid") if parent_element is not None else None
-                parent = parent_value.text.strip() if parent_value is not None and parent_value.text else None
-                memory = mig.find("fb_memory_usage")
-                if memory is None:
-                    continue
-                parsed_devices[uuid] = GPUDevice(
-                    uuid=uuid,
-                    free_memory_bytes=_xml_memory_bytes(
-                        memory.find("free"), "mig.fb_memory_usage.free"
-                    ),
-                    memory_bytes=_xml_memory_bytes(
-                        memory.find("total"), "mig.fb_memory_usage.total"
-                    ),
-                    mig_parent_uuid=parent,
-                )
-            if not parsed_devices or not allocated.issubset(parsed_devices):
-                raise TypedPreflightFailure(
-                    "gpu_structured_discovery_cardinality_incomplete",
-                    "structured GPU observation does not cover every allocated UUID/MIG UUID",
-                    allocated=tuple(sorted(allocated)),
-                    observed=tuple(sorted(parsed_devices)),
-                )
-            if set(inventory.physical_uuids).difference(parsed_devices) or set(
-                inventory.mig_uuids
-            ).difference(parsed_devices):
-                raise TypedPreflightFailure(
-                    "gpu_structured_discovery_cardinality_incomplete",
-                    "strict NVIDIA inventory and memory observation disagree",
-                )
-            process_inventory_visibility = (
-                _prove_allocated_process_inventory_visibility(
-                    root,
-                    allocated,
-                    parent_map,
-                )
-            )
-            devices = tuple(sorted(parsed_devices.values(), key=lambda device: device.uuid))
-            processes = _parse_structured_gpu_processes(root, parsed_devices, parent_map)
             tool_capability["nvidia-smi"] = {
                 "available": True,
                 "path": nvidia_smi,
@@ -5117,6 +5231,7 @@ class ExecutionResourcePlan:
                 for side_effect in self.side_effect_inventory
             ),
         )
+
         object.__setattr__(self, "state_history", tuple(self.state_history))
         if not self.state_history or self.state_history[-1] != self.state:
             raise PlanStateError("state history must end at the current state")
@@ -5530,7 +5645,7 @@ class ManagedGpuOutcome:
     plan_fingerprint: Sha256Hex | None
     admission_fingerprint: Sha256Hex | None
     planned_chunk_ids: tuple[str, ...]
-    runner_lifecycle: object | None
+    runner_lifecycle: RunnerLifecycleEvidence | None
     runner_lifecycle_fingerprint: Sha256Hex | None
     primary_failure: FailureRecord | None
     secondary_failures: tuple[FailureRecord, ...]
@@ -5599,10 +5714,10 @@ class ManagedGpuOutcomeReducer:
         *,
         run_id: str,
         planned_chunk_ids: tuple[str, ...],
-        admission: object | None,
+        admission: RunGpuAdmissionReceipt | None,
         source_freeze: SourceFreezeReceipt | None,
         runtime_identity: RuntimeIdentityReceipt | None,
-        runner_lifecycle: object | None,
+        runner_lifecycle: RunnerLifecycleEvidence | None,
         primary_failure: FailureRecord | None,
         secondary_failures: tuple[FailureRecord, ...],
         release_disposition: tuple[FdReleaseEvidence, ...],
@@ -5618,16 +5733,11 @@ class ManagedGpuOutcomeReducer:
         source_fingerprint = (
             source_freeze.receipt_fingerprint if source_freeze is not None else None
         )
-        del runtime_identity
         admission_fingerprint = (
-            getattr(admission, "admission_fingerprint", None)
-            if admission is not None
-            else None
+            admission.admission_fingerprint if admission is not None else None
         )
         plan_fingerprint = (
-            getattr(admission, "plan_fingerprint", None)
-            if admission is not None
-            else None
+            admission.plan_fingerprint if admission is not None else None
         )
         lifecycle_fingerprint = (
             hashlib.sha256(
@@ -5742,7 +5852,17 @@ def build_completion_coverage_input(
     evidence_absence: tuple[EvidenceAbsence, ...],
 ) -> CompletionCoverageInput:
     """Assemble one exact coverage input without becoming a second owner."""
-    del runtime_identity
+    visibility = admission.container_visible_uuid_mapping if admission is not None else None
+    if visibility is not None:
+        if runtime_identity is None:
+            raise CompletionCoverageFailure(
+                "runtime identity is required for UUID visibility coverage"
+            )
+        visibility = replace(
+            visibility,
+            namespace_id=f"pid:[{runtime_identity.namespace_inode}]",
+            provision_receipt_fingerprint=runtime_identity.provision_fingerprint,
+        )
     return CompletionCoverageInput(
         schema_version=COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION,
         outcome=outcome,
@@ -5762,9 +5882,7 @@ def build_completion_coverage_input(
             admission.concurrent_run_evidence if admission is not None else None
         ),
         mig_evidence=admission.mig_evidence if admission is not None else None,
-        container_visible_uuid_mapping=(
-            admission.container_visible_uuid_mapping if admission is not None else None
-        ),
+        container_visible_uuid_mapping=visibility,
         os_safe_lock_placement=(
             admission.os_safe_lock_placement if admission is not None else None
         ),
@@ -5840,7 +5958,7 @@ class CompletionCoverage:
     plan_fingerprint: str
     terminal_event_id: str
     delivery_ordinal: int
-    input_record: CompletionCoverageInput | _LegacyPlannerCoverageRecord
+    input_record: CompletionCoverageInput
     recorded_at: str
     all_planned_chunks_complete: bool
     overall_delivery_complete: bool
@@ -5988,11 +6106,16 @@ class CompletionCoverageAdapter:
             "R5 CompletionCoverageAdapter.record_once accepts only the exact public input"
         )
 
-    def _record_legacy_once(
+    def _historical_planner_closeout_rejected(
         self,
         input: _LegacyPlannerCoverageRecord,
     ) -> CompletionCoverage:
-        """Record only the historical deterministic planner closeout path."""
+        """Reject the superseded planner closeout instead of recording coverage."""
+        raise CompletionCoverageFailure(
+            "historical planner completion is not an authorized R5 route"
+        )
+
+        # The old validation body remains unreachable historical evidence only.
         key = (input.plan_fingerprint, input.terminal_event_id)
         with self._lock:
             if key in self._records:
@@ -6200,25 +6323,21 @@ class PostToolUseProjectionReducer:
         exact_input = cast(CompletionCoverageInput, coverage.input_record)
         admission_source = exact_input.container_visible_uuid_mapping
         selected = tuple(exact_input.selected_uuids)
-        if isinstance(admission_source, Mapping):
-            namespace_value = admission_source.get("namespace_id", "managed-runtime")
-            provision_value = admission_source.get("provision_receipt_fingerprint", "")
-        else:
-            namespace_value = getattr(admission_source, "namespace_id", "managed-runtime")
-            provision_value = getattr(admission_source, "provision_receipt_fingerprint", "")
-        namespace_id = str(namespace_value)
-        provision_fingerprint = str(provision_value)
-        if not provision_fingerprint:
-            provision_fingerprint = hashlib.sha256(
-                b"runtime-provision-absence"
-            ).hexdigest()
         admission = None
         if outcome.admission_fingerprint is not None:
+            if not isinstance(admission_source, UuidVisibilityEvidence):
+                raise CompletionCoverageFailure(
+                    "GPU projection requires typed UUID visibility and runtime identity evidence"
+                )
+            if not admission_source.namespace_id or not admission_source.provision_receipt_fingerprint:
+                raise CompletionCoverageFailure(
+                    "GPU projection requires non-empty runtime namespace and provision fingerprints"
+                )
             admission = {
                 "admission_fingerprint": outcome.admission_fingerprint,
                 "guarantee": "run-level-opaque-uuid-admission",
-                "namespace_id": namespace_id,
-                "provision_receipt_fingerprint": provision_fingerprint,
+                "namespace_id": admission_source.namespace_id,
+                "provision_receipt_fingerprint": admission_source.provision_receipt_fingerprint,
                 "selected_uuids": selected,
             }
         error = None
@@ -6804,7 +6923,7 @@ def handle_pre_execution_failure(
         )
         completion_coverage = CompletionCoverageAdapter(
             evidence_path=completion_path
-        )._record_legacy_once(failure_coverage_input)
+        )._historical_planner_closeout_rejected(failure_coverage_input)
         closeout_witness = _persist_pre_execution_failure_record(
             runtime_root,
             projection_root,
@@ -9085,7 +9204,7 @@ def dispose_resources(
         effective_env_certificate_matches=certificate_matches,
         cleanup_has_unresolved_leak_or_unknown=bool(leaks),
     )
-    completion_coverage = completion_coverage_adapter._record_legacy_once(
+    completion_coverage = completion_coverage_adapter._historical_planner_closeout_rejected(
         final_coverage_input
     )
     closeout_payload = {

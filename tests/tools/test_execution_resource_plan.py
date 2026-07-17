@@ -19,7 +19,6 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 from tests.tools.resource_plan_test_evidence import (
@@ -39,6 +38,7 @@ from tools.experiments.execution_resource_plan import (
     GpuProcessOccupancyProbe,
     GpuReservationTransaction,
     GpuRunRequest,
+    RunGpuAdmissionReceipt,
     ManagedGpuOutcomeReducer,
     PostToolUseProjectionReducer,
     ReservationEvidence,
@@ -52,6 +52,8 @@ from tools.experiments.execution_resource_plan import (
     SourceFreezeOwner,
     TypedPreflightFailure,
     UUIDReservationStore,
+    UuidVisibilityEvidence,
+    build_source_path_set,
     freeze_resource_plan,
     materialize_environment,
     parse_nvidia_driver_version,
@@ -68,9 +70,29 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
         """Terminal outcome, exactly-once coverage, and Hook bytes share one receipt."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            admission = SimpleNamespace(
-                admission_fingerprint="a" * 64,
+            uuid = "GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            visibility = UuidVisibilityEvidence(
+                cuda_visible_devices=uuid,
+                nvidia_visible_devices=uuid,
+                disposition="explicit",
+                visible_uuids=(uuid,),
+                namespace_id="pid:[4026531836]",
+                provision_receipt_fingerprint="c" * 64,
+                fingerprint="d" * 64,
+            )
+            admission = RunGpuAdmissionReceipt(
+                schema_version="gpu-admission/v1",
+                candidate_uuids=(uuid,),
+                occupied_uuids=(),
+                reserved_uuids=(),
+                selected_uuids=(uuid,),
+                inventory_fingerprint="e" * 64,
+                occupancy_fingerprint="f" * 64,
+                reservation_fingerprint="g" * 64,
+                runtime_identity_fingerprint="h" * 64,
                 plan_fingerprint="b" * 64,
+                admission_fingerprint="a" * 64,
+                container_visible_uuid_mapping=visibility,
             )
             outcome = ManagedGpuOutcomeReducer().reduce_terminal(
                 run_id="r5-terminal",
@@ -78,7 +100,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 admission=admission,
                 source_freeze=None,
                 runtime_identity=None,
-                runner_lifecycle={"terminal_status": "succeeded"},
+                runner_lifecycle=None,
                 primary_failure=None,
                 secondary_failures=(),
                 release_disposition=(),
@@ -92,7 +114,6 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 "actual_gpu_processes",
                 "concurrent_run_evidence",
                 "mig_evidence",
-                "container_visible_uuid_mapping",
                 "os_safe_lock_placement",
                 "descendant_retention_evidence",
             )
@@ -119,16 +140,16 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 schema_version=COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION,
                 outcome=outcome,
                 planned_chunk_ids=("chunk-1",),
-                candidate_uuids=("GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",),
+                candidate_uuids=(uuid,),
                 occupied_uuids=(),
                 reserved_uuids=(),
-                selected_uuids=("GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",),
+                selected_uuids=(uuid,),
                 lock_readback=None,
                 effective_environment=None,
                 actual_gpu_processes=None,
                 concurrent_run_evidence=None,
                 mig_evidence=None,
-                container_visible_uuid_mapping=None,
+                container_visible_uuid_mapping=visibility,
                 os_safe_lock_placement=None,
                 descendant_retention_evidence=None,
                 source_freeze_evidence=None,
@@ -616,6 +637,27 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             )
             owner.close()
             self.assertEqual(owner._owned_fds, [])
+
+    def test_source_path_set_includes_nonignored_untracked_topic_and_exact_registry(self) -> None:
+        """Source membership includes untracked topic files and only the canonical registry edge."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "--quiet", str(root)], check=True)
+            for relative_path in (
+                "tools/experiments/execution_resource_plan.py",
+                "tools/experiments/run_managed_experiment.py",
+                "tools/experiments/registry_lib.py",
+                "tools/agent_tools/jit_canonical_ir.py",
+                "experiments/registry.toml",
+                "experiments/topic/cases.py",
+            ):
+                path = root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("source\n", encoding="utf-8")
+            source_paths = build_source_path_set(str(root), "topic", ())
+            self.assertIn("experiments/registry.toml", source_paths)
+            self.assertIn("experiments/topic/cases.py", source_paths)
+            self.assertNotIn("tools/experiments/experiments_registry.toml", source_paths)
 
     def test_source_freeze_failure_preserves_primary_and_typed_close_secondary(self) -> None:
         """Failure cleanup keeps the primary and exposes one attempted close ambiguity."""

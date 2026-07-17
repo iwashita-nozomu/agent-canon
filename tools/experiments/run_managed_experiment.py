@@ -68,6 +68,8 @@ from tools.experiments.execution_resource_plan import (
     PostToolUseProjectionReducer,
     ResourceRequest,
     ResourcePlanError,
+    ExecutionResourcePlan,
+    RuntimeIdentityReceipt,
     TypedPreflightFailure,
     NvidiaSMIResourceProbe,
     freeze_resource_plan,
@@ -240,19 +242,18 @@ class RunContext:
 
 
 def build_admitted_environment(
-    plan: object,
-    runtime_identity: object,
+    plan: ExecutionResourcePlan,
+    runtime_identity: RuntimeIdentityReceipt,
 ) -> AdmittedEnvironment:
     """Build the exact opaque-UUID environment before generic runner construction."""
-    if runtime_identity is None:
+    if runtime_identity.runtime_route != "MANAGED_CONTAINER":
         raise TypedPreflightFailure(
-            "runtime_identity_missing",
-            "admitted environment requires a proven runtime identity receipt",
+            "runtime_identity_route_invalid",
+            "managed admission requires the managed-container runtime identity",
+            runtime_route=runtime_identity.runtime_route,
         )
-    allocation = getattr(plan, "gpu_allocation", None)
-    selected = tuple(getattr(allocation, "selected_ids", ()))
-    raw_execution = getattr(plan, "execution", {})
-    raw_environment = raw_execution.get("env", {}) if isinstance(raw_execution, Mapping) else {}
+    selected = tuple(plan.gpu_allocation.selected_ids)
+    raw_environment = plan.execution.get("env")
     if not isinstance(raw_environment, Mapping) or any(
         not isinstance(key, str) or not isinstance(value, str)
         for key, value in raw_environment.items()
@@ -308,14 +309,14 @@ def build_admitted_environment(
     )
 
 
-class RunGpuAdmissionContext(AbstractContextManager[object]):
+class RunGpuAdmissionContext(AbstractContextManager[GpuRunRequest]):
     """Composition-only ordering and reverse-release context."""
 
     @classmethod
-    def create(cls, request: object) -> "RunGpuAdmissionContext":
+    def create(cls, request: GpuRunRequest) -> "RunGpuAdmissionContext":
         return cls(request)
 
-    def __init__(self, request: object) -> None:
+    def __init__(self, request: GpuRunRequest) -> None:
         self.request = request
         self.state: str = "CREATED"
         self._release_callbacks: list[Callable[[], object]] = []
@@ -343,7 +344,7 @@ class RunGpuAdmissionContext(AbstractContextManager[object]):
             )
         self._release_failure_sink = sink
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> GpuRunRequest:
         if self.state != "CREATED":
             raise TypedPreflightFailure(
                 "gpu_context_reentered",
@@ -396,6 +397,21 @@ def _build_admitted_context(case: object) -> TaskContext:
 
 def _run_topic_case(case: object, context: TaskContext) -> ExecutionResult:
     """Adapt one topic callable to the generic runner task boundary."""
+    working_directory = context.get("working_directory")
+    if not isinstance(working_directory, str) or not working_directory:
+        raise TypedPreflightFailure(
+            "gpu_source_snapshot_cwd_missing",
+            "managed topic execution requires the frozen source snapshot root",
+        )
+    try:
+        os.chdir(working_directory)
+    except OSError as exc:
+        raise TypedPreflightFailure(
+            "gpu_source_snapshot_cwd_unavailable",
+            "managed topic execution could not enter the frozen source snapshot root",
+            working_directory=working_directory,
+            errno=exc.errno,
+        ) from exc
     if isinstance(case, Mapping) and callable(case.get("topic_callable")):
         return case["topic_callable"](case.get("topic_case"), context)
     raise TypedPreflightFailure(
@@ -1754,7 +1770,7 @@ def execute_managed_run(
         source_paths=source_paths,
         planned_chunk_ids=request.requested_chunks,
     )
-    admission_context = RunGpuAdmissionContext.create(request)
+    admission_context = RunGpuAdmissionContext.create(source_request)
     source_freeze = None
     runtime_identity = None
     admission: RunGpuAdmissionReceipt | None = None
@@ -1862,7 +1878,10 @@ def execute_managed_run(
                 )
                 final_observation = final_probe.observe()
                 final_inventory = final_observation.nvidia_inventory
-                if final_inventory is None or final_inventory.evidence_fingerprint == inventory.evidence_fingerprint:
+                if (
+                    final_inventory is None
+                    or final_observation.fingerprint == initial_observation.fingerprint
+                ):
                     raise TypedPreflightFailure(
                         "gpu_run_admission_raced",
                         "final NVIDIA evidence did not provide a new admission snapshot",
@@ -2135,11 +2154,15 @@ def execute_managed_run(
                     nvidia_visible_devices=admitted_environment.nvidia_visible_devices,
                     disposition="explicit",
                     visible_uuids=tuple(allocation.selected_ids),
+                    namespace_id=f"pid:[{runtime_identity.namespace_inode}]",
+                    provision_receipt_fingerprint=runtime_identity.provision_fingerprint,
                     fingerprint=_r5_evidence_fingerprint(
                         {
                             "cuda": exact_visible,
                             "nvidia": admitted_environment.nvidia_visible_devices,
                             "visible_uuids": allocation.selected_ids,
+                            "namespace_id": f"pid:[{runtime_identity.namespace_inode}]",
+                            "provision_receipt_fingerprint": runtime_identity.provision_fingerprint,
                         }
                     ),
                 )
@@ -2182,7 +2205,10 @@ def execute_managed_run(
                 {
                     "topic_case": case,
                     "topic_callable": task,
-                    "context": {"environment_variables": dict(exact_environment)},
+                    "context": {
+                        "environment_variables": dict(exact_environment),
+                        "working_directory": str(context.paths.result_dir / "source_snapshot"),
+                    },
                 }
                 for case in cases
             ]
