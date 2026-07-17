@@ -25,14 +25,14 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-import agent_team  # noqa: E402
-from report_artifact_checks import write_completion_coverage_artifact  # noqa: E402
-from work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
 from agent_team import (  # noqa: E402
     AgentTypeSelection,
     load_team_config,
     validate_agent_type_selections,
 )
+import agent_team  # noqa: E402
+from report_artifact_checks import write_completion_coverage_artifact  # noqa: E402
+from work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
 
 RUNTIME_PROFILE_INVENTORY = PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
@@ -127,7 +127,7 @@ def ready_closeout_evidence_lines(
     )
     return [
         "",
-        "## AgentCanon Latest And CI Gate Evidence",
+        "## AgentCanon Latest Evidence",
         "- agent_canon_latest_command: make agent-canon-ensure-latest",
         "- agent_canon_latest_status: pass",
         "- agent_canon_submodule_status: fixture-clean",
@@ -168,6 +168,7 @@ def ready_closeout_evidence_lines(
         "- selected_non_python_static_evidence: fixture-static-evidence",
         "- typed_owner_boundary_status: pass",
         "- mapping_error_sets_empty: yes",
+        "- canonical_dispatcher_schema_status: pass",
         "",
         "## CompletionCoverage And Failure Response Evidence",
         "- completion_coverage_artifact: completion_coverage.json",
@@ -479,6 +480,120 @@ def write_ready_final_review(report_dir: Path) -> None:
     )
 
 
+def write_ready_completion_coverage(report_dir: Path, run_id: str) -> None:
+    """Write the completion-coverage evidence consumed by task_close."""
+    source_binding = {
+        "run_id": run_id,
+        "context_id": "fixture-context",
+        "organizer_context_id": "fixture-organizer",
+        "parent": "codex",
+        "component_manager": "codex",
+        "assigned_unit": "fixture-unit",
+        "source_binding": {"run_id": run_id, "context_id": "fixture-context"},
+        "source_refs": ["tests/agent_tools/test_task_start_and_close.py"],
+    }
+    append_ledger_event(
+        report_dir,
+        {
+            "run_id": run_id,
+            "context_id": "fixture-context",
+            "event_id": "fixture-event-1",
+            "semantic_kind": "request_clause",
+            "owner": "codex",
+            "state_owner": "codex",
+            "api_owner": "codex",
+            "dependency_owner": "codex",
+            "responsibility_unit": "fixture-unit",
+            "intent_id": "fixture-intent",
+            "outcome": "complete",
+            "clause_id": "T1-C1",
+            "evidence_refs": ["fixture-evidence"],
+            "artifact_refs": ["fixture-artifact"],
+            "source_binding": source_binding["source_binding"],
+            "gate_evidence": [
+                {
+                    "gate_id": "oop_readability_guard",
+                    "stage": "review",
+                    "owner": "codex",
+                    "outcome": "pass",
+                    "artifact_refs": ["fixture-oop"],
+                    "source_event_refs": ["fixture-event-1"],
+                    "scanned_paths": ["tools/agent_tools/task_close.py"],
+                    "signal_counts": {"review_signal_findings": 0},
+                    "typed_boundary_counts": {"api_boundary": 0},
+                    "solid_counts": {"single responsibility": 0},
+                    "typed_evidence_owner": "oop-readability-checker",
+                },
+                {
+                    "gate_id": "solid_evidence_gate",
+                    "stage": "review",
+                    "owner": "codex",
+                    "outcome": "pass",
+                    "artifact_refs": ["fixture-solid"],
+                    "source_event_refs": ["fixture-event-1"],
+                    "scanned_paths": ["tools/agent_tools/task_close.py"],
+                    "covered_paths": ["tools/agent_tools/task_close.py"],
+                    "solid_counts": {"single responsibility": 0},
+                },
+                {
+                    "gate_id": "canonical_formatter_static",
+                    "stage": "validation",
+                    "owner": "codex",
+                    "outcome": "pass",
+                    "artifact_refs": ["fixture-format"],
+                    "source_event_refs": ["fixture-event-1"],
+                },
+            ],
+        },
+    )
+    write_completion_coverage_artifact(
+        report_dir,
+        read_ledger_snapshot(report_dir, "fixture-snapshot"),
+        source_binding,
+        ["T1-C1"],
+        {
+            "owner": "codex",
+            "state_owner": "codex",
+            "api_owner": "codex",
+            "dependency_owner": "codex",
+        },
+        {
+            "w2_implementation_complete": True,
+            "w2_review_complete": True,
+            "source_freeze_review_complete": True,
+            "formatter_and_static_checks_pass": True,
+        },
+        {"planned_work_complete": True},
+        {"open_repairs": []},
+        {"open_crossing_edges": []},
+        {
+            "run_id": run_id,
+            "context_id": "fixture-context",
+            "observation_ref": "fixture-topology",
+            "global_publication_state": "publication_ready",
+            "routing_gate": "verified",
+            "writer_release_order_complete": True,
+            "final_review_approved": True,
+            "closeout_unlocked": True,
+            "branch_creation_reason": (
+                "convergence_w2_writer_owned_after_git_index_blocker"
+            ),
+            "source_freeze_before_review": True,
+            "formatter_static_events": ["formatter", "static"],
+            "writer_cardinality": 1,
+            "writer_collision_state": "collision_preserved",
+            "descendant_disposition": {"status": "none"},
+            "topology_schema": "agent-canon.control-topology.v1",
+            "topology_order": [
+                "design_approved",
+                "writer_released",
+                "source_frozen",
+                "change_review_approved",
+            ],
+        },
+    )
+
+
 def write_ready_closeout_bundle(
     report_dir: Path, run_id: str, workspace: Path = PROJECT_ROOT
 ) -> None:
@@ -546,6 +661,9 @@ def write_ready_closeout_bundle(
                 "- commit_created: yes",
                 "- push_completed: yes",
                 "- user_completion_report: unlocked",
+                "- mapping_error_sets_empty: yes",
+                "- typed_owner_boundary_status: pass",
+                "- canonical_dispatcher_schema_status: pass",
                 *ready_closeout_evidence_lines(workspace=workspace),
             ]
         ),
@@ -553,75 +671,7 @@ def write_ready_closeout_bundle(
     )
     write_ready_schedule(report_dir)
     _log_ready_work(report_dir)
-    source_binding = {
-        "run_id": run_id,
-        "context_id": "fixture-context",
-        "organizer_context_id": "fixture-organizer",
-        "parent": "codex",
-        "component_manager": "codex",
-        "assigned_unit": "fixture-unit",
-        "source_binding": {"run_id": run_id, "context_id": "fixture-context"},
-        "source_refs": ["tests/agent_tools/test_task_start_and_close.py"],
-    }
-    append_ledger_event(
-        report_dir,
-        {
-            "run_id": run_id,
-            "context_id": "fixture-context",
-            "event_id": "fixture-event-1",
-            "semantic_kind": "request_clause",
-            "owner": "codex",
-            "state_owner": "codex",
-            "api_owner": "codex",
-            "dependency_owner": "codex",
-            "responsibility_unit": "fixture-unit",
-            "intent_id": "fixture-intent",
-            "outcome": "complete",
-            "clause_id": "T1-C1",
-            "evidence_refs": ["fixture-evidence"],
-            "artifact_refs": ["fixture-artifact"],
-            "source_binding": source_binding["source_binding"],
-            "gate_evidence": [
-                {
-                    "gate_id": "oop_readability_guard",
-                    "stage": "review",
-                    "owner": "codex",
-                    "outcome": "pass",
-                    "artifact_refs": ["fixture-oop"],
-                    "source_event_refs": ["fixture-event-1"],
-                    "scanned_paths": ["tools/agent_tools/task_close.py"],
-                    "signal_counts": {"review_signal_findings": 0},
-                    "typed_boundary_counts": {"api_boundary": 0},
-                    "solid_counts": {"single responsibility": 0},
-                    "typed_evidence_owner": "oop-readability-checker",
-                },
-                {
-                    "gate_id": "solid_evidence_gate",
-                    "stage": "review",
-                    "owner": "codex",
-                    "outcome": "pass",
-                    "artifact_refs": ["fixture-solid"],
-                    "source_event_refs": ["fixture-event-1"],
-                    "scanned_paths": ["tools/agent_tools/task_close.py"],
-                    "covered_paths": ["tools/agent_tools/task_close.py"],
-                    "solid_counts": {"single responsibility": 0},
-                },
-                {"gate_id": "canonical_formatter_static", "stage": "validation", "owner": "codex", "outcome": "pass", "artifact_refs": ["fixture-format"], "source_event_refs": ["fixture-event-1"]},
-            ],
-        },
-    )
-    write_completion_coverage_artifact(
-        report_dir,
-        read_ledger_snapshot(report_dir, "fixture-snapshot"),
-        source_binding,
-        ["T1-C1"],
-        {"owner": "codex", "state_owner": "codex", "api_owner": "codex", "dependency_owner": "codex"},
-        {"w2_implementation_complete": True, "w2_review_complete": True, "source_freeze_review_complete": True, "formatter_and_static_checks_pass": True},
-        {"planned_work_complete": True},
-        {"open_repairs": []},
-        {"open_crossing_edges": []},
-        {"run_id": run_id, "context_id": "fixture-context", "observation_ref": "fixture-topology", "global_publication_state": "publication_ready", "routing_gate": "verified", "writer_release_order_complete": True, "final_review_approved": True, "closeout_unlocked": True, "branch_creation_reason": "convergence_w2_writer_owned_after_git_index_blocker", "source_freeze_before_review": True, "formatter_static_events": ["formatter", "static"], "writer_cardinality": 1, "writer_collision_state": "collision_preserved", "descendant_disposition": {"status": "none"}, "topology_schema": "agent-canon.control-topology.v1", "topology_order": ["design_approved", "writer_released", "source_frozen", "change_review_approved"]},
-    )
+    write_ready_completion_coverage(report_dir, run_id)
     write_ready_workflow_monitoring(report_dir)
     write_ready_agent_evaluation(report_dir)
     write_ready_final_review(report_dir)
@@ -2899,7 +2949,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertEqual(
                 default_quality_check_policy["roles"],
-                ["test_designer", "change_reviewer"],
+                ["change_reviewer"],
             )
             self.assertEqual(
                 default_quality_check_policy["provenance"]["task_default_specialists"],
@@ -3189,6 +3239,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
+                        "- mapping_error_sets_empty: yes",
+                        "- typed_owner_boundary_status: pass",
+                        "- canonical_dispatcher_schema_status: pass",
                         *ready_closeout_evidence_lines(),
                     ]
                 ),
@@ -3199,6 +3252,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_final_review(report_dir)
+            write_ready_completion_coverage(report_dir, run_id)
             write_ready_diff_check_artifact(report_dir)
 
             result = subprocess.run(
@@ -3232,8 +3286,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "- repo_wide_static_analysis_complete: profile_selected",
             )
             closeout_text = closeout_text.replace(
-            )
-            closeout_text = closeout_text.replace(
                 "- mechanical_loop_static_analysis_status: pass",
                 "- mechanical_loop_static_analysis_status: targeted",
             )
@@ -3255,7 +3307,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
-            self.assertIn("MAKE_CI_STATUS=targeted", result.stdout)
+            self.assertIn(
+                "MECHANICAL_LOOP_STATIC_ANALYSIS_STATUS=targeted",
+                result.stdout,
+            )
 
     def test_task_close_rejects_pending_profile_selected_static_analysis(self) -> None:
         """task_close should not treat targeted routing as a waiver for pending checks."""
@@ -3270,8 +3325,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
             closeout_text = closeout_text.replace(
                 "- repo_wide_static_analysis_complete: yes",
                 "- repo_wide_static_analysis_complete: profile_selected",
-            )
-            closeout_text = closeout_text.replace(
             )
             closeout_text = closeout_text.replace(
                 "- mechanical_loop_static_analysis_status: pass",
@@ -3458,6 +3511,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
+                        "- mapping_error_sets_empty: yes",
+                        "- typed_owner_boundary_status: pass",
+                        "- canonical_dispatcher_schema_status: pass",
                         *ready_closeout_evidence_lines(workspace=workspace_root),
                     ]
                 ),
@@ -3468,6 +3524,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_final_review(report_dir)
+            write_ready_completion_coverage(report_dir, run_id)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
 
             result = subprocess.run(
@@ -3487,7 +3544,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
             self.assertIn("ALL_PLANNED_CHUNKS_COMPLETE=yes", result.stdout)
             self.assertIn("OVERALL_DELIVERY_COMPLETE=yes", result.stdout)
-            self.assertIn("SPEC_PRODUCT_COVERAGE_COMPLETE=yes", result.stdout)
+            self.assertIn("COMPLETION_COVERAGE_CONSUMER_READY=True", result.stdout)
             self.assertIn("REVIEW_FINDINGS_INTEGRATED=yes", result.stdout)
             self.assertIn("POST_FIX_FULL_REVIEW_COMPLETE=yes", result.stdout)
             self.assertIn("MECHANICAL_COMPLETION_LOOP_COMPLETE=yes", result.stdout)
