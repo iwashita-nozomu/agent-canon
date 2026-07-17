@@ -36,7 +36,6 @@ permissions:
   contents: read
 
 env:
-  AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
   AGENT_COORDINATION_TASK: ${{ inputs.task }}
   AGENT_COORDINATION_OWNER: ${{ inputs.owner }}
   AGENT_COORDINATION_SPECIALISTS: ${{ inputs.specialists }}
@@ -61,6 +60,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -128,6 +128,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -180,6 +181,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -232,6 +234,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -284,6 +287,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -343,6 +347,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -402,6 +407,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -461,6 +467,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -520,6 +527,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -579,6 +587,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -638,6 +647,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -697,6 +707,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -756,6 +767,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -815,6 +827,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -874,6 +887,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -926,6 +940,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -978,6 +993,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -1030,6 +1046,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -1082,6 +1099,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -1134,6 +1152,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -1186,6 +1205,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -1238,6 +1258,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -1290,6 +1311,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh
@@ -1334,6 +1356,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
         run: |
           if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
             bash .github/scripts/checkout_agent_canon_submodule.sh

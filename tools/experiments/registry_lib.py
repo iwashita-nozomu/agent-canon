@@ -10,7 +10,11 @@
 from __future__ import annotations
 
 import json
-import tomllib
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 from pathlib import Path
 
 DEFAULTS_KEY_ORDER = (

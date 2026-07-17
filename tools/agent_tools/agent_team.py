@@ -15,7 +15,11 @@ import hashlib
 import json
 import re
 import subprocess
-import tomllib
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
