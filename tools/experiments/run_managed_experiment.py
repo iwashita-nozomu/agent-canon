@@ -426,7 +426,7 @@ def _capture_runner_lifecycle(
     """Read generic lifecycle evidence without inspecting process internals."""
     if runner is None:
         return None
-    return getattr(runner, "last_lifecycle_evidence", None)
+    return runner.last_lifecycle_evidence
 
 
 def repo_root_from_script() -> Path:
@@ -1737,13 +1737,13 @@ def execute_managed_run(
     context: RunContext,
     run_config: Mapping[str, object],
     *,
-    task: Callable[..., object],
+    task: Callable[..., ExecutionResult],
     cases: list[object],
-    context_builder: Callable[..., object],
-    initializer: Callable[..., object],
-    resource_estimator: Callable[..., object],
-    skip_controller: object | None = None,
-) -> object:
+    context_builder: Callable[[object], TaskContext],
+    initializer: Callable[[TaskContext], None],
+    resource_estimator: Callable[[object], FullResourceEstimate],
+    skip_controller: None = None,
+) -> ExecutionResult:
     """Compose the fixed owners around one generic ff97 runner invocation."""
     del context_builder, initializer, resource_estimator, skip_controller
     request = _resource_request_for_managed_run(context, run_config)
@@ -1790,7 +1790,7 @@ def execute_managed_run(
     coverage_descendants: DescendantRetentionEvidence | None = None
     coverage_attempted: set[EvidenceAbsenceField] = set()
     primary_exception: BaseException | None = None
-    execution_result: object | None = None
+    execution_result: ExecutionResult | None = None
     runner_lifecycle: RunnerLifecycleEvidence | None = None
     runner_invoked = False
     admission_context.register_release_failure_sink(release_failures.append)
@@ -2238,6 +2238,11 @@ def execute_managed_run(
             runner_invoked = True
             runner.run(worker)
             runner_lifecycle = _capture_runner_lifecycle(runner)
+            if runner_lifecycle is None:
+                raise TypedPreflightFailure(
+                    "experiment_runner_lifecycle_missing",
+                    "generic runner completed without typed lifecycle evidence",
+                )
             if not scheduler.completions:
                 raise TypedPreflightFailure(
                     "experiment_runner_completion_missing",
@@ -2252,6 +2257,14 @@ def execute_managed_run(
         if primary_exception is not None
         else (release_failures[0] if release_failures else None)
     )
+    if primary_failure is not None:
+        outcome_exit_code = 1
+    else:
+        if execution_result is None:
+            raise ResourcePlanError(
+                "ExperimentRunner returned no typed result for a successful managed run"
+            )
+        outcome_exit_code = _execution_exit_code(execution_result)
     secondary_failures = tuple(
         release_failures
         if primary_exception is not None
@@ -2293,11 +2306,7 @@ def execute_managed_run(
         secondary_failures=secondary_failures,
         release_disposition=tuple(reservation_dispositions),
         context_state="closed",
-        exit_code=(
-            1
-            if primary_failure is not None
-            else _execution_exit_code(execution_result)
-        ),
+        exit_code=outcome_exit_code,
     )
     optional_fields = (
         "source_freeze_evidence",
@@ -2358,23 +2367,24 @@ def execute_managed_run(
     return execution_result
 
 
-def _execution_exit_code(execution_result: object) -> int:
-    raw_exit_code = getattr(execution_result, "raw_exit_code", None)
-    if isinstance(raw_exit_code, int):
-        return raw_exit_code
-    status = getattr(execution_result, "status", None)
-    return 0 if status in (None, "ok", "completed", "success") else 1
+def _execution_exit_code(execution_result: ExecutionResult) -> int:
+    raw_exit_code = execution_result.raw_exit_code
+    if raw_exit_code is None:
+        raise ResourcePlanError(
+            "ExperimentRunner returned an ExecutionResult without a raw exit code"
+        )
+    return raw_exit_code
 
 
 def run_cli(
     args: argparse.Namespace,
     *,
-    task: Callable[..., object] | None = None,
+    task: Callable[..., ExecutionResult] | None = None,
     cases: list[object] | None = None,
-    context_builder: Callable[..., object] | None = None,
-    initializer: Callable[..., object] | None = None,
-    resource_estimator: Callable[..., object] | None = None,
-    skip_controller: object | None = None,
+    context_builder: Callable[[object], TaskContext] | None = None,
+    initializer: Callable[[TaskContext], None] | None = None,
+    resource_estimator: Callable[[object], FullResourceEstimate] | None = None,
+    skip_controller: None = None,
 ) -> int:
     """Run one managed experiment only through an injected ExperimentRunner port."""
     context = build_run_context(args)
@@ -2463,11 +2473,13 @@ def run_cli(
     execution_result = execute_managed_run(
         context,
         run_config,
-        task=cast(Callable[..., object], task),
+        task=cast(Callable[..., ExecutionResult], task),
         cases=cast(list[object], cases),
-        context_builder=cast(Callable[..., object], context_builder),
-        initializer=cast(Callable[..., object], initializer),
-        resource_estimator=cast(Callable[..., object], resource_estimator),
+        context_builder=cast(Callable[[object], TaskContext], context_builder),
+        initializer=cast(Callable[[TaskContext], None], initializer),
+        resource_estimator=cast(
+            Callable[[object], FullResourceEstimate], resource_estimator
+        ),
         skip_controller=skip_controller,
     )
     exit_code = _execution_exit_code(execution_result)

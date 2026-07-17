@@ -159,6 +159,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 root / "completion_coverage.json"
             )
             coverage = coverage_adapter.record_once(coverage_input)
+            self.assertFalse(coverage.partial_complete)
+            self.assertFalse(coverage.all_planned_chunks_complete)
+            self.assertFalse(coverage.overall_delivery_complete)
             projection = PostToolUseProjectionReducer().project(outcome, coverage)
             hook = (
                 Path(__file__).resolve().parents[2]
@@ -573,6 +576,30 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                     with self.assertRaises(TypedPreflightFailure) as raised:
                         transaction.try_reserve((first, second), requested_count=2)
                     self.assertEqual(raised.exception.code, "gpu_lock_open_failed")
+                    retry = GpuReservationTransaction(temporary)
+                    retry_evidence = retry.try_reserve((first,))
+                    self.assertEqual(retry_evidence.disposition, "ACQUIRED")
+                    self.assertEqual(retry.close()[0].close_attempts, 1)
+            finally:
+                os.umask(previous_umask)
+
+    def test_gpu_reservation_partial_exhaustion_rolls_back_every_held_fd(self) -> None:
+        """A short candidate list releases partial locks before reporting busy."""
+        first = "GPU-11111111111111111111111111111111"
+        with tempfile.TemporaryDirectory() as temporary:
+            previous_umask = os.umask(0o0007)
+            try:
+                with patch.object(
+                    GpuReservationTransaction,
+                    "_read_filesystem_type",
+                    return_value="ext4",
+                ):
+                    transaction = GpuReservationTransaction(temporary)
+                    evidence = transaction.try_reserve((first,), requested_count=2)
+                    self.assertEqual(evidence.disposition, "BUSY_CANDIDATE")
+                    release = transaction.close()
+                    self.assertEqual(len(release), 1)
+                    self.assertEqual(release[0].close_attempts, 1)
                     retry = GpuReservationTransaction(temporary)
                     retry_evidence = retry.try_reserve((first,))
                     self.assertEqual(retry_evidence.disposition, "ACQUIRED")

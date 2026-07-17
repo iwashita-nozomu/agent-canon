@@ -1,5 +1,5 @@
 # @dependency-start
-# contract test-only-evidence
+# contract test
 # responsibility Provides deterministic injected observations for public contract selectors.
 # upstream implementation ../../tools/experiments/execution_resource_plan.py owns production discovery and planning.
 # downstream implementation ./test_execution_resource_plan.py public resource-plan observables.

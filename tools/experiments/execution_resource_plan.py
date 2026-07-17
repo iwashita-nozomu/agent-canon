@@ -3858,8 +3858,26 @@ class GpuReservationTransaction:
                 if len(self._held) >= requested_count:
                     self._state = "HELD"
                     return self._evidence("ACQUIRED")
-            self._state = "CLOSED"
-            self._close_root()
+            self._state = "ROLLING_BACK"
+            dispositions = self.close()
+            if any(item.disposition == "close_ambiguous" for item in dispositions):
+                raise TypedPreflightFailure(
+                    "gpu_reservation_rollback_ambiguous",
+                    "partial GPU reservation rollback had an ambiguous close",
+                    primary_failure="candidate_exhaustion",
+                    release_dispositions=tuple(
+                        _fd_release_payload(item) for item in dispositions
+                    ),
+                )
+            if any(item.error_kind is not None for item in dispositions):
+                raise TypedPreflightFailure(
+                    "gpu_reservation_rollback_failed",
+                    "partial GPU reservation rollback recorded a release failure",
+                    primary_failure="candidate_exhaustion",
+                    release_dispositions=tuple(
+                        _fd_release_payload(item) for item in dispositions
+                    ),
+                )
             return self._evidence("BUSY_CANDIDATE")
         except BaseException as primary:
             self._state = "ROLLING_BACK"
@@ -6035,7 +6053,7 @@ class CompletionCoverageAdapter:
                     raise CompletionCoverageFailure(
                         "CompletionCoverage requires a durable evidence path",
                     )
-                terminal_complete = True
+                terminal_complete = outcome.context_state == "closed"
                 cleanup_complete = (
                     outcome.context_state == "closed"
                     and all(
@@ -6043,11 +6061,18 @@ class CompletionCoverageAdapter:
                         for item in outcome.release_disposition
                     )
                 )
-                all_planned_chunks_complete = (
-                    outcome.primary_failure is None and outcome.exit_code == 0
+                missing_evidence = tuple(
+                    item.field_name for item in input.absence_dispositions
                 )
-                partial_complete = True
-                closeout_complete = cleanup_complete
+                reached_evidence_complete = not missing_evidence
+                all_planned_chunks_complete = (
+                    reached_evidence_complete
+                    and bool(input.planned_chunk_ids)
+                    and outcome.primary_failure is None
+                    and outcome.exit_code == 0
+                )
+                partial_complete = reached_evidence_complete
+                closeout_complete = cleanup_complete and reached_evidence_complete
                 overall_delivery_complete = (
                     terminal_complete
                     and partial_complete
@@ -6059,6 +6084,10 @@ class CompletionCoverageAdapter:
                     if outcome.primary_failure is not None
                     else None
                 )
+                unresolved_blockers = (
+                    ((f"failure:{failure_kind}",) if failure_kind is not None else ())
+                    + tuple(f"evidence_absent:{name}" for name in missing_evidence)
+                )
                 coverage_payload = {
                     "schema_version": "completion-coverage/v2",
                     "input_fingerprint": input.input_fingerprint,
@@ -6069,6 +6098,7 @@ class CompletionCoverageAdapter:
                     "all_planned_chunks_complete": all_planned_chunks_complete,
                     "overall_delivery_complete": overall_delivery_complete,
                     "failure_kind": failure_kind,
+                    "unresolved_blockers": unresolved_blockers,
                 }
                 coverage_fingerprint = hashlib.sha256(
                     _canonical_json(coverage_payload).encode("utf-8")
@@ -6088,9 +6118,7 @@ class CompletionCoverageAdapter:
                     recorded_at=recorded_at,
                     all_planned_chunks_complete=all_planned_chunks_complete,
                     overall_delivery_complete=overall_delivery_complete,
-                    unresolved_blockers=(
-                        (f"failure:{failure_kind}",) if failure_kind is not None else ()
-                    ),
+                    unresolved_blockers=unresolved_blockers,
                     persistence_witness=persistence_witness,
                     input_fingerprint=input.input_fingerprint,
                     terminal_complete=terminal_complete,
