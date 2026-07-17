@@ -409,9 +409,10 @@ canonical formatter/dispatcher、validation-response、review integration が
 
 1. `user_request_contract.md` の active clause、`schedule.md` の planned work unit、直近 review findings、validation blockers、commit / push、shared canon sync、follow-up 判断を一覧化します。
 1. 最新 diff と tracked / untracked state を確認し、変更対象 file の dependency manifest、downstream edge、旧参照、copy / snapshot / backup path を見ます。
-1. 必要な dependency review、canonical formatter/check、選択した非 Python
-   static evidence、読み取り確認を記録します。別 checker の再実行や別 CI を
-   追加して loop を閉じることはしません。
+1. 必要な repo-wide dependency review、静的解析、読み取り確認、docs / targeted
+   tests / agent checks を実行します。動作確認や broad execution は runtime
+   または unresolved risk に対する supplemental evidence として記録し、
+   completion predicate は選択した canonical route で確定します。
 1. read-only の diff-check agent を起動し、run bundle、request contract、schedule、latest diff、validation evidence、dependency evidence を渡します。
 1. diff-check agent の decision が `approve` 以外なら、fix-now finding を実装して loop の 1 に戻ります。`escalate` は該当する設計・計画 stage へ戻します。
    この修正 loop では、review finding への応答を、同じ意図を保つ修正、
@@ -531,9 +532,9 @@ goal-driven task では `/goal` 確定前でも provisional bundle を作り、r
 - 長めの task で run 単位の記録が必要
 - subagent と parent の責務を分けたい
 
-full staged route では、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、active gate の場合の `document_flow_reviewer` を標準構成とします。W2 は typed contract evidence を使い、`test_designer` を completion gate にしません。
+full staged route では、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、active gate の場合の `document_flow_reviewer` を標準構成とします。W2 の completion gate は approved typed contract evidence と active owner route で確定します。
 owner-bounded route では、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ full staged route へ昇格します。
-Codex subagent では、`requirements_organizer`、`manager_reviewer`、`execution_planner`、`plan_reviewer`、`detailed_designer`、`detailed_design_reviewer`、`document_flow_reviewer`、`worker`、`spark_worker` を workflow family に応じて stage ごとに明示します。behavior-specific な test design は W2 の completion predicate ではありません。
+Codex subagent では、`requirements_organizer`、`manager_reviewer`、`execution_planner`、`plan_reviewer`、`detailed_designer`、`detailed_design_reviewer`、`document_flow_reviewer`、`worker`、`spark_worker` を workflow family に応じて stage ごとに明示します。W2 の completion predicate は approved typed contract evidence と active owner route に結び付けます。
 Agent Wave の標準順序は `計画 -> レビュー -> 編集` です。bootstrap は
 `team_manifest.yaml` に `run.standard_wave_sequence` を出し、parent は
 plan artifact、review gate decision、edit handoff evidence をこの順で
@@ -694,10 +695,8 @@ cost を無視して review coverage を優先する run では、research-drive
 - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書で reader-facing 構成を変える場合は `long-form-writing` を DSL-to-prose adapter として読み、docs-impact が高い場合だけ別 reviewer で `docs-completeness-review` も通す
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を読み、`notation_definition_reviewer`、`logic_gap_reviewer`、必要に応じて別 reviewer の `docs-completeness-review` を通す
 - 投稿論文や thesis chapter の draft では `paper-writing` を読み、`citation_evidence_reviewer` も別 instance で通す
-- contract-only wrapper や checker-owned validation だけの変更では、typed
-  contract evidence と canonical command evidence を validation route に置く。
-  Test-first、test-count、coverage、mutation、private-helper、checker-retest
-  は completion criteria ではない。
+- contract-only wrapper や checker-owned validation だけの変更では、static contract validation と canonical command evidence を validation route に置く。
+  Approved typed contract evidence remains the completion criterion.
 - validation tool の autofix は changed contract、changed lines、または task plan が名指しした checker-owned property に結び付く finding に適用し、広い validation で出た既存 style debt は residual evidence と repair route に分ける
 - 研究・実験系の変更では active experiment profile の risk に応じて `report_reviewer` と research perspective reviewers を選ぶ
 - JAX export / native runtime の task では、対象 implementation slice で `generic callable path`、`specialized coeff path`、`export-based generic path` のどれを触るか宣言する。generic path は `jax.export` artifact producer と consumer/runtime smoke を完了条件に含める
@@ -735,16 +734,17 @@ and unresolved or intent-changing work enters `escalation_pending`.
 `evaluate_completion_boundary` accepts one
 `control_topology_ledger.json` snapshot for all routing/publication facts. Its
 other inputs are schedule, open-work, repair, and crossing-edge state only;
-parent-route or global-publication state is never passed as a second direct
+parent-route and global-publication state remain outside a second direct
 argument. It derives the independent predicates
-`all_planned_chunks_complete` and `overall_delivery_complete`. A chunk, slice,
-checkpoint, or subpass cannot set either predicate.
+`all_planned_chunks_complete` and `overall_delivery_complete`. Each chunk, slice,
+checkpoint, or subpass remains an internal progress observation.
 
 W2-20 is ordered as W2 design `APPROVE`, exactly one isolated-branch writer
 release with collision preservation and
 `branch_creation_reason=convergence_w2_gate_completion_authority`, source
-freeze/review, then W3/parent integration. `routing_gate=verified` is only a
-later integration/publication observation and never authorizes writer release.
+freeze/review, then W3/parent integration. `routing_gate=verified` is observed at
+later integration/publication, while writer release authority remains the W2
+design `APPROVE` plus isolated branch release.
 
 W1 remains the producer of `ExecutionResourcePlan`. W2 consumes one broad
 W2-12 plan/actual/readback/failure certificate mapping and one W2-19 ordered
@@ -765,8 +765,8 @@ environment, produce resources, or duplicate tests/gates.
   `evidence`. The canonical token-safe slug lists are owned by
   `documents/runtime-profiles-and-check-matrix.json` and projected into
   `documents/runtime-profiles-and-check-matrix.md`; this workflow only points
-  to that taxonomy. Preserve intent through the owning repair route or record
-  escalation; an unresolved response cannot advance completion.
+  to that taxonomy. Completion advances after response resolution through the
+  owning repair route or recorded escalation.
 - Shared canon、Large delivery、高 risk 変更では差分限定ではなく全 repo 対象で `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。Routine docs / Focused code は changed-file dependency checks と relevant downstream review を evidence にできる
 - Source freeze 後は canonical formatter/check path と選択した非 Python static
   evidence を一度記録する。別 CI、別 formatter、別 checker、checker-retest
@@ -791,6 +791,7 @@ environment, produce resources, or duplicate tests/gates.
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃ったら、chunk completion を全体 completion evidence に統合する
 - `closeout_gate.md` の `unfinished_tasks_absent=yes` で、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断の完了状態を示す
 - `closeout_gate.md` の `dependency_headers_complete=yes` で、作成・編集した text file の依存 file header coverage を示す
+- Full owner validation の static evidence とともに、`closeout_gate.md` の `repo_wide_static_analysis_complete=profile_selected` と canonical command evidence を記録します。
 - Shared canon、Large delivery、高 risk 変更では `closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` とともに、checkpoint / final review で全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` と header 修正 evidence を残す。Routine docs / Focused code は targeted dependency evidence を残す
 - `closeout_gate.md` の `canonical_format_check_status=pass` と選択した非 Python
   static evidence で、canonical validation を示す。別 CI は W2 gate ではない。
