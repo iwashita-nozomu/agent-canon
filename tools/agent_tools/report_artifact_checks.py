@@ -508,14 +508,26 @@ def _validation_route_record(
 
 
 def _validation_stream(
-    data: bytes, returncode: int | None, state: str
+    data: bytes,
+    returncode: int | None,
+    state: str,
+    stream_name: str,
+    artifact_path: str,
 ) -> dict[str, object]:
     """Materialize one complete stream observation."""
     return {
+        "stream": stream_name,
         "state": state,
+        "pipe_created": state != "not_created",
+        "eof_observed": state == "eof_complete",
         "complete": state == "eof_complete",
-        "size_bytes": len(data),
-        "sha256": hashlib.sha256(data).hexdigest(),
+        "capture_error": None if state == "eof_complete" else "process_not_spawned",
+        "artifact": {
+            "path": artifact_path,
+            "size_bytes": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "blob": git_blob_oid(data),
+        },
         "returncode": returncode,
     }
 
@@ -622,6 +634,18 @@ def _verify_validation_replay(
     streams = manifest.get("streams")
     if not isinstance(streams, Mapping):
         raise ValidationMaterializerError("validation_result:stream_mismatch")
+    termination = manifest.get("termination")
+    if not isinstance(termination, Mapping):
+        raise ValidationMaterializerError("validation_result:stream_mismatch")
+    version_returncode = termination.get("version_returncode")
+    validation_returncode = termination.get("validation_returncode")
+    if not isinstance(version_returncode, int) or isinstance(version_returncode, bool):
+        raise ValidationMaterializerError("validation_result:stream_mismatch")
+    if validation_returncode is not None and (
+        not isinstance(validation_returncode, int)
+        or isinstance(validation_returncode, bool)
+    ):
+        raise ValidationMaterializerError("validation_result:stream_mismatch")
     stream_paths = {
         "version": {"stdout": "version.stdout", "stderr": "version.stderr"},
         "validation": {
@@ -637,12 +661,38 @@ def _verify_validation_replay(
             stream = group_streams.get(stream_name)
             if not isinstance(stream, Mapping):
                 raise ValidationMaterializerError("validation_result:stream_mismatch")
+            expected_returncode = (
+                version_returncode if group == "version" else validation_returncode
+            )
+            expected_state = (
+                "eof_complete" if expected_returncode is not None else "not_created"
+            )
+            expected_capture_error = (
+                None if expected_state == "eof_complete" else "process_not_spawned"
+            )
+            if (
+                stream.get("stream") != stream_name
+                or stream.get("state") != expected_state
+                or stream.get("pipe_created") != (expected_state != "not_created")
+                or stream.get("eof_observed") != (expected_state == "eof_complete")
+                or stream.get("complete") != (expected_state == "eof_complete")
+                or stream.get("capture_error") != expected_capture_error
+                or stream.get("returncode") != expected_returncode
+            ):
+                raise ValidationMaterializerError("validation_result:stream_mismatch")
+            artifact = stream.get("artifact")
+            if not isinstance(artifact, Mapping) or artifact.get("path") != leaf_name:
+                raise ValidationMaterializerError("validation_result:stream_mismatch")
             leaf_bytes = _validation_stable_bytes(manifest_path.parent / leaf_name)
-            if stream.get("size_bytes") != len(leaf_bytes):
+            if artifact.get("size_bytes") != len(leaf_bytes):
                 raise ValidationMaterializerError(
                     "validation_result:output_hash_mismatch"
                 )
-            if stream.get("sha256") != hashlib.sha256(leaf_bytes).hexdigest():
+            if artifact.get("sha256") != hashlib.sha256(leaf_bytes).hexdigest():
+                raise ValidationMaterializerError(
+                    "validation_result:output_hash_mismatch"
+                )
+            if artifact.get("blob") != git_blob_oid(leaf_bytes):
                 raise ValidationMaterializerError(
                     "validation_result:output_hash_mismatch"
                 )
@@ -683,7 +733,11 @@ def materialize_required_validation(workspace: Path) -> dict[str, object]:
         and latest_terminal.get("producer_runtime_agent_id")
         == producer_runtime_agent_id
     )
-    if latest_terminal is not None and replay_producer_matches:
+    if (
+        latest_terminal is not None
+        and latest_terminal.get("outcome") == "pass"
+        and replay_producer_matches
+    ):
         artifact = latest_terminal.get("artifact")
         if not isinstance(artifact, Mapping):
             raise ValidationMaterializerError("validation_artifact:manifest_mismatch")
@@ -817,10 +871,18 @@ def materialize_required_validation(workspace: Path) -> dict[str, object]:
     streams = {
         "version": {
             "stdout": _validation_stream(
-                version_stdout, version.returncode, version_state
+                version_stdout,
+                version.returncode,
+                version_state,
+                "stdout",
+                "version.stdout",
             ),
             "stderr": _validation_stream(
-                version_stderr, version.returncode, version_state
+                version_stderr,
+                version.returncode,
+                version_state,
+                "stderr",
+                "version.stderr",
             ),
         },
         "validation": {
@@ -828,11 +890,15 @@ def materialize_required_validation(workspace: Path) -> dict[str, object]:
                 validation_stdout,
                 validation_returncode,
                 validation_state,
+                "stdout",
+                "validation.stdout",
             ),
             "stderr": _validation_stream(
                 validation_stderr,
                 validation_returncode,
                 validation_state,
+                "stderr",
+                "validation.stderr",
             ),
         },
     }
