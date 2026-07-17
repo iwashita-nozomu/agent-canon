@@ -17,7 +17,10 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import cast
 
-import tomllib
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 
 
 def detect_workspace_root() -> Path:

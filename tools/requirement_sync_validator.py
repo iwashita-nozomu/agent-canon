@@ -18,9 +18,12 @@ from __future__ import annotations
 import ast
 import re
 import sys
-import tomllib
-from pathlib import Path
 
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
+from pathlib import Path
 
 PACKAGE_NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]+")
 
