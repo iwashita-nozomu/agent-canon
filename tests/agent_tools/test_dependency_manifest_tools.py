@@ -687,7 +687,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / ".dockerignore").write_text(
-                "vendor/agent-canon\n.git\n.state\n*.gguf\n",
+                "vendor/agent-canon\n.git\n.state\n",
                 encoding="utf-8",
             )
             (root / ".gitignore").write_text(".venv/\nvenv/\n", encoding="utf-8")

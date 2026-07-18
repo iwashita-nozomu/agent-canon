@@ -245,9 +245,7 @@ check_docker_build_context_isolation() {
   grep -Fxq '.git' "$dockerignore" \
     || report_issue ".dockerignore must exclude .git from template Docker build context"
   grep -Fxq '.state' "$dockerignore" \
-    || report_issue ".dockerignore must exclude .state so local model caches stay out of Docker build context"
-  grep -Fxq '*.gguf' "$dockerignore" \
-    || report_issue ".dockerignore must exclude GGUF model artifacts from Docker build context"
+    || report_issue ".dockerignore must exclude generated .state content from Docker build context"
 }
 
 check_result_visualization_requirements() {

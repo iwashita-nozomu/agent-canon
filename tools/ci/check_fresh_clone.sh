@@ -23,7 +23,7 @@ overlay_current_tree() {
     echo "fresh_clone_overlay_next_action=install rsync via docker/Dockerfile or host requirements"
     exit 1
   fi
-  rsync -a --delete --exclude .git --exclude .state --exclude .cache/huggingface --exclude '*.gguf' --exclude '*.safetensors' --exclude 'pytorch_model*.bin' --exclude 'model-*.bin' "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
+  rsync -a --delete --exclude .git --exclude .state "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
 }
 
 git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null

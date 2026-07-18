@@ -150,7 +150,7 @@ before implementation.
 - `implementation_surface_route`: `PRIMARY_SURFACE`, `PRIMARY_PATHS`,
   `FORBIDDEN_PATHS`, `REQUIRED_PRE_EDIT_CHECKS`, or a router-unavailable
   blocker
-- `responsibility_search`: structured semantic-index / local-LLM / tool-catalog
+- `responsibility_search`: structured semantic-index / deterministic search / tool-catalog
   result paths, not broad raw text-search dumps
 - `reuse_survey`: existing tools, skills, workflows, helpers, libraries, and
   why reuse / extension / deletion / new implementation was selected

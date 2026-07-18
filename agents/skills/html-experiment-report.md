@@ -111,7 +111,7 @@ Use the Rust semantic-index tool as the evidence producer:
 agent-canon semantic-index compare-providers \
   --db reports/semantic-index.sqlite \
   --query-file reports/search_query.txt \
-  --right-provider llama-server-embedding \
+  --right-provider openai-compatible-embedding \
   --right-model <embedding-model> \
   --report reports/agents/<run-id>/semantic_provider_compare.json
 ```

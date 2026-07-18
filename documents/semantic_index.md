@@ -26,16 +26,15 @@ in the existing strict analysis tools.
 ## Reader Map
 
 Use this document to answer how semantic-index cache state is generated, which
-commands expose search or discourse evidence, and where Local LLM, provider,
+commands expose search or discourse evidence, and where semantic providers,
 eval, and candidate-generation boundaries sit. Start with the evidence ledger,
-generated cache, and Local LLM boundary; then use Commands for operational
+generated cache, and semantic-provider boundary; then use Commands for operational
 entrypoints. The final sections explain providers, eval scope, and candidate
 generation boundaries so search output is not mistaken for edit authority.
 
 ## Evidence And Assumption Ledger
 
-- Evidence sources:
-  `search-coordination.md`, `local-llm-responsibility-analysis.md`,
+- Evidence sources: `search-coordination.md`,
   `../rust/agent-canon/src/semantic_index.rs`, and
   `../tools/catalog.yaml`.
 - Assumption:
@@ -71,7 +70,7 @@ target-directory publish file, then atomically rename it over the requested
 path. This keeps normal SQLite locking and journaling behavior during mutation
 while still supporting generated cache paths on network-backed worktrees.
 
-## Local LLM And Prose IR Boundary
+## Semantic Provider And Prose IR Boundary
 
 The `semantic-index` command surface owns vector-cache commands: `build`,
 `search`, `context-pack`, `thin-docs`, `merge-candidates`,
@@ -87,8 +86,8 @@ document structure in chat.
 
 Prose IR and intermediate representation extraction are not stored in the
 semantic-index database. When existing prose must become graph seed data, route
-the document through `agent-canon local-llm extract-prose-ir` and
-`$prose-reasoning-graph`; semantic-index can then supply search context,
+the document through the deterministic `ingest` / `ingest-set` commands owned
+by `$prose-reasoning-graph`; semantic-index can then supply search context,
 candidate neighbors, or responsibility-bucket evidence. Skill integration
 should pass `context-pack` cells to the receiving skill and keep final
 acceptance with dependency review, structured analysis, tests, and human review
@@ -110,22 +109,22 @@ SQLite database is missing, build the index in the current worktree and retry
 the bounded command. Do not treat a missing generated cache as permission to
 skip semantic-index and immediately read broad raw text-search output.
 
-Add an LLM-backed embedding provider to an existing index:
+Add an OpenAI-compatible embedding provider to an existing index:
 
 ```bash
 agent-canon semantic-index embed-provider \
   --root . \
   --db reports/semantic-index.sqlite \
-  --provider llama-server-embedding \
-  --model ggml-org/embeddinggemma-300M-GGUF:Q8_0 \
-  --embedding-url http://127.0.0.1:8080/v1/embeddings
+  --provider openai-compatible-embedding \
+  --model <embedding-model> \
+  --embedding-url <openai-compatible-embedding-url>
 ```
 
 `embed-provider` does not rebuild files or nodes. It reads the existing node
 line ranges, skips nodes that already have the requested `(provider, model)`
 embedding, asks an OpenAI-compatible embedding endpoint for missing vectors,
 and adds another `(provider, model, dim)` vector set to the same SQLite table.
-Interrupted local-LLM embedding runs can be resumed by rerunning the same
+Interrupted embedding runs can be resumed by rerunning the same
 command against the same database.
 
 Search by meaning-like vector similarity:
@@ -343,8 +342,8 @@ Compare provider outputs without changing the downstream candidate logic:
 agent-canon semantic-index compare-providers \
   --db reports/semantic-index.sqlite \
   --query-file reports/search_query.txt \
-  --right-provider llama-server-embedding \
-  --right-model ggml-org/embeddinggemma-300M-GGUF:Q8_0 \
+  --right-provider openai-compatible-embedding \
+  --right-model <embedding-model> \
   --report reports/semantic_index_provider_compare.json
 ```
 
@@ -358,9 +357,8 @@ The deterministic baseline provider is `deterministic-dense-v1`, model
 `hash-token-char-v1`. It is deterministic and offline so tests and CI can
 measure the tool without a local model.
 
-The LLM-backed provider path is `llama-server-embedding`, also accepted as
-`openai-compatible-embedding` for non-llama.cpp endpoints. It uses
-`llama-server` or another OpenAI-compatible `/v1/embeddings` endpoint. The
+The remote provider path is `openai-compatible-embedding`. It uses an
+explicitly configured OpenAI-compatible `/v1/embeddings` endpoint. The
 provider writes only vector blobs and provenance keys. It does not write model
 labels, summaries, or repository-wide ownership decisions.
 

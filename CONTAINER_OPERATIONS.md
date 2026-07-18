@@ -54,7 +54,7 @@ Read this file when a task touches any of these surfaces:
 This file is the source of truth for the Docker / devcontainer / VS Code ownership
 boundary. `agent-canon-environment.toml` is the machine-readable environment
 contract for Rust tooling, compiled tool cache, MCP preflight commands, and
-local LLM tool locations. Other files may summarize the boundary, but they must
+deterministic search tool locations. Other files may summarize the boundary, but they must
 not become a second policy surface.
 
 Use this precedence when wording conflicts:
@@ -62,7 +62,7 @@ Use this precedence when wording conflicts:
 1. `CONTAINER_OPERATIONS.md`: normative owner boundary, forbidden placements,
    and required validation.
 1. `agent-canon-environment.toml`: machine-readable toolchain, compiled tool,
-   MCP preflight, and local LLM environment expectations.
+   MCP preflight, and deterministic search environment expectations.
 1. `tools/docker_dependency_validator.sh`: mechanical enforcement of the
    boundary for template and derived repos.
 1. `docker/README.md`: repo-local implementation runbook for this template's
@@ -162,7 +162,7 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   Ghostscript, and PDF inspection helpers, belongs in `.devcontainer/post-create.sh`.
   This is an agent-side writing toolchain, not a default project runtime
   dependency.
-- Local LLM server, installer, model-cache, and compatibility consumers are not
+- Model server, installer, model-cache, and compatibility consumers are not
   part of the container runtime. Former compatibility validation is a read-only
   `skill_evaluator` route using `gpt-5.4-mini`; the container does not download,
   start, or mount a local model runtime.

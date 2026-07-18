@@ -424,7 +424,7 @@ def validate_dockerignore(root: Path) -> list[Finding]:
         return [Finding("missing_file", relative, "missing")]
     text = path.read_text(encoding="utf-8")
     findings: list[Finding] = []
-    for ignored_path in (".git", ".state", "*.gguf", "*.safetensors", "pytorch_model*.bin", "model-*.bin", ".cache/huggingface", "vendor/agent-canon"):
+    for ignored_path in (".git", ".state", "vendor/agent-canon"):
         if not re.search(rf"(^|\n){re.escape(ignored_path)}(\n|$)", text):
             findings.append(
                 Finding("dependency_contract_violation", relative, f"missing-ignore:{ignored_path}")

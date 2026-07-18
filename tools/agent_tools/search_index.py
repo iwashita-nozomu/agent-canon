@@ -7,7 +7,7 @@
 # downstream implementation ./search.py consumes search cards as the coordinated search provider
 # downstream implementation ../../tests/agent_tools/test_search.py validates semantic-card generation through the coordinated search surface
 # @dependency-end
-"""Build repo-local search cards for first-class LLM-backed search."""
+"""Build repo-local search cards for first-class deterministic semantic search."""
 
 from __future__ import annotations
 
@@ -412,14 +412,14 @@ def load_cards(path: Path) -> tuple[SearchCard, ...]:
                 line_end=mapping_int(data, "line_end", 1),
                 chunk_hash=mapping_string(data, "chunk_hash"),
                 summary=mapping_string(data, "summary"),
-                concepts=string_tuple(data.get("concepts")),
-                aliases=string_tuple(data.get("aliases")),
+                concepts=mapping_string_tuple(data, "concepts"),
+                aliases=mapping_string_tuple(data, "aliases"),
                 responsibility=mapping_string(data, "responsibility"),
                 owner=mapping_string(data, "owner"),
-                related_tools=string_tuple(data.get("related_tools")),
-                related_docs=string_tuple(data.get("related_docs")),
-                related_tests=string_tuple(data.get("related_tests")),
-                ambiguity_notes=string_tuple(data.get("ambiguity_notes")),
+                related_tools=mapping_string_tuple(data, "related_tools"),
+                related_docs=mapping_string_tuple(data, "related_docs"),
+                related_tests=mapping_string_tuple(data, "related_tests"),
+                ambiguity_notes=mapping_string_tuple(data, "ambiguity_notes"),
                 generated_by=mapping_string(data, "generated_by"),
             )
         )

@@ -177,11 +177,6 @@ def write_valid_docker_runtime(root: Path) -> None:
             [
                 ".git",
                 ".state",
-                "*.gguf",
-                "*.safetensors",
-                "pytorch_model*.bin",
-                "model-*.bin",
-                ".cache/huggingface",
                 "vendor/agent-canon",
                 "",
             ]
@@ -874,8 +869,8 @@ def test_missing_agent_canon_dockerignore_fails(tmp_path: Path) -> None:
     assert "dependency_contract_violation:.dockerignore:missing-ignore:vendor/agent-canon" in result.stdout
 
 
-def test_missing_local_model_cache_dockerignore_fails(tmp_path: Path) -> None:
-    """Docker build context should not include local LLM model artifacts."""
+def test_missing_agent_state_dockerignore_fails(tmp_path: Path) -> None:
+    """Docker build context should not include generated agent state."""
     write_valid_runtime(tmp_path)
     (tmp_path / ".dockerignore").write_text(".git\nvendor/agent-canon\n", encoding="utf-8")
 
@@ -883,4 +878,3 @@ def test_missing_local_model_cache_dockerignore_fails(tmp_path: Path) -> None:
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert "dependency_contract_violation:.dockerignore:missing-ignore:.state" in result.stdout
-    assert "dependency_contract_violation:.dockerignore:missing-ignore:*.gguf" in result.stdout

@@ -471,8 +471,10 @@ def emit_bootstrap_output(
     print("IMPLEMENTATION_SURFACE_ROUTE_STATUS=pending")
     print(
         "IMPLEMENTATION_SURFACE_ROUTE_COMMAND="
-        "tools/bin/agent-canon local-llm route-implementation-surface "
-        "--request-file <request-or-design-question.txt> --format text"
+        "python3 tools/agent_tools/search.py "
+        "--query-file <request-or-design-question.txt> "
+        "--providers text,semantic,vector,tool,header-deps,code-deps "
+        "--format json"
     )
     print("TOOL_REUSE_LEDGER_STATUS=required_before_custom_implementation")
     print("PRE_EDIT_REJECTION_PREDICTION_STATUS=pending")
