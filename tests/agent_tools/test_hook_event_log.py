@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests O(1) hook spooling, no-replace identity, and dispatcher-clean failures.
-# upstream design ../../reports/agents/20260717-125542-reconstruct-approved-runtime-evidence-ma/design_amendment_posttooluse_spool.md hot-path amendment
+# upstream design ../../documents/runtime-log-archive.md bounded hook-event spool and explicit checkpoint policy
 # upstream implementation ../../.codex/hooks/hook_event_log.py publishes per-event spool files
 # upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py checks hot-path reachability
 # @dependency-end

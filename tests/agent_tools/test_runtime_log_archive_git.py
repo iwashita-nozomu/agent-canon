@@ -6,7 +6,7 @@
 # upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages the ignored log archive clone
 # upstream implementation ../../tools/agent_tools/runtime_log_paths.py defines repo keys and archive mount paths
 # upstream design ../../documents/runtime-log-archive.md documents archive branch and push policy
-# upstream design ../../reports/agents/20260717-125542-reconstruct-approved-runtime-evidence-ma/design_amendment_posttooluse_spool.md explicit checkpoint transaction
+# upstream design ../../agents/COMMUNICATION_PROTOCOL.md source-bound runtime-event communication and checkpoint contract
 # @dependency-end
 
 from __future__ import annotations
