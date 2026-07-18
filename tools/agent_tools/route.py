@@ -42,12 +42,14 @@ from skill_route_catalog import (
     CapabilityRootError,
     SkillRoutingRule,
     build_capability_index,
-    load_skill_related_map,  # noqa: F401
+    load_skill_related_map as _load_skill_related_map,
     load_skill_route_rules,
     load_skill_route_rules_from_root,
     ordered_unique,
     related_skill_candidates,
 )
+
+load_skill_related_map = _load_skill_related_map
 
 ROUTE_NAME = "task-routing"
 SKILL_NAME = "task-routing"
