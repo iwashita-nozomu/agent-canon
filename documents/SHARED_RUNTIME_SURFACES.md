@@ -24,6 +24,11 @@ because they are cloned from the template. That coupling is intentional. The
 boundary that must stay clear is ownership: each root path must say who owns it,
 whether a derived repository may override it, and where edits must be made.
 
+Target-State-First, Decision Sufficiency, model/profile, ToolCall, capacity,
+and lifecycle behavior remains an AgentCanon-owned generated projection. Root
+views link to the canonical workflow, subagent, communication, registry,
+handshake, and closeout owners; they are not independent policy sources.
+
 ## Reader Map
 
 Use this document to answer who owns each shared runtime surface exposed from

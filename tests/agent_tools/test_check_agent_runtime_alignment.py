@@ -28,13 +28,11 @@ import check_agent_runtime_alignment as runtime_alignment  # noqa: E402
 from agent_team import (  # noqa: E402
     TaskCatalog,
     codex_runtime_max_depth,
-    codex_runtime_max_threads,
     load_team_config,
     resolve_cross_cutting_document_packet,
     resolve_document_section_locators,
     resolve_role,
     resolve_role_document_packet,
-    workflow_spawn_budget,
     workflow_topology_policy_violations,
 )
 from check_agent_runtime_alignment import validate_permanent_team_mapping  # noqa: E402
@@ -285,7 +283,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         configs["worker"] = {**configs["worker"], "model": "gpt-5.5"}
 
         with patch.object(runtime_alignment, "parse_codex_agents", return_value=configs):
-            with self.assertRaisesRegex(RuntimeError, "worker model must be gpt-5.6-luna"):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "worker model must project registry profile luna_implementation_xhigh",
+            ):
                 runtime_alignment.validate_codex_agent_settings()
 
     def test_alignment_assigns_mini_only_to_skill_evaluator(self) -> None:
@@ -346,6 +347,49 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 self.assertNotIn("## Decision Sufficiency Packet", text)
                 self.assertNotIn('"schema": "agent-canon.decision-sufficiency.v1"', text)
 
+    def test_generated_role_views_cannot_claim_model_authority(self) -> None:
+        """Both runtime docs reject generated-view authority and manual model edits."""
+        docs = (
+            PROJECT_ROOT / ".codex" / "README.md",
+            PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
+        )
+        for path in docs:
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                self.assertEqual(
+                    runtime_alignment.generated_role_authority_contradictions(text),
+                    (),
+                )
+        stale_claims = (
+            ".codex/agents/*.toml is the source of truth for model and reasoning.",
+            "Update role TOMLs to change model reasoning.",
+            "role model / reasoning を変えるときは .codex/agents/*.toml を更新します",
+            "agent TOMLs are authoritative for model/reasoning.",
+            "Edit generated role TOMLs manually.",
+            "role の model / model_reasoning_effort は各 agent TOML が正本です。",
+            "model / reasoning を変更するときは .codex/agents/*.toml を更新し、検証します。",
+        )
+        for path in docs:
+            for claim in stale_claims:
+                with self.subTest(path=path, claim=claim):
+                    self.assertTrue(
+                        runtime_alignment.generated_role_authority_contradictions(claim)
+                    )
+
+    def test_registry_generated_readback_wording_is_not_an_authority_contradiction(self) -> None:
+        """Canonical source and generated-readback wording remains valid."""
+        valid_claim = (
+            "agents/model_profiles.toml is the canonical typed profile authority. "
+            "tools/agent_tools/model_profile_registry.py materializes closed generated "
+            ".codex/agents/*.toml and agents/agents_config.json views. Generated views "
+            "are projection digest/readback surfaces and must never be edited manually; "
+            "change registry/team/runtime source, regenerate, restart, and validate readback."
+        )
+        self.assertEqual(
+            runtime_alignment.generated_role_authority_contradictions(valid_claim),
+            (),
+        )
+
     def test_alignment_rejects_mini_model_on_ordinary_role(self) -> None:
         """A normal role cannot claim the T14 skill-validation model."""
         configs = runtime_alignment.parse_codex_agents()
@@ -358,7 +402,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         with patch.object(runtime_alignment, "parse_codex_agents", return_value=configs):
             with self.assertRaisesRegex(
                 RuntimeError,
-                "explorer may use gpt-5.4-mini only for explicit T14 skill_evaluation via skill_evaluator",
+                "explorer model must project registry profile luna_reasoning_high",
             ):
                 runtime_alignment.validate_codex_agent_settings()
 
@@ -371,95 +415,22 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "unsupported profile keys: service_tier"):
                 runtime_alignment.validate_codex_agent_settings()
 
-    def test_workflow_spawn_budget_rejects_write_budget_above_active(self) -> None:
-        """Write-capable subagents must be bounded by the active spawn budget."""
-        catalog = TaskCatalog(
-            raw={},
-            workflow_families=(
-                {
-                    "id": "bad-budget",
-                    "spawn_budget": {
-                        "active_subagents": 2,
-                        "max_write_subagents": 3,
-                    },
-                },
-            ),
-            tasks=(),
-            review_packs=(),
-        )
-
-        with self.assertRaisesRegex(
-            RuntimeError,
-            "max_write_subagents exceeds active_subagents",
-        ):
-            workflow_spawn_budget(catalog, "bad-budget")
-
-    def test_workflow_spawn_budget_rejects_active_budget_above_runtime_threads(self) -> None:
-        """Workflow active budget must not exceed Codex runtime max_threads."""
-        runtime_max_threads = codex_runtime_max_threads()
-        catalog = TaskCatalog(
-            raw={},
-            workflow_families=(
-                {
-                    "id": "bad-runtime-budget",
-                    "spawn_budget": {
-                        "active_subagents": runtime_max_threads + 1,
-                        "max_write_subagents": 1,
-                    },
-                },
-            ),
-            tasks=(),
-            review_packs=(),
-        )
-
-        with self.assertRaisesRegex(
-            RuntimeError,
-            "active_subagents exceeds runtime max_threads",
-        ):
-            workflow_spawn_budget(catalog, "bad-runtime-budget")
-
-    def test_workflow_spawn_budget_allows_active_equal_runtime_threads(self) -> None:
-        """Workflow active budget may equal the runtime max_threads boundary."""
-        runtime_max_threads = codex_runtime_max_threads()
-        catalog = TaskCatalog(
-            raw={},
-            workflow_families=(
-                {
-                    "id": "boundary-budget",
-                    "spawn_budget": {
-                        "active_subagents": runtime_max_threads,
-                        "max_write_subagents": 1,
-                    },
-                },
-            ),
-            tasks=(),
-            review_packs=(),
-        )
-
-        self.assertEqual(
-            workflow_spawn_budget(catalog, "boundary-budget"),
-            (runtime_max_threads, 1),
-        )
-
+    def test_capacity_request_is_derived_from_declared_topology(self) -> None:
+        """Workflow capacity is sourced from declared topology rather than numeric budgets."""
+        catalog = loaded_task_catalog_raw()
+        topology = cast(dict[str, object], catalog["role_topology_defaults"])
+        self.assertEqual(topology["capacity_derivation"], "declared_team_peak_plus_nested_reservations_v1")
+        for family in cast(list[dict[str, object]], catalog["workflow_families"]):
+            request = cast(dict[str, object], family["capacity_request"])
+            self.assertEqual(request["topology_source"], "role_topology")
+            self.assertEqual(request["write_scope_source"], "team_manifest.run.write_scopes")
+            self.assertNotIn("spawn_budget", family)
     def test_project_config_rejects_agent_policy_scalar_keys(self) -> None:
         """Task policy strings must stay out of Codex's [agents] runtime table."""
-        config = {
-            "model": runtime_alignment.PARENT_MODEL,
-            "model_reasoning_effort": runtime_alignment.PARENT_REASONING_EFFORT,
-            "review_model": runtime_alignment.REVIEW_MODEL,
-            "model_context_window": runtime_alignment.EXPECTED_MODEL_CONTEXT_WINDOW,
-            "tool_output_token_limit": runtime_alignment.EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT,
-            "features": {
-                "hooks": True,
-                "goals": True,
-                "multi_agent": True,
-            },
-            "agents": {
-                "max_threads": runtime_alignment.EXPECTED_MAX_THREADS,
-                "max_depth": runtime_alignment.EXPECTED_MAX_DEPTH,
-                "job_max_runtime_seconds": runtime_alignment.EXPECTED_JOB_MAX_RUNTIME_SECONDS,
-                "same_role_instances": "allowed_with_distinct_packets",
-            },
+        config = runtime_alignment.load_project_config_toml()
+        config["agents"] = {
+            **cast(dict[str, object], config["agents"]),
+            "same_role_instances": "allowed_with_distinct_packets",
         }
 
         with (

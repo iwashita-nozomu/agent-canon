@@ -45,7 +45,7 @@ downstream implementation ./hooks/notebook_quality_guard.py warns on notebook-as
 - 共通入口は `AGENTS.md`
 - workflow と skill の正本は `agents/`
 - Codex-specific routing は `agents/canonical/CODEX_WORKFLOW.md` と `agents/canonical/CODEX_SUBAGENTS.md`
-- runtime cap は `.codex/config.toml` の `[agents].max_threads = 24` を使い、spawn は depth ではなく bounded concurrency で制御します
+- `.codex/config.toml` の `[agents].max_threads = 26` は direct frontier `20` と nested reservation `6` から生成した requested/configured readback です。platform-effective / current-available capacity は別入力であり、26 を runtime の普遍的な cap とは扱いません
 - `[agents]` は上限と timeout の設定であり、上位 runtime / developer instruction が要求する explicit subagent authorization を上書きしません。明示許可が無い session では fan-out plan と handoff packet を作り、実際の spawn は許可後に行います
 - plan mode や permissions のような mode は session 単位です。official Codex CLI では `/plan`、`/model`、`/permissions` を使います
 - runtime が `/agent` を提供する場合は inventory 確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます
@@ -72,18 +72,23 @@ change a user profile for a fresh session after observed token, latency, or
 tool-output evidence identifies a runtime constraint. Profile changes do not
 waive workflow gates and do not authorize dropping decision-relevant context.
 
-## Runtime Spawn Limits
+## Runtime Capacity And Lifecycle Projection
 
-- `max_threads = 24`
-  - runtime hard ceiling として使います
+- `.codex/config.toml` の `max_threads` は、宣言 topology の生成値を
+  loader/readback した `configured_max_threads` です。現在の生成値は
+  `20 + 6 = 26` であり、普遍的な ceiling ではありません。
+- requested / configured / platform-effective / workflow-demand /
+  write-cap / nested-reserved / available は [capacity handshake owner](../agents/canonical/CODEX_SUBAGENTS.md#capacity-and-lifecycle)
+  の型付き projection に従います。effective は予約後の既知制約の最小値で、
+  saturation は work を queue します。model-capacity event は thread
+  saturation と別です。
 - `job_max_runtime_seconds = 3600`
   - 長めの review / repo scan / validation を含む subagent job を 1 時間まで許容します
 - `max_depth = 2`
   - one bounded child-subagent layer を許可します
-- 同時 spawn の既定 budget は workflow family 側で決めます
-  - repo-changing workflow family: active 4 / write-capable 2
-  - `Skill Evaluation` / T14: evaluator-only active 1 / write-capable cap 1
-  - specialist は decision ごとの wave で入れ替え、全 role を同時起動しない
+- 同時 spawn と write frontier は宣言 topology と pairwise-disjoint write
+  scope から生成されます。固定 active/write 数、task-size/count/time
+  budget、または capacity probe は認可根拠になりません。
 - `team_manifest.yaml` の `run.spawn_budget.active_subagents` が総同時起動 budget、`run.spawn_budget.max_write_subagents` と `run.write_scope_policy.max_write_subagents` が write-capable subagent だけの上限です。write-capable 上限は総同時起動 cap と区別します。
 - same-role instance policy は `agents/task_catalog.yaml` と generated
   `team_manifest.yaml` の `run.delegated_spawn_policy` が正本です。
@@ -95,7 +100,10 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 - 新規 user request では前 task の subagent を使い回さず、run bundle ごとに fresh subagent を起こします
 - active task の途中追加指示は parent が `same_active_task_delta` / `scope_or_contract_change` / `new_task` に分類し、same-task delta は run bundle checkpoint と updated packet path を残してから run-local subagent へ再配送し、scope 変更は fresh follow-up wave にします
 - `team_manifest.yaml` には `run.subagent_lifecycle_policy` を出し、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を handoff prompt に含めます
-- closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
+- closeout は canonical `spawned -> active -> durable result/error -> handed
+  back -> descendants closure verified -> close requested -> closed ->
+  reservation released` を全 descendant で確認し、canonical `close_agent`
+  ToolCall を含む CloseoutPacket を使います。
 
 ## Hook Context
 
@@ -129,25 +137,28 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 
 ## Model Settings
 
-- `.codex/agents/*.toml` is the source of truth for each Codex subagent's
-  `model` and `model_reasoning_effort`.
-- `.codex/config.toml` owns the Sol/high parent default, the Luna `/review`
-  default, project features, runtime limits, skill registration, and the agent
-  registry. Child model settings remain in role TOMLs.
+- `agents/model_profiles.toml` is the canonical typed authority for every
+  parent and child model, reasoning, capability, context, return, checkpoint,
+  and continuation field.
+- `tools/agent_tools/model_profile_registry.py` materializes closed
+  `.codex/agents/*.toml` and `agents/agents_config.json` generated views.
 - `tools/agent_tools/check_agent_runtime_alignment.py` and
   `tools/agent_tools/evaluate_codex_agent_roles.py` validate the materialized
   agent TOML files directly.
-- Ordinary planning, authoring, exploration, experiment execution, and review
-  children use Luna/high. `worker` and `ship_reviewer` use Luna/xhigh; Spark
-  remains explicit mechanical work. `gpt-5.4-mini/medium` is reserved for the
-  fresh, read-only, artifact-only `skill_evaluator` lane in explicit T14
-  `skill_evaluation` and is absent from permanent team roles.
+- `agents/model_profiles.toml` が child model、reasoning、capability、context、
+  return schema、continuation を所有し、canonical materializer が
+  `.codex/agents/*.toml` と `agents/agents_config.json` の role projection を生成します。
+  role view を手動の model authority として編集しません。
+- generated view の更新後は alignment readback を確認し、load 済み session
+  との不一致は手動編集せず restart して canonical projection を再読込します。
 - The parent uses Sol/high and owns integration and final approval. Sol/xhigh is
   an explicit high-risk or final escalation, not a child-role default.
 - mode の扱い
   - plan mode や permissions は session 単位で、per-agent TOML には書きません
   - official Codex CLI では `/plan`、`/model`、`/permissions` を使います
-- `.codex/config.toml` の `[agents.<name>]` が role registry、`.codex/agents/*.toml` が role behavior と model / reasoning 設定の正本です
+- `.codex/config.toml` の `[agents.<name>]` は role registration を所有し、
+  model / reasoning authority は `agents/model_profiles.toml`、role TOML は
+  materialized readback view です
 
 ## Current Agents
 

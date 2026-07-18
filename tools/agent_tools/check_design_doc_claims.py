@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -66,6 +67,8 @@ CLAIM_CUE_RE = re.compile(
     r"|必須|責務|契約|検証|確認|使う|接続|比較|生成|出力|入力|読む|書く",
     re.IGNORECASE,
 )
+RC_ID_RE = re.compile(r"^RC-\d{2}$")
+TARGET_STATE_SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 POSITIVE_CUE_RE = re.compile(
     r"\b(must|shall|requires?|uses?|validates?|runs?|routes?|maps?|owns?)\b"
     r"|必須|使う|使用|実行|接続|検証",
@@ -107,6 +110,23 @@ class Claim:
 
 
 @dataclass(frozen=True)
+class ClaimEvidenceRecord:
+    """One typed design claim-evidence record."""
+
+    record_version: int
+    claim_id: str
+    claim_text_sha256: str
+    evidence_class: str
+    input_identity: str
+    owner_id: str
+    evidence_ids: tuple[str, ...]
+    request_clause_ids: tuple[str, ...]
+    target_state_contract_sha256: str | None
+    final_readback_action_id: str | None
+    status: str
+
+
+@dataclass(frozen=True)
 class Finding:
     """One design evidence finding."""
 
@@ -132,6 +152,7 @@ class CheckResult:
     supported_claims: int
     evidence_paths: tuple[str, ...]
     parent_paths: tuple[str, ...]
+    claim_evidence_records: tuple[ClaimEvidenceRecord, ...]
     findings: tuple[Finding, ...]
 
 
@@ -631,6 +652,8 @@ def normalized_checkable_token(raw_token: str) -> str | None:
 
 def is_checkable_token(token: str) -> bool:
     """Return whether a Markdown code span is a checkable code/path token."""
+    if TARGET_STATE_SHA_RE.fullmatch(token):
+        return True
     if any(sep in token for sep in ("/", "\\", "::", ".", "_", "-")):
         return True
     if token.startswith("--"):
@@ -753,6 +776,90 @@ def assumption_terms(text: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(match.group(0) for match in ASSUMPTION_TERM_RE.finditer(text)))
 
 
+def claim_evidence_record_v1(
+    claim: Claim,
+    all_evidence_text: dict[str, str],
+    assumption_terms_in_claim_text: tuple[str, ...],
+) -> ClaimEvidenceRecord:
+    """Return one fixed-shape claim evidence record."""
+    claim_hash = hashlib.sha256(claim.text.encode("utf-8")).hexdigest()
+    claim_tokens = tuple(token.lower() for token in claim.tokens)
+    if any(RC_ID_RE.fullmatch(token.upper()) for token in claim_tokens):
+        rc_ids = tuple(
+            token.upper() for token in claim_tokens if RC_ID_RE.fullmatch(token.upper())
+        )
+        return ClaimEvidenceRecord(
+            record_version=1,
+            claim_id=f"{claim.path}:{claim.line}",
+            claim_text_sha256=claim_hash,
+            evidence_class="request_contract",
+            input_identity=claim.path,
+            owner_id="check_design_doc_claims",
+            evidence_ids=(),
+            request_clause_ids=rc_ids,
+            target_state_contract_sha256=None,
+            final_readback_action_id=None,
+            status="verified",
+        )
+    for token in claim_tokens:
+        if TARGET_STATE_SHA_RE.fullmatch(token):
+            return ClaimEvidenceRecord(
+                record_version=1,
+                claim_id=f"{claim.path}:{claim.line}",
+                claim_text_sha256=claim_hash,
+                evidence_class="target_state",
+                input_identity=claim.path,
+                owner_id="check_design_doc_claims",
+                evidence_ids=tuple(sorted(all_evidence_text)),
+                request_clause_ids=(),
+                target_state_contract_sha256=token,
+                final_readback_action_id=None,
+                status="approved_pending_implementation",
+            )
+        if any(term.lower() in token for term in assumption_terms_in_claim_text):
+            return ClaimEvidenceRecord(
+                record_version=1,
+                claim_id=f"{claim.path}:{claim.line}",
+                claim_text_sha256=claim_hash,
+                evidence_class="assumption",
+                input_identity=claim.path,
+                owner_id="check_design_doc_claims",
+                evidence_ids=(),
+                request_clause_ids=(),
+                target_state_contract_sha256=None,
+                final_readback_action_id=None,
+                status="blocked",
+            )
+    return ClaimEvidenceRecord(
+        record_version=1,
+        claim_id=f"{claim.path}:{claim.line}",
+        claim_text_sha256=claim_hash,
+        evidence_class="current_state",
+        input_identity=claim.path,
+        owner_id="check_design_doc_claims",
+        evidence_ids=tuple(sorted(all_evidence_text)),
+        request_clause_ids=(),
+        target_state_contract_sha256=None,
+        final_readback_action_id=None,
+        status="verified",
+    )
+
+
+def claim_evidence_class_counts(
+    records: Sequence[ClaimEvidenceRecord],
+) -> dict[str, int]:
+    """Return stable counts by typed evidence class."""
+    counts = {
+        "current_state": 0,
+        "request_contract": 0,
+        "target_state": 0,
+        "assumption": 0,
+    }
+    for record in records:
+        counts[record.evidence_class] += 1
+    return counts
+
+
 def check_assumption_ledger(path: str, text: str) -> list[Finding]:
     """Check implicit assumption terms against the design ledger."""
     terms = assumption_terms(text)
@@ -838,10 +945,12 @@ def check_claim_support(
     root: Path,
     claims: Sequence[Claim],
     evidence: dict[str, str],
-) -> tuple[int, list[Finding]]:
+) -> tuple[int, list[Finding], tuple[ClaimEvidenceRecord, ...]]:
     """Check claim tokens against repo paths and evidence text."""
     supported = 0
     findings: list[Finding] = []
+    records: list[ClaimEvidenceRecord] = []
+    assumption_terms_in_text = assumption_terms("\n".join(claim.text for claim in claims))
     for claim in claims:
         if not claim.tokens:
             findings.append(
@@ -852,10 +961,35 @@ def check_claim_support(
                     "add code/path/command evidence token or move statement to non-claim prose",
                 )
             )
+            records.append(
+                ClaimEvidenceRecord(
+                    record_version=1,
+                    claim_id=f"{claim.path}:{claim.line}",
+                    claim_text_sha256=hashlib.sha256(claim.text.encode("utf-8")).hexdigest(),
+                    evidence_class="assumption",
+                    input_identity=claim.path,
+                    owner_id="check_design_doc_claims",
+                    evidence_ids=(),
+                    request_clause_ids=(),
+                    target_state_contract_sha256=None,
+                    final_readback_action_id=None,
+                    status="blocked",
+                )
+            )
             continue
+        record = claim_evidence_record_v1(claim, evidence, assumption_terms_in_text)
+        records.append(record)
         token_findings = []
         for token in claim.tokens:
             if token_is_path_in_repo(root, claim.path, token) or token_in_evidence(token, evidence):
+                continue
+            if record.evidence_class == "request_contract" and RC_ID_RE.fullmatch(token.upper()):
+                continue
+            if record.evidence_class == "target_state" and TARGET_STATE_SHA_RE.fullmatch(token.lower()):
+                continue
+            if record.evidence_class == "assumption" and token.lower() in {
+                term.lower() for term in assumption_terms_in_text
+            }:
                 continue
             token_findings.append(
                 Finding(
@@ -869,7 +1003,7 @@ def check_claim_support(
             findings.extend(token_findings)
         else:
             supported += 1
-    return supported, findings
+    return supported, findings, tuple(records)
 
 
 def missing_dependency_target_findings(root: Path, path: str, evidence_paths: Sequence[str]) -> list[Finding]:
@@ -897,13 +1031,18 @@ def _check_one_from_manifest(
             supported_claims=0,
             evidence_paths=(),
             parent_paths=(),
+            claim_evidence_records=(),
             findings=(Finding("design-document-unresolved", path, 0, f"path={path}"),),
         )
     text = read_text(root, path)
     claims = extract_claims(path, text)
     evidence_paths, parent_paths, traversal_findings = dependency_closure(path, edges, recursive_depth)
     readable_evidence = evidence_texts(root, evidence_paths)
-    supported, claim_findings = check_claim_support(root, claims, readable_evidence)
+    supported, claim_findings, claim_evidence_records = check_claim_support(
+        root,
+        claims,
+        readable_evidence,
+    )
     findings: list[Finding] = []
     if claims and not has_evidence_ledger(text):
         findings.append(Finding("missing-evidence-assumption-ledger", path, 0, "section=Evidence And Assumption Ledger"))
@@ -918,6 +1057,7 @@ def _check_one_from_manifest(
         supported_claims=supported,
         evidence_paths=tuple(sorted(evidence_paths)),
         parent_paths=tuple(sorted(parent_paths)),
+        claim_evidence_records=claim_evidence_records,
         findings=tuple(sorted(findings, key=lambda item: (item.kind, item.path, item.line, item.detail))),
     )
 
@@ -926,6 +1066,7 @@ def check_one(root: Path, path: str, consumer: GraphClaimConsumer) -> CheckResul
     """Check one design document against graph-provided evidence context."""
     if resolve_existing_text_path(root, path) is None:
         return CheckResult(
+            claim_evidence_records=(),
             path=path,
             claims=0,
             supported_claims=0,
@@ -936,7 +1077,7 @@ def check_one(root: Path, path: str, consumer: GraphClaimConsumer) -> CheckResul
     text = read_text(root, path)
     claims = extract_claims(path, text)
     context = consumer.context(path)
-    supported, claim_findings = check_claim_support(root, claims, context.evidence)
+    supported, claim_findings, claim_evidence_records = check_claim_support(root, claims, context.evidence)
     findings: list[Finding] = []
     if claims and not has_evidence_ledger(text):
         findings.append(Finding("missing-evidence-assumption-ledger", path, 0, "section=Evidence And Assumption Ledger"))
@@ -945,6 +1086,7 @@ def check_one(root: Path, path: str, consumer: GraphClaimConsumer) -> CheckResul
     findings.extend(check_parent_contradictions(root, path, text, context.parent_paths))
     findings.extend(claim_findings)
     return CheckResult(
+        claim_evidence_records=claim_evidence_records,
         path=path,
         claims=len(claims),
         supported_claims=supported,
@@ -969,12 +1111,25 @@ def render_text(results: Sequence[CheckResult]) -> str:
     lines: list[str] = []
     for finding in findings:
         lines.append(finding.render())
+    aggregate_counts = {
+        "current_state": 0,
+        "request_contract": 0,
+        "target_state": 0,
+        "assumption": 0,
+    }
+    for result in results:
+        for key, value in claim_evidence_class_counts(result.claim_evidence_records).items():
+            aggregate_counts[key] += value
     lines.extend(
         [
             f"DESIGN_DOC_CLAIMS_DOCUMENTS={len(results)}",
             f"DESIGN_DOC_CLAIMS_CHECKED={sum(result.claims for result in results)}",
             f"DESIGN_DOC_CLAIMS_SUPPORTED={sum(result.supported_claims for result in results)}",
             f"DESIGN_DOC_CLAIMS_EVIDENCE_PATHS={sum(len(result.evidence_paths) for result in results)}",
+            f"DESIGN_DOC_CLAIMS_CURRENT_STATE={aggregate_counts['current_state']}",
+            f"DESIGN_DOC_CLAIMS_REQUEST_CONTRACT={aggregate_counts['request_contract']}",
+            f"DESIGN_DOC_CLAIMS_TARGET_STATE={aggregate_counts['target_state']}",
+            f"DESIGN_DOC_CLAIMS_ASSUMPTION={aggregate_counts['assumption']}",
             f"DESIGN_DOC_CLAIMS_FINDINGS={len(findings)}",
             f"DESIGN_DOC_CLAIMS={'pass' if not findings else 'fail'}",
         ]
@@ -1006,6 +1161,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         except GraphClientError as error:
             results = tuple(
                 CheckResult(
+                    claim_evidence_records=(),
                     path=path,
                     claims=0,
                     supported_claims=0,

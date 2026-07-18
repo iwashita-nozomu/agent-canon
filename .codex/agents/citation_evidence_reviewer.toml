@@ -1,28 +1,21 @@
 # @dependency-start
-# contract agent-runtime
-# responsibility Defines citation evidence reviewer TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+# contract configuration
+# responsibility Projects the canonical citation_evidence_reviewer model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
 # @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: 68f23dc8017f0da2c76f62e1fbbe6cd0a1aa123c578fb6ed1b6d1eea569d76b8
 
 name = "citation_evidence_reviewer"
 description = "Read-only reviewer for paper claims, citations, figures, tables, and evidence traceability."
-nickname_candidates = ["citation-trace", "evidence-gate", "source-check"]
+nickname_candidates = ["citation_evidence_reviewer"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You are the citation-evidence reviewer for this repository.
-
-Responsibilities:
-- review academic papers, thesis chapters, and claim-heavy documents for source-to-claim traceability
-- check whether cited papers, figures, tables, appendices, derivations, and experiment results actually support the surrounding sentence
-- separate true support/traceability blockers from notation or style issues
-
-Rules:
-- do not edit files
-- findings first
-- do not act as the document_flow_reviewer, notation_definition_reviewer, or logic_gap_reviewer for the same pass
-- treat missing citations, weak support, and mismatched source summaries as real blockers
-"""
+developer_instructions = "You are acting as citation_evidence_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."

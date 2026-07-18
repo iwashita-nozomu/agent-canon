@@ -298,6 +298,87 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
 
+    def test_request_contract_claim_is_typed_as_request_contract(self) -> None:
+        """Request-contract claims are emitted as request_contract records."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "design" / "feature.md",
+                """
+                # Feature Design
+                <!--
+                @dependency-start
+                responsibility Documents Feature Design fixture.
+                downstream implementation ../../tools/feature_runner.py runner implementation
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `tools/feature_runner.py`.
+                - Assumptions: request-contract claim is test-only.
+
+                ## Claims
+
+                - The design must satisfy request-contract `RC-10`.
+                """,
+            )
+            write(
+                root / "tools" / "feature_runner.py",
+                """
+                def run_feature() -> None:
+                    pass
+                """,
+            )
+
+            result = run_checker("--format", "json", "documents/design/feature.md", root=root)
+            payload = json.loads(result.stdout)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(payload["status"], "pass")
+            records = payload["documents"][0]["claim_evidence_records"]
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0]["evidence_class"], "request_contract")
+            self.assertEqual(records[0]["status"], "verified")
+
+    def test_target_state_claim_reports_target_state_class(self) -> None:
+        """Target-state claims are typed and accepted as approved_pending_implementation."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "design" / "feature.md",
+                """
+                # Feature Design
+                <!--
+                @dependency-start
+                contract design
+                responsibility Documents Feature Design fixture.
+                upstream design ../README.md feature design
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `documents/README.md`.
+                - Assumptions: target-state projection is not yet implemented.
+
+                ## Claims
+
+                - The design route requires target state `e8ae83767a4c3a7edb10a59f611c9f949ac8ea0563dcf844329f2be95c9a2762`.
+                """,
+            )
+            write(root / "documents" / "README.md", "# Docs\n")
+
+            result = run_checker("--format", "json", "documents/design/feature.md", root=root)
+            payload = json.loads(result.stdout)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(payload["status"], "pass")
+            records = payload["documents"][0]["claim_evidence_records"]
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0]["evidence_class"], "target_state")
+            self.assertEqual(records[0]["status"], "approved_pending_implementation")
+
     def test_fail_key_value_token_requires_same_record_evidence(self) -> None:
         """A key and value in separate evidence records do not support a pair claim."""
         with tempfile.TemporaryDirectory() as tmp_dir:

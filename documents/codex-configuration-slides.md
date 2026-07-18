@@ -89,7 +89,7 @@ goals = true
 multi_agent = true
 
 [agents]
-max_threads = 24
+max_threads = 26
 max_depth = 2
 job_max_runtime_seconds = 3600
 ```
@@ -101,11 +101,13 @@ job_max_runtime_seconds = 3600
 - 外部 sandbox 前提なので approval は `never`
 - filesystem sandbox は `danger-full-access`
 - 親 orchestrator は `gpt-5.6-sol/high`
-- named child の model / effort は `.codex/agents/*.toml` が所有
+- named child の model / effort / capability / context / return schema は
+  `agents/model_profiles.toml` が所有し、role TOML は generated view
 - 1 tool output の context 取り込みは 4096 token まで
 - hooks を有効化し、runtime guardrail を組み込む
 - multi-agent と repo-owned skill / child-agent registry を有効化
-- subagent は最大 24 thread、job timeout 3600 秒
+- topology-derived request は direct `20` + nested `6` = `26`。platform-effective
+  / current-available capacity は別入力で、26 を platform cap とは主張しない
 - AgentCanon の repo-local deterministic checks は Rust CLI / Python tool が所有する
 - Codex は project trust、hook context、apps / external connectors / session tool availability を所有する
 
@@ -261,7 +263,7 @@ repo runtime は `.codex/config.toml` と role TOML の現在値から開始し�
 名や見積もり規模で profile を先に選びません。
 
 - parent: `.codex/config.toml` の `gpt-5.6-sol/high`
-- named child: `.codex/agents/*.toml` の model / effort
+- named child: `agents/model_profiles.toml` から生成した role view の model / effort
 - profile 変更: 観測済み token、latency、model-effort、tool-output evidence が原因 surface を示した後
 - current model support: `$openai-docs` で確認
 
@@ -296,7 +298,7 @@ repo runtime は `.codex/config.toml` と role TOML の現在値から開始し�
 
 | Field | 意味 |
 | ----- | ---- |
-| `max_threads` | 同時 agent thread 上限 |
+| `max_threads` | topology-derived requested/configured readback。effective / available capacity は別入力 |
 | `max_depth` | nested spawn depth |
 | `job_max_runtime_seconds` | worker timeout |
 

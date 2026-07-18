@@ -26,6 +26,8 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 UTC = timezone.utc
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
 try:

@@ -37,6 +37,12 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 個別 skill のリンク一覧は `skills/README.md` と `skills/catalog.yaml` に集約します。
 この hub には常用 skill の抜粋を増やしません。
 
+Target-State-First と Decision Sufficiency は
+[COMMUNICATION_PROTOCOL.md](COMMUNICATION_PROTOCOL.md)、
+[CODEX_WORKFLOW.md](canonical/CODEX_WORKFLOW.md)、
+[CODEX_SUBAGENTS.md](canonical/CODEX_SUBAGENTS.md) の canonical projection を
+参照します。モデル、capacity、lifecycle、ToolCall の重複規則はここに置きません。
+
 ## Runtime Entry Points
 
 - [AGENTS.md](../AGENTS.md)

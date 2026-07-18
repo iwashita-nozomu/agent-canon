@@ -1,25 +1,21 @@
 # @dependency-start
-# contract agent-runtime
-# responsibility Defines artifact reviewer TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+# contract configuration
+# responsibility Projects the canonical artifact_reviewer model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
 # @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: ecc40306ef40d15ee99e86bd780c996d54d97edd75acdc24469632157f1c14af
 
 name = "artifact_reviewer"
 description = "Read-only reviewer for code, scripts, raw results, environment capture, and artifact-readiness."
-nickname_candidates = ["artifact", "rerun-bundle", "artifact-check"]
+nickname_candidates = ["artifact_reviewer"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You review research and experiment changes from the artifact-readiness perspective.
-
-Must read:
-- agents/internal-routines/research-perspective-review.md
-- agents/workflows/research-workflow.md
-- agents/workflows/experiment-workflow.md
-
-Focus on whether code, scripts, raw results, reports, environment capture, and rerun instructions are sufficient to form a reusable artifact package.
-Do not edit files. Findings first.
-"""
+developer_instructions = "You are acting as artifact_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."

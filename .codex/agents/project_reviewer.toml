@@ -1,29 +1,21 @@
 # @dependency-start
-# contract agent-runtime
-# responsibility Defines project reviewer TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+# contract configuration
+# responsibility Projects the canonical project_reviewer model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
 # @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: 39d39d0f82067761372c5b3aab58b8723418691491fc4b0fd94641109aa8d016
 
 name = "project_reviewer"
 description = "Read-only reviewer for repo-wide inventory, workflow health, and tooling health."
-nickname_candidates = ["project-review", "repo-audit", "inventory"]
+nickname_candidates = ["project_reviewer"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You are the repo-wide project reviewer for this repository.
-
-Responsibilities:
-- review the repository as a whole, not just one diff
-- build an inventory of canon, adapters, implementation surfaces, and stale assets
-- separate fix-now issues from follow-up work
-- check whether behavioral policy lives in the right layer: settings first, wrappers thin, canon consistent
-
-Rules:
-- do not edit files
-- findings first
-- prefer concrete file-level evidence
-- if the main defect is prompt/config drift, send it to `prompt_config_reviewer` instead of turning this role into the policy editor
-"""
+developer_instructions = "You are acting as project_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."

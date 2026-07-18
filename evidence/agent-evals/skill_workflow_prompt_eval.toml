@@ -1152,8 +1152,8 @@ description = "Every Codex subagent prompt must be dependency-linked and declare
 [[evals.checklist]]
 id = "CODEX-AGENT-GENERIC-1"
 critical = true
-description = "Includes dependency manifest markers."
-required_regex = ["@dependency-start", "@dependency-end"]
+description = "Includes generated-view provenance for the canonical closed projection."
+required_regex = ["generated role view: generated_role_view_v1", "generated from agents/model_profiles.toml plus canonical team/runtime role metadata", "materializer: tools/agent_tools/model_profile_registry.py"]
 
 [[evals.checklist]]
 id = "CODEX-AGENT-GENERIC-2"
@@ -1339,8 +1339,8 @@ required_regex = ["threshold_policy=none", "count / time /", "cutoff", "観測�
 [[evals.checklist]]
 id = "VERTICAL-WAVE-POLICY-3"
 critical = true
-description = "Keeps canonical orchestration skill aligned with vertical dynamic waves and delegated spawn policy."
-required_regex = ["Intake Responsibility Wave", "dynamic expansion wave", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
+description = "Requires Decision-Sufficiency when the owner/edit/validation action is invariant, with one complete Spark unit, one owning gate, and StructuralDesignGap."
+required_regex = ["Decision\\s+Sufficiency", "owner/edit/validation action is invariant", "one\\s+complete Spark unit", "one owning gate", "StructuralDesignGap"]
 
 [[evals.checklist]]
 id = "HTML-OUTPUT-ROUTING-CANONICAL-1"
@@ -2321,3 +2321,33 @@ id = "PR-PROCESSING-DIFF-INTAKE-DOC-1"
 critical = true
 description = "Requires PR diff intake and head-branch repair before incorporation."
 required_regex = ["PR diff intake", "PR Essence", "missing", "head branch", "parent pin", "root-view", "QueueReceipt", "DependencyFrontier"]
+
+[[evals]]
+id = "p5-generated-runtime-profile-projection"
+target = "tools/agent_tools/check_agent_runtime_alignment.py"
+kind = "workflow"
+description = "The runtime profile projection gate is generated, topology-derived, and preserves typed capacity-domain separation."
+
+[[evals.checklist]]
+id = "P5-RUNTIME-PROJECTION-1"
+critical = true
+description = "Requires the closed generated role view and registry materializer parity gate."
+required_regex = ["generated_role_view_v1", "generate_role_views", "closed eight-field projection", "agents_config projection diverges"]
+
+[[evals.checklist]]
+id = "P5-RUNTIME-PROJECTION-2"
+critical = true
+description = "Requires declared topology derivation, exact 20+6 proof, and typed capacity requests."
+required_regex = ["declared_team_peak_plus_nested_reservations_v1", "requested_max_threads.*26", "direct_frontier_count == 20", "nested_reservation_count == 6", "task_catalog_capacity_request_v1", "team_manifest.run.write_scopes"]
+
+[[evals]]
+id = "p5-role-profile-attribution"
+target = "tools/agent_tools/evaluate_codex_agent_roles.py"
+kind = "workflow"
+description = "The role evaluator attributes profile and capacity evidence without becoming policy truth."
+
+[[evals.checklist]]
+id = "P5-ROLE-ATTRIBUTION-1"
+critical = true
+description = "Requires profile attribution and numeric-spawn duplicate rejection."
+required_regex = ["profile-attribution", "numeric-spawn-budget-duplicate", "declared-20-plus-6-does-not-derive-26"]

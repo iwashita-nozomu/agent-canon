@@ -9,6 +9,8 @@
 # upstream design ../../agents/skills/catalog.yaml public skill routing and related-skill catalog
 # upstream implementation ./skill_route_catalog.py canonical skill-route rules and capability metadata
 # upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
+# upstream implementation ./model_profile_registry.py owns canonical model/profile projections
+# upstream implementation ./capacity_handshake.py owns typed capacity readback
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""
@@ -19,6 +21,7 @@ import json
 import re
 import subprocess
 import tempfile
+import shutil
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -28,9 +31,13 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
 import yaml
+import model_profile_registry
 from agent_team import (
     ROOT,
     Role,
@@ -39,6 +46,7 @@ from agent_team import (
     TeamConfig,
     codex_runtime_max_depth,
     codex_runtime_max_threads,
+    declared_team_capacity_derivation,
     create_run_bundle,
     default_specialists_for_task,
     load_task_catalog,
@@ -70,22 +78,14 @@ INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
 EXPECTED_MODEL_CONTEXT_WINDOW = 1_000_000
 EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
-EXPECTED_MAX_THREADS = 24
+EXPECTED_MAX_THREADS = 26
 EXPECTED_MAX_DEPTH = 2
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
 MIN_DYNAMIC_SPAWN_BUDGET = 4
-PARENT_MODEL = "gpt-5.6-sol"
-PARENT_REASONING_EFFORT = "high"
-REVIEW_MODEL = "gpt-5.6-luna"
-LUNA_MODEL = "gpt-5.6-luna"
-SPARK_MODEL = "gpt-5.3-codex-spark"
-SKILL_VALIDATION_MODEL = "gpt-5.4-mini"
-LUNA_XHIGH_AGENT_IDS = {"worker", "ship_reviewer"}
-SPARK_LOW_AGENT_IDS = {"spark_worker"}
 EVALUATOR_AGENT_ID = "skill_evaluator"
 EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
-SKILL_VALIDATION_AGENT_IDS = {EVALUATOR_AGENT_ID}
 FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
+GENERATED_ROLE_VIEW_MATERIALIZER = "generate_role_views"
 SCOPED_MODEL_POLICY_KEYS = {
     "model",
     "model_reasoning_effort",
@@ -267,14 +267,17 @@ def load_project_skill_config_toml() -> dict[str, object]:
 def validate_project_config() -> None:
     """Check that the shared project config exposes the review route."""
     config = load_project_config_toml()
-    ensure(config.get("model") == PARENT_MODEL, f"model must be {PARENT_MODEL}")
+    registry = model_profile_registry.load_model_profile_registry(ROOT)
+    parent_profile = registry.by_profile("sol_parent_high")
+    review_profile = registry.by_profile("luna_reasoning_high")
+    ensure(config.get("model") == parent_profile.model, "parent model must project sol_parent_high")
     ensure(
-        config.get("model_reasoning_effort") == PARENT_REASONING_EFFORT,
-        f"model_reasoning_effort must be {PARENT_REASONING_EFFORT}",
+        config.get("model_reasoning_effort") == parent_profile.reasoning_effort,
+        "parent reasoning effort must project sol_parent_high",
     )
     ensure(
-        config.get("review_model") == REVIEW_MODEL,
-        f"review_model must be {REVIEW_MODEL}",
+        config.get("review_model") == review_profile.model,
+        "review_model must project luna_reasoning_high",
     )
     forbidden_project_keys = sorted(
         {"service_tier", "flex", "tier"} & set(config)
@@ -529,61 +532,81 @@ def configured_dispatcher_scripts() -> set[str]:
     return scripts
 
 
-def validate_codex_agent_settings() -> None:
-    """Check that Codex agent TOML files carry the executable model settings."""
+def validate_generated_role_views() -> None:
+    """Validate the closed role-view projection against canonical sources."""
+    config = load_team_config()
+    raw = config.raw
+    agent_views = require_mapping(raw.get("agent_views"), "agents_config.agent_views must be a mapping")
+    bindings_raw = require_list(raw.get("roles"), "agents_config.roles must be a list")
+    bindings: dict[str, dict[str, object]] = {}
+    for raw_binding in bindings_raw:
+        binding = require_mapping(raw_binding, "agents_config.roles entries must be mappings")
+        role_id = require_string(binding.get("id"), "agents_config.roles[].id must be a string")
+        ensure(role_id not in bindings, f"duplicate generated role binding: {role_id}")
+        bindings[role_id] = binding
     configs = parse_codex_agents()
+    expected_fields = {
+        "name", "description", "nickname_candidates", "sandbox_mode",
+        "approval_policy", "model", "model_reasoning_effort", "developer_instructions",
+    }
+    registry = model_profile_registry.load_model_profile_registry(ROOT)
+    registry_ids = {profile.id for profile in registry.model_profiles}
+    generated = {
+        view.role_id: view
+        for view in model_profile_registry.generate_role_views(registry, root=ROOT)
+    }
+    ensure(set(configs) == set(agent_views) == set(bindings), "generated role-view sets must be identical")
+    ensure(len(configs) == 34, "generated role-view projection must contain 34 views")
+    ensure("sol_parent_high" in registry_ids, "registry must retain sol_parent_high")
+    ensure(raw.get("team", {}).get("parent_profile_id", "sol_parent_high") == "sol_parent_high", "team parent profile must be Sol")
+    for role_id, config_view in sorted(configs.items()):
+        source = require_mapping(agent_views.get(role_id), f"agent_views.{role_id} must be a mapping")
+        binding = bindings[role_id]
+        ensure({key for key in config_view if not key.startswith("__")} == expected_fields, f"{role_id} generated view must be closed eight-field projection")
+        view = generated[role_id]
+        for field in expected_fields:
+            projected = {
+                "name": view.name,
+                "description": view.description,
+                "nickname_candidates": list(view.nickname_candidates),
+                "sandbox_mode": view.sandbox_mode,
+                "approval_policy": view.approval_policy,
+                "model": view.model,
+                "model_reasoning_effort": view.reasoning_effort,
+                "developer_instructions": view.rendered_instructions,
+            }[field]
+            ensure(config_view.get(field) == projected, f"{role_id} {field} must project canonical registry materialization")
+            ensure(source.get(field) == projected, f"{role_id} agents_config projection diverges for {field}")
+        profile_id = require_string(source.get("profile_id"), f"agent_views.{role_id}.profile_id must be a string")
+        ensure(profile_id in registry_ids, f"{role_id} profile is not in model profile registry")
+        ensure(binding.get("profile_id") == profile_id, f"{role_id} profile binding diverges from agent view")
+        ensure(binding.get("capsule_schema_id") == view.capsule_schema_id == source.get("capsule_schema_id"), f"{role_id} capsule schema diverges")
+        ensure(require_string(source.get("logical_role_id"), f"agent_views.{role_id}.logical_role_id must be a string"), "logical role id must be non-empty")
+        ensure(require_string(source.get("role_contract_ref"), f"agent_views.{role_id}.role_contract_ref must be a string"), "role contract ref must be non-empty")
+        ensure(tuple(require_string_list(binding.get("capabilities"), f"roles.{role_id}.capabilities")) == view.capabilities, f"{role_id} capabilities diverge")
+        ensure(binding.get("projection_digest") == view.source_canonical_digest == source.get("projection_digest"), f"{role_id} projection digest diverges")
+        ensure(binding.get("return_schema_id") == view.return_schema_id == source.get("return_schema_id"), f"{role_id} return schema diverges")
+        ensure(binding.get("checkpoint_policy") == view.checkpoint_policy == source.get("checkpoint_policy"), f"{role_id} checkpoint policy diverges")
+        ensure(binding.get("continuation_policy") == view.continuation_policy == source.get("continuation_policy"), f"{role_id} continuation policy diverges")
+        ensure("generated_role_view_v1" in (CODEX_AGENT_ROOT / f"{role_id}.toml").read_text(encoding="utf-8"), f"{role_id} missing generated header")
+
+
+def validate_codex_agent_settings() -> None:
+    """Check executable settings and the canonical generated role projection."""
+    configs = parse_codex_agents()
+    registry = model_profile_registry.load_model_profile_registry(ROOT)
+    generated = {view.role_id: view for view in model_profile_registry.generate_role_views(registry, ROOT)}
     valid_efforts = {"low", "medium", "high", "xhigh"}
     for role_id, config in sorted(configs.items()):
         forbidden_keys = sorted(FORBIDDEN_AGENT_PROFILE_KEYS & set(config))
-        ensure(
-            not forbidden_keys,
-            f"{role_id} agent TOML contains unsupported profile keys: {', '.join(forbidden_keys)}",
-        )
+        ensure(not forbidden_keys, f"{role_id} agent TOML contains unsupported profile keys: {', '.join(forbidden_keys)}")
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
-        model = config.get("model")
-        effort = config.get("model_reasoning_effort")
-        ensure(
-            isinstance(model, str) and bool(model),
-            f"{role_id} model must be a non-empty string",
-        )
-        ensure(
-            isinstance(effort, str) and effort in valid_efforts,
-            f"{role_id} model_reasoning_effort must be one of {sorted(valid_efforts)}",
-        )
-        if model == SKILL_VALIDATION_MODEL:
-            ensure(
-                role_id in SKILL_VALIDATION_AGENT_IDS,
-                f"{role_id} may use {SKILL_VALIDATION_MODEL} only for explicit T14 skill_evaluation via skill_evaluator",
-            )
-        if role_id in LUNA_XHIGH_AGENT_IDS:
-            expected_model, expected_effort = LUNA_MODEL, "xhigh"
-        elif role_id in SKILL_VALIDATION_AGENT_IDS:
-            expected_model, expected_effort = SKILL_VALIDATION_MODEL, "medium"
-        elif role_id in SPARK_LOW_AGENT_IDS:
-            expected_model, expected_effort = SPARK_MODEL, "low"
-        else:
-            expected_model, expected_effort = LUNA_MODEL, "high"
-        ensure(
-            model == expected_model,
-            f"{role_id} model must be {expected_model}",
-        )
-        ensure(
-            effort == expected_effort,
-            f"{role_id} model_reasoning_effort must be {expected_effort}",
-        )
-        ensure(model != PARENT_MODEL, f"{role_id} child model must not use Sol")
-        ensure(model != "gpt-5.5", f"{role_id} child model must not use gpt-5.5")
-    evaluator = configs[EVALUATOR_AGENT_ID]
-    ensure(evaluator.get("sandbox_mode") == "read-only", f"{EVALUATOR_AGENT_ID} sandbox_mode must be read-only")
-    ensure(evaluator.get("approval_policy") == "never", f"{EVALUATOR_AGENT_ID} approval_policy must be never")
-    evaluator_instructions = str(evaluator.get("developer_instructions", "")).lower()
-    for phrase in ("scenario packet", "do not edit", "nested agents", "reused", "output:", "requirement results:", "telemetry:", "result metadata:"):
-        ensure(phrase in evaluator_instructions, f"{EVALUATOR_AGENT_ID} instructions missing {phrase}")
-
-    for role_id, marker in INITIAL_INTAKE_MARKERS.items():
-        instructions = str(configs[role_id].get("developer_instructions", ""))
-        ensure(marker in instructions, f"{role_id} missing intake responsibility marker")
-
+        ensure(isinstance(config.get("model"), str) and bool(config.get("model")), f"{role_id} model must be a non-empty string")
+        ensure(isinstance(config.get("model_reasoning_effort"), str) and config.get("model_reasoning_effort") in valid_efforts, f"{role_id} model_reasoning_effort must be valid")
+        view = generated[role_id]
+        ensure(config.get("model") == view.model, f"{role_id} model must project registry profile {view.profile_id}")
+        ensure(config.get("model_reasoning_effort") == view.reasoning_effort, f"{role_id} reasoning must project registry profile {view.profile_id}")
+    validate_generated_role_views()
 
 def validate_team_config_references() -> None:
     """Check role references inside the team config."""
@@ -745,6 +768,10 @@ def validate_task_catalog_references() -> None:
     topology = require_mapping(
         catalog.raw.get("role_topology_defaults"),
         "role_topology_defaults must be a mapping",
+    )
+    ensure(
+        topology.get("capacity_derivation") == "declared_team_peak_plus_nested_reservations_v1",
+        "role_topology_defaults must declare the approved capacity derivation",
     )
     topology_role_families = require_mapping(
         topology.get("role_families"),
@@ -981,19 +1008,14 @@ def validate_task_catalog_references() -> None:
                     role_id in role_ids,
                     f"family {family_id} references unknown role {role_id}",
                 )
-        active_budget, max_write_budget = workflow_spawn_budget(catalog, family_id)
-        ensure(
-            active_budget <= runtime_max_threads,
-            f"family {family_id} active_subagents exceeds runtime max_threads",
+        ensure("spawn_budget" not in family, f"family {family_id} must not declare numeric spawn_budget")
+        capacity_request = require_mapping(
+            family.get("capacity_request"), f"family {family_id} capacity_request must be a mapping"
         )
-        ensure(
-            max_write_budget >= 1,
-            f"family {family_id} max_write_subagents must be >= 1",
-        )
-        ensure(
-            max_write_budget <= active_budget,
-            f"family {family_id} max_write_subagents exceeds active_subagents",
-        )
+        ensure(capacity_request.get("schema_id") == "task_catalog_capacity_request_v1", f"family {family_id} capacity_request schema mismatch")
+        ensure(capacity_request.get("policy_id") == "topology_derived_v1", f"family {family_id} capacity policy mismatch")
+        ensure(capacity_request.get("topology_source") == "role_topology", f"family {family_id} capacity topology source mismatch")
+        ensure(capacity_request.get("write_scope_source") == "team_manifest.run.write_scopes", f"family {family_id} write scope source mismatch")
 
     for task_id in task_ids(catalog):
         task = next(task for task in catalog.tasks if task["id"] == task_id)
@@ -1024,6 +1046,12 @@ def validate_task_catalog_references() -> None:
         ),
         f"T12 default-active specialists must be the five role topology defaults, got {t12_specialists}",
     )
+    derivation = declared_team_capacity_derivation(catalog)
+    ensure(derivation.requested_max_threads() == 26, "declared topology must derive max_threads=26")
+    peak = derivation.peak_family
+    ensure(peak.workflow_family_id == "research_driven_change", "research_driven_change must be the peak family")
+    ensure(peak.direct_frontier_count == 20, "declared direct frontier must be 20")
+    ensure(peak.nested_reservation_count == 6, "declared nested reservations must be 6")
     topology_violations = workflow_topology_policy_violations(catalog)
     ensure(
         not topology_violations,
@@ -1280,8 +1308,71 @@ def validate_official_system_skill_delegation(
             )
 
 
+_STALE_GENERATED_ROLE_AUTHORITY_PATTERNS = (
+    re.compile(
+        r"\.codex/agents/\*\.toml`?\s+is the source of truth for[^\n]*(?:model|reasoning)",
+        re.IGNORECASE,
+    ),
+    re.compile(r"Child model settings remain in role TOMLs", re.IGNORECASE),
+    re.compile(
+        r"(?:model|reasoning).{0,120}\.codex/agents/\*\.toml.{0,80}(?:正本|優先|更新(?:し|します|する))",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:edit|update).{0,80}(?:role TOMLs?|\.codex/agents/\*\.toml).{0,80}(?:model|reasoning)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:agent|role)\s+TOMLs?\s+are\s+authoritative\s+for\s+(?:model|reasoning)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:model|reasoning).{0,80}(?:各\s+)?agent TOML.{0,40}正本",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:edit|update)\b.{0,80}(?:generated\s+)?(?:agent|role)\s+TOMLs?.{0,40}\bmanually\b",
+        re.IGNORECASE,
+    ),
+)
+
+
+def generated_role_authority_contradictions(text: str) -> tuple[str, ...]:
+    """Return stale claims that promote generated role views to policy authority."""
+    normalized = " ".join(text.split())
+    return tuple(
+        pattern.pattern
+        for pattern in _STALE_GENERATED_ROLE_AUTHORITY_PATTERNS
+        if pattern.search(normalized)
+    )
+
+
+def validate_registry_authority_docs() -> None:
+    """Require canonical registry authority and reject manual generated-view policy."""
+    for relative_path in (
+        ".codex/README.md",
+        "agents/canonical/CODEX_SUBAGENTS.md",
+    ):
+        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        contradictions = generated_role_authority_contradictions(text)
+        ensure(
+            not contradictions,
+            f"{relative_path} contains stale generated-role authority: "
+            + ", ".join(contradictions),
+        )
+        for marker in (
+            "agents/model_profiles.toml",
+            "model_profile_registry.py",
+            "generated",
+            "readback",
+            "restart",
+        ):
+            ensure(marker in text, f"{relative_path} missing registry authority marker: {marker}")
+
+
 def validate_subagent_protocol_docs() -> None:
     """Check subagent routing docs keep machine-enforceable boundaries."""
+    validate_registry_authority_docs()
     for path in SUBAGENT_PROTOCOL_DOCS:
         text = path.read_text(encoding="utf-8")
         if path.name == "TASK_WORKFLOWS.md":
@@ -1393,6 +1484,17 @@ def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
     (workspace.workspace_root / "python").mkdir()
     (workspace.workspace_root / "documents").mkdir()
     (workspace.workspace_root / "reports" / "runtime").mkdir(parents=True)
+    (workspace.workspace_root / ".codex").mkdir()
+    (workspace.workspace_root / "agents").mkdir()
+    for relative_path in (
+        ".codex/config.toml",
+        "agents/agents_config.json",
+        "agents/task_catalog.yaml",
+        "agents/model_profiles.toml",
+        "agents/capacity_policy.toml",
+    ):
+        destination = workspace.workspace_root / relative_path
+        shutil.copy2(ROOT / relative_path, destination)
     (workspace.workspace_root / "WORKTREE_SCOPE.md").write_text(
         "\n".join(
             [

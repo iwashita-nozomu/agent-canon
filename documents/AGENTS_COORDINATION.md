@@ -46,6 +46,12 @@ legacy adapter に重複 policy を置きません。
 
 ## Runtime Instruction Surfaces
 
+The executable policy projection is owned by the canonical workflow,
+subagent, communication, model/profile, implementation-route, capacity, and
+closeout owners. This adapter only links to those surfaces; it does not
+restate Target-State-First, Decision Sufficiency, ToolCall, capacity, or
+lifecycle policy.
+
 - [ROOT_AGENTS.md](../ROOT_AGENTS.md)
 - [AGENTS.md](../AGENTS.md)
 - [.github/AGENTS.md](../.github/AGENTS.md)

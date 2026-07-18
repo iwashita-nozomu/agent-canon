@@ -65,6 +65,17 @@ has `tool_id=skill-tool-commands` and
 `agent-canon.skill-tool-commands.args.v1`. Do not reconstruct either token as a
 prose shell command.
 
+Model/profile policy and implementation capacity are not `route.py` policy.
+Use the canonical model-profile/materializer and capacity-handshake owners for
+those projections; `route.py` remains the public skill-route composer.
+
+```bash
+python3 tools/agent_tools/route.py --area checks --changed <path>
+python3 tools/agent_tools/route.py --name profile_surface_resolver.py
+python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text
+```
+
 ## Outputs
 
 - `ROUTE`
