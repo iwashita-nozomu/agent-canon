@@ -867,6 +867,30 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             self.assertIn("experiments/topic/cases.py", source_paths)
             self.assertNotIn("tools/experiments/experiments_registry.toml", source_paths)
 
+    def test_source_path_set_fails_closed_when_exact_registry_is_missing(self) -> None:
+        """The fixed registry closure is required and has no alternate spelling."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "--quiet", str(root)], check=True)
+            for relative_path in (
+                "tools/experiments/execution_resource_plan.py",
+                "tools/experiments/run_managed_experiment.py",
+                "tools/experiments/registry_lib.py",
+                "tools/agent_tools/jit_canonical_ir.py",
+                "experiments/topic/run.py",
+            ):
+                path = root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("source\n", encoding="utf-8")
+
+            with self.assertRaises(TypedPreflightFailure) as raised:
+                build_source_path_set(str(root), "topic", ())
+
+            self.assertEqual(
+                raised.exception.code,
+                "gpu_source_path_registry_missing",
+            )
+
     def test_source_freeze_failure_preserves_primary_and_typed_close_secondary(self) -> None:
         """Failure cleanup keeps the primary and exposes one attempted close ambiguity."""
         source_root = Path(__file__).resolve().parents[2]

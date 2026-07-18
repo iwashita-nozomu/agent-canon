@@ -3,6 +3,7 @@
 # contract environment
 # responsibility Renders shared devcontainer compose from repo-local Docker pack.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
+# upstream design ../documents/gpu-admission-r5-source-packet.md exact Compose runtime identity wiring
 # upstream environment devcontainer.json initializeCommand entrypoint
 # @dependency-end
 
@@ -193,7 +194,7 @@ environment_lines=(
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
   '      AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"'
   '      AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"'
-  '      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/receipts/shared-runtime-provision.v4.json"'
+  '      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"'
   "${pack_environment_lines[@]}"
 )
 if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then

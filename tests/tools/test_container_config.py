@@ -6,6 +6,7 @@
 # upstream implementation ../../tools/ci/container_config.py validates container config
 # upstream implementation ../../tools/ci/container_runtime.py defines runtime pack fields
 # upstream environment ../../.devcontainer/post-create.sh installs shared devcontainer tools
+# upstream design ../../documents/gpu-admission-r5-source-packet.md exact runtime identity validator oracle
 # @dependency-end
 
 from __future__ import annotations
@@ -245,7 +246,9 @@ def write_valid_devcontainer_files(root: Path) -> None:
         "\n".join(
             [
                 "shared-runtime-readback/v1",
-                "shared-runtime-readback.v4.json",
+                "shared-runtime-readback.json",
+                "read_shared_runtime_provision",
+                "write_runtime_receipt_atomic",
                 "os.O_NOFOLLOW",
                 "os.fstat(probe_fd)",
                 "os.stat(probe_path, follow_symlinks=False)",
@@ -256,8 +259,6 @@ def write_valid_devcontainer_files(root: Path) -> None:
                 "candidate.st_gid",
                 "/proc/self/mountinfo",
                 "/proc/self/ns/mnt",
-                "O_TMPFILE",
-                "libc.linkat",
                 "",
             ]
         ),
@@ -268,6 +269,7 @@ def write_valid_devcontainer_files(root: Path) -> None:
         "\n".join(
             [
                 "#!/usr/bin/env bash",
+                "umask 0007",
                 "finalize-shared-runtime.sh",
                 "run_as_root",
                 "apt_install gh",
@@ -325,7 +327,7 @@ def write_valid_devcontainer_files(root: Path) -> None:
                 "target: /var/lib/agent-canon/runtime",
                 'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
                 'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
-                'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/receipts/shared-runtime-provision.v4.json"',
+                'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"',
                 "printf '%s\\n' \"$pack\" \"$output\" \"$DEVCONTAINER_PROJECT_NAME\"",
                 "",
             ]
@@ -360,7 +362,9 @@ def write_valid_devcontainer_only(root: Path) -> None:
         "\n".join(
             [
                 "shared-runtime-readback/v1",
-                "shared-runtime-readback.v4.json",
+                "shared-runtime-readback.json",
+                "read_shared_runtime_provision",
+                "write_runtime_receipt_atomic",
                 "os.O_NOFOLLOW",
                 "os.fstat(probe_fd)",
                 "os.stat(probe_path, follow_symlinks=False)",
@@ -371,8 +375,6 @@ def write_valid_devcontainer_only(root: Path) -> None:
                 "candidate.st_gid",
                 "/proc/self/mountinfo",
                 "/proc/self/ns/mnt",
-                "O_TMPFILE",
-                "libc.linkat",
                 "",
             ]
         ),
@@ -383,6 +385,7 @@ def write_valid_devcontainer_only(root: Path) -> None:
         "\n".join(
             [
                 "#!/usr/bin/env bash",
+                "umask 0007",
                 "finalize-shared-runtime.sh",
                 "run_as_root",
                 "apt_install gh",
@@ -440,7 +443,7 @@ def write_valid_devcontainer_only(root: Path) -> None:
                 "target: /var/lib/agent-canon/runtime",
                 'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
                 'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
-                'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/receipts/shared-runtime-provision.v4.json"',
+                'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"',
                 "printf '%s\\n' \"$pack\" \"$output\" \"$DEVCONTAINER_PROJECT_NAME\" \"$compose_mode\" \"$image\"",
                 "",
             ]

@@ -8,6 +8,8 @@
 # upstream implementation ./execution_resource_plan.py canonical admission planning and terminal owner
 # upstream implementation ../../documents/experiment-runner-ff97-lifecycle.md fixed ff97 StandardRunner lifecycle and scheduler source identity
 # downstream implementation ../../documents/gpu-admission-r5-ordered-integration-interface.json ordered W2-W4 interface
+# downstream implementation ../../experiments/_template/run.py exposes the topic main adapted from the frozen snapshot
+# downstream implementation ../../tests/tools/test_run_managed_experiment.py validates the sole composition and frozen topic adapter
 # upstream design ../../documents/gpu-admission-r5-nvidia-visibility.md NVIDIA process/PID/MIG/UUID visibility gate
 # @dependency-end
 
@@ -26,6 +28,7 @@ import hashlib
 import json
 import os
 import platform
+import runpy
 import shlex
 import shutil
 import socket
@@ -64,6 +67,7 @@ from tools.experiments.execution_resource_plan import (
     FailureRecord,
     FdReleaseEvidence,
     GpuRunRequest,
+    HOST_RUNTIME_ROOT,
     ManagedGpuOutcomeReducer,
     PostToolUseProjectionReducer,
     ResourceRequest,
@@ -241,6 +245,16 @@ class RunContext:
     git: GitSnapshot
 
 
+@dataclass(frozen=True)
+class _ManagedTopicCase:
+    """One exact topic entrypoint bound to the frozen source snapshot."""
+
+    entrypoint_relative_path: str
+    argv: tuple[str, ...]
+    snapshot_root: str
+    environment_variables: tuple[tuple[str, str], ...]
+
+
 def build_admitted_environment(
     plan: ExecutionResourcePlan,
     runtime_identity: RuntimeIdentityReceipt,
@@ -375,7 +389,7 @@ class RunGpuAdmissionContext(AbstractContextManager[GpuRunRequest]):
         return False
 
 
-def _runner_owned_estimate(case: object) -> object:
+def _runner_owned_estimate(case: _ManagedTopicCase) -> FullResourceEstimate:
     """Return the generic runner estimate without GPU-ID ownership."""
     del case
     return FullResourceEstimate(
@@ -386,42 +400,152 @@ def _runner_owned_estimate(case: object) -> object:
     )
 
 
-def _build_admitted_context(case: object) -> TaskContext:
-    """Build an ordinary case context; admission values are overlaid by the initializer."""
-    if isinstance(case, Mapping):
-        raw = case.get("context", {})
-        if isinstance(raw, Mapping):
-            return dict(raw)
-    return {}
+def _build_admitted_context(case: _ManagedTopicCase) -> TaskContext:
+    """Build one fresh generic context from the immutable admitted case."""
+    return {
+        "environment_variables": dict(case.environment_variables),
+        "working_directory": case.snapshot_root,
+    }
 
 
-def _run_topic_case(case: object, context: TaskContext) -> ExecutionResult:
-    """Adapt one topic callable to the generic runner task boundary."""
-    working_directory = context.get("working_directory")
-    if not isinstance(working_directory, str) or not working_directory:
-        raise TypedPreflightFailure(
-            "gpu_source_snapshot_cwd_missing",
-            "managed topic execution requires the frozen source snapshot root",
-        )
+def _bind_managed_topic_case(
+    context: RunContext,
+    source_paths: tuple[str, ...],
+    exact_environment: Mapping[str, str],
+) -> _ManagedTopicCase:
+    """Bind the selected CLI entrypoint to its immutable snapshot location."""
+    expected_relative = f"experiments/{context.identity.topic}/run.py"
     try:
-        os.chdir(working_directory)
+        topic_relative = context.topic_dir.resolve().relative_to(
+            context.repo_root.resolve()
+        )
+    except ValueError as exc:
+        raise TypedPreflightFailure(
+            "experiment_runner_topic_identity_mismatch",
+            "managed topic directory must be inside the repository root",
+            topic=context.identity.topic,
+        ) from exc
+    if topic_relative.as_posix() != f"experiments/{context.identity.topic}":
+        raise TypedPreflightFailure(
+            "experiment_runner_topic_identity_mismatch",
+            "managed topic directory is not the canonical experiments/<topic> path",
+            topic_relative_path=topic_relative.as_posix(),
+        )
+    if expected_relative not in source_paths:
+        raise TypedPreflightFailure(
+            "gpu_source_freeze_manifest_incomplete",
+            "the canonical topic entrypoint is absent from source membership",
+            entrypoint_relative_path=expected_relative,
+        )
+
+    command = tuple(context.command.command)
+    source_entrypoint = str(context.repo_root.resolve() / expected_relative)
+    matches = tuple(
+        index
+        for index, token in enumerate(command)
+        if token in {expected_relative, source_entrypoint}
+    )
+    interpreter_name = Path(command[0]).name if command else ""
+    python_interpreter = interpreter_name in {"python", "python3"} or (
+        interpreter_name.startswith("python3.")
+        and interpreter_name.removeprefix("python3.").isdigit()
+    )
+    if matches != (1,) or not python_interpreter:
+        raise TypedPreflightFailure(
+            "managed_command_entrypoint_mismatch",
+            "selected managed command must invoke the exact topic run.py with Python",
+            expected_entrypoint=expected_relative,
+            selected_command=command,
+        )
+
+    snapshot_root = context.paths.result_dir / "source_snapshot"
+    snapshot_entrypoint = snapshot_root / expected_relative
+    return _ManagedTopicCase(
+        entrypoint_relative_path=expected_relative,
+        argv=(str(snapshot_entrypoint), *command[2:]),
+        snapshot_root=str(snapshot_root),
+        environment_variables=tuple(sorted(exact_environment.items())),
+    )
+
+
+def _run_topic_case(
+    case: _ManagedTopicCase,
+    context: TaskContext,
+) -> ExecutionResult:
+    """Load the topic main from the frozen snapshot in the generic child."""
+    working_directory = context.get("working_directory")
+    if working_directory != case.snapshot_root:
+        raise TypedPreflightFailure(
+            "gpu_source_snapshot_cwd_mismatch",
+            "managed topic context did not retain the frozen source snapshot root",
+        )
+    snapshot_root = Path(case.snapshot_root)
+    entrypoint = snapshot_root / case.entrypoint_relative_path
+    try:
+        resolved_entrypoint = entrypoint.resolve(strict=True)
+        resolved_entrypoint.relative_to(snapshot_root.resolve(strict=True))
+        if not resolved_entrypoint.is_file():
+            raise OSError("topic entrypoint is not a regular file")
     except OSError as exc:
         raise TypedPreflightFailure(
-            "gpu_source_snapshot_cwd_unavailable",
-            "managed topic execution could not enter the frozen source snapshot root",
-            working_directory=working_directory,
-            errno=exc.errno,
+            "gpu_source_snapshot_entrypoint_unavailable",
+            "managed topic entrypoint is unavailable in the frozen source snapshot",
+            entrypoint_relative_path=case.entrypoint_relative_path,
         ) from exc
-    if isinstance(case, Mapping) and callable(case.get("topic_callable")):
-        return case["topic_callable"](case.get("topic_case"), context)
-    raise TypedPreflightFailure(
-        "topic_case_adapter_unavailable",
-        "managed topic case did not provide its approved callable",
+    except ValueError as exc:
+        raise TypedPreflightFailure(
+            "gpu_source_snapshot_entrypoint_escape",
+            "managed topic entrypoint escaped the frozen source snapshot root",
+            entrypoint_relative_path=case.entrypoint_relative_path,
+        ) from exc
+
+    previous_argv = sys.argv
+    previous_cwd = Path.cwd()
+    previous_sys_path = list(sys.path)
+    try:
+        os.chdir(snapshot_root)
+        sys.argv = list(case.argv)
+        sys.path = [str(resolved_entrypoint.parent), str(snapshot_root), *sys.path]
+        namespace = runpy.run_path(
+            str(resolved_entrypoint),
+            run_name="_agent_canon_managed_topic",
+        )
+        topic_main = namespace.get("main")
+        if not callable(topic_main):
+            raise TypedPreflightFailure(
+                "experiment_runner_topic_entrypoint_invalid",
+                "managed topic run.py must expose the documented main() entrypoint",
+                entrypoint_relative_path=case.entrypoint_relative_path,
+            )
+        result = topic_main()
+    finally:
+        sys.path = previous_sys_path
+        sys.argv = previous_argv
+        os.chdir(previous_cwd)
+
+    if not isinstance(result, int) or isinstance(result, bool):
+        raise TypedPreflightFailure(
+            "experiment_runner_topic_result_invalid",
+            "managed topic main() must return an integer status",
+            result_type=type(result).__name__,
+        )
+    if result == 0:
+        return ExecutionResult(
+            status="ok",
+            raw_exit_code=0,
+            source="managed_topic_main",
+        )
+    return ExecutionResult(
+        status="failed",
+        failure_kind="topic_main_nonzero",
+        message=f"topic main returned {result}",
+        raw_exit_code=result,
+        source="managed_topic_main",
     )
 
 
 def _capture_runner_lifecycle(
-    runner: StandardRunner[object] | None,
+    runner: StandardRunner[_ManagedTopicCase] | None,
 ) -> RunnerLifecycleEvidence | None:
     """Read generic lifecycle evidence without inspecting process internals."""
     if runner is None:
@@ -1736,16 +1860,8 @@ def _r5_evidence_fingerprint(payload: Mapping[str, object]) -> str:
 def execute_managed_run(
     context: RunContext,
     run_config: Mapping[str, object],
-    *,
-    task: Callable[..., ExecutionResult],
-    cases: list[object],
-    context_builder: Callable[[object], TaskContext],
-    initializer: Callable[[TaskContext], None],
-    resource_estimator: Callable[[object], FullResourceEstimate],
-    skip_controller: None = None,
 ) -> ExecutionResult:
     """Compose the fixed owners around one generic ff97 runner invocation."""
-    del context_builder, initializer, resource_estimator, skip_controller
     request = _resource_request_for_managed_run(context, run_config)
     raw_config = run_config.get("config", {})
     config = cast(Mapping[str, object], raw_config) if isinstance(raw_config, Mapping) else {}
@@ -1804,15 +1920,30 @@ def execute_managed_run(
 
             runtime_root = os.environ.get(
                 "AGENT_CANON_SHARED_RUNTIME_SOURCE",
-                "/var/lib/agent-canon/runtime",
+                HOST_RUNTIME_ROOT,
+            )
+            if runtime_root != HOST_RUNTIME_ROOT:
+                raise TypedPreflightFailure(
+                    "runtime_identity_path_mismatch",
+                    "managed execution requires the exact shared runtime root",
+                    runtime_root=runtime_root,
+                )
+            expected_provision_path = (
+                f"{HOST_RUNTIME_ROOT}/shared-runtime-provision.json"
             )
             provision_path = os.environ.get(
                 "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
-                f"{runtime_root}/receipts/shared-runtime-provision.v4.json",
+                expected_provision_path,
             )
+            if provision_path != expected_provision_path:
+                raise TypedPreflightFailure(
+                    "runtime_identity_path_mismatch",
+                    "managed execution requires the exact provision receipt path",
+                    provision_path=provision_path,
+                )
             provision = read_shared_runtime_provision(provision_path)
             readback = read_shared_runtime_readback(
-                f"{runtime_root}/receipts/shared-runtime-readback.v4.json"
+                f"{HOST_RUNTIME_ROOT}/shared-runtime-readback.json"
             )
             runtime_identity = RuntimeIdentityReader().read(provision, readback)
 
@@ -2196,30 +2327,19 @@ def execute_managed_run(
                 container_visible_uuid_mapping=coverage_visibility,
                 os_safe_lock_placement=coverage_lock_placement,
             )
-            if not callable(task) or not cases:
-                raise TypedPreflightFailure(
-                    "topic_case_adapter_unavailable",
-                    "the managed run requires at least one callable topic case",
-                )
             exact_environment = dict(admitted_environment.exact_env_map)
-            admitted_cases = [
-                {
-                    "topic_case": case,
-                    "topic_callable": task,
-                    "context": {
-                        "environment_variables": dict(exact_environment),
-                        "working_directory": str(context.paths.result_dir / "source_snapshot"),
-                    },
-                }
-                for case in cases
-            ]
+            admitted_case = _bind_managed_topic_case(
+                context,
+                source_paths,
+                exact_environment,
+            )
             worker = StandardWorker(
                 task=_run_topic_case,
                 resource_estimator=_runner_owned_estimate,
                 initializer=apply_environment_variables,
             )
             scheduler = StandardFullResourceScheduler.from_worker(
-                cases=admitted_cases,
+                cases=[admitted_case],
                 worker=worker,
                 context_builder=_build_admitted_context,
                 skip_controller=None,
@@ -2395,15 +2515,8 @@ def _execution_exit_code(execution_result: ExecutionResult) -> int:
 
 def run_cli(
     args: argparse.Namespace,
-    *,
-    task: Callable[..., ExecutionResult] | None = None,
-    cases: list[object] | None = None,
-    context_builder: Callable[[object], TaskContext] | None = None,
-    initializer: Callable[[TaskContext], None] | None = None,
-    resource_estimator: Callable[[object], FullResourceEstimate] | None = None,
-    skip_controller: None = None,
 ) -> int:
-    """Run one managed experiment only through an injected ExperimentRunner port."""
+    """Run one managed experiment through the canonical frozen topic adapter."""
     context = build_run_context(args)
     patterns = resolve_eval_artifact_patterns(
         context.registry.defaults,
@@ -2449,36 +2562,6 @@ def run_cli(
         )
         return PREFLIGHT_FAILURE_EXIT_CODE
 
-    bindings = (task, cases, context_builder, initializer, resource_estimator)
-    if any(binding is None for binding in bindings):
-        message = (
-            "managed execution requires the approved ExperimentRunner task, cases, "
-            "context, initializer, and resource-estimator bindings; direct command "
-            "launch is not an authorized route"
-        )
-        print(message, file=sys.stderr)
-        manifest["preflight_error"] = {
-            "kind": "experiment_runner_binding_required",
-            "message": message,
-            "canonical_owner": "tools/experiments/execution_resource_plan.py",
-        }
-        append_startup_event(
-            context,
-            "preflight_failed",
-            {
-                "exit_code": PREFLIGHT_FAILURE_EXIT_CODE,
-                "message": message,
-            },
-        )
-        finalize_run_manifest(
-            context,
-            manifest,
-            start_monotonic,
-            PREFLIGHT_FAILURE_EXIT_CODE,
-            patterns,
-        )
-        return PREFLIGHT_FAILURE_EXIT_CODE
-
     append_startup_event(
         context,
         "command_start",
@@ -2490,14 +2573,6 @@ def run_cli(
     execution_result = execute_managed_run(
         context,
         run_config,
-        task=cast(Callable[..., ExecutionResult], task),
-        cases=cast(list[object], cases),
-        context_builder=cast(Callable[[object], TaskContext], context_builder),
-        initializer=cast(Callable[[TaskContext], None], initializer),
-        resource_estimator=cast(
-            Callable[[object], FullResourceEstimate], resource_estimator
-        ),
-        skip_controller=skip_controller,
     )
     exit_code = _execution_exit_code(execution_result)
     append_startup_event(context, "command_exit", {"exit_code": exit_code})

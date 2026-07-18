@@ -4,6 +4,8 @@
 # responsibility Provisions the host-side shared AgentCanon runtime namespace before Compose creation.
 # upstream design ../CONTAINER_OPERATIONS.md exact shared-runtime identity and namespace contract
 # upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
+# upstream design ../documents/gpu-admission-r5-source-packet.md exact provision receipt path and owner boundary
+# upstream implementation ../tools/experiments/execution_resource_plan.py owns atomic runtime receipt publication
 # downstream implementation finalize-shared-runtime.sh proves the container readback
 # downstream implementation generate-runtime-compose.sh renders the matching bind and identity
 # @dependency-end
@@ -12,11 +14,12 @@ set -euo pipefail
 
 runtime_root="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-/var/lib/agent-canon/runtime}"
 runtime_group="agent-canon-runtime"
-provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/receipts/shared-runtime-provision.v4.json}"
+provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/shared-runtime-provision.json}"
 locks_root="${runtime_root}/locks"
 receipts_root="${runtime_root}/receipts"
 probe_path="${locks_root}/bootstrap-probe.lock"
 runtime_route="MANAGED_CONTAINER"
+agent_canon_root="$(cd -P "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 
 fail() {
   printf 'shared runtime bootstrap failed: %s\n' "$1" >&2
@@ -40,7 +43,8 @@ case "$runtime_root" in
   /var/lib/agent-canon/runtime) ;;
   *) fail "shared runtime source must be /var/lib/agent-canon/runtime" ;;
 esac
-[ "$provision_receipt" = "${runtime_root}/receipts/shared-runtime-provision.v4.json" ] || fail "provision receipt path is not canonical"
+[ "$provision_receipt" = "${runtime_root}/shared-runtime-provision.json" ] || fail "provision receipt path is not canonical"
+[ -f "${agent_canon_root}/tools/experiments/execution_resource_plan.py" ] || fail "canonical runtime receipt publisher is unavailable"
 
 host_uid="$(id -u)"
 host_gid="$(id -g)"
@@ -127,17 +131,29 @@ try:
 finally:
     os.close(fd)
 PY
-python3 - "$provision_receipt" "$runtime_root" "$runtime_route" "$host_uid" "$host_gid" "$host_supplementary_gids" <<'PY'
+python3 - "$agent_canon_root" "$provision_receipt" "$runtime_root" "$runtime_route" "$host_uid" "$host_gid" "$host_supplementary_gids" <<'PY'
 from __future__ import annotations
 
-import ctypes
 import hashlib
 import json
 import os
-import stat
 import sys
 
-receipt_path, runtime_root, route, raw_uid, raw_gid, raw_groups = sys.argv[1:]
+(
+    source_root,
+    receipt_path,
+    runtime_root,
+    route,
+    raw_uid,
+    raw_gid,
+    raw_groups,
+) = sys.argv[1:]
+sys.path.insert(0, source_root)
+
+from tools.experiments.execution_resource_plan import (  # noqa: E402
+    write_runtime_receipt_atomic,
+)
+
 payload = {
     "schema_version": "shared-runtime-provision/v1",
     "runtime_route": route,
@@ -160,53 +176,8 @@ def canonical_bytes(value: object) -> bytes:
     ).encode("utf-8")
 
 
-def write_all(fd: int, data: bytes) -> None:
-    view = memoryview(data)
-    while view:
-        written = os.write(fd, view)
-        if written <= 0:
-            raise OSError("shared runtime receipt write made no progress")
-        view = view[written:]
-
-
 payload["provision_fingerprint"] = hashlib.sha256(canonical_bytes(payload)).hexdigest()
-data = canonical_bytes(payload) + b"\n"
-if not hasattr(os, "O_TMPFILE"):
-    raise OSError("atomic shared runtime receipt publication requires O_TMPFILE")
-
-parent_path = os.path.dirname(receipt_path)
-parent_fd = os.open(parent_path, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
-temporary_fd = os.open(
-    parent_path,
-    os.O_TMPFILE | os.O_WRONLY | os.O_CLOEXEC,
-    0o660,
-)
-try:
-    os.fchmod(temporary_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
-    write_all(temporary_fd, data)
-    os.fsync(temporary_fd)
-    libc = ctypes.CDLL(None, use_errno=True)
-    libc.linkat.argtypes = [
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_int,
-    ]
-    libc.linkat.restype = ctypes.c_int
-    if libc.linkat(
-        temporary_fd,
-        b"",
-        -100,
-        os.fsencode(receipt_path),
-        0x1000,
-    ) != 0:
-        error_number = ctypes.get_errno()
-        raise OSError(error_number, os.strerror(error_number), receipt_path)
-    os.fsync(parent_fd)
-finally:
-    os.close(temporary_fd)
-    os.close(parent_fd)
+write_runtime_receipt_atomic(receipt_path, payload)
 PY
 
 printf 'SHARED_RUNTIME_BOOTSTRAP=pass route=%s source=%s provision=%s\n' "$runtime_route" "$runtime_root" "$provision_receipt"

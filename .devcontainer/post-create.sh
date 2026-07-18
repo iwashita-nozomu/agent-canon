@@ -4,14 +4,22 @@
 # responsibility Runs shared devcontainer post-create setup after workspace mount.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
 # upstream design ../CONTAINER_OPERATIONS.md container and devcontainer ownership boundary
+# upstream design ../documents/gpu-admission-r5-source-packet.md exact umask and finalize ordering
 # upstream design ../documents/rust-agent-tool-migration.md Rust toolchain and CLI install boundary
 # upstream design ../documents/tools/lean_proof_env.md Lean proof environment toolchain contract
 # upstream environment devcontainer.json postCreateCommand entrypoint
+# upstream implementation finalize-shared-runtime.sh proves the inherited exact runtime identity
 # upstream implementation ../tools/ci/scan_secrets.sh runs dedicated secret scanners
 # downstream implementation ../rust/agent-canon/src/structured_analysis.rs builds structured analysis cache DB
 # @dependency-end
 
 set -euo pipefail
+
+umask 0007
+[ "$(umask)" = "0007" ] || {
+  echo "post-create runtime umask is not exactly 0007" >&2
+  exit 1
+}
 
 workspace="${1:-/workspace}"
 devcontainer_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

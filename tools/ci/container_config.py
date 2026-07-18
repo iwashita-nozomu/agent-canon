@@ -5,6 +5,7 @@
 # upstream design ../../documents/coding-conventions-project.md environment configuration policy
 # upstream design ../../documents/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
 # upstream design ../../documents/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
+# upstream design ../../documents/gpu-admission-r5-source-packet.md exact runtime identity validation contract
 # upstream design ../../documents/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
 # upstream design ../../documents/tools/lean_proof_env.md Lean proof environment toolchain boundary
@@ -74,6 +75,7 @@ FORBIDDEN_DOCKERFILE_PATTERNS = (
     ),
 )
 REQUIRED_POST_CREATE_SNIPPETS = (
+    "umask 0007",
     "finalize-shared-runtime.sh",
     "run_as_root",
     "docker/register_safe_directories.sh",
@@ -455,7 +457,9 @@ def validate_finalize_shared_runtime_script(devcontainer_dir: Path) -> list[Find
         Finding("dependency_contract_violation", relative, f"missing:{snippet}")
         for snippet in (
             "shared-runtime-readback/v1",
-            "shared-runtime-readback.v4.json",
+            "shared-runtime-readback.json",
+            "read_shared_runtime_provision",
+            "write_runtime_receipt_atomic",
             "os.O_NOFOLLOW",
             "os.fstat(probe_fd)",
             "os.stat(probe_path, follow_symlinks=False)",
@@ -466,12 +470,17 @@ def validate_finalize_shared_runtime_script(devcontainer_dir: Path) -> list[Find
             "candidate.st_gid",
             "/proc/self/mountinfo",
             "/proc/self/ns/mnt",
-            "O_TMPFILE",
-            "libc.linkat",
         )
         if snippet not in script
     ]
-    for snippet in ("run_as_root", "chown", "O_TRUNC", "O_CREAT"):
+    for snippet in (
+        "run_as_root",
+        "chown",
+        "O_TRUNC",
+        "O_CREAT",
+        "shared-runtime-readback.v4.json",
+        "/receipts/shared-runtime-readback",
+    ):
         if snippet in script:
             findings.append(Finding("inconsistency", relative, f"forbidden:{snippet}"))
     return findings
@@ -566,11 +575,18 @@ def validate_generate_runtime_compose_script(devcontainer_dir: Path) -> list[Fin
         "target: /var/lib/agent-canon/runtime",
         'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
         'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
-        'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/receipts/shared-runtime-provision.v4.json"',
+        'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"',
         "vendor/agent-canon",
     ):
         findings.extend(validate_generate_runtime_compose_snippet(script, snippet))
-    for snippet in ("DEVCONTAINER_SUBNET", "DEVCONTAINER_GATEWAY", "ipam:", "subnet:", "gateway:"):
+    for snippet in (
+        "DEVCONTAINER_SUBNET",
+        "DEVCONTAINER_GATEWAY",
+        "ipam:",
+        "subnet:",
+        "gateway:",
+        "/receipts/shared-runtime-provision",
+    ):
         if snippet in script:
             findings.append(
                 Finding("inconsistency", ".devcontainer/generate-runtime-compose.sh", f"forbidden:{snippet}")
@@ -612,14 +628,19 @@ def validate_generated_compose(devcontainer_dir: Path, pack: PackConfig) -> list
         "target: /var/lib/agent-canon/runtime",
         'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
         'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
-        'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/receipts/shared-runtime-provision.v4.json"',
+        'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"',
     )
     findings = [
         Finding("inconsistency", ".devcontainer/docker-compose.generated.yml", f"missing:{snippet}")
         for snippet in expected_snippets
         if snippet not in compose
     ]
-    for snippet in ("ipam:", "subnet:", "gateway:"):
+    for snippet in (
+        "ipam:",
+        "subnet:",
+        "gateway:",
+        "/receipts/shared-runtime-provision",
+    ):
         if snippet in compose:
             findings.append(
                 Finding("inconsistency", ".devcontainer/docker-compose.generated.yml", f"forbidden:{snippet}")

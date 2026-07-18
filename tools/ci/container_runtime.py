@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Provides container runtime CI automation.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/gpu-admission-r5-source-packet.md exact runtime receipt names
 # @dependency-end
 
 """Shared helpers for repo-defined container runtime scripts."""
@@ -48,8 +49,8 @@ PROCESS_UMASK = 0o0007
 DIRECTORY_MODE = 0o2770
 FILE_MODE = 0o0660
 LOCAL_FLOCK_FILESYSTEMS = ("btrfs", "ext4", "xfs")
-PROVISION_RECEIPT_NAME = "shared-runtime-provision.v4.json"
-READBACK_RECEIPT_NAME = "shared-runtime-readback.v4.json"
+PROVISION_RECEIPT_NAME = "shared-runtime-provision.json"
+READBACK_RECEIPT_NAME = "shared-runtime-readback.json"
 RUNTIME_ROUTE = "MANAGED_CONTAINER"
 
 

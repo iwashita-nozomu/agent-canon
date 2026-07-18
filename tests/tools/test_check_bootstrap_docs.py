@@ -3,6 +3,7 @@
 # responsibility Tests bootstrap docs checker behavior.
 # upstream implementation ../../tools/docs/check_bootstrap_docs.py bootstrap docs checker under test
 # upstream design ../../documents/template-bootstrap.md bootstrap documentation contract
+# upstream design ../../documents/gpu-admission-r5-source-packet.md post-create runtime identity documentation boundary
 # @dependency-end
 """Tests for the bootstrap-facing doc validator."""
 

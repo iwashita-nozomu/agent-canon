@@ -12,6 +12,8 @@
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
 # downstream implementation ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
 # downstream implementation ../../experiments/_template/run.py direct GPU launch is statically prohibited
+# downstream environment ../../.devcontainer/bootstrap-shared-runtime.sh publishes the provision receipt through this owner
+# downstream environment ../../.devcontainer/finalize-shared-runtime.sh parses and publishes runtime receipts through this owner
 # @dependency-end
 
 # Static consumer closure: run_managed_experiment.py is the only managed-run
@@ -308,12 +310,22 @@ def _strict_json_object(raw: bytes, *, path: str) -> dict[str, JsonValue]:
     return decoded
 
 
-def _read_runtime_receipt(path: AbsolutePosixPath) -> dict[str, JsonValue]:
+def _read_runtime_receipt(
+    path: AbsolutePosixPath,
+) -> tuple[dict[str, JsonValue], os.stat_result]:
     validate_absolute_posix_path(path)
+    parent = os.path.dirname(path)
+    name = os.path.basename(path)
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
     flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    directory = -1
+    descriptor = -1
     try:
-        descriptor = os.open(path, flags)
+        directory = os.open(parent, directory_flags)
+        descriptor = os.open(name, flags, dir_fd=directory)
     except OSError as exc:
+        if directory >= 0:
+            os.close(directory)
         raise TypedPreflightFailure(
             "runtime_receipt_unavailable",
             "runtime receipt could not be opened with no-follow flags",
@@ -321,11 +333,20 @@ def _read_runtime_receipt(path: AbsolutePosixPath) -> dict[str, JsonValue]:
             errno=exc.errno,
         ) from exc
     try:
+        parent_stat = os.fstat(directory)
         before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode):
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_dev != parent_stat.st_dev
+            or stat.S_IMODE(before.st_mode) != 0o660
+            or before.st_uid != parent_stat.st_uid
+            or before.st_gid != parent_stat.st_gid
+            or before.st_size <= 0
+            or before.st_size > 65536
+        ):
             raise TypedPreflightFailure(
                 "runtime_receipt_invalid",
-                "runtime receipt must be a regular file",
+                "runtime receipt fd identity, mode, owner, group, or size is invalid",
                 path=path,
             )
         chunks: list[bytes] = []
@@ -339,15 +360,30 @@ def _read_runtime_receipt(path: AbsolutePosixPath) -> dict[str, JsonValue]:
             before.st_dev,
             before.st_ino,
             before.st_size,
-        ) != (after.st_dev, after.st_ino, after.st_size):
+            before.st_mode,
+            before.st_uid,
+            before.st_gid,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mode,
+            after.st_uid,
+            after.st_gid,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        ):
             raise TypedPreflightFailure(
                 "runtime_receipt_raced",
                 "runtime receipt identity changed while reading",
                 path=path,
             )
-        return _strict_json_object(b"".join(chunks), path=path)
+        return _strict_json_object(b"".join(chunks), path=path), before
     finally:
         os.close(descriptor)
+        os.close(directory)
 
 
 def _write_all(descriptor: int, payload: bytes) -> None:
@@ -392,24 +428,103 @@ def write_runtime_receipt_atomic(
     path: AbsolutePosixPath,
     payload: Mapping[str, JsonValue],
 ) -> None:
-    """Publish one canonical receipt through O_TMPFILE and linkat."""
+    """Publish one canonical receipt atomically under the runtime receipt lock."""
     validate_absolute_posix_path(path)
+    if fcntl is None:
+        raise TypedPreflightFailure(
+            "runtime_receipt_lock_unavailable",
+            "runtime receipt publication requires POSIX flock",
+            path=path,
+        )
     parent = os.path.dirname(path)
     name = os.path.basename(path).encode("utf-8")
+    lock_path = os.path.join(parent, "locks", "shared-runtime-receipt.lock")
+    validate_absolute_posix_path(lock_path)
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
     temporary_flags = os.O_WRONLY | os.O_TMPFILE | os.O_CLOEXEC
     directory = os.open(parent, directory_flags)
+    lock_descriptor = -1
     descriptor = -1
+    staging_name: bytes | None = None
     try:
-        descriptor = os.open(parent, temporary_flags, 0o660)
+        parent_stat = os.fstat(directory)
+        try:
+            lock_descriptor = os.open(
+                lock_path,
+                os.O_RDWR | os.O_CREAT | os.O_CLOEXEC | os.O_NOFOLLOW,
+                0o660,
+            )
+        except OSError as exc:
+            raise TypedPreflightFailure(
+                "runtime_receipt_lock_unavailable",
+                "runtime receipt publication lock could not be opened",
+                path=lock_path,
+                errno=exc.errno,
+            ) from exc
+        lock_stat = os.fstat(lock_descriptor)
+        if (
+            not stat.S_ISREG(lock_stat.st_mode)
+            or lock_stat.st_dev != parent_stat.st_dev
+            or stat.S_IMODE(lock_stat.st_mode) != 0o660
+            or lock_stat.st_uid != parent_stat.st_uid
+            or lock_stat.st_gid != parent_stat.st_gid
+        ):
+            raise TypedPreflightFailure(
+                "runtime_receipt_lock_tampered",
+                "runtime receipt publication lock identity is not exact",
+                path=lock_path,
+            )
+        fcntl.flock(lock_descriptor, fcntl.LOCK_EX)
+
+        descriptor = os.open(".", temporary_flags, 0o660, dir_fd=directory)
+        os.fchmod(descriptor, 0o660)
         encoded = (_canonical_json(_json_safe(payload)) + "\n").encode("utf-8")
         _write_all(descriptor, encoded)
         os.fsync(descriptor)
-        _link_tmpfile(descriptor, directory, name)
+        try:
+            existing = os.stat(name, dir_fd=directory, follow_symlinks=False)
+        except FileNotFoundError:
+            existing = None
+        if existing is None:
+            _link_tmpfile(descriptor, directory, name)
+        else:
+            if (
+                not stat.S_ISREG(existing.st_mode)
+                or existing.st_dev != parent_stat.st_dev
+                or stat.S_IMODE(existing.st_mode) != 0o660
+                or existing.st_uid != parent_stat.st_uid
+                or existing.st_gid != parent_stat.st_gid
+            ):
+                raise TypedPreflightFailure(
+                    "runtime_receipt_target_tampered",
+                    "runtime receipt target identity is not replaceable",
+                    path=path,
+                )
+            staging_name = (
+                f".{os.path.basename(path)}.{secrets.token_hex(16)}.tmp".encode("utf-8")
+            )
+            _link_tmpfile(descriptor, directory, staging_name)
+            os.replace(
+                staging_name,
+                name,
+                src_dir_fd=directory,
+                dst_dir_fd=directory,
+            )
+            staging_name = None
         os.fsync(directory)
     finally:
+        if staging_name is not None:
+            try:
+                os.unlink(staging_name, dir_fd=directory)
+            except FileNotFoundError:
+                pass
         if descriptor >= 0:
             os.close(descriptor)
+        if lock_descriptor >= 0:
+            try:
+                fcntl.flock(lock_descriptor, fcntl.LOCK_UN)
+            finally:
+                os.close(lock_descriptor)
         os.close(directory)
 
 
@@ -613,7 +728,7 @@ def _require_receipt_shape(
 def read_shared_runtime_provision(
     path: AbsolutePosixPath,
 ) -> SharedRuntimeProvisionReceipt:
-    payload = _read_runtime_receipt(path)
+    payload, receipt_stat = _read_runtime_receipt(path)
     _require_receipt_shape(
         payload,
         frozenset(
@@ -676,6 +791,12 @@ def read_shared_runtime_provision(
             "runtime provision receipt fingerprint does not match its payload",
             path=path,
         )
+    if receipt_stat.st_uid != typed_payload["host_uid"]:
+        raise TypedPreflightFailure(
+            "runtime_receipt_identity_mismatch",
+            "runtime provision receipt fd owner differs from its host identity",
+            path=path,
+        )
     return SharedRuntimeProvisionReceipt(
         schema_version=cast(
             Literal["shared-runtime-provision/v1"],
@@ -705,7 +826,7 @@ def read_shared_runtime_provision(
 def read_shared_runtime_readback(
     path: AbsolutePosixPath,
 ) -> SharedRuntimeReadbackReceipt:
-    payload = _read_runtime_receipt(path)
+    payload, receipt_stat = _read_runtime_receipt(path)
     _require_receipt_shape(
         payload,
         frozenset(
@@ -789,6 +910,12 @@ def read_shared_runtime_readback(
         raise TypedPreflightFailure(
             "runtime_receipt_fingerprint_mismatch",
             "runtime readback receipt fingerprint does not match its payload",
+            path=path,
+        )
+    if receipt_stat.st_uid != typed_payload["container_uid"]:
+        raise TypedPreflightFailure(
+            "runtime_receipt_identity_mismatch",
+            "runtime readback receipt fd owner differs from its container identity",
             path=path,
         )
     return SharedRuntimeReadbackReceipt(
@@ -2445,8 +2572,13 @@ def build_source_path_set(
             )
         result.append(relative_path)
     registry_path = source_root / "experiments/registry.toml"
-    if registry_path.is_file():
-        result.append("experiments/registry.toml")
+    if not registry_path.is_file():
+        raise TypedPreflightFailure(
+            "gpu_source_path_registry_missing",
+            "the canonical experiments/registry.toml source edge is missing",
+            relative_path="experiments/registry.toml",
+        )
+    result.append("experiments/registry.toml")
     try:
         listed = subprocess.run(
             [

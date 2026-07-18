@@ -2,6 +2,7 @@
 # contract configuration
 # responsibility Defines machine-readable AgentCanon development environment expectations.
 # upstream design CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
+# upstream design documents/gpu-admission-r5-source-packet.md exact shared runtime artifact identity
 # upstream design documents/rust-agent-tool-migration.md Rust tool migration policy
 # upstream implementation .devcontainer/post-create.sh installs shared development tooling
 # downstream implementation tools/rebuild_agent_tools.sh rebuilds compiled AgentCanon tools
@@ -83,8 +84,8 @@ runtime_directory_mode = "02770"
 runtime_file_mode = "0660"
 runtime_umask = "0007"
 local_flock_filesystems = ["btrfs", "ext4", "xfs"]
-provision_receipt = "/var/lib/agent-canon/runtime/receipts/shared-runtime-provision.v4.json"
-readback_receipt = "/var/lib/agent-canon/runtime/receipts/shared-runtime-readback.v4.json"
+provision_receipt = "/var/lib/agent-canon/runtime/shared-runtime-provision.json"
+readback_receipt = "/var/lib/agent-canon/runtime/shared-runtime-readback.json"
 compose_user = "${LOCAL_UID}:${LOCAL_GID}"
 compose_group_add = "${AGENT_CANON_RUNTIME_GID}"
 compose_bind_source = "/var/lib/agent-canon/runtime"

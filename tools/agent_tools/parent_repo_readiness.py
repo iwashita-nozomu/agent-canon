@@ -4,8 +4,11 @@
 # responsibility Checks whether a parent repository satisfies AgentCanon runtime expectations.
 # upstream design ../../documents/shared-runtime-surfaces.toml root surface ownership manifest
 # upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md parent update checklist
+# upstream design ../../documents/gpu-admission-r5-source-packet.md runtime identity receipt consumer boundary
 # upstream implementation ./surface_manifest.py parses shared runtime surface manifests
 # upstream implementation ../ci/container_config.py validates parent Docker/devcontainer surfaces
+# upstream implementation ../../.devcontainer/bootstrap-shared-runtime.sh publishes the provision receipt
+# upstream implementation ../../.devcontainer/finalize-shared-runtime.sh publishes the readback receipt
 # downstream implementation ../../tests/agent_tools/test_parent_repo_readiness.py tests checker behavior
 # @dependency-end
 """Check parent repository readiness for an AgentCanon submodule pin."""
@@ -120,7 +123,25 @@ ENVIRONMENT_PATHS = (
     ExpectedPath("docker/packs/default.toml", "container_environment", "file"),
     ExpectedPath("docker/packs/default-host-docker.toml", "container_environment", "file"),
     ExpectedPath(".devcontainer/devcontainer.json", "devcontainer_environment", "file"),
+    ExpectedPath(
+        ".devcontainer/bootstrap-shared-runtime.sh",
+        "runtime_identity_receipt",
+        "file",
+        executable=True,
+    ),
+    ExpectedPath(
+        ".devcontainer/finalize-shared-runtime.sh",
+        "runtime_identity_receipt",
+        "file",
+        executable=True,
+    ),
     ExpectedPath(".devcontainer/post-create.sh", "devcontainer_environment", "file", executable=True),
+    ExpectedPath(
+        ".devcontainer/post-attach.sh",
+        "runtime_identity_receipt",
+        "file",
+        executable=True,
+    ),
     ExpectedPath(
         ".devcontainer/generate-runtime-compose.sh",
         "devcontainer_environment",

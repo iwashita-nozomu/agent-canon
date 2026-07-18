@@ -6,6 +6,7 @@ contract reference
 responsibility Documents AgentCanon-owned container, devcontainer, editor workspace, and recent cross-repository operation rules.
 upstream design README.md AgentCanon top-level entrypoint and rule index.
 upstream design documents/SHARED_RUNTIME_SURFACES.md shared root view and owner-class manifest.
+upstream design documents/gpu-admission-r5-source-packet.md exact GPU admission runtime identity boundary.
 downstream design documents/github-first-module-and-devcontainer-policy.md GitHub-first module and shared devcontainer boundary policy.
 downstream design documents/rust-agent-tool-migration.md Rust toolchain and AgentCanon CLI migration boundary.
 downstream design documents/coding-conventions-project.md project environment and dependency ownership conventions.
@@ -181,6 +182,16 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   Host `~/.codex` is never mounted. Successful post-create tool availability is
   recorded and later certified by `EnvironmentCertificate`, not by a second
   environment policy surface.
+- GPU admission runtime identity uses exactly
+  `/var/lib/agent-canon/runtime/shared-runtime-provision.json` and
+  `/var/lib/agent-canon/runtime/shared-runtime-readback.json`. Bootstrap runs
+  before Compose generation and publishes the host receipt; generated Compose
+  preserves the same UID/GID, supplementary runtime group, bind source/target,
+  and provision path. Post-create establishes `umask 0007` before finalize;
+  finalize validates the provision receipt and publishes readback. Post-attach
+  is observational only. Receipt parsing and atomic publication are owned by
+  `tools/experiments/execution_resource_plan.py`; scripts do not carry a second
+  JSON parser or writer and do not repair failed identity.
 - Mount behavior belongs in `.devcontainer/devcontainer.json`.
 - Shared devcontainer names must be repository-specific. Do not use a fixed
   `name` or Compose project name that makes every template-derived repository

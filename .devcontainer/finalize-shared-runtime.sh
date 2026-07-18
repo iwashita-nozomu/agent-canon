@@ -4,7 +4,9 @@
 # responsibility Reads back the container shared AgentCanon runtime namespace after Compose bind.
 # upstream design ../CONTAINER_OPERATIONS.md exact shared-runtime identity and namespace contract
 # upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
+# upstream design ../documents/gpu-admission-r5-source-packet.md exact readback receipt path and owner boundary
 # upstream implementation bootstrap-shared-runtime.sh publishes the host provision receipt
+# upstream implementation ../tools/experiments/execution_resource_plan.py owns exact receipt parsing and atomic publication
 # downstream implementation post-attach.sh reports the readback receipt observationally
 # @dependency-end
 
@@ -12,11 +14,12 @@ set -euo pipefail
 
 runtime_root="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-/var/lib/agent-canon/runtime}"
 runtime_route="${AGENT_CANON_RUNTIME_ROUTE:-MANAGED_CONTAINER}"
-provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/receipts/shared-runtime-provision.v4.json}"
-readback_receipt="${runtime_root}/receipts/shared-runtime-readback.v4.json"
+provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/shared-runtime-provision.json}"
+readback_receipt="${runtime_root}/shared-runtime-readback.json"
 locks_root="${runtime_root}/locks"
 receipts_root="${runtime_root}/receipts"
 probe_path="${locks_root}/bootstrap-probe.lock"
+agent_canon_root="$(cd -P "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 
 fail() {
   printf 'shared runtime finalize failed: %s\n' "$1" >&2
@@ -25,7 +28,8 @@ fail() {
 
 [ "$runtime_route" = "MANAGED_CONTAINER" ] || fail "runtime route is not MANAGED_CONTAINER"
 [ "$runtime_root" = "/var/lib/agent-canon/runtime" ] || fail "shared runtime target is not canonical"
-[ "$provision_receipt" = "${runtime_root}/receipts/shared-runtime-provision.v4.json" ] || fail "provision receipt path is not canonical"
+[ "$provision_receipt" = "${runtime_root}/shared-runtime-provision.json" ] || fail "provision receipt path is not canonical"
+[ -f "${agent_canon_root}/tools/experiments/execution_resource_plan.py" ] || fail "canonical runtime receipt owner is unavailable"
 
 container_uid="$(id -u)"
 container_gid="$(id -g)"
@@ -45,10 +49,9 @@ case " $container_supplementary_gids " in
   *) fail "container session is missing runtime group $runtime_gid" ;;
 esac
 
-python3 - "$provision_receipt" "$readback_receipt" "$runtime_root" "$probe_path" "$runtime_route" "$runtime_gid" "$container_uid" "$container_gid" "$container_supplementary_gids" <<'PY'
+python3 - "$agent_canon_root" "$provision_receipt" "$readback_receipt" "$runtime_root" "$probe_path" "$runtime_route" "$runtime_gid" "$container_uid" "$container_gid" "$container_supplementary_gids" <<'PY'
 from __future__ import annotations
 
-import ctypes
 import fcntl
 import hashlib
 import json
@@ -57,6 +60,7 @@ import stat
 import sys
 
 (
+    source_root,
     provision_path,
     readback_path,
     runtime_root,
@@ -67,6 +71,13 @@ import sys
     raw_container_gid,
     raw_container_groups,
 ) = sys.argv[1:]
+sys.path.insert(0, source_root)
+
+from tools.experiments.execution_resource_plan import (  # noqa: E402
+    read_shared_runtime_provision,
+    write_runtime_receipt_atomic,
+)
+
 runtime_gid = int(raw_runtime_gid)
 container_uid = int(raw_container_uid)
 container_gid = int(raw_container_gid)
@@ -83,65 +94,20 @@ def canonical_bytes(value: object) -> bytes:
     ).encode("utf-8")
 
 
-def read_receipt(path: str) -> dict[str, object]:
-    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
-    try:
-        descriptor = os.fstat(fd)
-        if not stat.S_ISREG(descriptor.st_mode):
-            raise OSError(f"receipt is not a regular file: {path}")
-        if stat.S_IMODE(descriptor.st_mode) != 0o660:
-            raise OSError(f"receipt mode is not 0660: {path}")
-        if descriptor.st_gid != runtime_gid or descriptor.st_uid != container_uid:
-            raise OSError(f"receipt identity differs: {path}")
-        if descriptor.st_size <= 0 or descriptor.st_size > 65536:
-            raise OSError(f"receipt size is outside the bounded range: {path}")
-        raw = os.pread(fd, descriptor.st_size, 0)
-        if len(raw) != descriptor.st_size:
-            raise OSError(f"receipt read was incomplete: {path}")
-    finally:
-        os.close(fd)
-    value = json.loads(raw.decode("utf-8"))
-    if not isinstance(value, dict):
-        raise OSError(f"receipt JSON is not an object: {path}")
-    return value
-
-
-provision = read_receipt(provision_path)
-provision_keys = {
-    "schema_version",
-    "runtime_route",
-    "host_uid",
-    "host_gid",
-    "host_supplementary_gids",
-    "host_umask",
-    "bind_source_path",
-    "bind_source_dev",
-    "bind_source_ino",
-    "provision_fingerprint",
-}
-if set(provision) != provision_keys:
-    raise OSError("provision receipt fields are not exact")
-provision_without_fingerprint = dict(provision)
-fingerprint = provision_without_fingerprint.pop("provision_fingerprint")
-if not isinstance(fingerprint, str) or hashlib.sha256(
-    canonical_bytes(provision_without_fingerprint)
-).hexdigest() != fingerprint:
-    raise OSError("provision receipt fingerprint does not match")
-if provision["schema_version"] != "shared-runtime-provision/v1":
-    raise OSError("provision receipt schema is not shared-runtime-provision/v1")
-if provision["runtime_route"] != runtime_route:
+provision = read_shared_runtime_provision(provision_path)
+if provision.runtime_route != runtime_route:
     raise OSError("provision receipt route differs")
-if provision["host_uid"] != container_uid or provision["host_gid"] != container_gid:
+if provision.host_uid != container_uid or provision.host_gid != container_gid:
     raise OSError("Compose user identity differs from host provision identity")
-if tuple(provision["host_supplementary_gids"]) != container_groups:
+if provision.host_supplementary_gids != container_groups:
     raise OSError("Compose supplementary groups differ from host provision identity")
-if provision["host_umask"] != 0o0007:
+if provision.host_umask != 0o0007:
     raise OSError("host provision umask is not 0007")
 
 root_stat = os.stat(runtime_root, follow_symlinks=False)
-if provision["bind_source_path"] != runtime_root:
+if provision.bind_source_path != runtime_root:
     raise OSError("provision bind source path differs")
-if provision["bind_source_dev"] != root_stat.st_dev or provision["bind_source_ino"] != root_stat.st_ino:
+if provision.bind_source_dev != root_stat.st_dev or provision.bind_source_ino != root_stat.st_ino:
     raise OSError("provision bind source identity differs")
 
 mount_record: tuple[int, int, str] | None = None
@@ -215,38 +181,7 @@ readback = {
     "probe_fd_disposition": "closed",
 }
 readback["readback_fingerprint"] = hashlib.sha256(canonical_bytes(readback)).hexdigest()
-data = canonical_bytes(readback) + b"\n"
-
-parent_path = os.path.dirname(readback_path)
-if not hasattr(os, "O_TMPFILE"):
-    raise OSError("atomic shared runtime readback publication requires O_TMPFILE")
-parent_fd = os.open(parent_path, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
-temporary_fd = os.open(parent_path, os.O_TMPFILE | os.O_WRONLY | os.O_CLOEXEC, 0o660)
-try:
-    os.fchmod(temporary_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
-    view = memoryview(data)
-    while view:
-        written = os.write(temporary_fd, view)
-        if written <= 0:
-            raise OSError("shared runtime readback write made no progress")
-        view = view[written:]
-    os.fsync(temporary_fd)
-    libc = ctypes.CDLL(None, use_errno=True)
-    libc.linkat.argtypes = [
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_int,
-    ]
-    libc.linkat.restype = ctypes.c_int
-    if libc.linkat(temporary_fd, b"", -100, os.fsencode(readback_path), 0x1000) != 0:
-        error_number = ctypes.get_errno()
-        raise OSError(error_number, os.strerror(error_number), readback_path)
-    os.fsync(parent_fd)
-finally:
-    os.close(temporary_fd)
-    os.close(parent_fd)
+write_runtime_receipt_atomic(readback_path, readback)
 
 published = os.stat(readback_path, follow_symlinks=False)
 if not stat.S_ISREG(published.st_mode):

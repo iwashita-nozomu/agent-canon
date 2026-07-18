@@ -281,7 +281,8 @@ def test_managed_public_route_has_one_canonical_admission_owner() -> None:
     assert "_W1" + "UUIDScheduler" not in source
     assert "materialized.plan" not in source
     assert "side_effect_disposers" not in source
-    assert "launch is not an authorized route" in source
+    assert "topic_callable" not in source
+    assert "experiment_runner_binding_required" not in source
 
 
 def test_r5_admitted_environment_and_context_are_composition_only() -> None:
@@ -422,6 +423,88 @@ def test_r5_runner_lifecycle_capture_is_finally_bound_for_interruptions() -> Non
     )
     assert launch_contract in source
     assert missing_evidence_contract in source
+
+
+def test_normal_cli_binds_frozen_topic_to_ff97_lifecycle() -> None:
+    """The canonical adapter runs snapshot bytes and records ff97 lifecycle evidence."""
+    runner_root = (
+        Path(__file__).resolve().parents[2].parent
+        / "experiment_runner-w1-r4-lifecycle-design"
+        / "python"
+    )
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = os.pathsep.join(
+        [str(runner_root), str(Path(__file__).resolve().parents[2])]
+    )
+    check = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import tempfile\n"
+                "from pathlib import Path\n"
+                "from experiment_runner import (\n"
+                "    FullResourceCapacity, StandardFullResourceScheduler,\n"
+                "    StandardRunner, StandardWorker, apply_environment_variables,\n"
+                ")\n"
+                "from tools.experiments.run_managed_experiment import (\n"
+                "    _ManagedTopicCase, _build_admitted_context,\n"
+                "    _capture_runner_lifecycle, _run_topic_case,\n"
+                "    _runner_owned_estimate,\n"
+                ")\n"
+                "with tempfile.TemporaryDirectory() as raw:\n"
+                "    root = Path(raw)\n"
+                "    live = root / 'live' / 'experiments' / 'topic' / 'run.py'\n"
+                "    frozen_root = root / 'result' / 'source_snapshot'\n"
+                "    frozen = frozen_root / 'experiments' / 'topic' / 'run.py'\n"
+                "    output = root / 'observed.txt'\n"
+                "    live.parent.mkdir(parents=True)\n"
+                "    frozen.parent.mkdir(parents=True)\n"
+                "    source = (\n"
+                "        'import os\\nfrom pathlib import Path\\n'\n"
+                "        'def main():\\n'\n"
+                '        \'    Path(os.environ[\\"R5_FROZEN_RESULT\\"]).write_text(\\"frozen\\", encoding=\\"utf-8\\")\\n\'\n'
+                "        '    return 0\\n'\n"
+                "    )\n"
+                "    live.write_text(source, encoding='utf-8')\n"
+                "    frozen.write_bytes(live.read_bytes())\n"
+                "    live.write_text(source.replace('frozen', 'mutated-live'), encoding='utf-8')\n"
+                "    case = _ManagedTopicCase(\n"
+                "        entrypoint_relative_path='experiments/topic/run.py',\n"
+                "        argv=(str(frozen),), snapshot_root=str(frozen_root),\n"
+                "        environment_variables=(('R5_FROZEN_RESULT', str(output)),),\n"
+                "    )\n"
+                "    worker = StandardWorker(\n"
+                "        task=_run_topic_case, resource_estimator=_runner_owned_estimate,\n"
+                "        initializer=apply_environment_variables,\n"
+                "    )\n"
+                "    scheduler = StandardFullResourceScheduler.from_worker(\n"
+                "        cases=[case], worker=worker, context_builder=_build_admitted_context,\n"
+                "        skip_controller=None, disable_gpu_preallocation=True,\n"
+                "        gpu_environment_config=None,\n"
+                "        resource_capacity=FullResourceCapacity(\n"
+                "            max_workers=1, host_memory_bytes=0, gpu_devices=(),\n"
+                "        ),\n"
+                "    )\n"
+                "    runner = StandardRunner(scheduler=scheduler, monitor=None, on_case_finished=None)\n"
+                "    assert runner.run(worker) is None\n"
+                "    lifecycle = _capture_runner_lifecycle(runner)\n"
+                "    assert lifecycle is not None and lifecycle.scheduler_completed\n"
+                "    assert scheduler.completions[0].result.raw_exit_code == 0\n"
+                "    assert output.read_text(encoding='utf-8') == 'frozen'\n"
+            ),
+        ],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert check.returncode == 0, check.stderr
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "return run_cli(parse_args())" in source
+    assert "execution_result = execute_managed_run(" in source
+    assert "experiment_runner_binding_required" not in source
+    assert "topic_callable" not in source
 
 
 def test_public_alternate_gpu_routes_are_typed_or_managed() -> None:

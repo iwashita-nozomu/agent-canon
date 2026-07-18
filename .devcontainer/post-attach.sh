@@ -3,13 +3,15 @@
 # contract environment
 # responsibility Reports shared devcontainer attach status.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
+# upstream design ../documents/gpu-admission-r5-source-packet.md observational readback receipt contract
 # upstream environment devcontainer.json postAttachCommand entrypoint
+# upstream implementation finalize-shared-runtime.sh publishes the exact readback receipt
 # @dependency-end
 set -euo pipefail
 
 runtime_root="${AGENT_CANON_RUNTIME_ROOT:-/var/lib/agent-canon/runtime}"
 source_projection_root="${AGENT_CANON_SOURCE_PROJECTION_ROOT:-/workspace/reports/agents/devcontainer/runtime}"
-readback_receipt="${runtime_root}/receipts/shared-runtime-readback.v4.json"
+readback_receipt="${runtime_root}/shared-runtime-readback.json"
 
 gpu_device_visible() {
   [ -e /dev/nvidia0 ] && return 0
