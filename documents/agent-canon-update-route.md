@@ -1,107 +1,129 @@
 <!--
 @dependency-start
 contract reference
-responsibility Defines the canonical AgentCanon update route and command responsibility split.
-upstream implementation ../tools/update_agent_canon.sh provides high-level update commands.
-upstream implementation ../tools/sync_agent_canon.sh provides low-level root view and submodule sync.
-upstream implementation ../tools/ci/check_agent_canon_latest.sh checks update freshness.
-upstream design ./agent-canon-parent-repo-latest-checklist.md defines task-start latest checks.
-downstream design ../agents/skills/agent-update-branch.md separates canon-pin and source PR lanes.
+responsibility Owns the canonical AgentCanon source-to-parent update transaction and namespace boundaries.
+upstream design ../agents/skills/agent-orchestration.md owns Decision Sufficiency policy.
+upstream design ../agents/skills/structure-refactor.md owns final-structure-first scope formation.
+upstream implementation ../tools/agent_tools/update_lifecycle_contract.py owns lifecycle schemas and transition guards.
+downstream implementation ../tools/update_agent_canon.sh executes source rebind, queue/frontier, and parent-projection guards.
+downstream implementation ../tools/agent_tools/publication_integrator.py owns source publication CAS/readback.
+downstream implementation ../tools/agent_tools/github_publish.py adapts immutable GitHub PR topology.
+downstream design ../agents/workflows/agent-canon-pr-workflow.md owns source PR operations.
+downstream design ../agents/workflows/pr-queue-cleanup-workflow.md owns projection and cleanup ordering.
 @dependency-end
 -->
 
 # AgentCanon Update Route
 
-The canonical parent-repo route is:
+## Front Door And Reader Map
 
-Run `make agent-canon-update-plan` first. If it reports a mutation route,
-request current-task user approval before invoking `make agent-canon-latest`
-with all four inline Git authority/reason fields in the same segment.
+`tools/update_agent_canon.sh` is the single user entrypoint. Read this document
+for route meaning and `tools/agent_tools/update_lifecycle_contract.py` for exact
+machine schemas. Skills, README files, CI adapters, and parent views link here;
+they do not restate the transaction.
 
-`latest` is the user-facing high-level route. It may update the parent pin,
-repair root views, rebuild shared tools, and report pending parent TODOs. It
-does not erase local AgentCanon source changes. Safe dirty checkout state is
-preserved while AgentCanon `main` is merged, root views are repaired and
-checked, and local source commits route to an AgentCanon PR.
+The standalone AgentCanon clone is the source owner. A template or derived
+repository is a parent projection consumer and never becomes a second source
+namespace.
 
-The update route reuses existing branch / PR ownership by default. If the
-current AgentCanon source branch or parent update branch already owns the same
-surface, continue it. Do not create a branch just to start fresh, avoid dirty
-state, split a small addendum, or handle an additional user instruction. A new
-branch requires `branch_creation_reason=<reason>` in run evidence or the PR body
-before approval is requested. Creation additionally requires current-task user
-approval and all four authority/reason fields in the same command segment.
-Workflow authority and a reason alone are not sufficient.
+## Owner Namespace
 
-Every AgentCanon source, parent submodule pin, `.gitmodules`, root runtime
-view, shared root-copy surface, and parent root sync change opens the mandatory
-`agentcanon_structure_followup` gate. Record
-`agentcanon_structure_followup=required`, then run the root-view repair and
-check commands from the template / derived parent root that consumes the
-AgentCanon pin:
+| Surface | Canonical location | Responsibility |
+| --- | --- | --- |
+| source contract | `tools/agent_tools/update_lifecycle_contract.py` | schemas, identities, guards, receipt materializers |
+| source implementation | clone-root `tools/`, `agents/`, `documents/`, `.github/`, `.codex/`, `evidence/`, `tests/`, `rust/` | reviewed product source |
+| runtime state | `.agent-canon/update-lifecycle/state/` | resumable transaction pointer/state; never source canon |
+| generated evidence | `reports/agents/<run-id>/` and `.agent-canon/update-lifecycle/evidence/` | immutable receipts, timings, review and readback evidence |
+| projection queue | `.agent-canon/update-lifecycle/projection-queue/` | accepted QueueReceipt and pending/accepted DependencyFrontier |
+| parent projection | parent `vendor/agent-canon` gitlink and AgentCanon-owned root views | downstream view after frontier acceptance only |
 
-```bash
-bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
-```
+Unknown shared state is outside the task-owned namespace and remains unchanged.
+There is no legacy subtree, snapshot, wrapper, or alternate owner route.
 
-Record `agentcanon_structure_followup=pass` only after both `link-root` and
-`check` pass from the parent root.
-For standalone AgentCanon source PRs, this parent-root follow-up runs after the
-source change is integrated or while preparing the parent pin/root-view PR; it
-is mandatory propagation evidence.
+## Authoritative Transaction
+
+1. Import the owner-produced `DecisionSufficiencyPacket`. When every plausible
+   `h in H` selects the same owner/edit/validation tuple, begin execution and
+   reject additional zero-value investigation.
+1. Consume the final-structure-first contract from
+   `agents/skills/structure-refactor.md#Pre-Task Structure Repair Contract` to
+   fix the target owner graph and namespace. Once that graph is coherent,
+   implementation is the immediate main transition; no update-specific survey,
+   precautionary preflight, or intermediate validation step may intervene.
+1. Implement the complete source mechanisms and generated views under that
+   fixed graph. `UpdateTransaction` and `Snapshot` record resumable progress;
+   preparation or generation labels are internal state, not separate route
+   gates. Resume at `first_missing_checkpoint`, and return a passed same-input
+   receipt with replay timing.
+1. Validate the completed source transaction afterward: G1 proves source
+   correctness once, and G2 consumes G1 to prove generated completeness once.
+1. Before candidate freeze, read `origin/main` and materialize the immutable
+   `SourceMainRebindReceipt`. Append, without mutating it:
+   `CandidateFreezeReceipt -> CandidateReviewReceipt -> CandidateCasReceipt`.
+1. G3 binds immutable remote/base/head/fork/permission identity and the exact
+   candidate/tree. `PullRequestLifecycle` carries PR Essence, reviews, and
+   contributor diff through draft/ready/review/closed/conflict states. Only
+   verified-true permission permits publication.
+1. Merge the source PR by expected-old CAS and perform a distinct source-main
+   publication readback. Push, PR, and checks reuse the same G3 tree identity;
+   they do not independently prove it again.
+1. Enqueue exactly one accepted `QueueReceipt` keyed by
+   `(source_namespace,candidate_sha,tree_sha,input_digest)`. Create a pending
+   `DependencyFrontier` with ordered oracle `#388 -> #389 -> current`.
+1. Accept the frontier only when source-main equals the current candidate,
+   QueueReceipt is accepted, and all predecessor publication evidence is
+   present and ordered. Pending/failed frontier records prohibit parent work.
+1. G4 permits one parent pin/root projection. Parent-owned validation and
+   remote CI run once, then G5 proves exact remote publication readback. Parent
+   consumers trust G1-G3 receipts and do not repeat those invariants.
+1. After G5, materialize DurableHandback, close every descendant, release every
+   reservation, clean only task-owned temp/cache, prove unknown shared state
+   unchanged, pass G6, and execute the canonical terminal `close_agent`
+   ToolCall token.
+
+Identity mismatch or closed-head conflict creates an explicitly linked
+successor; it never mutates the old transaction. Retry is driven by typed state,
+not elapsed time, line count, read count, retry count, or check count.
+
+## Canonical Six Boundaries
+
+| Gate | Owner invariant | Downstream trust |
+| --- | --- | --- |
+| G1 | source correctness | G2/publication eligibility consume receipt |
+| G2 | generated completeness | PR CI consumes receipt |
+| G3 | PR identity, permission, review, CAS | source merge and queue consume receipt |
+| G4 | accepted frontier and parent projection integrity | parent publication consumes receipt |
+| G5 | exact remote publication readback | cleanup may begin |
+| G6 | handback, descendants, reservations, cleanup, close token | terminal auditor consumes receipt |
+
+Each invariant has one canonical gate. Downstream tools validate receipt
+identity and ordering only; they do not rerun the owned check.
 
 ## Command Responsibilities
 
-| Command | Responsibility |
+| Entry | Responsibility |
 | --- | --- |
-| `tools/update_agent_canon.sh plan` | observe/update route decision; read-only |
-| `tools/update_agent_canon.sh latest` | high-level parent pin/root-view update route; uses preserve-dirty merge when safe |
-| `tools/update_agent_canon.sh apply` | compatibility low-level apply; not the canonical task-start route |
-| `tools/update_agent_canon.sh merge-main-into-current` | strict clean-worktree local AgentCanon source branch PR route |
-| `tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` | dirty-preserving local AgentCanon source branch PR route |
-| `tools/sync_agent_canon.sh link-root` | repair root symlink/copy views |
-| `tools/sync_agent_canon.sh check` | validate root views |
-| `tools/ci/check_agent_canon_latest.sh` | latest-state gate; mutation must be explicit in output |
+| `tools/update_agent_canon.sh plan` | optional read-only projection only when its result can change the owner/structure decision; never a required preflight |
+| `tools/update_agent_canon.sh latest` | standalone source-main rebind or, in a parent, accepted-frontier projection |
+| `tools/update_agent_canon.sh apply` | strict clean source rebind or accepted parent projection |
+| `tools/update_agent_canon.sh merge-main-into-current` | clean standalone/source-branch rebind |
+| `tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` | task-dirt-preserving source rebind |
+| `tools/update_agent_canon.sh enqueue-source-projection` | materialize/replay one QueueReceipt, pending frontier, and current-transaction marker |
+| `tools/update_agent_canon.sh accept-dependency-frontier` | perform source-main readback and append one accepted frontier record |
+| `tools/ci/check_agent_canon_pr.sh` | consume G1-G3 and run the one source PR gate |
+| `tools/ci/check_agent_canon_latest.sh` | consume G4-G5 without a second source-main check |
 
-## Cases
+## Failure And Cleanup Semantics
 
-1. Parent repo uses an old AgentCanon main pin: run the parent pin update route.
-1. `vendor/agent-canon` has safe dirty checkout state: `latest` preserves the
-   dirt, merges GitHub main into the current named branch, restores the dirt,
-   repairs/checks root views, and reports the AgentCanon branch/PR next action.
-1. `vendor/agent-canon` has local source commits: merge GitHub main into that
-   branch, push the existing branch, and open or update the AgentCanon PR. Use a
-   new branch only when the existing branch / PR cannot safely continue, and
-   record the reason first.
-1. Root view drift only: run `link-root` and `check`.
-1. AgentCanon update TODO pending: treat it as first work, then rerun latest.
-1. Legacy subtree/snapshot repos: compatibility appendix only.
-
-## Mandatory Structure Follow-Up Gate
-
-Use `agentcanon_structure_followup=required` for:
-
-- AgentCanon source PRs and source commits that change shared canon behavior or
-  synced surfaces.
-- Parent `vendor/agent-canon` gitlink updates and `.gitmodules` changes.
-- AgentCanon-owned root runtime views and shared root-copy surfaces.
-- Parent root sync PRs in template or derived repositories.
-
-The gate passes only when the parent root has run both root-view commands and
-the PR/run evidence records `agentcanon_structure_followup=pass`:
-
-```bash
-bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
-```
-
-Parent readiness and structure checks selected by the active parent profile
-remain required after this gate; the structure follow-up gate does not replace
-`make agent-canon-pr-check` or the runtime profile validation route.
-
-## Eval Coverage
-
-The update route must be covered by issue-derived evals for route consistency,
-check-command mutation visibility, TODO acknowledgement explicitness, and
-AgentCanon PR versus parent pin separation.
+- Unknown or false push permission: refuse mutation.
+- Rebind/freeze/review/CAS predecessor mismatch: fail the current transaction;
+  changed identity requires a successor.
+- Duplicate or reordered `#388/#389/current` evidence: refuse frontier
+  acceptance.
+- Parent projection before accepted frontier: fail closed.
+- Remote readback mismatch: no cleanup; retry the same identity only when the
+  failure is typed transient.
+- Completed-but-open or unknown descendant, reservation leak, malformed token,
+  or cleanup before G5: G6 failure.
+- Cleanup deletes only enumerated task-owned paths after readback. Unknown
+  shared state must have equal before/after digests and unchanged evidence.

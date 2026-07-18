@@ -6,6 +6,7 @@
 # upstream implementation ../../tools/agent_tools/workflow_monitor.py appends evidence
 # upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py seeds evidence
 # upstream implementation ../../tools/agent_tools/task_start.py seeds evidence
+# upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns update lifecycle evidence identities
 # @dependency-end
 
 from __future__ import annotations
@@ -76,6 +77,54 @@ class WorkflowMonitorTest(unittest.TestCase):
             module.VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES,
             frozenset(response["intent_preservation"]),
         )
+
+    def test_monitor_records_pointer_only_update_lifecycle_evidence(self) -> None:
+        """Monitoring keeps DSV/lifecycle/close refs without duplicating policy."""
+        module = load_monitor_module()
+        evidence_type = getattr(module, "LifecycleMonitoringEvidence")
+        entries_type = getattr(module, "MonitoringEntries")
+        append_monitoring = getattr(module, "append_monitoring")
+        evidence_refs = (
+            "evidence:" + "1" * 64,
+            "evidence:" + "2" * 64,
+        )
+        evidence = evidence_type(
+            decision_sufficiency_packet_ref="evidence:" + "3" * 64,
+            decision_sufficiency_rejection_ref=None,
+            lifecycle_state="closed",
+            evidence_refs=evidence_refs,
+            close_agent_tool_call_ref="close-token:" + "4" * 64,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = append_monitoring(
+                Path(tmp_dir),
+                entries_type(lifecycle_evidence=evidence),
+            )
+            text = path.read_text(encoding="utf-8")
+
+        self.assertIn("## Update Lifecycle Evidence", text)
+        self.assertIn('"schema":"agent-canon.update-lifecycle-monitoring.v1"', text)
+        self.assertIn('"lifecycle_state":"closed"', text)
+        self.assertIn(evidence_refs[0], text)
+        self.assertNotIn("plausible repository state", text)
+
+    def test_monitor_rejects_duplicate_lifecycle_evidence_refs(self) -> None:
+        """One evidence identity may be recorded only once in a monitor event."""
+        module = load_monitor_module()
+        evidence_type = getattr(module, "LifecycleMonitoringEvidence")
+        lifecycle_record = getattr(module, "lifecycle_monitoring_record")
+        repeated = "evidence:" + "5" * 64
+        evidence = evidence_type(
+            decision_sufficiency_packet_ref="evidence:" + "6" * 64,
+            decision_sufficiency_rejection_ref=None,
+            lifecycle_state="prepared",
+            evidence_refs=(repeated, repeated),
+            close_agent_tool_call_ref=None,
+        )
+
+        with self.assertRaisesRegex(ValueError, "evidence_ref_duplicate"):
+            lifecycle_record(evidence)
 
     def test_monitor_appends_signals_interventions_and_decisions(self) -> None:
         """The monitor CLI should update all monitored sections."""

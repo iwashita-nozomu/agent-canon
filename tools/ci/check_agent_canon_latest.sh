@@ -5,6 +5,7 @@
 # upstream design ../README.md shared automation index
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines PR-first propagation after dirty shared-canon checks
 # upstream design ../../agents/workflows/derived-agent-canon-diff-workflow.md defines branch route for derived shared-canon diffs
+# upstream implementation ../agent_tools/update_lifecycle_contract.py owns G4/G5 readback evidence identity.
 # @dependency-end
 
 set -euo pipefail
@@ -12,6 +13,33 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
+
+if [[ -n "${AGENT_CANON_LATEST_GATE_BUNDLE:-}" ]]; then
+  PYTHONPATH="${ROOT_DIR}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+    python3 - "${AGENT_CANON_LATEST_GATE_BUNDLE}" <<'PY'
+import json
+import sys
+from pathlib import Path
+from update_lifecycle_contract import binding_identity, validate_gate_verdict
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+values = payload.get("gate_verdicts") if isinstance(payload, dict) else None
+if not isinstance(values, list):
+    raise SystemExit("agent_canon_latest_gate_bundle:gate_verdicts_missing")
+gates = [validate_gate_verdict(value) for value in values]
+if tuple(gate["gate_id"] for gate in gates) != ("G4", "G5"):
+    raise SystemExit("agent_canon_latest_gate_bundle:order_invalid")
+if any(gate["verdict"] != "pass" for gate in gates):
+    raise SystemExit("agent_canon_latest_gate_bundle:gate_not_passed")
+if binding_identity(gates[0]["binding"]) != binding_identity(gates[1]["binding"]):
+    raise SystemExit("agent_canon_latest_gate_bundle:identity_mismatch")
+print("AGENT_CANON_LATEST_GATE_RECEIPTS=consumed")
+print("AGENT_CANON_LATEST_GATE_ORDER=G4,G5")
+print("AGENT_CANON_LATEST=pass")
+print("AGENT_CANON_LATEST_ROUTE=lifecycle_readback_receipt")
+PY
+  exit 0
+fi
 
 plan_output="$(bash tools/update_agent_canon.sh plan)"
 printf '%s\n' "$plan_output"

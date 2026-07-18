@@ -190,7 +190,7 @@ issues = [
 id = "shared-tooling"
 owner = "agent-canon"
 class = "tooling"
-description = "Shared automation, static gates, OOP checkers, Rust CLI, and tool catalog metadata."
+description = "Shared automation, canonical update-lifecycle schemas, static gates, OOP checkers, Rust CLI, and tool catalog metadata."
 paths = [
   "tools/**",
   "rust/**",

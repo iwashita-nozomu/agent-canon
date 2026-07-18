@@ -5,6 +5,7 @@
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
 # upstream design ../documents/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
 # upstream implementation ./sync_agent_canon.sh performs low-level submodule freshness and root-view synchronization.
+# upstream implementation ./agent_tools/update_lifecycle_contract.py owns queue/frontier receipt mechanics and guards.
 # upstream implementation ./rebuild_agent_tools.sh rebuilds compiled AgentCanon tools after safe updates.
 # downstream implementation ./agent_tools/agent_canon_update_todos.py advances parent-repo AgentCanon update TODO state after safe updates.
 # downstream implementation ../tests/tools/test_update_agent_canon.py validates update wrapper behavior.
@@ -23,6 +24,17 @@ fi
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
+if [ -n "$SUPERPROJECT_DIR" ]; then
+  AGENT_CANON_SOURCE_MODE="parent_projection"
+  AGENT_CANON_DIR="$ROOT_DIR/$PREFIX"
+else
+  AGENT_CANON_SOURCE_MODE="standalone_source"
+  AGENT_CANON_DIR="$ROOT_DIR"
+fi
+UPDATE_OWNER_NAMESPACE="${AGENT_CANON_UPDATE_OWNER_NAMESPACE:-$ROOT_DIR/.agent-canon/update-lifecycle}"
+UPDATE_STATE_DIR="$UPDATE_OWNER_NAMESPACE/state"
+UPDATE_EVIDENCE_DIR="$UPDATE_OWNER_NAMESPACE/evidence"
+UPDATE_PROJECTION_DIR="$UPDATE_OWNER_NAMESPACE/projection-queue"
 
 usage() {
   cat <<EOF
@@ -33,6 +45,8 @@ Usage:
   bash tools/update_agent_canon.sh rebuild-tools
   bash tools/update_agent_canon.sh merge-main-into-current [branch]
   bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty [branch]
+  bash tools/update_agent_canon.sh enqueue-source-projection <binding.json> <rebind.json> <source-main-readback-evidence-ref> <pr-388-evidence-ref> <pr-389-evidence-ref> [queue.json] [frontier.pending.json]
+  bash tools/update_agent_canon.sh accept-dependency-frontier <frontier.pending.json> <queue.json> <rebind.json> <acceptance-evidence-ref> [frontier.accepted.json] [branch]
   bash tools/update_agent_canon.sh status
 
 Commands:
@@ -57,6 +71,10 @@ Commands:
       and restore the dirty work after a successful merge. If the merge itself
       conflicts, the stash is kept and the command reports the stash ref to
       restore after resolving the main merge.
+  enqueue-source-projection
+      Materialize or replay the exact source-main QueueReceipt and pending dependency frontier.
+  accept-dependency-frontier
+      Read back source main and append acceptance to the exact pending frontier.
   status
       Print low-level AgentCanon submodule/root-view status.
 
@@ -132,6 +150,11 @@ ensure_remote_commit_object() {
 }
 
 ensure_agent_canon_submodule() {
+  if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
+    git -C "$AGENT_CANON_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+      || die "standalone AgentCanon source is not a Git worktree"
+    return
+  fi
   [ -d "$ROOT_DIR/$PREFIX" ] || die "prefix '$PREFIX' does not exist"
   [ "$(git -C "$ROOT_DIR" ls-tree HEAD "$PREFIX" 2>/dev/null | awk '{print $1}')" = "160000" ] \
     || die "prefix '$PREFIX' is not a Git submodule"
@@ -141,6 +164,10 @@ ensure_agent_canon_submodule() {
 }
 
 submodule_remote_url() {
+  if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
+    git -C "$AGENT_CANON_DIR" remote get-url origin 2>/dev/null || true
+    return
+  fi
   git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.url" 2>/dev/null || true
 }
 
@@ -199,15 +226,15 @@ restore_original_submodule_ref() {
   local original_branch="$1"
   local original_head="$2"
   if [ -n "$original_branch" ]; then
-    git -C "$ROOT_DIR/$PREFIX" switch "$original_branch" >/dev/null
+    git -C "$AGENT_CANON_DIR" switch "$original_branch" >/dev/null
     return
   fi
-  git -C "$ROOT_DIR/$PREFIX" checkout --detach "$original_head" >/dev/null
+  git -C "$AGENT_CANON_DIR" checkout --detach "$original_head" >/dev/null
 }
 
 stash_ref_for_sha() {
   local stash_sha="$1"
-  git -C "$ROOT_DIR/$PREFIX" stash list --format='%gd %H' \
+  git -C "$AGENT_CANON_DIR" stash list --format='%gd %H' \
     | awk -v sha="$stash_sha" '$2 == sha {print $1; exit}'
 }
 
@@ -216,17 +243,17 @@ drop_stash_sha_if_present() {
   local stash_ref=""
   stash_ref="$(stash_ref_for_sha "$stash_sha")"
   [ -n "$stash_ref" ] || return 0
-  git -C "$ROOT_DIR/$PREFIX" stash drop "$stash_ref" >/dev/null
+  git -C "$AGENT_CANON_DIR" stash drop "$stash_ref" >/dev/null
 }
 
 remove_eval_log_worktree() {
   local worktree_path="$1"
   local branch="$2"
   if [ -n "$worktree_path" ] && [ -d "$worktree_path" ]; then
-    git -C "$ROOT_DIR/$PREFIX" worktree remove --force "$worktree_path" >/dev/null 2>&1 || true
+    git -C "$AGENT_CANON_DIR" worktree remove --force "$worktree_path" >/dev/null 2>&1 || true
   fi
   if [ -n "$branch" ]; then
-    git -C "$ROOT_DIR/$PREFIX" branch -D "$branch" >/dev/null 2>&1 || true
+    git -C "$AGENT_CANON_DIR" branch -D "$branch" >/dev/null 2>&1 || true
   fi
 }
 
@@ -272,7 +299,7 @@ park_eval_log_dirty_state_if_safe() {
   local -a paths=()
 
   ensure_agent_canon_submodule
-  status_output="$(git -C "$ROOT_DIR/$PREFIX" status --porcelain=v1 --untracked-files=all)"
+  status_output="$(git -C "$AGENT_CANON_DIR" status --porcelain=v1 --untracked-files=all)"
   if [ -z "$status_output" ]; then
     echo "AGENT_CANON_EVAL_LOG_PARK=clean"
     return 0
@@ -289,26 +316,26 @@ park_eval_log_dirty_state_if_safe() {
     paths+=("$path")
   done <<< "$status_output"
 
-  current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-  current_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+  current_branch="$(git -C "$AGENT_CANON_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  current_head="$(git -C "$AGENT_CANON_DIR" rev-parse HEAD)"
   log_branch="${AGENT_CANON_EVAL_LOG_BRANCH:-agent-logs/$(parent_repo_log_slug)}"
   tmp_branch="agent-log-park/$(parent_repo_log_slug)/$(date -u +%Y%m%dT%H%M%SZ)-$$"
 
   echo "AGENT_CANON_EVAL_LOG_PARK=started"
   echo "AGENT_CANON_EVAL_LOG_PARK_BRANCH=$log_branch"
-  git -C "$ROOT_DIR/$PREFIX" stash push -u -m "park eval logs before AgentCanon latest" -- "${paths[@]}" >/dev/null
-  stash_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse --verify refs/stash)"
+  git -C "$AGENT_CANON_DIR" stash push -u -m "park eval logs before AgentCanon latest" -- "${paths[@]}" >/dev/null
+  stash_sha="$(git -C "$AGENT_CANON_DIR" rev-parse --verify refs/stash)"
 
-  git -C "$ROOT_DIR/$PREFIX" fetch --no-write-fetch-head origin "$log_branch" >/dev/null 2>&1 || true
-  if git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/remotes/origin/$log_branch"; then
+  git -C "$AGENT_CANON_DIR" fetch --no-write-fetch-head origin "$log_branch" >/dev/null 2>&1 || true
+  if git -C "$AGENT_CANON_DIR" show-ref --verify --quiet "refs/remotes/origin/$log_branch"; then
     log_start_ref="origin/$log_branch"
-  elif git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/heads/$log_branch"; then
+  elif git -C "$AGENT_CANON_DIR" show-ref --verify --quiet "refs/heads/$log_branch"; then
     log_start_ref="$log_branch"
   else
     log_start_ref="$current_head"
   fi
   tmp_worktree="$(mktemp -d)"
-  git -C "$ROOT_DIR/$PREFIX" worktree add -b "$tmp_branch" "$tmp_worktree" "$log_start_ref" >/dev/null
+  git -C "$AGENT_CANON_DIR" worktree add -b "$tmp_branch" "$tmp_worktree" "$log_start_ref" >/dev/null
 
   apply_log="$(mktemp)"
   git -C "$tmp_worktree" stash apply "$stash_sha" >"$apply_log" 2>&1 || apply_rc=$?
@@ -342,6 +369,10 @@ park_eval_log_dirty_state_if_safe() {
 }
 
 parent_pin() {
+  if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
+    git -C "$AGENT_CANON_DIR" rev-parse HEAD
+    return
+  fi
   git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX"
 }
 
@@ -358,7 +389,7 @@ emit_remote_main_ancestor_evidence() {
   local remote_sha="$1"
   local post_head="$2"
 
-  if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$post_head"; then
+  if git -C "$AGENT_CANON_DIR" merge-base --is-ancestor "$remote_sha" "$post_head"; then
     echo "agent_canon_merge_remote_main_in_post_head=yes"
     echo "agent_canon_merge_remote_main_verified=yes"
     return
@@ -515,8 +546,258 @@ rebuild_agent_tools_if_available() {
   bash "$rebuild_tool"
 }
 
+emit_queue_receipt() {
+  local binding_file="$1"
+  local rebind_receipt_file="$2"
+  local source_main_readback_evidence_ref="$3"
+  local predecessor_388_evidence_ref="$4"
+  local predecessor_389_evidence_ref="$5"
+  local queue_output="${6:-$UPDATE_PROJECTION_DIR/queue.accepted.json}"
+  local frontier_output="${7:-$UPDATE_PROJECTION_DIR/frontier.pending.json}"
+  local current_marker="$UPDATE_STATE_DIR/current-transaction"
+
+  mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
+  PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
+    python3 - "$binding_file" "$rebind_receipt_file" \
+      "$source_main_readback_evidence_ref" "$predecessor_388_evidence_ref" \
+      "$predecessor_389_evidence_ref" "$queue_output" "$frontier_output" \
+      "$AGENT_CANON_DIR" "$current_marker" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+from update_lifecycle_contract import (
+    materialize_dependency_frontier,
+    materialize_queue_receipt,
+    validate_dependency_frontier,
+    validate_queue_receipt,
+)
+
+(
+    binding_path,
+    rebind_path,
+    readback_ref,
+    predecessor_388_ref,
+    predecessor_389_ref,
+    queue_path,
+    frontier_path,
+    source_namespace,
+    current_marker_path,
+) = sys.argv[1:]
+binding = json.loads(Path(binding_path).read_text(encoding="utf-8"))
+rebind = json.loads(Path(rebind_path).read_text(encoding="utf-8"))
+queue = materialize_queue_receipt(
+    binding=binding,
+    source_namespace=str(Path(source_namespace).resolve()),
+    source_main_rebind_receipt_id=rebind["rebind_receipt_id"],
+    source_main_readback_evidence_ref=readback_ref,
+    state="accepted",
+)
+predecessors = [
+    {
+        "queue_number": 388,
+        "source_pr": "#388",
+        "publication_evidence_id": predecessor_388_ref,
+    },
+    {
+        "queue_number": 389,
+        "source_pr": "#389",
+        "source_pr_sha": "3ce14a5e8103e3c53178d579be9cb7920c715ecb",
+        "publication_evidence_id": predecessor_389_ref,
+    },
+]
+frontier = materialize_dependency_frontier(
+    binding=binding,
+    queue_receipt=queue,
+    rebind_receipt=rebind,
+    source_main_readback_evidence_ref=readback_ref,
+    ordered_predecessor_evidence=predecessors,
+)
+
+def persist_once(path_text, record, validator, identity_field):
+    path = Path(path_text)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_file():
+        existing = validator(json.loads(path.read_text(encoding="utf-8")))
+        if existing[identity_field] != record[identity_field]:
+            raise SystemExit(f"input_identity_mismatch:{path}")
+        replay = json.loads(json.dumps(existing))
+        replay["binding"]["timing"]["replayed"] = True
+        return replay
+    handle = tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=path.parent, delete=False
+    )
+    try:
+        json.dump(record, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+        handle.close()
+        os.replace(handle.name, path)
+    finally:
+        if os.path.exists(handle.name):
+            os.unlink(handle.name)
+    return record
+
+queue_result = persist_once(
+    queue_path, queue, validate_queue_receipt, "queue_receipt_id"
+)
+frontier_result = persist_once(
+    frontier_path, frontier, validate_dependency_frontier, "frontier_id"
+)
+marker = {
+    "schema": "agent-canon.update-lifecycle-current-transaction.v1",
+    "transaction_id": binding["transaction_id"],
+    "queue_receipt_id": queue_result["queue_receipt_id"],
+    "frontier_id": frontier_result["frontier_id"],
+}
+marker_path = Path(current_marker_path)
+if marker_path.is_file():
+    existing_marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    if existing_marker != marker:
+        raise SystemExit(f"input_identity_mismatch:{marker_path}")
+else:
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=marker_path.parent, delete=False
+    )
+    try:
+        json.dump(marker, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+        handle.close()
+        os.replace(handle.name, marker_path)
+    finally:
+        if os.path.exists(handle.name):
+            os.unlink(handle.name)
+print(f"AGENT_CANON_QUEUE_RECEIPT_ID={queue_result['queue_receipt_id']}")
+print(f"AGENT_CANON_QUEUE_REPLAYED={str(queue_result['binding']['timing']['replayed']).lower()}")
+print(f"AGENT_CANON_FRONTIER_ID={frontier_result['frontier_id']}")
+print(f"AGENT_CANON_FRONTIER_STATE={frontier_result['frontier_state']}")
+PY
+}
+
+accept_dependency_frontier() {
+  local pending_frontier_file="$1"
+  local queue_receipt_file="$2"
+  local rebind_receipt_file="$3"
+  local acceptance_evidence_ref="$4"
+  local accepted_output="${5:-$UPDATE_PROJECTION_DIR/frontier.accepted.json}"
+  local branch="${6:-$DEFAULT_BRANCH}"
+  local remote_url=""
+  local source_main_sha=""
+
+  remote_url="$(submodule_remote_url)"
+  [ -n "$remote_url" ] || die "AgentCanon source remote is unavailable"
+  source_main_sha="$(resolve_remote_branch_sha "$remote_url" "$branch")"
+  mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
+  PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
+    python3 - "$pending_frontier_file" "$queue_receipt_file" \
+      "$rebind_receipt_file" "$source_main_sha" "$acceptance_evidence_ref" \
+      "$accepted_output" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+from update_lifecycle_contract import (
+    validate_dependency_frontier,
+    validate_dependency_frontier_transition,
+)
+
+pending_path, queue_path, rebind_path, source_main_sha, acceptance_ref, output_path = sys.argv[1:]
+pending = json.loads(Path(pending_path).read_text(encoding="utf-8"))
+queue = json.loads(Path(queue_path).read_text(encoding="utf-8"))
+rebind = json.loads(Path(rebind_path).read_text(encoding="utf-8"))
+accepted = json.loads(json.dumps(pending))
+accepted["frontier_state"] = "accepted"
+accepted["preceding_frontier_evidence_id"] = pending["binding"]["evidence_ref"]
+accepted["acceptance_evidence_ref"] = acceptance_ref
+transaction_id = pending["binding"]["transaction_id"]
+accepted = validate_dependency_frontier_transition(
+    pending,
+    accepted,
+    queue_receipt=queue,
+    rebind_receipt=rebind,
+    origin_main_commit_sha=source_main_sha,
+    ordered_oracle=[
+        "source_pr:#388",
+        "source_pr:#389",
+        f"transaction:{transaction_id}",
+    ],
+)
+path = Path(output_path)
+path.parent.mkdir(parents=True, exist_ok=True)
+if path.is_file():
+    existing = validate_dependency_frontier(
+        json.loads(path.read_text(encoding="utf-8"))
+    )
+    if existing["frontier_id"] != accepted["frontier_id"]:
+        raise SystemExit(f"input_identity_mismatch:{path}")
+    result = json.loads(json.dumps(existing))
+    result["binding"]["timing"]["replayed"] = True
+else:
+    handle = tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=path.parent, delete=False
+    )
+    try:
+        json.dump(accepted, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+        handle.close()
+        os.replace(handle.name, path)
+    finally:
+        if os.path.exists(handle.name):
+            os.unlink(handle.name)
+    result = accepted
+print(f"AGENT_CANON_FRONTIER_ID={result['frontier_id']}")
+print(f"AGENT_CANON_FRONTIER_STATE={result['frontier_state']}")
+print(f"AGENT_CANON_FRONTIER_REPLAYED={str(result['binding']['timing']['replayed']).lower()}")
+print(f"AGENT_CANON_SOURCE_MAIN_READBACK={source_main_sha}")
+PY
+}
+
+require_accepted_dependency_frontier() {
+  local current_marker="$UPDATE_STATE_DIR/current-transaction"
+  local accepted_frontier="$UPDATE_PROJECTION_DIR/frontier.accepted.json"
+  if [ ! -f "$current_marker" ]; then
+    return 0
+  fi
+  [ -f "$accepted_frontier" ] \
+    || die "parent projection blocked until dependency frontier acceptance"
+  PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
+    python3 - "$accepted_frontier" "$current_marker" <<'PY'
+import json
+import sys
+from pathlib import Path
+from update_lifecycle_contract import validate_dependency_frontier
+
+frontier = validate_dependency_frontier(
+    json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+)
+marker = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+if set(marker) != {"schema", "transaction_id", "queue_receipt_id", "frontier_id"}:
+    raise SystemExit("frontier:current_transaction_marker_invalid")
+if marker["schema"] != "agent-canon.update-lifecycle-current-transaction.v1":
+    raise SystemExit("frontier:current_transaction_marker_invalid")
+if frontier["frontier_state"] != "accepted":
+    raise SystemExit("frontier:not_accepted")
+if frontier["binding"]["transaction_id"] != marker["transaction_id"]:
+    raise SystemExit("frontier:transaction_identity_mismatch")
+if frontier["frontier_id"] != marker["frontier_id"]:
+    raise SystemExit("frontier:identity_mismatch")
+print(f"AGENT_CANON_PARENT_PROJECTION_FRONTIER={frontier['frontier_id']}")
+PY
+}
+
 cmd_plan() {
   local branch="${1:-$DEFAULT_BRANCH}"
+  if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
+    echo "agent_canon_plan_route=standalone_source_rebind"
+    echo "agent_canon_plan_source_namespace=$AGENT_CANON_DIR"
+    echo "agent_canon_plan_owner_namespace=$UPDATE_OWNER_NAMESPACE"
+    echo "agent_canon_plan_branch=$branch"
+    return
+  fi
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" plan "$branch"
 }
 
@@ -531,6 +812,12 @@ cmd_latest() {
   local latest_rc=0
   local park_rc=0
   local todo_rc=0
+
+  if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
+    cmd_merge_main_into_current_preserve_dirty "$branch"
+    return
+  fi
+  require_accepted_dependency_frontier
 
   park_eval_log_dirty_state_if_safe || park_rc=$?
   if [ "$park_rc" -gt 1 ]; then
@@ -597,6 +884,12 @@ cmd_apply() {
   local latest_rc=0
   local park_rc=0
 
+  if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
+    cmd_merge_main_into_current "$branch"
+    return
+  fi
+  require_accepted_dependency_frontier
+
   park_eval_log_dirty_state_if_safe || park_rc=$?
   if [ "$park_rc" -gt 1 ]; then
     echo "AGENT_CANON_LATEST_TOOL_RESULT=eval_log_park_failed"
@@ -625,6 +918,14 @@ cmd_rebuild_tools() {
 }
 
 cmd_status() {
+  if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
+    echo "agent_canon_source_mode=standalone_source"
+    echo "agent_canon_source_namespace=$AGENT_CANON_DIR"
+    echo "agent_canon_source_head=$(git -C "$AGENT_CANON_DIR" rev-parse HEAD)"
+    echo "agent_canon_source_tree=$(git -C "$AGENT_CANON_DIR" rev-parse HEAD^{tree})"
+    echo "agent_canon_source_worktree_status=$(git -C "$AGENT_CANON_DIR" status --porcelain=v1 --untracked-files=all | wc -l | tr -d ' ')"
+    return
+  fi
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" status
 }
 
@@ -648,10 +949,10 @@ cmd_merge_main_into_current() {
   [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
 
   remote_sha="$(resolve_remote_branch_sha "$remote_url" "$branch")"
-  ensure_remote_commit_object "$ROOT_DIR/$PREFIX" "$remote_url" "$remote_sha"
-  pre_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
-  current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-  submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all)"
+  ensure_remote_commit_object "$AGENT_CANON_DIR" "$remote_url" "$remote_sha"
+  pre_head="$(git -C "$AGENT_CANON_DIR" rev-parse HEAD)"
+  current_branch="$(git -C "$AGENT_CANON_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  submodule_status="$(git -C "$AGENT_CANON_DIR" status --short --untracked-files=all)"
 
   echo "agent_canon_merge_prefix=$PREFIX"
   echo "agent_canon_merge_source=${remote_url}#${branch}"
@@ -687,10 +988,10 @@ cmd_merge_main_into_current() {
   timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
   backup_branch="agent-canon-merge-backup/$(sanitize_ref_component "$current_branch")/$timestamp"
   backup_ref="refs/heads/$backup_branch"
-  git -C "$ROOT_DIR/$PREFIX" branch "$backup_branch" "$pre_head" >/dev/null
+  git -C "$AGENT_CANON_DIR" branch "$backup_branch" "$pre_head" >/dev/null
   echo "agent_canon_merge_backup_ref=$backup_ref"
 
-  if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$pre_head"; then
+  if git -C "$AGENT_CANON_DIR" merge-base --is-ancestor "$remote_sha" "$pre_head"; then
     echo "agent_canon_merge_post_head=$pre_head"
     emit_remote_main_ancestor_evidence "$remote_sha" "$pre_head"
     echo "agent_canon_merge_result=already_contains_main"
@@ -700,9 +1001,9 @@ cmd_merge_main_into_current() {
   fi
 
   merge_log="$(mktemp)"
-  if git -C "$ROOT_DIR/$PREFIX" merge --no-edit "$remote_sha" >"$merge_log" 2>&1; then
-    post_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
-    if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$pre_head" "$remote_sha"; then
+  if git -C "$AGENT_CANON_DIR" merge --no-edit "$remote_sha" >"$merge_log" 2>&1; then
+    post_head="$(git -C "$AGENT_CANON_DIR" rev-parse HEAD)"
+    if git -C "$AGENT_CANON_DIR" merge-base --is-ancestor "$pre_head" "$remote_sha"; then
       result="fast_forwarded"
     else
       result="merged"
@@ -718,7 +1019,7 @@ cmd_merge_main_into_current() {
 
   cat "$merge_log" >&2
   rm -f "$merge_log"
-  conflict_files="$(git -C "$ROOT_DIR/$PREFIX" diff --name-only --diff-filter=U | paste -sd, -)"
+  conflict_files="$(git -C "$AGENT_CANON_DIR" diff --name-only --diff-filter=U | paste -sd, -)"
   echo "agent_canon_merge_result=conflict"
   echo "agent_canon_merge_conflict_files=${conflict_files:-<unset>}"
   echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
@@ -737,8 +1038,8 @@ cmd_merge_main_into_current_preserve_dirty() {
   local restore_rc=0
 
   ensure_agent_canon_submodule
-  current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-  submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all)"
+  current_branch="$(git -C "$AGENT_CANON_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  submodule_status="$(git -C "$AGENT_CANON_DIR" status --short --untracked-files=all)"
 
   echo "agent_canon_merge_dirty_preserve_prefix=$PREFIX"
   echo "agent_canon_merge_dirty_preserve_target_branch=${current_branch:-<detached>}"
@@ -758,8 +1059,8 @@ cmd_merge_main_into_current_preserve_dirty() {
 
   echo "agent_canon_merge_dirty_preserve_result=started"
   echo "agent_canon_merge_dirty_preserve_worktree_status=dirty"
-  git -C "$ROOT_DIR/$PREFIX" stash push -u -m "preserve dirty AgentCanon work before merge-main-into-current" >/dev/null
-  stash_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse --verify refs/stash)"
+  git -C "$AGENT_CANON_DIR" stash push -u -m "preserve dirty AgentCanon work before merge-main-into-current" >/dev/null
+  stash_sha="$(git -C "$AGENT_CANON_DIR" rev-parse --verify refs/stash)"
   stash_ref="$(stash_ref_for_sha "$stash_sha")"
   echo "agent_canon_merge_dirty_stash_ref=${stash_ref:-<unknown>}"
   echo "agent_canon_merge_dirty_stash_sha=$stash_sha"
@@ -773,7 +1074,7 @@ cmd_merge_main_into_current_preserve_dirty() {
   fi
 
   restore_log="$(mktemp)"
-  git -C "$ROOT_DIR/$PREFIX" stash apply "$stash_sha" >"$restore_log" 2>&1 || restore_rc=$?
+  git -C "$AGENT_CANON_DIR" stash apply "$stash_sha" >"$restore_log" 2>&1 || restore_rc=$?
   if [ "$restore_rc" -eq 0 ]; then
     rm -f "$restore_log"
     drop_stash_sha_if_present "$stash_sha"
@@ -822,6 +1123,16 @@ main() {
     merge-main-into-current-preserve-dirty)
       shift
       cmd_merge_main_into_current_preserve_dirty "${1:-$DEFAULT_BRANCH}"
+      ;;
+    enqueue-source-projection)
+      [ "$#" -ge 6 ] || die "enqueue-source-projection requires binding, rebind, readback, #388, and #389 evidence arguments"
+      shift
+      emit_queue_receipt "$@"
+      ;;
+    accept-dependency-frontier)
+      [ "$#" -ge 5 ] || die "accept-dependency-frontier requires pending frontier, queue, rebind, and acceptance evidence arguments"
+      shift
+      accept_dependency_frontier "$@"
       ;;
     status)
       shift

@@ -378,6 +378,30 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_subagent_wave_routing_requires_runtime_owner_pointer(self) -> None:
+        """The runtime shim points to the policy owner instead of copying policy."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_subagent_wave_routing_contract(root)
+            shim = root / ".agents" / "skills" / "agent-orchestration" / "SKILL.md"
+            shim.write_text(
+                shim.read_text(encoding="utf-8").replace(
+                    "agents/skills/agent-orchestration.md",
+                    "missing-owner.md",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "subagent_wave_routing")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-text:subagent_wave_routing:"
+                ".agents/skills/agent-orchestration/SKILL.md:"
+                "missing-runtime-orchestration-owner-pointer",
+                result.stdout,
+            )
+
     def write_file(self, root: Path, relative: str, text: str) -> None:
         """Write one fixture file."""
         path = root / relative
@@ -467,7 +491,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "agents/canonical/CODEX_SUBAGENTS.md",
             "agents/TASK_WORKFLOWS.md",
             "agents/skills/agent-orchestration.md",
-            ".agents/skills/agent-orchestration/SKILL.md",
             "tools/agent_tools/check_convention_compliance.py",
         ]:
             self.write_file(
@@ -492,8 +515,25 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             )
         self.write_file(
             root,
+            ".agents/skills/agent-orchestration/SKILL.md",
+            "\n".join(
+                [
+                    "<!--",
+                    "@dependency-start",
+                    "responsibility Routes to the canonical orchestration owner.",
+                    "upstream design ../../../agents/skills/agent-orchestration.md owner",
+                    "@dependency-end",
+                    "-->",
+                    "agents/skills/agent-orchestration.md",
+                    "machine-readable ToolCall tokens",
+                    "",
+                ]
+            ),
+        )
+        self.write_file(
+            root,
             "evidence/agent-evals/skill_workflow_prompt_eval.toml",
-            "VERTICAL-WAVE-POLICY vertical dynamic wave write-capable handoff\n",
+            "VERTICAL-WAVE-POLICY ORCH-SHIM-POINTER-1 ORCH-SHIM-TOOLCALL-1\n",
         )
         self.write_file(
             root,

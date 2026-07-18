@@ -44,6 +44,7 @@ ALLOWED_OWNERS = frozenset(
         "project",
         "github-path-constraint",
         "agent-canon-standalone",
+        "agent-canon-update",
         "legacy",
     }
 )
@@ -58,7 +59,10 @@ ALLOWED_CLASSES = frozenset(
         "project_content",
         "test_mirror",
         "github_copy",
+        "generated_evidence",
+        "projection_view",
         "standalone_only",
+        "transaction_state",
         "removed_legacy",
     }
 )

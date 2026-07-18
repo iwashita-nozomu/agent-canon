@@ -10,12 +10,22 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import tempfile
 import unittest
 from collections.abc import Sequence
 from pathlib import Path
 
 from tools.agent_tools import github_publish
+from tools.agent_tools.update_lifecycle_contract import (
+    validate_pull_request_lifecycle,
+    validate_pull_request_transition,
+)
+
+CANDIDATE_SHA = "a" * 40
+CANDIDATE_TREE = "b" * 40
+BASE_SHA = "c" * 40
+BASE_TREE = "d" * 40
 
 
 class FakeRunner:
@@ -49,9 +59,55 @@ class FakeRunner:
             )
         return self.outputs[key]
 
+    def add_publication_identity(self, branch: str = "topic", base: str = "main") -> None:
+        """Register the exact candidate and base identities used by one lifecycle."""
+        self.add(["git", "rev-parse", branch], stdout=CANDIDATE_SHA + "\n")
+        self.add(
+            ["git", "rev-parse", f"{CANDIDATE_SHA}^{{tree}}"],
+            stdout=CANDIDATE_TREE + "\n",
+        )
+        self.add(["git", "rev-parse", f"origin/{base}"], stdout=BASE_SHA + "\n")
+        self.add(
+            ["git", "rev-parse", f"{BASE_SHA}^{{tree}}"],
+            stdout=BASE_TREE + "\n",
+        )
+
 
 class GithubPublishTest(unittest.TestCase):
     """Exercise the GitHub publish command planner."""
+
+    def lifecycle_fixture(
+        self,
+        *,
+        permission_state: str = "verified_true",
+        state: str | None = None,
+    ) -> dict[str, object]:
+        """Build one exact user lifecycle without a remote mutation."""
+        runner = FakeRunner()
+        runner.add_publication_identity()
+        args = argparse.Namespace(
+            user_task="typed PR lifecycle",
+            title="Typed lifecycle",
+            body_file=None,
+            base="main",
+            draft=False,
+        )
+        verification = github_publish.RemoteVerification(
+            repo="owner/repo",
+            remote="origin",
+            remote_url="git@github.com:owner/repo.git",
+            remote_slug="owner/repo",
+            permission_state=permission_state,
+            permission_evidence_id="evidence:" + "e" * 64,
+            actor_id="viewer:test",
+        )
+        return github_publish.build_pull_request_lifecycle(
+            args,
+            runner,
+            verification,
+            "topic",
+            state=state,
+        )
 
     def test_normalized_repo_slug_accepts_common_github_urls(self) -> None:
         """Remote URL parsing should support ssh, https, and owner/name."""
@@ -80,8 +136,8 @@ class GithubPublishTest(unittest.TestCase):
         """Mismatched gh repo and origin must fail instead of trying another push route."""
         runner = FakeRunner()
         runner.add(
-            ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl"],
-            stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git"}',
+            ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl,viewerPermission"],
+            stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
         )
         runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:other/repo.git\n")
 
@@ -95,10 +151,11 @@ class GithubPublishTest(unittest.TestCase):
         runner = FakeRunner()
         runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
         runner.add(
-            ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl"],
-            stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git"}',
+            ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl,viewerPermission"],
+            stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
         )
         runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+        runner.add_publication_identity()
         runner.add(["git", "status", "--short", "--untracked-files=all"], stdout=" M file.py\n")
         runner.add(["git", "push", "-u", "origin", "topic"], stderr="pushed\n")
         args = argparse.Namespace(
@@ -126,10 +183,11 @@ class GithubPublishTest(unittest.TestCase):
             runner = FakeRunner()
             runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
             runner.add(
-                ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl"],
-                stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git"}',
+                ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl,viewerPermission"],
+                stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
             )
             runner.add(["git", "remote", "get-url", "origin"], stdout="https://github.com/owner/repo.git\n")
+            runner.add_publication_identity()
             runner.add(
                 [
                     "gh",
@@ -164,6 +222,24 @@ class GithubPublishTest(unittest.TestCase):
                 ],
                 stdout="https://github.com/owner/repo/pull/1\n",
             )
+            runner.add(
+                [
+                    "gh",
+                    "pr",
+                    "view",
+                    "topic",
+                    "--repo",
+                    "owner/repo",
+                    "--json",
+                    "number,url,state,isDraft,baseRefName,headRefName,headRefOid,reviewDecision,reviews",
+                ],
+                stdout=(
+                    '{"number":1,"url":"https://github.com/owner/repo/pull/1",'
+                    '"state":"OPEN","isDraft":false,"baseRefName":"main",'
+                    f'"headRefName":"topic","headRefOid":"{CANDIDATE_SHA}",'
+                    '"reviewDecision":"","reviews":[]}'
+                ),
+            )
             args = argparse.Namespace(
                 action="pr",
                 root=".",
@@ -189,10 +265,11 @@ class GithubPublishTest(unittest.TestCase):
         runner = FakeRunner()
         runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
         runner.add(
-            ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl"],
-            stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git"}',
+            ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl,viewerPermission"],
+            stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
         )
         runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+        runner.add_publication_identity()
         runner.add(
             ["gh", "pr", "checks", "1", "--repo", "owner/repo", "--watch=false"],
             stdout="static-gates\tpending\t0\turl\t\n",
@@ -214,6 +291,128 @@ class GithubPublishTest(unittest.TestCase):
 
         self.assertEqual(summary["status"], "pending")
         self.assertEqual(summary["next_action"], "wait_for_github_checks_or_rerun_with_--watch")
+
+    def test_unknown_push_permission_is_a_typed_refusal(self) -> None:
+        """GitHub mutation cannot infer authority from repository topology."""
+        lifecycle = self.lifecycle_fixture(
+            permission_state="unknown",
+            state="permission_unknown",
+        )
+
+        with self.assertRaises(github_publish.UserVisibleFailure) as raised:
+            github_publish.materialize_pr_identity_gate(lifecycle)
+
+        self.assertIn("permission", raised.exception.message)
+
+    def test_user_fork_and_contributor_topologies_preserve_typed_identity(self) -> None:
+        """All three discriminated PR kinds retain Essence, reviews, and diff state."""
+        user = self.lifecycle_fixture()
+        fork = copy.deepcopy(user)
+        fork["kind"] = "fork"
+        fork.pop("user_identity")
+        fork["fork_identity"] = {
+            "repo_owner": "fork-owner",
+            "repo_name": "repo",
+            "parent_repo_owner": "owner",
+            "parent_repo_name": "repo",
+            "ref": "refs/heads/topic",
+        }
+        contributor = copy.deepcopy(user)
+        contributor["kind"] = "contributor"
+        contributor.pop("user_identity")
+        contributor["contributor_identity"] = {
+            "actor_id": "contributor:test",
+            "display_name": "Contributor",
+        }
+        contributor["contributor_diff"] = {
+            "commit_sha": CANDIDATE_SHA,
+            "tree_sha": CANDIDATE_TREE,
+            "diff_sha256": "sha256:" + "f" * 64,
+        }
+
+        checked = [
+            validate_pull_request_lifecycle(value)
+            for value in (user, fork, contributor)
+        ]
+        self.assertEqual([item["kind"] for item in checked], ["user", "fork", "contributor"])
+        self.assertEqual(
+            checked[2]["contributor_diff"], contributor["contributor_diff"]
+        )
+        self.assertEqual(
+            [item["pr_essence"] for item in checked],
+            [user["pr_essence"], user["pr_essence"], user["pr_essence"]],
+        )
+
+    def test_typed_pr_state_machine_handles_remote_and_review_states(self) -> None:
+        """Draft/review/closed/multi-remote/conflict states use one transition graph."""
+        ready = self.lifecycle_fixture()
+        draft = self.lifecycle_fixture(state="draft")
+        self.assertEqual(
+            validate_pull_request_transition(draft, ready)["state"],
+            "ready",
+        )
+        for state in (
+            "changes_requested",
+            "external_review",
+            "merged",
+            "closed_head",
+            "multiple_remotes",
+        ):
+            successor = copy.deepcopy(ready)
+            successor["state"] = state
+            with self.subTest(state=state):
+                self.assertEqual(
+                    validate_pull_request_transition(ready, successor)["state"],
+                    state,
+                )
+        conflict = copy.deepcopy(ready)
+        conflict["state"] = "conflict_successor"
+        conflict["successor_ref"] = "pr-successor:" + "9" * 64
+        self.assertEqual(
+            validate_pull_request_transition(ready, conflict)["state"],
+            "conflict_successor",
+        )
+
+        unknown = self.lifecycle_fixture(
+            permission_state="unknown",
+            state="permission_unknown",
+        )
+        denied = self.lifecycle_fixture(
+            permission_state="verified_false",
+            state="permission_denied",
+        )
+        self.assertEqual(
+            validate_pull_request_transition(unknown, denied)["state"],
+            "permission_denied",
+        )
+
+    def test_readback_keeps_essence_and_appends_external_review(self) -> None:
+        """Remote changes-requested evidence cannot replace the original PR Essence."""
+        lifecycle = self.lifecycle_fixture()
+        updated = github_publish.lifecycle_with_pr_readback(
+            lifecycle,
+            {
+                "number": 7,
+                "state": "OPEN",
+                "isDraft": False,
+                "baseRefName": "main",
+                "headRefName": "topic",
+                "headRefOid": CANDIDATE_SHA,
+                "reviewDecision": "CHANGES_REQUESTED",
+                "reviews": [
+                    {
+                        "id": "review-7",
+                        "author": {"login": "external-reviewer"},
+                        "state": "CHANGES_REQUESTED",
+                        "body": "please revise",
+                    }
+                ],
+            },
+        )
+
+        self.assertEqual(updated["state"], "changes_requested")
+        self.assertEqual(updated["pr_essence"], lifecycle["pr_essence"])
+        self.assertEqual(updated["reviews"][0]["reviewer_id"], "external-reviewer")
 
 
 if __name__ == "__main__":

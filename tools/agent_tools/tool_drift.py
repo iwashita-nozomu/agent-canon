@@ -374,13 +374,13 @@ CONTRACTS = (
             ),
             TextCheck(
                 ".agents/skills/agent-orchestration/SKILL.md",
-                "vertical dynamic wave",
-                "missing-runtime-orchestration-vertical-wave-policy",
+                "agents/skills/agent-orchestration.md",
+                "missing-runtime-orchestration-owner-pointer",
             ),
             TextCheck(
                 ".agents/skills/agent-orchestration/SKILL.md",
-                "write-capable handoff",
-                "missing-runtime-orchestration-write-capable-handoff-policy",
+                "machine-readable ToolCall tokens",
+                "missing-runtime-orchestration-toolcall-consumer",
             ),
             TextCheck(
                 "evidence/agent-evals/skill_workflow_prompt_eval.toml",
@@ -389,8 +389,13 @@ CONTRACTS = (
             ),
             TextCheck(
                 "evidence/agent-evals/skill_workflow_prompt_eval.toml",
-                "write-capable handoff",
-                "missing-write-capable-handoff-prompt-eval",
+                "ORCH-SHIM-POINTER-1",
+                "missing-orchestration-owner-pointer-eval",
+            ),
+            TextCheck(
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "ORCH-SHIM-TOOLCALL-1",
+                "missing-orchestration-toolcall-eval",
             ),
         ),
     ),

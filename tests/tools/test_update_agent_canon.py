@@ -9,8 +9,10 @@
 from __future__ import annotations
 
 import os
+import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -24,6 +26,11 @@ def resolve_repo_root() -> Path:
         if (candidate / ".git").exists():
             git_root = candidate
             if (candidate / "vendor" / "agent-canon").exists():
+                return candidate
+            if (
+                (candidate / "ROOT_AGENTS.md").is_file()
+                and (candidate / "tools" / "update_agent_canon.sh").is_file()
+            ):
                 return candidate
     if git_root is not None:
         raise unittest.SkipTest("derived-repo agent-canon wrapper tests require vendor/agent-canon")
@@ -47,13 +54,17 @@ AGENT_CANON_IS_SUBMODULE = bool(
         text=True,
     ).stdout.strip()
 )
+AGENT_CANON_IS_STANDALONE = not (REPO_ROOT / "vendor" / "agent-canon").exists()
+sys.path.insert(0, str(REPO_ROOT / "tools" / "agent_tools"))
+
+from update_lifecycle_contract import materialize_source_main_rebind_receipt  # noqa: E402
 OVERLAY_EXCLUDED_NAMES = {".git", ".pytest_cache", ".ruff_cache", "reports"}
 SUBMODULE_GITFILE = Path("vendor") / "agent-canon" / ".git"
 
 
 @unittest.skipIf(
-    AGENT_CANON_IS_SUBMODULE,
-    "subtree snapshot wrapper tests do not apply when vendor/agent-canon is a submodule",
+    AGENT_CANON_IS_SUBMODULE or AGENT_CANON_IS_STANDALONE,
+    "subtree snapshot wrapper tests require a derived subtree checkout",
 )
 class UpdateAgentCanonTest(unittest.TestCase):
     """Exercise the wrapper through a cloned repository."""
@@ -2753,6 +2764,211 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(apply.returncode, 0, apply.stderr)
             self.assertIn("agent_canon_latest=updating_submodule", apply.stdout)
             self.assertEqual(pinned_sha, remote_sha)
+
+
+class StandaloneUpdateLifecycleTest(unittest.TestCase):
+    """Exercise the single standalone queue/frontier transaction entry."""
+
+    def make_source_repo(self, root: Path) -> tuple[Path, Path]:
+        """Create a local source clone and local main remote with lifecycle tools."""
+        source = root / "source"
+        remote = root / "origin.git"
+        source.mkdir()
+        subprocess.run(["git", "init", "-b", "main"], cwd=source, check=True)
+        subprocess.run(["git", "config", "user.name", "Lifecycle Test"], cwd=source, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "lifecycle@example.invalid"],
+            cwd=source,
+            check=True,
+        )
+        tool_dir = source / "tools" / "agent_tools"
+        tool_dir.mkdir(parents=True)
+        shutil.copy2(REPO_ROOT / "tools" / "update_agent_canon.sh", source / "tools")
+        for name in ("artifact_identity.py", "update_lifecycle_contract.py"):
+            shutil.copy2(REPO_ROOT / "tools" / "agent_tools" / name, tool_dir / name)
+        (source / "ROOT_AGENTS.md").write_text("# fixture\n", encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=source, check=True)
+        subprocess.run(["git", "commit", "-m", "fixture source"], cwd=source, check=True)
+        subprocess.run(["git", "init", "--bare", str(remote)], check=True)
+        subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=source, check=True)
+        subprocess.run(["git", "push", "-u", "origin", "main"], cwd=source, check=True)
+        subprocess.run(
+            ["git", "--git-dir", str(remote), "symbolic-ref", "HEAD", "refs/heads/main"],
+            check=True,
+        )
+        return source, remote
+
+    def binding_and_rebind(self, source: Path) -> tuple[dict[str, object], dict[str, object]]:
+        """Return one exact binding and immutable pre-freeze rebind receipt."""
+        candidate = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=source,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        tree = subprocess.run(
+            ["git", "rev-parse", "HEAD^{tree}"],
+            cwd=source,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        binding: dict[str, object] = {
+            "transaction_id": "tx:" + "1" * 64,
+            "snapshot_id": "snapshot:" + "2" * 64,
+            "candidate_sha": candidate,
+            "tree_sha": tree,
+            "input_digest": "sha256:" + "3" * 64,
+            "tool_id": "update-agent-canon",
+            "tool_version": "test.v1",
+            "evidence_ref": "evidence:" + "4" * 64,
+            "evidence_digest": "sha256:" + "5" * 64,
+            "timing": {
+                "started_at": "2026-07-18T00:00:00Z",
+                "finished_at": "2026-07-18T00:00:00Z",
+                "last_attempt_at": "2026-07-18T00:00:00Z",
+                "duration_ms": 0,
+                "attempt": 1,
+                "replayed": False,
+            },
+        }
+        base = {
+            "remote": "origin",
+            "ref": "refs/heads/main",
+            "commit_sha": candidate,
+            "tree_sha": tree,
+        }
+        rebind = materialize_source_main_rebind_receipt(
+            binding=binding,
+            old_base_identity=base,
+            new_base_identity=base,
+            origin_main_readback_evidence_ref="evidence:" + "6" * 64,
+        )
+        return binding, rebind
+
+    def test_queue_frontier_replays_once_and_blocks_parent_before_acceptance(self) -> None:
+        """Source readback queues once; pending state blocks parent projection."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source, remote = self.make_source_repo(root)
+            binding, rebind = self.binding_and_rebind(source)
+            binding_path = root / "binding.json"
+            rebind_path = root / "rebind.json"
+            binding_path.write_text(json.dumps(binding), encoding="utf-8")
+            rebind_path.write_text(json.dumps(rebind), encoding="utf-8")
+            owner_namespace = source / ".agent-canon" / "update-lifecycle"
+            unknown_sibling = source / ".agent-canon" / "shared" / "sentinel"
+            unknown_sibling.parent.mkdir(parents=True)
+            unknown_sibling.write_text("preserve\n", encoding="utf-8")
+            env = {
+                **os.environ,
+                "AGENT_CANON_UPDATE_OWNER_NAMESPACE": str(owner_namespace),
+            }
+            command = [
+                "bash",
+                "tools/update_agent_canon.sh",
+                "enqueue-source-projection",
+                str(binding_path),
+                str(rebind_path),
+                "evidence:" + "7" * 64,
+                "evidence:" + "8" * 64,
+                "evidence:" + "9" * 64,
+            ]
+            first = subprocess.run(
+                command,
+                cwd=source,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            replay = subprocess.run(
+                command,
+                cwd=source,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr)
+            self.assertIn("AGENT_CANON_QUEUE_REPLAYED=true", replay.stdout)
+
+            parent = root / "parent"
+            parent.mkdir()
+            subprocess.run(["git", "init", "-b", "main"], cwd=parent, check=True)
+            subprocess.run(
+                ["git", "config", "user.name", "Parent Test"], cwd=parent, check=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "parent@example.invalid"],
+                cwd=parent,
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "protocol.file.allow=always",
+                    "submodule",
+                    "add",
+                    str(remote),
+                    "vendor/agent-canon",
+                ],
+                cwd=parent,
+                check=True,
+            )
+            parent_env = {
+                **env,
+                "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "agent_canon_workflow",
+                "AGENT_CANON_BRANCH_WORKTREE_REASON": "frontier test",
+                "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
+                "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "frontier test",
+            }
+            blocked = subprocess.run(
+                [
+                    "bash",
+                    "vendor/agent-canon/tools/update_agent_canon.sh",
+                    "latest",
+                ],
+                cwd=parent,
+                env=parent_env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(blocked.returncode, 0)
+            self.assertIn("blocked until dependency frontier acceptance", blocked.stderr)
+
+            accepted = subprocess.run(
+                [
+                    "bash",
+                    "tools/update_agent_canon.sh",
+                    "accept-dependency-frontier",
+                    str(owner_namespace / "projection-queue" / "frontier.pending.json"),
+                    str(owner_namespace / "projection-queue" / "queue.accepted.json"),
+                    str(rebind_path),
+                    "evidence:" + "a" * 64,
+                ],
+                cwd=source,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
+            frontier = json.loads(
+                (owner_namespace / "projection-queue" / "frontier.accepted.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(frontier["frontier_state"], "accepted")
+            self.assertEqual(
+                [item["source_pr"] for item in frontier["ordered_predecessor_evidence"]],
+                ["#388", "#389"],
+            )
+            self.assertEqual(unknown_sibling.read_text(encoding="utf-8"), "preserve\n")
 
 
 if __name__ == "__main__":

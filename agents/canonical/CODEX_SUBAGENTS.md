@@ -83,6 +83,12 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 
 ## Activation Budget
 
+- Handoff は owner-produced `DecisionSufficiencyPacket` reference を消費します。
+  design、path、failure semantics が固定され、全 `h in H` で owner / edit /
+  validation が同じ packet は `route=spark_worker` と exactly one owner gate へ直接
+  route します。この consumer の action set はその直接 route に固定されます。
+  DSV policy の意味論は
+  `agents/skills/agent-orchestration.md#Decision Sufficiency Packet` だけが所有します。
 - runtime hard ceiling は [.codex/config.toml](../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `24` です
 - `.codex/config.toml` の `[agents].max_depth` は `2` を正本にし、one bounded child-subagent layer を許可します
 - cap は同時実行数の上限として扱います
@@ -115,7 +121,14 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - 前 task の文脈は run bundle と artifact path で渡し、新規 task は fresh subagent で開始します
 - 作業中の user 追加指示は、parent が `same_active_task_delta`、`scope_or_contract_change`、`new_task` に分類してから処理します。`same_active_task_delta` は `python3 tools/agent_tools/workflow_monitor.py --mid-task-user-input ...` で現在の run bundle、`schedule.md` Agent Wave Ledger、`workflow_monitoring.md` に checkpoint と updated packet path を追記し、unchanged role scope がある場合に run-local active subagent へ `send_input` できます。scope、allowed paths、review gate、または owner が変わる場合は fresh follow-up wave を起こします。`new_task` は fresh run-local subagent と新しい run bundle に切り替えます。
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を subagent handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を実行時の機械契約にします
-- closeout 前に終端 status の run-local subagent を lifecycle cleanup として閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を user-facing completion の readiness evidence にします。非終端の no-return instance は `subagents_closed=no`、`termination_action=preserve_running_instance`、`lifecycle_gate=pending` とします
+- 各 source/reviewer/PR/pin agent は durable handback の直後に全 descendants
+  を閉じ、reservation release receipt を ledger に残します。
+  `completed-but-open`、unknown descendant、reservation leak は G6 failure です。
+  closeout は `DurableHandback -> descendants_closed -> reservations_released ->
+  CleanupProof -> G6 -> terminal CloseAgentToolCall` の machine sequence を受理し、
+  terminal CloseAgentToolCall を唯一の close operation とします。
+  非終端の no-return instance は `termination_action=preserve_running_instance`
+  として terminal token materialization を block します。
 
 ## Handoff Context Contract
 
@@ -128,9 +141,13 @@ Subagent の context は correctness gate です。parent は handoff prompt ご
 - `do_not_read`: unrelated modules、generated raw logs、historical reports、他 role の scope など、読まない surface。
 - `expected_output`: findings schema、decision vocabulary、uncertainty / residual risk、test gaps。
 - `implementation_surface_route`: implementation handoff では `PRIMARY_PATHS` を `allowed_paths` の seed、`FORBIDDEN_PATHS` を `do_not_read` の seed にします。router が unavailable なら、その blocker または deterministic router recovery output を local provisional route evidence として渡し、path selection を packet output に基づけます。
+- `decision_sufficiency_packet_ref`: owner-produced `H`,
+  `downstream_decision`, `possible_branches`, `invariant`,
+  `value_of_information`, `route_verdict`, `rejection` の immutable packet ref。
 - `tool_route`: `run.repo_tool_routing_policy` への参照。
-- `tool_commands`: 選択済み skill ごとの `show_skill_packet`、`required_commands`、
-  `task_matching_conditional_commands`、`validation_commands`。
+- `tool_call_tokens`: 選択済み skill 専属 tool の canonical `tool_id`、argument
+  schema、typed arguments、intent、typed failure semantics を持つ machine token。
+  machine token のまま実行し、typed failure semantics を保持します。
 - `tool_evidence`: `dynamic_skill_routing` の候補、`tool_catalog_matches`、実行済み
   tool packet の結果。
 - `tool_reuse_ledger` と `pre_edit_rejection_prediction`: selected write-capable implementer には、既存 tool を使うか拒否した理由と `tool_rejection_preflight.py` の結果または pending blocker を渡します。

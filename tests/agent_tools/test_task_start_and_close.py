@@ -32,6 +32,11 @@ from agent_team import (  # noqa: E402
     validate_agent_type_selections,
 )
 from report_artifact_checks import write_completion_coverage_artifact  # noqa: E402
+from task_close import update_lifecycle_closeout_consumer  # noqa: E402
+from update_lifecycle_contract import (  # noqa: E402
+    materialize_close_agent_tool_call,
+    materialize_gate_verdict,
+)
 from work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
 
 RUNTIME_PROFILE_INVENTORY = PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
@@ -40,6 +45,104 @@ TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 WORKTREE_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "worktree_start.py"
 SETUP_WORKTREE_SCRIPT = PROJECT_ROOT / "tools" / "setup_worktree.sh"
+
+
+def update_lifecycle_closeout_fixture() -> dict[str, object]:
+    """Return one valid six-gate nested-lifecycle closeout artifact."""
+    binding: dict[str, object] = {
+        "transaction_id": "tx:" + "1" * 64,
+        "snapshot_id": "snapshot:" + "2" * 64,
+        "candidate_sha": "3" * 40,
+        "tree_sha": "4" * 40,
+        "input_digest": "sha256:" + "5" * 64,
+        "tool_id": "update-lifecycle-closeout",
+        "tool_version": "test.v1",
+        "evidence_ref": "evidence:" + "6" * 64,
+        "evidence_digest": "sha256:" + "7" * 64,
+        "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": False,
+        },
+    }
+    previous_ref = "evidence:" + "8" * 64
+    gates: list[dict[str, object]] = []
+    for index, gate_id in enumerate(("G1", "G2", "G3", "G4", "G5", "G6"), 1):
+        gate = materialize_gate_verdict(
+            binding=binding,
+            gate_id=gate_id,
+            ordered_input_evidence_refs=[previous_ref],
+            invariant=f"fixture_{gate_id.lower()}",
+            output_digest="sha256:" + format(index, "x") * 64,
+            owner=str(PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py")
+            + "#update_lifecycle_closeout_consumer",
+            verdict="pass",
+        )
+        gates.append(gate)
+        previous_ref = cast("dict[str, object]", gate["binding"])["evidence_ref"]  # type: ignore[assignment]
+    handback: dict[str, object] = {
+        "schema": "agent-canon.durable-handback.v1",
+        "binding": binding,
+        "agent_id": "agent:owner",
+        "descendant_ids": ["agent:reviewer"],
+        "reservation_ids": ["reservation:reviewer"],
+        "evidence_ref": "evidence:" + "b" * 64,
+        "state": "durable_handback",
+    }
+    owned_path = "/tmp/agent-canon-update-owned"
+    gate_five_binding = cast("dict[str, object]", gates[4]["binding"])
+    cleanup: dict[str, object] = {
+        "schema": "agent-canon.cleanup-proof.v1",
+        "binding": binding,
+        "remote_readback_evidence_ref": gate_five_binding["evidence_ref"],
+        "task_owned_paths": [owned_path],
+        "task_owned_state_before": {owned_path: "present"},
+        "task_owned_state_after": {owned_path: "removed"},
+        "cleaned_paths": [owned_path],
+        "unknown_shared_state_before_digest": "sha256:" + "c" * 64,
+        "unknown_shared_state_after_digest": "sha256:" + "c" * 64,
+        "unknown_shared_state_unchanged_evidence_ref": "evidence:" + "d" * 64,
+        "evidence_ref": "evidence:" + "e" * 64,
+        "state": "cleanup_proven",
+    }
+    descendants_ref = "evidence:" + "f" * 64
+    reservations_ref = "evidence:" + "0" * 64
+    token = materialize_close_agent_tool_call(
+        binding=binding,
+        run_id="run-update-lifecycle",
+        agent_id="agent:owner",
+        gate_verdicts=gates,
+        cleanup_proof=cleanup,
+        durable_handback=handback,
+        descendants_closed_evidence_ref=descendants_ref,
+        reservations_released_evidence_ref=reservations_ref,
+    )
+    return {
+        "schema": "agent-canon.update-lifecycle-closeout.v1",
+        "gate_verdicts": gates,
+        "durable_handback": handback,
+        "descendants": [
+            {
+                "agent_id": "agent:reviewer",
+                "state": "closed",
+                "evidence_ref": descendants_ref,
+            }
+        ],
+        "reservations": [
+            {
+                "reservation_id": "reservation:reviewer",
+                "state": "released",
+                "evidence_ref": reservations_ref,
+            }
+        ],
+        "descendants_closed_evidence_ref": descendants_ref,
+        "reservations_released_evidence_ref": reservations_ref,
+        "cleanup_proof": cleanup,
+        "close_agent_tool_call": token,
+    }
 
 
 def current_git_head(workspace: Path = PROJECT_ROOT) -> str:
@@ -679,6 +782,88 @@ def write_ready_closeout_bundle(
 
 class TaskStartAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
+
+    def consume_update_lifecycle_fixture(
+        self,
+        payload: dict[str, object],
+    ) -> dict[str, object]:
+        """Persist and consume one isolated update-lifecycle closeout record."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir)
+            (report_dir / "update_lifecycle_closeout.json").write_text(
+                json.dumps(payload),
+                encoding="utf-8",
+            )
+            return update_lifecycle_closeout_consumer(report_dir)
+
+    def test_update_lifecycle_terminal_tool_call_passes_after_cleanup(self) -> None:
+        """The positive close route binds all six gates and terminal ToolCall."""
+        payload = update_lifecycle_closeout_fixture()
+
+        decision = self.consume_update_lifecycle_fixture(payload)
+
+        token = cast("dict[str, object]", payload["close_agent_tool_call"])
+        self.assertEqual(decision["ready"], True)
+        self.assertEqual(decision["reason"], "pass")
+        self.assertEqual(token["tool_id"], "close_agent")
+        self.assertEqual(token["state"], "terminal")
+        self.assertEqual(decision["close_agent_token_id"], token["token_id"])
+
+    def test_update_lifecycle_rejects_completed_but_open_descendant(self) -> None:
+        """A completed handback is not a substitute for closing the agent."""
+        payload = update_lifecycle_closeout_fixture()
+        descendants = cast("list[dict[str, object]]", payload["descendants"])
+        descendants[0]["state"] = "completed"
+
+        decision = self.consume_update_lifecycle_fixture(payload)
+
+        self.assertEqual(decision["reason"], "close_agent:completed_but_open")
+
+    def test_update_lifecycle_rejects_unknown_descendant(self) -> None:
+        """Every observed descendant must exist in the durable handback ledger."""
+        payload = update_lifecycle_closeout_fixture()
+        descendants = cast("list[dict[str, object]]", payload["descendants"])
+        descendants.append(
+            {
+                "agent_id": "agent:unknown",
+                "state": "closed",
+                "evidence_ref": "evidence:" + "1" * 64,
+            }
+        )
+
+        decision = self.consume_update_lifecycle_fixture(payload)
+
+        self.assertEqual(decision["reason"], "close_agent:unknown_descendant")
+
+    def test_update_lifecycle_rejects_reservation_leak(self) -> None:
+        """Closeout remains blocked until every declared reservation is released."""
+        payload = update_lifecycle_closeout_fixture()
+        reservations = cast("list[dict[str, object]]", payload["reservations"])
+        reservations[0]["state"] = "reserved"
+
+        decision = self.consume_update_lifecycle_fixture(payload)
+
+        self.assertEqual(decision["reason"], "close_agent:reservation_leak")
+
+    def test_update_lifecycle_rejects_cleanup_before_remote_readback(self) -> None:
+        """Cleanup proof must point at the exact G5 publication evidence."""
+        payload = update_lifecycle_closeout_fixture()
+        cleanup = cast("dict[str, object]", payload["cleanup_proof"])
+        cleanup["remote_readback_evidence_ref"] = "evidence:" + "2" * 64
+
+        decision = self.consume_update_lifecycle_fixture(payload)
+
+        self.assertEqual(decision["reason"], "close_agent:cleanup_before_remote_readback")
+
+    def test_update_lifecycle_rejects_missing_gate_receipt(self) -> None:
+        """Terminal close requires the ordered complete G1-G6 boundary set."""
+        payload = update_lifecycle_closeout_fixture()
+        gates = cast("list[dict[str, object]]", payload["gate_verdicts"])
+        gates.pop()
+
+        decision = self.consume_update_lifecycle_fixture(payload)
+
+        self.assertEqual(decision["reason"], "close_agent:all_six_gate_evidence_required")
 
     def assert_current_checkout_write_policy(
         self,

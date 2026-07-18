@@ -19,10 +19,6 @@ path = "ROOT_AGENTS.md"
 markers = ["Design Integrity Gate", "responsibility model", "Abstract Design Frame", "Design-To-Implementation Trace", "design_issue_blocker", "implementation shortcut"]
 
 [[contracts.surfaces]]
-path = ".agents/skills/agent-orchestration/SKILL.md"
-markers = ["Design Integrity Gate", "responsibility model", "Abstract Design Frame", "design_issue_blocker", "implementation shortcut"]
-
-[[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"
 markers = ["Design Integrity Gate", "responsibility model", "Abstract Design Frame", "design_issue_blocker", "implementation shortcut"]
 
@@ -47,10 +43,6 @@ id = "static_read_validation_policy"
 description = "Validation policy treats static analysis and reading evidence as primary, with operation checks and broad execution only as supplemental evidence for runtime or unresolved risk."
 
 [[contracts.surfaces]]
-path = ".agents/skills/agent-orchestration/SKILL.md"
-markers = ["static/read evidence", "unresolved signal", "operation checks", "smoke runs", "Expensive command"]
-
-[[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"
 markers = ["静的解析・読み取り evidence", "未解決 signal", "動作確認", "smoke run", "重いコマンド"]
 
@@ -73,10 +65,6 @@ markers = ["Static analysis and reading evidence", "primary validation evidence"
 [[contracts]]
 id = "literature_backed_skill_call_order"
 description = "Research-backed implementation skill-call sequences place literature-survey before research-workflow, design, implementation, benchmark, and report claims."
-
-[[contracts.surfaces]]
-path = ".agents/skills/agent-orchestration/SKILL.md"
-markers = ["$literature-survey", "$research-workflow", "before `$research-workflow`", "source packet", "adoption/exclusion"]
 
 [[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"
@@ -105,10 +93,6 @@ markers = ["$literature-survey", "$research-workflow", "research_driven_change",
 [[contracts]]
 id = "owner_bounded_tool_route"
 description = "Owner-bounded repository edits run existing tools without a pre-use reading gate and keep owner/tool/validation routing visible."
-
-[[contracts.surfaces]]
-path = ".agents/skills/agent-orchestration/SKILL.md"
-markers = ["existing-tool route", "targeted-validation evidence", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing"]
 
 [[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"

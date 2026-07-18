@@ -1,539 +1,150 @@
-# agent-canon PR ワークフロー
+# AgentCanon Source PR Workflow
 <!--
 @dependency-start
 contract workflow
-responsibility Documents agent-canon PR ワークフロー for this repository.
-upstream implementation ../../tools/sync_agent_canon.sh sync implementation
-upstream implementation ../../tools/update_agent_canon.sh tool-first latest update and conflict handoff
-upstream implementation ../../tools/ci/check_agent_canon_pr.sh PR gate implementation
-upstream implementation ../../tools/ci/check_github_workflows.py GitHub workflow and PR checklist gate
-upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py creates run-local report bundles
-upstream implementation ../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
-upstream implementation ../../tools/agent_tools/tool_drift.py tool/convention trace gate
-upstream implementation ../../tools/agent_tools/responsibility_scope.py responsibility scope gate
-upstream implementation ../../tools/agent_tools/issue_sync.py local/GitHub issue sync gate
-upstream implementation ../../tools/agent_tools/eval_accumulation_check.py eval accumulation gate
-upstream design ../../tools/catalog.yaml structured tool catalog
-upstream design ../../issues/README.md durable operational finding storage
-upstream design ../../documents/dependency-manifest-design.md dependency graph and search-to-edit-scope evidence
-upstream design ../../documents/agent-canon-github-remote.md defines canonical remote evidence
-upstream design ../../documents/template-github-remote.md defines template remote evidence
-upstream design ../canonical/ARTIFACT_PLACEMENT.md defines run-local artifact placement
-upstream design ../skills/result-artifact-writeout.md defines result artifact writeout
-downstream design derived-agent-canon-diff-workflow.md derived diff workflow consumes PR gates
-downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates PR Essence workflow markers
+responsibility Owns exact AgentCanon source candidate review, GitHub PR CAS, merge, and publication readback.
+upstream design ../../documents/agent-canon-update-route.md owns the end-to-end source-to-parent transaction.
+upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns lifecycle and PR topology schemas.
+upstream implementation ../../tools/agent_tools/publication_integrator.py owns candidate CAS and publication authority.
+upstream implementation ../../tools/agent_tools/github_publish.py adapts verified GitHub remote and PR operations.
+upstream implementation ../../tools/ci/check_agent_canon_pr.sh owns the one source PR gate invocation.
+downstream design pr-queue-cleanup-workflow.md consumes source publication readback.
+downstream design ../skills/pr-processing.md consumes PullRequestLifecycle and queue receipts.
 @dependency-end
 -->
 
-この文書は、AgentCanon source change と template submodule pin change を PR に乗せるときの正本です。
-standalone AgentCanon repo、template repo 側の branch、PR、merge、submodule pin 更新を 1 本の手順で扱います。
-
-## この文書の読み方
-
-- この文書は、AgentCanon source PR、template pin PR、GitHub write、sync、security baseline の maintenance route を所有します。
-- 前半は対象、固定ルール、freshness gate、issues / findings gate、branch / push ルールを扱い、後半は標準手順、派生 repo、repo-local tool PR、PR body、完了条件、禁止事項、入口を扱います。
-- maintainer は `## Freshness Gate Route` と `## 標準手順` を先に読み、PR evidence 作成時は `## PR Body Examples` と `## PR 完了条件` を確認します。
-- chunked reading では、現在の state が freshness、issues、branch、PR publish、closeout のどれかを先に決め、その節だけを手順正本として開きます。
-
-## 対象
-
-- `vendor/agent-canon/` 配下の変更
-- shared runtime surface を増減する変更
-- `.github/workflows/agent-coordination.yml` のような synced root copy の変更
-- `tools/sync_agent_canon.sh` の link / copy spec を変える変更
-- workflow、skill、subagent、review policy、agent helper の変更
-
-## 固定ルール
-
-- shared canon の正本は standalone AgentCanon repo です。template 内で作業する場合は `vendor/agent-canon/` submodule worktree がその working copy になります。
-- GitHub 上の canonical shared canon repo は `https://github.com/iwashita-nozomu/agent-canon.git` です。
-- template の canonical repo は `https://github.com/iwashita-nozomu/project_template.git` です。
-- `.gitmodules` の AgentCanon URL は canonical GitHub URL にします。
-- root 側の symlink view や root copy を直接編集しません。
-- shared canon 変更は dedicated branch と dedicated PR に分けます。
-- shared canon 変更は dedicated commit に分けます。
-- repo-local tool を AgentCanon に集約する変更は、原則 PR で行い、今回のような direct update は user が明示した特例だけにします。
-- 派生 repo 由来の shared canon 差分は、`vendor/agent-canon/` 内の normal GitHub branch と AgentCanon PR に分けます。
-- 派生 repo 側の local diff、AgentCanon branch、shared canon main、派生 repo submodule pin を一連で閉じる場合は、先に `agents/workflows/derived-agent-canon-diff-workflow.md` で状態分類と closeout 順を固定します。
-- shared surface を増減したら `bash tools/sync_agent_canon.sh link-root` を同じ pass で実行します。
-- AgentCanon source change、submodule pin change、`.gitmodules` change、root
-  runtime view / root-copy surface change、parent root sync PR はすべて
-  `agentcanon_structure_followup=required` です。AgentCanon source PR では
-  parent root sync をまだ実行できない場合、後続の parent pin / root-view PR
-  または blocker を記録します。parent pin / root-view PR では template /
-  derived parent root で `bash tools/sync_agent_canon.sh link-root` と
-  `bash tools/sync_agent_canon.sh check` を実行し、両方の pass 後だけ
-  `agentcanon_structure_followup=pass` を PR / run evidence に記録します。
-- standalone AgentCanon repo では Makefile 前提を置かず、下の explicit validation commands を使います。
-- template / derived repo では `make agent-canon-pr-check` を AgentCanon の full maintenance/source route として使います。
-- `make agent-canon-pr-check` は GitHub mirror / submodule / security evidence も出します。`AGENT_CANON_GITHUB_REPO` と `TEMPLATE_GITHUB_REPO` で repository name を上書きできます。
-- template / derived repo では `Repository CI` が repository test suite を所有します。AgentCanon pin / root-view validation は `git submodule status vendor/agent-canon` と `bash tools/sync_agent_canon.sh check` で確認します。`Fresh Clone Acceptance` は clone、AgentCanon update、runtime surface を所有します。
-- file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` を省略しません。
-- AgentCanon source commit / PR と template parent gitlink commit / PR は別 step です。AgentCanon main を先に更新し、その後 template 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、template pin commit を作ります。
-- push が自然な次手なら、許可待ちの提案に戻らずそのまま実行します。止めるのは user stop か external block だけです。
-- validation failure response は `documents/runtime-profiles-and-check-matrix.json`
-  を canonical taxonomy owner として cite し、
-  `documents/runtime-profiles-and-check-matrix.md` は generated reader projection
-  として扱います。PR body には required evidence と same-intent repair /
-  escalation result だけを記録します。
-- PR state の inspect、PR 作成、owned branch push、PR title/body 更新、evidence comment 追加、draft 化は workflow の一部として実行できます。merge、close、ready-for-review、reviewer request、review dismissal、auto-merge、branch deletion、failing check bypass は user の current-task 明示許可または tracked maintainer policy が無い限り実行しません。
-- tool addition、tool behavior change、memory addition、agent-learning update、skill eval result、feedback-loop change は standalone AgentCanon branch / PR の対象です。template / derived repo の pin PR だけで close しません。
-- user、reviewer、runtime、CI が workflow defect を露出した場合は、run bundle だけでなく `issues/`、`memory/`、または `notes/failures/` に durable record を残します。
-- PR / branch push では `.github/workflows/agent-improvement-guide.yml` が memory、skill eval、hook result、issues を読み、read-only improvement guide artifact を生成します。実際の skill / workflow / tool 修正は local Codex が別 branch で行います。
-- standalone AgentCanon PR / branch push では `.github/workflows/agent-canon-static-gates.yml` が tool catalog、tool drift、dependency review、skill mirror、runtime role alignment、skill/workflow prompt eval、convention compliance、GitHub workflow convention、container config を軽量 gate として走らせます。local の `make agent-canon-pr-check` は引き続き merge 前の広い gate です。
-- Issue template / eval capture work uses `documents/issue-label-taxonomy.md`,
-  `documents/prompt-skill-evaluation-checklist.md`, and
-  `evidence/agent-evals/issue_eval_manifest.toml` as the closeout route.
-
-## Freshness Gate Route
-
-`check_agent_canon_latest.sh` や `make agent-canon-pr-check` が dirty shared-canon 差分を理由に止まった場合、その失敗は「pin を更新して消す」合図ではなく、PR-first route へ入る合図です。
-
-通常の parent repo 最新化は、まず tool に任せます。
-
-```bash
-make agent-canon-update-plan
-```
-
-If the plan requires mutation, request current-task user approval before
-running protected latest with all four inline Git authority/reason fields.
-
-The command responsibility split is maintained in
-`documents/agent-canon-update-route.md`. Keep
-`merge-main-into-current-preserve-dirty` on the AgentCanon PR branch route,
-not in the normal parent pin update sequence.
-
-`make agent-canon-latest` は safe な AgentCanon `main` 更新、root view check、
-親 repo update TODO acknowledge まで進めます。local shared-canon branch、dirty
-submodule、diverged history、merge conflict がある場合は、その場で破壊的に直さず
-`AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md`、
-`AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty`、
-`NEXT_ACTION=run_agentcanon_conflict_workflow` を出します。この出力を見た parent agent は
-AgentCanon conflict workflow に入り、branch commit、merge-main、PR、post-merge latest を
-順に処理します。
-
-local checkout branch に shared-canon commit がある場合、その checkout は merge してよい
-正規の AgentCanon PR 入力です。親 repo の gitlink を戻したり、submodule を remote
-main へ checkout し直して差分を消すのではなく、current branch に GitHub `main` を
-merge し、conflict を submodule 内で解消してから同じ branch を PR に出します。
-この merge は任意の自己申告ではなく、`merge-main-into-current-preserve-dirty` が
-`agent_canon_merge_remote_main_in_post_head=yes` と
-`agent_canon_merge_remote_main_verified=yes` を出すことで保証します。
-
-扱いは次の順に固定します。
-
-1. `vendor/agent-canon/` の shared canon 差分を dedicated branch / commit に分ける
-1. 派生 repo 起点なら current-task user approval と全 4 inline Git authority/reason field を得て protected `merge-main-into-current-preserve-dirty` を通し、already-current AgentCanon branch を GitHub へ push する
-1. standalone AgentCanon repo へ PR を作り、merge する
-1. template / derived repo 側で `make agent-canon-ensure-latest` を再実行する
-1. `bash tools/sync_agent_canon.sh link-root` と `bash tools/sync_agent_canon.sh check` を通す
-1. parent gitlink / root shared surface commit を AgentCanon source PR とは別に作る
-
-pre-merge の AgentCanon source PR では、standalone validation command を正本にします。
-post-merge の template / derived pin PR では、`make agent-canon-pr-check` が pass することを正本にします。
-
-## Issues / Findings Gate
-
-AgentCanon PR の前に、運用 finding を durable storage に残すかを必ず判断します。
-この gate は「今から思い出して書く」作業ではなく、PR 作成時に機械的に確認する source-of-truth check です。
-
-1. Structure intake / responsibility evidence を確認する
-
-```bash
-python3 tools/agent_tools/responsibility_scope.py --root . --format json > reports/responsibility_scope.json
-python3 tools/agent_tools/file_surface_inventory.py --root . --submodule-aware --json-out reports/file_surface_inventory.json --markdown-out reports/file_surface_inventory.md
-```
-
-template / derived repo から作業している場合は、`vendor/agent-canon/` prefix
-付きの structure intake、responsibility-scope、file-surface inventory、または
-dependency review artifact を PR body に引用します。run bundle は補助 evidence
-であり、durable storage の代替ではありません。
-Durable finding status evidence covers `issues/open` and `issues/closed`;
-those issue-state surfaces do not replace structure intake or dependency review
-as edit-scope evidence.
-
-2. Dependency review で edit scope を展開する
-
-```bash
-bash tools/agent_tools/run_repo_dependency_review.sh \
-  --report-dir reports/dependency-review
-```
-
-構造 intake が承認済み search-hits file を昇格している場合は、
-`run_repo_dependency_review.sh --search-hits-file <path>` を使い、検索結果では
-なく dependency-expanded scope を PR evidence にします。
-
-`dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` または dependency
-review summary を、issue または PR body の edit-scope evidence に残します。
-structure intake、responsibility-scope、または dependency-review evidence なしに
-「どの file を編集・確認するか」を決めません。
-
-3. 新しい workflow defect がある場合は issue file を作る
-
-```text
-issues/open/AC-YYYYMMDD-short-slug.md
-```
-
-issue file は `issues/README.md` の required fields を持ちます。
-finding の粒度は、affected surfaces と dependency-expanded edit scope を書ける大きさまで分割します。
-
-4. PR template に issue status を書く
-
-- standalone AgentCanon repo では `.github/PULL_REQUEST_TEMPLATE.md` の `Operational Findings / Issues` に記入します。
-- template / derived repo では `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` の `Operational Findings / Issues` に記入します。
-- 新規 durable finding が不要な場合は、検索した surface と不要判断の理由を PR body に書きます。
-- `python3 tools/agent_tools/issue_sync.py` を実行し、GitHub mirror が未作成の local issue は `ISSUE_SYNC_PLAN=` を PR body に貼るか、明示的に defer します。
-- `.github/workflows/issue-mirror.yml` の PR check が出す Step Summary を確認し、linked GitHub Issue の state / title drift があれば PR 内で修正します。
-- GitHub Actions の Agent Improvement Guide がある場合は、その artifact / step summary を確認し、memory、eval、hook、issues 由来の改善候補を PR body に反映します。
-
-## Branch ルール
-
-- branch 名は `canon/<topic>-YYYYMMDD` を使います。
-- 派生 repo から始まる branch も GitHub 上の normal branch として扱い、`canon-pr/<topic>` または `canon/<topic>-YYYYMMDD` に寄せます。
-- shared canon 以外の implementation change と同じ branch に混ぜません。
-- shared canon 変更と repo-local implementation change の両方が必要な場合は branch と PR を分けます。
-
-## Push / GitHub write 前の remote 確認
-
-- push、PR branch update、または GitHub write を始める前に `remote_verified=yes` の根拠を揃えます。
-- 標準入口は `python3 tools/agent_tools/github_publish.py ... --user-task "<current user task>" --repo <owner/name>` です。この tool は `gh repo view` と `git remote get-url origin` が同じ `owner/name` を指す場合だけ publish / PR 操作へ進み、stdout に `REMOTE_VERIFIED=yes` と user task を出します。
-- `git status --short --branch` は branch 状態の補助 evidence として見ますが、push 先 repository の決定には使いません。
-- hook 出力などで remote 確認が読みづらい場合でも、`.git/config` や repo metadata から push 先を推定しません。`github_publish.py` が `NEXT_ACTION=configure_origin_remote_for_the_user_task` または `NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_verified_remote_required` を出したら、その user task と remote 設定を修復して同じ tool を再実行します。
-- literal URL push is not a standard route. GitHub publish / PR 作業は `github_publish.py` の verified remote route に戻します。
-- PR 文脈、過去作業、branch 名、template 名、hardcoded repository name から push 先 repository を推定してはいけません。`project_template` のような名前は remote verification evidence ではありません。
-
-## 標準手順
-
-1. AgentCanon source worktree または `vendor/agent-canon/` branch を編集する
-
-- workflow doc、skill、subagent、script は standalone AgentCanon repo、または template 内の `vendor/agent-canon/` submodule worktree を編集します。
-- root 側の symlink view は編集しません。
-- tool addition、memory addition、skill eval result、feedback loop change はこの source worktree 側で commit し、template pin PR だけには閉じ込めません。
-
-3. `agentcanon_structure_followup` gate を通す
-
-AgentCanon source work、template / derived parent pin、root view、shared
-root-copy surface、parent root sync PR はすべて
-`agentcanon_structure_followup=required` として扱います。
-standalone AgentCanon source PR では、parent root sync をまだ実行できない
-場合、source PR body または run evidence に後続の parent pin / root-view PR
-または blocker を記録します。source PR merge 後または parent pin/root-view PR
-準備時に parent root からこの gate を実行します。
-
-```bash
-bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
-```
-
-両方が parent root で pass したときだけ
-`agentcanon_structure_followup=pass` を PR body、run bundle、または work log
-に残します。template / derived repo では、この gate の後に parent readiness /
-structure checks を含む `make agent-canon-pr-check` を続けます。
-
-4. PR 前の validation を流す
-
-standalone AgentCanon repo:
-
-```bash
-PR_CHECK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"
-trap 'rm -rf "${PR_CHECK_TMP}"' EXIT
-bash tools/agent_tools/run_repo_dependency_review.sh \
-  --fail-missing \
-  --cycle-report-only \
-  --report-dir "${PR_CHECK_TMP}/dependency-review/agent-canon-pr"
-python3 tools/agent_tools/render_dependency_manifest_graph.py \
-  --graph-tsv "${PR_CHECK_TMP}/dependency-review/agent-canon-pr/dependency_graph.tsv" \
-  --markdown-out "${PR_CHECK_TMP}/dependency-review/agent-canon-pr/dependency_manifest_graph.md" \
-  --dot-out "${PR_CHECK_TMP}/dependency-review/agent-canon-pr/dependency_manifest_graph.dot"
-python3 tools/agent_tools/classify_path_risk.py --path agents/workflows/agent-canon-pr-workflow.md --format text
-python3 tools/agent_tools/tool_catalog.py
-python3 tools/agent_tools/tool_drift.py
-python3 tools/agent_tools/responsibility_scope.py
-python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check
-python3 tools/agent_tools/run_accumulated_agent_evals.py \
-  --run-id agent-canon-pr-gate \
-  --log-dir "${PR_CHECK_TMP}/agent-eval-runs/agent-canon-pr-gate"
-python3 tools/agent_tools/eval_accumulation_check.py
-python3 tools/ci/check_github_workflows.py
-tools/bin/agent-canon docs check
-bash tools/ci/run_all_checks.sh --quick
-python3 tools/agent_tools/generated_artifact_guard.py
-```
-
-template / derived repo:
-
-```bash
-make agent-canon-pr-check
-```
-
-template / derived repo でこの段階の `make agent-canon-pr-check` が `AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest` を出した場合は、failure を PR-first handoff evidence として扱います。
-そのまま pin を戻したり `sync_agent_canon.sh push` で bypass せず、AgentCanon PR merge 後にこの check を再実行します。
-
-`make agent-canon-pr-check` は次をまとめて実行します。
-
-- shared surface drift check
-- agent runtime checks
-- `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`
-- `python3 tools/agent_tools/tool_catalog.py`
-- `python3 tools/agent_tools/tool_drift.py`
-- `python3 tools/agent_tools/responsibility_scope.py`
-- `python3 tools/agent_tools/issue_sync.py`
-- `python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir <tmp>/agent-eval-runs/agent-canon-pr-gate`
-- `python3 tools/agent_tools/eval_accumulation_check.py`
-- `python3 tools/ci/check_github_workflows.py`
-- docs checks
-- quick CI
-- `python3 tools/agent_tools/generated_artifact_guard.py`
-
-5. commit を分ける
-
-- AgentCanon source commit と template parent gitlink / root copy commit を分けます。
-- template 側では `vendor/agent-canon` の gitlink、`.gitmodules`、root copy / link spec の変更だけを commit します。
-- unrelated change を同じ commit に混ぜません。
-- `documents/BRANCH_SCOPE.md` の範囲分割契約に従い、commit は実行単位、PR はレビュー単位として扱います。
-- 複数の問題、canonical owner、behavior or contract delta、validation route が同じ PR に入る場合は、run bundle または PR body に範囲表を置きます。
-- 独立して main に入れられる差分単位は、merge 前に別 PR または別 commit に分けます。
-
-6. PR を作る
-
-- PR 作成 / 更新の前に run-local report を固定します。active run bundle が無い場合は
-  `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --owner codex --workspace-root "$PWD"`
-  を実行し、`RUN_ID`、`REPORT_DIR`、`AGENT_CANON_PREFLIGHT_*` を
-  `work_log.md` または `workflow_monitoring.md` に残します。
-- PR body は先に `reports/agents/<run-id>/pr_body.md` へ展開し、agent が
-  body 全文、validation、authority、blocker、Issue reference を確認してから publish します。
-- PR body の `PR Essence` には problem / user request、design intent、
-  canonical owner、behavior or contract delta、evidence route を書きます。
-- `github_publish.py publish-pr` には
-  `--summary-out reports/agents/<run-id>/github_publish.json` を付けます。
-  PR 作成 / 更新後は PR number / URL、branch、head SHA、mutation authority、
-  check summary、Issue action、remaining blocker を `work_log.md` または
-  `pr_processing_log.md` に追記します。
-- standalone AgentCanon repo へ shared canon source change を出す PR では `.github/PULL_REQUEST_TEMPLATE.md` を使います。
-- template / derived repo 側で `vendor/agent-canon/` の pin、root copy、または shared surface を変える PR では `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
-- 変更した surface、validation、upstream sync result または block reason を PR 本文に書きます。
-- 変更の本質を validation list から分け、どの問題をどの正本 owner で解いたかを
-  `PR Essence` として PR 本文に書きます。
-- issue file または durable finding 不要判断、dependency-expanded edit scope、tool / memory / eval route を PR 本文に書きます。
-- PR body は run bundle の `pr_body.md` などの明示 file に展開します。template の path だけを `gh pr create --template` に渡して、agent が最終 body を確認しない状態にしません。
-- standalone AgentCanon PR、template / derived repo の AgentCanon PR、default template / repo-local PR のいずれも、作成または更新は `python3 tools/agent_tools/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。
-- 既存 PR がある場合、tool は既存 PR を報告します。PR body を更新する意図がある場合だけ `--update-existing` を付けます。
-- `goal.md` が `pr_mutation_authority: github_pr_automation_when_green`
-  を持つ場合、PR body の `GitHub Automation Output` に authority と
-  `gh pr checks` summary を残し、merge は GitHub PR automation の visible
-  evidence に委譲します。
-
-7. merge する
-
-- `gh` / GitHub MCP が使えることは、PR 状態確認と PR body / evidence 更新の許可です。merge / close / ready-for-review / reviewer request / auto-merge は、current task で user がその mutation を明示した場合だけ実行します。
-- `github_pr_automation_when_green` は GitHub PR automation
-  にだけ merge authority を渡します。local Codex は
-  `GITHUB_PR_AUTOMATION_AUTHORITY`、`GITHUB_PR_AUTOMATION_DECISION`、`GITHUB_PR_AUTOMATION_CHECKS`、
-  `GITHUB_AUTOMATION_VISIBLE_EVIDENCE`、`GITHUB_AUTOMATION_BLOCKER` が PR-visible surface に
-  出るまで merge 完了扱いにせず、自分では merge しません。
-- 明示許可が無い場合は、merge 可能でも PR body、run bundle、または `goal.md` に "blocked on PR mutation authority" と残して止めます。
-- file 構成変更がある場合も別 `git worktree` は作らず、current checkout 上の integration branch で merge します。
-- `python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
-
-8. merge 後に template pin を更新する
-
-Keep the current checkout. If it is not the authorized parent integration
-branch, request user direction instead of checking out another branch. After
-current-task approval, run the protected latest command with all four inline
-Git authority/reason fields, then repair and check root views.
-
-`make agent-canon-ensure-latest` rebuilds compiled AgentCanon tools after the
-pin update. In submodule repos, treat `vendor/agent-canon` local git state and
-the `agent_canon_latest_submodule_local_state_checked=yes` evidence as the
-primary latest decision surface; GitHub MCP / codex-app PR checks are optional
-external confirmation and must not reimplement this tool route. If it reports
-`AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_cargo`,
-rerun `make agent-canon-rebuild-tools` inside the DevContainer before relying
-on Rust-backed `agent-canon` CLI behavior.
-
-9. local working clone がある場合は fast-forward する
-
-```bash
-git -C /mnt/l/workspace/agent-canon pull --ff-only
-```
-
-## 派生 repo 側の shared canon 提案
-
-派生 repo では、shared canon の差分を直接 `main` へ push しません。
-normal AgentCanon branch に積み、AgentCanon PR で review / merge します。
-local submodule divergence や unsafe local submodule state で `ensure-latest` が止まった場合も、この branch 経由で出所を固定してから shared canon main へ取り込み、派生 repo 側で `make agent-canon-ensure-latest` を再実行します。
-
-After current-task user approval, invoke the protected
-`merge-main-into-current-preserve-dirty` wrapper with all four inline Git
-authority/reason fields, then push the already-current branch.
-
-## Repo-Local Tool Collection PR
-
-Derived repositories often grow local scripts before they are ready for shared
-canon. Collect them by PR with this sequence:
-
-1. Inventory `tools/`, `scripts/`, `tests/tools/`, `documents/tools/`, and
-   result/log/report helpers in the derived repo.
-1. Compare each candidate with current AgentCanon; do not overwrite newer
-   canonical tools with stale repo-local copies.
-1. Promote repo-neutral tools into the nearest canonical family under
-   `tools/agent_tools/`, `tools/ci/`, `tools/docs/`, `tools/data/`,
-   `tools/hlo/`, `tools/audit/`, `tools/experiments/`, `tools/oop/`, or
-   `tools/validation/`.
-1. Keep project-specific or unsafe tools in the derived source repository, or
-   delete them after review. Do not create new `tools/legacy/` paths in
-   AgentCanon.
-1. Update `documents/repo-local-tool-imports.md`,
-   `documents/tools/README.md`, `documents/tools/tool-docs.toml`,
-   `tools/README.md`, and `tools/catalog.yaml`.
-1. Add or update smoke tests, help checks, or static checks before wiring a new
-   tool into default CI.
-1. Run the standalone explicit validation commands or `make agent-canon-pr-check`
-   in template / derived repos, and include the import disposition table in the
-   PR body.
-
-Direct updates must still leave the same evidence in the commit and run bundle.
-
-## PR Body Examples
-
-### AgentCanon Pin-Only Update
-
-```text
-PR Essence:
-- Problem / user request: refresh the template to the current AgentCanon main.
-- Design intent: keep the parent repo as a consumer of shared canon.
-- Canonical owner: template submodule pin and root shared surface.
-- Behavior or contract delta: pin-only consumer state for the current AgentCanon source contract.
-- Evidence route: sync check and pin SHA evidence.
-
-Summary:
-- Updated template vendor/agent-canon pin only.
-
-Validation:
-- bash tools/sync_agent_canon.sh check: pass
-- make agent-checks: pass
-- make ci: pass
-
-AgentCanon Evidence:
-- AgentCanon GitHub SHA: <sha>
-- template submodule SHA: <sha>
-- .gitmodules reviewed: unchanged
-```
-
-### AgentCanon Source Change Plus Template Pin
-
-```text
-PR Essence:
-- Problem / user request: shared AgentCanon behavior changed and parent repos need the pin update.
-- Design intent: land source canon first, then propagate through the template pin.
-- Canonical owner: AgentCanon source PR plus template submodule pin.
-- Behavior or contract delta: source contract changed under AgentCanon.
-- Evidence route: source PR, dependency review, and template sync evidence.
-
-Summary:
-- Changed AgentCanon source under vendor/agent-canon.
-- Advanced template submodule pin after AgentCanon main was updated.
-
-Validation:
-- bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing: pass
-- python3 tools/agent_tools/tool_catalog.py: pass
-- python3 tools/agent_tools/tool_drift.py: pass
-- python3 tools/ci/check_github_workflows.py: pass
-- make ci: pass
-
-Propagation:
-- AgentCanon commit / PR: <url-or-sha>
-- Template commit / PR: <url-or-sha>
-```
-
-### Root-Only Template Workflow Change
-
-```text
-PR Essence:
-- Problem / user request: template-local workflow behavior changed.
-- Design intent: keep repo-local workflow policy outside shared canon.
-- Canonical owner: template root GitHub Actions or PR checklist.
-- Behavior or contract delta: template workflow contract changed.
-- Evidence route: GitHub workflow checker and docs check.
-
-Summary:
-- Changed template-local GitHub Actions or PR checklist.
-
-Scope:
-- No vendor/agent-canon source change.
-- vendor/agent-canon pin unchanged because the change is template-local.
-
-Validation:
-- python3 tools/ci/check_github_workflows.py: pass
-- tools/bin/agent-canon docs check: pass
-- make ci: pass
-```
-
-## PR 完了条件
-
-次をすべて満たしたときだけ shared canon PR を完了扱いにします。
-
-- standalone AgentCanon repo では explicit validation commands が pass、template / derived repo では `make agent-canon-pr-check` が pass
-- root shared surface が `bash tools/sync_agent_canon.sh check` で clean
-- PR 本文に `PR Essence` として problem / user request、design intent、
-  canonical owner、behavior or contract delta、evidence route が記録されている
-- PR 本文に changed surface と validation が記録されている
-- AgentCanon source PR では、PR 本文または run evidence に
-  `agentcanon_structure_followup=required` と、後続の parent pin / root-view PR
-  または blocker が記録されている。parent pin / root-view PR では
-  `agentcanon_structure_followup=required` と、parent root で
-  `bash tools/sync_agent_canon.sh link-root` と
-  `bash tools/sync_agent_canon.sh check` が pass した後の
-  `agentcanon_structure_followup=pass` が記録されている
-- PR 本文に `issues/` durable finding、または durable finding 不要判断と検索 evidence が記録されている
-- PR 本文に structure-intake / responsibility-scope / dependency-review
-  evidence、または edit-scope evidence 不要判断が記録されている
-- PR 本文に template PR、AgentCanon PR または commit、submodule pin、GitHub `main` SHA、security check 状態が記録されている
-- file 構成変更がある場合は current-checkout integration branch merge と tree check が完了
-- AgentCanon main へ merge 後、template / derived parent root で
-  `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、
-  `bash tools/sync_agent_canon.sh check`、parent readiness / structure checks、
-  parent gitlink commit / push の実行結果が残っている。external block / user
-  stop は未実行理由として記録できますが、PR 完了扱いにはしません。
-
-## GitHub Security Baseline
-
-AgentCanon / template の GitHub repo は private を既定にし、少なくとも次を PR 前に確認します。
-
-```bash
-gh repo view iwashita-nozomu/agent-canon --json nameWithOwner,visibility,isPrivate,defaultBranchRef
-gh api repos/iwashita-nozomu/agent-canon/branches/main/protection
-gh api repos/iwashita-nozomu/agent-canon/vulnerability-alerts
-gh api repos/iwashita-nozomu/agent-canon/dependabot/alerts --jq length
-```
-
-- branch protection が無い場合は `missing_or_unavailable` として PR 本文へ残し、必要なら GitHub UI で `main` 保護、required checks、delete branch on merge を設定します。
-- vulnerability alert / Dependabot alert が disabled の場合は、private repo 側の security settings で有効化するか、無効の理由を PR に残します。
-- `gh auth status` は host で人間が初回認証します。container は host `~/.config/gh` mount を使い、token を repo に書きません。
-
-## 禁止事項
-
-- root 側の symlink view を直接編集して shared canon 変更を close してはいけません。
-- shared canon 変更を repo-local implementation change と同じ PR に混ぜてはいけません。
-- tool addition、memory addition、skill eval result、feedback-loop change を template pin PR だけに閉じ込めてはいけません。
-- workflow defect を run bundle だけに残して durable `issues/`、`memory/`、または `notes/failures/` に昇格しないまま close してはいけません。
-- raw text search hit だけを根拠に edit scope を決め、dependency-expanded edit scope を省略してはいけません。
-- standalone AgentCanon repo では explicit validation commands、template / derived repo では `make agent-canon-pr-check` を省略して PR を close してはいけません。
-- `gh` が使えるだけで PR merge、close、ready-for-review、reviewer request、auto-merge、review dismissal、branch deletion を実行してはいけません。
-- `vendor/agent-canon/` の構成変更を file 単位の拾い直しで `main` に戻してはいけません。
-- template `main` merge 後に AgentCanon PR / merge と template pin 更新の対応を曖昧なままにしてはいけません。
-
-## 使う入口
-
-- `documents/SHARED_RUNTIME_SURFACES.md`
-- `documents/agent-canon-subtree-migration.md`
-- `issues/README.md`
-- `documents/dependency-manifest-design.md`
-- `agents/workflows/main-integration-workflow.md`
-- `tools/sync_agent_canon.sh`
-- `tools/ci/check_agent_canon_pr.sh`
-- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`
-
-## Convention Compliance Gate
-
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.
+This document owns the source PR lane only. The front door and full transaction
+are `tools/update_agent_canon.sh` and
+`documents/agent-canon-update-route.md`. Parent pin/root projection is a later
+consumer and cannot begin here.
+
+## Reader Map
+
+- Read `Candidate Sequence` for source freeze/review/CAS ordering.
+- Read `PullRequestLifecycle` for user/fork/contributor and permission handling.
+- Read `Publication` for merge/readback and queue handoff.
+- Machine schemas live only in `update_lifecycle_contract.py`; this workflow
+  names their use and does not define alternate records.
+
+## Source And Branch Ownership
+
+- Canonical source is the standalone AgentCanon clone. A parent submodule
+  worktree may be a working copy but the parent is not a source owner.
+- Source branch names use `canon/<topic>-YYYYMMDD`.
+- Reuse the current branch/lifecycle while its immutable identity and push
+  authority remain valid. A closed head, conflict, identity drift, or unrelated
+  owner surface creates an explicitly linked successor.
+- Root projection views, parent gitlinks, unknown shared state, and upstream
+  Materializer implementation are not edited in the source PR lane.
+
+## Candidate Sequence
+
+The only valid append-only order is:
+
+`SourceMainRebindReceipt -> CandidateFreezeReceipt ->
+CandidateReviewReceipt -> CandidateCasReceipt -> PullRequestLifecycle open ->
+source merge -> PublicationReadbackReceipt/source-main readback`.
+
+1. Read `origin/main` immediately before freeze and record immutable old/new
+   base, transaction, snapshot, input, and evidence identity. Later fields are
+   absent from this pre-freeze record.
+1. Freeze exact candidate commit/tree and append the rebind predecessor.
+1. Obtain one independent exact-SHA/tree review. APPROVE binds the same
+   candidate; REVISE repairs the same context and appends a new review receipt.
+1. CAS against the immutable base/head/tree. G3 consumes G1/G2 evidence and
+   proves repository, ref, fork/contributor, permission, review, and expected
+   old identity once.
+1. Push and PR publication consume that G3 receipt. They do not repeat local
+   candidate/tree verification.
+
+Non-sequential predecessor, stale rebind, candidate/tree mismatch, or moved
+base fails closed. Changed immutable input requires a successor transaction.
+
+## PullRequestLifecycle
+
+`PullRequestLifecycle` is the only PR state machine. Its discriminator is
+`user|fork|contributor`; remote, base, head, fork, and permission identities are
+immutable in one record.
+
+- `permission_state=unknown|verified_false` prohibits push, PR mutation, and
+  merge. Only verified remote/API evidence with `verified_true` grants the
+  relevant authority.
+- Draft, ready, changes-requested, and external-review transitions retain PR
+  Essence and review history.
+- Contributor records additionally retain exact contributor commit/tree/diff.
+- Closed head is recorded without inventing a successor.
+- Multiple verified remotes block publication until one remote is explicitly
+  selected with fresh evidence.
+- Conflict or immutable drift enters `conflict_successor` and retains Essence,
+  reviews, and contributor diff in the linked successor.
+
+PR Essence always records the problem / user request and design intent, plus
+canonical owner, behavior or contract delta, and evidence route. It is preserved
+in the run-local PR
+body artifact and remote PR body.
+
+## GitHub Adapter Boundary
+
+`github_publish.py` is an internal adapter selected by the update transaction.
+It verifies `gh` repository identity against the selected Git remote and reads
+viewer permission evidence. `publish-pr` materializes candidate/base/head and
+G3 once, reuses them for branch push and PR creation/update, then reads the PR
+head/base/review state back. `checks` consumes G3 and, after publication, G5;
+it does not create another candidate verdict.
+
+Push authority is never inferred from authentication success, branch name,
+repository naming, PR context, or a configured URL. Literal URL push and
+multiple-remote guessing are invalid routes.
+
+## Source PR Gate
+
+`.github/workflows/agent-canon-static-gates.yml` runs only for the PR candidate
+(plus explicit manual dispatch). It invokes `check_agent_canon_pr.sh` once.
+Branch push and merged-main push do not rerun the same source candidate gate.
+
+`check_agent_canon_pr.sh` consumes G1-G3 once and owns only its static/source PR
+checks. Runtime alignment, prompt/eval, convention, skill-command, GitHub
+workflow, dependency, docs, and quick-CI work are not called through a second
+standalone loop in the same run.
+
+The upstream Materializer hook/archive hot-path defect remains an external
+dependency. This workflow records its evidence/blocker and does not implement a
+second report/archive materializer.
+
+## Publication
+
+1. `publication_integrator.py` verifies expected-old CAS and publishes the
+   approved candidate through the selected PR merge authority.
+1. Merge/API readback must prove the same immutable base/head, verified
+   permission authority, merge result, and candidate tree.
+1. A distinct post-merge source-main readback proves `origin/main` equals the
+   approved candidate/tree and materializes G5 publication evidence. It is not
+   the pre-freeze rebind receipt.
+1. The source lane emits one accepted QueueReceipt and one pending frontier.
+   Retry of the same input reuses the receipt.
+1. Source PR completion hands off to
+   `pr-queue-cleanup-workflow.md`; it never moves the parent pin directly.
+
+## Completion Conditions
+
+- exact rebind/freeze/review/CAS predecessor chain is valid;
+- one independent exact-candidate APPROVE exists;
+- G1-G3 and source PR CI pass for the same RecordBinding;
+- immutable PullRequestLifecycle and permission authority pass;
+- expected-old merge CAS passes;
+- source-main publication readback matches candidate commit/tree;
+- PR Essence, reviews, and contributor diff where applicable are retained;
+- accepted QueueReceipt and pending DependencyFrontier are materialized;
+- source/reviewer/PR descendants have durable handback, are closed, and their
+  reservations are released;
+- parent projection remains untouched until frontier acceptance.
+
+## Prohibited Routes
+
+- editing a parent/root projection as source;
+- compatibility branch, wrapper, subtree, or snapshot routes;
+- assumed permission or inferred remote selection;
+- separate push, PR, checks, and main-push candidate/tree verdicts;
+- merging a stale or unreviewed candidate;
+- parent pin/root sync before accepted frontier;
+- cleanup before remote readback or prose-only agent closeout.

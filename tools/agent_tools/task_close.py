@@ -4,6 +4,7 @@
 # responsibility Provides task close agent workflow automation.
 # upstream implementation ./agent_team.py resolves report root defaults
 # upstream implementation ./report_artifact_checks.py validates schedule and work log artifacts
+# upstream implementation ./update_lifecycle_contract.py owns gate, cleanup, handback, and terminal ToolCall identities.
 # upstream design ../../agents/templates/closeout_gate.md defines closeout status contract
 # upstream design ../../agents/templates/agent_evaluation.md defines evaluation contract
 # downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests closeout
@@ -33,6 +34,14 @@ from report_artifact_checks import (
     token_fields,
     wave_reconciliation_blockers,
 )
+from update_lifecycle_contract import (
+    GATE_IDS,
+    binding_identity,
+    validate_cleanup_proof,
+    validate_close_agent_tool_call,
+    validate_durable_handback,
+    validate_gate_verdict,
+)
 
 STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
 MECHANICAL_STATIC_ANALYSIS_READY_STATUSES = {"pass", "targeted", "not_applicable"}
@@ -46,6 +55,9 @@ DOCUMENT_SPLIT_DECISION_PREFIXES = (
 )
 DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
+UPDATE_LIFECYCLE_CLOSEOUT_ARTIFACT_NAME = "update_lifecycle_closeout.json"
+UPDATE_LIFECYCLE_CLOSEOUT_SCHEMA = "agent-canon.update-lifecycle-closeout.v1"
+EVIDENCE_REF_PATTERN = re.compile(r"^evidence:[0-9a-f]{64}$")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -610,6 +622,168 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         return {"ready": False, "reason": str(exc)}
 
 
+def update_lifecycle_closeout_consumer(report_dir: Path) -> dict[str, object]:
+    """Consume six gate IDs and terminal cleanup evidence without rerunning gates."""
+    artifact_path = report_dir / UPDATE_LIFECYCLE_CLOSEOUT_ARTIFACT_NAME
+    if not artifact_path.is_file():
+        return {"ready": True, "applicable": False, "reason": "not_applicable"}
+    try:
+        raw = json.loads(artifact_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": f"close_agent:artifact_unreadable:{exc}",
+        }
+    if not isinstance(raw, dict) or raw.get("schema") != UPDATE_LIFECYCLE_CLOSEOUT_SCHEMA:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:schema_invalid",
+        }
+    required = {
+        "schema",
+        "gate_verdicts",
+        "durable_handback",
+        "descendants",
+        "reservations",
+        "descendants_closed_evidence_ref",
+        "reservations_released_evidence_ref",
+        "cleanup_proof",
+        "close_agent_tool_call",
+    }
+    if set(raw) != required:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:artifact_fields_invalid",
+        }
+    try:
+        gate_values = raw["gate_verdicts"]
+        if not isinstance(gate_values, list):
+            raise ValueError("close_agent:all_six_gate_evidence_required")
+        gates = [validate_gate_verdict(value) for value in gate_values]
+        if tuple(gate["gate_id"] for gate in gates) != GATE_IDS:
+            raise ValueError("close_agent:all_six_gate_evidence_required")
+        if any(gate["verdict"] != "pass" for gate in gates):
+            raise ValueError("close_agent:gate_not_passed")
+        identity = binding_identity(gates[0]["binding"])
+        if any(binding_identity(gate["binding"]) != identity for gate in gates[1:]):
+            raise ValueError("close_agent:identity_mismatch")
+        handback = validate_durable_handback(raw["durable_handback"])
+        cleanup = validate_cleanup_proof(raw["cleanup_proof"])
+        token = validate_close_agent_tool_call(raw["close_agent_tool_call"])
+        if binding_identity(handback["binding"]) != identity:
+            raise ValueError("close_agent:identity_mismatch")
+        if binding_identity(cleanup["binding"]) != identity:
+            raise ValueError("close_agent:identity_mismatch")
+        if binding_identity(token["binding"]) != identity:
+            raise ValueError("close_agent:identity_mismatch")
+    except (TypeError, ValueError) as exc:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": str(exc),
+        }
+    descendants = raw["descendants"]
+    if not isinstance(descendants, list) or any(
+        not isinstance(item, dict)
+        or set(item) != {"agent_id", "state", "evidence_ref"}
+        for item in descendants
+    ):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:descendant_evidence_invalid",
+        }
+    declared_descendants = set(handback["descendant_ids"])
+    observed_descendants = {str(item["agent_id"]) for item in descendants}
+    if observed_descendants != declared_descendants:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:unknown_descendant",
+        }
+    if any(item["state"] == "completed" for item in descendants):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:completed_but_open",
+        }
+    if any(
+        item["state"] != "closed"
+        or EVIDENCE_REF_PATTERN.fullmatch(str(item["evidence_ref"])) is None
+        for item in descendants
+    ):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:descendant_not_closed",
+        }
+    reservations = raw["reservations"]
+    if not isinstance(reservations, list) or any(
+        not isinstance(item, dict)
+        or set(item) != {"reservation_id", "state", "evidence_ref"}
+        for item in reservations
+    ):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:reservation_evidence_invalid",
+        }
+    declared_reservations = set(handback["reservation_ids"])
+    observed_reservations = {str(item["reservation_id"]) for item in reservations}
+    if observed_reservations != declared_reservations or any(
+        item["state"] != "released"
+        or EVIDENCE_REF_PATTERN.fullmatch(str(item["evidence_ref"])) is None
+        for item in reservations
+    ):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:reservation_leak",
+        }
+    descendants_ref = raw["descendants_closed_evidence_ref"]
+    reservations_ref = raw["reservations_released_evidence_ref"]
+    if (
+        EVIDENCE_REF_PATTERN.fullmatch(str(descendants_ref)) is None
+        or EVIDENCE_REF_PATTERN.fullmatch(str(reservations_ref)) is None
+    ):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:lifecycle_evidence_invalid",
+        }
+    gate_refs = [gate["binding"]["evidence_ref"] for gate in gates]
+    if cleanup["remote_readback_evidence_ref"] != gate_refs[4]:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:cleanup_before_remote_readback",
+        }
+    args = token["args"]
+    if (
+        args["gate_verdict_evidence_refs"] != gate_refs
+        or args["cleanup_proof_evidence_ref"] != cleanup["evidence_ref"]
+        or args["durable_handback_evidence_ref"] != handback["evidence_ref"]
+        or args["descendants_closed_evidence_ref"] != descendants_ref
+        or args["reservations_released_evidence_ref"] != reservations_ref
+        or token["agent_id"] != handback["agent_id"]
+    ):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:token_evidence_mismatch",
+        }
+    return {
+        "ready": True,
+        "applicable": True,
+        "reason": "pass",
+        "gate_evidence_refs": gate_refs,
+        "close_agent_token_id": token["token_id"],
+    }
+
+
 def main() -> int:
     """Run the closeout check."""
     args = build_parser().parse_args()
@@ -710,6 +884,7 @@ def main() -> int:
     )
     report_artifact_blockers = report_artifact_placement_blockers(workspace, report_dir)
     completion_decision = completion_coverage_consumer(report_dir)
+    update_lifecycle_decision = update_lifecycle_closeout_consumer(report_dir)
     wave_reconciliation = wave_reconciliation_blockers(
         schedule_text,
         workflow_monitoring_text,
@@ -727,6 +902,8 @@ def main() -> int:
         "validation_complete": closeout.get("validation_complete") == "yes",
         "request_contract_complete": closeout.get("request_contract_complete") == "yes",
         "completion_coverage_consumer": completion_decision.get("ready") is True,
+        "update_lifecycle_closeout_consumer": update_lifecycle_decision.get("ready")
+        is True,
         "all_planned_chunks_complete": (
             completion_decision.get("all_planned_chunks_complete") is True
             and closeout.get("all_planned_chunks_complete") == "yes"
@@ -964,6 +1141,18 @@ def main() -> int:
     print(f"COMPLETION_COVERAGE_ARTIFACT={report_dir / COMPLETION_COVERAGE_ARTIFACT_NAME}")
     print(f"COMPLETION_COVERAGE_CONSUMER_READY={completion_decision.get('ready', False)}")
     print(f"COMPLETION_COVERAGE_CONSUMER_REASON={completion_decision.get('reason', '')}")
+    print(
+        "UPDATE_LIFECYCLE_CLOSEOUT_APPLICABLE="
+        f"{update_lifecycle_decision.get('applicable', False)}"
+    )
+    print(
+        "UPDATE_LIFECYCLE_CLOSEOUT_READY="
+        f"{update_lifecycle_decision.get('ready', False)}"
+    )
+    print(
+        "UPDATE_LIFECYCLE_CLOSEOUT_REASON="
+        f"{update_lifecycle_decision.get('reason', '')}"
+    )
     print(
         "MAPPING_ERROR_SETS_EMPTY="
         f"{closeout.get('mapping_error_sets_empty', canonical_evidence.get('mapping_error_sets_empty', ''))}"
