@@ -20,6 +20,7 @@ import yaml
 from agent_team import (
     RunBundleSpec,
     create_run_bundle,
+    load_task_catalog,
     load_team_config,
     resolve_role,
     resolve_role_write_scope,
@@ -109,9 +110,16 @@ def find_by_id(entries: object, entry_id: str) -> dict[str, object]:
 
 def prepare_workspace(workspace_root: Path) -> None:
     """Create a minimal workspace that satisfies manifest scope resolution."""
+    (workspace_root / ".codex").mkdir(parents=True, exist_ok=True)
+    (workspace_root / "agents").mkdir(parents=True, exist_ok=True)
     (workspace_root / "python").mkdir(parents=True, exist_ok=True)
     (workspace_root / "documents").mkdir(parents=True, exist_ok=True)
     (workspace_root / "reports" / "runtime").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / ".codex" / "config.toml", workspace_root / ".codex" / "config.toml")
+    shutil.copy2(
+        ROOT / "agents" / "model_profiles.toml",
+        workspace_root / "agents" / "model_profiles.toml",
+    )
     (workspace_root / "WORKTREE_SCOPE.md").write_text(
         "\n".join(
             [
@@ -239,6 +247,7 @@ def main() -> int:
         validate_task_catalog()
 
         config = load_team_config()
+        task_catalog = load_task_catalog(config)
         specialist_roles = tuple(
             resolve_role(config, role_id)
             for role_id in BASE_RESEARCH_ROLE_IDS + PERSPECTIVE_ROLE_IDS
@@ -258,6 +267,7 @@ def main() -> int:
                 created_at_iso=created_at_iso,
                 roles=roles,
                 workspace_root=workspace_root.resolve(),
+                task_catalog=task_catalog,
             )
         )
 
