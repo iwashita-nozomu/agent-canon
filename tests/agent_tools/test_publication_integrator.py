@@ -150,14 +150,14 @@ class PublicationIntegratorTest(unittest.TestCase):
                 gate_id=gate_id,
                 ordered_input_evidence_refs=["evidence:" + "8" * 64],
                 invariant=invariant,
-                owner_symbol="test_boundary_gate_identity_is_distinct_and_replay_stable",
+                owner_symbol=owner_symbol,
                 output={"candidate": "3" * 40},
                 verdict="pass",
             )
-            for gate_id, invariant in (
-                ("G1", "source_correctness"),
-                ("G3", "pr_identity_cas"),
-                ("G5", "remote_publication_readback"),
+            for gate_id, invariant, owner_symbol in (
+                ("G1", "source_correctness", "resolve_publication_eligibility"),
+                ("G3", "pr_identity_cas", "resolve_publication_authority"),
+                ("G5", "remote_publication_readback", "integrate_publication"),
             )
         ]
         replay = _publication_gate(
@@ -165,7 +165,7 @@ class PublicationIntegratorTest(unittest.TestCase):
             gate_id="G3",
             ordered_input_evidence_refs=["evidence:" + "8" * 64],
             invariant="pr_identity_cas",
-            owner_symbol="test_boundary_gate_identity_is_distinct_and_replay_stable",
+            owner_symbol="resolve_publication_authority",
             output={"candidate": "3" * 40},
             verdict="pass",
         )

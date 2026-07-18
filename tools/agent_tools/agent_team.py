@@ -2601,7 +2601,7 @@ def manifest_run_lines(
             "write-capable handoff when design_brief.md exists"
         )
         lines.append(
-            "      - include run.repo_tool_routing_policy selected-skill packet commands, "
+            "      - include run.repo_tool_routing_policy selected-skill ToolCall tokens, "
             "dynamic skill candidates, and tool evidence in every handoff packet"
         )
         lines.append(

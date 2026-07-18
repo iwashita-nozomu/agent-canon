@@ -70,7 +70,8 @@ def test_latest_consumes_g4_g5_receipts_without_rechecking_source(tmp_path: Path
         ordered_input_evidence_refs=[g4["binding"]["evidence_ref"]],
         invariant="remote_publication_readback",
         output_digest="sha256:" + "a" * 64,
-        owner=str(PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh") + "#readback",
+        owner=str(PROJECT_ROOT / "tools" / "agent_tools" / "publication_integrator.py")
+        + "#integrate_publication",
         verdict="pass",
     )
     bundle = tmp_path / "g4-g5.json"

@@ -44,10 +44,13 @@ CANDIDATE_FREEZE_SCHEMA = "agent-canon.candidate-freeze-receipt.v1"
 CANDIDATE_REVIEW_SCHEMA = "agent-canon.candidate-review-receipt.v1"
 CANDIDATE_CAS_SCHEMA = "agent-canon.candidate-cas-receipt.v1"
 PUBLICATION_READBACK_SCHEMA = "agent-canon.publication-readback-receipt.v1"
+SOURCE_PROJECTION_PACKET_SCHEMA = "agent-canon.source-projection-packet.v1"
 QUEUE_RECEIPT_SCHEMA = "agent-canon.queue-receipt.v1"
 DEPENDENCY_FRONTIER_SCHEMA = "agent-canon.dependency-frontier.v1"
 PULL_REQUEST_LIFECYCLE_SCHEMA = "agent-canon.pull-request-lifecycle.v1"
 DURABLE_HANDBACK_SCHEMA = "agent-canon.durable-handback.v1"
+DESCENDANT_CLOSE_RECEIPT_SCHEMA = "agent-canon.descendant-close-receipt.v1"
+RESERVATION_RELEASE_RECEIPT_SCHEMA = "agent-canon.reservation-release-receipt.v1"
 CLEANUP_PROOF_SCHEMA = "agent-canon.cleanup-proof.v1"
 CLOSE_AGENT_TOOL_CALL_SCHEMA = "agent-canon.close-agent-tool-call.v1"
 CLOSE_AGENT_ARGS_SCHEMA = "agent-canon.close-agent.args.v1"
@@ -56,15 +59,20 @@ GATE_IDS = ("G1", "G2", "G3", "G4", "G5", "G6")
 CHECKPOINT_IDS = (
     "prepare",
     "generate",
-    *GATE_IDS,
+    "G1",
+    "G2",
+    "G3",
     "source_main_readback",
     "queue",
     "frontier",
+    "G4",
     "remote_readback",
+    "G5",
     "handback",
     "descendants",
     "reservations",
     "cleanup",
+    "G6",
     "nested_lifecycle_cleanup",
 )
 TRANSACTION_STATES = (
@@ -143,6 +151,62 @@ PULL_REQUEST_BRANCH_RULES: dict[str, dict[str, tuple[str, ...]]] = {
         "required": ("contributor_identity", "contributor_diff"),
         "forbidden": ("user_identity", "fork_identity"),
     },
+}
+
+GATE_CONTRACTS: dict[str, dict[str, object]] = {
+    "G1": {
+        "invariant": "source_correctness",
+        "owners": (
+            "tools/agent_tools/publication_integrator.py#resolve_publication_eligibility",
+        ),
+    },
+    "G2": {
+        "invariant": "generated_completeness",
+        "owners": ("tools/ci/check_agent_canon_pr.sh#run_pr_agent_checks",),
+    },
+    "G3": {
+        "invariant": "pr_identity_cas",
+        "owners": (
+            "tools/agent_tools/publication_integrator.py#resolve_publication_authority",
+            "tools/agent_tools/github_publish.py#materialize_pr_identity_gate",
+        ),
+    },
+    "G4": {
+        "invariant": "parent_projection_integrity",
+        "owners": ("tools/update_agent_canon.sh#accept_dependency_frontier",),
+    },
+    "G5": {
+        "invariant": "remote_publication_readback",
+        "owners": (
+            "tools/agent_tools/publication_integrator.py#integrate_publication",
+        ),
+    },
+    "G6": {
+        "invariant": "nested_lifecycle_cleanup",
+        "owners": (
+            "tools/agent_tools/agent_team.py#materialize_close_agent_tool_call",
+        ),
+    },
+}
+
+_STATE_CHECKPOINT_PREFIX: dict[str, int] = {
+    "created": 0,
+    "prepared": 1,
+    "generated": 2,
+    "gates_ready": 4,
+    "reviewed": 4,
+    "pr_open": 5,
+    "pr_merged": 5,
+    "source_main_readback": 6,
+    "queue_enqueued": 7,
+    "frontier_accepted": 9,
+    "remote_readback": 11,
+    "durable_handback": 12,
+    "descendants_closed": 13,
+    "reservations_released": 14,
+    "cleanup_proven": 15,
+    "nested_lifecycle_cleanup": 17,
+    "closed": len(CHECKPOINT_IDS),
 }
 
 _HEX40 = re.compile(r"^[0-9a-f]{40}$")
@@ -466,18 +530,24 @@ def validate_gate_verdict(value: object) -> dict[str, object]:
     )
     _schema(verdict, GATE_VERDICT_SCHEMA)
     validate_record_binding(verdict["binding"])
-    _one_of(verdict["gate_id"], GATE_IDS, "gate_verdict.gate_id")
+    gate_id = _one_of(verdict["gate_id"], GATE_IDS, "gate_verdict.gate_id")
     _string_list(
         verdict["ordered_input_evidence_refs"],
         "gate_verdict.ordered_input_evidence_refs",
         pattern=_EVIDENCE,
         nonempty=True,
     )
-    _string(verdict["invariant"], "gate_verdict.invariant")
+    invariant = _string(verdict["invariant"], "gate_verdict.invariant")
     _pattern(verdict["output_digest"], _SHA256, "gate_verdict.output_digest")
     owner = _string(verdict["owner"], "gate_verdict.owner")
     if not owner.startswith("/") or "#" not in owner:
         _fail("lifecycle:owner_invalid", "gate_verdict.owner")
+    contract = GATE_CONTRACTS[gate_id]
+    if invariant != contract["invariant"]:
+        _fail("lifecycle:gate_invariant_mismatch", gate_id)
+    owners = cast(tuple[str, ...], contract["owners"])
+    if not any(owner.endswith(expected) for expected in owners):
+        _fail("lifecycle:gate_owner_mismatch", gate_id)
     state = _one_of(verdict["verdict"], ("pass", "fail", "retry"), "gate_verdict.verdict")
     retry_reason = verdict["retry_reason"]
     if state == "retry":
@@ -487,6 +557,59 @@ def validate_gate_verdict(value: object) -> dict[str, object]:
     if verdict["next_checkpoint"] is not None:
         _one_of(verdict["next_checkpoint"], CHECKPOINT_IDS, "gate_verdict.next_checkpoint")
     return _clone(verdict)
+
+
+def validate_gate_chain(
+    values: Sequence[object],
+    *,
+    expected_gate_ids: Sequence[str] | None = None,
+    require_pass: bool = True,
+) -> tuple[dict[str, object], ...]:
+    """Validate one canonical gate slice and its ordered evidence linkage."""
+    gates = tuple(validate_gate_verdict(value) for value in values)
+    gate_ids = tuple(cast(str, gate["gate_id"]) for gate in gates)
+    if expected_gate_ids is not None and gate_ids != tuple(expected_gate_ids):
+        _fail("lifecycle:gate_order_invalid")
+    if not gates:
+        _fail("lifecycle:gate_sequence_empty")
+    identity = binding_identity(gates[0]["binding"])
+    if any(binding_identity(gate["binding"]) != identity for gate in gates[1:]):
+        _fail("lifecycle:gate_identity_mismatch")
+    if require_pass and any(gate["verdict"] != "pass" for gate in gates):
+        _fail("lifecycle:gate_not_passed")
+
+    by_id = {cast(str, gate["gate_id"]): gate for gate in gates}
+    evidence = {
+        gate_id: cast(Mapping[str, object], gate["binding"])["evidence_ref"]
+        for gate_id, gate in by_id.items()
+    }
+
+    def require_prefix(gate_id: str, prefix: Sequence[object]) -> None:
+        if gate_id not in by_id:
+            return
+        refs = tuple(
+            cast(Sequence[object], by_id[gate_id]["ordered_input_evidence_refs"])
+        )
+        if refs[: len(prefix)] != tuple(prefix):
+            _fail("lifecycle:gate_predecessor_mismatch", gate_id)
+
+    if "G1" in by_id and not cast(
+        Sequence[object], by_id["G1"]["ordered_input_evidence_refs"]
+    ):
+        _fail("lifecycle:gate_predecessor_missing", "G1")
+    if "G1" in evidence:
+        require_prefix("G2", (evidence["G1"],))
+    if "G1" in evidence and "G2" in evidence:
+        require_prefix("G3", (evidence["G1"], evidence["G2"]))
+    if "G3" in evidence:
+        require_prefix("G4", (evidence["G3"],))
+    if "G4" in evidence:
+        require_prefix("G5", (evidence["G4"],))
+    if all(gate_id in evidence for gate_id in GATE_IDS[:5]):
+        require_prefix("G6", tuple(evidence[gate_id] for gate_id in GATE_IDS[:5]))
+    if len(set(evidence.values())) != len(evidence):
+        _fail("lifecycle:gate_evidence_reused")
+    return gates
 
 
 def materialize_gate_verdict(
@@ -576,6 +699,21 @@ def validate_update_transaction(value: object) -> dict[str, object]:
         if checkpoint_id in seen:
             _fail("lifecycle:checkpoint_duplicate", checkpoint_id)
         seen[checkpoint_id] = receipt
+    passed = {
+        checkpoint_id
+        for checkpoint_id, receipt in seen.items()
+        if receipt["verdict"] in {"pass", "skip"}
+    }
+    passed_prefix = 0
+    for checkpoint_id in CHECKPOINT_IDS:
+        if checkpoint_id not in passed:
+            break
+        passed_prefix += 1
+    if any(
+        checkpoint_id in passed
+        for checkpoint_id in CHECKPOINT_IDS[passed_prefix + 1 :]
+    ):
+        _fail("lifecycle:checkpoint_out_of_order")
     computed_missing = next(
         (
             checkpoint
@@ -593,6 +731,13 @@ def validate_update_transaction(value: object) -> dict[str, object]:
     )
     if len(gate_refs) > len(GATE_IDS):
         _fail("lifecycle:gate_evidence_count_invalid")
+    passed_gate_refs = tuple(
+        cast(Mapping[str, object], seen[gate_id]["binding"])["evidence_ref"]
+        for gate_id in GATE_IDS
+        if gate_id in passed
+    )
+    if gate_refs != passed_gate_refs:
+        _fail("lifecycle:gate_evidence_mismatch")
     _nullable_hash_id(transaction["queue_receipt_id"], "queue:", "update_transaction.queue_receipt_id")
     _nullable_hash_id(transaction["frontier_id"], "frontier:", "update_transaction.frontier_id")
     _nullable_hash_id(transaction["successor_transaction_id"], "tx:", "update_transaction.successor_transaction_id")
@@ -601,6 +746,48 @@ def validate_update_transaction(value: object) -> dict[str, object]:
         _fail("lifecycle:successor_missing")
     if state != "successor_required" and transaction["successor_transaction_id"] is not None:
         _fail("lifecycle:successor_forbidden")
+    required_prefix = _STATE_CHECKPOINT_PREFIX.get(state)
+    if required_prefix is not None and passed_prefix != required_prefix:
+        _fail("lifecycle:state_checkpoint_mismatch", state)
+    if state in {
+        "reviewed",
+        "pr_open",
+        "pr_merged",
+        "source_main_readback",
+        "queue_enqueued",
+        "frontier_accepted",
+        "remote_readback",
+        "durable_handback",
+        "descendants_closed",
+        "reservations_released",
+        "cleanup_proven",
+        "nested_lifecycle_cleanup",
+        "closed",
+    } and transaction["source_main_rebind_receipt_id"] is None:
+        _fail("lifecycle:rebind_receipt_required", state)
+    if state in {
+        "queue_enqueued",
+        "frontier_accepted",
+        "remote_readback",
+        "durable_handback",
+        "descendants_closed",
+        "reservations_released",
+        "cleanup_proven",
+        "nested_lifecycle_cleanup",
+        "closed",
+    } and transaction["queue_receipt_id"] is None:
+        _fail("lifecycle:queue_receipt_required", state)
+    if state in {
+        "frontier_accepted",
+        "remote_readback",
+        "durable_handback",
+        "descendants_closed",
+        "reservations_released",
+        "cleanup_proven",
+        "nested_lifecycle_cleanup",
+        "closed",
+    } and transaction["frontier_id"] is None:
+        _fail("lifecycle:frontier_required", state)
     return _clone(transaction)
 
 
@@ -670,8 +857,11 @@ def validate_source_main_rebind_receipt(value: object) -> dict[str, object]:
     _pattern(input_identity["input_digest"], _SHA256, "source_main_rebind_receipt.input_identity.input_digest")
     if input_identity["input_digest"] != binding["input_digest"]:
         _fail("input_identity_mismatch", "source_main_rebind_receipt.input_identity")
-    _validate_git_identity(receipt["old_base_identity"], "source_main_rebind_receipt.old_base_identity", remote=True)
+    old_base = _validate_git_identity(receipt["old_base_identity"], "source_main_rebind_receipt.old_base_identity", remote=True)
     new_base = _validate_git_identity(receipt["new_base_identity"], "source_main_rebind_receipt.new_base_identity", remote=True)
+    for field, identity in (("old_base_identity", old_base), ("new_base_identity", new_base)):
+        if identity["remote"] != "origin" or identity["ref"] != "refs/heads/main":
+            _fail("lifecycle:source_main_identity_invalid", field)
     readback = _mapping(receipt["origin_main_readback"], "source_main_rebind_receipt.origin_main_readback")
     _exact_keys(readback, ("remote", "ref", "commit_sha", "command", "evidence_ref"), field="source_main_rebind_receipt.origin_main_readback")
     _string(readback["remote"], "source_main_rebind_receipt.origin_main_readback.remote")
@@ -813,6 +1003,44 @@ def validate_candidate_cas_receipt(value: object) -> dict[str, object]:
     return receipt
 
 
+def materialize_candidate_cas_receipt(
+    *,
+    candidate_review_receipt: Mapping[str, object],
+    cas_base_identity: Mapping[str, object],
+    cas_evidence_ref: str,
+) -> dict[str, object]:
+    """Append one exact-base CAS receipt after independent review."""
+    review = validate_candidate_review_receipt(candidate_review_receipt)
+    _validate_git_identity(cas_base_identity, "candidate_cas_receipt.cas_base_identity")
+    _pattern(cas_evidence_ref, _EVIDENCE, "candidate_cas_receipt.cas_evidence_ref")
+    review_binding = cast(Mapping[str, object], review["binding"])
+    binding = dict(review_binding)
+    evidence_hex = cas_evidence_ref.removeprefix("evidence:")
+    binding["evidence_ref"] = cas_evidence_ref
+    binding["evidence_digest"] = "sha256:" + evidence_hex
+    key = {
+        "binding_identity": binding_identity(binding),
+        "predecessor_evidence_id": review_binding["evidence_ref"],
+        "rebind_receipt_evidence_id": review["rebind_receipt_evidence_id"],
+        "candidate_identity": review["candidate_identity"],
+        "cas_base_identity": dict(cas_base_identity),
+        "cas_evidence_ref": cas_evidence_ref,
+    }
+    receipt = {
+        "schema": CANDIDATE_CAS_SCHEMA,
+        "cas_receipt_id": "cas:"
+        + hashlib.sha256(canonical_json_bytes(key)).hexdigest(),
+        "binding": binding,
+        "predecessor_evidence_id": review_binding["evidence_ref"],
+        "rebind_receipt_evidence_id": review["rebind_receipt_evidence_id"],
+        "candidate_identity": review["candidate_identity"],
+        "cas_base_identity": dict(cas_base_identity),
+        "cas_evidence_ref": cas_evidence_ref,
+        "cas_stage": "cas",
+    }
+    return validate_candidate_cas_transition(review, receipt)
+
+
 def validate_candidate_freeze_transition(rebind: object, freeze: object) -> dict[str, object]:
     checked_rebind = validate_source_main_rebind_receipt(rebind)
     checked_freeze = validate_candidate_freeze_receipt(freeze)
@@ -857,6 +1085,31 @@ def validate_candidate_cas_transition(review: object, cas: object) -> dict[str, 
         validate_candidate_cas_receipt(cas),
         field="candidate_cas",
     )
+
+
+def validate_candidate_cas_pr_transition(
+    cas: object,
+    pr_lifecycle: object,
+) -> dict[str, object]:
+    """Bind one CAS base and exact candidate to one immutable PR topology."""
+    checked_cas = validate_candidate_cas_receipt(cas)
+    checked_pr = validate_pull_request_lifecycle(pr_lifecycle)
+    _same_binding(checked_cas["binding"], checked_pr["binding"], "candidate_cas.pr")
+    candidate = cast(Mapping[str, object], checked_cas["candidate_identity"])
+    head = cast(Mapping[str, object], checked_pr["head_identity"])
+    if (
+        candidate["candidate_sha"] != head["commit_sha"]
+        or candidate["tree_sha"] != head["tree_sha"]
+    ):
+        _fail("lifecycle:candidate_identity_mismatch", "candidate_cas.pr")
+    cas_base = cast(Mapping[str, object], checked_cas["cas_base_identity"])
+    pr_base = cast(Mapping[str, object], checked_pr["base_identity"])
+    if (
+        cas_base["commit_sha"] != pr_base["commit_sha"]
+        or cas_base["tree_sha"] != pr_base["tree_sha"]
+    ):
+        _fail("lifecycle:cas_base_identity_mismatch")
+    return checked_pr
 
 
 def _validate_repo_identity(value: object, field: str, *, remote: bool = False) -> dict[str, object]:
@@ -932,11 +1185,16 @@ def validate_pull_request_lifecycle(value: object) -> dict[str, object]:
     kind = _one_of(lifecycle["kind"], PR_KINDS, "pull_request_lifecycle.kind")
     state = _one_of(lifecycle["state"], PR_STATES, "pull_request_lifecycle.state")
     binding = validate_record_binding(lifecycle["binding"])
-    _validate_repo_identity(lifecycle["remote_identity"], "pull_request_lifecycle.remote_identity", remote=True)
-    _validate_repo_identity(lifecycle["base_identity"], "pull_request_lifecycle.base_identity")
+    remote = _validate_repo_identity(lifecycle["remote_identity"], "pull_request_lifecycle.remote_identity", remote=True)
+    base = _validate_repo_identity(lifecycle["base_identity"], "pull_request_lifecycle.base_identity")
     head = _validate_repo_identity(lifecycle["head_identity"], "pull_request_lifecycle.head_identity")
     if head["commit_sha"] != binding["candidate_sha"] or head["tree_sha"] != binding["tree_sha"]:
         _fail("pr_lifecycle:head_binding_mismatch")
+    if any(
+        remote[field] != head[field]
+        for field in ("repo_owner", "repo_name", "ref", "commit_sha", "tree_sha")
+    ):
+        _fail("pr_lifecycle:remote_head_identity_mismatch")
     _validate_branch_table(lifecycle["branch"])
     rules = PULL_REQUEST_BRANCH_RULES[kind]
     for field in rules["required"]:
@@ -945,13 +1203,26 @@ def validate_pull_request_lifecycle(value: object) -> dict[str, object]:
     for field in rules["forbidden"]:
         if field in lifecycle:
             _fail("pr_lifecycle:branch_field_forbidden", field)
+    user_identity: dict[str, object] | None = None
     if kind == "user":
-        _validate_actor(lifecycle["user_identity"], "pull_request_lifecycle.user_identity")
+        user_identity = _validate_actor(
+            lifecycle["user_identity"], "pull_request_lifecycle.user_identity"
+        )
+        if any(base[field] != head[field] for field in ("repo_owner", "repo_name")):
+            _fail("pr_lifecycle:user_repository_mismatch")
     elif kind == "fork":
         fork = _mapping(lifecycle["fork_identity"], "pull_request_lifecycle.fork_identity")
         _exact_keys(fork, ("repo_owner", "repo_name", "parent_repo_owner", "parent_repo_name", "ref"), field="pull_request_lifecycle.fork_identity")
         for field in fork:
             _string(fork[field], f"pull_request_lifecycle.fork_identity.{field}")
+        if (
+            fork["repo_owner"] != head["repo_owner"]
+            or fork["repo_name"] != head["repo_name"]
+            or fork["parent_repo_owner"] != base["repo_owner"]
+            or fork["parent_repo_name"] != base["repo_name"]
+            or fork["ref"] != head["ref"]
+        ):
+            _fail("pr_lifecycle:fork_identity_mismatch")
     else:
         _validate_actor(lifecycle["contributor_identity"], "pull_request_lifecycle.contributor_identity")
         diff = _mapping(lifecycle["contributor_diff"], "pull_request_lifecycle.contributor_diff")
@@ -959,6 +1230,11 @@ def validate_pull_request_lifecycle(value: object) -> dict[str, object]:
         _pattern(diff["commit_sha"], _HEX40, "pull_request_lifecycle.contributor_diff.commit_sha")
         _pattern(diff["tree_sha"], _HEX40, "pull_request_lifecycle.contributor_diff.tree_sha")
         _pattern(diff["diff_sha256"], _SHA256, "pull_request_lifecycle.contributor_diff.diff_sha256")
+        if (
+            diff["commit_sha"] != head["commit_sha"]
+            or diff["tree_sha"] != head["tree_sha"]
+        ):
+            _fail("pr_lifecycle:contributor_diff_identity_mismatch")
     permission = _mapping(lifecycle["permission_identity"], "pull_request_lifecycle.permission_identity")
     _exact_keys(permission, ("actor_id", "permission_state", "permission_evidence_id", "authority_source", "assumption_forbidden"), field="pull_request_lifecycle.permission_identity")
     _string(permission["actor_id"], "pull_request_lifecycle.permission_identity.actor_id")
@@ -967,8 +1243,16 @@ def validate_pull_request_lifecycle(value: object) -> dict[str, object]:
     _string(permission["authority_source"], "pull_request_lifecycle.permission_identity.authority_source")
     if permission["assumption_forbidden"] is not True:
         _fail("pr_lifecycle:permission_assumption_forbidden")
-    if state in {"ready", "changes_requested", "external_review", "merged"} and permission_state != "verified_true":
-        _fail("pr_lifecycle:permission_not_verified")
+    if (
+        kind == "user"
+        and user_identity is not None
+        and user_identity["actor_id"] != permission["actor_id"]
+    ):
+        _fail("pr_lifecycle:actor_identity_mismatch")
+    if state == "permission_unknown" and permission_state != "unknown":
+        _fail("pr_lifecycle:permission_state_mismatch")
+    if state == "permission_denied" and permission_state != "verified_false":
+        _fail("pr_lifecycle:permission_state_mismatch")
     essence = _mapping(lifecycle["pr_essence"], "pull_request_lifecycle.pr_essence")
     _exact_keys(essence, ("problem", "intent", "canonical_owner", "contract_delta", "evidence_refs"), field="pull_request_lifecycle.pr_essence")
     for field in ("problem", "intent", "canonical_owner", "contract_delta"):
@@ -1011,7 +1295,10 @@ def validate_pull_request_transition(previous: object, current: object) -> dict[
     new = validate_pull_request_lifecycle(current)
     old_state = cast(str, old["state"])
     new_state = cast(str, new["state"])
-    allowed = (old_state, new_state) in _PR_TRANSITIONS
+    _same_binding(old["binding"], new["binding"], "pull_request_lifecycle")
+    allowed = (old_state, new_state) in _PR_TRANSITIONS or (
+        old_state == new_state and old_state in PR_OPEN_STATES
+    )
     if old_state in PR_OPEN_STATES and new_state in {"closed_head", "multiple_remotes"}:
         allowed = True
     if old_state in PR_REVIEWABLE_STATES and new_state == "conflict_successor":
@@ -1063,12 +1350,39 @@ def validate_publication_readback_receipt(value: object) -> dict[str, object]:
         extra_fields=("pr_identity", "publication_evidence_ref"),
     )
     pr = _mapping(receipt["pr_identity"], "publication_readback_receipt.pr_identity")
-    _exact_keys(pr, ("number", "base_commit_sha", "head_sha", "tree_sha"), field="publication_readback_receipt.pr_identity")
+    _exact_keys(
+        pr,
+        (
+            "number",
+            "remote_name",
+            "ref",
+            "base_commit_sha",
+            "base_tree_sha",
+            "head_sha",
+            "head_tree_sha",
+            "merge_commit_sha",
+            "merge_tree_sha",
+        ),
+        field="publication_readback_receipt.pr_identity",
+    )
     _positive_int(pr["number"], "publication_readback_receipt.pr_identity.number")
-    for field in ("base_commit_sha", "head_sha", "tree_sha"):
+    if pr["remote_name"] != "origin" or pr["ref"] != "refs/heads/main":
+        _fail("lifecycle:publication_remote_identity_mismatch")
+    for field in (
+        "base_commit_sha",
+        "base_tree_sha",
+        "head_sha",
+        "head_tree_sha",
+        "merge_commit_sha",
+        "merge_tree_sha",
+    ):
         _pattern(pr[field], _HEX40, f"publication_readback_receipt.pr_identity.{field}")
     candidate = cast(Mapping[str, object], receipt["candidate_identity"])
-    if pr["head_sha"] != candidate["candidate_sha"] or pr["tree_sha"] != candidate["tree_sha"]:
+    if (
+        pr["head_sha"] != candidate["candidate_sha"]
+        or pr["head_tree_sha"] != candidate["tree_sha"]
+        or pr["merge_tree_sha"] != candidate["tree_sha"]
+    ):
         _fail("lifecycle:publication_candidate_mismatch")
     _pattern(receipt["publication_evidence_ref"], _EVIDENCE, "publication_readback_receipt.publication_evidence_ref")
     return receipt
@@ -1088,12 +1402,230 @@ def validate_publication_readback_transition(
     _same_binding(checked_pr["binding"], checked_readback["binding"], "publication_readback")
     if checked_cas["candidate_identity"] != checked_readback["candidate_identity"]:
         _fail("lifecycle:candidate_identity_mismatch", "publication_readback")
+    cas_base = cast(Mapping[str, object], checked_cas["cas_base_identity"])
+    pr_base = cast(Mapping[str, object], checked_pr["base_identity"])
+    pr_head = cast(Mapping[str, object], checked_pr["head_identity"])
+    readback_pr = cast(Mapping[str, object], checked_readback["pr_identity"])
+    if (
+        cas_base["commit_sha"] != pr_base["commit_sha"]
+        or cas_base["tree_sha"] != pr_base["tree_sha"]
+        or readback_pr["base_commit_sha"] != pr_base["commit_sha"]
+        or readback_pr["base_tree_sha"] != pr_base["tree_sha"]
+    ):
+        _fail("lifecycle:cas_base_identity_mismatch")
+    if (
+        readback_pr["head_sha"] != pr_head["commit_sha"]
+        or readback_pr["head_tree_sha"] != pr_head["tree_sha"]
+    ):
+        _fail("lifecycle:publication_head_identity_mismatch")
+    remote = cast(Mapping[str, object], checked_pr["remote_identity"])
+    if (
+        readback_pr["remote_name"] != remote["remote_name"]
+        or readback_pr["ref"] != pr_base["ref"]
+    ):
+        _fail("lifecycle:publication_remote_identity_mismatch")
     pr_binding = cast(Mapping[str, object], checked_pr["binding"])
     if checked_readback["predecessor_evidence_id"] != pr_binding["evidence_ref"]:
         _fail("lifecycle:predecessor_mismatch", "publication_readback")
     if checked_readback["rebind_receipt_evidence_id"] != checked_cas["rebind_receipt_evidence_id"]:
         _fail("lifecycle:rebind_mismatch", "publication_readback")
     return checked_readback
+
+
+def materialize_publication_readback_receipt(
+    *,
+    candidate_cas_receipt: Mapping[str, object],
+    pull_request_lifecycle: Mapping[str, object],
+    pr_number: int,
+    merge_commit_sha: str,
+    merge_tree_sha: str,
+    publication_evidence_ref: str,
+) -> dict[str, object]:
+    """Append exact PR/base/head/merge publication readback identity."""
+    cas = validate_candidate_cas_receipt(candidate_cas_receipt)
+    lifecycle = validate_candidate_cas_pr_transition(
+        cas, pull_request_lifecycle
+    )
+    if lifecycle["state"] != "merged":
+        _fail("lifecycle:pr_not_merged")
+    _positive_int(pr_number, "publication_readback_receipt.pr_identity.number")
+    _pattern(merge_commit_sha, _HEX40, "publication_readback_receipt.merge_commit_sha")
+    _pattern(merge_tree_sha, _HEX40, "publication_readback_receipt.merge_tree_sha")
+    _pattern(
+        publication_evidence_ref,
+        _EVIDENCE,
+        "publication_readback_receipt.publication_evidence_ref",
+    )
+    lifecycle_binding = cast(Mapping[str, object], lifecycle["binding"])
+    binding = dict(lifecycle_binding)
+    evidence_hex = publication_evidence_ref.removeprefix("evidence:")
+    binding["evidence_ref"] = publication_evidence_ref
+    binding["evidence_digest"] = "sha256:" + evidence_hex
+    candidate = cast(Mapping[str, object], cas["candidate_identity"])
+    base = cast(Mapping[str, object], lifecycle["base_identity"])
+    head = cast(Mapping[str, object], lifecycle["head_identity"])
+    remote = cast(Mapping[str, object], lifecycle["remote_identity"])
+    pr_identity = {
+        "number": pr_number,
+        "remote_name": remote["remote_name"],
+        "ref": base["ref"],
+        "base_commit_sha": base["commit_sha"],
+        "base_tree_sha": base["tree_sha"],
+        "head_sha": head["commit_sha"],
+        "head_tree_sha": head["tree_sha"],
+        "merge_commit_sha": merge_commit_sha,
+        "merge_tree_sha": merge_tree_sha,
+    }
+    key = {
+        "binding_identity": binding_identity(binding),
+        "predecessor_evidence_id": lifecycle_binding["evidence_ref"],
+        "rebind_receipt_evidence_id": cas["rebind_receipt_evidence_id"],
+        "candidate_identity": candidate,
+        "pr_identity": pr_identity,
+        "publication_evidence_ref": publication_evidence_ref,
+    }
+    receipt = {
+        "schema": PUBLICATION_READBACK_SCHEMA,
+        "readback_receipt_id": "publication-readback:"
+        + hashlib.sha256(canonical_json_bytes(key)).hexdigest(),
+        "binding": binding,
+        "predecessor_evidence_id": lifecycle_binding["evidence_ref"],
+        "rebind_receipt_evidence_id": cas["rebind_receipt_evidence_id"],
+        "candidate_identity": candidate,
+        "pr_identity": pr_identity,
+        "publication_evidence_ref": publication_evidence_ref,
+        "readback_stage": "publication_readback",
+    }
+    return validate_publication_readback_transition(cas, lifecycle, receipt)
+
+
+def validate_source_projection_packet(value: object) -> dict[str, object]:
+    """Validate the sole post-publication input consumed by update `latest`."""
+    packet = _mapping(value, "source_projection_packet")
+    _exact_keys(
+        packet,
+        (
+            "schema",
+            "binding",
+            "source_main_rebind_receipt",
+            "candidate_cas_receipt",
+            "pull_request_lifecycle",
+            "publication_readback_receipt",
+            "source_gate_verdicts",
+            "ordered_predecessor_evidence",
+            "acceptance_evidence_ref",
+        ),
+        field="source_projection_packet",
+    )
+    _schema(packet, SOURCE_PROJECTION_PACKET_SCHEMA)
+    binding = validate_record_binding(packet["binding"])
+    rebind = validate_source_main_rebind_receipt(
+        packet["source_main_rebind_receipt"]
+    )
+    cas = validate_candidate_cas_receipt(packet["candidate_cas_receipt"])
+    lifecycle = validate_candidate_cas_pr_transition(
+        cas, packet["pull_request_lifecycle"]
+    )
+    readback = validate_publication_readback_transition(
+        cas, lifecycle, packet["publication_readback_receipt"]
+    )
+    source_gates = validate_gate_chain(
+        _sequence(
+            packet["source_gate_verdicts"],
+            "source_projection_packet.source_gate_verdicts",
+        ),
+        expected_gate_ids=("G1", "G2", "G3"),
+        require_pass=True,
+    )
+    for field, record_binding in (
+        ("rebind", rebind["binding"]),
+        ("cas", cas["binding"]),
+        ("pr", lifecycle["binding"]),
+        ("readback", readback["binding"]),
+    ):
+        _same_binding(binding, record_binding, f"source_projection_packet.{field}")
+    if any(
+        binding_identity(gate["binding"]) != binding_identity(binding)
+        for gate in source_gates
+    ):
+        _fail("lifecycle:gate_identity_mismatch")
+    g3_inputs = cast(Sequence[object], source_gates[2]["ordered_input_evidence_refs"])
+    cas_binding = cast(Mapping[str, object], cas["binding"])
+    if cas_binding["evidence_ref"] not in g3_inputs:
+        _fail("lifecycle:gate_predecessor_mismatch", "G3")
+    if readback["rebind_receipt_evidence_id"] != rebind["rebind_receipt_id"]:
+        _fail("lifecycle:rebind_mismatch", "source_projection_packet")
+    publication = cast(Mapping[str, object], readback["pr_identity"])
+    if publication["merge_commit_sha"] != binding["candidate_sha"]:
+        _fail("lifecycle:publication_candidate_mismatch")
+    predecessors = _sequence(
+        packet["ordered_predecessor_evidence"],
+        "source_projection_packet.ordered_predecessor_evidence",
+    )
+    if len(predecessors) != 2:
+        _fail("frontier:predecessor_order_invalid")
+    expected = ((388, "#388"), (389, "#389"))
+    for index, (value_item, expected_item) in enumerate(
+        zip(predecessors, expected, strict=True)
+    ):
+        item = _mapping(
+            value_item,
+            f"source_projection_packet.ordered_predecessor_evidence[{index}]",
+        )
+        _exact_keys(
+            item,
+            ("queue_number", "source_pr", "publication_evidence_id"),
+            optional=("source_pr_sha",) if expected_item[0] == 389 else (),
+            field=f"source_projection_packet.ordered_predecessor_evidence[{index}]",
+        )
+        if (item["queue_number"], item["source_pr"]) != expected_item:
+            _fail("frontier:predecessor_order_invalid")
+        _pattern(
+            item["publication_evidence_id"],
+            _EVIDENCE,
+            f"source_projection_packet.ordered_predecessor_evidence[{index}].publication_evidence_id",
+        )
+        if expected_item[0] == 389:
+            _pattern(
+                item.get("source_pr_sha"),
+                _HEX40,
+                "source_projection_packet.ordered_predecessor_evidence[1].source_pr_sha",
+            )
+    _pattern(
+        packet["acceptance_evidence_ref"],
+        _EVIDENCE,
+        "source_projection_packet.acceptance_evidence_ref",
+    )
+    return _clone(packet)
+
+
+def materialize_source_projection_packet(
+    *,
+    binding: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    pull_request_lifecycle: Mapping[str, object],
+    publication_readback_receipt: Mapping[str, object],
+    source_gate_verdicts: Sequence[Mapping[str, object]],
+    ordered_predecessor_evidence: Sequence[Mapping[str, object]],
+    acceptance_evidence_ref: str,
+) -> dict[str, object]:
+    """Materialize the sole state packet consumed by update `latest`."""
+    return validate_source_projection_packet(
+        {
+            "schema": SOURCE_PROJECTION_PACKET_SCHEMA,
+            "binding": dict(binding),
+            "source_main_rebind_receipt": dict(source_main_rebind_receipt),
+            "candidate_cas_receipt": dict(candidate_cas_receipt),
+            "pull_request_lifecycle": dict(pull_request_lifecycle),
+            "publication_readback_receipt": dict(publication_readback_receipt),
+            "source_gate_verdicts": [dict(item) for item in source_gate_verdicts],
+            "ordered_predecessor_evidence": [
+                dict(item) for item in ordered_predecessor_evidence
+            ],
+            "acceptance_evidence_ref": acceptance_evidence_ref,
+        }
+    )
 
 
 def queue_once_key(source_namespace: str, binding: Mapping[str, object]) -> str:
@@ -1166,6 +1698,26 @@ def materialize_queue_receipt(
             "state": state,
         }
     )
+
+
+def validate_immutable_replay(
+    existing: object,
+    requested: object,
+    *,
+    field: str,
+) -> None:
+    """Reject replay when any immutable receipt field changed."""
+
+    def immutable(record: object) -> dict[str, object]:
+        cloned = _clone(_mapping(record, field))
+        binding = _mapping(cloned.get("binding"), f"{field}.binding")
+        binding_copy = dict(binding)
+        binding_copy.pop("timing", None)
+        cloned["binding"] = binding_copy
+        return cloned
+
+    if immutable(existing) != immutable(requested):
+        _fail("input_identity_mismatch", field)
 
 
 def frontier_key(source_namespace: str, binding: Mapping[str, object]) -> str:
@@ -1374,6 +1926,122 @@ def validate_durable_handback(value: object) -> dict[str, object]:
     return _clone(handback)
 
 
+def validate_descendant_close_receipt(value: object) -> dict[str, object]:
+    """Validate one transaction-bound descendant terminal receipt."""
+    receipt = _mapping(value, "descendant_close_receipt")
+    _exact_keys(
+        receipt,
+        (
+            "schema",
+            "binding",
+            "agent_id",
+            "state",
+            "durable_handback_evidence_ref",
+            "evidence_ref",
+        ),
+        field="descendant_close_receipt",
+    )
+    _schema(receipt, DESCENDANT_CLOSE_RECEIPT_SCHEMA)
+    validate_record_binding(receipt["binding"])
+    agent_id = _string(receipt["agent_id"], "descendant_close_receipt.agent_id")
+    if not agent_id.startswith("agent:"):
+        _fail("lifecycle:identity_invalid", "descendant_close_receipt.agent_id")
+    if receipt["state"] != "closed":
+        _fail("close_agent:descendant_not_closed")
+    _pattern(
+        receipt["durable_handback_evidence_ref"],
+        _EVIDENCE,
+        "descendant_close_receipt.durable_handback_evidence_ref",
+    )
+    _pattern(receipt["evidence_ref"], _EVIDENCE, "descendant_close_receipt.evidence_ref")
+    return _clone(receipt)
+
+
+def materialize_descendant_close_receipt(
+    *,
+    binding: Mapping[str, object],
+    durable_handback: Mapping[str, object],
+    agent_id: str,
+    evidence_ref: str,
+) -> dict[str, object]:
+    """Materialize one close receipt only for a declared descendant."""
+    checked_binding = validate_record_binding(binding)
+    handback = validate_durable_handback(durable_handback)
+    _same_binding(checked_binding, handback["binding"], "descendant_close")
+    if agent_id not in cast(Sequence[object], handback["descendant_ids"]):
+        _fail("close_agent:unknown_descendant")
+    return validate_descendant_close_receipt(
+        {
+            "schema": DESCENDANT_CLOSE_RECEIPT_SCHEMA,
+            "binding": checked_binding,
+            "agent_id": agent_id,
+            "state": "closed",
+            "durable_handback_evidence_ref": handback["evidence_ref"],
+            "evidence_ref": evidence_ref,
+        }
+    )
+
+
+def validate_reservation_release_receipt(value: object) -> dict[str, object]:
+    """Validate one transaction-bound reservation release receipt."""
+    receipt = _mapping(value, "reservation_release_receipt")
+    _exact_keys(
+        receipt,
+        (
+            "schema",
+            "binding",
+            "reservation_id",
+            "state",
+            "durable_handback_evidence_ref",
+            "evidence_ref",
+        ),
+        field="reservation_release_receipt",
+    )
+    _schema(receipt, RESERVATION_RELEASE_RECEIPT_SCHEMA)
+    validate_record_binding(receipt["binding"])
+    reservation_id = _string(
+        receipt["reservation_id"], "reservation_release_receipt.reservation_id"
+    )
+    if not reservation_id.startswith("reservation:"):
+        _fail("lifecycle:identity_invalid", "reservation_release_receipt.reservation_id")
+    if receipt["state"] != "released":
+        _fail("close_agent:reservation_leak")
+    _pattern(
+        receipt["durable_handback_evidence_ref"],
+        _EVIDENCE,
+        "reservation_release_receipt.durable_handback_evidence_ref",
+    )
+    _pattern(
+        receipt["evidence_ref"], _EVIDENCE, "reservation_release_receipt.evidence_ref"
+    )
+    return _clone(receipt)
+
+
+def materialize_reservation_release_receipt(
+    *,
+    binding: Mapping[str, object],
+    durable_handback: Mapping[str, object],
+    reservation_id: str,
+    evidence_ref: str,
+) -> dict[str, object]:
+    """Materialize one release receipt only for a declared reservation."""
+    checked_binding = validate_record_binding(binding)
+    handback = validate_durable_handback(durable_handback)
+    _same_binding(checked_binding, handback["binding"], "reservation_release")
+    if reservation_id not in cast(Sequence[object], handback["reservation_ids"]):
+        _fail("close_agent:reservation_leak")
+    return validate_reservation_release_receipt(
+        {
+            "schema": RESERVATION_RELEASE_RECEIPT_SCHEMA,
+            "binding": checked_binding,
+            "reservation_id": reservation_id,
+            "state": "released",
+            "durable_handback_evidence_ref": handback["evidence_ref"],
+            "evidence_ref": evidence_ref,
+        }
+    )
+
+
 def validate_cleanup_proof(value: object) -> dict[str, object]:
     proof = _mapping(value, "cleanup_proof")
     _exact_keys(
@@ -1422,13 +2090,21 @@ def validate_cleanup_proof(value: object) -> dict[str, object]:
 
 
 def _validate_gate_sequence(values: Sequence[object], binding: object) -> tuple[dict[str, object], ...]:
-    gates = tuple(validate_gate_verdict(value) for value in values)
-    if tuple(gate["gate_id"] for gate in gates) != GATE_IDS:
-        _fail("close_agent:all_six_gate_evidence_required")
+    try:
+        gates = validate_gate_chain(
+            values,
+            expected_gate_ids=GATE_IDS,
+            require_pass=True,
+        )
+    except LifecycleContractError as exc:
+        if exc.code in {
+            "lifecycle:gate_order_invalid",
+            "lifecycle:gate_sequence_empty",
+        }:
+            _fail("close_agent:all_six_gate_evidence_required")
+        raise
     for gate in gates:
         _same_binding(binding, gate["binding"], "close_agent.gates")
-        if gate["verdict"] != "pass":
-            _fail("close_agent:gate_not_passed", cast(str, gate["gate_id"]))
     return gates
 
 
@@ -1599,8 +2275,13 @@ def guard_transition(
         if field not in evidence:
             _fail("lifecycle:transition_evidence_missing", field)
     if (current_state, next_state) == ("generated", "gates_ready"):
-        gates = tuple(validate_gate_verdict(item) for item in _sequence(evidence["gate_verdicts"], "transition.gate_verdicts"))
-        if tuple(gate["gate_id"] for gate in gates) != ("G1", "G2") or any(gate["verdict"] != "pass" for gate in gates):
+        try:
+            validate_gate_chain(
+                _sequence(evidence["gate_verdicts"], "transition.gate_verdicts"),
+                expected_gate_ids=("G1", "G2"),
+                require_pass=True,
+            )
+        except LifecycleContractError:
             _fail("lifecycle:gates_not_ready")
     elif (current_state, next_state) == ("reviewed", "pr_open"):
         pr = validate_pull_request_lifecycle(evidence["pr_lifecycle"])
@@ -1631,6 +2312,7 @@ def guard_transition(
 __all__ = [
     "CHECKPOINT_IDS",
     "CLOSE_LIFECYCLE_STATES",
+    "GATE_CONTRACTS",
     "GATE_IDS",
     "LifecycleContractError",
     "PULL_REQUEST_BRANCH_RULES",
@@ -1642,15 +2324,21 @@ __all__ = [
     "guard_transition",
     "import_decision_sufficiency_verdict",
     "materialize_close_agent_tool_call",
+    "materialize_candidate_cas_receipt",
     "materialize_dependency_frontier",
+    "materialize_descendant_close_receipt",
     "materialize_gate_verdict",
     "materialize_queue_receipt",
+    "materialize_reservation_release_receipt",
+    "materialize_publication_readback_receipt",
     "materialize_source_main_rebind_receipt",
+    "materialize_source_projection_packet",
     "parse_decision_sufficiency_verdict",
     "pull_request_branch_table",
     "queue_once_key",
     "serialize_decision_sufficiency_verdict",
     "validate_candidate_cas_receipt",
+    "validate_candidate_cas_pr_transition",
     "validate_candidate_cas_transition",
     "validate_candidate_freeze_receipt",
     "validate_candidate_freeze_transition",
@@ -1661,16 +2349,21 @@ __all__ = [
     "validate_close_agent_tool_call",
     "validate_dependency_frontier",
     "validate_dependency_frontier_transition",
+    "validate_descendant_close_receipt",
     "validate_durable_handback",
     "validate_evidence_identity",
     "validate_gate_verdict",
+    "validate_gate_chain",
+    "validate_immutable_replay",
     "validate_publication_readback_receipt",
     "validate_publication_readback_transition",
     "validate_pull_request_lifecycle",
     "validate_pull_request_transition",
     "validate_queue_receipt",
     "validate_record_binding",
+    "validate_reservation_release_receipt",
     "validate_snapshot",
+    "validate_source_projection_packet",
     "validate_source_main_rebind_receipt",
     "validate_update_transaction",
 ]

@@ -31,10 +31,11 @@ else
   AGENT_CANON_SOURCE_MODE="standalone_source"
   AGENT_CANON_DIR="$ROOT_DIR"
 fi
-UPDATE_OWNER_NAMESPACE="${AGENT_CANON_UPDATE_OWNER_NAMESPACE:-$ROOT_DIR/.agent-canon/update-lifecycle}"
+UPDATE_OWNER_NAMESPACE="$ROOT_DIR/.agent-canon/update-lifecycle"
 UPDATE_STATE_DIR="$UPDATE_OWNER_NAMESPACE/state"
 UPDATE_EVIDENCE_DIR="$UPDATE_OWNER_NAMESPACE/evidence"
 UPDATE_PROJECTION_DIR="$UPDATE_OWNER_NAMESPACE/projection-queue"
+SOURCE_PROJECTION_PACKET="$UPDATE_STATE_DIR/source-publication-ready.json"
 
 usage() {
   cat <<EOF
@@ -45,8 +46,6 @@ Usage:
   bash tools/update_agent_canon.sh rebuild-tools
   bash tools/update_agent_canon.sh merge-main-into-current [branch]
   bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty [branch]
-  bash tools/update_agent_canon.sh enqueue-source-projection <binding.json> <rebind.json> <source-main-readback-evidence-ref> <pr-388-evidence-ref> <pr-389-evidence-ref> [queue.json] [frontier.pending.json]
-  bash tools/update_agent_canon.sh accept-dependency-frontier <frontier.pending.json> <queue.json> <rebind.json> <acceptance-evidence-ref> [frontier.accepted.json] [branch]
   bash tools/update_agent_canon.sh status
 
 Commands:
@@ -71,10 +70,6 @@ Commands:
       and restore the dirty work after a successful merge. If the merge itself
       conflicts, the stash is kept and the command reports the stash ref to
       restore after resolving the main merge.
-  enqueue-source-projection
-      Materialize or replay the exact source-main QueueReceipt and pending dependency frontier.
-  accept-dependency-frontier
-      Read back source main and append acceptance to the exact pending frontier.
   status
       Print low-level AgentCanon submodule/root-view status.
 
@@ -572,6 +567,7 @@ from update_lifecycle_contract import (
     materialize_dependency_frontier,
     materialize_queue_receipt,
     validate_dependency_frontier,
+    validate_immutable_replay,
     validate_queue_receipt,
 )
 
@@ -621,8 +617,7 @@ def persist_once(path_text, record, validator, identity_field):
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.is_file():
         existing = validator(json.loads(path.read_text(encoding="utf-8")))
-        if existing[identity_field] != record[identity_field]:
-            raise SystemExit(f"input_identity_mismatch:{path}")
+        validate_immutable_replay(existing, record, field=str(path))
         replay = json.loads(json.dumps(existing))
         replay["binding"]["timing"]["replayed"] = True
         return replay
@@ -681,31 +676,46 @@ accept_dependency_frontier() {
   local queue_receipt_file="$2"
   local rebind_receipt_file="$3"
   local acceptance_evidence_ref="$4"
-  local accepted_output="${5:-$UPDATE_PROJECTION_DIR/frontier.accepted.json}"
-  local branch="${6:-$DEFAULT_BRANCH}"
-  local remote_url=""
-  local source_main_sha=""
+  local source_main_sha="$5"
+  local accepted_output="${6:-$UPDATE_PROJECTION_DIR/frontier.accepted.json}"
+  local g4_output="$UPDATE_EVIDENCE_DIR/g4.parent-projection-integrity.json"
 
-  remote_url="$(submodule_remote_url)"
-  [ -n "$remote_url" ] || die "AgentCanon source remote is unavailable"
-  source_main_sha="$(resolve_remote_branch_sha "$remote_url" "$branch")"
+  [[ "$source_main_sha" =~ ^[0-9a-f]{40}$ ]] \
+    || die "accepted frontier requires exact origin/main readback identity"
   mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
   PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
     python3 - "$pending_frontier_file" "$queue_receipt_file" \
       "$rebind_receipt_file" "$source_main_sha" "$acceptance_evidence_ref" \
-      "$accepted_output" <<'PY'
+      "$accepted_output" "$SOURCE_PROJECTION_PACKET" "$g4_output" \
+      "$ROOT_DIR" <<'PY'
+import hashlib
 import json
 import os
 import sys
 import tempfile
 from pathlib import Path
 
+from artifact_identity import canonical_json_bytes
 from update_lifecycle_contract import (
+    materialize_gate_verdict,
     validate_dependency_frontier,
     validate_dependency_frontier_transition,
+    validate_gate_verdict,
+    validate_immutable_replay,
+    validate_source_projection_packet,
 )
 
-pending_path, queue_path, rebind_path, source_main_sha, acceptance_ref, output_path = sys.argv[1:]
+(
+    pending_path,
+    queue_path,
+    rebind_path,
+    source_main_sha,
+    acceptance_ref,
+    output_path,
+    packet_path,
+    g4_path,
+    root_dir,
+) = sys.argv[1:]
 pending = json.loads(Path(pending_path).read_text(encoding="utf-8"))
 queue = json.loads(Path(queue_path).read_text(encoding="utf-8"))
 rebind = json.loads(Path(rebind_path).read_text(encoding="utf-8"))
@@ -732,8 +742,7 @@ if path.is_file():
     existing = validate_dependency_frontier(
         json.loads(path.read_text(encoding="utf-8"))
     )
-    if existing["frontier_id"] != accepted["frontier_id"]:
-        raise SystemExit(f"input_identity_mismatch:{path}")
+    validate_immutable_replay(existing, accepted, field=str(path))
     result = json.loads(json.dumps(existing))
     result["binding"]["timing"]["replayed"] = True
 else:
@@ -749,32 +758,178 @@ else:
         if os.path.exists(handle.name):
             os.unlink(handle.name)
     result = accepted
+packet = validate_source_projection_packet(
+    json.loads(Path(packet_path).read_text(encoding="utf-8"))
+)
+g3 = packet["source_gate_verdicts"][2]
+
+def immutable_receipt(record):
+    value = json.loads(json.dumps(record))
+    value["binding"].pop("timing", None)
+    return value
+
+g4 = materialize_gate_verdict(
+    binding=result["binding"],
+    gate_id="G4",
+    ordered_input_evidence_refs=[
+        g3["binding"]["evidence_ref"],
+        queue["binding"]["evidence_ref"],
+        result["acceptance_evidence_ref"],
+    ],
+    invariant="parent_projection_integrity",
+    output_digest="sha256:"
+    + hashlib.sha256(
+        canonical_json_bytes(
+            {
+                "queue": immutable_receipt(queue),
+                "frontier": immutable_receipt(result),
+            }
+        )
+    ).hexdigest(),
+    owner=str(Path(root_dir).resolve())
+    + "/tools/update_agent_canon.sh#accept_dependency_frontier",
+    verdict="pass",
+)
+g4_output = Path(g4_path)
+g4_output.parent.mkdir(parents=True, exist_ok=True)
+if g4_output.is_file():
+    existing_g4 = validate_gate_verdict(
+        json.loads(g4_output.read_text(encoding="utf-8"))
+    )
+    validate_immutable_replay(existing_g4, g4, field=str(g4_output))
+    g4_result = json.loads(json.dumps(existing_g4))
+    g4_result["binding"]["timing"]["replayed"] = True
+else:
+    handle = tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=g4_output.parent, delete=False
+    )
+    try:
+        json.dump(g4, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+        handle.close()
+        os.replace(handle.name, g4_output)
+    finally:
+        if os.path.exists(handle.name):
+            os.unlink(handle.name)
+    g4_result = g4
 print(f"AGENT_CANON_FRONTIER_ID={result['frontier_id']}")
 print(f"AGENT_CANON_FRONTIER_STATE={result['frontier_state']}")
 print(f"AGENT_CANON_FRONTIER_REPLAYED={str(result['binding']['timing']['replayed']).lower()}")
 print(f"AGENT_CANON_SOURCE_MAIN_READBACK={source_main_sha}")
+print(f"AGENT_CANON_G4_EVIDENCE_REF={g4_result['binding']['evidence_ref']}")
 PY
+}
+
+advance_source_projection() {
+  local packet="$SOURCE_PROJECTION_PACKET"
+  local binding_file="$UPDATE_STATE_DIR/source-projection.binding.json"
+  local rebind_file="$UPDATE_STATE_DIR/source-projection.rebind.json"
+  local source_main_sha=""
+  local projection_values=()
+
+  [ -f "$packet" ] || die "source projection packet is missing"
+  source_main_sha="$(resolve_remote_branch_sha origin main)"
+  mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
+  mapfile -t projection_values < <(
+    PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
+      python3 - "$packet" "$binding_file" "$rebind_file" "$source_main_sha" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+from update_lifecycle_contract import validate_source_projection_packet
+
+packet_path, binding_path, rebind_path, observed_source_main = sys.argv[1:]
+packet = validate_source_projection_packet(
+    json.loads(Path(packet_path).read_text(encoding="utf-8"))
+)
+binding = packet["binding"]
+if binding["candidate_sha"] != observed_source_main:
+    raise SystemExit("frontier:origin_main_readback_mismatch")
+
+def persist_projection(path_text, value):
+    path = Path(path_text)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rendered = json.dumps(value, indent=2, sort_keys=True) + "\n"
+    if path.is_file():
+        if path.read_text(encoding="utf-8") != rendered:
+            raise SystemExit(f"input_identity_mismatch:{path}")
+        return
+    handle = tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=path.parent, delete=False
+    )
+    try:
+        handle.write(rendered)
+        handle.close()
+        os.replace(handle.name, path)
+    finally:
+        if os.path.exists(handle.name):
+            os.unlink(handle.name)
+
+persist_projection(binding_path, binding)
+persist_projection(rebind_path, packet["source_main_rebind_receipt"])
+readback = packet["publication_readback_receipt"]
+predecessors = packet["ordered_predecessor_evidence"]
+print(readback["publication_evidence_ref"])
+print(predecessors[0]["publication_evidence_id"])
+print(predecessors[1]["publication_evidence_id"])
+print(packet["acceptance_evidence_ref"])
+PY
+  )
+  [ "${#projection_values[@]}" -eq 4 ] \
+    || die "source projection packet extraction failed"
+  emit_queue_receipt \
+    "$binding_file" \
+    "$rebind_file" \
+    "${projection_values[0]}" \
+    "${projection_values[1]}" \
+    "${projection_values[2]}"
+  accept_dependency_frontier \
+    "$UPDATE_PROJECTION_DIR/frontier.pending.json" \
+    "$UPDATE_PROJECTION_DIR/queue.accepted.json" \
+    "$rebind_file" \
+    "${projection_values[3]}" \
+    "$source_main_sha"
 }
 
 require_accepted_dependency_frontier() {
   local current_marker="$UPDATE_STATE_DIR/current-transaction"
+  local accepted_queue="$UPDATE_PROJECTION_DIR/queue.accepted.json"
   local accepted_frontier="$UPDATE_PROJECTION_DIR/frontier.accepted.json"
-  if [ ! -f "$current_marker" ]; then
-    return 0
-  fi
+  local g4_receipt="$UPDATE_EVIDENCE_DIR/g4.parent-projection-integrity.json"
+  [ -f "$current_marker" ] \
+    || die "parent projection blocked: current transaction marker is missing"
+  [ -f "$accepted_queue" ] \
+    || die "parent projection blocked until queue acceptance"
   [ -f "$accepted_frontier" ] \
     || die "parent projection blocked until dependency frontier acceptance"
+  [ -f "$g4_receipt" ] \
+    || die "parent projection blocked until G4 integrity evidence"
   PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
-    python3 - "$accepted_frontier" "$current_marker" <<'PY'
+    python3 - "$accepted_frontier" "$accepted_queue" "$current_marker" \
+      "$g4_receipt" <<'PY'
 import json
 import sys
 from pathlib import Path
-from update_lifecycle_contract import validate_dependency_frontier
+from update_lifecycle_contract import (
+    binding_identity,
+    validate_dependency_frontier,
+    validate_gate_verdict,
+    validate_queue_receipt,
+)
 
 frontier = validate_dependency_frontier(
     json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 )
-marker = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+queue = validate_queue_receipt(
+    json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+)
+marker = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))
+g4 = validate_gate_verdict(
+    json.loads(Path(sys.argv[4]).read_text(encoding="utf-8"))
+)
 if set(marker) != {"schema", "transaction_id", "queue_receipt_id", "frontier_id"}:
     raise SystemExit("frontier:current_transaction_marker_invalid")
 if marker["schema"] != "agent-canon.update-lifecycle-current-transaction.v1":
@@ -785,6 +940,18 @@ if frontier["binding"]["transaction_id"] != marker["transaction_id"]:
     raise SystemExit("frontier:transaction_identity_mismatch")
 if frontier["frontier_id"] != marker["frontier_id"]:
     raise SystemExit("frontier:identity_mismatch")
+if queue["state"] != "accepted" or queue["queue_receipt_id"] != marker["queue_receipt_id"]:
+    raise SystemExit("frontier:queue_not_accepted")
+if binding_identity(queue["binding"]) != binding_identity(frontier["binding"]):
+    raise SystemExit("frontier:queue_identity_mismatch")
+if (
+    g4["gate_id"] != "G4"
+    or g4["verdict"] != "pass"
+    or binding_identity(g4["binding"]) != binding_identity(frontier["binding"])
+    or frontier["acceptance_evidence_ref"]
+    not in g4["ordered_input_evidence_refs"]
+):
+    raise SystemExit("frontier:g4_identity_mismatch")
 print(f"AGENT_CANON_PARENT_PROJECTION_FRONTIER={frontier['frontier_id']}")
 PY
 }
@@ -814,6 +981,10 @@ cmd_latest() {
   local todo_rc=0
 
   if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
+    if [ -f "$SOURCE_PROJECTION_PACKET" ]; then
+      advance_source_projection
+      return
+    fi
     cmd_merge_main_into_current_preserve_dirty "$branch"
     return
   fi
@@ -1123,16 +1294,6 @@ main() {
     merge-main-into-current-preserve-dirty)
       shift
       cmd_merge_main_into_current_preserve_dirty "${1:-$DEFAULT_BRANCH}"
-      ;;
-    enqueue-source-projection)
-      [ "$#" -ge 6 ] || die "enqueue-source-projection requires binding, rebind, readback, #388, and #389 evidence arguments"
-      shift
-      emit_queue_receipt "$@"
-      ;;
-    accept-dependency-frontier)
-      [ "$#" -ge 5 ] || die "accept-dependency-frontier requires pending frontier, queue, rebind, and acceptance evidence arguments"
-      shift
-      accept_dependency_frontier "$@"
       ;;
     status)
       shift

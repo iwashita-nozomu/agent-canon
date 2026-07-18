@@ -26,6 +26,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 import agent_team  # noqa: E402
+from artifact_identity import canonical_json_bytes  # noqa: E402
 from agent_team import (  # noqa: E402
     AgentTypeSelection,
     load_team_config,
@@ -35,7 +36,9 @@ from report_artifact_checks import write_completion_coverage_artifact  # noqa: E
 from task_close import update_lifecycle_closeout_consumer  # noqa: E402
 from update_lifecycle_contract import (  # noqa: E402
     materialize_close_agent_tool_call,
+    materialize_descendant_close_receipt,
     materialize_gate_verdict,
+    materialize_reservation_release_receipt,
 )
 from work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
 
@@ -68,21 +71,64 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
             "replayed": False,
         },
     }
-    previous_ref = "evidence:" + "8" * 64
+    seed_ref = "evidence:" + "8" * 64
     gates: list[dict[str, object]] = []
+    gate_contracts = {
+        "G1": (
+            "source_correctness",
+            PROJECT_ROOT / "tools" / "agent_tools" / "publication_integrator.py",
+            "resolve_publication_eligibility",
+        ),
+        "G2": (
+            "generated_completeness",
+            PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh",
+            "run_pr_agent_checks",
+        ),
+        "G3": (
+            "pr_identity_cas",
+            PROJECT_ROOT / "tools" / "agent_tools" / "github_publish.py",
+            "materialize_pr_identity_gate",
+        ),
+        "G4": (
+            "parent_projection_integrity",
+            PROJECT_ROOT / "tools" / "update_agent_canon.sh",
+            "accept_dependency_frontier",
+        ),
+        "G5": (
+            "remote_publication_readback",
+            PROJECT_ROOT / "tools" / "agent_tools" / "publication_integrator.py",
+            "integrate_publication",
+        ),
+        "G6": (
+            "nested_lifecycle_cleanup",
+            PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py",
+            "materialize_close_agent_tool_call",
+        ),
+    }
     for index, gate_id in enumerate(("G1", "G2", "G3", "G4", "G5", "G6"), 1):
+        evidence_refs = [
+            cast("dict[str, object]", gate["binding"])["evidence_ref"]
+            for gate in gates
+        ]
+        ordered_inputs = {
+            "G1": [seed_ref],
+            "G2": evidence_refs[:1],
+            "G3": evidence_refs[:2],
+            "G4": evidence_refs[2:3],
+            "G5": evidence_refs[3:4],
+            "G6": evidence_refs[:5],
+        }[gate_id]
+        invariant, owner_path, owner_symbol = gate_contracts[gate_id]
         gate = materialize_gate_verdict(
             binding=binding,
             gate_id=gate_id,
-            ordered_input_evidence_refs=[previous_ref],
-            invariant=f"fixture_{gate_id.lower()}",
+            ordered_input_evidence_refs=cast("list[str]", ordered_inputs),
+            invariant=cast("str", invariant),
             output_digest="sha256:" + format(index, "x") * 64,
-            owner=str(PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py")
-            + "#update_lifecycle_closeout_consumer",
+            owner=f"{owner_path}#{owner_symbol}",
             verdict="pass",
         )
         gates.append(gate)
-        previous_ref = cast("dict[str, object]", gate["binding"])["evidence_ref"]  # type: ignore[assignment]
     handback: dict[str, object] = {
         "schema": "agent-canon.durable-handback.v1",
         "binding": binding,
@@ -108,8 +154,28 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
         "evidence_ref": "evidence:" + "e" * 64,
         "state": "cleanup_proven",
     }
-    descendants_ref = "evidence:" + "f" * 64
-    reservations_ref = "evidence:" + "0" * 64
+    descendants = [
+        materialize_descendant_close_receipt(
+            binding=binding,
+            durable_handback=handback,
+            agent_id="agent:reviewer",
+            evidence_ref="evidence:" + "f" * 64,
+        )
+    ]
+    reservations = [
+        materialize_reservation_release_receipt(
+            binding=binding,
+            durable_handback=handback,
+            reservation_id="reservation:reviewer",
+            evidence_ref="evidence:" + "0" * 64,
+        )
+    ]
+    descendants_ref = "evidence:" + hashlib.sha256(
+        canonical_json_bytes(descendants)
+    ).hexdigest()
+    reservations_ref = "evidence:" + hashlib.sha256(
+        canonical_json_bytes(reservations)
+    ).hexdigest()
     token = materialize_close_agent_tool_call(
         binding=binding,
         run_id="run-update-lifecycle",
@@ -124,20 +190,8 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
         "schema": "agent-canon.update-lifecycle-closeout.v1",
         "gate_verdicts": gates,
         "durable_handback": handback,
-        "descendants": [
-            {
-                "agent_id": "agent:reviewer",
-                "state": "closed",
-                "evidence_ref": descendants_ref,
-            }
-        ],
-        "reservations": [
-            {
-                "reservation_id": "reservation:reviewer",
-                "state": "released",
-                "evidence_ref": reservations_ref,
-            }
-        ],
+        "descendants": descendants,
+        "reservations": reservations,
         "descendants_closed_evidence_ref": descendants_ref,
         "reservations_released_evidence_ref": reservations_ref,
         "cleanup_proof": cleanup,
@@ -823,13 +877,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
         """Every observed descendant must exist in the durable handback ledger."""
         payload = update_lifecycle_closeout_fixture()
         descendants = cast("list[dict[str, object]]", payload["descendants"])
-        descendants.append(
-            {
-                "agent_id": "agent:unknown",
-                "state": "closed",
-                "evidence_ref": "evidence:" + "1" * 64,
-            }
-        )
+        unknown = dict(descendants[0])
+        unknown["agent_id"] = "agent:unknown"
+        unknown["evidence_ref"] = "evidence:" + "1" * 64
+        descendants.append(unknown)
 
         decision = self.consume_update_lifecycle_fixture(payload)
 
@@ -1608,9 +1659,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "REPO_TOOL_COMMAND_PACKET_COMMAND=python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text",
+                "REPO_TOOL_CALL_TOKEN_SCHEMA=agent-canon.tool-call.v1",
                 result.stdout,
             )
+            self.assertNotIn("REPO_TOOL_COMMAND_PACKET_COMMAND=", result.stdout)
             self.assertIn(
                 "REPO_TOOL_SELECTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
@@ -1795,10 +1847,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(
                 repo_tool_routing_policy["sequence"],
                 [
-                    "show_skill_packet",
-                    "run_required_commands",
-                    "run_task_matching_conditional_commands",
-                    "run_validation_commands",
+                    "materialize_tool_call_token",
+                    "execute_canonical_tool_id",
+                    "record_typed_result",
                 ],
             )
             self.assertIn(
@@ -1807,18 +1858,19 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             first_tool_route = repo_tool_routing_policy["sequential_tool_routes"][0]
             self.assertEqual(first_tool_route["skill"], "agent-orchestration")
+            tool_call_token = first_tool_route["tool_call_token"]
+            self.assertEqual(tool_call_token["schema"], "agent-canon.tool-call.v1")
+            self.assertEqual(tool_call_token["tool_id"], "skill-tool-commands")
             self.assertEqual(
-                first_tool_route["packet_command"],
-                "python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text",
+                tool_call_token["arguments"],
+                {"skill": "agent-orchestration", "format": "json"},
             )
+            self.assertNotIn("packet_command", first_tool_route)
             self.assertNotIn("commands", first_tool_route)
             self.assertIn("runtime_skill", first_tool_route)
             self.assertIn("canonical_doc", first_tool_route)
             self.assertIn("related_skills", first_tool_route)
-            self.assertEqual(
-                repo_tool_routing_policy["check_command"],
-                "python3 tools/agent_tools/skill_tool_commands.py check",
-            )
+            self.assertNotIn("check_command", repo_tool_routing_policy)
             self.assertTrue(default_quality_check_policy["enabled"])
             self.assertEqual(
                 default_quality_check_policy["source"],
@@ -2672,9 +2724,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "REPO_TOOL_COMMAND_PACKET_COMMAND=python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text",
+                "REPO_TOOL_CALL_TOKEN_SCHEMA=agent-canon.tool-call.v1",
                 result.stdout,
             )
+            self.assertNotIn("REPO_TOOL_COMMAND_PACKET_COMMAND=", result.stdout)
             self.assertIn("REPO_TOOL_SELECTED_SKILLS=", result.stdout)
             self.assertIn("REPO_TOOL_DYNAMIC_CANDIDATES=", result.stdout)
             self.assertIn(
@@ -2895,14 +2948,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 delegated_spawn_policy["required_before_spawn"],
             )
             self.assertIn(
-                "include run.repo_tool_routing_policy selected-skill packet commands, dynamic skill candidates, and tool evidence in every handoff packet",
+                "include run.repo_tool_routing_policy selected-skill ToolCall tokens, dynamic skill candidates, and tool evidence in every handoff packet",
                 delegated_spawn_policy["required_before_spawn"],
             )
             self.assertIn(
                 "tool_route", delegated_spawn_policy["handoff_required_fields"]
             )
             self.assertIn(
-                "tool_command_packet_command",
+                "tool_call_token",
                 delegated_spawn_policy["handoff_required_fields"],
             )
             self.assertNotIn(
@@ -3005,9 +3058,16 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "$task-routing",
                 repo_tool_routing_policy["dynamic_skill_routing"]["candidates"],
             )
+            first_route_token = repo_tool_routing_policy["sequential_tool_routes"][0][
+                "tool_call_token"
+            ]
+            self.assertEqual(first_route_token["tool_id"], "skill-tool-commands")
             self.assertEqual(
-                repo_tool_routing_policy["sequential_tool_routes"][0]["packet_command"],
-                "python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text",
+                first_route_token["arguments"],
+                {"skill": "agent-orchestration", "format": "json"},
+            )
+            self.assertNotIn(
+                "packet_command", repo_tool_routing_policy["sequential_tool_routes"][0]
             )
             self.assertNotIn(
                 "commands", repo_tool_routing_policy["sequential_tool_routes"][0]
@@ -3228,8 +3288,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     subagent_prompt_packet["internal_skill_routes"],
                 )
                 self.assertEqual(
-                    subagent_prompt_packet["tool_command_packet_command"],
-                    "python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text",
+                    subagent_prompt_packet["tool_call_tokens"],
+                    "run.repo_tool_routing_policy.sequential_tool_routes[].tool_call_token",
+                )
+                self.assertNotIn(
+                    "tool_command_packet_command", subagent_prompt_packet
                 )
                 self.assertNotIn("tool_commands", subagent_prompt_packet)
                 self.assert_role_prompt_includes(

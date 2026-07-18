@@ -11,13 +11,18 @@ from __future__ import annotations
 
 import argparse
 import copy
+import sys
 import tempfile
 import unittest
 from collections.abc import Sequence
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+
 from tools.agent_tools import github_publish
 from tools.agent_tools.update_lifecycle_contract import (
+    materialize_gate_verdict,
     validate_pull_request_lifecycle,
     validate_pull_request_transition,
 )
@@ -72,6 +77,13 @@ class FakeRunner:
             stdout=BASE_TREE + "\n",
         )
 
+    def add_verified_actor(self) -> None:
+        """Register one immutable authenticated GitHub actor readback."""
+        self.add(
+            ["gh", "api", "user", "--jq", "{id: .id, login: .login, name: .name}"],
+            stdout='{"id":7,"login":"owner","name":"Owner"}',
+        )
+
 
 class GithubPublishTest(unittest.TestCase):
     """Exercise the GitHub publish command planner."""
@@ -109,6 +121,94 @@ class GithubPublishTest(unittest.TestCase):
             state=state,
         )
 
+    def publication_components(
+        self,
+        lifecycle: dict[str, object],
+    ) -> tuple[dict[str, object], list[dict[str, object]]]:
+        """Build exact reviewed-CAS and canonical G1/G2 fixtures."""
+        binding = dict(lifecycle["binding"])
+        head = lifecycle["head_identity"]
+        base = lifecycle["base_identity"]
+        assert isinstance(head, dict)
+        assert isinstance(base, dict)
+        cas_evidence_ref = "evidence:" + "8" * 64
+        cas_binding = dict(binding)
+        cas_binding["evidence_ref"] = cas_evidence_ref
+        cas_binding["evidence_digest"] = "sha256:" + "8" * 64
+        cas = {
+            "schema": "agent-canon.candidate-cas-receipt.v1",
+            "cas_receipt_id": "cas:" + "9" * 64,
+            "binding": cas_binding,
+            "predecessor_evidence_id": binding["evidence_ref"],
+            "rebind_receipt_evidence_id": "rebind:" + "a" * 64,
+            "candidate_identity": {
+                "candidate_sha": head["commit_sha"],
+                "tree_sha": head["tree_sha"],
+            },
+            "cas_base_identity": {
+                "commit_sha": base["commit_sha"],
+                "tree_sha": base["tree_sha"],
+            },
+            "cas_evidence_ref": cas_evidence_ref,
+            "cas_stage": "cas",
+        }
+        g1 = materialize_gate_verdict(
+            binding=binding,
+            gate_id="G1",
+            ordered_input_evidence_refs=[str(binding["evidence_ref"])],
+            invariant="source_correctness",
+            output_digest="sha256:" + "b" * 64,
+            owner=str(
+                PROJECT_ROOT / "tools"
+                / "agent_tools"
+                / "publication_integrator.py"
+            )
+            + "#resolve_publication_eligibility",
+            verdict="pass",
+        )
+        g1_binding = g1["binding"]
+        assert isinstance(g1_binding, dict)
+        g2 = materialize_gate_verdict(
+            binding=binding,
+            gate_id="G2",
+            ordered_input_evidence_refs=[str(g1_binding["evidence_ref"])],
+            invariant="generated_completeness",
+            output_digest="sha256:" + "c" * 64,
+            owner=str(
+                PROJECT_ROOT / "tools"
+                / "ci"
+                / "check_agent_canon_pr.sh"
+            )
+            + "#run_pr_agent_checks",
+            verdict="pass",
+        )
+        return cas, [g1, g2]
+
+    def publication_packet(
+        self,
+        args: argparse.Namespace,
+        runner: FakeRunner,
+    ) -> dict[str, object]:
+        """Materialize the sole packet accepted by a GitHub mutation."""
+        verification = github_publish.verify_remote(
+            runner,
+            repo=args.repo,
+            remote=args.remote,
+        )
+        branch = args.branch or "topic"
+        lifecycle = github_publish.build_pull_request_lifecycle(
+            args,
+            runner,
+            verification,
+            branch,
+        )
+        cas, upstream = self.publication_components(lifecycle)
+        return github_publish.materialize_github_publication_packet(
+            lifecycle=lifecycle,
+            candidate_cas_receipt=cas,
+            upstream_gate_verdicts=upstream,
+        )
+
     def test_normalized_repo_slug_accepts_common_github_urls(self) -> None:
         """Remote URL parsing should support ssh, https, and owner/name."""
         self.assertEqual(
@@ -140,11 +240,29 @@ class GithubPublishTest(unittest.TestCase):
             stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
         )
         runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:other/repo.git\n")
+        runner.add(
+            [
+                "gh",
+                "repo",
+                "view",
+                "other/repo",
+                "--json",
+                "nameWithOwner,url,sshUrl,viewerPermission,parent",
+            ],
+            stdout=(
+                '{"nameWithOwner":"other/repo","url":"https://github.com/other/repo",'
+                '"sshUrl":"git@github.com:other/repo.git","viewerPermission":"WRITE",'
+                '"parent":null}'
+            ),
+        )
 
         with self.assertRaises(github_publish.UserVisibleFailure) as context:
             github_publish.verify_remote(runner, repo="owner/repo", remote="origin")
 
-        self.assertIn("verified_remote_required", context.exception.next_action)
+        self.assertEqual(
+            context.exception.next_action,
+            "materialize_the_typed_multiple_remotes_or_contributor_lifecycle",
+        )
 
     def test_push_allows_dirty_worktree_and_uses_verified_origin(self) -> None:
         """Dirty worktree is warning evidence, not a push blocker."""
@@ -155,6 +273,7 @@ class GithubPublishTest(unittest.TestCase):
             stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
         )
         runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+        runner.add_verified_actor()
         runner.add_publication_identity()
         runner.add(["git", "status", "--short", "--untracked-files=all"], stdout=" M file.py\n")
         runner.add(["git", "push", "-u", "origin", "topic"], stderr="pushed\n")
@@ -169,7 +288,8 @@ class GithubPublishTest(unittest.TestCase):
             summary_out=None,
         )
 
-        summary = github_publish.run(args, runner)
+        packet = self.publication_packet(args, runner)
+        summary = github_publish.run(args, runner, publication_packet=packet)
 
         self.assertEqual(summary["status"], "ok")
         self.assertTrue(summary["worktree_dirty"])
@@ -187,6 +307,7 @@ class GithubPublishTest(unittest.TestCase):
                 stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
             )
             runner.add(["git", "remote", "get-url", "origin"], stdout="https://github.com/owner/repo.git\n")
+            runner.add_verified_actor()
             runner.add_publication_identity()
             runner.add(
                 [
@@ -231,13 +352,14 @@ class GithubPublishTest(unittest.TestCase):
                     "--repo",
                     "owner/repo",
                     "--json",
-                    "number,url,state,isDraft,baseRefName,headRefName,headRefOid,reviewDecision,reviews",
+                    "number,url,state,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
                 ],
                 stdout=(
                     '{"number":1,"url":"https://github.com/owner/repo/pull/1",'
-                    '"state":"OPEN","isDraft":false,"baseRefName":"main",'
+                    f'"state":"OPEN","isDraft":false,"baseRefName":"main","baseRefOid":"{BASE_SHA}",'
                     f'"headRefName":"topic","headRefOid":"{CANDIDATE_SHA}",'
-                    '"reviewDecision":"","reviews":[]}'
+                    '"headRepository":{"nameWithOwner":"owner/repo"},'
+                    '"reviewDecision":"","reviews":[],"mergeCommit":null}'
                 ),
             )
             args = argparse.Namespace(
@@ -255,7 +377,8 @@ class GithubPublishTest(unittest.TestCase):
                 summary_out=None,
             )
 
-            summary = github_publish.run(args, runner)
+            packet = self.publication_packet(args, runner)
+            summary = github_publish.run(args, runner, publication_packet=packet)
 
         self.assertEqual(summary["action"], "pr-create")
         self.assertEqual(summary["pr_url"], "https://github.com/owner/repo/pull/1")
@@ -269,6 +392,7 @@ class GithubPublishTest(unittest.TestCase):
             stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
         )
         runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+        runner.add_verified_actor()
         runner.add_publication_identity()
         runner.add(
             ["gh", "pr", "checks", "1", "--repo", "owner/repo", "--watch=false"],
@@ -287,7 +411,8 @@ class GithubPublishTest(unittest.TestCase):
             summary_out=None,
         )
 
-        summary = github_publish.run(args, runner)
+        packet = self.publication_packet(args, runner)
+        summary = github_publish.run(args, runner, publication_packet=packet)
 
         self.assertEqual(summary["status"], "pending")
         self.assertEqual(summary["next_action"], "wait_for_github_checks_or_rerun_with_--watch")
@@ -299,36 +424,82 @@ class GithubPublishTest(unittest.TestCase):
             state="permission_unknown",
         )
 
+        cas, upstream = self.publication_components(lifecycle)
         with self.assertRaises(github_publish.UserVisibleFailure) as raised:
-            github_publish.materialize_pr_identity_gate(lifecycle)
+            github_publish.materialize_pr_identity_gate(lifecycle, cas, upstream)
 
         self.assertIn("permission", raised.exception.message)
 
     def test_user_fork_and_contributor_topologies_preserve_typed_identity(self) -> None:
         """All three discriminated PR kinds retain Essence, reviews, and diff state."""
         user = self.lifecycle_fixture()
-        fork = copy.deepcopy(user)
-        fork["kind"] = "fork"
-        fork.pop("user_identity")
-        fork["fork_identity"] = {
-            "repo_owner": "fork-owner",
-            "repo_name": "repo",
-            "parent_repo_owner": "owner",
-            "parent_repo_name": "repo",
-            "ref": "refs/heads/topic",
-        }
-        contributor = copy.deepcopy(user)
-        contributor["kind"] = "contributor"
-        contributor.pop("user_identity")
-        contributor["contributor_identity"] = {
-            "actor_id": "contributor:test",
-            "display_name": "Contributor",
-        }
-        contributor["contributor_diff"] = {
+        args = argparse.Namespace(
+            user_task="typed PR lifecycle",
+            title="Typed lifecycle",
+            body_file=None,
+            base="main",
+            draft=False,
+        )
+        runner = FakeRunner()
+        runner.add_publication_identity()
+        runner.add(
+            [
+                "gh",
+                "api",
+                "repos/owner/repo/commits/main",
+                "--jq",
+                "{commit_sha: .sha, tree_sha: .commit.tree.sha}",
+            ],
+            stdout=(
+                f'{{"commit_sha":"{BASE_SHA}","tree_sha":"{BASE_TREE}"}}'
+            ),
+        )
+        fork = github_publish.build_pull_request_lifecycle(
+            args,
+            runner,
+            github_publish.RemoteVerification(
+                repo="owner/repo",
+                remote="origin",
+                remote_url="git@github.com:fork-owner/repo.git",
+                remote_slug="fork-owner/repo",
+                topology_kind="fork",
+                head_repo="fork-owner/repo",
+                fork_parent_repo="owner/repo",
+                permission_state="verified_true",
+                permission_evidence_id="evidence:" + "e" * 64,
+                actor_id="github-user:7",
+                actor_display_name="Fork Owner",
+            ),
+            "topic",
+        )
+        contributor_diff = {
             "commit_sha": CANDIDATE_SHA,
             "tree_sha": CANDIDATE_TREE,
             "diff_sha256": "sha256:" + "f" * 64,
         }
+        contributor = github_publish.build_pull_request_lifecycle(
+            args,
+            runner,
+            github_publish.RemoteVerification(
+                repo="owner/repo",
+                remote="origin",
+                remote_url="git@github.com:contributor/repo.git",
+                remote_slug="contributor/repo",
+                topology_kind="contributor",
+                head_repo="contributor/repo",
+                permission_state="verified_false",
+                permission_evidence_id="evidence:" + "d" * 64,
+                actor_id="github-user:7",
+                actor_display_name="Owner",
+            ),
+            "topic",
+            contributor_identity={
+                "actor_id": "contributor:test",
+                "display_name": "Contributor",
+            },
+            contributor_diff=contributor_diff,
+            state="external_review",
+        )
 
         checked = [
             validate_pull_request_lifecycle(value)
@@ -336,7 +507,7 @@ class GithubPublishTest(unittest.TestCase):
         ]
         self.assertEqual([item["kind"] for item in checked], ["user", "fork", "contributor"])
         self.assertEqual(
-            checked[2]["contributor_diff"], contributor["contributor_diff"]
+            checked[2]["contributor_diff"], contributor_diff
         )
         self.assertEqual(
             [item["pr_essence"] for item in checked],
@@ -396,8 +567,10 @@ class GithubPublishTest(unittest.TestCase):
                 "state": "OPEN",
                 "isDraft": False,
                 "baseRefName": "main",
+                "baseRefOid": BASE_SHA,
                 "headRefName": "topic",
                 "headRefOid": CANDIDATE_SHA,
+                "headRepository": {"nameWithOwner": "owner/repo"},
                 "reviewDecision": "CHANGES_REQUESTED",
                 "reviews": [
                     {

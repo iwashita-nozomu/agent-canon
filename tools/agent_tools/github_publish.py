@@ -31,12 +31,18 @@ from update_lifecycle_contract import (
     binding_identity,
     materialize_gate_verdict,
     pull_request_branch_table,
+    validate_candidate_cas_pr_transition,
+    validate_candidate_cas_receipt,
+    validate_gate_chain,
     validate_gate_verdict,
     validate_pull_request_lifecycle,
+    validate_pull_request_transition,
+    validate_record_binding,
 )
 
 MAX_ERROR_CHARS = 4000
 REMOTE_SCP_RE = re.compile(r"^[^@]+@[^:]+:(?P<slug>[^/]+/[^/]+?)(?:\.git)?/?$")
+GITHUB_PUBLICATION_PACKET_SCHEMA = "agent-canon.github-publication-packet.v1"
 
 
 @dataclass(frozen=True)
@@ -73,6 +79,9 @@ class RemoteVerification:
     remote: str
     remote_url: str
     remote_slug: str
+    topology_kind: str = "user"
+    head_repo: str = ""
+    fork_parent_repo: str = ""
     permission_state: str = "unknown"
     permission_evidence_id: str = ""
     actor_id: str = "viewer:unknown"
@@ -252,6 +261,45 @@ def gh_repo_metadata(runner: Runner, repo: str | None) -> Mapping[str, object]:
     return json_object(result.stdout, command="gh repo view")
 
 
+def gh_authenticated_actor(runner: Runner) -> tuple[str, str]:
+    """Return the authenticated GitHub actor from an identity-owning endpoint."""
+    command = ["gh", "api", "user", "--jq", "{id: .id, login: .login, name: .name}"]
+    result = run_command(
+        runner,
+        command,
+        next_action="authenticate_gh_and_read_the_verified_actor_identity",
+    )
+    actor = json_object(result.stdout, command="gh api user")
+    actor_number = actor.get("id")
+    login = actor.get("login")
+    display_name = actor.get("name")
+    if not isinstance(actor_number, int) or not isinstance(login, str) or not login:
+        raise UserVisibleFailure(
+            message="gh api user did not expose immutable actor identity",
+            next_action="authenticate_gh_and_read_the_verified_actor_identity",
+        )
+    display = display_name if isinstance(display_name, str) and display_name else login
+    return f"github-user:{actor_number}", display
+
+
+def gh_head_repo_metadata(runner: Runner, repo: str) -> Mapping[str, object]:
+    """Read fork-parent and permission identity for a non-base head repository."""
+    command = [
+        "gh",
+        "repo",
+        "view",
+        repo,
+        "--json",
+        "nameWithOwner,url,sshUrl,viewerPermission,parent",
+    ]
+    result = run_command(
+        runner,
+        command,
+        next_action="verify_the_fork_head_repository_and_parent_identity",
+    )
+    return json_object(result.stdout, command="gh repo view head")
+
+
 def verify_remote(
     runner: Runner,
     *,
@@ -273,15 +321,30 @@ def verify_remote(
     )
     remote_url = remote_result.stdout.strip()
     remote_slug = normalized_repo_slug(remote_url)
-    if remote_slug is None or remote_slug != name_with_owner:
+    if remote_slug is None:
         raise UserVisibleFailure(
-            message=(
-                f"remote {remote!r} points at {remote_slug or '<unrecognized>'}, "
-                f"but gh resolved {name_with_owner}"
-            ),
+            message=f"remote {remote!r} has an unrecognized GitHub identity",
             next_action="fix_origin_remote_or_pass_the_correct_--repo_verified_remote_required",
         )
-    viewer_permission = metadata.get("viewerPermission")
+    topology_kind = "user"
+    fork_parent_repo = ""
+    permission_metadata = metadata
+    if remote_slug != name_with_owner:
+        head_metadata = gh_head_repo_metadata(runner, remote_slug)
+        parent = head_metadata.get("parent")
+        parent_name = parent.get("nameWithOwner") if isinstance(parent, Mapping) else None
+        if head_metadata.get("nameWithOwner") != remote_slug or parent_name != name_with_owner:
+            raise UserVisibleFailure(
+                message=(
+                    f"remote {remote!r} points at {remote_slug}, which is not a "
+                    f"verified fork of {name_with_owner}"
+                ),
+                next_action="materialize_the_typed_multiple_remotes_or_contributor_lifecycle",
+            )
+        topology_kind = "fork"
+        fork_parent_repo = name_with_owner
+        permission_metadata = head_metadata
+    viewer_permission = permission_metadata.get("viewerPermission")
     if viewer_permission in {"ADMIN", "MAINTAIN", "WRITE"}:
         permission_state = "verified_true"
     elif isinstance(viewer_permission, str):
@@ -290,6 +353,8 @@ def verify_remote(
         permission_state = "unknown"
     permission_evidence = {
         "repo": name_with_owner,
+        "head_repo": remote_slug,
+        "topology_kind": topology_kind,
         "remote": remote,
         "remote_url_sha256": "sha256:"
         + hashlib.sha256(remote_url.encode()).hexdigest(),
@@ -300,15 +365,19 @@ def verify_remote(
     permission_evidence_id = "evidence:" + hashlib.sha256(
         canonical_json_bytes(permission_evidence)
     ).hexdigest()
-    actor_digest = hashlib.sha256(name_with_owner.encode()).hexdigest()
+    actor_id, actor_display_name = gh_authenticated_actor(runner)
     return RemoteVerification(
         repo=name_with_owner,
         remote=remote,
         remote_url=remote_url,
         remote_slug=remote_slug,
+        topology_kind=topology_kind,
+        head_repo=remote_slug,
+        fork_parent_repo=fork_parent_repo,
         permission_state=permission_state,
         permission_evidence_id=permission_evidence_id,
-        actor_id=f"viewer:{actor_digest}",
+        actor_id=actor_id,
+        actor_display_name=actor_display_name,
     )
 
 
@@ -398,7 +467,7 @@ def pull_request_readback(
         "--repo",
         repo,
         "--json",
-        "number,url,state,isDraft,baseRefName,headRefName,headRefOid,reviewDecision,reviews",
+        "number,url,state,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
     ]
     result = run_command(
         runner,
@@ -421,6 +490,11 @@ def lifecycle_with_pr_readback(
             message="pull request base identity changed after publication",
             next_action="materialize_a_conflict_successor_lifecycle",
         )
+    if readback.get("baseRefOid") != base["commit_sha"]:
+        raise UserVisibleFailure(
+            message="pull request base commit changed after publication",
+            next_action="materialize_a_conflict_successor_lifecycle",
+        )
     if readback.get("headRefName") != str(head["ref"]).removeprefix("refs/heads/"):
         raise UserVisibleFailure(
             message="pull request head ref changed after publication",
@@ -429,6 +503,16 @@ def lifecycle_with_pr_readback(
     if readback.get("headRefOid") != head["commit_sha"]:
         raise UserVisibleFailure(
             message="pull request head commit differs from the frozen candidate",
+            next_action="materialize_a_conflict_successor_lifecycle",
+        )
+    head_repository = readback.get("headRepository")
+    expected_head_repo = f"{head['repo_owner']}/{head['repo_name']}"
+    if (
+        not isinstance(head_repository, Mapping)
+        or head_repository.get("nameWithOwner") != expected_head_repo
+    ):
+        raise UserVisibleFailure(
+            message="pull request head repository changed after publication",
             next_action="materialize_a_conflict_successor_lifecycle",
         )
     remote_state = str(readback.get("state", "")).upper()
@@ -475,7 +559,21 @@ def lifecycle_with_pr_readback(
     updated = dict(checked)
     updated["state"] = state
     updated["reviews"] = retained_reviews
-    return validate_pull_request_lifecycle(updated)
+    updated_binding = dict(cast(Mapping[str, object], checked["binding"]))
+    readback_ref = _evidence_ref(
+        {
+            "predecessor_evidence_ref": updated_binding["evidence_ref"],
+            "readback": readback,
+            "state": state,
+            "reviews": retained_reviews,
+        }
+    )
+    updated_binding["evidence_ref"] = readback_ref
+    updated_binding["evidence_digest"] = "sha256:" + readback_ref.removeprefix(
+        "evidence:"
+    )
+    updated["binding"] = updated_binding
+    return validate_pull_request_transition(checked, updated)
 
 
 def string_field(mapping: Mapping[str, object], key: str) -> str:
@@ -536,6 +634,39 @@ def _permission_identity(verification: RemoteVerification) -> dict[str, object]:
     }
 
 
+def _github_base_identity(
+    runner: Runner,
+    *,
+    repo: str,
+    ref: str,
+) -> tuple[str, str]:
+    """Read an exact base commit/tree when the head remote is a fork."""
+    command = [
+        "gh",
+        "api",
+        f"repos/{repo}/commits/{ref}",
+        "--jq",
+        "{commit_sha: .sha, tree_sha: .commit.tree.sha}",
+    ]
+    result = run_command(
+        runner,
+        command,
+        next_action="read_the_exact_pull_request_base_commit_and_tree",
+    )
+    identity = json_object(result.stdout, command="gh api base commit")
+    commit_sha = string_field(identity, "commit_sha")
+    tree_sha = string_field(identity, "tree_sha")
+    if (
+        re.fullmatch(r"[0-9a-f]{40}", commit_sha) is None
+        or re.fullmatch(r"[0-9a-f]{40}", tree_sha) is None
+    ):
+        raise UserVisibleFailure(
+            message="GitHub base identity is incomplete",
+            next_action="read_the_exact_pull_request_base_commit_and_tree",
+        )
+    return commit_sha, tree_sha
+
+
 def build_pull_request_lifecycle(
     args: argparse.Namespace,
     runner: Runner,
@@ -543,9 +674,19 @@ def build_pull_request_lifecycle(
     branch: str,
     *,
     state: str | None = None,
+    topology_kind: str | None = None,
+    contributor_identity: Mapping[str, object] | None = None,
+    contributor_diff: Mapping[str, object] | None = None,
+    lifecycle_binding: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
-    """Materialize one immutable user PR topology before any GitHub mutation."""
+    """Materialize one immutable user/fork/contributor PR topology."""
     base_ref = str(getattr(args, "base", "main") or "main")
+    kind = topology_kind or verification.topology_kind
+    if kind not in {"user", "fork", "contributor"}:
+        raise UserVisibleFailure(
+            message=f"unsupported pull-request topology: {kind}",
+            next_action="materialize_a_typed_user_fork_or_contributor_lifecycle",
+        )
     candidate_sha = _git_object_id(
         runner,
         branch,
@@ -556,16 +697,36 @@ def build_pull_request_lifecycle(
         f"{candidate_sha}^{{tree}}",
         next_action="freeze_the_local_candidate_tree_before_github_publication",
     )
-    base_sha = _git_object_id(
-        runner,
-        f"{verification.remote}/{base_ref}",
-        next_action="fetch_and_rebind_the_exact_pull_request_base",
+    external_binding = (
+        None
+        if lifecycle_binding is None
+        else validate_record_binding(lifecycle_binding)
     )
-    base_tree = _git_object_id(
-        runner,
-        f"{base_sha}^{{tree}}",
-        next_action="read_the_exact_pull_request_base_tree",
-    )
+    if external_binding is not None and (
+        external_binding["candidate_sha"] != candidate_sha
+        or external_binding["tree_sha"] != tree_sha
+    ):
+        raise UserVisibleFailure(
+            message="transaction binding differs from the selected candidate",
+            next_action="materialize_a_successor_for_the_changed_candidate",
+        )
+    if kind == "user" and verification.remote_slug == verification.repo:
+        base_sha = _git_object_id(
+            runner,
+            f"{verification.remote}/{base_ref}",
+            next_action="fetch_and_rebind_the_exact_pull_request_base",
+        )
+        base_tree = _git_object_id(
+            runner,
+            f"{base_sha}^{{tree}}",
+            next_action="read_the_exact_pull_request_base_tree",
+        )
+    else:
+        base_sha, base_tree = _github_base_identity(
+            runner,
+            repo=verification.repo,
+            ref=base_ref,
+        )
     body_text = ""
     body_path = getattr(args, "body_file", None)
     if isinstance(body_path, str) and body_path:
@@ -576,30 +737,46 @@ def build_pull_request_lifecycle(
         "title": str(getattr(args, "title", "") or ""),
         "body_sha256": _sha256(body_text),
         "repo": verification.repo,
+        "head_repo": verification.head_repo or verification.remote_slug,
         "remote": verification.remote,
         "branch": branch,
         "base": base_ref,
+        "kind": kind,
     }
-    input_digest = _sha256(input_record)
-    transaction_id = "tx:" + hashlib.sha256(
-        canonical_json_bytes(
-            {
-                "input_digest": input_digest,
-                "candidate_sha": candidate_sha,
-                "tree_sha": tree_sha,
-            }
-        )
-    ).hexdigest()
-    snapshot_id = "snapshot:" + hashlib.sha256(
-        canonical_json_bytes(
-            {
-                "remote": verification.remote,
-                "base_ref": base_ref,
-                "base_sha": base_sha,
-                "base_tree": base_tree,
-            }
-        )
-    ).hexdigest()
+    input_digest = (
+        _sha256(input_record)
+        if external_binding is None
+        else cast(str, external_binding["input_digest"])
+    )
+    transaction_id = (
+        "tx:"
+        + hashlib.sha256(
+            canonical_json_bytes(
+                {
+                    "input_digest": input_digest,
+                    "candidate_sha": candidate_sha,
+                    "tree_sha": tree_sha,
+                }
+            )
+        ).hexdigest()
+        if external_binding is None
+        else cast(str, external_binding["transaction_id"])
+    )
+    snapshot_id = (
+        "snapshot:"
+        + hashlib.sha256(
+            canonical_json_bytes(
+                {
+                    "remote": verification.remote,
+                    "base_ref": base_ref,
+                    "base_sha": base_sha,
+                    "base_tree": base_tree,
+                }
+            )
+        ).hexdigest()
+        if external_binding is None
+        else cast(str, external_binding["snapshot_id"])
+    )
     observed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     evidence_seed = {
         "transaction_id": transaction_id,
@@ -629,7 +806,21 @@ def build_pull_request_lifecycle(
             "replayed": False,
         },
     }
+    if external_binding is not None:
+        binding = dict(external_binding)
+        binding["evidence_ref"] = evidence_ref
+        binding["evidence_digest"] = _sha256(evidence_seed)
+        binding["timing"] = {
+            "started_at": observed_at,
+            "finished_at": observed_at,
+            "last_attempt_at": observed_at,
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": False,
+        }
     repo_owner, repo_name = verification.repo.split("/", 1)
+    head_repo = verification.head_repo or verification.remote_slug
+    head_owner, head_name = head_repo.split("/", 1)
     permission = _permission_identity(verification)
     lifecycle_state = state
     if lifecycle_state is None:
@@ -650,12 +841,12 @@ def build_pull_request_lifecycle(
     )
     lifecycle = {
         "schema": "agent-canon.pull-request-lifecycle.v1",
-        "kind": "user",
+        "kind": kind,
         "binding": binding,
         "state": lifecycle_state,
         "remote_identity": {
-            "repo_owner": repo_owner,
-            "repo_name": repo_name,
+            "repo_owner": head_owner,
+            "repo_name": head_name,
             "remote_name": verification.remote,
             "url_digest": _sha256(verification.remote_url),
             "ref": f"refs/heads/{branch}",
@@ -670,17 +861,13 @@ def build_pull_request_lifecycle(
             "tree_sha": base_tree,
         },
         "head_identity": {
-            "repo_owner": repo_owner,
-            "repo_name": repo_name,
+            "repo_owner": head_owner,
+            "repo_name": head_name,
             "ref": f"refs/heads/{branch}",
             "commit_sha": candidate_sha,
             "tree_sha": tree_sha,
         },
         "branch": pull_request_branch_table(),
-        "user_identity": {
-            "actor_id": verification.actor_id,
-            "display_name": verification.actor_display_name,
-        },
         "permission_identity": permission,
         "pr_essence": {
             "problem": str(args.user_task),
@@ -691,14 +878,54 @@ def build_pull_request_lifecycle(
         },
         "reviews": [],
     }
+    if kind == "user":
+        lifecycle["user_identity"] = {
+            "actor_id": verification.actor_id,
+            "display_name": verification.actor_display_name,
+        }
+    elif kind == "fork":
+        parent_repo = verification.fork_parent_repo or verification.repo
+        parent_owner, parent_name = parent_repo.split("/", 1)
+        lifecycle["fork_identity"] = {
+            "repo_owner": head_owner,
+            "repo_name": head_name,
+            "parent_repo_owner": parent_owner,
+            "parent_repo_name": parent_name,
+            "ref": f"refs/heads/{branch}",
+        }
+    else:
+        if contributor_identity is None or contributor_diff is None:
+            raise UserVisibleFailure(
+                message="contributor lifecycle requires immutable actor and diff identity",
+                next_action="read_the_contributor_pr_head_and_diff_before_processing",
+            )
+        lifecycle["contributor_identity"] = dict(contributor_identity)
+        lifecycle["contributor_diff"] = dict(contributor_diff)
     return validate_pull_request_lifecycle(lifecycle)
 
 
 def materialize_pr_identity_gate(
     lifecycle: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    upstream_gate_verdicts: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
-    """Materialize G3 once from the immutable topology and permission evidence."""
+    """Materialize G3 from G1/G2, exact CAS, topology, and permission."""
     checked = validate_pull_request_lifecycle(lifecycle)
+    cas = validate_candidate_cas_receipt(candidate_cas_receipt)
+    validate_candidate_cas_pr_transition(cas, checked)
+    upstream = validate_gate_chain(
+        list(upstream_gate_verdicts),
+        expected_gate_ids=("G1", "G2"),
+        require_pass=True,
+    )
+    if any(
+        binding_identity(item["binding"]) != binding_identity(checked["binding"])
+        for item in (*upstream, cas)
+    ):
+        raise UserVisibleFailure(
+            message="G1/G2/CAS evidence does not bind the selected PR topology",
+            next_action="materialize_a_successor_for_the_changed_candidate_or_base",
+        )
     permission = cast(Mapping[str, object], checked["permission_identity"])
     if permission["permission_state"] != "verified_true":
         raise UserVisibleFailure(
@@ -706,13 +933,22 @@ def materialize_pr_identity_gate(
             next_action="read_verified_remote_permission_and_create_a_successor_lifecycle",
         )
     binding = cast(Mapping[str, object], checked["binding"])
+    upstream_refs = [
+        cast(str, cast(Mapping[str, object], item["binding"])["evidence_ref"])
+        for item in upstream
+    ]
+    cas_binding = cast(Mapping[str, object], cas["binding"])
     return materialize_gate_verdict(
         binding=binding,
         gate_id="G3",
-        ordered_input_evidence_refs=[cast(str, binding["evidence_ref"])],
+        ordered_input_evidence_refs=[
+            *upstream_refs,
+            cast(str, cas_binding["evidence_ref"]),
+            cast(str, binding["evidence_ref"]),
+        ],
         invariant="pr_identity_cas",
-        output_digest=_sha256(checked),
-        owner=f"{Path(__file__).resolve()}#perform_pr",
+        output_digest=_sha256({"lifecycle": checked, "cas": cas}),
+        owner=f"{Path(__file__).resolve()}#materialize_pr_identity_gate",
         verdict="pass",
         retry_reason=None,
         next_checkpoint=None,
@@ -721,22 +957,116 @@ def materialize_pr_identity_gate(
 
 def require_pr_identity_gate(
     lifecycle: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    upstream_gate_verdicts: Sequence[Mapping[str, object]],
     gate_verdict: Mapping[str, object],
 ) -> tuple[dict[str, object], dict[str, object]]:
     """Consume, without recomputing, one exact G3 publication authority."""
     checked = validate_pull_request_lifecycle(lifecycle)
+    cas = validate_candidate_cas_receipt(candidate_cas_receipt)
+    validate_candidate_cas_pr_transition(cas, checked)
     gate = validate_gate_verdict(gate_verdict)
     if gate["gate_id"] != "G3" or gate["verdict"] != "pass":
         raise UserVisibleFailure(
             message="GitHub mutation requires a passing G3 PR identity/CAS verdict",
             next_action="materialize_the_exact_candidate_permission_and_cas_evidence",
         )
-    if binding_identity(checked["binding"]) != binding_identity(gate["binding"]):
+    try:
+        validate_gate_chain(
+            [*upstream_gate_verdicts, gate],
+            expected_gate_ids=("G1", "G2", "G3"),
+            require_pass=True,
+        )
+    except ValueError as exc:
+        raise UserVisibleFailure(
+            message=f"G3 predecessor chain is invalid: {exc}",
+            next_action="materialize_G1_G2_and_CAS_for_the_exact_candidate",
+        ) from exc
+    cas_binding = cast(Mapping[str, object], cas["binding"])
+    gate_inputs = cast(Sequence[object], gate["ordered_input_evidence_refs"])
+    if (
+        binding_identity(checked["binding"]) != binding_identity(gate["binding"])
+        or binding_identity(cas_binding) != binding_identity(gate["binding"])
+        or cast(str, cas_binding["evidence_ref"]) not in gate_inputs
+    ):
         raise UserVisibleFailure(
             message="G3 evidence does not bind the selected PR lifecycle",
             next_action="create_a_successor_lifecycle_for_the_changed_identity",
         )
     return checked, gate
+
+
+def materialize_github_publication_packet(
+    *,
+    lifecycle: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    upstream_gate_verdicts: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Materialize the sole machine packet consumed by GitHub mutations."""
+    checked_lifecycle = validate_pull_request_lifecycle(lifecycle)
+    checked_cas = validate_candidate_cas_receipt(candidate_cas_receipt)
+    upstream = validate_gate_chain(
+        list(upstream_gate_verdicts),
+        expected_gate_ids=("G1", "G2"),
+        require_pass=True,
+    )
+    gate = materialize_pr_identity_gate(checked_lifecycle, checked_cas, upstream)
+    return {
+        "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
+        "pull_request_lifecycle": checked_lifecycle,
+        "candidate_cas_receipt": checked_cas,
+        "upstream_gate_verdicts": list(upstream),
+        "g3_gate": gate,
+    }
+
+
+def validate_github_publication_packet(value: object) -> dict[str, object]:
+    """Validate one immutable publication packet without rebuilding evidence."""
+    if not isinstance(value, Mapping) or set(value) != {
+        "schema",
+        "pull_request_lifecycle",
+        "candidate_cas_receipt",
+        "upstream_gate_verdicts",
+        "g3_gate",
+    }:
+        raise UserVisibleFailure(
+            message="GitHub publication packet fields are invalid",
+            next_action="materialize_the_canonical_github_publication_packet",
+        )
+    if value.get("schema") != GITHUB_PUBLICATION_PACKET_SCHEMA:
+        raise UserVisibleFailure(
+            message="GitHub publication packet schema is invalid",
+            next_action="materialize_the_canonical_github_publication_packet",
+        )
+    upstream_value = value["upstream_gate_verdicts"]
+    if not isinstance(upstream_value, Sequence) or isinstance(
+        upstream_value, (str, bytes)
+    ):
+        raise UserVisibleFailure(
+            message="GitHub publication predecessor gates are invalid",
+            next_action="materialize_G1_and_G2_for_the_exact_candidate",
+        )
+    lifecycle, gate = require_pr_identity_gate(
+        cast(Mapping[str, object], value["pull_request_lifecycle"]),
+        cast(Mapping[str, object], value["candidate_cas_receipt"]),
+        cast(Sequence[Mapping[str, object]], upstream_value),
+        cast(Mapping[str, object], value["g3_gate"]),
+    )
+    return {
+        "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
+        "pull_request_lifecycle": lifecycle,
+        "candidate_cas_receipt": validate_candidate_cas_receipt(
+            value["candidate_cas_receipt"]
+        ),
+        "upstream_gate_verdicts": list(
+            validate_gate_chain(
+                list(upstream_value),
+                expected_gate_ids=("G1", "G2"),
+                require_pass=True,
+            )
+        ),
+        "g3_gate": gate,
+    }
 
 
 def base_summary(args: argparse.Namespace, verification: RemoteVerification, branch: str) -> dict[str, object]:
@@ -761,6 +1091,8 @@ def publication_context(
     branch: str,
     *,
     pr_lifecycle: Mapping[str, object] | None,
+    candidate_cas_receipt: Mapping[str, object] | None,
+    upstream_gate_verdicts: Sequence[Mapping[str, object]],
     g3_gate: Mapping[str, object] | None,
 ) -> tuple[dict[str, object], dict[str, object]]:
     """Return one topology/G3 pair, materializing it only when absent."""
@@ -769,8 +1101,26 @@ def publication_context(
         if pr_lifecycle is None
         else validate_pull_request_lifecycle(pr_lifecycle)
     )
-    gate = materialize_pr_identity_gate(lifecycle) if g3_gate is None else dict(g3_gate)
-    return require_pr_identity_gate(lifecycle, gate)
+    if candidate_cas_receipt is None:
+        raise UserVisibleFailure(
+            message="GitHub publication requires the exact reviewed CAS receipt",
+            next_action="materialize_CandidateCasReceipt_after_independent_review",
+        )
+    gate = (
+        materialize_pr_identity_gate(
+            lifecycle,
+            candidate_cas_receipt,
+            upstream_gate_verdicts,
+        )
+        if g3_gate is None
+        else dict(g3_gate)
+    )
+    return require_pr_identity_gate(
+        lifecycle,
+        candidate_cas_receipt,
+        upstream_gate_verdicts,
+        gate,
+    )
 
 
 def perform_push(
@@ -780,6 +1130,8 @@ def perform_push(
     branch: str,
     *,
     pr_lifecycle: Mapping[str, object] | None = None,
+    candidate_cas_receipt: Mapping[str, object] | None = None,
+    upstream_gate_verdicts: Sequence[Mapping[str, object]] = (),
     g3_gate: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Push the verified branch to origin."""
@@ -794,6 +1146,8 @@ def perform_push(
         verification,
         branch,
         pr_lifecycle=pr_lifecycle,
+        candidate_cas_receipt=candidate_cas_receipt,
+        upstream_gate_verdicts=upstream_gate_verdicts,
         g3_gate=g3_gate,
     )
     if lifecycle["state"] not in {
@@ -839,6 +1193,8 @@ def perform_pr(
     branch: str,
     *,
     pr_lifecycle: Mapping[str, object] | None = None,
+    candidate_cas_receipt: Mapping[str, object] | None = None,
+    upstream_gate_verdicts: Sequence[Mapping[str, object]] = (),
     g3_gate: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Create or update a pull request for the verified branch."""
@@ -849,6 +1205,8 @@ def perform_pr(
         verification,
         branch,
         pr_lifecycle=pr_lifecycle,
+        candidate_cas_receipt=candidate_cas_receipt,
+        upstream_gate_verdicts=upstream_gate_verdicts,
         g3_gate=g3_gate,
     )
     if lifecycle["state"] not in {
@@ -968,6 +1326,8 @@ def perform_checks(
     branch: str,
     *,
     pr_lifecycle: Mapping[str, object] | None = None,
+    candidate_cas_receipt: Mapping[str, object] | None = None,
+    upstream_gate_verdicts: Sequence[Mapping[str, object]] = (),
     g3_gate: Mapping[str, object] | None = None,
     g5_gate: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
@@ -978,6 +1338,8 @@ def perform_checks(
         verification,
         branch,
         pr_lifecycle=pr_lifecycle,
+        candidate_cas_receipt=candidate_cas_receipt,
+        upstream_gate_verdicts=upstream_gate_verdicts,
         g3_gate=g3_gate,
     )
     checked_g5: dict[str, object] | None = None
@@ -1099,18 +1461,53 @@ def command_failure_message(exc: CommandFailure) -> str:
     return f"command failed ({exc.result.returncode}): {command}"
 
 
-def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> dict[str, object]:
+def run(
+    args: argparse.Namespace,
+    runner: Runner = subprocess_runner,
+    *,
+    publication_packet: Mapping[str, object] | None = None,
+) -> dict[str, object]:
     """Run the selected publish action."""
     os.chdir(args.root)
     branch = selected_branch(runner, args.branch)
     verification = verify_remote(runner, repo=args.repo, remote=args.remote)
-    lifecycle = build_pull_request_lifecycle(
-        args,
-        runner,
-        verification,
-        branch,
+    if publication_packet is None:
+        packet_path = Path(
+            ".agent-canon/update-lifecycle/state/github-publication.json"
+        )
+        if not packet_path.is_file():
+            raise UserVisibleFailure(
+                message="canonical GitHub publication packet is missing",
+                next_action="materialize_reviewed_CAS_and_G1_G2_G3_before_mutation",
+            )
+        loaded = json.loads(packet_path.read_text(encoding="utf-8"))
+        publication_packet = cast(Mapping[str, object], loaded)
+    packet = validate_github_publication_packet(publication_packet)
+    lifecycle = cast(Mapping[str, object], packet["pull_request_lifecycle"])
+    cas = cast(Mapping[str, object], packet["candidate_cas_receipt"])
+    upstream = cast(
+        Sequence[Mapping[str, object]], packet["upstream_gate_verdicts"]
     )
-    g3_gate = materialize_pr_identity_gate(lifecycle)
+    g3_gate = cast(Mapping[str, object], packet["g3_gate"])
+    remote_identity = cast(Mapping[str, object], lifecycle["remote_identity"])
+    base_identity = cast(Mapping[str, object], lifecycle["base_identity"])
+    permission = cast(Mapping[str, object], lifecycle["permission_identity"])
+    expected_head_repo = verification.head_repo or verification.remote_slug
+    if (
+        f"{remote_identity['repo_owner']}/{remote_identity['repo_name']}"
+        != expected_head_repo
+        or remote_identity["remote_name"] != verification.remote
+        or remote_identity["ref"] != f"refs/heads/{branch}"
+        or f"{base_identity['repo_owner']}/{base_identity['repo_name']}"
+        != verification.repo
+        or permission["actor_id"] != verification.actor_id
+        or permission["permission_evidence_id"]
+        != verification.permission_evidence_id
+    ):
+        raise UserVisibleFailure(
+            message="publication packet differs from verified immutable GitHub topology",
+            next_action="materialize_a_successor_publication_packet",
+        )
     if args.action == "push":
         return perform_push(
             args,
@@ -1118,6 +1515,8 @@ def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> dict[st
             verification,
             branch,
             pr_lifecycle=lifecycle,
+            candidate_cas_receipt=cas,
+            upstream_gate_verdicts=upstream,
             g3_gate=g3_gate,
         )
     if args.action == "pr":
@@ -1127,6 +1526,8 @@ def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> dict[st
             verification,
             branch,
             pr_lifecycle=lifecycle,
+            candidate_cas_receipt=cas,
+            upstream_gate_verdicts=upstream,
             g3_gate=g3_gate,
         )
     if args.action == "publish-pr":
@@ -1136,6 +1537,8 @@ def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> dict[st
             verification,
             branch,
             pr_lifecycle=lifecycle,
+            candidate_cas_receipt=cas,
+            upstream_gate_verdicts=upstream,
             g3_gate=g3_gate,
         )
         pr_summary = perform_pr(
@@ -1144,6 +1547,8 @@ def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> dict[st
             verification,
             branch,
             pr_lifecycle=lifecycle,
+            candidate_cas_receipt=cas,
+            upstream_gate_verdicts=upstream,
             g3_gate=g3_gate,
         )
         summary = dict(pr_summary)
@@ -1157,6 +1562,8 @@ def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> dict[st
             verification,
             branch,
             pr_lifecycle=lifecycle,
+            candidate_cas_receipt=cas,
+            upstream_gate_verdicts=upstream,
             g3_gate=g3_gate,
         )
     raise UserVisibleFailure(

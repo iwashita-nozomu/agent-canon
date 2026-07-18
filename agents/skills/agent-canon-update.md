@@ -85,7 +85,10 @@ TODO state up to date.
 1. The source clone enqueues once under
    `.agent-canon/update-lifecycle/projection-queue`. The ordered predecessor
    oracle is `#388 -> #389 -> current transaction`. Parent pin/root sync cannot
-   start from a pending or failed frontier.
+   start from a pending or failed frontier. After publication readback, the
+   state machine writes the typed source-publication packet and the existing
+   `latest` entry advances queue/frontier/G4 internally; no queue CLI alias is
+   exposed.
 1. `PullRequestLifecycle` carries immutable base/head repository, owner, ref,
    fork/contributor, permission, Essence, review, and contributor-diff state.
    Unknown or false push permission is a typed refusal rather than assumed

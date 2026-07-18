@@ -191,20 +191,17 @@ consume_pr_gate_receipts() {
 import json
 import sys
 from pathlib import Path
-from update_lifecycle_contract import binding_identity, validate_gate_verdict
+from update_lifecycle_contract import validate_gate_chain
 
 payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 values = payload.get("gate_verdicts") if isinstance(payload, dict) else None
 if not isinstance(values, list):
     raise SystemExit("agent_canon_pr_gate_bundle:gate_verdicts_missing")
-gates = [validate_gate_verdict(value) for value in values]
-if tuple(gate["gate_id"] for gate in gates) != ("G1", "G2", "G3"):
-    raise SystemExit("agent_canon_pr_gate_bundle:order_invalid")
-if any(gate["verdict"] != "pass" for gate in gates):
-    raise SystemExit("agent_canon_pr_gate_bundle:gate_not_passed")
-identity = binding_identity(gates[0]["binding"])
-if any(binding_identity(gate["binding"]) != identity for gate in gates[1:]):
-    raise SystemExit("agent_canon_pr_gate_bundle:identity_mismatch")
+validate_gate_chain(
+    values,
+    expected_gate_ids=("G1", "G2", "G3"),
+    require_pass=True,
+)
 print("AGENT_CANON_PR_GATE_RECEIPTS=consumed")
 print("AGENT_CANON_PR_GATE_ORDER=G1,G2,G3")
 PY

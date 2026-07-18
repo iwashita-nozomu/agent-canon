@@ -32,7 +32,7 @@ namespace.
 | --- | --- | --- |
 | source contract | `tools/agent_tools/update_lifecycle_contract.py` | schemas, identities, guards, receipt materializers |
 | source implementation | clone-root `tools/`, `agents/`, `documents/`, `.github/`, `.codex/`, `evidence/`, `tests/`, `rust/` | reviewed product source |
-| runtime state | `.agent-canon/update-lifecycle/state/` | resumable transaction pointer/state; never source canon |
+| runtime state | `.agent-canon/update-lifecycle/state/` | resumable transaction pointer and typed GitHub/source-publication packets; never source canon |
 | generated evidence | `reports/agents/<run-id>/` and `.agent-canon/update-lifecycle/evidence/` | immutable receipts, timings, review and readback evidence |
 | projection queue | `.agent-canon/update-lifecycle/projection-queue/` | accepted QueueReceipt and pending/accepted DependencyFrontier |
 | parent projection | parent `vendor/agent-canon` gitlink and AgentCanon-owned root views | downstream view after frontier acceptance only |
@@ -70,6 +70,9 @@ There is no legacy subtree, snapshot, wrapper, or alternate owner route.
 1. Enqueue exactly one accepted `QueueReceipt` keyed by
    `(source_namespace,candidate_sha,tree_sha,input_digest)`. Create a pending
    `DependencyFrontier` with ordered oracle `#388 -> #389 -> current`.
+   The post-readback state machine materializes
+   `source-publication-ready.json`; the existing `latest` entry consumes it and
+   internally appends queue, frontier acceptance, and G4 evidence.
 1. Accept the frontier only when source-main equals the current candidate,
    QueueReceipt is accepted, and all predecessor publication evidence is
    present and ordered. Pending/failed frontier records prohibit parent work.
@@ -104,12 +107,10 @@ identity and ordering only; they do not rerun the owned check.
 | Entry | Responsibility |
 | --- | --- |
 | `tools/update_agent_canon.sh plan` | optional read-only projection only when its result can change the owner/structure decision; never a required preflight |
-| `tools/update_agent_canon.sh latest` | standalone source-main rebind or, in a parent, accepted-frontier projection |
+| `tools/update_agent_canon.sh latest` | standalone source-main rebind; after typed publication readback, internal queue/frontier advance; in a parent, accepted-frontier projection |
 | `tools/update_agent_canon.sh apply` | strict clean source rebind or accepted parent projection |
 | `tools/update_agent_canon.sh merge-main-into-current` | clean standalone/source-branch rebind |
 | `tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` | task-dirt-preserving source rebind |
-| `tools/update_agent_canon.sh enqueue-source-projection` | materialize/replay one QueueReceipt, pending frontier, and current-transaction marker |
-| `tools/update_agent_canon.sh accept-dependency-frontier` | perform source-main readback and append one accepted frontier record |
 | `tools/ci/check_agent_canon_pr.sh` | consume G1-G3 and run the one source PR gate |
 | `tools/ci/check_agent_canon_latest.sh` | consume G4-G5 without a second source-main check |
 
