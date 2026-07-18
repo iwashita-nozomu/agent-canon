@@ -1358,8 +1358,8 @@ required_regex = ["PR body", "reader-facing report", "report-writing", "JSON / J
 [[evals.checklist]]
 id = "VERTICAL-WAVE-POLICY-3"
 critical = true
-description = "Keeps canonical orchestration skill aligned with vertical dynamic waves and delegated spawn policy."
-required_regex = ["Intake Responsibility Wave", "dynamic expansion wave", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
+description = "Requires Decision-Sufficiency when the owner/edit/validation action is invariant, with one complete Spark unit, one owning gate, and StructuralDesignGap."
+required_regex = ["Decision\\s*-Sufficiency", "owner/edit/validation action is invariant", "one\\s+complete Spark unit", "one owning gate", "StructuralDesignGap"]
 
 [[evals.checklist]]
 id = "HTML-OUTPUT-ROUTING-CANONICAL-1"
@@ -2351,7 +2351,7 @@ description = "The runtime profile projection gate is generated, topology-derive
 id = "P5-RUNTIME-PROJECTION-1"
 critical = true
 description = "Requires the closed generated role view and registry materializer parity gate."
-required_regex = ["generated_role_view_v1", "generate_role_views", "closed eight-field projection", "developer instructions diverge"]
+required_regex = ["generated_role_view_v1", "generate_role_views", "closed eight-field projection", "agents_config projection diverges"]
 
 [[evals.checklist]]
 id = "P5-RUNTIME-PROJECTION-2"
