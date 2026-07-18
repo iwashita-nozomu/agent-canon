@@ -5,11 +5,14 @@
 # responsibility Tests design-document claim evidence checker behavior.
 # upstream design ../../documents/design/README.md design-document evidence policy
 # upstream implementation ../../tools/agent_tools/check_design_doc_claims.py checks design claims
+# upstream implementation ../../tools/agent_tools/graph_client.py validates persisted graph context
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh provides dependency graph semantics
 # @dependency-end
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import subprocess
 import sys
@@ -17,6 +20,11 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from tools.agent_tools import check_design_doc_claims as graph_claim_checker
+from tools.agent_tools.graph_client import GraphResponse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_design_doc_claims.py"
@@ -634,6 +642,127 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(payload["status"], "pass")
             self.assertEqual(payload["finding_count"], 0)
+
+
+class FakeDesignGraphClient:
+    """Provide graph-owned context without rerunning the graph producer."""
+
+    def __init__(self, _root: Path, *, status: str = "fresh") -> None:
+        self._status = status
+
+    def status(self) -> SimpleNamespace:
+        return SimpleNamespace(
+            status=self._status,
+            exit_code=0 if self._status == "fresh" else 2,
+        )
+
+    def context(self, path: str) -> GraphResponse:
+        payload = {
+            "schema": "agent-canon.graph.context.v1",
+            "command": "context",
+            "status": self._status,
+            "resolved_path": path,
+            "source_identity": {
+                "snapshot_commit": "a" * 40,
+                "source_path": path,
+                "content_sha256": "b" * 64,
+            },
+            "evidence_paths": [path, "tools/feature_runner.py"],
+            "parent_paths": [],
+        }
+        return GraphResponse(
+            "agent-canon.graph.context.v1",
+            "context",
+            self._status,
+            payload,
+            0 if self._status == "fresh" else 2,
+        )
+
+
+class DesignDocGraphConsumerTest(unittest.TestCase):
+    """Exercise consume-only graph context and freshness refusal."""
+
+    def run_main(
+        self,
+        root: Path,
+        graph: FakeDesignGraphClient,
+        *paths: str,
+    ) -> tuple[int, str]:
+        output = io.StringIO()
+        (root / ".git").mkdir(exist_ok=True)
+        argv = ["check_design_doc_claims.py", "--root", str(root), *paths]
+        with (
+            patch.object(sys, "argv", argv),
+            patch.object(graph_claim_checker, "GraphClient", lambda _root: graph),
+            contextlib.redirect_stdout(output),
+        ):
+            result = graph_claim_checker.main()
+        return result, output.getvalue()
+
+    def test_check_one_consumes_graph_context_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents/design/feature.md",
+                """
+                # Feature Design
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence: `tools/feature_runner.py`.
+
+                ## Claims
+
+                - The design must route work through `run_feature`.
+                """,
+            )
+            write(
+                root / "tools/feature_runner.py",
+                """
+                def run_feature() -> None:
+                    pass
+                """,
+            )
+            result, output = self.run_main(
+                root,
+                FakeDesignGraphClient(root),
+                "documents/design/feature.md",
+            )
+            self.assertEqual(result, 0, output)
+            self.assertIn("DESIGN_DOC_CLAIMS=pass", output)
+
+    def test_stale_graph_context_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(root / "documents/design/feature.md", "# Feature Design\n")
+            result, output = self.run_main(
+                root,
+                FakeDesignGraphClient(root, status="stale"),
+                "documents/design/feature.md",
+            )
+            self.assertNotEqual(result, 0)
+            self.assertIn("graph snapshot is not fresh", output)
+
+    def test_graph_context_without_identity_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(root / "documents/design/feature.md", "# Feature Design\n")
+            graph = FakeDesignGraphClient(root)
+            missing_identity = GraphResponse(
+                "agent-canon.graph.context.v1",
+                "context",
+                "fresh",
+                {"resolved_path": "documents/design/feature.md"},
+                0,
+            )
+            with patch.object(graph, "context", return_value=missing_identity):
+                result, output = self.run_main(
+                    root,
+                    graph,
+                    "documents/design/feature.md",
+                )
+            self.assertNotEqual(result, 0)
+            self.assertIn("graph context did not resolve", output)
 
 
 if __name__ == "__main__":

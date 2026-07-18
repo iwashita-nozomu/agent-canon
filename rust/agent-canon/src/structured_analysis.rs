@@ -2715,7 +2715,7 @@ fn render_build_summary(result: &BuildResult, root: &Path, profile: &str) -> Str
     )
 }
 
-fn initialize_graph_schema(connection: &Connection) -> rusqlite::Result<()> {
+pub(crate) fn initialize_graph_schema(connection: &Connection) -> rusqlite::Result<()> {
     connection.execute_batch(
         "
         CREATE TABLE IF NOT EXISTS metadata (
@@ -2764,6 +2764,15 @@ fn initialize_graph_schema(connection: &Connection) -> rusqlite::Result<()> {
         );
         ",
     )
+}
+
+pub(crate) fn validate_graph_connection(connection: &Connection) -> rusqlite::Result<()> {
+    let findings = validate_graph_contract(connection)?;
+    if findings.is_empty() {
+        Ok(())
+    } else {
+        Err(rusqlite::Error::InvalidQuery)
+    }
 }
 
 fn analysis_document_id(connection: &Connection) -> rusqlite::Result<String> {

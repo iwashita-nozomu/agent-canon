@@ -22,6 +22,11 @@ from dataclasses import asdict, dataclass
 from itertools import groupby
 from pathlib import Path
 
+try:
+    from .graph_client import GraphClient, GraphClientError
+except ImportError:  # pragma: no cover - direct CLI execution
+    from graph_client import GraphClient, GraphClientError
+
 HEADER_SCAN_LINES = 80
 MANIFEST_FIELD_COUNT = 4
 MANIFEST_REASON_MAX_SPLIT = MANIFEST_FIELD_COUNT - 1
@@ -137,6 +142,46 @@ class ClosureAccumulator:
     evidence: set[str]
     parents: set[str]
     queue: deque[tuple[str, int]]
+
+
+@dataclass(frozen=True)
+class GraphClaimContext:
+    """Graph-owned context used by the claim checker."""
+
+    evidence_paths: tuple[str, ...]
+    parent_paths: tuple[str, ...]
+    evidence: dict[str, str]
+
+
+class GraphClaimConsumer:
+    """Consume one fresh graph snapshot without parsing dependency headers."""
+
+    def __init__(self, root: Path) -> None:
+        """Bind the repository root and its typed graph adapter."""
+        self.root = root
+        self.client = GraphClient(root)
+
+    def context(self, path: str) -> GraphClaimContext:
+        """Return graph-certified evidence paths for one design document."""
+        response = self.client.context(path)
+        if response.status != "fresh" or response.exit_code != 0:
+            raise GraphClientError("graph snapshot is not fresh")
+        if response.source_identity is None:
+            raise GraphClientError(f"graph context did not resolve {path}")
+        payload = response.payload
+        raw_evidence = payload.get("evidence_paths")
+        raw_parents = payload.get("parent_paths")
+        if not isinstance(raw_evidence, list) or not isinstance(raw_parents, list):
+            raise GraphClientError(f"graph context for {path} omitted canonical path sets")
+        evidence_paths = tuple(sorted({value for value in raw_evidence if isinstance(value, str)}))
+        parent_paths = tuple(sorted({value for value in raw_parents if isinstance(value, str)}))
+        if path not in evidence_paths:
+            evidence_paths = tuple(sorted({path, *evidence_paths}))
+        return GraphClaimContext(
+            evidence_paths=evidence_paths,
+            parent_paths=parent_paths,
+            evidence=evidence_texts(self.root, evidence_paths),
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -838,7 +883,7 @@ def missing_dependency_target_findings(root: Path, path: str, evidence_paths: Se
     return findings
 
 
-def check_one(
+def _check_one_from_manifest(
     root: Path,
     path: str,
     edges: Sequence[ManifestEdge],
@@ -873,6 +918,38 @@ def check_one(
         supported_claims=supported,
         evidence_paths=tuple(sorted(evidence_paths)),
         parent_paths=tuple(sorted(parent_paths)),
+        findings=tuple(sorted(findings, key=lambda item: (item.kind, item.path, item.line, item.detail))),
+    )
+
+
+def check_one(root: Path, path: str, consumer: GraphClaimConsumer) -> CheckResult:
+    """Check one design document against graph-provided evidence context."""
+    if resolve_existing_text_path(root, path) is None:
+        return CheckResult(
+            path=path,
+            claims=0,
+            supported_claims=0,
+            evidence_paths=(),
+            parent_paths=(),
+            findings=(Finding("design-document-unresolved", path, 0, f"path={path}"),),
+        )
+    text = read_text(root, path)
+    claims = extract_claims(path, text)
+    context = consumer.context(path)
+    supported, claim_findings = check_claim_support(root, claims, context.evidence)
+    findings: list[Finding] = []
+    if claims and not has_evidence_ledger(text):
+        findings.append(Finding("missing-evidence-assumption-ledger", path, 0, "section=Evidence And Assumption Ledger"))
+    findings.extend(missing_dependency_target_findings(root, path, context.evidence_paths))
+    findings.extend(check_assumption_ledger(path, text))
+    findings.extend(check_parent_contradictions(root, path, text, context.parent_paths))
+    findings.extend(claim_findings)
+    return CheckResult(
+        path=path,
+        claims=len(claims),
+        supported_claims=supported,
+        evidence_paths=context.evidence_paths,
+        parent_paths=context.parent_paths,
         findings=tuple(sorted(findings, key=lambda item: (item.kind, item.path, item.line, item.detail))),
     )
 
@@ -921,8 +998,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = args.root.resolve()
     paths = selected_paths(root, args)
-    edges = all_manifest_edges(root)
-    results = tuple(check_one(root, path, edges, args.recursive_depth) for path in paths)
+    repository_scoped = (root / ".git").exists() or (root / "vendor" / "agent-canon" / ".git").exists()
+    if repository_scoped:
+        try:
+            consumer = GraphClaimConsumer(root)
+            results = tuple(check_one(root, path, consumer) for path in paths)
+        except GraphClientError as error:
+            results = tuple(
+                CheckResult(
+                    path=path,
+                    claims=0,
+                    supported_claims=0,
+                    evidence_paths=(),
+                    parent_paths=(),
+                    findings=(Finding("graph-snapshot-unavailable", path, 0, str(error)),),
+                )
+                for path in paths
+            )
+    else:
+        edges = all_manifest_edges(root)
+        results = tuple(
+            _check_one_from_manifest(root, path, edges, args.recursive_depth)
+            for path in paths
+        )
     if args.format == "json":
         print(render_json(results))
     else:

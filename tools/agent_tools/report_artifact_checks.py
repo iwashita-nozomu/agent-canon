@@ -44,6 +44,14 @@ APPROVE_DECISION_PATTERN = re.compile(
     r"^(?:[-*]\s*)?(?:decision\s*:\s*)?approve\s*$",
     re.IGNORECASE,
 )
+REVIEW_TARGET_SHA_PATTERN = re.compile(
+    r"\breview_target_sha256\s*=\s*`?([0-9a-f]{64})`?",
+    re.IGNORECASE,
+)
+DESIGN_ARTIFACT_PATH_PATTERN = re.compile(
+    r"^\s*-\s*Design artifact path:\s*`?([^`\r\n]+?)`?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
 REQUIRED_ACTUAL_WAVE_FIELDS = (
     "wave_event",
     "wave_id",
@@ -3304,6 +3312,28 @@ def has_approve_decision(text: str) -> bool:
     return any(
         APPROVE_DECISION_PATTERN.fullmatch(line)
         for line in final_review_decision_lines(text)
+    )
+
+
+@dataclass(frozen=True)
+class ReviewIdentityResult:
+    """Authoritative design-path, target-digest, and decision projection."""
+
+    design_artifact_path: str | None
+    review_target_sha256: str | None
+    decision_approved: bool
+
+
+def parse_review_identity(text: str) -> ReviewIdentityResult:
+    """Parse one review identity through the shared structural decision owner."""
+    path_matches = DESIGN_ARTIFACT_PATH_PATTERN.findall(text)
+    sha_matches = REVIEW_TARGET_SHA_PATTERN.findall(text)
+    return ReviewIdentityResult(
+        design_artifact_path=(
+            path_matches[-1].strip().strip("'\"") if path_matches else None
+        ),
+        review_target_sha256=(sha_matches[-1].lower() if sha_matches else None),
+        decision_approved=has_approve_decision(text),
     )
 
 

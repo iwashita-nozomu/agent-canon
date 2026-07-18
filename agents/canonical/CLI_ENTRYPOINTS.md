@@ -111,3 +111,62 @@ post-implementation change review は `diff_triage_reviewer` が既定です。
 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します。write scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
 
 GitHub Actions から回すときは `.github/workflows/agent-coordination.yml` を使います。
+
+## Runtime Evidence and Knowledge Graph
+
+The generic source-bound runtime certificate is created from the source
+checkout and active run bundle:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
+  --result-family <requirements|design|review|validation|lifecycle> \
+  --run-id <run-id> --gate-id <gate-id> --base-ref <base-ref>
+```
+
+The command writes one immutable prepared
+`runtime_event.<unit-id>.json` artifact, appends post-target evidence to the
+repo-local outcome spool, and publishes a separate hash-linked
+`runtime_event.<unit-id>.outcome.<attempt-id>.<sequence>.json` receipt. The
+artifact contains `publication_intent.prepared_state=prepared` and never
+contains a future-valued outcome. Success requires a durability-confirmed
+latest `committed` receipt; missing, uncertain, malformed, colliding, or
+unconfirmed records fail closed.
+
+Success prints the artifact path/unit/source-record hash, materialization and
+attempt IDs, latest receipt path/hash, `RUNTIME_EVENT_OUTCOME=committed`, and
+`RUNTIME_EVENT_MATERIALIZE=pass` only after the attempt lock is released. A
+typed transaction failure prints only
+`RUNTIME_EVENT_ERROR_CODE=<code>` and
+`RUNTIME_EVENT_MATERIALIZE=fail`, writes no stderr, and exits `1`. Retrying the
+same command confirms or appends records for the deterministic attempt; it
+does not replace prior artifact, observation, or receipt bytes.
+
+PostToolUse uses a separate O(1) local spool and never invokes this CLI. Check
+the hot path without building repository/archive context, then publish one
+explicit checkpoint when requested:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py check-hook-hot-path
+python3 tools/agent_tools/runtime_log_archive_git.py sync
+```
+
+`sync` owns one nonblocking lock and one archive ensure. It snapshots, ingests,
+deduplicates, projects, publishes, reads back, and only then removes certified
+spool files. `archive_transaction_busy`, `partial_retained`, `failed`, and
+`uncertain` states leave source events for a later checkpoint.
+
+The Rust graph uses one build transaction and one prepared-artifact/committed-
+receipt pair:
+
+```bash
+tools/bin/agent-canon graph build --root <repo-root> --format json
+tools/bin/agent-canon graph status --root <repo-root> --format json
+tools/bin/agent-canon graph query --root <repo-root> --relation dependency --all --format json
+tools/bin/agent-canon graph context --root <repo-root> --path <repo-relative-path> --format json
+```
+
+`status`, `query`, and `context` are read-only consumers. They reuse the
+persisted v2 snapshot and return stale/unavailable state when the artifact,
+receipt, live source identity, worktree manifest identity, or profile changes;
+each command performs one bounded freshness probe and does not regenerate
+runtime evidence.
