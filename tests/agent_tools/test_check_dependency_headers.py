@@ -6,6 +6,7 @@
 # upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream implementation ../../tools/agent_tools/check_dependency_headers.py changed-file checks
 # upstream implementation ../../tools/agent_tools/graph_client.py validates persisted graph responses
+# upstream implementation ../../tools/agent_tools/visualization_contract.py canonical visualization contract dependency target
 # @dependency-end
 
 from __future__ import annotations
@@ -24,6 +25,44 @@ from tools.agent_tools import check_dependency_headers as graph_checker
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_headers.py"
+VISUALIZATION_QUEUE_PATHS = (
+    "agents/skills/algorithm-flowchart.md",
+    "agents/skills/catalog.yaml",
+    ".agents/skills/algorithm-flowchart/SKILL.md",
+    ".agents/skills/dependency-analysis/SKILL.md",
+    ".agents/skills/prose-reasoning-graph/SKILL.md",
+    "agents/skills/structure-refactor.md",
+    ".agents/skills/structure-refactor/SKILL.md",
+    "agents/skills/structure-planning.md",
+    ".agents/skills/structure-planning/SKILL.md",
+    "agents/skills/report-writing.md",
+    ".agents/skills/report-writing/SKILL.md",
+    "agents/skills/long-form-writing.md",
+    ".agents/skills/long-form-writing/SKILL.md",
+    "agents/skills/html-output.md",
+    ".agents/skills/html-output/SKILL.md",
+    "agents/skills/formal-proof-workflow.md",
+    ".agents/skills/formal-proof-workflow/SKILL.md",
+    "agents/skills/md-style-check.md",
+    ".agents/skills/md-style-check/SKILL.md",
+    "agents/skills/README.md",
+    "tools/agent_tools/skill_route_catalog.py",
+    "tools/agent_tools/capability_route.py",
+    "tests/agent_tools/test_render_dependency_manifest_graph.py",
+    "tools/catalog.yaml",
+    "tools/agent_tools/tool_catalog.py",
+    "tools/README.md",
+    "documents/tools/README.md",
+    "documents/tools/tool-docs.toml",
+    "tests/agent_tools/test_tool_catalog.py",
+    "tests/agent_tools/test_dependency_manifest_tools.py",
+    "tests/agent_tools/test_check_dependency_headers.py",
+    "rust/agent-canon/src/docs.rs",
+    "rust/agent-canon/src/main.rs",
+    "tests/tools/test_fix_mermaid.py",
+    "agents/workflows/implementation-waterfall-workflow.md",
+    "agents/workflows/agent-canon-pr-workflow.md",
+)
 
 
 class DependencyHeaderCheckTest(unittest.TestCase):
@@ -62,6 +101,24 @@ class DependencyHeaderCheckTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
+
+    def test_visualization_completion_queue_has_canonical_contract_edges(self) -> None:
+        """Every queue surface declares its canonical visualization dependency."""
+        for relative_path in VISUALIZATION_QUEUE_PATHS:
+            with self.subTest(path=relative_path):
+                header = "\n".join(
+                    (PROJECT_ROOT / relative_path)
+                    .read_text(encoding="utf-8")
+                    .splitlines()[:80]
+                )
+                self.assertIn("@dependency-start", header)
+                self.assertIn("@dependency-end", header)
+                self.assertTrue(
+                    "code-visualization.md" in header
+                    or "visualization_contract.py" in header
+                    or "visualization_contract.md" in header,
+                    relative_path,
+                )
 
     def test_accepts_skill_frontmatter_before_dependency_manifest(self) -> None:
         """SKILL.md may keep YAML frontmatter before the dependency manifest."""

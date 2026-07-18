@@ -8,10 +8,21 @@ description: Use when Markdown files changed, docs formatter/fixer output must b
 contract skill
 responsibility Documents Markdown Style Check for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
+upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
+downstream implementation ../../../tests/tools/test_fix_mermaid.py tests formatter and post-format coverage behavior.
 @dependency-end
 -->
 
 # Markdown Style Check
+
+## Visualization Formatter Gate
+
+For Mermaid artifacts, consume `$code-visualization`'s
+`VisualizationSourceUniverse`, canonical `ToolCall`, and
+`ProjectionCoverageManifest`; format the complete artifact and return
+post-format readback identities for the owner's final coverage status. This
+shim owns syntax only and cannot treat rewriting, substitution, aggregation,
+or deletion as an omission repair. A pre-format marker is not readback.
 
 ## Tool Commands
 

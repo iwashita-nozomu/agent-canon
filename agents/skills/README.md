@@ -7,11 +7,22 @@ responsibility Documents Shared Skill Canon for this repository.
 upstream design ./catalog.yaml enumerates public skill families
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
 downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates public and official skill boundaries
+upstream design code-visualization.md sole public visualization owner and typed projection contract
+downstream implementation ../../tools/agent_tools/skill_route_catalog.py validates visualization owner and adapter metadata
 @dependency-end
 -->
 
 このディレクトリは、public Codex skill 文書の人間向け正本です。
 機械 discovery 用の `SKILL.md` は `.agents/skills/` を正本にします。
+
+## Visualization Ownership
+
+`code-visualization` is the sole public visualization skill. Visualization-
+producing skills remain native fact producers or renderer/formatter adapters
+and route through its canonical `VisualizationSourceUniverse`, schema-bearing
+`ToolCall`, `ProjectionCoverageManifest`, post-format readback, and final
+coverage status. The public catalog must not add a second visualization owner
+or copy the universal omission/granularity policy into adapter entries.
 
 ## Reader Map
 

@@ -16,14 +16,32 @@ upstream implementation ../../tools/agent_tools/eval_accumulation_check.py eval 
 upstream design ../../tools/catalog.yaml structured tool catalog
 upstream design ../../issues/README.md durable operational finding storage
 upstream design ../../documents/dependency-manifest-design.md dependency graph and search-to-edit-scope evidence
+upstream design ../skills/code-visualization.md sole public visualization owner and source publication boundary
+upstream implementation ../../tools/agent_tools/visualization_contract.py typed visualization coverage checker
 upstream design ../../documents/agent-canon-github-remote.md defines canonical remote evidence
 upstream design ../../documents/template-github-remote.md defines template remote evidence
 upstream design ../canonical/ARTIFACT_PLACEMENT.md defines run-local artifact placement
 upstream design ../skills/result-artifact-writeout.md defines result artifact writeout
+downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py validates workflow gate dependency edges
 downstream design derived-agent-canon-diff-workflow.md derived diff workflow consumes PR gates
 downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates PR Essence workflow markers
 @dependency-end
 -->
+
+## Visualization Source-Main Gate
+
+For changes owned by `code-visualization`, require one independent exact review
+of the complete AgentCanon source diff and the canonical route, coverage,
+post-format readback, formatter, and producer-checker results before the source
+PR is eligible for merge. The workflow references the typed contract in
+`tools/agent_tools/visualization_contract.py` and does not duplicate its
+schema or omission/granularity policy.
+
+After the source PR merges to AgentCanon `main`, read back every merged
+source-main path and rerun the same canonical gates against that source. For
+the isolated visualization ownership route, record
+`parent_pin_update=forbidden`; do not update or repair a parent checkout,
+parent/vendor clone, or submodule pin as part of this source gate.
 
 この文書は、AgentCanon source change と template submodule pin change を PR に乗せるときの正本です。
 standalone AgentCanon repo、template repo 側の branch、PR、merge、submodule pin 更新を 1 本の手順で扱います。

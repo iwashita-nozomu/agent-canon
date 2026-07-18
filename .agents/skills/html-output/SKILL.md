@@ -10,10 +10,21 @@ upstream design ../../../agents/skills/html-output.md documents the canonical HT
 upstream design ../../../agents/skills/structure-planning.md defines reusable page structure contracts
 upstream design ../../../agents/skills/report-writing.md defines report content and Markdown default
 upstream design ../../../agents/skills/html-experiment-report.md defines experiment-specific HTML report routing
+upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
+downstream implementation ../../../tests/agent_tools/test_check_dependency_headers.py validates this adapter dependency header.
 @dependency-end
 -->
 
 # HTML Output
+
+## Visualization Adapter Boundary
+
+For embedded graphs, call `$code-visualization` with the complete selected
+native facts and consume its `VisualizationSourceUniverse`, canonical
+`ToolCall`, `ProjectionCoverageManifest`, post-format readback, and final
+coverage status. This shim owns HTML syntax, accessibility, layout, and
+reversible filtering only; filters cannot delete embedded identities, and the
+universal omission/granularity contract is not duplicated here.
 
 ## Tool Commands
 

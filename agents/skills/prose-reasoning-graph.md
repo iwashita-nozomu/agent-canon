@@ -23,7 +23,10 @@ downstream design ../../documents/tools/prose_reasoning_graph.md documents CLI u
 - Use when: section order, reader path, claim support, split/merge/bridge
   decisions, logic holes, or graph-backed rewrite packets need evidence.
 - Boundary: graph artifacts preserve source truth and prepare handoff; they do
-  not replace the receiving writing, research, proof, or review skill.
+  not replace the receiving writing, research, proof, or review skill. Renderer
+  and large-graph projection output remains a view surface only, and
+  code-visualization routes own repository graph rendering through typed tool
+  arguments and coverage checks.
 
 ## Purpose
 

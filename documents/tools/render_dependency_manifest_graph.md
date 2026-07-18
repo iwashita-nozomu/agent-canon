@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents dependency manifest graph report rendering.
 upstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders Markdown and DOT graph reports.
+upstream implementation ../../tools/agent_tools/visualization_contract.py owns projection identity, marker, readback, and coverage semantics.
 upstream design ../dependency-manifest-design.md defines dependency manifest semantics.
 upstream design ../structured-analysis/graph-dsl.md defines shared graph storage and projection contract.
 upstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph adapter vocabulary when dependency graph views are embedded in prose workflows.
@@ -22,6 +23,8 @@ Use this tool when a review needs a repo-local dependency-manifest graph artifac
   or a supplied `--graph-tsv`.
 - Produces: three canonical bundle routes, named projections, manifest and Graph IR
   schema commitments, and self-contained HTML behavior.
+- Produces the exact D2.4 `VisualizationSourceUniverse`, ordered owner/adapter
+  `ToolCall` records, and artifact-specific manifest/readback/report records.
 
 ## Skill / Evaluator Exact-Three Route
 
@@ -95,6 +98,36 @@ single invocation.
 - `artifacts[].path`: stable locator path relative to `--bundle-dir`
 - `artifacts[].sha256`: digest for generated outputs
 - `artifacts[].bytes`: exact byte size of each artifact
+- `visualization_source_universe`: native node/edge identities plus every
+  GraphIR-derived directory node and containment edge, computed before
+  projection with deterministic source provenance
+- `visualization_tool_calls`: exactly one canonical owner ToolCall followed by
+  exactly one dependency-adapter ToolCall
+- `visualization_coverage`: one record per rendered GraphIR,
+  Markdown/Mermaid, DOT, and HTML artifact, each containing its
+  `ProjectionCoverageManifest`, external
+  final-artifact `ReadbackProjection`, and `CoverageReport`
+
+The ToolCall order and exact pairs are:
+
+1. `agent_canon.visualization.coverage` /
+   `agent_canon.visualization.arguments.coverage.v1`
+2. `agent_canon.visualization.adapter.dependency_manifest` /
+   `agent_canon.visualization.arguments.dependency_manifest.v1`
+
+`tools/agent_tools/render_dependency_manifest_graph.py` remains the executable
+command path. It is never a ToolCall ID.
+
+`dependency_graph.tsv` remains one of the six basenames and the native
+checker/source evidence. It is not a rendered visualization projection and has
+no partial full-universe coverage record.
+
+Every coverage report exposes exact eight-kind `source_counts`,
+`rendered_counts`, and `readback_counts`, the deterministic `coverage_digest`,
+and the complete untruncated violation list. Native nodes map to `identity`,
+native and containment edges map to `edge`, and derived directories map to
+`module`; the other five fixed kinds remain present with zero counts when the
+dependency graph has no such source record.
 
 Rendered output is emitted as bundle text and JSON:
 - bundle text at markdown and dot outputs
@@ -137,6 +170,41 @@ The Graph IR schema is `agent_canon.graph_ir.v2`. Its `documents` records source
 projections, `metadata` records deterministic producer and checker context, and
 `diagnostics` records renderer observations. Directional cycles are represented
 as separate `cycles.upstream` and `cycles.downstream` arrays.
+
+## Final-artifact marker and readback order
+
+Coverage is not inferred from renderer output. After native TSV parsing, the
+adapter computes directory containment and adds every emitted GraphIR directory
+node (`kind=module`) and containment edge (`kind=edge`) to the dependency
+closure. Each derived payload records
+`provenance_kind=derived_directory_containment`, the producer path, its
+directory or source/target identity, and all native source identities from
+which it was derived. The adapter then performs this order for each of the four
+rendered artifacts:
+
+1. serialize the owner ToolCall followed by the dependency adapter ToolCall;
+2. build complete one-to-one projection entries using only
+   `serialize_projection_identity`;
+3. build the typed manifest and obtain its marker only from
+   `serialize_projection_coverage_manifest`;
+4. commit renderer syntax/layout at the formatter-owned final-write boundary;
+5. call `readback_projection` with the final bytes/path;
+6. call `validate_projection_coverage(..., readback=...)`.
+
+The exact marker prefix is
+`agent_canon_visualization_coverage_v1:`. GraphIR v2 stores a
+`visualization_coverage.marker` object; Markdown stores one adjacent HTML
+comment immediately before its Mermaid fence; DOT stores a graph comment; HTML
+stores `script[type=application/json][id=agent-canon-visualization-coverage]`.
+The separate identity tokens are also serialized, so marker presence alone
+cannot pass readback.
+
+TSV remains byte-for-byte producer evidence and checker authority. It is copied
+or generated transactionally and retained in artifact descriptors, but it does
+not receive a coverage sidecar or subset manifest. GraphIR, Markdown, DOT, and
+HTML all use the same full native-plus-derived universe and have exactly equal
+manifest source-identity sets. Formatter ownership remains syntax/layout-only
+and cannot extract, delete, aggregate, or relabel source identities.
 
 ## HTML Behavior
 
