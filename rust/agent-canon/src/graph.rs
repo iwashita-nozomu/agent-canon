@@ -17,9 +17,11 @@ use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 
 const GRAPH_SCHEMA_VERSION: &str = "graph_storage_core.v1";
 const RUNTIME_EVENT_SCHEMA: &str = "agent_canon.runtime_event.v1";
@@ -28,6 +30,7 @@ const RUNTIME_PUBLICATION_INTENT_SCHEMA: &str = "agent_canon.runtime_event.publi
 const RUNTIME_OBSERVATION_SCHEMA: &str =
     "agent_canon.runtime_event.publication_outcome_observation.v1";
 const RUNTIME_RECEIPT_SCHEMA: &str = "agent_canon.runtime_event.publication_outcome_receipt.v1";
+static GRAPH_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone)]
 struct RuntimeEvidenceSnapshot {
@@ -182,10 +185,101 @@ struct BuildMaterial {
     graph_fingerprint: String,
 }
 
+struct GraphStaging {
+    root: PathBuf,
+    database: PathBuf,
+}
+
+impl GraphStaging {
+    fn create(operation_id: &str) -> Result<Self, GraphError> {
+        let host_temp = std::env::temp_dir()
+            .canonicalize()
+            .map_err(|error| GraphError::Io(error.to_string()))?;
+        let root = host_temp.join(format!("agent-canon-graph-{operation_id}"));
+        fs::create_dir(&root).map_err(|error| GraphError::Io(error.to_string()))?;
+        let database = root.join("graph.sqlite");
+        if let Err(error) = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&database)
+        {
+            let _ = fs::remove_dir(&root);
+            return Err(GraphError::Io(error.to_string()));
+        }
+        let staging = Self { root, database };
+        if staging
+            .root
+            .canonicalize()
+            .map_err(|error| GraphError::Io(error.to_string()))?
+            != staging.root
+            || staging
+                .database
+                .canonicalize()
+                .map_err(|error| GraphError::Io(error.to_string()))?
+                != staging.database
+        {
+            return Err(GraphError::Validation(
+                "graph staging path is not canonical".to_string(),
+            ));
+        }
+        Ok(staging)
+    }
+}
+
+impl Drop for GraphStaging {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
+struct PublicationTemp {
+    path: PathBuf,
+    armed: bool,
+}
+
+impl PublicationTemp {
+    fn new(path: &Path) -> Self {
+        Self {
+            path: path.to_path_buf(),
+            armed: true,
+        }
+    }
+
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for PublicationTemp {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
+
 fn sha256(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     format!("{:x}", hasher.finalize())
+}
+
+fn graph_operation_id(material: &BuildMaterial) -> String {
+    let sequence = GRAPH_TEMP_SEQUENCE.fetch_add(1, AtomicOrdering::Relaxed);
+    let identity = sha256(
+        [
+            b"agent_canon.graph.storage.operation.v1\0".as_slice(),
+            material.root.to_string_lossy().as_bytes(),
+            b"\0",
+            material.input_fingerprint.as_bytes(),
+            b"\0",
+            sequence.to_string().as_bytes(),
+        ]
+        .concat()
+        .as_slice(),
+    );
+    format!("{}-{sequence}-{}", std::process::id(), &identity[..16])
 }
 
 fn required_string(object: &Map<String, Value>, field: &str) -> Result<String, GraphError> {
@@ -1856,14 +1950,124 @@ fn metadata_optional(connection: &Connection, key: &str) -> Result<Option<String
         .map_err(|error| GraphError::Unavailable(error.to_string()))
 }
 
-fn materialize_graph_store(material: &BuildMaterial) -> Result<GraphIntegrationRecord, GraphError> {
-    fs::create_dir_all(&material.graph_root).map_err(|error| GraphError::Io(error.to_string()))?;
-    let temporary = material
-        .graph_root
-        .join(format!("graph.sqlite.tmp.{}", std::process::id()));
-    let _ = fs::remove_file(&temporary);
+fn canonical_published_graph_path(root: &Path) -> Result<PathBuf, GraphError> {
+    let canonical_root = root
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let graph_root = canonical_root.join(".agent-canon/knowledge-graph");
+    let canonical_graph_root = graph_root
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    if canonical_graph_root != graph_root {
+        return Err(GraphError::Validation(
+            "published graph directory is not canonical".to_string(),
+        ));
+    }
+    let published = graph_root.join("graph.sqlite");
+    let canonical_published = published
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    if canonical_published != published
+        || !fs::metadata(&canonical_published)
+            .map_err(|error| GraphError::Io(error.to_string()))?
+            .is_file()
+    {
+        return Err(GraphError::Validation(
+            "published graph database path is not canonical regular file".to_string(),
+        ));
+    }
+    Ok(canonical_published)
+}
+
+fn sqlite_immutable_uri(path: &Path) -> Result<String, GraphError> {
+    if !path.is_absolute() {
+        return Err(GraphError::Validation(
+            "published graph database path is not absolute".to_string(),
+        ));
+    }
+    let path_text = path.to_str().ok_or_else(|| {
+        GraphError::Validation("published graph database path is not UTF-8".to_string())
+    })?;
+    let mut uri = String::from("file:");
+    for byte in path_text.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'/') {
+            uri.push(char::from(byte));
+        } else {
+            uri.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    uri.push_str("?immutable=1");
+    Ok(uri)
+}
+
+fn graph_publication_temp_path(graph_root: &Path, operation_id: &str) -> PathBuf {
+    graph_root.join(format!("graph.sqlite.tmp.{operation_id}"))
+}
+
+fn publish_graph_bytes_at(
+    graph_root: &Path,
+    published: &Path,
+    publication_temp: &Path,
+    staged_bytes: &[u8],
+    staged_sha256: &str,
+) -> Result<(), GraphError> {
+    if published != graph_root.join("graph.sqlite")
+        || publication_temp.parent() != Some(graph_root)
+        || publication_temp == published
+    {
+        return Err(GraphError::Validation(
+            "graph publication paths are invalid".to_string(),
+        ));
+    }
+    fs::create_dir_all(graph_root).map_err(|error| GraphError::Io(error.to_string()))?;
+    if graph_root
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?
+        != graph_root
+    {
+        return Err(GraphError::Validation(
+            "graph publication directory is not canonical".to_string(),
+        ));
+    }
+    let mut output = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(publication_temp)
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let mut owned_temp = PublicationTemp::new(publication_temp);
+    output
+        .write_all(staged_bytes)
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    output
+        .sync_all()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    drop(output);
+    let publication_readback =
+        fs::read(publication_temp).map_err(|error| GraphError::Io(error.to_string()))?;
+    if publication_readback != staged_bytes || sha256(&publication_readback) != staged_sha256 {
+        return Err(GraphError::Validation(
+            "graph publication temporary readback mismatch".to_string(),
+        ));
+    }
+    fs::rename(publication_temp, published).map_err(|error| GraphError::Io(error.to_string()))?;
+    owned_temp.disarm();
+    File::open(published)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    File::open(graph_root)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    Ok(())
+}
+
+fn build_graph_staging(
+    material: &BuildMaterial,
+    staging_database: &Path,
+) -> Result<GraphIntegrationRecord, GraphError> {
     let connection =
-        Connection::open(&temporary).map_err(|error| GraphError::Io(error.to_string()))?;
+        Connection::open_with_flags(staging_database, OpenFlags::SQLITE_OPEN_READ_WRITE)
+            .map_err(|error| GraphError::Io(error.to_string()))?;
     initialize_graph_schema(&connection).map_err(|error| GraphError::Io(error.to_string()))?;
     connection
         .execute("DELETE FROM metadata", [])
@@ -2010,18 +2214,37 @@ fn materialize_graph_store(material: &BuildMaterial) -> Result<GraphIntegrationR
     validate_graph_connection(&connection)
         .map_err(|error| GraphError::Validation(error.to_string()))?;
     drop(connection);
-    let published = material.graph_root.join("graph.sqlite");
-    fs::rename(&temporary, &published).map_err(|error| GraphError::Io(error.to_string()))?;
-    File::open(&published)
+    Ok(integration)
+}
+
+fn materialize_graph_store(material: &BuildMaterial) -> Result<GraphIntegrationRecord, GraphError> {
+    let operation_id = graph_operation_id(material);
+    let staging = GraphStaging::create(&operation_id)?;
+    if staging.root.starts_with(&material.root) {
+        return Err(GraphError::Validation(
+            "graph staging path is inside the source repository".to_string(),
+        ));
+    }
+    let integration = build_graph_staging(material, &staging.database)?;
+    File::open(&staging.database)
         .and_then(|file| file.sync_all())
         .map_err(|error| GraphError::Io(error.to_string()))?;
-    File::open(&material.graph_root)
-        .and_then(|directory| directory.sync_all())
-        .map_err(|error| GraphError::Io(error.to_string()))?;
-    let readback = Connection::open_with_flags(&published, OpenFlags::SQLITE_OPEN_READ_ONLY)
-        .map_err(|error| GraphError::Unavailable(error.to_string()))?;
+    let staged_bytes =
+        fs::read(&staging.database).map_err(|error| GraphError::Io(error.to_string()))?;
+    let staged_sha256 = sha256(&staged_bytes);
+    let published = material.graph_root.join("graph.sqlite");
+    let publication_temp = graph_publication_temp_path(&material.graph_root, &operation_id);
+    publish_graph_bytes_at(
+        &material.graph_root,
+        &published,
+        &publication_temp,
+        &staged_bytes,
+        &staged_sha256,
+    )?;
+    let readback = open_db(&material.root)?;
     validate_graph_connection(&readback)
         .map_err(|error| GraphError::Validation(error.to_string()))?;
+    let runtime_json = runtime_evidence_json(&material.runtime_evidence);
     let expected_integration = serde_json::to_string(&integration.json()).unwrap_or_default();
     if metadata(&readback, "integration_record")? != expected_integration
         || metadata(&readback, "runtime_event_materialization")?
@@ -2102,9 +2325,13 @@ fn parse_args(args: &[String]) -> Result<GraphArgs, GraphError> {
 }
 
 fn open_db(root: &Path) -> Result<Connection, GraphError> {
-    let path = root.join(".agent-canon/knowledge-graph/graph.sqlite");
-    Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
-        .map_err(|error| GraphError::Unavailable(error.to_string()))
+    let path = canonical_published_graph_path(root)?;
+    let uri = sqlite_immutable_uri(&path)?;
+    Connection::open_with_flags(
+        uri,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
+    )
+    .map_err(|error| GraphError::Unavailable(error.to_string()))
 }
 
 fn load_graph_records(root: &Path) -> Result<(Vec<Value>, Vec<Value>), GraphError> {
@@ -3001,6 +3228,134 @@ mod tests {
             depth: 1,
             token: None,
         }
+    }
+
+    #[test]
+    fn graph_storage_realization_stages_outside_repository_and_reads_immutable_publication() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        let root = fixture.root.canonicalize().expect("canonical fixture root");
+        let material = collect_build_material(&root, "default").expect("build material");
+        let operation_id = graph_operation_id(&material);
+        let staging = GraphStaging::create(&operation_id).expect("exclusive local staging");
+        let host_temp = std::env::temp_dir()
+            .canonicalize()
+            .expect("canonical host temp");
+
+        assert_eq!(staging.root.parent(), Some(host_temp.as_path()));
+        assert!(!staging.database.starts_with(&material.graph_root));
+        let published = material.graph_root.join("graph.sqlite");
+        let publication_temp = graph_publication_temp_path(&material.graph_root, &operation_id);
+        assert!(!published.exists());
+        assert!(!publication_temp.exists());
+
+        let integration =
+            build_graph_staging(&material, &staging.database).expect("local SQLite build");
+        assert!(!published.exists());
+        assert!(!publication_temp.exists());
+        File::open(&staging.database)
+            .and_then(|file| file.sync_all())
+            .expect("staging fsync");
+        let staged_bytes = fs::read(&staging.database).expect("staging bytes");
+        let staged_sha256 = sha256(&staged_bytes);
+
+        publish_graph_bytes_at(
+            &material.graph_root,
+            &published,
+            &publication_temp,
+            &staged_bytes,
+            &staged_sha256,
+        )
+        .expect("exact byte publication");
+
+        assert_eq!(fs::read(&published).expect("published bytes"), staged_bytes);
+        assert!(!publication_temp.exists());
+        let canonical = canonical_published_graph_path(&material.root).expect("canonical graph");
+        let immutable_uri = sqlite_immutable_uri(&canonical).expect("immutable URI");
+        assert!(immutable_uri.starts_with("file:"));
+        assert!(immutable_uri.ends_with("?immutable=1"));
+        assert_eq!(
+            sqlite_immutable_uri(Path::new("/graph storage?#%.sqlite"))
+                .expect("reserved path encoding"),
+            "file:/graph%20storage%3F%23%25.sqlite?immutable=1"
+        );
+        let readback = open_db(&material.root).expect("immutable graph readback");
+        validate_graph_connection(&readback).expect("published graph contract");
+        assert_eq!(
+            metadata(&readback, "integration_record").expect("integration metadata"),
+            serde_json::to_string(&integration.json()).expect("integration JSON")
+        );
+        assert!(readback.execute("DELETE FROM metadata", []).is_err());
+        drop(readback);
+
+        #[cfg(unix)]
+        {
+            fs::remove_file(&published).expect("replace published graph for symlink oracle");
+            std::os::unix::fs::symlink(&staging.database, &published)
+                .expect("published graph symlink");
+            assert!(matches!(
+                open_db(&material.root),
+                Err(GraphError::Validation(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn graph_storage_realization_pre_rename_failures_preserve_old_and_unrelated_temps() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        let graph_root = fixture.root.join(".agent-canon/knowledge-graph");
+        fs::create_dir_all(&graph_root).expect("graph root");
+        let graph_root = graph_root.canonicalize().expect("canonical graph root");
+        let published = graph_root.join("graph.sqlite");
+        let collision = graph_root.join("graph.sqlite.tmp.collision");
+        let unrelated = graph_root.join("graph.sqlite.tmp.3288035");
+        let old_bytes = b"old published graph";
+        let new_bytes = b"new staged graph bytes";
+        fs::write(&published, old_bytes).expect("old graph");
+        fs::write(&collision, b"collision owner").expect("collision temp");
+        fs::write(&unrelated, b"unrelated failed partial").expect("unrelated temp");
+
+        assert!(matches!(
+            publish_graph_bytes_at(
+                &graph_root,
+                &published,
+                &collision,
+                new_bytes,
+                &sha256(new_bytes),
+            ),
+            Err(GraphError::Io(_))
+        ));
+        assert_eq!(fs::read(&published).expect("old graph readback"), old_bytes);
+        assert_eq!(
+            fs::read(&collision).expect("collision readback"),
+            b"collision owner"
+        );
+        assert_eq!(
+            fs::read(&unrelated).expect("unrelated temp readback"),
+            b"unrelated failed partial"
+        );
+
+        let owned_temp = graph_root.join("graph.sqlite.tmp.owned-hash-failure");
+        assert!(matches!(
+            publish_graph_bytes_at(
+                &graph_root,
+                &published,
+                &owned_temp,
+                new_bytes,
+                &"0".repeat(64),
+            ),
+            Err(GraphError::Validation(_))
+        ));
+        assert_eq!(
+            fs::read(&published).expect("preserved old graph"),
+            old_bytes
+        );
+        assert!(!owned_temp.exists());
+        assert_eq!(
+            fs::read(&unrelated).expect("retained unrelated temp"),
+            b"unrelated failed partial"
+        );
     }
 
     #[test]
