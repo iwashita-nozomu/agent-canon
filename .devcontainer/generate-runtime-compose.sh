@@ -3,6 +3,7 @@
 # contract environment
 # responsibility Renders shared devcontainer compose from repo-local Docker pack.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
+# upstream design ../documents/gpu-admission-r5-source-packet.md exact Compose runtime identity wiring
 # upstream environment devcontainer.json initializeCommand entrypoint
 # @dependency-end
 
@@ -82,6 +83,11 @@ else
 fi
 
 volume_lines=("      - ..:${workspace_mount}:cached")
+volume_lines+=(
+  "      - type: bind"
+  "        source: /var/lib/agent-canon/runtime"
+  "        target: /var/lib/agent-canon/runtime"
+)
 for pack_mount in "${pack_mounts[@]}"; do
   volume_lines+=("      - ${pack_mount}")
 done
@@ -116,9 +122,6 @@ if [ -n "${AGENT_CANON_SECRET_DIR:-}" ] && [ "$secret_mode" != "invalid" ]; then
     )
     secret_mount_status="enabled"
   fi
-fi
-if [ -d "${HOME}/.codex" ]; then
-  volume_lines+=("      - ${HOME}/.codex:/root/.codex")
 fi
 if [ -d "${HOME}/.config/gh" ]; then
   volume_lines+=("      - ${HOME}/.config/gh:/root/.config/gh")
@@ -189,6 +192,9 @@ environment_lines=(
   "      DEVCONTAINER_GPU_REQUEST: \"${gpu_request}\""
   "      AGENT_CANON_SECRET_MOUNT: \"${secret_target}\""
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
+  '      AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"'
+  '      AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"'
+  '      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"'
   "${pack_environment_lines[@]}"
 )
 if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
@@ -205,6 +211,9 @@ fi
   printf 'name: %s\n' "$compose_project_name"
   printf 'services:\n'
   printf '  workspace:\n'
+  printf '    user: "${LOCAL_UID}:${LOCAL_GID}"\n'
+  printf '    group_add:\n'
+  printf '      - "${AGENT_CANON_RUNTIME_GID}"\n'
   if [ "$compose_mode" = "repo-docker-pack" ]; then
     printf '    build:\n'
     printf '      context: ..\n'

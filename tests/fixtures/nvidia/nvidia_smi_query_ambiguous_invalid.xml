@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nvidia_smi_log>
+  <gpu>
+    <uuid>GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</uuid>
+    <processes><unknown_process_scope><pid>123</pid></unknown_process_scope></processes>
+  </gpu>
+</nvidia_smi_log>

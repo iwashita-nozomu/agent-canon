@@ -17,12 +17,9 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
 downstream design dependency-tools-and-licenses.md documents dependency tool purposes and license evidence
 downstream design ../../tools/user/README.md defines stable user-facing tool entrypoint migration target
 downstream design ../../tools/internal/README.md defines skill, workflow, and compatibility helper migration targets
-downstream implementation ../../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
 downstream implementation ../../rust/agent-canon/src/test_design.rs runs test design resilience diagnostics
-downstream implementation ../../tools/agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
-downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility eval engine
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
 downstream implementation ../../tools/agent_tools/search.py coordinates purpose-based search providers
 downstream implementation ../../tools/agent_tools/search_index.py builds repo-local semantic search cards
@@ -105,9 +102,9 @@ to choose a route:
 - Repo structure, issue, and PR support: `repo_structure_contract.py`,
   `issue_sync.py`, `github_publish.py`, `classify_path_risk.py`, and
   `render_dependency_manifest_graph.py`.
-- Search and prose structure: `agent-canon local-llm ...`,
-  `agent-canon semantic-index ...`, `prose_reasoning_graph.py`, and
-  `tools/agent_tools/route.py --area search`.
+- Search and prose structure: `tools/agent_tools/search.py`,
+  `tools/agent_tools/search_index.py`, `agent-canon semantic-index ...`,
+  `prose_reasoning_graph.py`, and `tools/agent_tools/route.py --area search`.
 - Proof, algorithm, and test design: `formal_proof.py`, `lean_proof_env.py`,
   `tool_proof_coverage.py`, `jit_canonical_ir.py`,
   `cpp_template_to_lean.py`,
@@ -177,13 +174,10 @@ second command manual.
     最新化した template / derived repo は、DevContainer を作り直したあと
     `agent-canon rust-migration-plan --root vendor/agent-canon --limit 12` で
     次に Rust 化する tool 候補を確認します。
-  - `local-llm classify-responsibility` は単一 file 責務分析の Rust CLI
-    入口です。`route-implementation-surface` は実装前に primary owner と
-    required pre-edit checks を返します。`search`、`build-index`、`eval`
-    もこの CLI surface から呼び、Python 実装は互換 engine として残します。
-    `extract-prose-ir` は document / term part prompt を作り、`llama-cli` が
-    利用可能な場合は `--llm-jobs` で bounded parallel に実行してから
-    deterministic prose IR を出します。
+  - `semantic-index` は SQLite-backed semantic evidence の Rust CLI
+    入口です。purpose-based search は `tools/agent_tools/search.py`、
+    deterministic card index は `tools/agent_tools/search_index.py`、prose
+    seed は `prose_reasoning_graph.py ingest|ingest-set` がそれぞれ所有します。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`
@@ -255,13 +249,6 @@ second command manual.
   - uncommitted Rust source が installed binary より新しい場合も再ビルドし、作業中の CLI smoke が stale binary を使わないようにします。
   - `make agent-canon-ensure-latest`、`make agent-canon-latest`、`make agent-canon-update` は同じ high-level latest route に入り、その safe path から自動的に呼ばれます。
   - `AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_cargo` が出た場合は、DevContainer 内で再実行するか Rust toolchain を用意してから `make agent-canon-rebuild-tools` を実行します。
-- `tools/install_llama_cpp.sh`
-  - llama.cpp を `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下に build し、`llama-cli` と `llama-server` を公開します。
-  - PostCreate では `--allow-fetch` で取得と build を行い、AgentCanon update 後の rebuild では既存 checkout を再コンパイルします。
-  - Local LLM の llama.cpp build は CPU-only です。`AGENT_CANON_LLAMA_CPP_CUDA=auto|1|cuda` は互換入力として受け付けますが、GPU build には切り替えません。
-  - `AGENT_CANON_LLAMA_CPP_CMAKE_ARGS` は追加 CMake flags、`AGENT_CANON_LLAMA_CPP_BUILD_JOBS` は build 並列数です。GPU accelerator を有効化する CMake flags は CPU-only policy violation として失敗させます。
-  - CPU-only CMake flag の組み合わせは build cache key として記録されます。source が新しくなくても設定が変わった場合は `already_current` にせず再ビルドします。
-  - 既定 model selector は `ggml-org/SmolLM3-3B-GGUF:Q4_K_M` です。model weights は lazy fetch で、repo にコミットしません。
 - `tools/agent_tools/route.py`
   - 長い候補 tool / skill 名を短い route area へ解決します。
   - 例: `profile_surface_resolver.py` は `route.py --area surface`、`$runtime-capability-routing` は `route.py --area runtime` として扱います。
@@ -286,8 +273,8 @@ second command manual.
   - 例:
 
 ```bash
-agent-canon local-llm search --purpose "dependency header graph tool"
-agent-canon local-llm search --purpose "github cli validation" --providers llm,tool,vector
+python3 tools/agent_tools/search.py --purpose "dependency header graph tool" --format json
+python3 tools/agent_tools/search.py --purpose "github cli validation" --providers semantic,tool,vector --format json
 python3 tools/agent_tools/route.py --area search
 python3 tools/agent_tools/vector_search.py --query "dependency header graph"
 python3 tools/agent_tools/vector_search.py --surface tools --query "github cli validation"
@@ -377,8 +364,8 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - hook event は PostToolUse で source repo の `.agent-canon/runtime-event-spool/` へ atomic no-replace publish し、archive Git や `ensure` を呼びません。明示 `runtime_log_archive_git.py sync` が nonblocking lock、1 回の ensure、snapshot/ingest/dedup/projection、commit/push/readback、verified finalize を所有します。hot path は `check-hook-hot-path` で archive context 構築前に検査します。eval report、Codex runtime summary、`reports/agents/` の agent run report と checkpoint 済み hook JSONL は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にします。
   - `generate_agent_improvement_guide.py` は `memory/`、mounted `.agent-canon/log-archive/eval-results/skill-workflow-prompt/`、mounted hook archive、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、skill usage、hook event、tool name、checker target、protocol feedback token の不足をまとめ、実修正は local Codex に渡します。
   - `generate_agent_runtime_dashboard.py` は同じ evidence tree を人間が見るための dashboard にします。正本ログの場所、hook namespace、entry 数、skill usage、prompt route 候補、human feedback、eval report family、issue 数を Markdown に出し、GitHub Actions では AgentCanon repo の Step Summary と artifact にだけ出します。agent がログ分析するときは `--compact-out` で token-light summary、generated drilldown、prompt/token rolling trend を生成し、通常分析では raw JSONL を開かずそれを読みます。token 利用は lifetime total だけではなく recent moving average と coverage status で判断します。足りない詳細は raw log 検索ではなく dashboard tool の追加 summary として生成し、raw JSONL は tool 実装、schema debugging、corruption audit の explicit rationale がある場合だけ使います。
-  - `run_accumulated_agent_evals.py` は同じ evidence tree の required eval family を機械的に追記する入口です。role、skill/workflow prompt、local LLM、workflow-selection、report-quality の各 eval を `--accumulate` で実行し、標準出力は log file に捕捉します。
-  - `eval_accumulation_check.py` は同じ evidence tree の構造 gate です。hook JSONL、skill eval report、local LLM eval report、unique id、ignore rule を検査し、改善指南書が読めない evidence を早期に止めます。agent-facing run では `--compact-out <path>.json` を使い、finding 全件は JSON summary 側へ逃がします。
+  - `run_accumulated_agent_evals.py` は同じ evidence tree の required eval family を機械的に追記する入口です。role、skill/workflow prompt、workflow-selection、report-quality の各 eval を `--accumulate` で実行し、標準出力は log file に捕捉します。
+  - `eval_accumulation_check.py` は同じ evidence tree の構造 gate です。hook JSONL、skill eval report、unique id、ignore rule を検査し、改善指南書が読めない evidence を早期に止めます。agent-facing run では `--compact-out <path>.json` を使い、finding 全件は JSON summary 側へ逃がします。
   - `evaluate_workflow_selection.py` は `evidence/agent-evals/workflow_selection_eval.toml` の固定 prompt case で workflow routing を検査します。`--accumulate` を付けた run は `.agent-canon/log-archive/eval-results/workflow-selection/` に詳細結果を蓄積します。
   - `evaluate_codex_agent_roles.py` は subagent role TOML ごとに `explorer` read-only、reviewer findings-first、`spark_worker` bounded implementation、禁止事項、model cost bucket、task routing、token / latency / retry / parent intervention / format violation / output-used metrics の受け口を検査します。agent-facing run では `--compact-out <path>.json` を使い、model matrix と finding detail は artifact で読む運用にします。
   - 蓄積 file は `<eval_run_id>-<status>-<skill-slug>.md` 形式です。`eval_run_id` は `skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>` で採番され、既存 report を上書きしません。

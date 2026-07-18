@@ -4,6 +4,8 @@
 # contract test
 # responsibility Tests JIT-canonical IR extraction and backend trace capture.
 # upstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived IR.
+# upstream implementation ../../tools/experiments/execution_resource_plan.py owns GPU discovery/reservation.
+# upstream implementation ../../tools/experiments/run_managed_experiment.py owns the only managed GPU launch route.
 # upstream design ../../documents/tools/jit_canonical_ir.md defines the extraction contract.
 # upstream design ../../documents/tools/jit_ir_to_lean.md defines the Lean evidence boundary.
 # @dependency-end
@@ -323,33 +325,11 @@ def test_jit_runtime_backend_config_requires_env(monkeypatch: pytest.MonkeyPatch
         tool.resolve_runtime_backend_config(include_backend_trace=False)
 
 
-def test_jit_gpu_platform_selects_open_slot(monkeypatch: pytest.MonkeyPatch) -> None:
-    """GPU platform routing selects an idle visible device slot."""
+def test_jit_gpu_platform_requires_managed_runner() -> None:
+    """Direct JIT GPU selection fails closed at the alternate route boundary."""
     tool = _load_jit_tool_module()
-    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
-    monkeypatch.delenv("NVIDIA_VISIBLE_DEVICES", raising=False)
-    monkeypatch.delenv("AGENT_CANON_JIT_CUDA_VISIBLE_DEVICES", raising=False)
-
-    def fake_run(
-        command: list[str],
-        *,
-        text: bool,
-        capture_output: bool,
-        check: bool,
-        timeout: int,
-    ) -> subprocess.CompletedProcess[str]:
-        assert command[0] == "nvidia-smi"
-        assert text is True
-        assert capture_output is True
-        assert check is False
-        assert timeout == 5
-        return subprocess.CompletedProcess(
-            command,
-            0,
-            stdout="0, 2048, 80\n1, 0, 0\n",
-            stderr="",
-        )
-
-    monkeypatch.setattr(tool.subprocess, "run", fake_run)
-
-    assert tool.resolve_cuda_visible_devices(None) == "1"
+    with pytest.raises(
+        SystemExit,
+        match="gpu_route_blocked=canonical_managed_experiment_runner_required",
+    ):
+        tool.resolve_cuda_visible_devices(None)

@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Provides container runtime CI automation.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/gpu-admission-r5-source-packet.md exact runtime receipt names
 # @dependency-end
 
 """Shared helpers for repo-defined container runtime scripts."""
@@ -41,6 +42,16 @@ HOST_CODEX_HOME = Path.home() / ".codex"
 HOST_GH_CONFIG = Path.home() / ".config" / "gh"
 HOST_SSH_DIR = Path.home() / ".ssh"
 BUILDER_INFO_TIMEOUT_SECONDS = 15
+HOST_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+CONTAINER_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+RUNTIME_GROUP_NAME = "agent-canon-runtime"
+PROCESS_UMASK = 0o0007
+DIRECTORY_MODE = 0o2770
+FILE_MODE = 0o0660
+LOCAL_FLOCK_FILESYSTEMS = ("btrfs", "ext4", "xfs")
+PROVISION_RECEIPT_NAME = "shared-runtime-provision.json"
+READBACK_RECEIPT_NAME = "shared-runtime-readback.json"
+RUNTIME_ROUTE = "MANAGED_CONTAINER"
 
 
 @dataclass(frozen=True)

@@ -4,6 +4,7 @@
 contract reference
 responsibility Documents Experiment Registry for this repository.
 upstream design README.md durable document index
+upstream design ./gpu-admission-r5-source-packet.md exact registry closure and frozen topic adapter contract
 downstream implementation ../tools/ci/check_experiment_registry.py validates registry schema
 downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predicts managed execution surface guardrails
 @dependency-end
@@ -36,6 +37,10 @@ durable な正本は常に topic 名です。
 
 - `experiments/registry.toml`
 
+この exact path は managed run の必須 source closure です。存在しない場合は
+`gpu_source_path_registry_missing` で launch 前に失敗します。optional registry、
+別名 file、direct command、または compatibility fallback はありません。
+
 この file では、少なくとも次を topic ごとに持ちます。
 
 - `name`
@@ -61,6 +66,13 @@ checked-in 設定正本は topic の `config.yaml` に置きます。managed run
 `result/<run_name>/config.json` と `result/<run_name>/config_source.yaml` を書き出し、inner command はその
 snapshot から今回 run の設定を復元します。必要な topic では `{config_source_path}`、
 `{stdout_log_path}`、`{stderr_log_path}`、`{startup_log_path}` も registered command で参照できます。
+
+command は Python interpreter の直後に exact canonical
+`experiments/<topic>/run.py` を置きます。managed adapter は placeholder 解決後の
+残り argv と entrypoint を fd-bound source snapshot に置き換え、snapshot の
+`main()` を 1 つの generic ff97 case として実行します。registry command が topic
+作成 tool、managed runner 自身、別 scheduler、または live source callable を再帰
+呼び出ししてはいけません。
 
 ## branch-only topics
 
@@ -118,6 +130,9 @@ python3 tools/experiments/sync_experiment_registry_context.py --topic <topic>
 - project `Makefile` は registry の smoke / formal command へ到達する target を持ちます。標準名は `make experiment-smoke TOPIC=<topic>` と `make experiment-formal TOPIC=<topic>` です。
 - formal run は `tools/experiments/run_managed_experiment.py` を使います。
 - 可能なら Make target の内側で `--use-registered-command formal` を使い、registry の formal command をそのまま実行します。
+- GPU run では full physical/MIG UUID admission environment が generic runner
+  construction 前に確定します。CPU/index/prefix/direct/compatibility fallback は
+  formal evidence になりません。
 - `run_manifest.json` には registry snapshot を残し、あとで「どの topic のどの正本 command を使ったか」を辿れるようにします。
 - checked-in 設定正本は topic の `config.yaml` に置きます。managed runner は `config.json` に今回 run の設定 dictionary と path map を残し、`config_source.yaml` に checked-in `config.yaml` のコピーを残します。`run_manifest.json` からも `config_path` と `config_source_path` を辿れるようにします。
 - run 開始時点の再現情報は managed runner が `command.json`、`environment.json`、`source_snapshot.json` に保存します。`command.json` は placeholder 解決後の command と cwd、`environment.json` は全 environment key を記録し secret-like key の値を redaction します。`source_snapshot.json` は topic source、registry、command source、runner source、dirty source file の bytes / sha256 と git status を持ちます。

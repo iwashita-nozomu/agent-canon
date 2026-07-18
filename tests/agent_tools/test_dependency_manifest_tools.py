@@ -672,10 +672,10 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "AGENT_CANON_TOOLS_HOME",
                         "${tools_home}/agent-canon/bin/agent-canon",
                         "/usr/local/bin/agent-canon",
-                        "install_llama_cpp",
-                        "tools/install_llama_cpp.sh",
-                        "ggml-org/SmolLM3-3B-GGUF:Q4_K_M",
-                        "${tools_home}/bin/llama-cli",
+                        "AGENT_CANON_RUNTIME_ROOT",
+                        "AGENT_CANON_SOURCE_PROJECTION_ROOT",
+                        "tool-availability.json",
+                        "tree --version",
                         "/etc/profile.d/agent-canon-rust.sh",
                         "",
                     ]
@@ -687,16 +687,12 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / ".dockerignore").write_text(
-                "vendor/agent-canon\n.git\n.state\n*.gguf\n",
+                "vendor/agent-canon\n.git\n.state\n",
                 encoding="utf-8",
             )
             (root / ".gitignore").write_text(".venv/\nvenv/\n", encoding="utf-8")
             (root / "README.md").write_text(
                 "PYTHONPATH=/workspace/python\nUse docker run for execution.\n",
-                encoding="utf-8",
-            )
-            (root / "tools" / "install_llama_cpp.sh").write_text(
-                "ggml-org/llama.cpp\ncmake --build\n",
                 encoding="utf-8",
             )
             (root / "tools" / "ci" / "python_env_policy.py").write_text(

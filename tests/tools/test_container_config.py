@@ -6,6 +6,7 @@
 # upstream implementation ../../tools/ci/container_config.py validates container config
 # upstream implementation ../../tools/ci/container_runtime.py defines runtime pack fields
 # upstream environment ../../.devcontainer/post-create.sh installs shared devcontainer tools
+# upstream design ../../documents/gpu-admission-r5-source-packet.md exact runtime identity validator oracle
 # @dependency-end
 
 from __future__ import annotations
@@ -176,15 +177,6 @@ def write_valid_docker_runtime(root: Path) -> None:
             [
                 ".git",
                 ".state",
-                "*.gguf",
-                "*.safetensors",
-                "pytorch_model*.bin",
-                "model-*.bin",
-                ".cache/huggingface",
-                ".cache/llama.cpp",
-                "vendor/local-llm-server/llama-cpp/models",
-                "vendor/local-llm-server/llama-cpp/cache",
-                "vendor/local-llm-server/llama-cpp/runtime",
                 "vendor/agent-canon",
                 "",
             ]
@@ -232,7 +224,7 @@ def write_valid_devcontainer_files(root: Path) -> None:
             [
                 "{",
                 '  "name": "${localWorkspaceFolderBasename}-devcontainer",',
-                '  "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",',
+                '  "initializeCommand": "bash .devcontainer/bootstrap-shared-runtime.sh && bash .devcontainer/generate-runtime-compose.sh",',
                 '  "dockerComposeFile": "docker-compose.generated.yml",',
                 '  "service": "workspace",',
                 '  "workspaceFolder": "/workspace",',
@@ -245,10 +237,35 @@ def write_valid_devcontainer_files(root: Path) -> None:
     )
     write_file(
         root,
+        ".devcontainer/finalize-shared-runtime.sh",
+        "\n".join(
+            [
+                "shared-runtime-readback/v1",
+                "shared-runtime-readback.json",
+                "read_shared_runtime_provision",
+                "write_runtime_receipt_atomic",
+                "os.O_NOFOLLOW",
+                "os.fstat(probe_fd)",
+                "os.stat(probe_path, follow_symlinks=False)",
+                "stat.S_ISREG",
+                "stat.S_IMODE",
+                "candidate.st_dev",
+                "candidate.st_ino",
+                "candidate.st_gid",
+                "/proc/self/mountinfo",
+                "/proc/self/ns/mnt",
+                "",
+            ]
+        ),
+    )
+    write_file(
+        root,
         ".devcontainer/post-create.sh",
         "\n".join(
             [
                 "#!/usr/bin/env bash",
+                "umask 0007",
+                "finalize-shared-runtime.sh",
                 "run_as_root",
                 "apt_install gh",
                 "bash /workspace/docker/register_safe_directories.sh /workspace",
@@ -265,10 +282,10 @@ def write_valid_devcontainer_files(root: Path) -> None:
                 "AGENT_CANON_TOOLS_HOME",
                 "${tools_home}/agent-canon/bin/agent-canon",
                 "/usr/local/bin/agent-canon",
-                "install_llama_cpp",
-                "tools/install_llama_cpp.sh",
-                "ggml-org/SmolLM3-3B-GGUF:Q4_K_M",
-                "${tools_home}/bin/llama-cli",
+                "AGENT_CANON_RUNTIME_ROOT",
+                "AGENT_CANON_SOURCE_PROJECTION_ROOT",
+                "tool-availability.json",
+                "tree --version",
                 "install_secret_scanners",
                 "gitleaks",
                 "trufflehog",
@@ -298,6 +315,14 @@ def write_valid_devcontainer_files(root: Path) -> None:
                 "AGENT_CANON_SECRET_DIR",
                 "AGENT_CANON_SECRET_MOUNT",
                 "AGENT_CANON_SECRET_DIR_MODE",
+                'user: "${LOCAL_UID}:${LOCAL_GID}"',
+                "group_add:",
+                '"${AGENT_CANON_RUNTIME_GID}"',
+                "source: /var/lib/agent-canon/runtime",
+                "target: /var/lib/agent-canon/runtime",
+                'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
+                'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
+                'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"',
                 "printf '%s\\n' \"$pack\" \"$output\" \"$DEVCONTAINER_PROJECT_NAME\"",
                 "",
             ]
@@ -315,7 +340,7 @@ def write_valid_devcontainer_only(root: Path) -> None:
             [
                 "{",
                 '  "name": "${localWorkspaceFolderBasename}-devcontainer",',
-                '  "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",',
+                '  "initializeCommand": "bash .devcontainer/bootstrap-shared-runtime.sh && bash .devcontainer/generate-runtime-compose.sh",',
                 '  "dockerComposeFile": "docker-compose.generated.yml",',
                 '  "service": "workspace",',
                 '  "workspaceFolder": "/workspace",',
@@ -328,10 +353,35 @@ def write_valid_devcontainer_only(root: Path) -> None:
     )
     write_file(
         root,
+        ".devcontainer/finalize-shared-runtime.sh",
+        "\n".join(
+            [
+                "shared-runtime-readback/v1",
+                "shared-runtime-readback.json",
+                "read_shared_runtime_provision",
+                "write_runtime_receipt_atomic",
+                "os.O_NOFOLLOW",
+                "os.fstat(probe_fd)",
+                "os.stat(probe_path, follow_symlinks=False)",
+                "stat.S_ISREG",
+                "stat.S_IMODE",
+                "candidate.st_dev",
+                "candidate.st_ino",
+                "candidate.st_gid",
+                "/proc/self/mountinfo",
+                "/proc/self/ns/mnt",
+                "",
+            ]
+        ),
+    )
+    write_file(
+        root,
         ".devcontainer/post-create.sh",
         "\n".join(
             [
                 "#!/usr/bin/env bash",
+                "umask 0007",
+                "finalize-shared-runtime.sh",
                 "run_as_root",
                 "apt_install gh",
                 "docker/register_safe_directories.sh",
@@ -348,10 +398,10 @@ def write_valid_devcontainer_only(root: Path) -> None:
                 "AGENT_CANON_TOOLS_HOME",
                 "${tools_home}/agent-canon/bin/agent-canon",
                 "/usr/local/bin/agent-canon",
-                "install_llama_cpp",
-                "tools/install_llama_cpp.sh",
-                "ggml-org/SmolLM3-3B-GGUF:Q4_K_M",
-                "${tools_home}/bin/llama-cli",
+                "AGENT_CANON_RUNTIME_ROOT",
+                "AGENT_CANON_SOURCE_PROJECTION_ROOT",
+                "tool-availability.json",
+                "tree --version",
                 "install_secret_scanners",
                 "gitleaks",
                 "trufflehog",
@@ -381,6 +431,14 @@ def write_valid_devcontainer_only(root: Path) -> None:
                 "AGENT_CANON_SECRET_DIR",
                 "AGENT_CANON_SECRET_MOUNT",
                 "AGENT_CANON_SECRET_DIR_MODE",
+                'user: "${LOCAL_UID}:${LOCAL_GID}"',
+                "group_add:",
+                '"${AGENT_CANON_RUNTIME_GID}"',
+                "source: /var/lib/agent-canon/runtime",
+                "target: /var/lib/agent-canon/runtime",
+                'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
+                'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
+                'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"',
                 "printf '%s\\n' \"$pack\" \"$output\" \"$DEVCONTAINER_PROJECT_NAME\" \"$compose_mode\" \"$image\"",
                 "",
             ]
@@ -811,8 +869,8 @@ def test_missing_agent_canon_dockerignore_fails(tmp_path: Path) -> None:
     assert "dependency_contract_violation:.dockerignore:missing-ignore:vendor/agent-canon" in result.stdout
 
 
-def test_missing_local_model_cache_dockerignore_fails(tmp_path: Path) -> None:
-    """Docker build context should not include local LLM model artifacts."""
+def test_missing_agent_state_dockerignore_fails(tmp_path: Path) -> None:
+    """Docker build context should not include generated agent state."""
     write_valid_runtime(tmp_path)
     (tmp_path / ".dockerignore").write_text(".git\nvendor/agent-canon\n", encoding="utf-8")
 
@@ -820,4 +878,3 @@ def test_missing_local_model_cache_dockerignore_fails(tmp_path: Path) -> None:
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert "dependency_contract_violation:.dockerignore:missing-ignore:.state" in result.stdout
-    assert "dependency_contract_violation:.dockerignore:missing-ignore:*.gguf" in result.stdout

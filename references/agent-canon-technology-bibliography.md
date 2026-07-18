@@ -11,7 +11,6 @@ downstream design ../documents/tools/README.md documents operator-facing tool en
 downstream design ../documents/tools/lean_capability_matrix.md records Lean feature routing adopted from bibliography sources.
 downstream design ../tools/README.md documents root tool inventory.
 downstream implementation ../rust/agent-canon/src/semantic_index.rs implements the semantic vector cache.
-downstream implementation ../rust/agent-canon/src/local_llm.rs routes local LLM and llama.cpp tools.
 downstream implementation ../tools/agent_tools/reference_materializer.py materializes consulted external sources.
 @dependency-end
 -->
@@ -27,7 +26,7 @@ review-method bibliography, while this file maps implementation/runtime
 surfaces to primary technical sources.
 
 Artifact retention decision for this pass: no external PDFs, HTML snapshots,
-SQLite databases, model files, vector caches, or local LLM outputs were
+SQLite databases, provider payloads, or vector caches were
 retained in the tracked tree. The durable retained artifact is this source
 record.
 
@@ -48,8 +47,8 @@ implementation authority.
   Thoughts.
 - Semantic indexing and discourse structure: Transformer/BERT/SBERT,
   vector-space search, provider-compatible embeddings via `$openai-docs` API
-  reference route, discourse relations/connectives, SQLite, llama.cpp, GGUF,
-  SHA-256, Rust crates used by the Rust CLI.
+  reference route, discourse relations/connectives, SQLite, SHA-256, and Rust
+  crates used by the Rust CLI.
 - Formal proof support: Lean 4, mathlib theorem search, LeanSearch,
   Isabelle/Sledgehammer, CoqHammer, and informal-to-formal proof sketching.
 - Compiler and proof graph tooling: LLVM Kaleidoscope, MLIR, CompCert,
@@ -82,7 +81,7 @@ implementation authority.
 | Toolformer: Language Models Can Teach Themselves to Use Tools | <https://arxiv.org/abs/2302.04761> | Tool-selection evals and routing repair | Models can learn when to call tools, what arguments to pass, and how to incorporate results. | Paper is about training-time self-supervision, not a guarantee for runtime agents. | Use as conceptual support for measured tool-selection evals. |
 | Tree of Thoughts: Deliberate Problem Solving with Large Language Models | <https://arxiv.org/abs/2305.10601> | Plan alternatives, branch review, and escalation | Exploring multiple candidate "thought" units can improve tasks needing planning/search. | Expensive and not required for small deterministic edits. | Use as background for high-risk branching and review waves. |
 
-## Semantic Indexing, Embeddings, And Local LLMs
+## Semantic Indexing And Embeddings
 
 | Source | URL or DOI | AgentCanon surface | Claim used | Limitations | Decision |
 | --- | --- | --- | --- | --- | --- |
@@ -92,9 +91,7 @@ implementation authority.
 | A Vector Space Model for Automatic Indexing | <https://doi.org/10.1145/361219.361220> | Deterministic vector baseline and TF-IDF-style search | Vector representations and similarity ranking are a classic information retrieval basis. | Classic lexical vector space is not equivalent to neural embeddings. | Use as background for deterministic lexical-vector providers. |
 | SQLite database file format | <https://www.sqlite.org/fileformat.html> | Semantic-index SQLite cache layout and generated DB policy | SQLite stores database state in a main database file and may use rollback or WAL files during transactions. | Low-level format details are not an API contract for application logic. | Use for generated cache and artifact-retention policy. |
 | SQLite write-ahead logging | <https://www.sqlite.org/wal.html> | Semantic-index publish/locking behavior | WAL mode records committed changes in a separate log and supports readers with a stable end mark. | AgentCanon currently publishes completed temporary DBs rather than relying on repo-local WAL artifacts. | Use to explain SQLite sidecar files and why DB caches are ignored. |
-| llama.cpp HTTP server README | <https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md> | `llama-server-embedding` and OpenAI-compatible local endpoint | llama.cpp server exposes OpenAI-compatible chat, responses, and embeddings routes, with CPU/GPU options. | README tracks `master`; pin versions in installer/tests when reproducibility matters. | Adopt as operational source for local embedding server support. |
-| GGUF format documentation | <https://github.com/ggml-org/ggml/blob/master/docs/gguf.md> | Local model artifact handling and ignored model files | GGUF stores models for inference with ggml-based executors and is designed for extensibility. | Format evolves with ggml; model licensing is separate. | Adopt for local model file terminology and ignore policy. |
-| `$openai-docs` API reference route | host-provided Codex skill | Provider-compatible vector request/response shape | Embedding request/response shape is checked through `$openai-docs` Docs MCP / API reference when the OpenAI-compatible provider contract changes. | Local llama.cpp endpoints may not match every OpenAI schema feature. | Adopt as compatibility route, not as requirement to use remote OpenAI. |
+| `$openai-docs` API reference route | host-provided Codex skill | Provider-compatible vector request/response shape | Embedding request/response shape is checked through `$openai-docs` Docs MCP / API reference when the OpenAI-compatible provider contract changes. | Provider implementations may support only a subset of the API schema. | Adopt as an explicit provider-contract route, not as a requirement to use remote OpenAI. |
 | FIPS 180-4 Secure Hash Standard | <https://csrc.nist.gov/pubs/fips/180-4/upd1/final> | SHA-256 content hashing in Rust CLI tools | FIPS 180-4 specifies SHA-1 and SHA-2 hash algorithms including SHA-256. | NIST notes FIPS 180-4 is planned for revision; keep hash usage conventional, not cryptographic-policy-heavy. | Adopt for SHA-256 naming and standards reference. |
 | rusqlite crate docs | <https://docs.rs/rusqlite/latest/rusqlite/> | Rust SQLite access | `rusqlite` is an ergonomic Rust wrapper around SQLite. | Crate version in AgentCanon is pinned separately in `Cargo.toml` and `Cargo.lock`. | Adopt for Rust SQLite API reference. |
 | serde_json crate docs | <https://docs.rs/serde_json/latest/serde_json/> | JSON and JSONL output from Rust tools | `serde_json` serializes/deserializes JSON and provides untyped `Value` support. | Docs describe latest crate; validate against locked version for API changes. | Adopt for JSON output implementation reference. |

@@ -5,8 +5,8 @@
 # upstream design ../../documents/coding-conventions-project.md environment configuration policy
 # upstream design ../../documents/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
 # upstream design ../../documents/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
+# upstream design ../../documents/gpu-admission-r5-source-packet.md exact runtime identity validation contract
 # upstream design ../../documents/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
-# upstream design ../../documents/local-llm-responsibility-analysis.md local LLM devcontainer boundary
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
 # upstream design ../../documents/tools/lean_proof_env.md Lean proof environment toolchain boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
@@ -75,6 +75,8 @@ FORBIDDEN_DOCKERFILE_PATTERNS = (
     ),
 )
 REQUIRED_POST_CREATE_SNIPPETS = (
+    "umask 0007",
+    "finalize-shared-runtime.sh",
     "run_as_root",
     "docker/register_safe_directories.sh",
     "docker/install_python_dependencies.sh",
@@ -92,10 +94,10 @@ REQUIRED_POST_CREATE_SNIPPETS = (
     "AGENT_CANON_TOOLS_HOME",
     "${tools_home}/agent-canon/bin/agent-canon",
     "/usr/local/bin/agent-canon",
-    "install_llama_cpp",
-    "tools/install_llama_cpp.sh",
-    "ggml-org/SmolLM3-3B-GGUF:Q4_K_M",
-    "${tools_home}/bin/llama-cli",
+    "AGENT_CANON_RUNTIME_ROOT",
+    "AGENT_CANON_SOURCE_PROJECTION_ROOT",
+    "tool-availability.json",
+    "tree --version",
     "install_secret_scanners",
     "gitleaks",
     "trufflehog",
@@ -422,7 +424,7 @@ def validate_dockerignore(root: Path) -> list[Finding]:
         return [Finding("missing_file", relative, "missing")]
     text = path.read_text(encoding="utf-8")
     findings: list[Finding] = []
-    for ignored_path in (".git", ".state", "*.gguf", "*.safetensors", "pytorch_model*.bin", "model-*.bin", ".cache/huggingface", ".cache/llama.cpp", "vendor/local-llm-server/llama-cpp/models", "vendor/local-llm-server/llama-cpp/cache", "vendor/local-llm-server/llama-cpp/runtime", "vendor/agent-canon"):
+    for ignored_path in (".git", ".state", "vendor/agent-canon"):
         if not re.search(rf"(^|\n){re.escape(ignored_path)}(\n|$)", text):
             findings.append(
                 Finding("dependency_contract_violation", relative, f"missing-ignore:{ignored_path}")
@@ -441,6 +443,46 @@ def validate_post_create(root: Path) -> list[Finding]:
     for snippet in REQUIRED_POST_CREATE_SNIPPETS:
         if snippet not in text:
             findings.append(Finding("dependency_contract_violation", relative, f"missing:{snippet}"))
+    return findings
+
+
+def validate_finalize_shared_runtime_script(devcontainer_dir: Path) -> list[Finding]:
+    """Validate the readback-only shared-runtime finalizer contract."""
+    path = devcontainer_dir / "finalize-shared-runtime.sh"
+    relative = ".devcontainer/finalize-shared-runtime.sh"
+    if not path.is_file():
+        return [Finding("missing_file", relative, "missing")]
+    script = path.read_text(encoding="utf-8")
+    findings = [
+        Finding("dependency_contract_violation", relative, f"missing:{snippet}")
+        for snippet in (
+            "shared-runtime-readback/v1",
+            "shared-runtime-readback.json",
+            "read_shared_runtime_provision",
+            "write_runtime_receipt_atomic",
+            "os.O_NOFOLLOW",
+            "os.fstat(probe_fd)",
+            "os.stat(probe_path, follow_symlinks=False)",
+            "stat.S_ISREG",
+            "stat.S_IMODE",
+            "candidate.st_dev",
+            "candidate.st_ino",
+            "candidate.st_gid",
+            "/proc/self/mountinfo",
+            "/proc/self/ns/mnt",
+        )
+        if snippet not in script
+    ]
+    for snippet in (
+        "run_as_root",
+        "chown",
+        "O_TRUNC",
+        "O_CREAT",
+        "shared-runtime-readback.v4.json",
+        "/receipts/shared-runtime-readback",
+    ):
+        if snippet in script:
+            findings.append(Finding("inconsistency", relative, f"forbidden:{snippet}"))
     return findings
 
 
@@ -482,7 +524,7 @@ def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
     findings: list[Finding] = []
     expected_json = {
         "name": "${localWorkspaceFolderBasename}-devcontainer",
-        "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",
+        "initializeCommand": "bash .devcontainer/bootstrap-shared-runtime.sh && bash .devcontainer/generate-runtime-compose.sh",
         "dockerComposeFile": "docker-compose.generated.yml",
         "service": "workspace",
         "postCreateCommand": "bash .devcontainer/post-create.sh /workspace",
@@ -526,10 +568,25 @@ def validate_generate_runtime_compose_script(devcontainer_dir: Path) -> list[Fin
         "AGENT_CANON_SECRET_DIR",
         "AGENT_CANON_SECRET_MOUNT",
         "AGENT_CANON_SECRET_DIR_MODE",
+        'user: "${LOCAL_UID}:${LOCAL_GID}"',
+        'group_add:',
+        '"${AGENT_CANON_RUNTIME_GID}"',
+        "source: /var/lib/agent-canon/runtime",
+        "target: /var/lib/agent-canon/runtime",
+        'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
+        'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
+        'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"',
         "vendor/agent-canon",
     ):
         findings.extend(validate_generate_runtime_compose_snippet(script, snippet))
-    for snippet in ("DEVCONTAINER_SUBNET", "DEVCONTAINER_GATEWAY", "ipam:", "subnet:", "gateway:"):
+    for snippet in (
+        "DEVCONTAINER_SUBNET",
+        "DEVCONTAINER_GATEWAY",
+        "ipam:",
+        "subnet:",
+        "gateway:",
+        "/receipts/shared-runtime-provision",
+    ):
         if snippet in script:
             findings.append(
                 Finding("inconsistency", ".devcontainer/generate-runtime-compose.sh", f"forbidden:{snippet}")
@@ -559,17 +616,31 @@ def validate_generated_compose(devcontainer_dir: Path, pack: PackConfig) -> list
         "name:",
         "services:",
         "workspace:",
+        'user: "${LOCAL_UID}:${LOCAL_GID}"',
+        "group_add:",
+        '- "${AGENT_CANON_RUNTIME_GID}"',
         "context: ..",
         f"dockerfile: {pack.dockerfile}",
         f"working_dir: {pack.workdir}",
         f"- ..:{pack.workspace_mount}:cached",
+        "type: bind",
+        "source: /var/lib/agent-canon/runtime",
+        "target: /var/lib/agent-canon/runtime",
+        'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
+        'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
+        'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"',
     )
     findings = [
         Finding("inconsistency", ".devcontainer/docker-compose.generated.yml", f"missing:{snippet}")
         for snippet in expected_snippets
         if snippet not in compose
     ]
-    for snippet in ("ipam:", "subnet:", "gateway:"):
+    for snippet in (
+        "ipam:",
+        "subnet:",
+        "gateway:",
+        "/receipts/shared-runtime-provision",
+    ):
         if snippet in compose:
             findings.append(
                 Finding("inconsistency", ".devcontainer/docker-compose.generated.yml", f"forbidden:{snippet}")
@@ -592,6 +663,7 @@ def validate_devcontainer(root: Path) -> list[Finding]:
         return findings
 
     findings.extend(validate_devcontainer_json(config))
+    findings.extend(validate_finalize_shared_runtime_script(devcontainer_dir))
     post_attach = devcontainer_dir / "post-attach.sh"
     if not post_attach.is_file():
         findings.append(Finding("missing_file", ".devcontainer/post-attach.sh", "missing"))

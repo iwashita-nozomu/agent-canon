@@ -4,6 +4,7 @@
 contract reference
 responsibility Documents `experiment_runner` 設計方針 for this repository.
 upstream design README.md durable document index
+upstream design ./gpu-admission-r5-source-packet.md fixes the ff97 managed lifecycle binding
 @dependency-end
 -->
 
@@ -166,8 +167,11 @@ topic README には、少なくとも次を書きます。
         resource_capacity=resource_capacity,
     )
 
-    runner = StandardRunner(scheduler)
-    runner.run(worker)
+    runner = StandardRunner(scheduler=scheduler)
+    assert runner.run(worker) is None
+    completion_results = tuple(
+        completion.result for completion in scheduler.completions
+    )
 
 この組み立てで実験側が差し替える場所は次だけです。
 
@@ -180,6 +184,11 @@ topic README には、少なくとも次を書きます。
 
 CLI 側では、この組み立てを 1 回だけ行います。case loop、process spawn、
 GPU assignment、timeout、signal cleanup を CLI で重ねて実装しません。
+`StandardRunner` も 1 run につきこの 1 instance だけです。
+`runner.run(worker)` の戻り値は常に `None` であり、terminal result は
+`scheduler.completions` の `StandardCompletion.result` からだけ読みます。
+runner の戻り値を `ExecutionResult` として扱う wrapper や、second runner
+を追加してはいけません。
 CLI が行うのは次だけです。
 
 - YAML config を読む

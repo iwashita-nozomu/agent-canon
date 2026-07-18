@@ -43,6 +43,7 @@ SKIP_PREFIXES = (
     ".ruff_cache/",
     "reports/",
 )
+RAW_NVIDIA_FIXTURE_PREFIX = "tests/fixtures/nvidia/"
 HEADER_SCAN_LINES = 80
 BINARY_SNIFF_BYTES = 4096
 CONTRACT_REGISTRY = Path("documents/dependency-contract-kinds.toml")
@@ -138,6 +139,11 @@ def should_check(root: Path, path: Path) -> bool:
         return False
     relative = repo_relative(root, path)
     if any(relative.startswith(prefix) for prefix in SKIP_PREFIXES):
+        return False
+    if relative.startswith(RAW_NVIDIA_FIXTURE_PREFIX) and path.suffix.lower() == ".txt":
+        # These files are exact fd-bound NVIDIA byte evidence; their dependency
+        # owner is tests/fixtures/nvidia/README.md and manifest.json. Injecting
+        # a header would change the parser oracle bytes and manifest SHA.
         return False
     return path.suffix.lower() in CHECKABLE_SUFFIXES
 

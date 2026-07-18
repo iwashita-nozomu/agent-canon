@@ -2504,6 +2504,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("IMPLEMENTATION_SURFACE_ROUTE_STATUS=pending", result.stdout)
             self.assertIn(
+                "IMPLEMENTATION_SURFACE_ROUTE_COMMAND=python3 tools/agent_tools/search.py "
+                "--query-file <request-or-design-question.txt> "
+                "--providers text,semantic,vector,tool,header-deps,code-deps "
+                "--format json",
+                result.stdout,
+            )
+            self.assertIn(
                 "TOOL_REUSE_LEDGER_STATUS=required_before_custom_implementation",
                 result.stdout,
             )
@@ -2819,6 +2826,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertNotIn(
                 "commands", repo_tool_routing_policy["sequential_tool_routes"][0]
+            )
+            self.assertEqual(
+                implementation_gate_defaults["implementation_surface_route_command"],
+                "python3 tools/agent_tools/search.py "
+                "--query-file <request-or-design-question.txt> "
+                "--providers text,semantic,vector,tool,header-deps,code-deps "
+                "--format json",
             )
             self.assertEqual(
                 implementation_gate_defaults["tool_reuse_ledger_status"],

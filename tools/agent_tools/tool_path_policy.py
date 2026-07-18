@@ -10,7 +10,7 @@
 # downstream implementation ../../tests/agent_tools/test_tool_catalog.py validates catalog findings
 # downstream implementation ../../tests/agent_tools/test_tool_drift.py validates orphan detection
 # downstream implementation ../../tests/agent_tools/test_vector_search.py validates search exclusion
-# downstream implementation ../../tests/agent_tools/test_search_index.py validates search-card pruning
+# downstream implementation ../../tests/agent_tools/test_search.py validates search-card pruning
 # @dependency-end
 """Shared path policy for retired AgentCanon tool surfaces."""
 
