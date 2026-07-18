@@ -64,9 +64,12 @@ There is no legacy subtree, snapshot, wrapper, or alternate owner route.
    candidate/tree. `PullRequestLifecycle` carries PR Essence, reviews, and
    contributor diff through draft/ready/review/closed/conflict states. Only
    verified-true permission permits publication.
-1. Merge the source PR by expected-old CAS and perform a distinct source-main
-   publication readback. Push, PR, and checks reuse the same G3 tree identity;
-   they do not independently prove it again.
+1. Merge the source PR by expected-old CAS. Authoritative PR readback keeps the
+   post-merge base ref separate from the merge-parent commit/tree and requires
+   that merge-parent identity to equal the rebind/CAS base. A distinct
+   source-main publication readback follows. Push, PR, and checks consume one
+   sealed G3 authority; post-publication checks additionally consume sealed,
+   same-binding G5 evidence.
 1. Enqueue exactly one accepted `QueueReceipt` keyed by
    `(source_namespace,candidate_sha,tree_sha,input_digest,
    publication_merge_sha,publication_merge_tree)`. Create a pending

@@ -436,6 +436,85 @@ class GithubPublishTest(unittest.TestCase):
         self.assertEqual(summary["status"], "pending")
         self.assertEqual(summary["next_action"], "wait_for_github_checks_or_rerun_with_--watch")
 
+    def test_mutation_adapter_rejects_unsealed_publication_authority(self) -> None:
+        """Direct mutation calls cannot fabricate lifecycle or G3 authority."""
+        args = argparse.Namespace(allow_main=False, user_task="reject forged push")
+        verification = github_publish.RemoteVerification(
+            repo="owner/repo",
+            remote="origin",
+            remote_url="git@github.com:owner/repo.git",
+            remote_slug="owner/repo",
+        )
+        forged = github_publish.GithubPublicationAuthority()
+        runner = FakeRunner()
+
+        with self.assertRaises(github_publish.UserVisibleFailure) as raised:
+            github_publish.perform_push(
+                args,
+                runner,
+                verification,
+                "topic",
+                authority=forged,
+            )
+
+        self.assertIn("owner-materialized", raised.exception.message)
+        self.assertEqual(runner.commands, [])
+
+    def test_post_publication_checks_consume_same_binding_g5(self) -> None:
+        """Post-publication checks retain a passing exact-identity G5 receipt."""
+        lifecycle = self.lifecycle_fixture()
+        rebind, cas, upstream = self.publication_components(lifecycle)
+        packet = github_publish.materialize_github_publication_packet(
+            lifecycle=lifecycle,
+            candidate_cas_receipt=cas,
+            source_main_rebind_receipt=rebind,
+            upstream_gate_verdicts=upstream,
+        )
+        publication = github_publish.GithubPublicationAuthority.from_packet(packet)
+        g3 = packet["g3_gate"]
+        assert isinstance(g3, dict)
+        g5 = materialize_gate_verdict(
+            binding=lifecycle["binding"],
+            gate_id="G5",
+            ordered_input_evidence_refs=[str(g3["binding"]["evidence_ref"])],
+            invariant="remote_publication_readback",
+            output_digest="sha256:" + "5" * 64,
+            owner=str(
+                PROJECT_ROOT / "tools" / "agent_tools" / "publication_integrator.py"
+            )
+            + "#integrate_publication",
+            verdict="pass",
+        )
+        authority = github_publish.GithubPostPublicationChecksAuthority.from_publication(
+            publication, g5
+        )
+        runner = FakeRunner()
+        runner.add(
+            ["gh", "pr", "checks", "7", "--repo", "owner/repo", "--watch=false"],
+            stdout="all\tpass\t0\turl\t\n",
+        )
+        args = argparse.Namespace(
+            user_task="post-publication checks",
+            pr="7",
+            watch=False,
+        )
+        verification = github_publish.RemoteVerification(
+            repo="owner/repo",
+            remote="origin",
+            remote_url="git@github.com:owner/repo.git",
+            remote_slug="owner/repo",
+        )
+
+        result = github_publish.perform_checks(
+            args,
+            runner,
+            verification,
+            "topic",
+            authority=authority,
+        )
+
+        self.assertEqual(result["g5_gate"], g5)
+
     def test_unknown_push_permission_is_a_typed_refusal(self) -> None:
         """GitHub mutation cannot infer authority from repository topology."""
         lifecycle = self.lifecycle_fixture(
@@ -671,9 +750,22 @@ class GithubPublishTest(unittest.TestCase):
                 "api",
                 f"repos/owner/repo/git/commits/{MERGE_SHA}",
                 "--jq",
+                "{commit_sha: .sha, tree_sha: .tree.sha, parents: [.parents[].sha]}",
+            ],
+            stdout=(
+                f'{{"commit_sha":"{MERGE_SHA}","tree_sha":"{MERGE_TREE}",'
+                f'"parents":["{BASE_SHA}"]}}'
+            ),
+        )
+        runner.add(
+            [
+                "gh",
+                "api",
+                f"repos/owner/repo/git/commits/{BASE_SHA}",
+                "--jq",
                 "{commit_sha: .sha, tree_sha: .tree.sha}",
             ],
-            stdout=f'{{"commit_sha":"{MERGE_SHA}","tree_sha":"{MERGE_TREE}"}}',
+            stdout=f'{{"commit_sha":"{BASE_SHA}","tree_sha":"{BASE_TREE}"}}',
         )
 
         result = github_publish.authoritative_publication_readback(
@@ -689,7 +781,9 @@ class GithubPublishTest(unittest.TestCase):
         identity = receipt["pr_identity"]
         assert isinstance(identity, dict)
         self.assertEqual(identity["head_sha"], CANDIDATE_SHA)
-        self.assertEqual(identity["base_sha"], MERGE_SHA)
+        self.assertEqual(identity["post_merge_base_ref_sha"], MERGE_SHA)
+        self.assertEqual(identity["merge_cas_base_sha"], BASE_SHA)
+        self.assertEqual(identity["merge_cas_base_tree_sha"], BASE_TREE)
         self.assertEqual(identity["merge_commit_sha"], MERGE_SHA)
         self.assertEqual(identity["merge_tree_sha"], MERGE_TREE)
 

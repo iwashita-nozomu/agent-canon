@@ -51,7 +51,9 @@ def lifecycle_binding() -> dict[str, object]:
 
 def publication_readback_receipt(
     *,
-    base_sha: str,
+    post_merge_base_ref_sha: str,
+    merge_cas_base_sha: str,
+    merge_cas_base_tree: str,
     candidate_sha: str,
     candidate_tree: str,
     merge_sha: str,
@@ -79,7 +81,9 @@ def publication_readback_receipt(
             "head_ref": "refs/heads/topic",
             "head_repo_owner": "owner",
             "head_repo_name": "repo",
-            "base_sha": base_sha,
+            "post_merge_base_ref_sha": post_merge_base_ref_sha,
+            "merge_cas_base_sha": merge_cas_base_sha,
+            "merge_cas_base_tree_sha": merge_cas_base_tree,
             "head_sha": candidate_sha,
             "merge_commit_sha": merge_sha,
             "merge_tree_sha": merge_tree,
@@ -174,7 +178,9 @@ class PublicationIntegratorTest(unittest.TestCase):
                 pr_merge_adapter=lambda _request: {
                     "status": "merged",
                     "publication_readback_receipt": publication_readback_receipt(
-                        base_sha=server_result,
+                        post_merge_base_ref_sha=server_result,
+                        merge_cas_base_sha=expected_base,
+                        merge_cas_base_tree=expected_tree,
                         candidate_sha=candidate,
                         candidate_tree=candidate_tree,
                         merge_sha=server_result,
@@ -269,7 +275,9 @@ class PublicationIntegratorTest(unittest.TestCase):
                 pr_merge_adapter=lambda _request: {
                     "status": "merged",
                     "publication_readback_receipt": publication_readback_receipt(
-                        base_sha=server_result,
+                        post_merge_base_ref_sha=server_result,
+                        merge_cas_base_sha=expected_base,
+                        merge_cas_base_tree=expected_tree,
                         candidate_sha=candidate,
                         candidate_tree=candidate_tree,
                         merge_sha=server_result,

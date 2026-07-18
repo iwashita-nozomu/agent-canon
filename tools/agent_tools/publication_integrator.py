@@ -892,6 +892,9 @@ def integrate_publication(
             readback_candidate["candidate_sha"] != candidate_commit
             or readback_candidate["tree_sha"] != candidate_tree
             or readback_pr["head_sha"] != candidate_commit
+            or readback_pr["merge_cas_base_sha"] != expected
+            or readback_pr["merge_cas_base_tree_sha"]
+            != target["expected_target_tree"]
         ):
             raise PublicationError("publication_integrator:pr_identity_mismatch")
         publication_pr_number = cast(int, readback_pr["number"])

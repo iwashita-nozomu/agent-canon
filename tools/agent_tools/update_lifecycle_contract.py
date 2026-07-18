@@ -1407,7 +1407,9 @@ def validate_publication_readback_receipt(value: object) -> dict[str, object]:
             "head_ref",
             "head_repo_owner",
             "head_repo_name",
-            "base_sha",
+            "post_merge_base_ref_sha",
+            "merge_cas_base_sha",
+            "merge_cas_base_tree_sha",
             "head_sha",
             "merge_commit_sha",
             "merge_tree_sha",
@@ -1420,7 +1422,9 @@ def validate_publication_readback_receipt(value: object) -> dict[str, object]:
     for field in ("head_ref", "head_repo_owner", "head_repo_name"):
         _string(pr[field], f"publication_readback_receipt.pr_identity.{field}")
     for field in (
-        "base_sha",
+        "post_merge_base_ref_sha",
+        "merge_cas_base_sha",
+        "merge_cas_base_tree_sha",
         "head_sha",
         "merge_commit_sha",
         "merge_tree_sha",
@@ -1459,6 +1463,8 @@ def validate_publication_readback_transition(
     if (
         cas_base["commit_sha"] != pr_base["commit_sha"]
         or cas_base["tree_sha"] != pr_base["tree_sha"]
+        or readback_pr["merge_cas_base_sha"] != cas_base["commit_sha"]
+        or readback_pr["merge_cas_base_tree_sha"] != cas_base["tree_sha"]
     ):
         _fail("lifecycle:cas_base_identity_mismatch")
     if readback_pr["head_sha"] != pr_head["commit_sha"]:
@@ -1523,10 +1529,20 @@ def materialize_publication_readback_receipt(
         _HEX40,
         "authoritative_pr_readback.mergeTreeOid",
     )
-    base_sha = _pattern(
+    post_merge_base_ref_sha = _pattern(
         readback.get("baseRefOid"),
         _HEX40,
         "authoritative_pr_readback.baseRefOid",
+    )
+    merge_cas_base_sha = _pattern(
+        readback.get("mergeCasBaseOid"),
+        _HEX40,
+        "authoritative_pr_readback.mergeCasBaseOid",
+    )
+    merge_cas_base_tree_sha = _pattern(
+        readback.get("mergeCasBaseTreeOid"),
+        _HEX40,
+        "authoritative_pr_readback.mergeCasBaseTreeOid",
     )
     head_sha = _pattern(
         readback.get("headRefOid"),
@@ -1538,6 +1554,8 @@ def materialize_publication_readback_receipt(
         or readback.get("headRefName") != str(head["ref"]).removeprefix("refs/heads/")
         or head_sha != head["commit_sha"]
         or head_repo != expected_head_repo
+        or merge_cas_base_sha != base["commit_sha"]
+        or merge_cas_base_tree_sha != base["tree_sha"]
     ):
         _fail("lifecycle:authoritative_pr_readback_mismatch")
     pr_identity = {
@@ -1547,7 +1565,9 @@ def materialize_publication_readback_receipt(
         "head_ref": head["ref"],
         "head_repo_owner": head["repo_owner"],
         "head_repo_name": head["repo_name"],
-        "base_sha": base_sha,
+        "post_merge_base_ref_sha": post_merge_base_ref_sha,
+        "merge_cas_base_sha": merge_cas_base_sha,
+        "merge_cas_base_tree_sha": merge_cas_base_tree_sha,
         "head_sha": head_sha,
         "merge_commit_sha": merge_commit_sha,
         "merge_tree_sha": merge_tree_sha,

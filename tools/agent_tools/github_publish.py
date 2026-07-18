@@ -58,12 +58,115 @@ class CommandResult:
     stderr: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class GithubPublicationAuthority:
-    """One validated immutable lifecycle/G3 authority used by mutations."""
+    """Opaque sealed publication packet consumed by GitHub mutations."""
 
-    lifecycle: Mapping[str, object]
-    g3_gate: Mapping[str, object]
+    _packet_bytes: bytes
+    _seal: str
+
+    @classmethod
+    def from_packet(
+        cls, packet: Mapping[str, object]
+    ) -> "GithubPublicationAuthority":
+        """Seal one fully validated publication packet."""
+        checked = validate_github_publication_packet(packet)
+        payload = canonical_json_bytes(checked)
+        instance = object.__new__(cls)
+        object.__setattr__(instance, "_packet_bytes", payload)
+        object.__setattr__(instance, "_seal", hashlib.sha256(payload).hexdigest())
+        return instance
+
+    def consume(self) -> dict[str, object]:
+        """Verify the opaque seal before exposing owner-validated evidence."""
+        try:
+            payload = self._packet_bytes
+            seal = self._seal
+        except AttributeError as exc:
+            raise UserVisibleFailure(
+                message="GitHub publication authority was not owner-materialized",
+                next_action="materialize_the_canonical_github_publication_packet",
+            ) from exc
+        if hashlib.sha256(payload).hexdigest() != seal:
+            raise UserVisibleFailure(
+                message="GitHub publication authority seal is invalid",
+                next_action="materialize_a_successor_publication_packet",
+            )
+        decoded = json.loads(payload)
+        if not isinstance(decoded, dict):
+            raise UserVisibleFailure(
+                message="GitHub publication authority payload is invalid",
+                next_action="materialize_the_canonical_github_publication_packet",
+            )
+        return cast(dict[str, object], decoded)
+
+
+@dataclass(frozen=True, init=False)
+class GithubPostPublicationChecksAuthority:
+    """Opaque publication packet plus passing same-binding G5 evidence."""
+
+    _payload_bytes: bytes
+    _seal: str
+
+    @classmethod
+    def from_publication(
+        cls,
+        publication_authority: GithubPublicationAuthority,
+        g5_gate: Mapping[str, object],
+    ) -> "GithubPostPublicationChecksAuthority":
+        """Seal a post-publication checks variant after validating G5."""
+        packet = publication_authority.consume()
+        lifecycle = cast(Mapping[str, object], packet["pull_request_lifecycle"])
+        checked_g5 = validate_gate_verdict(g5_gate)
+        if checked_g5["gate_id"] != "G5" or checked_g5["verdict"] != "pass":
+            raise UserVisibleFailure(
+                message="publication readback evidence is not a passing G5 verdict",
+                next_action="read_back_the_exact_remote_publication_identity",
+            )
+        if binding_identity(lifecycle["binding"]) != binding_identity(
+            checked_g5["binding"]
+        ):
+            raise UserVisibleFailure(
+                message="G5 evidence does not bind the selected PR lifecycle",
+                next_action="create_a_successor_lifecycle_for_the_changed_identity",
+            )
+        payload = canonical_json_bytes(
+            {"publication_packet": packet, "g5_gate": checked_g5}
+        )
+        instance = object.__new__(cls)
+        object.__setattr__(instance, "_payload_bytes", payload)
+        object.__setattr__(instance, "_seal", hashlib.sha256(payload).hexdigest())
+        return instance
+
+    def consume(self) -> tuple[dict[str, object], dict[str, object]]:
+        """Verify and return the sealed publication packet and G5 receipt."""
+        try:
+            payload = self._payload_bytes
+            seal = self._seal
+        except AttributeError as exc:
+            raise UserVisibleFailure(
+                message="post-publication checks authority was not owner-materialized",
+                next_action="materialize_passing_same_binding_G5_evidence",
+            ) from exc
+        if hashlib.sha256(payload).hexdigest() != seal:
+            raise UserVisibleFailure(
+                message="post-publication checks authority seal is invalid",
+                next_action="materialize_passing_same_binding_G5_evidence",
+            )
+        decoded = json.loads(payload)
+        if not isinstance(decoded, dict):
+            raise UserVisibleFailure(
+                message="post-publication checks authority payload is invalid",
+                next_action="materialize_passing_same_binding_G5_evidence",
+            )
+        packet = decoded.get("publication_packet")
+        gate = decoded.get("g5_gate")
+        if not isinstance(packet, dict) or not isinstance(gate, dict):
+            raise UserVisibleFailure(
+                message="post-publication checks authority fields are invalid",
+                next_action="materialize_passing_same_binding_G5_evidence",
+            )
+        return packet, gate
 
 
 @dataclass(frozen=True)
@@ -494,7 +597,7 @@ def pull_request_readback(
             "api",
             f"repos/{repo}/git/commits/{merge_oid}",
             "--jq",
-            "{commit_sha: .sha, tree_sha: .tree.sha}",
+            "{commit_sha: .sha, tree_sha: .tree.sha, parents: [.parents[].sha]}",
         ]
         tree_result = run_command(
             runner,
@@ -513,9 +616,49 @@ def pull_request_readback(
                 message="merge commit tree identity is incomplete",
                 next_action="read_back_the_exact_publication_merge_tree",
             )
+        parents = merge_identity.get("parents")
+        if (
+            not isinstance(parents, list)
+            or not parents
+            or re.fullmatch(r"[0-9a-f]{40}", str(parents[0])) is None
+        ):
+            raise UserVisibleFailure(
+                message="merge commit lacks an authoritative pre-merge CAS parent",
+                next_action="read_back_the_exact_publication_merge_base",
+            )
+        merge_cas_base_oid = str(parents[0])
+        base_command = [
+            "gh",
+            "api",
+            f"repos/{repo}/git/commits/{merge_cas_base_oid}",
+            "--jq",
+            "{commit_sha: .sha, tree_sha: .tree.sha}",
+        ]
+        base_result = run_command(
+            runner,
+            base_command,
+            next_action="read_back_the_exact_publication_merge_base_tree",
+        )
+        merge_base_identity = json_object(
+            base_result.stdout, command="gh api merge CAS base commit"
+        )
+        merge_cas_base_tree = merge_base_identity.get("tree_sha")
+        if (
+            merge_base_identity.get("commit_sha") != merge_cas_base_oid
+            or not isinstance(merge_cas_base_tree, str)
+            or re.fullmatch(r"[0-9a-f]{40}", merge_cas_base_tree) is None
+        ):
+            raise UserVisibleFailure(
+                message="merge CAS base commit/tree identity is incomplete",
+                next_action="read_back_the_exact_publication_merge_base_tree",
+            )
         readback["mergeTreeOid"] = merge_tree
+        readback["mergeCasBaseOid"] = merge_cas_base_oid
+        readback["mergeCasBaseTreeOid"] = merge_cas_base_tree
     else:
         readback["mergeTreeOid"] = None
+        readback["mergeCasBaseOid"] = None
+        readback["mergeCasBaseTreeOid"] = None
     return readback
 
 
@@ -565,14 +708,18 @@ def lifecycle_with_pr_readback(
     if remote_state == "MERGED":
         merge_commit = readback.get("mergeCommit")
         merge_tree = readback.get("mergeTreeOid")
+        merge_cas_base = readback.get("mergeCasBaseOid")
+        merge_cas_base_tree = readback.get("mergeCasBaseTreeOid")
         if (
             not isinstance(merge_commit, Mapping)
             or re.fullmatch(r"[0-9a-f]{40}", str(merge_commit.get("oid", ""))) is None
             or re.fullmatch(r"[0-9a-f]{40}", str(merge_tree or "")) is None
+            or merge_cas_base != base["commit_sha"]
+            or merge_cas_base_tree != base["tree_sha"]
         ):
             raise UserVisibleFailure(
-                message="merged PR readback lacks authoritative merge commit/tree identity",
-                next_action="read_back_the_exact_publication_merge_identity",
+                message="merged PR readback lacks matching merge/CAS identity",
+                next_action="reject_publication_readback_and_materialize_a_successor",
             )
         state = "merged"
     elif remote_state == "CLOSED":
@@ -1184,6 +1331,26 @@ def base_summary(args: argparse.Namespace, verification: RemoteVerification, bra
     }
 
 
+def consume_publication_authority(
+    authority: GithubPublicationAuthority,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Consume one opaque owner-materialized mutation authority."""
+    if type(authority) is not GithubPublicationAuthority:
+        raise UserVisibleFailure(
+            message="GitHub mutation requires an opaque publication authority",
+            next_action="materialize_the_canonical_github_publication_packet",
+        )
+    packet = authority.consume()
+    lifecycle = packet.get("pull_request_lifecycle")
+    gate = packet.get("g3_gate")
+    if not isinstance(lifecycle, dict) or not isinstance(gate, dict):
+        raise UserVisibleFailure(
+            message="GitHub publication authority fields are invalid",
+            next_action="materialize_the_canonical_github_publication_packet",
+        )
+    return lifecycle, gate
+
+
 def perform_push(
     args: argparse.Namespace,
     runner: Runner,
@@ -1198,8 +1365,7 @@ def perform_push(
             message="refusing to push main without --allow-main",
             next_action="publish_a_topic_branch_or_pass_--allow-main_with_explicit_authority",
         )
-    lifecycle = authority.lifecycle
-    gate = authority.g3_gate
+    lifecycle, gate = consume_publication_authority(authority)
     if lifecycle["state"] not in {
         "draft",
         "ready",
@@ -1246,8 +1412,7 @@ def perform_pr(
 ) -> dict[str, object]:
     """Create or update a pull request for the verified branch."""
     body_file = require_body_file(args.body_file)
-    lifecycle = authority.lifecycle
-    gate = authority.g3_gate
+    lifecycle, gate = consume_publication_authority(authority)
     if lifecycle["state"] not in {
         "draft",
         "ready",
@@ -1364,11 +1529,19 @@ def perform_checks(
     verification: RemoteVerification,
     branch: str,
     *,
-    authority: GithubPublicationAuthority,
+    authority: GithubPublicationAuthority | GithubPostPublicationChecksAuthority,
 ) -> dict[str, object]:
     """Show pull-request checks through gh."""
-    lifecycle = authority.lifecycle
-    gate = authority.g3_gate
+    checked_g5: dict[str, object] | None
+    if type(authority) is GithubPostPublicationChecksAuthority:
+        packet, checked_g5 = authority.consume()
+        lifecycle = cast(dict[str, object], packet["pull_request_lifecycle"])
+        gate = cast(dict[str, object], packet["g3_gate"])
+    else:
+        lifecycle, gate = consume_publication_authority(
+            cast(GithubPublicationAuthority, authority)
+        )
+        checked_g5 = None
     pr_selector = args.pr or branch
     command = ["gh", "pr", "checks", pr_selector, "--repo", verification.repo]
     if args.watch:
@@ -1391,6 +1564,7 @@ def perform_checks(
             "checks_stdout": result.stdout.strip(),
             "pull_request_lifecycle": lifecycle,
             "g3_gate": gate,
+            "g5_gate": checked_g5,
         }
     )
     if result.returncode == 8:
@@ -1493,13 +1667,9 @@ def run(
             )
         loaded = json.loads(packet_path.read_text(encoding="utf-8"))
         publication_packet = cast(Mapping[str, object], loaded)
-    packet = validate_github_publication_packet(publication_packet)
+    authority = GithubPublicationAuthority.from_packet(publication_packet)
+    packet = authority.consume()
     lifecycle = cast(Mapping[str, object], packet["pull_request_lifecycle"])
-    g3_gate = cast(Mapping[str, object], packet["g3_gate"])
-    authority = GithubPublicationAuthority(
-        lifecycle=lifecycle,
-        g3_gate=g3_gate,
-    )
     remote_identity = cast(Mapping[str, object], lifecycle["remote_identity"])
     base_identity = cast(Mapping[str, object], lifecycle["base_identity"])
     permission = cast(Mapping[str, object], lifecycle["permission_identity"])

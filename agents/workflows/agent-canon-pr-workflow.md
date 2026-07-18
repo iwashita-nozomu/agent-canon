@@ -118,9 +118,11 @@ second report/archive materializer.
 
 1. `publication_integrator.py` verifies expected-old CAS and publishes the
    approved candidate through the selected PR merge authority.
-1. Merge/API readback must authoritatively return PR number, base/head identity,
-   merge commit, and merge tree while retaining the reviewed candidate as a
-   separate immutable head identity. Caller-supplied merge identity is invalid.
+1. Merge/API readback must authoritatively return PR number, post-merge base-ref
+   identity, frozen head identity, merge-CAS base commit/tree from the merge
+   commit parent, and merge commit/tree. The merge-CAS base must equal the
+   rebind/CAS/lifecycle base. The reviewed candidate remains a separate
+   immutable head identity; caller-supplied merge identity is invalid.
 1. A distinct post-merge source-main readback proves `origin/main` equals the
    authoritative publication merge commit/tree and materializes G5 publication
    evidence. It is not the pre-freeze rebind receipt.

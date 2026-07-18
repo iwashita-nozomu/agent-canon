@@ -2951,6 +2951,8 @@ class StandaloneUpdateLifecycleTest(unittest.TestCase):
                 "state": "MERGED",
                 "baseRefName": "main",
                 "baseRefOid": merge_sha,
+                "mergeCasBaseOid": candidate,
+                "mergeCasBaseTreeOid": tree,
                 "headRefName": "canon/update-lifecycle",
                 "headRefOid": candidate,
                 "headRepository": {"nameWithOwner": "owner/agent-canon"},
