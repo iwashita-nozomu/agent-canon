@@ -1140,7 +1140,7 @@ description = "Every Codex subagent prompt must be dependency-linked and declare
 id = "CODEX-AGENT-GENERIC-1"
 critical = true
 description = "Includes generated-view provenance for the canonical closed projection."
-required_regex = ["generated role view: generated_role_view_v1", "generated from agents/agents_config.json and agents/model_profiles.toml", "materializer: tools/agent_tools/model_profile_registry.py"]
+required_regex = ["generated role view: generated_role_view_v1", "generated from agents/model_profiles.toml plus canonical team/runtime role metadata", "materializer: tools/agent_tools/model_profile_registry.py"]
 
 [[evals.checklist]]
 id = "CODEX-AGENT-GENERIC-2"

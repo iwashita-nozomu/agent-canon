@@ -285,7 +285,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         configs["worker"] = {**configs["worker"], "model": "gpt-5.5"}
 
         with patch.object(runtime_alignment, "parse_codex_agents", return_value=configs):
-            with self.assertRaisesRegex(RuntimeError, "worker model must be gpt-5.6-luna"):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "worker model must project registry profile luna_implementation_xhigh",
+            ):
                 runtime_alignment.validate_codex_agent_settings()
 
     def test_alignment_assigns_mini_only_to_skill_evaluator(self) -> None:
@@ -316,7 +319,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         with patch.object(runtime_alignment, "parse_codex_agents", return_value=configs):
             with self.assertRaisesRegex(
                 RuntimeError,
-                "explorer may use gpt-5.4-mini only for explicit T14 skill_evaluation via skill_evaluator",
+                "explorer model must project registry profile luna_reasoning_high",
             ):
                 runtime_alignment.validate_codex_agent_settings()
 
@@ -341,23 +344,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             self.assertNotIn("spawn_budget", family)
     def test_project_config_rejects_agent_policy_scalar_keys(self) -> None:
         """Task policy strings must stay out of Codex's [agents] runtime table."""
-        config = {
-            "model": runtime_alignment.PARENT_MODEL,
-            "model_reasoning_effort": runtime_alignment.PARENT_REASONING_EFFORT,
-            "review_model": runtime_alignment.REVIEW_MODEL,
-            "model_context_window": runtime_alignment.EXPECTED_MODEL_CONTEXT_WINDOW,
-            "tool_output_token_limit": runtime_alignment.EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT,
-            "features": {
-                "hooks": True,
-                "goals": True,
-                "multi_agent": True,
-            },
-            "agents": {
-                "max_threads": runtime_alignment.EXPECTED_MAX_THREADS,
-                "max_depth": runtime_alignment.EXPECTED_MAX_DEPTH,
-                "job_max_runtime_seconds": runtime_alignment.EXPECTED_JOB_MAX_RUNTIME_SECONDS,
-                "same_role_instances": "allowed_with_distinct_packets",
-            },
+        config = runtime_alignment.load_project_config_toml()
+        config["agents"] = {
+            **cast(dict[str, object], config["agents"]),
+            "same_role_instances": "allowed_with_distinct_packets",
         }
 
         with (

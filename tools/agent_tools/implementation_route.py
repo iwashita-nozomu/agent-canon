@@ -1,11 +1,30 @@
+#!/usr/bin/env python3
+# @dependency-start
+# contract tool
+# responsibility Routes one immutable fixed implementation packet to Spark or the saturation queue.
+# upstream implementation ./model_profile_registry.py owns profile, prompt, and Decision Sufficiency contracts
+# upstream implementation ./capacity_handshake.py owns typed capacity availability and queue semantics
+# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md defines fixed Spark continuation policy
+# downstream implementation ./agent_team.py performs actual typed implementation dispatch
+# downstream implementation ../../tests/agent_tools/test_implementation_route.py tests fail-closed routing
+# @dependency-end
+"""Fail-closed implementation routing for fixed Spark packets."""
+
 from __future__ import annotations
 
+import dataclasses
 import hashlib
+import re
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Any, Iterable, Mapping
 
-from tools.agent_tools import capacity_handshake
-from tools.agent_tools import model_profile_registry as model_profile_registry
+if __package__:
+    from . import capacity_handshake
+    from . import model_profile_registry
+else:
+    import capacity_handshake
+    import model_profile_registry
 
 SCHEMA_IDS = {
     "fixed_implementation_packet": "fixed_implementation_packet_v1",
@@ -14,9 +33,219 @@ SCHEMA_IDS = {
     "implementation_route_result": "implementation_route_result_v1",
     "structural_design_gap": "structural_design_gap_v1",
     "implementation_feedback": "implementation_feedback_v1",
-    "implementation_route": "implementation_route_result_v1",
     "spark_implementation_result": "spark_implementation_result_v1",
 }
+
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_REQUIRED_SHAPE_IDS = {
+    "fixed_implementation_packet_v1",
+    "spark_eligibility_evidence_v1",
+    "implementation_route_request_v1",
+    "implementation_route_result_v1",
+    "structural_design_gap_v1",
+    "implementation_feedback_v1",
+}
+_REQUIRED_DEPENDENCY_DIRECTIONS = {
+    "implementation_route->model_profile_registry",
+    "implementation_route->capacity_handshake",
+    "implementation_route-X->route",
+    "implementation_route-X->capability_route",
+    "implementation_route-X->skill_route_catalog",
+}
+_PACKET_FIELDS = {
+    "schema_id",
+    "packet_version",
+    "packet_id",
+    "static_packet_sha256",
+    "packet_set_ref",
+    "packet_set_sha256",
+    "request_clause_ids",
+    "target_state_contract_ref",
+    "target_state_contract_sha256",
+    "implementation_execution_contract_ref",
+    "materialization_mode",
+    "decision_sufficiency_ref",
+    "decision_sufficiency_sha256",
+    "abstract_design_frame_ref",
+    "abstract_design_frame_sha256",
+    "exact_owner",
+    "exact_write_set",
+    "forbidden_write_set",
+    "deletion_replacement_set_ref",
+    "immutable_source_packet_ref",
+    "immutable_source_packet_sha256",
+    "immutable_source_anchors",
+    "approved_identifiers_and_names",
+    "fixed_public_shape_ids",
+    "acceptance_checks",
+    "static_validation_commands",
+    "unresolved_algorithm_decisions",
+    "unresolved_api_decisions",
+    "unresolved_schema_decisions",
+    "unresolved_oracle_decisions",
+    "causal_repair_required",
+    "cross_owner_integration_required",
+    "deterministic_acceptance_fixed",
+    "public_shape_fixed",
+    "dependency_change_required",
+    "context_continuity_decision_ref",
+    "capacity_snapshot_ref",
+    "capacity_reservation_ref",
+    "owner_gate_id",
+    "parent_lineage_id",
+    "resume_worker_agent_id",
+    "dependency_import_direction",
+    "status",
+}
+_REQUEST_FIELDS = {
+    "schema_id",
+    "request_version",
+    "request_clause_ids",
+    "fixed_implementation_packet_ref",
+    "fixed_implementation_packet_sha256",
+    "target_state_contract_ref",
+    "target_state_contract_sha256",
+    "implementation_execution_contract_ref",
+    "decision_sufficiency_ref",
+    "decision_sufficiency_sha256",
+    "context_continuity_decision_ref",
+    "capacity_snapshot_ref",
+    "parent_lineage_id",
+    "resume_worker_agent_id",
+    "structural_design_gap_ref",
+    "fixed_implementation_packet",
+    "fixed_decision_sufficiency",
+    "capacity_snapshot",
+    "continuity_decision",
+}
+_ANCHOR_FIELDS = {
+    "anchor_purpose",
+    "ref",
+    "selector",
+    "sha256",
+    "manifest_sha256",
+    "manifest_canonicalization",
+    "path_count",
+    "base_state",
+    "required_predecessor_gate",
+    "required_gate",
+}
+_CONTINUITY_FIELDS = {
+    "decision_sufficiency",
+    "continue_existing",
+    "resume_worker_agent_id",
+    "resume_packet_sha256",
+    "fresh_packet_cheaper_than_suitable_continuation",
+    "structural_gap_repair_count",
+}
+_CAPACITY_PROJECTION_FIELDS = {
+    "shape_id",
+    "requested_total_capacity",
+    "effective_total_capacity",
+    "available_total_capacity",
+    "requested_write_capacity",
+    "effective_write_capacity",
+    "available_write_capacity",
+    "input_provenance",
+}
+
+
+def _closed_mapping(value: object, fields: set[str], label: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{label}:must_be_mapping")
+    keys = set(value)
+    unknown = sorted(str(key) for key in keys - fields)
+    missing = sorted(fields - keys)
+    if unknown:
+        raise ValueError(f"{label}:unknown_fields:{','.join(unknown)}")
+    if missing:
+        raise ValueError(f"{label}:missing_fields:{','.join(missing)}")
+    return value
+
+
+def _text(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field}:must_be_nonempty_string")
+    return value
+
+
+def _sha256(value: object, field: str) -> str:
+    text = _text(value, field)
+    if not _SHA256_RE.fullmatch(text):
+        raise ValueError(f"{field}:must_be_sha256")
+    return text
+
+
+def _string_tuple(value: object, field: str, *, nonempty: bool = True) -> tuple[str, ...]:
+    if not isinstance(value, (list, tuple)) or not all(isinstance(item, str) and item for item in value):
+        raise ValueError(f"{field}:must_be_string_sequence")
+    result = tuple(value)
+    if nonempty and not result:
+        raise ValueError(f"{field}:must_be_nonempty")
+    if len(result) != len(set(result)):
+        raise ValueError(f"{field}:duplicate")
+    return result
+
+
+def _bool(value: object, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{field}:must_be_bool")
+    return value
+
+
+def _int(value: object, field: str, *, minimum: int = 0) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+        raise ValueError(f"{field}:must_be_int_gte_{minimum}")
+    return value
+
+
+def _optional_text(value: object, field: str) -> str | None:
+    if value is None:
+        return None
+    return _text(value, field)
+
+
+def _relative_paths(value: object, field: str, *, nonempty: bool) -> tuple[str, ...]:
+    paths = _string_tuple(value, field, nonempty=nonempty)
+    for path in paths:
+        parsed = PurePosixPath(path)
+        if parsed.is_absolute() or ".." in parsed.parts or path.startswith("./"):
+            raise ValueError(f"{field}:path_not_canonical:{path}")
+    return paths
+
+
+@dataclass(frozen=True)
+class ImplementationPacketSet:
+    packet_set_id: str
+    packet_set_sha256: str
+    packets: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class StaticImplementationPacket:
+    packet_id: str
+    packet_sha256: str
+    source_anchor_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DesignSectionAnchor:
+    section_id: str
+    ref: str
+    sha256: str
+
+
+@dataclass(frozen=True)
+class ToolCallTokenTemplate:
+    tool_id: str
+    target_argument: str
+
+
+@dataclass(frozen=True)
+class TopologyGeneratedCapacitySetting:
+    requested_total_capacity: int
+    direct_frontier_count: int
+    nested_reservation_count: int
 
 
 @dataclass(frozen=True)
@@ -41,12 +270,8 @@ class ValidationAction:
 
 @dataclass(frozen=True)
 class DecisionSufficiencyProjection:
-    record_id: str
-    plausible_state_ids: tuple[str, ...]
-    fixed_action: object
-    action_equivalence: str
-    further_investigation: str
-    authorized_evidence_request_ids: tuple[str, ...]
+    record: model_profile_registry.DecisionSufficiencyRecord
+    fixed_action: model_profile_registry.OwnerEditValidationAction
 
 
 @dataclass(frozen=True)
@@ -70,6 +295,7 @@ class FixedImplementationPacket:
     decision_sufficiency_ref: str
     decision_sufficiency_sha256: str
     abstract_design_frame_ref: str
+    abstract_design_frame_sha256: str
     exact_owner: str
     exact_write_set: tuple[str, ...]
     forbidden_write_set: tuple[str, ...]
@@ -95,10 +321,22 @@ class FixedImplementationPacket:
     capacity_reservation_ref: str
     owner_gate_id: str
     parent_lineage_id: str
-    resume_worker_agent_id: str | None = None
-    dependency_import_direction: tuple[str, ...] = ()
+    resume_worker_agent_id: str | None
+    dependency_import_direction: tuple[str, ...]
     schema_id: str = SCHEMA_IDS["fixed_implementation_packet"]
     status: str = "ready"
+
+    @property
+    def unresolved_design_count(self) -> int:
+        return sum(
+            len(values)
+            for values in (
+                self.unresolved_algorithm_decisions,
+                self.unresolved_api_decisions,
+                self.unresolved_schema_decisions,
+                self.unresolved_oracle_decisions,
+            )
+        )
 
 
 @dataclass(frozen=True)
@@ -110,22 +348,21 @@ class SparkEligibilityEvidence:
     responsibility_graph_complete: bool
     owner_write_set_exact: bool
     source_packet_immutable: bool
-    design_review_approved: bool
-    document_flow_review_approved_when_active: bool
     all_design_blockers_resolved: bool
-    all_algorithm_api_schema_oracle_decisions_resolved: bool
     deterministic_acceptance_fixed: bool
     static_validation_fixed: bool
     no_causal_repair: bool
     no_cross_owner_integration: bool
-    no_architectural_interpretation_required: bool
-    public_shape_unchanged_or_fixed: bool
+    public_shape_fixed: bool
     dependency_direction_fixed: bool
     decision_sufficiency_identical: bool
     fresh_packet_cheaper_than_suitable_continuation: bool
     capacity_slot_granted_or_queueable: bool
     evidence_refs: tuple[str, ...]
-    evidence_id: str = SCHEMA_IDS["spark_eligibility_evidence"]
+    source_anchors: tuple[SourceAnchor, ...]
+    acceptance_checks: tuple[ValidationAction, ...]
+    static_validation_commands: tuple[str, ...]
+    schema_id: str = SCHEMA_IDS["spark_eligibility_evidence"]
 
 
 @dataclass(frozen=True)
@@ -142,7 +379,7 @@ class SparkEligibilityDecision:
     parent_lineage_id: str
     resume_worker_agent_id: str | None = None
     evidence: SparkEligibilityEvidence | None = None
-    schema_id: str = SCHEMA_IDS["fixed_implementation_packet"]
+    schema_id: str = "spark_eligibility_decision_v1"
 
 
 @dataclass(frozen=True)
@@ -165,6 +402,7 @@ class StructuralDesignGap:
     packet_sha256: str
     contradicted_target_field_ref: str
     contradiction_evidence_ref: str
+    actions_that_could_change: tuple[str, str]
     schema_id: str = SCHEMA_IDS["structural_design_gap"]
 
 
@@ -195,12 +433,12 @@ class ImplementationRouteRequest:
     context_continuity_decision_ref: str
     capacity_snapshot_ref: str
     parent_lineage_id: str
-    resume_worker_agent_id: str | None = None
-    structural_design_gap_ref: str | None = None
-    fixed_implementation_packet: Mapping[str, Any] | None = None
-    fixed_decision_sufficiency: Mapping[str, Any] | None = None
-    capacity_snapshot: Mapping[str, Any] | capacity_handshake.CapacitySnapshot | None = None
-    continuity_decision: Mapping[str, Any] | None = None
+    resume_worker_agent_id: str | None
+    structural_design_gap_ref: str | None
+    fixed_implementation_packet: Mapping[str, Any] | FixedImplementationPacket
+    fixed_decision_sufficiency: Mapping[str, Any]
+    capacity_snapshot: Mapping[str, Any] | capacity_handshake.CapacitySnapshot
+    continuity_decision: Mapping[str, Any]
     schema_id: str = SCHEMA_IDS["implementation_route_request"]
 
 
@@ -217,6 +455,10 @@ class ImplementationRouteResult:
     next_gate: str
     failure: ImplementationRouteFailure | None
     status: str
+    exact_write_set: tuple[str, ...] = ()
+    source_anchors: tuple[SourceAnchor, ...] = ()
+    acceptance_checks: tuple[ValidationAction, ...] = ()
+    static_validation_commands: tuple[str, ...] = ()
     schema_id: str = SCHEMA_IDS["implementation_route_result"]
 
 
@@ -233,676 +475,408 @@ class SparkImplementationResult:
     durable_result_summary: str
 
 
-@dataclass(frozen=True)
-class _ImplementationShape:
-    evidence: SparkEligibilityEvidence
-    decision: SparkEligibilityDecision
-    failure: ImplementationRouteFailure | None = None
+def _parse_source_anchor(value: object, index: int) -> SourceAnchor:
+    anchor = _closed_mapping(value, _ANCHOR_FIELDS, f"immutable_source_anchors[{index}]")
+    sha = None if anchor["sha256"] is None else _sha256(anchor["sha256"], "source_anchor.sha256")
+    manifest_sha = None if anchor["manifest_sha256"] is None else _sha256(anchor["manifest_sha256"], "source_anchor.manifest_sha256")
+    if sha is None and manifest_sha is None:
+        raise ValueError("source_anchor:digest_required")
+    path_count = anchor["path_count"]
+    if path_count is not None:
+        path_count = _int(path_count, "source_anchor.path_count", minimum=1)
+    return SourceAnchor(
+        anchor_purpose=_text(anchor["anchor_purpose"], "source_anchor.anchor_purpose"),
+        ref=_text(anchor["ref"], "source_anchor.ref"),
+        selector=_optional_text(anchor["selector"], "source_anchor.selector"),
+        sha256=sha,
+        manifest_sha256=manifest_sha,
+        manifest_canonicalization=_optional_text(anchor["manifest_canonicalization"], "source_anchor.manifest_canonicalization"),
+        path_count=path_count,
+        base_state=_optional_text(anchor["base_state"], "source_anchor.base_state"),
+        required_predecessor_gate=_optional_text(anchor["required_predecessor_gate"], "source_anchor.required_predecessor_gate"),
+        required_gate=_optional_text(anchor["required_gate"], "source_anchor.required_gate"),
+    )
 
 
-def _as_tuple(value: Any) -> tuple[str, ...]:
-    if value is None:
-        return ()
-    if isinstance(value, tuple):
-        return tuple(str(v) for v in value)
-    if isinstance(value, list):
-        return tuple(str(v) for v in value)
-    return (str(value),)
+def _parse_validation_action(value: object, index: int) -> ValidationAction:
+    action = _closed_mapping(value, {"command", "oracle"}, f"acceptance_checks[{index}]")
+    return ValidationAction(_text(action["command"], "validation.command"), _text(action["oracle"], "validation.oracle"))
 
 
-def _coerce_bool(value: Any, default: bool) -> bool:
-    return bool(value) if value is not None else default
+def _validate_fixed_packet(packet: FixedImplementationPacket) -> None:
+    if packet.schema_id != SCHEMA_IDS["fixed_implementation_packet"] or packet.packet_version != 1:
+        raise ValueError("fixed_packet:schema_or_version_mismatch")
+    if packet.status != "ready" or packet.materialization_mode != "one_direct_pass":
+        raise ValueError("fixed_packet:not_ready_for_direct_pass")
+    if packet.exact_owner != "implementation_route":
+        raise ValueError("fixed_packet:owner_mismatch")
+    if set(packet.exact_write_set) & set(packet.forbidden_write_set):
+        raise ValueError("fixed_packet:write_set_forbidden_overlap")
+    if set(packet.fixed_public_shape_ids) != _REQUIRED_SHAPE_IDS:
+        raise ValueError("fixed_packet:public_shape_set_mismatch")
+    if set(packet.dependency_import_direction) != _REQUIRED_DEPENDENCY_DIRECTIONS:
+        raise ValueError("fixed_packet:dependency_direction_mismatch")
+    if not packet.immutable_source_anchors or not packet.acceptance_checks or not packet.static_validation_commands:
+        raise ValueError("fixed_packet:evidence_or_validation_empty")
+    if packet.unresolved_design_count != 0:
+        raise ValueError("fixed_packet:unresolved_design_decisions")
+    if not packet.deterministic_acceptance_fixed or not packet.public_shape_fixed:
+        raise ValueError("fixed_packet:acceptance_or_public_shape_not_fixed")
+    if packet.causal_repair_required or packet.cross_owner_integration_required:
+        raise ValueError("fixed_packet:not_spark_eligible_structure")
 
 
-def _coerce_int(value: Any, default: int) -> int:
-    return int(value) if isinstance(value, int) else default
-
-
-def _coerce_string(value: Any, default: str) -> str:
-    if value is None:
-        return default
-    return str(value)
-
-
-def _coerce_mapping(value: Any) -> Mapping[str, Any]:
-    if not isinstance(value, Mapping):
-        raise TypeError("expected mapping")
-    return value
-
-
-def _as_id(value: Any, key: str) -> str:
-    if isinstance(value, str) and value:
+def _parse_fixed_packet(value: Mapping[str, Any] | FixedImplementationPacket) -> FixedImplementationPacket:
+    if isinstance(value, FixedImplementationPacket):
+        _validate_fixed_packet(value)
         return value
-    raise ValueError(f"{key}:missing")
+    packet = _closed_mapping(value, _PACKET_FIELDS, "fixed_implementation_packet")
+    anchors_raw = packet["immutable_source_anchors"]
+    checks_raw = packet["acceptance_checks"]
+    if not isinstance(anchors_raw, (list, tuple)) or not isinstance(checks_raw, (list, tuple)):
+        raise ValueError("fixed_packet:anchors_and_checks_must_be_sequences")
+    parsed = FixedImplementationPacket(
+        packet_version=_int(packet["packet_version"], "packet_version", minimum=1),
+        packet_id=_text(packet["packet_id"], "packet_id"),
+        static_packet_sha256=_sha256(packet["static_packet_sha256"], "static_packet_sha256"),
+        packet_set_ref=_text(packet["packet_set_ref"], "packet_set_ref"),
+        packet_set_sha256=_sha256(packet["packet_set_sha256"], "packet_set_sha256"),
+        request_clause_ids=_string_tuple(packet["request_clause_ids"], "request_clause_ids"),
+        target_state_contract_ref=_text(packet["target_state_contract_ref"], "target_state_contract_ref"),
+        target_state_contract_sha256=_sha256(packet["target_state_contract_sha256"], "target_state_contract_sha256"),
+        implementation_execution_contract_ref=_text(packet["implementation_execution_contract_ref"], "implementation_execution_contract_ref"),
+        materialization_mode=_text(packet["materialization_mode"], "materialization_mode"),
+        decision_sufficiency_ref=_text(packet["decision_sufficiency_ref"], "decision_sufficiency_ref"),
+        decision_sufficiency_sha256=_sha256(packet["decision_sufficiency_sha256"], "decision_sufficiency_sha256"),
+        abstract_design_frame_ref=_text(packet["abstract_design_frame_ref"], "abstract_design_frame_ref"),
+        abstract_design_frame_sha256=_sha256(packet["abstract_design_frame_sha256"], "abstract_design_frame_sha256"),
+        exact_owner=_text(packet["exact_owner"], "exact_owner"),
+        exact_write_set=_relative_paths(packet["exact_write_set"], "exact_write_set", nonempty=True),
+        forbidden_write_set=_relative_paths(packet["forbidden_write_set"], "forbidden_write_set", nonempty=False),
+        deletion_replacement_set_ref=_text(packet["deletion_replacement_set_ref"], "deletion_replacement_set_ref"),
+        immutable_source_packet_ref=_text(packet["immutable_source_packet_ref"], "immutable_source_packet_ref"),
+        immutable_source_packet_sha256=_sha256(packet["immutable_source_packet_sha256"], "immutable_source_packet_sha256"),
+        immutable_source_anchors=tuple(_parse_source_anchor(item, index) for index, item in enumerate(anchors_raw)),
+        approved_identifiers_and_names=_string_tuple(packet["approved_identifiers_and_names"], "approved_identifiers_and_names"),
+        fixed_public_shape_ids=_string_tuple(packet["fixed_public_shape_ids"], "fixed_public_shape_ids"),
+        acceptance_checks=tuple(_parse_validation_action(item, index) for index, item in enumerate(checks_raw)),
+        static_validation_commands=_string_tuple(packet["static_validation_commands"], "static_validation_commands"),
+        unresolved_algorithm_decisions=_string_tuple(packet["unresolved_algorithm_decisions"], "unresolved_algorithm_decisions", nonempty=False),
+        unresolved_api_decisions=_string_tuple(packet["unresolved_api_decisions"], "unresolved_api_decisions", nonempty=False),
+        unresolved_schema_decisions=_string_tuple(packet["unresolved_schema_decisions"], "unresolved_schema_decisions", nonempty=False),
+        unresolved_oracle_decisions=_string_tuple(packet["unresolved_oracle_decisions"], "unresolved_oracle_decisions", nonempty=False),
+        causal_repair_required=_bool(packet["causal_repair_required"], "causal_repair_required"),
+        cross_owner_integration_required=_bool(packet["cross_owner_integration_required"], "cross_owner_integration_required"),
+        deterministic_acceptance_fixed=_bool(packet["deterministic_acceptance_fixed"], "deterministic_acceptance_fixed"),
+        public_shape_fixed=_bool(packet["public_shape_fixed"], "public_shape_fixed"),
+        dependency_change_required=_bool(packet["dependency_change_required"], "dependency_change_required"),
+        context_continuity_decision_ref=_text(packet["context_continuity_decision_ref"], "context_continuity_decision_ref"),
+        capacity_snapshot_ref=_text(packet["capacity_snapshot_ref"], "capacity_snapshot_ref"),
+        capacity_reservation_ref=_text(packet["capacity_reservation_ref"], "capacity_reservation_ref"),
+        owner_gate_id=_text(packet["owner_gate_id"], "owner_gate_id"),
+        parent_lineage_id=_text(packet["parent_lineage_id"], "parent_lineage_id"),
+        resume_worker_agent_id=_optional_text(packet["resume_worker_agent_id"], "resume_worker_agent_id"),
+        dependency_import_direction=_string_tuple(packet["dependency_import_direction"], "dependency_import_direction"),
+        schema_id=_text(packet["schema_id"], "schema_id"),
+        status=_text(packet["status"], "status"),
+    )
+    _validate_fixed_packet(parsed)
+    return parsed
 
 
-def _normalize_profile_id(value: Any) -> str:
-    profile = _coerce_string(value, "")
-    if not profile:
-        raise ValueError("missing_profile")
-    return profile
-
-def _resolve_request(request: Mapping[str, Any] | ImplementationRouteRequest) -> ImplementationRouteRequest:
-    if isinstance(request, ImplementationRouteRequest):
-        return request
-    payload = _coerce_mapping(request)
+def _parse_request(value: Mapping[str, Any] | ImplementationRouteRequest) -> ImplementationRouteRequest:
+    if isinstance(value, ImplementationRouteRequest):
+        return value
+    request = _closed_mapping(value, _REQUEST_FIELDS, "implementation_route_request")
+    if request["schema_id"] != SCHEMA_IDS["implementation_route_request"]:
+        raise ValueError("implementation_route_request:schema_mismatch")
+    if not isinstance(request["fixed_implementation_packet"], (Mapping, FixedImplementationPacket)):
+        raise ValueError("implementation_route_request:fixed_packet_missing")
+    if not isinstance(request["fixed_decision_sufficiency"], Mapping):
+        raise ValueError("implementation_route_request:decision_sufficiency_missing")
+    if not isinstance(request["continuity_decision"], Mapping):
+        raise ValueError("implementation_route_request:continuity_missing")
+    if not isinstance(request["capacity_snapshot"], (Mapping, capacity_handshake.CapacitySnapshot)):
+        raise ValueError("implementation_route_request:capacity_snapshot_missing")
     return ImplementationRouteRequest(
-        request_version=_coerce_int(payload.get("request_version"), 1),
-        request_clause_ids=_as_tuple(payload.get("request_clause_ids")),
-        fixed_implementation_packet_ref=_coerce_string(payload.get("fixed_implementation_packet_ref"), ""),
-        fixed_implementation_packet_sha256=_coerce_string(payload.get("fixed_implementation_packet_sha256"), ""),
-        target_state_contract_ref=_coerce_string(payload.get("target_state_contract_ref"), ""),
-        target_state_contract_sha256=_coerce_string(payload.get("target_state_contract_sha256"), ""),
-        implementation_execution_contract_ref=_coerce_string(payload.get("implementation_execution_contract_ref"), ""),
-        decision_sufficiency_ref=_coerce_string(payload.get("decision_sufficiency_ref"), ""),
-        decision_sufficiency_sha256=_coerce_string(payload.get("decision_sufficiency_sha256"), ""),
-        context_continuity_decision_ref=_coerce_string(payload.get("context_continuity_decision_ref"), ""),
-        capacity_snapshot_ref=_coerce_string(payload.get("capacity_snapshot_ref"), ""),
-        parent_lineage_id=_coerce_string(payload.get("parent_lineage_id"), ""),
-        resume_worker_agent_id=payload.get("resume_worker_agent_id"),
-        structural_design_gap_ref=payload.get("structural_design_gap_ref"),
-        fixed_implementation_packet=payload.get("fixed_implementation_packet")
-        or payload.get("fixed_packet")
-        or payload.get("fixed_implementation_packet_payload"),
-        fixed_decision_sufficiency=payload.get("fixed_decision_sufficiency")
-        or payload.get("decision_sufficiency"),
-        capacity_snapshot=payload.get("capacity_snapshot"),
-        continuity_decision=payload.get("continuity_decision"),
+        request_version=_int(request["request_version"], "request_version", minimum=1),
+        request_clause_ids=_string_tuple(request["request_clause_ids"], "request_clause_ids"),
+        fixed_implementation_packet_ref=_text(request["fixed_implementation_packet_ref"], "fixed_implementation_packet_ref"),
+        fixed_implementation_packet_sha256=_sha256(request["fixed_implementation_packet_sha256"], "fixed_implementation_packet_sha256"),
+        target_state_contract_ref=_text(request["target_state_contract_ref"], "target_state_contract_ref"),
+        target_state_contract_sha256=_sha256(request["target_state_contract_sha256"], "target_state_contract_sha256"),
+        implementation_execution_contract_ref=_text(request["implementation_execution_contract_ref"], "implementation_execution_contract_ref"),
+        decision_sufficiency_ref=_text(request["decision_sufficiency_ref"], "decision_sufficiency_ref"),
+        decision_sufficiency_sha256=_sha256(request["decision_sufficiency_sha256"], "decision_sufficiency_sha256"),
+        context_continuity_decision_ref=_text(request["context_continuity_decision_ref"], "context_continuity_decision_ref"),
+        capacity_snapshot_ref=_text(request["capacity_snapshot_ref"], "capacity_snapshot_ref"),
+        parent_lineage_id=_text(request["parent_lineage_id"], "parent_lineage_id"),
+        resume_worker_agent_id=_optional_text(request["resume_worker_agent_id"], "resume_worker_agent_id"),
+        structural_design_gap_ref=_optional_text(request["structural_design_gap_ref"], "structural_design_gap_ref"),
+        fixed_implementation_packet=request["fixed_implementation_packet"],
+        fixed_decision_sufficiency=request["fixed_decision_sufficiency"],
+        capacity_snapshot=request["capacity_snapshot"],
+        continuity_decision=request["continuity_decision"],
     )
 
 
-def _parse_fixed_packet(payload: Mapping[str, Any] | FixedImplementationPacket) -> FixedImplementationPacket:
-    if isinstance(payload, FixedImplementationPacket):
-        return payload
-    m = _coerce_mapping(payload)
-    return FixedImplementationPacket(
-        packet_version=_coerce_int(m.get("packet_version"), 1),
-        packet_id=_as_id(m.get("packet_id"), "packet_id"),
-        static_packet_sha256=_as_id(m.get("static_packet_sha256"), "static_packet_sha256"),
-        packet_set_ref=_coerce_string(m.get("packet_set_ref"), ""),
-        packet_set_sha256=_coerce_string(m.get("packet_set_sha256"), ""),
-        request_clause_ids=_as_tuple(m.get("request_clause_ids")),
-        target_state_contract_ref=_coerce_string(m.get("target_state_contract_ref"), ""),
-        target_state_contract_sha256=_coerce_string(m.get("target_state_contract_sha256"), ""),
-        implementation_execution_contract_ref=_coerce_string(m.get("implementation_execution_contract_ref"), ""),
-        materialization_mode=_coerce_string(m.get("materialization_mode"), "one_direct_pass"),
-        decision_sufficiency_ref=_coerce_string(m.get("decision_sufficiency_ref"), ""),
-        decision_sufficiency_sha256=_coerce_string(m.get("decision_sufficiency_sha256"), ""),
-        abstract_design_frame_ref=_coerce_string(m.get("abstract_design_frame_ref"), ""),
-        exact_owner=_coerce_string(m.get("exact_owner"), "implementation_route"),
-        exact_write_set=_as_tuple(m.get("exact_write_set") or m.get("write_set_projection")),
-        forbidden_write_set=_as_tuple(m.get("forbidden_write_set")),
-        deletion_replacement_set_ref=_coerce_string(m.get("deletion_replacement_set_ref"), ""),
-        immutable_source_packet_ref=_coerce_string(m.get("immutable_source_packet_ref"), ""),
-        immutable_source_packet_sha256=_coerce_string(m.get("immutable_source_packet_sha256"), ""),
-        immutable_source_anchors=(),
-        approved_identifiers_and_names=_as_tuple(m.get("approved_identifiers_and_names")),
-        fixed_public_shape_ids=_as_tuple(m.get("fixed_public_shape_ids")),
-        acceptance_checks=(),
-        static_validation_commands=_as_tuple(m.get("static_validation_commands")),
-        unresolved_algorithm_decisions=_as_tuple(m.get("unresolved_algorithm_decisions")),
-        unresolved_api_decisions=_as_tuple(m.get("unresolved_api_decisions")),
-        unresolved_schema_decisions=_as_tuple(m.get("unresolved_schema_decisions")),
-        unresolved_oracle_decisions=_as_tuple(m.get("unresolved_oracle_decisions")),
-        causal_repair_required=_coerce_bool(m.get("causal_repair_required"), False),
-        cross_owner_integration_required=_coerce_bool(m.get("cross_owner_integration_required"), False),
-        deterministic_acceptance_fixed=_coerce_bool(m.get("deterministic_acceptance_fixed"), True),
-        public_shape_fixed=_coerce_bool(m.get("public_shape_fixed"), True),
-        dependency_change_required=_coerce_bool(m.get("dependency_change_required"), False),
-        context_continuity_decision_ref=_coerce_string(m.get("context_continuity_decision_ref"), ""),
-        capacity_snapshot_ref=_coerce_string(m.get("capacity_snapshot_ref"), ""),
-        capacity_reservation_ref=_coerce_string(m.get("capacity_reservation_ref"), "runtime://current-spawn/P2_capacity_handshake"),
-        owner_gate_id=_coerce_string(m.get("owner_gate_id"), "implementation_route_gate"),
-        parent_lineage_id=_coerce_string(m.get("parent_lineage_id"), ""),
-        resume_worker_agent_id=m.get("resume_worker_agent_id"),
-        dependency_import_direction=_as_tuple(m.get("dependency_import_direction")),
+def _decision_projection(value: object) -> DecisionSufficiencyProjection:
+    record = model_profile_registry.parse_decision_sufficiency_record(value)
+    validation = model_profile_registry.validate_decision_sufficiency(record)
+    if not validation.valid or record.fixed_action is None:
+        raise ValueError("decision_sufficiency:actions_not_invariant")
+    return DecisionSufficiencyProjection(record, record.fixed_action)
+
+
+def _continuity(value: object) -> Mapping[str, Any]:
+    continuity = _closed_mapping(value, _CONTINUITY_FIELDS, "continuity_decision")
+    if not isinstance(continuity["continue_existing"], bool):
+        raise ValueError("continuity_decision:continue_existing_must_be_bool")
+    if not isinstance(continuity["fresh_packet_cheaper_than_suitable_continuation"], bool):
+        raise ValueError("continuity_decision:fresh_cost_must_be_bool")
+    _int(continuity["structural_gap_repair_count"], "structural_gap_repair_count")
+    _optional_text(continuity["resume_worker_agent_id"], "continuity.resume_worker_agent_id")
+    if continuity["resume_packet_sha256"] is not None:
+        _sha256(continuity["resume_packet_sha256"], "continuity.resume_packet_sha256")
+    return continuity
+
+
+def _capacity_available(value: Mapping[str, Any] | capacity_handshake.CapacitySnapshot) -> tuple[int, int, tuple[str, ...]]:
+    if isinstance(value, capacity_handshake.CapacitySnapshot):
+        provenance = value.input_provenance
+        required = {
+            "requested_total_capacity",
+            "configured_total_capacity",
+            "platform_effective_total_capacity",
+            "current_available_total_capacity",
+            "workflow_dag_direct_demand",
+            "nested_reservation_count",
+            "write_scope_cap",
+        }
+        if not required.issubset({item.input_id for item in provenance}):
+            raise ValueError("capacity_snapshot:provenance_incomplete")
+        if any(item.value != item.readback_value for item in provenance):
+            raise ValueError("capacity_snapshot:readback_mismatch")
+        return value.available_total_capacity, value.available_write_capacity, tuple(item.source_ref for item in provenance)
+    projection = _closed_mapping(value, _CAPACITY_PROJECTION_FIELDS, "capacity_snapshot_projection")
+    if projection["shape_id"] != "capacity_snapshot_projection_v1":
+        raise ValueError("capacity_snapshot_projection:schema_mismatch")
+    for field in _CAPACITY_PROJECTION_FIELDS - {"shape_id", "input_provenance"}:
+        _int(projection[field], f"capacity_snapshot_projection.{field}")
+    provenance = projection["input_provenance"]
+    if not isinstance(provenance, list) or not provenance or not all(isinstance(item, str) and item for item in provenance):
+        raise ValueError("capacity_snapshot_projection:provenance_required")
+    return int(projection["available_total_capacity"]), int(projection["available_write_capacity"]), tuple(provenance)
+
+
+def _validate_identity(request: ImplementationRouteRequest, packet: FixedImplementationPacket) -> None:
+    pairs = (
+        (request.request_clause_ids, packet.request_clause_ids, "request_clause_ids"),
+        (request.fixed_implementation_packet_ref, packet.immutable_source_packet_ref, "fixed_implementation_packet_ref"),
+        (request.fixed_implementation_packet_sha256, packet.static_packet_sha256, "fixed_implementation_packet_sha256"),
+        (request.target_state_contract_ref, packet.target_state_contract_ref, "target_state_contract_ref"),
+        (request.target_state_contract_sha256, packet.target_state_contract_sha256, "target_state_contract_sha256"),
+        (request.implementation_execution_contract_ref, packet.implementation_execution_contract_ref, "implementation_execution_contract_ref"),
+        (request.decision_sufficiency_ref, packet.decision_sufficiency_ref, "decision_sufficiency_ref"),
+        (request.decision_sufficiency_sha256, packet.decision_sufficiency_sha256, "decision_sufficiency_sha256"),
+        (request.context_continuity_decision_ref, packet.context_continuity_decision_ref, "context_continuity_decision_ref"),
+        (request.capacity_snapshot_ref, packet.capacity_snapshot_ref, "capacity_snapshot_ref"),
+        (request.parent_lineage_id, packet.parent_lineage_id, "parent_lineage_id"),
     )
+    mismatches = [label for actual, expected, label in pairs if actual != expected]
+    if mismatches:
+        raise ValueError(f"packet_identity_mismatch:{','.join(mismatches)}")
 
 
-def _parse_capacity_snapshot(snapshot: Mapping[str, Any] | capacity_handshake.CapacitySnapshot | None) -> capacity_handshake.CapacitySnapshot | None:
-    if snapshot is None:
-        return None
-    if isinstance(snapshot, capacity_handshake.CapacitySnapshot):
-        return snapshot
-    m = _coerce_mapping(snapshot)
-    # Conservative synthetic snapshot to support test fixtures that only provide numbers.
-    requested = _coerce_int(m.get("requested_capacity"), _coerce_int(m.get("requested_total_capacity"), 0))
-    configured = _coerce_int(m.get("configured_max_threads"), 0)
-    if not requested or not configured:
-        requested = _coerce_int(m.get("requested_total"), requested)
-        configured = _coerce_int(m.get("configured"), configured)
-        if not requested or not configured:
-            return None
-
-    top = capacity_handshake.TopologyCapacityWitness(
-        target_state_contract_sha256=_coerce_string(m.get("target_state_contract_sha256"), ""),
-        declared_team_topology_ref="agents/task_catalog.yaml",
-        declared_team_topology_sha256=_coerce_string(m.get("declared_team_topology_sha256"), "sha"),
-        node_records=(
-            capacity_handshake.TopologyCapacityNode(
-                node_id="parent",
-                node_kind="parent",
-                predecessor_ids=(),
-                descendant_parent_id=None,
-                total_slot_weight=1,
-                write_slot_weight=0,
-                allowed_write_paths=("agents.task",),
-                exclusion_ids=(),
-            ),
-        ),
-        legal_frontier_ids=("parent",),
-        peak_frontier_node_ids=("parent",),
-        peak_write_frontier_node_ids=(),
-        requested_total_capacity=requested,
-        workflow_dag_peak_demand=_coerce_int(m.get("workflow_dag_demand"), requested),
-        nested_reservation_count=_coerce_int(m.get("nested_capacity_reservation"), 0),
-        workflow_dag_budget=_coerce_int(m.get("workflow_dag_budget"), requested),
-        write_scope_cap=_coerce_int(m.get("write_scope_cap"), configured),
-    )
-    deriv = capacity_handshake.DeclaredTeamTopologyDerivation(
-        derivation_version=1,
-        topology_source="agents/task_catalog.yaml",
-        workflow_role_source="agents/task_catalog.yaml",
-        direct_frontier_stage_class="reviewer",
-        nested_owner_stage_class="producer",
-        final_stage_class="final",
-        excluded_nested_role_ids=("",),
-        isolated_direct_role_ids=("",),
-        family_records=(
-            capacity_handshake.DeclaredFamilyCapacity(
-                workflow_family_id="default",
-                direct_frontier_role_ids=("reviewer",),
-                nested_owner_role_ids=("producer",),
-                final_frontier_role_ids=("final",),
-                direct_frontier_count=1,
-                nested_reservation_count=0,
-                final_frontier_count=1,
-            ),
-        ),
-    )
-    contract = capacity_handshake.SessionCapacityContract(
-        contract_id="synthetic",
-        generation=1,
-        capacity_policy=capacity_handshake.CapacityPolicy(
-            policy_version=1,
-            policy_id="synthetic_v1",
-            topology_proof_ref="agents/task_catalog.yaml",
-            topology_proof_sha256=_coerce_string(m.get("topology_sha256"), "sha"),
-            requested_total_capacity=requested,
-        ),
-        input_evidence=capacity_handshake.CapacityInputEvidence(
-            max_threads_loader=capacity_handshake.MaxThreadsLoaderEvidence(
-                loaded=True,
-                configured_max_threads=configured,
-                evidence_ref=".codex/config.toml",
-            ),
-            requested_capacity_loader=capacity_handshake.RequestedCapacityLoaderEvidence(
-                requested_total_capacity=requested,
-                topology_proof_ref="agents/task_catalog.yaml",
-                topology_proof_sha256="sha",
-                derived_from_topology=True,
-            ),
-        ),
-    )
-    return capacity_handshake.make_session_snapshot(
-        contract=contract,
-        requested_capacity=requested,
-        configured_max_threads=configured,
-        platform_advertised_effective_cap=_coerce_int(m.get("platform_advertised_effective_cap"), None),
-        currently_available_runtime_slots=_coerce_int(m.get("currently_available_runtime_slots"), None),
-        workflow_dag_demand=_coerce_int(m.get("workflow_dag_demand"), requested),
-        nested_capacity_reservation=_coerce_int(m.get("nested_capacity_reservation"), 0),
-        write_scope_cap=_coerce_int(m.get("write_scope_cap"), configured),
-        session_reload_generation=_coerce_int(m.get("session_reload_generation"), 1),
-    )
+def _validate_action(packet: FixedImplementationPacket, decision: DecisionSufficiencyProjection) -> None:
+    expected_validation = tuple(action.command for action in packet.acceptance_checks) + packet.static_validation_commands
+    action = decision.fixed_action
+    if action.owner != packet.exact_owner or action.edit != packet.exact_write_set or action.validation != expected_validation:
+        raise ValueError("decision_sufficiency:fixed_action_mismatch")
 
 
-def _read_decision_sufficiency(decision: Mapping[str, Any] | None) -> DecisionSufficiencyProjection:
-    if decision is None:
-        return DecisionSufficiencyProjection(
-            record_id="",
-            plausible_state_ids=(),
-            fixed_action=object(),
-            action_equivalence="divergent",
-            further_investigation="forbidden",
-            authorized_evidence_request_ids=(),
-        )
-    m = _coerce_mapping(decision)
-    return DecisionSufficiencyProjection(
-        record_id=_coerce_string(m.get("record_id"), ""),
-        plausible_state_ids=_as_tuple(m.get("plausible_state_ids")),
-        fixed_action=m.get("fixed_action", object()),
-        action_equivalence=_coerce_string(m.get("action_equivalence"), "divergent"),
-        further_investigation=_coerce_string(m.get("further_investigation"), "forbidden"),
-        authorized_evidence_request_ids=_as_tuple(m.get("authorized_evidence_request_ids")),
-    )
-
-
-def _build_eligibility_evidence(packet: FixedImplementationPacket, decision: DecisionSufficiencyProjection,
-                              continuity: Mapping[str, Any] | None) -> SparkEligibilityEvidence:
+def _evidence(packet: FixedImplementationPacket, decision: DecisionSufficiencyProjection, fresh_cheaper: bool, capacity_refs: tuple[str, ...]) -> SparkEligibilityEvidence:
     return SparkEligibilityEvidence(
         evidence_version=1,
-        target_state_approved=packet.target_state_contract_ref != "",
-        target_state_implementation_executable=packet.implementation_execution_contract_ref != "",
-        unresolved_design_decision_count=len(packet.unresolved_algorithm_decisions + packet.unresolved_api_decisions + packet.unresolved_schema_decisions + packet.unresolved_oracle_decisions),
-        responsibility_graph_complete=all(
-            dep in {
-                "implementation_route->model_profile_registry",
-                "implementation_route->capacity_handshake",
-                "implementation_route-X->route",
-                "implementation_route-X->capability_route",
-                "implementation_route-X->skill_route_catalog",
-            }
-            for dep in packet.dependency_import_direction
-        ),
-        owner_write_set_exact=len(packet.exact_write_set) > 0,
-        source_packet_immutable=packet.immutable_source_packet_ref != "",
-        design_review_approved=True,
-        document_flow_review_approved_when_active=True,
+        target_state_approved=True,
+        target_state_implementation_executable=True,
+        unresolved_design_decision_count=packet.unresolved_design_count,
+        responsibility_graph_complete=True,
+        owner_write_set_exact=True,
+        source_packet_immutable=True,
         all_design_blockers_resolved=True,
-        all_algorithm_api_schema_oracle_decisions_resolved=packet.unresolved_design_count() == 0
-        if hasattr(packet, "unresolved_design_count")
-        else (len(packet.unresolved_algorithm_decisions) == 0 and len(packet.unresolved_api_decisions) == 0 and len(packet.unresolved_schema_decisions) == 0 and len(packet.unresolved_oracle_decisions) == 0),
         deterministic_acceptance_fixed=packet.deterministic_acceptance_fixed,
-        static_validation_fixed=_coerce_bool(packet.static_validation_commands is not None, True),
+        static_validation_fixed=bool(packet.static_validation_commands),
         no_causal_repair=not packet.causal_repair_required,
         no_cross_owner_integration=not packet.cross_owner_integration_required,
-        no_architectural_interpretation_required=True,
-        public_shape_unchanged_or_fixed=packet.public_shape_fixed,
+        public_shape_fixed=packet.public_shape_fixed,
         dependency_direction_fixed=True,
-        decision_sufficiency_identical=decision.action_equivalence == "identical",
-        fresh_packet_cheaper_than_suitable_continuation=_coerce_bool(continuity and continuity.get("fresh_packet_cheaper_than_suitable_continuation", True), True),
+        decision_sufficiency_identical=decision.fixed_action is not None,
+        fresh_packet_cheaper_than_suitable_continuation=fresh_cheaper,
         capacity_slot_granted_or_queueable=True,
-        evidence_refs=("approved_design_artifact_sha256", "decision_sufficiency_user_freeze_ref", "target_state_contract", "capacity_snapshot_ref"),
+        evidence_refs=(
+            packet.abstract_design_frame_ref,
+            packet.target_state_contract_ref,
+            packet.immutable_source_packet_ref,
+            decision.record.record_id,
+            *decision.record.declared_decision_evidence,
+            *capacity_refs,
+        ),
+        source_anchors=packet.immutable_source_anchors,
+        acceptance_checks=packet.acceptance_checks,
+        static_validation_commands=packet.static_validation_commands,
     )
-
-
-def _pick_profile(packet: FixedImplementationPacket) -> str:
-    # Canonical projection: require the registered spark profile exists.
-    profile = _normalize_profile_id("spark_implementation_low")
-    registry = model_profile_registry.load_model_profile_registry()
-    registry.by_profile(profile)
-    return profile
-
-
-def _snapshot_available(snapshot: capacity_handshake.CapacitySnapshot | None) -> bool:
-    if snapshot is None:
-        return True
-    try:
-        return snapshot.remaining_total_slots > 0
-    except Exception:
-        return True
 
 
 def resolve_implementation_candidate(
     fixed_implementation_packet: Mapping[str, Any] | FixedImplementationPacket,
-    capacity_snapshot: Mapping[str, Any] | capacity_handshake.CapacitySnapshot | None,
-    continuity_decision: Mapping[str, Any] | None,
+    capacity_snapshot: Mapping[str, Any] | capacity_handshake.CapacitySnapshot,
+    continuity_decision: Mapping[str, Any],
 ) -> SparkEligibilityDecision:
     packet = _parse_fixed_packet(fixed_implementation_packet)
-    continuity = _coerce_mapping(continuity_decision) if continuity_decision is not None else None
-
-    decision_projection = _read_decision_sufficiency(
-        continuity.get("decision_sufficiency") if continuity else None
-    )
-
-    profile = _pick_profile(packet)
-
-    evidence = _build_eligibility_evidence(packet, decision_projection, continuity)
-    reason_codes: list[str] = []
-
-    if not evidence.target_state_approved:
-        reason_codes.append("target_state_not_approved")
-        return SparkEligibilityDecision(
-            decision_version=1,
-            decision_id=f"{packet.packet_id}:ineligible",
-            eligibility="ineligible",
-            selected_agent_type="none",
-            selected_profile_id="none",
-            reason_codes=tuple(reason_codes),
-            evidence_ref=packet.target_state_contract_ref,
-            context_continuity_decision_ref=packet.context_continuity_decision_ref,
-            capacity_action="blocked",
-            parent_lineage_id=packet.parent_lineage_id,
-            evidence=evidence,
-        )
-
-    if not evidence.target_state_implementation_executable:
-        reason_codes.append("target_state_not_implementation_executable")
-        return SparkEligibilityDecision(
-            decision_version=1,
-            decision_id=f"{packet.packet_id}:ineligible",
-            eligibility="ineligible",
-            selected_agent_type="none",
-            selected_profile_id="none",
-            reason_codes=tuple(reason_codes),
-            evidence_ref=packet.target_state_contract_ref,
-            context_continuity_decision_ref=packet.context_continuity_decision_ref,
-            capacity_action="blocked",
-            parent_lineage_id=packet.parent_lineage_id,
-            evidence=evidence,
-        )
-
-    if evidence.unresolved_design_decision_count:
-        reason_codes.append("unresolved_design_decision")
-    if not evidence.decision_sufficiency_identical:
-        reason_codes.append("action_divergent")
-    if not evidence.no_architectural_interpretation_required:
-        reason_codes.append("unsupported_architectural_interpretation")
-
-    if reason_codes:
-        return SparkEligibilityDecision(
-            decision_version=1,
-            decision_id=f"{packet.packet_id}:blocked",
-            eligibility="ineligible",
-            selected_agent_type="none",
-            selected_profile_id="none",
-            reason_codes=tuple(reason_codes),
-            evidence_ref=packet.target_state_contract_ref,
-            context_continuity_decision_ref=packet.context_continuity_decision_ref,
-            capacity_action="blocked",
-            parent_lineage_id=packet.parent_lineage_id,
-            evidence=evidence,
-        )
-
-    requested_continue = continuity.get("continue_existing") if continuity else False
-    existing_worker = _coerce_string(continuity.get("resume_worker_agent_id") if continuity else None, "")
-    same_packet = _coerce_string(continuity.get("resume_packet_sha256") if continuity else None, "")
-    if requested_continue and existing_worker:
-        if not same_packet or same_packet != packet.static_packet_sha256:
-            reason_codes.append("same_worker_resume_mismatch")
+    continuity = _continuity(continuity_decision)
+    decision = _decision_projection(continuity["decision_sufficiency"])
+    _validate_action(packet, decision)
+    available_total, available_write, capacity_refs = _capacity_available(capacity_snapshot)
+    fresh_cheaper = bool(continuity["fresh_packet_cheaper_than_suitable_continuation"])
+    evidence = _evidence(packet, decision, fresh_cheaper, capacity_refs)
+    continue_existing = bool(continuity["continue_existing"])
+    resume_worker = continuity["resume_worker_agent_id"]
+    resume_sha = continuity["resume_packet_sha256"]
+    repair_count = int(continuity["structural_gap_repair_count"])
+    if continue_existing:
+        if not isinstance(resume_worker, str) or resume_sha != packet.static_packet_sha256 or repair_count != 1:
             return SparkEligibilityDecision(
-                decision_version=1,
-                decision_id=f"{packet.packet_id}:blocked",
-                eligibility="ineligible",
-                selected_agent_type="none",
-                selected_profile_id="none",
-                reason_codes=tuple(reason_codes),
-                evidence_ref=packet.target_state_contract_ref,
-                context_continuity_decision_ref=packet.context_continuity_decision_ref,
-                capacity_action="blocked",
-                parent_lineage_id=packet.parent_lineage_id,
-                resume_worker_agent_id=existing_worker,
-                evidence=evidence,
+                1,
+                f"{packet.packet_id}:blocked",
+                "ineligible",
+                "none",
+                "none",
+                ("same_worker_resume_mismatch",),
+                packet.immutable_source_packet_ref,
+                packet.context_continuity_decision_ref,
+                "blocked",
+                packet.parent_lineage_id,
+                resume_worker if isinstance(resume_worker, str) else None,
+                evidence,
             )
-        reason_codes.append("resume_existing_worker")
+    elif resume_worker is not None or resume_sha is not None or repair_count != 0:
+        raise ValueError("continuity_decision:inactive_resume_fields_must_be_empty")
+    if not continue_existing and not fresh_cheaper:
         return SparkEligibilityDecision(
-            decision_version=1,
-            decision_id=f"{packet.packet_id}:continue",
-            eligibility="eligible",
-            selected_agent_type="spark_worker",
-            selected_profile_id=profile,
-            reason_codes=tuple(reason_codes),
-            evidence_ref=packet.target_state_contract_ref,
-            context_continuity_decision_ref=packet.context_continuity_decision_ref,
-            capacity_action="continue_existing",
-            parent_lineage_id=packet.parent_lineage_id,
-            resume_worker_agent_id=existing_worker,
+            1,
+            f"{packet.packet_id}:blocked",
+            "ineligible",
+            "none",
+            "none",
+            ("fresh_spark_cost_not_lower",),
+            packet.immutable_source_packet_ref,
+            packet.context_continuity_decision_ref,
+            "blocked",
+            packet.parent_lineage_id,
             evidence=evidence,
         )
-
-    parsed_snapshot = _parse_capacity_snapshot(capacity_snapshot)
-    available = _snapshot_available(parsed_snapshot)
-    if not available:
-        reason_codes.append("capacity_unavailable")
+    profile_id = "spark_implementation_low"
+    model_profile_registry.load_model_profile_registry().by_profile(profile_id)
+    if continue_existing:
         return SparkEligibilityDecision(
-            decision_version=1,
-            decision_id=f"{packet.packet_id}:queued",
-            eligibility="queued",
-            selected_agent_type="spark_worker",
-            selected_profile_id=profile,
-            reason_codes=tuple(reason_codes),
-            evidence_ref=packet.target_state_contract_ref,
-            context_continuity_decision_ref=packet.context_continuity_decision_ref,
-            capacity_action="queue",
-            parent_lineage_id=packet.parent_lineage_id,
+            1,
+            f"{packet.packet_id}:continue",
+            "eligible",
+            "spark_worker",
+            profile_id,
+            ("resume_same_spark_after_one_repaired_structural_gap",),
+            packet.immutable_source_packet_ref,
+            packet.context_continuity_decision_ref,
+            "continue_existing",
+            packet.parent_lineage_id,
+            str(resume_worker),
+            evidence,
+        )
+    if available_total < 1 or available_write < 1:
+        return SparkEligibilityDecision(
+            1,
+            f"{packet.packet_id}:queued",
+            "queued",
+            "spark_worker",
+            profile_id,
+            ("capacity_saturated",),
+            packet.immutable_source_packet_ref,
+            packet.context_continuity_decision_ref,
+            "queue",
+            packet.parent_lineage_id,
             evidence=evidence,
         )
-
-    if not evidence.fresh_packet_cheaper_than_suitable_continuation:
-        return SparkEligibilityDecision(
-            decision_version=1,
-            decision_id=f"{packet.packet_id}:blocked",
-            eligibility="ineligible",
-            selected_agent_type="worker",
-            selected_profile_id="none",
-            reason_codes=("fresh_spark_cost_not_lower",),
-            evidence_ref=packet.target_state_contract_ref,
-            context_continuity_decision_ref=packet.context_continuity_decision_ref,
-            capacity_action="blocked",
-            parent_lineage_id=packet.parent_lineage_id,
-            evidence=evidence,
-        )
-
     return SparkEligibilityDecision(
-        decision_version=1,
-        decision_id=f"{packet.packet_id}:eligible",
-        eligibility="eligible",
-        selected_agent_type="spark_worker",
-        selected_profile_id=profile,
-        reason_codes=("eligible",),
-        evidence_ref=packet.target_state_contract_ref,
-        context_continuity_decision_ref=packet.context_continuity_decision_ref,
-        capacity_action="reserve",
-        parent_lineage_id=packet.parent_lineage_id,
+        1,
+        f"{packet.packet_id}:eligible",
+        "eligible",
+        "spark_worker",
+        profile_id,
+        ("fixed_packet_eligible",),
+        packet.immutable_source_packet_ref,
+        packet.context_continuity_decision_ref,
+        "reserve_on_successful_spawn",
+        packet.parent_lineage_id,
         evidence=evidence,
     )
 
 
+def _blocked_result(code: str, evidence: str, *, packet: FixedImplementationPacket | None = None) -> ImplementationRouteResult:
+    digest = hashlib.sha256(evidence.encode("utf-8")).hexdigest()[:16]
+    return ImplementationRouteResult(
+        result_version=1,
+        decision_ref=f"{code}:{digest}",
+        selected_agent_type="none",
+        selected_profile_id="none",
+        packet_ref=packet.immutable_source_packet_ref if packet else None,
+        packet_sha256=packet.static_packet_sha256 if packet else None,
+        capacity_action="blocked",
+        resume_worker_agent_id=None,
+        next_gate=packet.owner_gate_id if packet else "implementation_route_gate",
+        failure=ImplementationRouteFailure(1, code, "implementation_route", (evidence,), False),
+        status="blocked",
+        exact_write_set=packet.exact_write_set if packet else (),
+        source_anchors=packet.immutable_source_anchors if packet else (),
+        acceptance_checks=packet.acceptance_checks if packet else (),
+        static_validation_commands=packet.static_validation_commands if packet else (),
+    )
+
+
 def route_implementation(request: Mapping[str, Any] | ImplementationRouteRequest) -> ImplementationRouteResult:
-    req = _resolve_request(request)
-
-    if not req.fixed_implementation_packet:
-        return ImplementationRouteResult(
-            result_version=1,
-            decision_ref="missing_fixed_implementation_packet",
-            selected_agent_type="none",
-            selected_profile_id="none",
-            packet_ref=req.fixed_implementation_packet_ref,
-            packet_sha256=req.fixed_implementation_packet_sha256,
-            capacity_action="blocked",
-            resume_worker_agent_id=req.resume_worker_agent_id,
-            next_gate="implementation_route_gate",
-            failure=ImplementationRouteFailure(
-                failure_version=1,
-                code="stale_packet",
-                owner_id="implementation_route",
-                evidence_refs=(req.fixed_implementation_packet_ref, req.decision_sufficiency_ref),
-                retryable=False,
-            ),
-            status="blocked",
-        )
-
+    packet: FixedImplementationPacket | None = None
     try:
-        packet = _parse_fixed_packet(req.fixed_implementation_packet)
-    except Exception as exc:
-        return ImplementationRouteResult(
-            result_version=1,
-            decision_ref=f"stale_packet:{hashlib.sha256(str(exc).encode()).hexdigest()[:16]}",
-            selected_agent_type="none",
-            selected_profile_id="none",
-            packet_ref=req.fixed_implementation_packet_ref,
-            packet_sha256=req.fixed_implementation_packet_sha256,
-            capacity_action="blocked",
-            resume_worker_agent_id=req.resume_worker_agent_id,
-            next_gate="implementation_route_gate",
-            failure=ImplementationRouteFailure(
-                failure_version=1,
-                code="stale_packet",
-                owner_id="implementation_route",
-                evidence_refs=(req.fixed_implementation_packet_ref,),
-                retryable=False,
-            ),
-            status="blocked",
-        )
-
-    if packet.exact_owner != "implementation_route":
-        return ImplementationRouteResult(
-            result_version=1,
-            decision_ref=f"owner_mismatch:{packet.packet_id}",
-            selected_agent_type="none",
-            selected_profile_id="none",
-            packet_ref=packet.static_packet_sha256 and req.fixed_implementation_packet_ref or None,
-            packet_sha256=req.fixed_implementation_packet_sha256,
-            capacity_action="blocked",
-            resume_worker_agent_id=req.resume_worker_agent_id,
-            next_gate=packet.owner_gate_id,
-            failure=ImplementationRouteFailure(
-                failure_version=1,
-                code="predecessor_gate_missing",
-                owner_id="implementation_route",
-                evidence_refs=(packet.target_state_contract_ref,),
-                retryable=False,
-            ),
-            status="blocked",
-        )
-
-    if req.structural_design_gap_ref and not req.resume_worker_agent_id:
-        return ImplementationRouteResult(
-            result_version=1,
-            decision_ref=f"{packet.packet_id}:structural_gap",
-            selected_agent_type="none",
-            selected_profile_id="none",
-            packet_ref=req.fixed_implementation_packet_ref,
-            packet_sha256=req.fixed_implementation_packet_sha256,
-            capacity_action="blocked",
-            resume_worker_agent_id=req.resume_worker_agent_id,
-            next_gate=packet.owner_gate_id,
-            failure=ImplementationRouteFailure(
-                failure_version=1,
-                code="same_worker_resume_mismatch",
-                owner_id="implementation_route",
-                evidence_refs=(req.structural_design_gap_ref,),
-                retryable=False,
-            ),
-            status="blocked",
-        )
-
-    continuity = _coerce_mapping(req.continuity_decision) if req.continuity_decision is not None else {
-        "decision_sufficiency": req.fixed_decision_sufficiency,
-        "resume_worker_agent_id": req.resume_worker_agent_id,
-        "fresh_packet_cheaper_than_suitable_continuation": True,
-        "continue_existing": bool(req.resume_worker_agent_id),
-        "resume_packet_sha256": req.fixed_implementation_packet_sha256,
-    }
-    if req.resume_worker_agent_id and "resume_worker_agent_id" not in continuity:
-        continuity["resume_worker_agent_id"] = req.resume_worker_agent_id
-
-    decision = resolve_implementation_candidate(packet, req.capacity_snapshot, continuity)
-
-    if req.resume_worker_agent_id and decision.capacity_action == "continue_existing":
-        if req.structural_design_gap_ref:
-            return ImplementationRouteResult(
-                result_version=1,
-                decision_ref=decision.decision_id,
-                selected_agent_type="spark_worker",
-                selected_profile_id=decision.selected_profile_id,
-                packet_ref=req.fixed_implementation_packet_ref,
-                packet_sha256=req.fixed_implementation_packet_sha256,
-                capacity_action="continue_existing",
-                resume_worker_agent_id=req.resume_worker_agent_id,
-                next_gate=packet.owner_gate_id,
-                failure=None,
-                status="completed",
-            )
-    if req.structural_design_gap_ref and req.fixed_implementation_packet_sha256 == packet.static_packet_sha256:
-        reason = "structural_design_gap_packet_stale"
-        return ImplementationRouteResult(
-            result_version=1,
-            decision_ref=decision.decision_id,
-            selected_agent_type="spark_worker",
-            selected_profile_id=decision.selected_profile_id,
-            packet_ref=req.fixed_implementation_packet_ref,
-            packet_sha256=req.fixed_implementation_packet_sha256,
-            capacity_action="continue_existing",
-            resume_worker_agent_id=req.resume_worker_agent_id,
-            next_gate=packet.owner_gate_id,
-            failure=None,
-            status="completed",
-        )
-
-    if decision.eligibility == "eligible":
-        if decision.selected_profile_id == "none":
-            return ImplementationRouteResult(
-                result_version=1,
-                decision_ref=decision.decision_id,
-                selected_agent_type="none",
-                selected_profile_id="none",
-                packet_ref=req.fixed_implementation_packet_ref,
-                packet_sha256=req.fixed_implementation_packet_sha256,
-                capacity_action=decision.capacity_action,
-                resume_worker_agent_id=decision.resume_worker_agent_id,
-                next_gate=packet.owner_gate_id,
-                failure=ImplementationRouteFailure(
-                    failure_version=1,
-                    code="unsuitable_profile",
-                    owner_id="implementation_route",
-                    evidence_refs=(decision.evidence_ref,),
-                    retryable=False,
-                ),
-                status="blocked",
-            )
-        status = "completed" if decision.capacity_action != "queue" else "queued"
-        return ImplementationRouteResult(
-            result_version=1,
-            decision_ref=decision.decision_id,
-            selected_agent_type="spark_worker",
-            selected_profile_id=decision.selected_profile_id,
-            packet_ref=req.fixed_implementation_packet_ref,
-            packet_sha256=req.fixed_implementation_packet_sha256,
-            capacity_action=decision.capacity_action,
-            resume_worker_agent_id=decision.resume_worker_agent_id,
-            next_gate=packet.owner_gate_id,
-            failure=None,
-            status=status,
-        )
-
-    if decision.eligibility == "queued":
-        return ImplementationRouteResult(
-            result_version=1,
-            decision_ref=decision.decision_id,
-            selected_agent_type="spark_worker",
-            selected_profile_id=decision.selected_profile_id,
-            packet_ref=req.fixed_implementation_packet_ref,
-            packet_sha256=req.fixed_implementation_packet_sha256,
-            capacity_action="queue",
-            resume_worker_agent_id=req.resume_worker_agent_id,
-            next_gate=packet.owner_gate_id,
-            failure=None,
-            status="queued",
-        )
-
-    if "stale" in decision.reason_codes:
-        code = "stale_packet"
-    elif "same_worker_resume_mismatch" in decision.reason_codes:
-        code = "same_worker_resume_mismatch"
-    elif "capacity_unavailable" in decision.reason_codes:
-        code = "capacity_unavailable"
-    elif "action_divergent" in decision.reason_codes:
-        code = "action_divergent"
-    elif "fresh_spark_cost_not_lower" in decision.reason_codes:
-        code = "fresh_spark_cost_not_lower"
-    else:
-        code = "predecessor_gate_missing"
-
+        parsed_request = _parse_request(request)
+        packet = _parse_fixed_packet(parsed_request.fixed_implementation_packet)
+        _validate_identity(parsed_request, packet)
+        route_continuity = _closed_mapping(parsed_request.continuity_decision, _CONTINUITY_FIELDS, "continuity_decision")
+        if route_continuity["decision_sufficiency"] != parsed_request.fixed_decision_sufficiency:
+            raise ValueError("decision_sufficiency:request_continuity_mismatch")
+        if parsed_request.resume_worker_agent_id != route_continuity["resume_worker_agent_id"]:
+            raise ValueError("continuity_decision:resume_worker_identity_mismatch")
+        if bool(parsed_request.structural_design_gap_ref) != (int(route_continuity["structural_gap_repair_count"]) == 1):
+            raise ValueError("continuity_decision:structural_gap_identity_mismatch")
+        decision = resolve_implementation_candidate(packet, parsed_request.capacity_snapshot, route_continuity)
+    except (ValueError, TypeError, model_profile_registry.ImplementationFeedback) as exc:
+        return _blocked_result("stale_or_malformed_packet_evidence", str(exc), packet=packet)
+    if decision.eligibility == "ineligible":
+        return _blocked_result(decision.reason_codes[0], decision.evidence_ref, packet=packet)
     return ImplementationRouteResult(
         result_version=1,
         decision_ref=decision.decision_id,
-        selected_agent_type="none" if decision.selected_agent_type == "none" else "worker",
-        selected_profile_id="none",
-        packet_ref=req.fixed_implementation_packet_ref,
-        packet_sha256=req.fixed_implementation_packet_sha256,
-        capacity_action="blocked",
-        resume_worker_agent_id=None,
+        selected_agent_type=decision.selected_agent_type,
+        selected_profile_id=decision.selected_profile_id,
+        packet_ref=packet.immutable_source_packet_ref,
+        packet_sha256=packet.static_packet_sha256,
+        capacity_action=decision.capacity_action,
+        resume_worker_agent_id=decision.resume_worker_agent_id,
         next_gate=packet.owner_gate_id,
-        failure=ImplementationRouteFailure(
-            failure_version=1,
-            code=code,
-            owner_id="implementation_route",
-            evidence_refs=(decision.evidence_ref,) + decision.reason_codes,
-            retryable=False,
-        ),
-        status="blocked",
+        failure=None,
+        status="queued" if decision.eligibility == "queued" else "completed",
+        exact_write_set=packet.exact_write_set,
+        source_anchors=packet.immutable_source_anchors,
+        acceptance_checks=packet.acceptance_checks,
+        static_validation_commands=packet.static_validation_commands,
     )
 
 
@@ -917,13 +891,13 @@ def build_spark_result(
     durable_result_summary: str = "",
 ) -> SparkImplementationResult:
     return SparkImplementationResult(
-        schema_id=SCHEMA_IDS["spark_implementation_result"],
-        packet_id=packet_id,
-        packet_sha256=packet_sha256,
-        status=status,
-        changed_paths=tuple(changed_paths),
-        acceptance_evidence=tuple(acceptance_evidence),
-        implementation_feedback=implementation_feedback,
-        structural_design_gap=structural_design_gap,
-        durable_result_summary=durable_result_summary,
+        SCHEMA_IDS["spark_implementation_result"],
+        packet_id,
+        packet_sha256,
+        status,
+        tuple(changed_paths),
+        tuple(acceptance_evidence),
+        implementation_feedback,
+        structural_design_gap,
+        durable_result_summary,
     )

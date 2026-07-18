@@ -45,7 +45,7 @@ downstream implementation ./hooks/notebook_quality_guard.py warns on notebook-as
 - 共通入口は `AGENTS.md`
 - workflow と skill の正本は `agents/`
 - Codex-specific routing は `agents/canonical/CODEX_WORKFLOW.md` と `agents/canonical/CODEX_SUBAGENTS.md`
-- runtime cap は `.codex/config.toml` の `[agents].max_threads = 24` を使い、spawn は depth ではなく bounded concurrency で制御します
+- `.codex/config.toml` の `[agents].max_threads = 26` は direct frontier `20` と nested reservation `6` から生成した requested/configured readback です。platform-effective / current-available capacity は別入力であり、26 を runtime の普遍的な cap とは扱いません
 - `[agents]` は上限と timeout の設定であり、上位 runtime / developer instruction が要求する explicit subagent authorization を上書きしません。明示許可が無い session では fan-out plan と handoff packet を作り、実際の spawn は許可後に行います
 - plan mode や permissions のような mode は session 単位です。official Codex CLI では `/plan`、`/model`、`/permissions` を使います
 - runtime が `/agent` を提供する場合は inventory 確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます
@@ -145,11 +145,10 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 - `tools/agent_tools/check_agent_runtime_alignment.py` and
   `tools/agent_tools/evaluate_codex_agent_roles.py` validate the materialized
   agent TOML files directly.
-- Ordinary planning, authoring, exploration, experiment execution, and review
-  children use Luna/high. `worker` and `ship_reviewer` use Luna/xhigh; Spark
-  remains explicit mechanical work. `gpt-5.4-mini/medium` is reserved for the
-  fresh, read-only, artifact-only `skill_evaluator` lane in explicit T14
-  `skill_evaluation` and is absent from permanent team roles.
+- `agents/model_profiles.toml` が child model、reasoning、capability、context、
+  return schema、continuation を所有し、canonical materializer が
+  `.codex/agents/*.toml` と `agents/agents_config.json` の role projection を生成します。
+  role view を手動の model authority として編集しません。
 - The parent uses Sol/high and owns integration and final approval. Sol/xhigh is
   an explicit high-risk or final escalation, not a child-role default.
 - mode の扱い

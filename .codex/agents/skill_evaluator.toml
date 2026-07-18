@@ -1,10 +1,18 @@
+# @dependency-start
+# contract configuration
+# responsibility Projects the canonical skill_evaluator model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
+# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/agents_config.json and agents/model_profiles.toml
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: f709c0a74b8286c27e6735dbac5685e905869e576c7661dc1679a9b5a8138897
 
 name = "skill_evaluator"
 description = "Fresh read-only evaluator for explicit empirical skill scenarios."
-nickname_candidates = ["skill-eval", "fresh-eval", "scenario-eval"]
+nickname_candidates = ["skill_evaluator"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.4-mini"

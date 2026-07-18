@@ -1,10 +1,18 @@
+# @dependency-start
+# contract configuration
+# responsibility Projects the canonical ship_reviewer model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
+# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/agents_config.json and agents/model_profiles.toml
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: ce0e1c43d81d30defd3ffa1286dfc737bf1114a73cfdfc9957ead24e5546cfca
 
 name = "ship_reviewer"
 description = "High-assurance read-only reviewer for final clause coverage and release readiness."
-nickname_candidates = ["ship-gate", "final-gate", "release-check"]
+nickname_candidates = ["ship_reviewer"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"

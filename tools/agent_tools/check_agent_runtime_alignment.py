@@ -9,6 +9,8 @@
 # upstream design ../../agents/skills/catalog.yaml public skill routing and related-skill catalog
 # upstream implementation ./skill_route_catalog.py canonical skill-route rules and capability metadata
 # upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
+# upstream implementation ./model_profile_registry.py owns canonical model/profile projections
+# upstream implementation ./capacity_handshake.py owns typed capacity readback
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""
@@ -81,17 +83,8 @@ EXPECTED_MAX_THREADS = 26
 EXPECTED_MAX_DEPTH = 2
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
 MIN_DYNAMIC_SPAWN_BUDGET = 4
-PARENT_MODEL = "gpt-5.6-sol"
-PARENT_REASONING_EFFORT = "high"
-REVIEW_MODEL = "gpt-5.6-luna"
-LUNA_MODEL = "gpt-5.6-luna"
-SPARK_MODEL = "gpt-5.3-codex-spark"
-SKILL_VALIDATION_MODEL = "gpt-5.4-mini"
-LUNA_XHIGH_AGENT_IDS = {"worker", "ship_reviewer"}
-SPARK_LOW_AGENT_IDS = {"spark_worker"}
 EVALUATOR_AGENT_ID = "skill_evaluator"
 EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
-SKILL_VALIDATION_AGENT_IDS = {EVALUATOR_AGENT_ID}
 FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
 GENERATED_ROLE_VIEW_MATERIALIZER = "generate_role_views"
 SCOPED_MODEL_POLICY_KEYS = {
@@ -275,14 +268,17 @@ def load_project_skill_config_toml() -> dict[str, object]:
 def validate_project_config() -> None:
     """Check that the shared project config exposes the review route."""
     config = load_project_config_toml()
-    ensure(config.get("model") == PARENT_MODEL, f"model must be {PARENT_MODEL}")
+    registry = model_profile_registry.load_model_profile_registry(ROOT)
+    parent_profile = registry.by_profile("sol_parent_high")
+    review_profile = registry.by_profile("luna_reasoning_high")
+    ensure(config.get("model") == parent_profile.model, "parent model must project sol_parent_high")
     ensure(
-        config.get("model_reasoning_effort") == PARENT_REASONING_EFFORT,
-        f"model_reasoning_effort must be {PARENT_REASONING_EFFORT}",
+        config.get("model_reasoning_effort") == parent_profile.reasoning_effort,
+        "parent reasoning effort must project sol_parent_high",
     )
     ensure(
-        config.get("review_model") == REVIEW_MODEL,
-        f"review_model must be {REVIEW_MODEL}",
+        config.get("review_model") == review_profile.model,
+        "review_model must project luna_reasoning_high",
     )
     forbidden_project_keys = sorted(
         {"service_tier", "flex", "tier"} & set(config)
@@ -554,23 +550,12 @@ def validate_generated_role_views() -> None:
         "name", "description", "nickname_candidates", "sandbox_mode",
         "approval_policy", "model", "model_reasoning_effort", "developer_instructions",
     }
-    model_by_profile = {
-        "luna_reasoning_high": (LUNA_MODEL, "high"),
-        "luna_implementation_xhigh": (LUNA_MODEL, "xhigh"),
-        "luna_ship_xhigh": (LUNA_MODEL, "xhigh"),
-        "spark_implementation_low": (SPARK_MODEL, "low"),
-        "mini_skill_evaluator_medium": (SKILL_VALIDATION_MODEL, "medium"),
-    }
     registry = model_profile_registry.load_model_profile_registry(ROOT)
     registry_ids = {profile.id for profile in registry.model_profiles}
-    generated = {}
-    for binding in bindings_raw:
-        binding = require_mapping(binding, "agents_config.roles entries must be mappings")
-        role_id = require_string(binding.get("id"), "agents_config.roles[].id must be a string")
-        profile = registry.by_profile(require_string(binding.get("profile_id") or binding.get("model_profile"), f"roles.{role_id}.profile_id"))
-        clauses = " ".join(clause.text for clause in sorted(profile.role_instruction_template.clauses, key=lambda item: item.priority))
-        template = profile.role_instruction_template.template_text.replace("{role_id in evaluator mode}", role_id)
-        generated[role_id] = template.format(role_id=role_id, model_alias=profile.model_alias, base_prompt=clauses)
+    generated = {
+        view.role_id: view
+        for view in model_profile_registry.generate_role_views(registry, root=ROOT)
+    }
     ensure(set(configs) == set(agent_views) == set(bindings), "generated role-view sets must be identical")
     ensure(len(configs) == 34, "generated role-view projection must contain 34 views")
     ensure("sol_parent_high" in registry_ids, "registry must retain sol_parent_high")
@@ -579,27 +564,39 @@ def validate_generated_role_views() -> None:
         source = require_mapping(agent_views.get(role_id), f"agent_views.{role_id} must be a mapping")
         binding = bindings[role_id]
         ensure({key for key in config_view if not key.startswith("__")} == expected_fields, f"{role_id} generated view must be closed eight-field projection")
-        for field in ("name", "description", "nickname_candidates", "sandbox_mode", "approval_policy"):
-            ensure(config_view.get(field) == source.get(field), f"{role_id} {field} must project agents_config.agent_views")
+        view = generated[role_id]
+        for field in expected_fields:
+            projected = {
+                "name": view.name,
+                "description": view.description,
+                "nickname_candidates": list(view.nickname_candidates),
+                "sandbox_mode": view.sandbox_mode,
+                "approval_policy": view.approval_policy,
+                "model": view.model,
+                "model_reasoning_effort": view.reasoning_effort,
+                "developer_instructions": view.rendered_instructions,
+            }[field]
+            ensure(config_view.get(field) == projected, f"{role_id} {field} must project canonical registry materialization")
+            ensure(source.get(field) == projected, f"{role_id} agents_config projection diverges for {field}")
         profile_id = require_string(source.get("profile_id"), f"agent_views.{role_id}.profile_id must be a string")
         ensure(profile_id in registry_ids, f"{role_id} profile is not in model profile registry")
         ensure(binding.get("profile_id") == profile_id, f"{role_id} profile binding diverges from agent view")
-        ensure(binding.get("capsule_schema_id") == source.get("capsule_schema_id"), f"{role_id} capsule schema diverges")
+        ensure(binding.get("capsule_schema_id") == view.capsule_schema_id == source.get("capsule_schema_id"), f"{role_id} capsule schema diverges")
         ensure(require_string(source.get("logical_role_id"), f"agent_views.{role_id}.logical_role_id must be a string"), "logical role id must be non-empty")
         ensure(require_string(source.get("role_contract_ref"), f"agent_views.{role_id}.role_contract_ref must be a string"), "role contract ref must be non-empty")
-        ensure(require_string_list(binding.get("capabilities"), f"roles.{role_id}.capabilities"), f"{role_id} capability references must be non-empty")
-        expected_model, expected_effort = model_by_profile.get(profile_id, (None, None))
-        ensure(expected_model is not None, f"{role_id} profile lacks executable model projection")
-        ensure(config_view.get("model") == expected_model, f"{role_id} model must be generated from profile {profile_id}")
-        ensure(config_view.get("model_reasoning_effort") == expected_effort, f"{role_id} reasoning effort must be generated from profile {profile_id}")
-        expected = generated[role_id].strip()
-        ensure(config_view.get("developer_instructions", "").strip() == expected, f"{role_id} developer instructions diverge from registry materializer")
+        ensure(tuple(require_string_list(binding.get("capabilities"), f"roles.{role_id}.capabilities")) == view.capabilities, f"{role_id} capabilities diverge")
+        ensure(binding.get("projection_digest") == view.source_canonical_digest == source.get("projection_digest"), f"{role_id} projection digest diverges")
+        ensure(binding.get("return_schema_id") == view.return_schema_id == source.get("return_schema_id"), f"{role_id} return schema diverges")
+        ensure(binding.get("checkpoint_policy") == view.checkpoint_policy == source.get("checkpoint_policy"), f"{role_id} checkpoint policy diverges")
+        ensure(binding.get("continuation_policy") == view.continuation_policy == source.get("continuation_policy"), f"{role_id} continuation policy diverges")
         ensure("generated_role_view_v1" in (CODEX_AGENT_ROOT / f"{role_id}.toml").read_text(encoding="utf-8"), f"{role_id} missing generated header")
 
 
 def validate_codex_agent_settings() -> None:
     """Check executable settings and the canonical generated role projection."""
     configs = parse_codex_agents()
+    registry = model_profile_registry.load_model_profile_registry(ROOT)
+    generated = {view.role_id: view for view in model_profile_registry.generate_role_views(registry, ROOT)}
     valid_efforts = {"low", "medium", "high", "xhigh"}
     for role_id, config in sorted(configs.items()):
         forbidden_keys = sorted(FORBIDDEN_AGENT_PROFILE_KEYS & set(config))
@@ -607,18 +604,9 @@ def validate_codex_agent_settings() -> None:
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
         ensure(isinstance(config.get("model"), str) and bool(config.get("model")), f"{role_id} model must be a non-empty string")
         ensure(isinstance(config.get("model_reasoning_effort"), str) and config.get("model_reasoning_effort") in valid_efforts, f"{role_id} model_reasoning_effort must be valid")
-        if config.get("model") == SKILL_VALIDATION_MODEL:
-            ensure(role_id == EVALUATOR_AGENT_ID, f"{role_id} may use gpt-5.4-mini only for explicit T14 skill_evaluation via skill_evaluator")
-        if role_id == EVALUATOR_AGENT_ID:
-            ensure(config.get("model") == SKILL_VALIDATION_MODEL and config.get("model_reasoning_effort") == "medium", "skill_evaluator must use gpt-5.4-mini/medium")
-            ensure(config.get("sandbox_mode") == "read-only", "skill_evaluator sandbox_mode must be read-only")
-        elif role_id == "spark_worker":
-            ensure(config.get("model") == SPARK_MODEL and config.get("model_reasoning_effort") == "low", "spark_worker must use Spark/low")
-        elif role_id in {"worker", "ship_reviewer"}:
-            ensure(config.get("model") == LUNA_MODEL and config.get("model_reasoning_effort") == "xhigh", f"{role_id} model must be {LUNA_MODEL}")
-        else:
-            ensure(config.get("model") == LUNA_MODEL and config.get("model_reasoning_effort") == "high", f"{role_id} model must be {LUNA_MODEL}")
-        ensure(config.get("model") != PARENT_MODEL, f"{role_id} child model must not use Sol")
+        view = generated[role_id]
+        ensure(config.get("model") == view.model, f"{role_id} model must project registry profile {view.profile_id}")
+        ensure(config.get("model_reasoning_effort") == view.reasoning_effort, f"{role_id} reasoning must project registry profile {view.profile_id}")
     validate_generated_role_views()
 
 def validate_team_config_references() -> None:

@@ -26,10 +26,10 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - この文書は、Codex runtime の subagent inventory、activation、handoff、budget、role mapping を所有します。
 - 前半は principles、budget、handoff context、wave plan、language / completeness / quality policy を扱い、後半は activation timing、command surface、role mapping、write safety、model settings、smoke test を扱います。
 - parent agent は `## Wave Plan Contract` と `## Handoff Context Contract` を先に読み、writer / reviewer は `## Permanent Team To Codex Mapping` と `## Recommended Routing` を参照します。
-- この文書の `parent Sol` は `.codex/config.toml` の
-  `gpt-5.6-sol/high` parent を、`Luna child` は該当 role TOML が選ぶ
-  `gpt-5.6-luna` child を指します。正確な model / effort は config と role
-  TOML が所有します。
+- この文書の `parent Sol` は `.codex/config.toml` の parent projection を指し、
+  child profile authority は `agents/model_profiles.toml` が所有します。
+  `.codex/agents/*.toml` と `agents/agents_config.json` の profile fields は
+  canonical materializer が生成する readback view です。
 - chunked reading では、実行中の wave に関係する policy 節だけを開き、role behavior の詳細は `.codex/agents/*.toml` へ戻します。
 
 ## Principles
@@ -77,8 +77,8 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - 分割境界は差し替え可能性で判断します。別実装、別証明、別 validation oracle、別 review decision に置き換えられる単位なら worker scope にできます。数理的に差し替えが起きない境界、記法だけの境界、固定 context、同じ oracle を共有する連続導出は、過剰な subagent 分割を避けて同じ input packet に残します。
 - 固定 packet の candidate replacement は行いません。capacity/model failure は typed event として同じ immutable packet を queue し、exact target contradiction だけを一度の `StructuralDesignGap` として修復後、同じ Spark を再開します。
 - 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution は
-  `gpt-5.6-luna` child の findings と `gpt-5.6-sol/high` parent の統合判断に
-  分け、ship decision は parent が持つ
+  registry-selected reasoning child の findings と parent の統合判断に分け、
+  ship decision は parent が持つ
 - plan mode や permissions のような mode は session 単位の設定として parent session 側で切り替える
 
 ## Activation Capacity Projection
@@ -100,7 +100,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
   boundary に縮約された時点で closeout 条件を満たします。
 - multi-agent family で予定 stage wave を絞る場合は、rate limit、blocked role、irrelevant role、または parent-direct exception rationale を `schedule.md` / `workflow_monitoring.md` に残します
 - `role` は permanent responsibility id であり、実行単位は `role_id+instance_id+agent_type` です。同じ role を複数起動する場合は、各 instance に distinct `input_packet`、`allowed_paths` / `do_not_read`、`expected_output`、`validation_route`、`review_gate` を与えます。read-only role は review focus や input packet が分離される場合に同一 wave で複数起動できます。write-capable role は disjoint write scope と parent integration order がある場合だけ同一 wave で複数起動できます。
-- role topology と same-role instance policy は `agents/task_catalog.yaml` の `workflow_families[].role_topology` を source にし、`team_manifest.yaml` の `run.spawn_wave_recommendation.role_topology` に mirror します。`.codex/config.toml` の `max_threads` は runtime cap として扱います。
+- role topology と same-role instance policy は `agents/task_catalog.yaml` の `workflow_families[].role_topology` を source にし、`team_manifest.yaml` の `run.spawn_wave_recommendation.role_topology` に mirror します。`.codex/config.toml` の `max_threads` は topology-derived requested/configured readback であり、platform-effective / current-available capacity は handshake の別入力です。
 - workflow demand、write-cap、nested reservation、available capacity は
   [capacity handshake](#capacity-and-lifecycle) の generated projection です。
   固定 active/write 数、task-size/count/time budget、または disposable probe は
@@ -668,7 +668,7 @@ workflow docs、task catalog は agent TOML を参照します。
 運用メモ:
 - OpenAI / Codex の current product evidence は `$openai-docs` で確認します。
   この文書は product-evidence route を示します。
-- この repo では、parent orchestrator / integrator は Sol/high、通常の planning / authoring / exploration / inventory / machine-report summarization / experiment execution / review child は Luna/high、`worker` と `ship_reviewer` は Luna/xhigh にします。`gpt-5.4-mini/medium` は fresh read-only artifact-only の `skill_evaluator` が明示的な T14 `skill_evaluation` で使う評価専用設定であり、permanent team role には割り当てません。`spark_worker` は explicit parent-packet selection がある機械的実装だけに使います。
+- `agents/model_profiles.toml` の closed registry が parent / reasoning / implementation / ship / Spark / evaluator profiles と explicit role bindings を所有します。`.codex/agents/*.toml` と `agents/agents_config.json` はその generated projection で、手動の model authority ではありません。`spark_worker` は typed fixed-packet route が選んだ機械的実装だけに使います。
 - 親の既定は Sol/high とし、Sol/xhigh は high-risk / final escalation evidence があるときに起動します
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
 - 極端に狭く、待ち時間が支配的な implementation loop は `spark_worker` selection の evidence になり得ますが、`worker` 既定を切り替えるには explicit parent-packet selection が必要です

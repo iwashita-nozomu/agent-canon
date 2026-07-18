@@ -1,11 +1,111 @@
+# @dependency-start
+# contract configuration
+# responsibility Declares the closed canonical model-profile registry and explicit role bindings.
+# upstream design ./canonical/CODEX_SUBAGENTS.md defines role/profile responsibilities
+# downstream implementation ../tools/agent_tools/model_profile_registry.py loads and materializes this registry
+# downstream implementation ../tools/agent_tools/check_agent_runtime_alignment.py validates generated views
+# downstream implementation ../.codex/agents/spark_worker.toml projects the Spark runtime role
+# @dependency-end
+
 schema_id = "model_profile_registry_v1"
 registry_id = "model_profile_registry"
-registry_version = 1
+registry_version = 2
+
+[role_profile_bindings]
+artifact_reviewer = "luna_reasoning_high"
+benchmark_reviewer = "luna_reasoning_high"
+citation_evidence_reviewer = "luna_reasoning_high"
+cpp_reviewer = "luna_reasoning_high"
+detailed_design_reviewer = "luna_reasoning_high"
+detailed_designer = "luna_reasoning_high"
+diff_triage_reviewer = "luna_reasoning_high"
+docs_workflow_steward = "luna_reasoning_high"
+document_flow_reviewer = "luna_reasoning_high"
+execution_planner = "luna_reasoning_high"
+experiment_runner = "luna_reasoning_high"
+explorer = "luna_reasoning_high"
+fair_data_reviewer = "luna_reasoning_high"
+literature_researcher = "luna_reasoning_high"
+logic_gap_reviewer = "luna_reasoning_high"
+long_form_writer = "luna_reasoning_high"
+manager_reviewer = "luna_reasoning_high"
+ml_science_reviewer = "luna_reasoning_high"
+notation_definition_reviewer = "luna_reasoning_high"
+oop_readability_reviewer = "luna_reasoning_high"
+plan_reviewer = "luna_reasoning_high"
+project_reviewer = "luna_reasoning_high"
+prompt_config_reviewer = "luna_reasoning_high"
+python_reviewer = "luna_reasoning_high"
+report_reviewer = "luna_reasoning_high"
+reproducibility_reviewer = "luna_reasoning_high"
+requirements_organizer = "luna_reasoning_high"
+reviewer = "luna_reasoning_high"
+scientific_computing_reviewer = "luna_reasoning_high"
+ship_reviewer = "luna_ship_xhigh"
+skill_evaluator = "mini_skill_evaluator_medium"
+spark_worker = "spark_implementation_low"
+test_designer = "luna_reasoning_high"
+worker = "luna_implementation_xhigh"
+
+[role_sandbox_bindings]
+artifact_reviewer = "read-only"
+benchmark_reviewer = "read-only"
+citation_evidence_reviewer = "read-only"
+cpp_reviewer = "read-only"
+detailed_design_reviewer = "read-only"
+detailed_designer = "workspace-write"
+diff_triage_reviewer = "read-only"
+docs_workflow_steward = "workspace-write"
+document_flow_reviewer = "read-only"
+execution_planner = "workspace-write"
+experiment_runner = "workspace-write"
+explorer = "read-only"
+fair_data_reviewer = "read-only"
+literature_researcher = "read-only"
+logic_gap_reviewer = "read-only"
+long_form_writer = "workspace-write"
+manager_reviewer = "read-only"
+ml_science_reviewer = "read-only"
+notation_definition_reviewer = "read-only"
+oop_readability_reviewer = "read-only"
+plan_reviewer = "read-only"
+project_reviewer = "read-only"
+prompt_config_reviewer = "read-only"
+python_reviewer = "read-only"
+report_reviewer = "read-only"
+reproducibility_reviewer = "read-only"
+requirements_organizer = "workspace-write"
+reviewer = "read-only"
+scientific_computing_reviewer = "read-only"
+ship_reviewer = "read-only"
+skill_evaluator = "read-only"
+spark_worker = "workspace-write"
+test_designer = "read-only"
+worker = "workspace-write"
+
+[standalone_role_metadata.long_form_writer]
+logical_role_id = "long_form_writer"
+role_contract_ref = "agents/model_profiles.toml#/standalone_role_metadata/long_form_writer"
+sandbox_mode = "workspace-write"
+
+[standalone_role_metadata.oop_readability_reviewer]
+logical_role_id = "oop_readability_reviewer"
+role_contract_ref = "agents/model_profiles.toml#/standalone_role_metadata/oop_readability_reviewer"
+sandbox_mode = "read-only"
 
 [[model_profiles]]
 id = "sol_parent_high"
 model_alias = "sol"
+model = "gpt-5.6-sol"
+reasoning_effort = "high"
 owner = "sol_parent"
+capabilities = ["orchestration", "integration"]
+allowed_context = ["objective", "context", "request_clause_ids", "owner_gate"]
+forbidden_context = ["unselected_raw_history"]
+return_schema_id = "parent_route_result_v1"
+checkpoint_policy = "parent_owned_nonblocking_observation"
+continuation_policy = "same_parent_session"
+projection_digest = "computed_sha256_v1"
 role_template = "You are acting as {role_id} under the {model_alias} profile. {base_prompt}"
 prompt_capsule_schema_id = "prompt_capsule_v1"
 prompt_capsule_template = "SOL_PROFILE::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"
@@ -29,7 +129,16 @@ priority = 2
 [[model_profiles]]
 id = "luna_reasoning_high"
 model_alias = "luna_reasoning"
+model = "gpt-5.6-luna"
+reasoning_effort = "high"
 owner = "luna"
+capabilities = ["reasoning", "review"]
+allowed_context = ["objective", "context", "request_clause_ids", "owner_gate", "evidence"]
+forbidden_context = ["unrelated_paths"]
+return_schema_id = "review_result_v1"
+checkpoint_policy = "parent_owned_review_gate"
+continuation_policy = "same_packet_when_suitable"
+projection_digest = "computed_sha256_v1"
 role_template = "You are acting as {role_id} with {model_alias} reasoning capacity. {base_prompt}"
 prompt_capsule_schema_id = "prompt_capsule_v1"
 prompt_capsule_template = "LUNA_REASONING::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"
@@ -48,7 +157,16 @@ priority = 1
 [[model_profiles]]
 id = "luna_implementation_xhigh"
 model_alias = "luna_implementation"
+model = "gpt-5.6-luna"
+reasoning_effort = "xhigh"
 owner = "luna"
+capabilities = ["implementation", "causal_repair", "cross_owner_integration"]
+allowed_context = ["objective", "context", "request_clause_ids", "owner_gate", "evidence"]
+forbidden_context = ["unrelated_paths"]
+return_schema_id = "implementation_feedback_v1"
+checkpoint_policy = "nonblocking_observation"
+continuation_policy = "same_packet_until_handoff"
+projection_digest = "computed_sha256_v1"
 role_template = "You are acting as {role_id} with {model_alias} implementation rigor. {base_prompt}"
 prompt_capsule_schema_id = "prompt_capsule_v1"
 prompt_capsule_template = "LUNA_IMPLEMENTATION::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"
@@ -67,7 +185,16 @@ priority = 1
 [[model_profiles]]
 id = "luna_ship_xhigh"
 model_alias = "luna_ship"
+model = "gpt-5.6-luna"
+reasoning_effort = "xhigh"
 owner = "luna"
+capabilities = ["final_review", "release_readiness"]
+allowed_context = ["objective", "context", "request_clause_ids", "owner_gate", "evidence"]
+forbidden_context = ["unrelated_paths"]
+return_schema_id = "ship_review_result_v1"
+checkpoint_policy = "single_owner_gate"
+continuation_policy = "terminal_after_gate"
+projection_digest = "computed_sha256_v1"
 role_template = "You are acting as {role_id} for ship readiness under {model_alias}. {base_prompt}"
 prompt_capsule_schema_id = "prompt_capsule_v1"
 prompt_capsule_template = "LUNA_SHIP::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"
@@ -86,11 +213,20 @@ priority = 1
 [[model_profiles]]
 id = "spark_implementation_low"
 model_alias = "spark_implementation"
+model = "gpt-5.3-codex-spark"
+reasoning_effort = "low"
 owner = "spark"
+capabilities = ["implementation", "fixed_packet"]
+allowed_context = ["objective", "context", "fixed_implementation_packet", "implementation_route_result", "owner_gate"]
+forbidden_context = ["broad_history", "unrelated_paths", "alternate_architecture"]
+return_schema_id = "spark_implementation_result_v1"
+checkpoint_policy = "nonblocking_observation_only"
+continuation_policy = "same_spark_after_one_repaired_structural_gap"
+projection_digest = "computed_sha256_v1"
 role_template = "You are acting as {role_id} for implementation execution with {model_alias}. {base_prompt}"
 prompt_capsule_schema_id = "prompt_capsule_v1"
 prompt_capsule_template = "SPARK::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"
-prompt_capsule_required_context = ["objective", "context"]
+prompt_capsule_required_context = ["objective", "context", "fixed_implementation_packet", "implementation_route_result", "owner_gate"]
 close_skill_id = "subagent-bootstrap"
 close_tool_id = "close_agent"
 close_tool_argument_schema_id = "close_agent_args_v1"
@@ -99,13 +235,22 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "spark_impl"
-text = "Produce mechanical, reproducible code edits with immediate schema and validation parity checks."
+text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema."
 priority = 1
 
 [[model_profiles]]
 id = "mini_skill_evaluator_medium"
 model_alias = "skill_evaluator"
+model = "gpt-5.4-mini"
+reasoning_effort = "medium"
 owner = "skill_evaluator"
+capabilities = ["skill_evaluation"]
+allowed_context = ["objective", "context", "scenario_packet", "expected_output_schema"]
+forbidden_context = ["common_run_context", "prior_scenario_context"]
+return_schema_id = "skill_evaluation_result_v1"
+checkpoint_policy = "terminal_evaluation"
+continuation_policy = "fresh_only_no_continuation"
+projection_digest = "computed_sha256_v1"
 role_template = "You are acting as {role_id} with {model_alias} policy. {base_prompt}"
 prompt_capsule_schema_id = "prompt_capsule_v1"
 prompt_capsule_template = "SKILL_EVALUATOR::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"

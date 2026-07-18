@@ -5,6 +5,8 @@
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
 # upstream design ../../evidence/agent-evals/README.md eval directory contract
 # upstream implementation ./agent_team.py loads team and task routing metadata
+# upstream implementation ./model_profile_registry.py owns canonical model/profile expectations
+# upstream implementation ./capacity_handshake.py owns typed capacity provenance
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_codex_agent_roles.py tests role eval behavior
 # @dependency-end
@@ -56,18 +58,9 @@ DEFAULT_RESULTS_FAMILY = "codex-agent-role"
 RUN_ID_DIGEST_LENGTH = 10
 GIT_COMMAND_TIMEOUT_SECONDS = 5
 VALID_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
-SPARK_MODEL = "gpt-5.3-codex-spark"
-SKILL_VALIDATION_MODEL = "gpt-5.4-mini"
-LUNA_MODEL = "gpt-5.6-luna"
-PARENT_MODEL = "gpt-5.6-sol"
-PARENT_REASONING_EFFORT = "high"
-REVIEW_MODEL = "gpt-5.6-luna"
 DEPRECATED_CODEX_MODELS = {"gpt-5.2", "gpt-5.3-codex"}
-SPARK_MODEL_AGENT_IDS = {"spark_worker"}
-LUNA_XHIGH_AGENT_IDS = {"worker", "ship_reviewer"}
 EVALUATOR_AGENT_ID = "skill_evaluator"
 EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
-SKILL_VALIDATION_AGENT_IDS = {EVALUATOR_AGENT_ID}
 FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
 GENERATED_ROLE_VIEW_MATERIALIZER = "generate_role_views"
 
@@ -189,10 +182,16 @@ def validate_no_legacy_model_policy(root: Path) -> list[Finding]:
     payload = load_toml(config_path.read_text(encoding="utf-8"))
     if "agent_model_policy" in payload:
         findings.append(Finding("model-settings", ".codex/config.toml", "legacy-agent-model-policy"))
+    try:
+        registry = model_profile_registry.load_model_profile_registry(root)
+        parent = registry.by_profile("sol_parent_high")
+        review = registry.by_profile("luna_reasoning_high")
+    except model_profile_registry.ImplementationFeedback:
+        return [Finding("model-settings", "agents/model_profiles.toml", "registry-unreadable")]
     for key, expected in (
-        ("model", PARENT_MODEL),
-        ("model_reasoning_effort", PARENT_REASONING_EFFORT),
-        ("review_model", REVIEW_MODEL),
+        ("model", parent.model),
+        ("model_reasoning_effort", parent.reasoning_effort),
+        ("review_model", review.model),
     ):
         if payload.get(key) != expected:
             findings.append(
@@ -250,7 +249,7 @@ def evaluate_generated_role_projection(
         team = json.loads((root / "agents" / "agents_config.json").read_text(encoding="utf-8"))
         registry = model_profile_registry.load_model_profile_registry(root)
         generated = {
-            view.role_id: view.rendered_instructions
+            view.role_id: view
             for view in model_profile_registry.generate_role_views(registry, root=root)
         }
     except (OSError, ValueError, model_profile_registry.ImplementationFeedback) as exc:
@@ -261,13 +260,6 @@ def evaluate_generated_role_projection(
         findings.append(Finding("generated-view", "agents_config", "role-view-binding-set-mismatch"))
         return findings
     expected_fields = {"name", "description", "nickname_candidates", "sandbox_mode", "approval_policy", "model", "model_reasoning_effort", "developer_instructions"}
-    model_by_profile = {
-        "luna_reasoning_high": (LUNA_MODEL, "high"),
-        "luna_implementation_xhigh": (LUNA_MODEL, "xhigh"),
-        "luna_ship_xhigh": (LUNA_MODEL, "xhigh"),
-        "spark_implementation_low": (SPARK_MODEL, "low"),
-        "mini_skill_evaluator_medium": (SKILL_VALIDATION_MODEL, "medium"),
-    }
     for agent_id, config in sorted(configs.items()):
         source = agent_views.get(agent_id)
         binding = bindings.get(agent_id)
@@ -278,19 +270,23 @@ def evaluate_generated_role_projection(
         if actual_fields != expected_fields:
             findings.append(Finding("generated-view", agent_id, "closed-eight-field-projection-mismatch"))
         profile_id = source.get("profile_id")
-        if not isinstance(profile_id, str) or profile_id not in model_by_profile:
+        if not isinstance(profile_id, str):
+            findings.append(Finding("profile-attribution", agent_id, "unknown-profile"))
+            continue
+        try:
+            profile = registry.by_profile(profile_id)
+        except model_profile_registry.ImplementationFeedback:
             findings.append(Finding("profile-attribution", agent_id, "unknown-profile"))
             continue
         if binding.get("profile_id") != profile_id:
             findings.append(Finding("profile-attribution", agent_id, "binding-divergence"))
-        expected_model, expected_effort = model_by_profile[profile_id]
-        if (config.get("model"), config.get("model_reasoning_effort")) != (expected_model, expected_effort):
+        if (config.get("model"), config.get("model_reasoning_effort")) != (profile.model, profile.reasoning_effort):
             findings.append(Finding("profile-attribution", agent_id, "runtime-view-divergence"))
         for field in ("name", "description", "nickname_candidates", "sandbox_mode", "approval_policy"):
             if config.get(field) != source.get(field):
                 findings.append(Finding("generated-view", agent_id, f"source-divergence-{field}"))
-        expected_instructions = generated.get(agent_id)
-        if expected_instructions is None or config.get("developer_instructions", "").strip() != str(expected_instructions).strip():
+        expected_view = generated.get(agent_id)
+        if expected_view is None or config.get("developer_instructions", "").strip() != expected_view.rendered_instructions.strip():
             findings.append(Finding("generated-view", agent_id, "developer-instructions-not-materialized"))
         if "generated_role_view_v1" not in (root / ".codex" / "agents" / f"{agent_id}.toml").read_text(encoding="utf-8"):
             findings.append(Finding("generated-view", agent_id, "missing-generated-header"))
@@ -317,6 +313,10 @@ def evaluate_static_agent_configs(
 ) -> list[Finding]:
     """Evaluate the closed generated role projection and executable settings."""
     findings = evaluate_generated_role_projection(root, configs)
+    try:
+        registry = model_profile_registry.load_model_profile_registry(root)
+    except model_profile_registry.ImplementationFeedback:
+        return findings + [Finding("model-settings", "agents/model_profiles.toml", "registry-unreadable")]
     for agent_id, config in configs.items():
         for key in sorted(FORBIDDEN_AGENT_PROFILE_KEYS & set(config)):
             findings.append(Finding("schema", agent_id, f"unsupported-profile-key-{key}"))
@@ -331,30 +331,26 @@ def evaluate_static_agent_configs(
             findings.append(Finding("model-settings", agent_id, "missing-model"))
         elif model in DEPRECATED_CODEX_MODELS:
             findings.append(Finding("model-settings", agent_id, f"deprecated-model-{model}"))
-        if model == SPARK_MODEL and agent_id not in SPARK_MODEL_AGENT_IDS:
-            findings.append(
-                Finding(
-                    "model-settings",
-                    agent_id,
-                    "spark-model-reserved-for-spark-worker",
+        try:
+            expected_profile = registry.profile_for_role(agent_id)
+        except model_profile_registry.ImplementationFeedback:
+            findings.append(Finding("profile-attribution", agent_id, "unknown-role-binding"))
+            continue
+        expected_model, expected_effort = expected_profile.model, expected_profile.reasoning_effort
+        if model != expected_model:
+            matching_profiles = [profile for profile in registry.model_profiles if profile.model == model]
+            if any("fixed_packet" in profile.capabilities for profile in matching_profiles):
+                findings.append(
+                    Finding("model-settings", agent_id, "spark-model-reserved-for-spark-worker")
                 )
-            )
-        if model == SKILL_VALIDATION_MODEL and agent_id not in SKILL_VALIDATION_AGENT_IDS:
-            findings.append(
-                Finding(
-                    "model-settings",
-                    agent_id,
-                    "skill-validation-model-reserved-for-skill-evaluator-t14",
+            if any("skill_evaluation" in profile.capabilities for profile in matching_profiles):
+                findings.append(
+                    Finding(
+                        "model-settings",
+                        agent_id,
+                        "skill-validation-model-reserved-for-skill-evaluator-t14",
+                    )
                 )
-            )
-        if agent_id == EVALUATOR_AGENT_ID:
-            expected_model, expected_effort = SKILL_VALIDATION_MODEL, "medium"
-        elif agent_id in SPARK_MODEL_AGENT_IDS:
-            expected_model, expected_effort = SPARK_MODEL, "low"
-        elif agent_id in LUNA_XHIGH_AGENT_IDS:
-            expected_model, expected_effort = LUNA_MODEL, "xhigh"
-        else:
-            expected_model, expected_effort = LUNA_MODEL, "high"
         if model != expected_model:
             findings.append(
                 Finding("model-settings", agent_id, f"expected-model-{expected_model}")

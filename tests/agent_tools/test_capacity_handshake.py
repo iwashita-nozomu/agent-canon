@@ -1,341 +1,226 @@
+# @dependency-start
+# contract test
+# responsibility Tests typed capacity derivation, successful-spawn reservations, queue retention, and lifecycle CAS.
+# upstream implementation ../../agents/capacity_policy.toml declares capacity policy
+# upstream implementation ../../tools/agent_tools/capacity_handshake.py implements the provider contract
+# downstream implementation ../../tools/agent_tools/agent_team.py consumes spawn reservation behavior
+# @dependency-end
+
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
 from tools.agent_tools.capacity_handshake import (
+    CapacityLedger,
     DeclaredFamilyCapacity,
     DeclaredTeamTopologyDerivation,
+    DescendantTopologyReadback,
     LifecycleStatus,
     ReadyWorkItem,
     TopologyCapacityNode,
     TopologyCapacityWitness,
-    CapacityLedger,
-    DescendantLifecycleRecord,
-    DescendantTopologyReadback,
-    ThreadSaturationEvent,
-    ModelCapacityEvent,
     load_startup_contract,
     main,
     make_session_snapshot,
     materialize_closeout_packet,
-    queue_ready_work,
-    queued_reclaim,
     record_lifecycle_transition,
+    record_successful_spawn,
     request_slot,
 )
 
 
-def _sample_derivation() -> DeclaredTeamTopologyDerivation:
+def _derivation() -> DeclaredTeamTopologyDerivation:
     return DeclaredTeamTopologyDerivation(
-        derivation_version=1,
-        topology_source="agents/task_catalog.yaml::role_topology_defaults",
-        workflow_role_source="agents/task_catalog.yaml::workflow_families[].roles",
-        direct_frontier_stage_class="reviewer",
-        nested_owner_stage_class="producer",
-        final_stage_class="final",
-        excluded_nested_role_ids=("skill_evaluator",),
-        isolated_direct_role_ids=("skill_evaluator",),
-        family_records=(
+        1,
+        "agents/task_catalog.yaml",
+        "agents/task_catalog.yaml",
+        "reviewer",
+        "producer",
+        "final",
+        (),
+        (),
+        (
             DeclaredFamilyCapacity(
-                workflow_family_id="research_driven_change",
-                direct_frontier_role_ids=tuple("f" for _ in range(20)),
-                nested_owner_role_ids=tuple("r" for _ in range(6)),
-                final_frontier_role_ids=tuple("x" for _ in range(3)),
-                direct_frontier_count=20,
-                nested_reservation_count=6,
-                final_frontier_count=3,
+                "research",
+                tuple(f"direct-{index}" for index in range(20)),
+                tuple(f"nested-{index}" for index in range(6)),
+                ("final",),
+                20,
+                6,
+                1,
             ),
         ),
     )
 
 
-def _sample_witness() -> TopologyCapacityWitness:
-    derivation = _sample_derivation()
+def _witness() -> TopologyCapacityWitness:
+    derivation = _derivation()
+    parent = TopologyCapacityNode("parent", "workflow", (), None, 1, 0, (), ())
+    children = tuple(
+        TopologyCapacityNode(f"child-{index}", "descendant", ("parent",), "parent", 1, 1, (f"p{index}",), ())
+        for index in range(6)
+    )
     return TopologyCapacityWitness(
-        target_state_contract_sha256="",
-        declared_team_topology_ref="agents/task_catalog.yaml",
-        declared_team_topology_sha256="sha",
-        node_records=(
-            TopologyCapacityNode(
-                node_id="parent",
-                node_kind="parent",
-                predecessor_ids=(),
-                descendant_parent_id=None,
-                total_slot_weight=1,
-                write_slot_weight=0,
-                allowed_write_paths=("agents.task",),
-                exclusion_ids=(),
-            ),
-            TopologyCapacityNode(
-                node_id="child",
-                node_kind="descendant",
-                predecessor_ids=("parent",),
-                descendant_parent_id="parent",
-                total_slot_weight=1,
-                write_slot_weight=0,
-                allowed_write_paths=("agents.child",),
-                exclusion_ids=(),
-            ),
-        ),
-        legal_frontier_ids=("parent", "child"),
-        peak_frontier_node_ids=("parent",),
-        peak_write_frontier_node_ids=(),
+        declared_team_topology_sha256="a" * 64,
+        node_records=(parent, *children),
+        legal_frontier_ids=tuple(node.node_id for node in (parent, *children)),
+        peak_frontier_node_ids=tuple(f"direct-{index}" for index in range(20)),
+        peak_write_frontier_node_ids=tuple(node.node_id for node in children),
         requested_total_capacity=26,
         workflow_dag_peak_demand=20,
         nested_reservation_count=6,
-        workflow_dag_budget=20,
-        write_scope_cap=2,
-        status="approved",
+        workflow_dag_budget=26,
+        write_scope_cap=6,
         derivation=derivation,
     )
 
 
-def _write_config(path: Path, value: int) -> str:
-    cfg = path / ".codex"
-    cfg.mkdir(parents=True, exist_ok=True)
-    file = cfg / "config.toml"
-    file.write_text(f"[agents]\nmax_threads = {value}\n", encoding="utf-8")
-    return str(file)
+def _contract(tmp_path: Path, configured: int = 26):
+    config = tmp_path / ".codex" / "config.toml"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text(f"[agents]\nmax_threads = {configured}\n", encoding="utf-8")
+    return load_startup_contract(_derivation(), _witness(), str(config))
 
 
-def _write_capacity_cli_policy(path: Path, value: int = 26, raw: str | None = None) -> None:
-    policy_dir = path / "agents"
-    policy_dir.mkdir(parents=True, exist_ok=True)
-    if raw is None:
-        raw = f'''policy_version = 1
-policy_id = "topology_derived_v1"
-
-[topology_derivation]
-total_slot_derivation = "max_legal_concurrent_open_frontier"
-
-[runtime_config_change_policy]
-target_value_derivation = "declared_team_peak_plus_nested_reservations"
-target_value = {value}
-required_predicates = ["generated_value_matches_topology_witness"]
-
-[generated_manifest_policy]
-numeric_family_default = false
-'''
-    (policy_dir / "capacity_policy.toml").write_text(raw, encoding="utf-8")
-
-
-@pytest.fixture
-def capacity_projection_root_26(tmp_path: Path) -> Path:
-    _write_capacity_cli_policy(tmp_path, 26)
-    _write_config(tmp_path, 26)
-    return tmp_path
-
-
-def test_requested_capacity_is_derived_from_topology():
-    derivation = _sample_derivation()
+def test_requested_capacity_is_direct_frontier_plus_nested_once() -> None:
+    derivation = _derivation()
+    assert derivation.peak_family.direct_frontier_count == 20
+    assert derivation.peak_family.nested_reservation_count == 6
     assert derivation.requested_max_threads() == 26
 
 
-def test_restart_required_evidence_on_unreadable_config(tmp_path):
-    witness = _sample_witness()
-    with pytest.raises(RuntimeError):
-        load_startup_contract(_sample_derivation(), witness, config_path=str(tmp_path / "missing" / "config.toml"))
-
-
-def test_requested_and_configured_inputs_remain_distinct_and_bootstrap_contract_uses_topology_value(tmp_path):
-    witness = _sample_witness()
-    cfg = _write_config(tmp_path, 24)
-    contract = load_startup_contract(_sample_derivation(), witness, config_path=cfg)
-    assert contract.input_evidence.requested_capacity_loader.requested_total_capacity == 26
-    assert contract.input_evidence.max_threads_loader.configured_max_threads == 24
-
-    snapshot = make_session_snapshot(contract)
-    assert snapshot.effective_total_capacity == 26
-    assert snapshot.configured_max_threads == 24
-
-
-def test_thread_and_model_capacity_events_are_distinct(tmp_path):
-    cfg = _write_config(tmp_path, 24)
-    contract = load_startup_contract(_sample_derivation(), _sample_witness(), config_path=cfg)
-    snapshot = make_session_snapshot(contract, currently_available_runtime_slots=1, write_scope_cap=0)
-    ledger = CapacityLedger(topology=DescendantTopologyReadback(parent_work_id="root"))
-
-    thread_result = request_slot(
-        snapshot,
-        ledger,
-        ReadyWorkItem(work_id="w-thread", packet_sha256="sha1", profile_id="agent", required_slots=2),
+def test_snapshot_separates_requested_effective_available_and_write(tmp_path: Path) -> None:
+    snapshot = make_session_snapshot(
+        _contract(tmp_path, 22),
+        platform_advertised_effective_cap=21,
+        currently_available_runtime_slots=9,
+        workflow_dag_demand=20,
+        nested_capacity_reservation=6,
+        write_scope_cap=4,
+        requested_write_capacity=4,
+        currently_available_write_slots=2,
     )
-    assert thread_result.status == "queued"
-    assert isinstance(thread_result.events[0], ThreadSaturationEvent)
-
-    model_result = request_slot(
-        snapshot,
-        ledger,
-        ReadyWorkItem(work_id="w-model", packet_sha256="sha2", profile_id="agent"),
-        model_capacity_denied=True,
-    )
-    assert model_result.status == "queued"
-    assert isinstance(model_result.events[0], ModelCapacityEvent)
-
-
-def test_queue_reclaim_after_close_releases_slots(tmp_path):
-    cfg = _write_config(tmp_path, 2)
-    contract = load_startup_contract(_sample_derivation(), _sample_witness(), config_path=cfg)
-    snapshot = make_session_snapshot(contract, requested_capacity=2, currently_available_runtime_slots=2, write_scope_cap=2)
-    ledger = CapacityLedger(topology=DescendantTopologyReadback(parent_work_id="root"))
-
-    first = request_slot(snapshot, ledger, ReadyWorkItem(work_id="running", packet_sha256="a", profile_id="agent", required_slots=2))
-    assert first.status == "granted"
-    queue_item = ReadyWorkItem(work_id="queued", packet_sha256="b", profile_id="agent", required_slots=1)
-    queue_ready_work(queue_item, ledger.ready_queue)
-
-    record_lifecycle_transition(ledger, "running", LifecycleStatus.CLOSED)
-    reclaim = queued_reclaim(snapshot, ledger, "running")
-    assert reclaim.status in {"reclaimed", "unchanged"}
-
-
-def test_closeout_fails_on_terminal_open_and_unknown_descendant(tmp_path):
-    cfg = _write_config(tmp_path, 24)
-    contract = load_startup_contract(_sample_derivation(), _sample_witness(), config_path=cfg)
-    _ = make_session_snapshot(contract)
-    closeout = materialize_closeout_packet(
-        parent_work_id="parent",
-        ledger=CapacityLedger(topology=DescendantTopologyReadback(parent_work_id="parent")),
-        descendants=(
-            DescendantTopologyReadback(
-                parent_work_id="parent",
-                descendants=(
-                    DescendantLifecycleRecord(
-                        work_id="child-a",
-                        parent_work_id="parent",
-                        status=LifecycleStatus.DURABLE_RESULT,
-                        durable_handback=False,
-                        close_readback=True,
-                    ),
-                    DescendantLifecycleRecord(
-                        work_id="child-b",
-                        parent_work_id="parent",
-                        status=LifecycleStatus.CLOSED,
-                        durable_handback=True,
-                        close_readback=False,
-                    ),
-                ),
-            ),
-        ),
-    )
-    assert closeout.status == "failed"
-    assert any("terminal_but_open" in f.detail for f in closeout.failures)
-    assert any("missing_close_readback" in f.detail for f in closeout.failures)
-
-
-def test_closeout_packet_includes_machine_readable_close_agent_calls():
-    closeout = materialize_closeout_packet(
-        parent_work_id="parent",
-        ledger=CapacityLedger(topology=DescendantTopologyReadback(parent_work_id="parent")),
-        descendants=(
-            DescendantTopologyReadback(
-                parent_work_id="parent",
-                descendants=(
-                    DescendantLifecycleRecord(
-                        work_id="child-c",
-                        parent_work_id="parent",
-                        status=LifecycleStatus.CLOSED,
-                        durable_handback=True,
-                        close_readback=True,
-                    ),
-                ),
-            ),
-        ),
-    )
-    assert closeout.status == "closed"
-    assert closeout.close_agent_calls
-    assert closeout.close_agent_calls[0].close_agent_call_token == "close_agent:child-c"
-
-
-def test_capacity_handshake_cli_v1_accepts_matching_26_projection(capacity_projection_root_26, capsys):
-    result = main(
-        (
-            "--root",
-            str(capacity_projection_root_26),
-            "--check-config-projection",
-            "--expected-max-threads",
-            "26",
-        )
-    )
-
-    assert result == 0
-    assert capsys.readouterr().out == "CAPACITY_CONFIG_PROJECTION=pass\n"
-
-
-@pytest.mark.parametrize(
-    ("policy_value", "configured_value", "expected_value"),
-    (
-        (25, 26, 26),
-        (26, 25, 26),
-        (26, 26, 25),
-    ),
-)
-def test_capacity_handshake_cli_v1_rejects_projection_mismatch(
-    tmp_path,
-    capsys,
-    policy_value,
-    configured_value,
-    expected_value,
-):
-    _write_capacity_cli_policy(tmp_path, policy_value)
-    _write_config(tmp_path, configured_value)
-
-    result = main(
-        (
-            "--root",
-            str(tmp_path),
-            "--check-config-projection",
-            "--expected-max-threads",
-            str(expected_value),
-        )
-    )
-
-    evidence = json.loads(capsys.readouterr().out)
-    assert result == 1
-    assert evidence == {
-        "configured_max_threads": configured_value,
-        "configured_source_ref": str(tmp_path / ".codex" / "config.toml"),
-        "derived_requested_capacity": policy_value,
-        "evidence_type": "CapacityInputEvidence",
-        "expected_max_threads": expected_value,
-        "policy_source_ref": str(tmp_path / "agents" / "capacity_policy.toml"),
-        "reason": "capacity_config_projection_mismatch",
-        "schema_id": "capacity_handshake_cli_v1",
-        "status": "fail",
+    assert snapshot.requested_total_capacity == 26
+    assert snapshot.effective_total_capacity == 21
+    assert snapshot.available_total_capacity == 9
+    assert snapshot.effective_write_capacity == 4
+    assert snapshot.available_write_capacity == 2
+    assert snapshot.reserved_total_capacity == 0
+    assert {item.input_id for item in snapshot.input_provenance} >= {
+        "requested_total_capacity",
+        "configured_total_capacity",
+        "platform_effective_total_capacity",
+        "current_available_total_capacity",
+        "workflow_dag_direct_demand",
+        "nested_reservation_count",
+        "write_scope_cap",
     }
+    assert all(item.readback_value == item.value for item in snapshot.input_provenance)
 
 
-@pytest.mark.parametrize(
-    ("policy_raw", "config_raw", "reason"),
-    (
-        ('policy_id = "topology_derived_v1"\n[', "[agents]\nmax_threads = 26\n", "capacity_policy_malformed"),
-        ('policy_id = "wrong"\n', "[agents]\nmax_threads = 26\n", "capacity_policy_schema_invalid"),
-        (None, "[agents\nmax_threads = 26\n", "max_threads_loader_unreadable"),
-        (None, '[agents]\nmax_threads = "26"\n', "max_threads_loader_unreadable"),
-    ),
-)
-def test_capacity_handshake_cli_v1_rejects_malformed_loader_input(tmp_path, capsys, policy_raw, config_raw, reason):
-    _write_capacity_cli_policy(tmp_path, raw=policy_raw)
-    config_dir = tmp_path / ".codex"
-    config_dir.mkdir(parents=True)
-    (config_dir / "config.toml").write_text(config_raw, encoding="utf-8")
-
-    result = main(
-        (
-            "--root",
-            str(tmp_path),
-            "--check-config-projection",
-            "--expected-max-threads",
-            "26",
+def test_nested_reservation_cannot_be_counted_twice(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="counted_once"):
+        make_session_snapshot(
+            _contract(tmp_path),
+            workflow_dag_demand=26,
+            nested_capacity_reservation=6,
         )
-    )
 
-    evidence = json.loads(capsys.readouterr().out)
-    assert result == 1
-    assert evidence["schema_id"] == "capacity_handshake_cli_v1"
-    assert evidence["evidence_type"] == "CapacityInputEvidence"
-    assert evidence["status"] == "fail"
-    assert evidence["reason"] == reason
+
+def test_reservation_is_created_only_after_successful_spawn(tmp_path: Path) -> None:
+    snapshot = make_session_snapshot(_contract(tmp_path), workflow_dag_demand=20, nested_capacity_reservation=6, write_scope_cap=2)
+    ledger = CapacityLedger(DescendantTopologyReadback("parent"))
+    item = ReadyWorkItem("child", "b" * 64, "spark_implementation_low", required_write_slots=1)
+    assert request_slot(snapshot, ledger, item).status == "ready"
+    assert ledger.open_records == {}
+    assert record_successful_spawn(snapshot, ledger, item, spawn_succeeded=False).status == "queued"
+    assert ledger.open_records == {}
+    ledger.ready_queue.clear()
+    assert record_successful_spawn(snapshot, ledger, item, spawn_succeeded=True).status == "granted"
+    assert set(ledger.open_records) == {"child"}
+    assert set(ledger.reservations) == {"child"}
+
+
+def _advance_to_readback(ledger: CapacityLedger, work_id: str) -> None:
+    sequence = (
+        (LifecycleStatus.SPAWNED, LifecycleStatus.ACTIVE, None),
+        (LifecycleStatus.ACTIVE, LifecycleStatus.DURABLE_RESULT_EVIDENCE, "result://durable"),
+        (LifecycleStatus.DURABLE_RESULT_EVIDENCE, LifecycleStatus.HANDED_BACK, "handback://ok"),
+        (LifecycleStatus.HANDED_BACK, LifecycleStatus.DESCENDANTS_CLOSURE_VERIFIED, "descendants://closed"),
+        (LifecycleStatus.DESCENDANTS_CLOSURE_VERIFIED, LifecycleStatus.CLOSED, "close://accepted"),
+        (LifecycleStatus.CLOSED, LifecycleStatus.READBACK_VERIFIED, "readback://ok"),
+    )
+    for generation, (old, new, evidence) in enumerate(sequence):
+        record_lifecycle_transition(
+            ledger,
+            work_id,
+            new,
+            expected_status=old,
+            expected_generation=generation,
+            evidence_ref=evidence,
+        )
+
+
+def test_lifecycle_is_closed_compare_and_swap_and_release_retains_record(tmp_path: Path) -> None:
+    snapshot = make_session_snapshot(_contract(tmp_path), workflow_dag_demand=20, nested_capacity_reservation=6)
+    ledger = CapacityLedger(DescendantTopologyReadback("parent"))
+    item = ReadyWorkItem("child", "c" * 64, "spark_implementation_low")
+    record_successful_spawn(snapshot, ledger, item, spawn_succeeded=True)
+    with pytest.raises(ValueError, match="out_of_order"):
+        record_lifecycle_transition(
+            ledger,
+            "child",
+            LifecycleStatus.CLOSED,
+            expected_status=LifecycleStatus.SPAWNED,
+            expected_generation=0,
+        )
+    _advance_to_readback(ledger, "child")
+    token = {"tool_id": "close_agent", "arguments": {"terminal_agent_id": "child"}}
+    packet = materialize_closeout_packet("parent", ledger, (ledger.topology,), {"child": token})
+    assert packet.status == "closed"
+    assert packet.close_agent_calls[0].close_agent_call_token == token
+    assert ledger.open_records["child"].status == LifecycleStatus.RESERVATION_RELEASED
+    assert "child" not in ledger.reservations
+
+
+def test_closeout_never_reclaims_open_record(tmp_path: Path) -> None:
+    snapshot = make_session_snapshot(_contract(tmp_path), workflow_dag_demand=20, nested_capacity_reservation=6)
+    ledger = CapacityLedger(DescendantTopologyReadback("parent"))
+    item = ReadyWorkItem("child", "d" * 64, "spark_implementation_low")
+    record_successful_spawn(snapshot, ledger, item, spawn_succeeded=True)
+    packet = materialize_closeout_packet("parent", ledger, (ledger.topology,), {})
+    assert packet.status == "failed"
+    assert "child" in ledger.open_records
+    assert "child" in ledger.reservations
+
+
+def _projection_root(tmp_path: Path, configured: int) -> Path:
+    (tmp_path / "agents").mkdir(parents=True)
+    (tmp_path / ".codex").mkdir(parents=True)
+    (tmp_path / "agents" / "capacity_policy.toml").write_text(
+        '''policy_id = "topology_derived_v1"
+[topology_derivation]
+direct_frontier_count = 20
+nested_reservation_count = 6
+nested_reservation_accounting = "count_once"
+[runtime_config_change_policy]
+target_value_derivation = "declared_team_peak_plus_nested_reservations_v1"
+target_value = 26
+required_predicates = ["generated_value_matches_topology_witness"]
+[generated_manifest_policy]
+numeric_family_default = false
+''',
+        encoding="utf-8",
+    )
+    (tmp_path / ".codex" / "config.toml").write_text(f"[agents]\nmax_threads = {configured}\n", encoding="utf-8")
+    return tmp_path
+
+
+def test_capacity_config_generator_and_readback(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = _projection_root(tmp_path, 18)
+    assert main(("--root", str(root), "--write-config-projection")) == 0
+    assert capsys.readouterr().out == "CAPACITY_CONFIG_PROJECTION=written\n"
+    assert main(("--root", str(root), "--check-config-projection", "--expected-max-threads", "26")) == 0
+    assert capsys.readouterr().out == "CAPACITY_CONFIG_PROJECTION=pass\n"

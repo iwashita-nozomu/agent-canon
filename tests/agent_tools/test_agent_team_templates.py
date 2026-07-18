@@ -16,7 +16,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
+import agent_team  # noqa: E402
 from agent_team import render_template, suggested_public_skills  # noqa: E402
+from tools.agent_tools import implementation_route  # noqa: E402
 
 
 class AgentTeamTemplateTest(unittest.TestCase):
@@ -66,6 +68,44 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertLess(
             skills.index("$literature-survey"),
             skills.index("$research-workflow"),
+        )
+
+    def test_fixed_implementation_dispatch_uses_typed_route_and_registry_prompt(self) -> None:
+        """Eligible implementation dispatch launches one Spark and one owning gate."""
+        result = implementation_route.ImplementationRouteResult(
+            result_version=1,
+            decision_ref="decision:P3",
+            selected_agent_type="spark_worker",
+            selected_profile_id="spark_implementation_low",
+            packet_ref="packet:P3",
+            packet_sha256="a" * 64,
+            capacity_action="reserve_on_successful_spawn",
+            resume_worker_agent_id=None,
+            next_gate="implementation_route_gate",
+            failure=None,
+            status="completed",
+        )
+        original = agent_team.implementation_route.route_implementation
+        calls: list[tuple[str, str]] = []
+        agent_team.implementation_route.route_implementation = lambda request: result
+        try:
+            dispatch = agent_team.dispatch_fixed_implementation(
+                {"fixed_implementation_packet": {"packet_id": "P3"}},
+                "materialize P3",
+                lambda role, prompt: calls.append((role, prompt)) or "spark-1",
+                workspace_root=PROJECT_ROOT,
+            )
+        finally:
+            agent_team.implementation_route.route_implementation = original
+        self.assertEqual(dispatch.status, "spawned")
+        self.assertEqual(dispatch.spawn_count, 1)
+        self.assertEqual(dispatch.owner_gate_count, 1)
+        self.assertEqual(dispatch.worker_agent_id, "spark-1")
+        self.assertEqual(calls[0][0], "spark_worker")
+        self.assertIn("SPARK::", calls[0][1])
+        self.assertEqual(
+            dispatch.close_agent_token.arguments,
+            {"terminal_agent_id": "spark-1"},
         )
 
 

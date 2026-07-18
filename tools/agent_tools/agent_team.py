@@ -6,6 +6,9 @@
 # upstream design ../../agents/task_catalog.yaml workflow topology and isolated skill-evaluation route
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy
 # upstream implementation ./skill_tool_commands.py builds selected skill command packets.
+# upstream implementation ./implementation_route.py owns fixed-packet Spark eligibility
+# upstream implementation ./model_profile_registry.py owns profile prompt/token materialization
+# upstream implementation ./capacity_handshake.py owns capacity reservations and lifecycle state
 # @dependency-end
 """Shared runtime helpers for the permanent agent team."""
 
@@ -20,15 +23,20 @@ try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Callable, Mapping, cast
 
 import yaml
-from tools.agent_tools import capacity_handshake
-from tools.agent_tools import implementation_route
-from tools.agent_tools import model_profile_registry
+if __package__:
+    from . import capacity_handshake
+    from . import implementation_route
+    from . import model_profile_registry
+else:
+    import capacity_handshake
+    import implementation_route
+    import model_profile_registry
 from route import decide_skills, implementation_handoff_required, load_skill_route_rules
 from skill_tool_commands import (
     PROMPT_PLACEHOLDER,
@@ -731,6 +739,20 @@ class _CapacityRuntime:
     write_scope_cap: int
 
 
+@dataclass(frozen=True)
+class ImplementationDispatch:
+    """One executable fixed-packet dispatch and its single owning gate."""
+
+    route_result: implementation_route.ImplementationRouteResult
+    prompt_capsule: model_profile_registry.MaterializedPromptCapsule | None
+    close_agent_token: model_profile_registry.ToolCallToken | None
+    worker_agent_id: str | None
+    owner_gate_id: str
+    owner_gate_count: int
+    spawn_count: int
+    status: str
+
+
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
     """Load the canonical team config."""
     parsed: object = json.loads(path.read_text(encoding="utf-8"))
@@ -1370,29 +1392,13 @@ def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
         workflow_dag_demand=peak.direct_frontier_count,
         nested_capacity_reservation=peak.nested_reservation_count,
         write_scope_cap=write_cap,
+        requested_write_capacity=write_cap,
+        workflow_dag_write_demand=write_cap,
     )
     parent_lineage_id = spec.parent_lineage_id or f"run:{spec.run_id}"
     ledger = capacity_handshake.CapacityLedger(
         topology=capacity_handshake.DescendantTopologyReadback(parent_work_id=spec.run_id)
     )
-    for role in spec.roles:
-        work_id = f"{spec.run_id}:{role.id}"
-        record = capacity_handshake.DescendantLifecycleRecord(
-            work_id=work_id,
-            parent_work_id=spec.run_id,
-            status=capacity_handshake.LifecycleStatus.SPAWNED,
-            reserved_slots=1,
-            reserved_write_slots=1 if role.write_policy.mode not in {"read_only", "artifacts_only"} else 0,
-        )
-        ledger.open_records[work_id] = record
-        ledger.topology = capacity_handshake.DescendantTopologyReadback(
-            parent_work_id=spec.run_id,
-            descendants=tuple((*ledger.topology.descendants, record)),
-        )
-        ledger.reservations[work_id] = capacity_handshake.ParentChildEdge(
-            parent_work_id=spec.run_id,
-            child_work_id=work_id,
-        )
     return _CapacityRuntime(
         binding=CapacityHandshakeConsumerBinding(),
         snapshot=snapshot,
@@ -1408,12 +1414,15 @@ def _json_capacity_record(record: capacity_handshake.DescendantLifecycleRecord) 
     return {
         "work_id": record.work_id,
         "parent_work_id": record.parent_work_id,
+        "profile_id": record.profile_id,
         "status": record.status.value,
+        "durable_result_evidence_ref": record.durable_result_evidence_ref,
         "durable_handback": record.durable_handback,
         "descendants_closed": record.descendants_closed,
         "close_readback": record.close_readback,
         "reserved_slots": record.reserved_slots,
         "reserved_write_slots": record.reserved_write_slots,
+        "transition_generation": record.transition_generation,
     }
 
 
@@ -1423,6 +1432,11 @@ def _capacity_projection(runtime: _CapacityRuntime, spec: RunBundleSpec) -> dict
     return {
         "schema_id": "team_manifest_capacity_request_v1",
         "requested_total_capacity": runtime.requested_capacity,
+        "effective_total_capacity": runtime.snapshot.effective_total_capacity,
+        "available_total_capacity": runtime.snapshot.available_total_capacity,
+        "requested_write_capacity": runtime.snapshot.requested_write_capacity,
+        "effective_write_capacity": runtime.snapshot.effective_write_capacity,
+        "available_write_capacity": runtime.snapshot.available_write_capacity,
         "topology_proof_ref": "agents/task_catalog.yaml",
         "topology_proof_sha256": runtime.topology_proof_sha256,
         "capacity_policy_ref": "agents/capacity_policy.toml",
@@ -1431,6 +1445,17 @@ def _capacity_projection(runtime: _CapacityRuntime, spec: RunBundleSpec) -> dict
         "configured_max_threads_loader_value": configured,
         "reload_state": "restart_required" if configured != runtime.requested_capacity else "current",
         "requested_capacity_loader_status": "completed",
+        "input_provenance": [
+            {
+                "input_id": item.input_id,
+                "value": item.value,
+                "source_ref": item.source_ref,
+                "loader_id": item.loader_id,
+                "readback_value": item.readback_value,
+                "status": item.status,
+            }
+            for item in runtime.snapshot.input_provenance
+        ],
         "parent_lineage_id": runtime.parent_lineage_id,
         "ledger_ref": f"runtime://ledger/{spec.run_id}",
         "capacity_handshake_binding": {
@@ -1467,50 +1492,42 @@ def _closeout_projection(
     spec: RunBundleSpec,
 ) -> dict[str, object]:
     """Materialize the provider closeout state with canonical close-agent tokens."""
+    calls: list[dict[str, object]] = []
+    tokens: dict[str, dict[str, object]] = {}
+    registry = model_profile_registry.load_model_profile_registry(spec.workspace_root)
+    for record in runtime.ledger.topology.descendants:
+        if record.status not in {
+            capacity_handshake.LifecycleStatus.READBACK_VERIFIED,
+            capacity_handshake.LifecycleStatus.RESERVATION_RELEASED,
+        }:
+            continue
+        if not record.profile_id:
+            raise RuntimeError(f"closeout record lacks profile identity: {record.work_id}")
+        token = model_profile_registry.materialize_tool_call_token(
+            model_profile_registry.ToolCallMaterializationRequest(
+                profile_id=record.profile_id,
+                terminal_agent_id=record.work_id,
+            ),
+            record.profile_id,
+            registry,
+        )
+        token_projection = {
+            "tool_id": token.tool_id,
+            "arguments": dict(token.arguments),
+        }
+        tokens[record.work_id] = token_projection
+        calls.append(
+            {
+                "agent_id": record.work_id,
+                "tool_call_token": token_projection,
+            }
+        )
     provider_packet = capacity_handshake.materialize_closeout_packet(
         parent_work_id=spec.run_id,
         ledger=runtime.ledger,
         descendants=(runtime.ledger.topology,),
+        close_agent_tokens=tokens,
     )
-    calls: list[dict[str, object]] = []
-    registry = model_profile_registry.load_model_profile_registry(spec.workspace_root)
-    for record in runtime.ledger.topology.descendants:
-        if record.status not in {
-            capacity_handshake.LifecycleStatus.DURABLE_RESULT,
-            capacity_handshake.LifecycleStatus.ERROR,
-            capacity_handshake.LifecycleStatus.CLOSED,
-        }:
-            continue
-        token = model_profile_registry.materialize_tool_call_token(
-            model_profile_registry.ToolCallMaterializationRequest(
-                profile_id="luna_implementation_xhigh",
-                terminal_agent_id=record.work_id,
-            ),
-            "luna_implementation_xhigh",
-            registry,
-        )
-        calls.append(
-            {
-                "agent_id": record.work_id,
-                "terminal_execution_status": (
-                    "errored"
-                    if record.status == capacity_handshake.LifecycleStatus.ERROR
-                    else "completed"
-                ),
-                "ledger_ref": f"runtime://ledger/{spec.run_id}",
-                "tool_call_token": {
-                    "schema_id": token.schema_id,
-                    "skill_id": token.skill_id,
-                    "tool_id": token.tool_id,
-                    "arguments": dict(token.arguments),
-                    "argument_schema_id": token.argument_schema_id,
-                    "failure_schema_id": token.failure_schema_id,
-                    "target": token.target,
-                },
-                "close_readback_status": "completed" if record.close_readback else "pending",
-                "status": "closed" if record.close_readback else "materialized",
-            }
-        )
     failures = [
         {"work_id": failure.work_id, "detail": failure.detail}
         for failure in provider_packet.failures
@@ -1523,8 +1540,121 @@ def _closeout_projection(
         "close_agent_tool_calls": calls,
         "failures": failures,
         "status": "completed" if not failures else "failed",
-        "natural_language_intent": "close terminal descendants in postorder and release reservations",
+        "natural_language_intent": "close terminal descendants in postorder and release reservations after readback",
     }
+
+
+def dispatch_fixed_implementation(
+    request: Mapping[str, object] | implementation_route.ImplementationRouteRequest,
+    objective: str,
+    spawn: Callable[[str, str], str | None],
+    *,
+    workspace_root: Path = ROOT,
+    capacity_runtime: _CapacityRuntime | None = None,
+) -> ImplementationDispatch:
+    """Route, materialize, and launch exactly one fixed Spark implementation worker."""
+    route_result = implementation_route.route_implementation(request)
+    if route_result.status == "blocked":
+        return ImplementationDispatch(route_result, None, None, None, route_result.next_gate, 1, 0, "blocked")
+    if route_result.status == "queued":
+        return ImplementationDispatch(route_result, None, None, None, route_result.next_gate, 1, 0, "queued")
+    if (
+        route_result.selected_agent_type != "spark_worker"
+        or route_result.selected_profile_id != "spark_implementation_low"
+        or route_result.failure is not None
+    ):
+        raise RuntimeError("implementation_dispatch:fixed_route_violation")
+    if isinstance(request, implementation_route.ImplementationRouteRequest):
+        packet_payload: object = request.fixed_implementation_packet
+    else:
+        packet_payload = request.get("fixed_implementation_packet")
+    if is_dataclass(packet_payload):
+        packet_context = asdict(packet_payload)
+    elif isinstance(packet_payload, Mapping):
+        packet_context = dict(packet_payload)
+    else:
+        raise RuntimeError("implementation_dispatch:fixed_packet_missing")
+    registry = model_profile_registry.load_model_profile_registry(workspace_root)
+    prompt = model_profile_registry.materialize_prompt_capsule(
+        model_profile_registry.PromptMaterializationRequest(
+            profile_id=route_result.selected_profile_id,
+            role_id="spark_worker",
+            context=(
+                model_profile_registry.ContextItem("objective", objective),
+                model_profile_registry.ContextItem("context", "fixed_packet_direct_materialization"),
+                model_profile_registry.ContextItem("fixed_implementation_packet", packet_context),
+                model_profile_registry.ContextItem("implementation_route_result", asdict(route_result)),
+                model_profile_registry.ContextItem("owner_gate", route_result.next_gate),
+            ),
+            objective=objective,
+        ),
+        registry,
+    )
+    if route_result.capacity_action == "continue_existing":
+        worker_agent_id = route_result.resume_worker_agent_id
+        spawn_count = 0
+        status = "continued"
+    else:
+        planned_id = f"{route_result.packet_sha256}:spark"
+        item = capacity_handshake.ReadyWorkItem(
+            work_id=planned_id,
+            packet_sha256=route_result.packet_sha256 or "",
+            profile_id=route_result.selected_profile_id,
+            required_slots=1,
+            required_write_slots=1,
+            model=registry.by_profile(route_result.selected_profile_id).model,
+        )
+        if capacity_runtime is not None:
+            readiness = capacity_handshake.request_slot(capacity_runtime.snapshot, capacity_runtime.ledger, item)
+            if readiness.status != "ready":
+                return ImplementationDispatch(route_result, prompt, None, None, route_result.next_gate, 1, 0, "queued")
+        worker_agent_id = spawn("spark_worker", prompt.body)
+        spawn_count = 1
+        if not worker_agent_id:
+            if capacity_runtime is not None:
+                capacity_handshake.record_successful_spawn(
+                    capacity_runtime.snapshot,
+                    capacity_runtime.ledger,
+                    item,
+                    spawn_succeeded=False,
+                )
+            return ImplementationDispatch(route_result, prompt, None, None, route_result.next_gate, 1, spawn_count, "queued")
+        if capacity_runtime is not None:
+            spawned_item = capacity_handshake.ReadyWorkItem(
+                work_id=worker_agent_id,
+                packet_sha256=item.packet_sha256,
+                profile_id=item.profile_id,
+                required_slots=item.required_slots,
+                required_write_slots=item.required_write_slots,
+                model=item.model,
+            )
+            capacity_handshake.record_successful_spawn(
+                capacity_runtime.snapshot,
+                capacity_runtime.ledger,
+                spawned_item,
+                spawn_succeeded=True,
+            )
+        status = "spawned"
+    if not worker_agent_id:
+        raise RuntimeError("implementation_dispatch:worker_identity_missing")
+    token = model_profile_registry.materialize_tool_call_token(
+        model_profile_registry.ToolCallMaterializationRequest(
+            route_result.selected_profile_id,
+            worker_agent_id,
+        ),
+        route_result.selected_profile_id,
+        registry,
+    )
+    return ImplementationDispatch(
+        route_result,
+        prompt,
+        token,
+        worker_agent_id,
+        route_result.next_gate,
+        1,
+        spawn_count,
+        status,
+    )
 
 
 def capacity_manifest_output_lines(
@@ -3245,14 +3375,24 @@ def manifest_prompt_contract_lines(
 ) -> list[str]:
     """Render prompt contract lines for one role."""
     lines = ["    prompt_contract:"]
-    lines.append(
-        "      assignment_prompt: "
-        f"{compact_role_prompt_contract(role, workflow_family)!r}"
-    )
-    lines.append(
-        "      assignment_prompt_source: "
-        "'tools/agent_tools/agent_team.py#role_prompt_contract'"
-    )
+    if role.id == "implementer":
+        lines.append(
+            "      assignment_prompt: "
+            "'runtime_materialized_fixed_packet_prompt_only'"
+        )
+        lines.append(
+            "      assignment_prompt_source: "
+            "'tools/agent_tools/agent_team.py#dispatch_fixed_implementation->model_profile_registry.materialize_prompt_capsule'"
+        )
+    else:
+        lines.append(
+            "      assignment_prompt: "
+            f"{compact_role_prompt_contract(role, workflow_family)!r}"
+        )
+        lines.append(
+            "      assignment_prompt_source: "
+            "'tools/agent_tools/agent_team.py#role_prompt_contract'"
+        )
     if role.id == "skill_evaluator":
         lines.append("      common_prompt_must_include_ref: 'not_applicable'")
         lines.append(

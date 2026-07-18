@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Provides task close agent workflow automation.
 # upstream implementation ./agent_team.py resolves report root defaults
+# upstream implementation ./capacity_handshake.py owns lifecycle state, reservations, and postorder release
 # upstream implementation ./report_artifact_checks.py validates schedule and work log artifacts
 # upstream design ../../agents/templates/closeout_gate.md defines closeout status contract
 # upstream design ../../agents/templates/agent_evaluation.md defines evaluation contract
@@ -17,12 +18,14 @@ import hashlib
 import json
 import re
 import subprocess
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from agent_team import resolve_report_root
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from tools.agent_tools import capacity_handshake
-from report_artifact_checks import (
+from tools.agent_tools.report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
     COMPLETION_COVERAGE_TAXONOMY_REFS,
     check_final_review_artifact,
@@ -49,24 +52,20 @@ DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
 
 
+def _resolve_report_root(report_root: str | None, workspace_root: Path) -> Path:
+    """Load the team CLI helper only for the CLI/report path."""
+    from agent_team import resolve_report_root
+
+    return resolve_report_root(report_root, workspace_root)
+
+
 def _lifecycle_status(value: object) -> capacity_handshake.LifecycleStatus:
-    """Map the serialized ledger value to the provider-owned enum."""
+    """Load only the provider-owned exact lifecycle state names."""
     if isinstance(value, capacity_handshake.LifecycleStatus):
         return value
-    aliases = {
-        "completed": capacity_handshake.LifecycleStatus.DURABLE_RESULT,
-        "durable_result": capacity_handshake.LifecycleStatus.DURABLE_RESULT,
-        "errored": capacity_handshake.LifecycleStatus.ERROR,
-        "error": capacity_handshake.LifecycleStatus.ERROR,
-        "handed_back": capacity_handshake.LifecycleStatus.HANDED_BACK,
-        "descendants_verified": capacity_handshake.LifecycleStatus.DESCENDANTS_VERIFIED,
-        "closed": capacity_handshake.LifecycleStatus.CLOSED,
-        "active": capacity_handshake.LifecycleStatus.ACTIVE,
-        "spawned": capacity_handshake.LifecycleStatus.SPAWNED,
-    }
     try:
-        return aliases[str(value)]
-    except KeyError as exc:
+        return capacity_handshake.LifecycleStatus(str(value))
+    except ValueError as exc:
         raise ValueError(f"unknown lifecycle status: {value}") from exc
 
 
@@ -84,12 +83,15 @@ def _ledger_from_projection(projection: dict[str, object]) -> capacity_handshake
         record = capacity_handshake.DescendantLifecycleRecord(
             work_id=str(raw.get("work_id", "")),
             parent_work_id=raw.get("parent_work_id"),
+            profile_id=str(raw.get("profile_id", "")),
             status=_lifecycle_status(raw.get("status")),
+            durable_result_evidence_ref=raw.get("durable_result_evidence_ref"),
             durable_handback=bool(raw.get("durable_handback", False)),
             descendants_closed=bool(raw.get("descendants_closed", False)),
             close_readback=bool(raw.get("close_readback", False)),
             reserved_slots=int(raw.get("reserved_slots", 1)),
             reserved_write_slots=int(raw.get("reserved_write_slots", 0)),
+            transition_generation=int(raw.get("transition_generation", 0)),
         )
         if not record.work_id:
             raise ValueError("capacity_ledger_record_work_id_missing")
@@ -116,16 +118,46 @@ def _ledger_from_projection(projection: dict[str, object]) -> capacity_handshake
 def _validate_close_agent_token(token: object, terminal_agent_id: str) -> str | None:
     if not isinstance(token, dict):
         return f"{terminal_agent_id}:close_agent_tool_call_missing"
+    if set(token) != {"tool_id", "arguments"}:
+        return f"{terminal_agent_id}:close_agent_token_fields_invalid"
     if token.get("tool_id") != "close_agent":
         return f"{terminal_agent_id}:close_agent_tool_id_invalid"
-    if token.get("argument_schema_id") != "close_agent_args_v1":
-        return f"{terminal_agent_id}:close_agent_argument_schema_invalid"
-    if token.get("target") != "terminal_agent_id":
-        return f"{terminal_agent_id}:close_agent_target_invalid"
     arguments = token.get("arguments")
-    if not isinstance(arguments, dict) or arguments.get("terminal_agent_id") != terminal_agent_id:
+    if (
+        not isinstance(arguments, dict)
+        or set(arguments) != {"terminal_agent_id"}
+        or arguments.get("terminal_agent_id") != terminal_agent_id
+    ):
         return f"{terminal_agent_id}:close_agent_target_binding_invalid"
     return None
+
+
+def _postorder_descendant_ids(
+    descendants: Sequence[capacity_handshake.DescendantLifecycleRecord],
+) -> tuple[str, ...]:
+    """Return deterministic child-before-parent close order."""
+    by_parent: dict[str | None, list[capacity_handshake.DescendantLifecycleRecord]] = {}
+    for record in descendants:
+        by_parent.setdefault(record.parent_work_id, []).append(record)
+    all_ids = {record.work_id for record in descendants}
+    result: list[str] = []
+    visiting: set[str] = set()
+
+    def visit(record: capacity_handshake.DescendantLifecycleRecord) -> None:
+        if record.work_id in visiting:
+            raise ValueError("descendant_cycle")
+        visiting.add(record.work_id)
+        for child in sorted(by_parent.get(record.work_id, []), key=lambda item: item.work_id):
+            visit(child)
+        visiting.remove(record.work_id)
+        result.append(record.work_id)
+
+    roots = [record for record in descendants if record.parent_work_id not in all_ids]
+    for record in sorted(roots, key=lambda item: item.work_id):
+        visit(record)
+    if len(result) != len(descendants):
+        raise ValueError("descendant_postorder_incomplete")
+    return tuple(result)
 
 
 def validate_capacity_lifecycle_closeout(
@@ -142,69 +174,55 @@ def validate_capacity_lifecycle_closeout(
             failures.append(f"{work_id}:unknown_descendant")
     for record in descendants:
         if record.parent_work_id != ledger.topology.parent_work_id:
-            failures.append(f"{record.work_id}:unknown_descendant_parent")
-        if record.status in {
-            capacity_handshake.LifecycleStatus.SPAWNED,
-            capacity_handshake.LifecycleStatus.ACTIVE,
+            if record.parent_work_id not in descendant_ids:
+                failures.append(f"{record.work_id}:unknown_descendant_parent")
+        if record.status not in {
+            capacity_handshake.LifecycleStatus.READBACK_VERIFIED,
+            capacity_handshake.LifecycleStatus.RESERVATION_RELEASED,
         }:
             failures.append(f"{record.work_id}:open_descendant")
-        if record.status in {
-            capacity_handshake.LifecycleStatus.DURABLE_RESULT,
-            capacity_handshake.LifecycleStatus.ERROR,
-        }:
-            if not record.durable_handback:
-                failures.append(f"{record.work_id}:missing_handback")
-            failures.append(f"{record.work_id}:terminal_but_open")
-        if record.status == capacity_handshake.LifecycleStatus.HANDED_BACK:
-            if not record.durable_handback:
-                failures.append(f"{record.work_id}:missing_handback")
-            failures.append(f"{record.work_id}:close_not_requested")
-        if record.status == capacity_handshake.LifecycleStatus.DESCENDANTS_VERIFIED:
-            failures.append(f"{record.work_id}:close_not_requested")
-        if record.status == capacity_handshake.LifecycleStatus.CLOSED:
-            if not record.durable_handback:
-                failures.append(f"{record.work_id}:missing_handback")
-            if not record.descendants_closed:
-                failures.append(f"{record.work_id}:open_descendant")
-            if not record.close_readback:
-                failures.append(f"{record.work_id}:close_rejected")
-    if ledger.reservations and not failures:
-        for work_id in ledger.reservations:
-            if work_id not in descendant_ids:
-                failures.append(f"{work_id}:reservation_leak")
-
-    terminal_ids = {
-        record.work_id
-        for record in descendants
-        if record.status
-        in {
-            capacity_handshake.LifecycleStatus.DURABLE_RESULT,
-            capacity_handshake.LifecycleStatus.ERROR,
-            capacity_handshake.LifecycleStatus.CLOSED,
-        }
-    }
-    seen_calls: set[str] = set()
+        if not record.durable_result_evidence_ref:
+            failures.append(f"{record.work_id}:missing_durable_result_evidence")
+        if not record.durable_handback:
+            failures.append(f"{record.work_id}:missing_handback")
+        if not record.descendants_closed:
+            failures.append(f"{record.work_id}:open_descendant")
+        if not record.close_readback:
+            failures.append(f"{record.work_id}:close_rejected")
+    try:
+        expected_postorder = _postorder_descendant_ids(descendants)
+    except ValueError as exc:
+        failures.append(str(exc))
+        expected_postorder = ()
+    seen_calls: list[str] = []
+    tokens_by_work_id: dict[str, dict[str, object]] = {}
     for raw_call in close_agent_tool_calls:
         if not isinstance(raw_call, dict):
             failures.append("close_agent_tool_call_invalid")
             continue
+        if set(raw_call) != {"agent_id", "tool_call_token"}:
+            failures.append("close_agent_tool_call_fields_invalid")
+            continue
         work_id = str(raw_call.get("agent_id", ""))
-        seen_calls.add(work_id)
+        if work_id in seen_calls:
+            failures.append(f"{work_id}:duplicate_close_agent_tool_call")
+        seen_calls.append(work_id)
         failure = _validate_close_agent_token(raw_call.get("tool_call_token"), work_id)
         if failure:
             failures.append(failure)
-    for work_id in sorted(terminal_ids - seen_calls):
+        elif isinstance(raw_call.get("tool_call_token"), dict):
+            tokens_by_work_id[work_id] = raw_call["tool_call_token"]
+    for work_id in sorted(descendant_ids - set(seen_calls)):
         failures.append(f"{work_id}:close_agent_tool_call_missing")
-
-    if not failures and snapshot is not None:
-        for record in descendants:
-            capacity_handshake.queued_reclaim(snapshot, ledger, record.work_id)
+    if tuple(seen_calls) != expected_postorder:
+        failures.append("close_agent_tool_calls_not_postorder")
 
     if not failures:
         provider_packet = capacity_handshake.materialize_closeout_packet(
             parent_work_id=ledger.topology.parent_work_id,
             ledger=ledger,
             descendants=(ledger.topology,),
+            close_agent_tokens=tokens_by_work_id,
         )
         failures.extend(
             f"{failure.work_id}:{failure.detail}" for failure in provider_packet.failures
@@ -212,14 +230,17 @@ def validate_capacity_lifecycle_closeout(
     if failures:
         return False, tuple(dict.fromkeys(failures))
 
-    if snapshot is None:
+    if snapshot is not None:
         for record in descendants:
-            ledger.open_records.pop(record.work_id, None)
-            ledger.reservations.pop(record.work_id, None)
-    if any(work_id in descendant_ids for work_id in ledger.open_records) or any(
-        work_id in descendant_ids for work_id in ledger.reservations
-    ):
+            capacity_handshake.queued_reclaim(snapshot, ledger, record.work_id)
+    if any(work_id in descendant_ids for work_id in ledger.reservations):
         return False, ("reservation_leak",)
+    if any(
+        ledger.open_records[work_id].status
+        != capacity_handshake.LifecycleStatus.RESERVATION_RELEASED
+        for work_id in descendant_ids
+    ):
+        return False, ("lifecycle_release_incomplete",)
     return True, ()
 
 
@@ -822,7 +843,7 @@ def main() -> int:
         report_dir = Path(args.report_dir).resolve()
     else:
         report_dir = (
-            resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)
+            _resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)
         ).resolve()
     workspace = Path.cwd().resolve()
     active_run = active_run_name(report_dir)
