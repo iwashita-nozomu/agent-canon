@@ -612,12 +612,12 @@ entries:
       - tests/agent_tools/test_run_accumulated_agent_evals.py
 
   - id: runtime-log-archive-git
-    summary: Ensures, imports, syncs, commits, and pushes AgentCanon runtime logs and agent reports to the external log archive.
+    summary: Materializes prepared runtime artifacts with confirmed outcome receipts and checkpoints atomic hook-event spool files through one prepared archive transaction.
     path: tools/agent_tools/runtime_log_archive_git.py
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/agent_tools/runtime_log_archive_git.py sync
+    command: python3 tools/agent_tools/runtime_log_archive_git.py <materialize-runtime-event|check-hook-hot-path|sync>
     writes: true
     default_wiring:
       ci: false
@@ -629,7 +629,47 @@ entries:
       - documents/runtime-log-archive-migration.md
       - agents/canonical/ARTIFACT_PLACEMENT.md
     tests:
+      - tests/agent_tools/test_hook_event_log.py
       - tests/agent_tools/test_runtime_log_archive_git.py
+
+  - id: agent-canon-graph
+    summary: Builds and serves the one-build dependency graph with a persisted runtime-evidence snapshot.
+    path: rust/agent-canon/src/graph.rs
+    family: root
+    role: runner
+    status: canonical
+    command: tools/bin/agent-canon graph <build|status|query|context> --root <repo-root> --format json
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/CLI_ENTRYPOINTS.md
+      - documents/dependency-manifest-design.md
+    tests:
+      - tests/agent_tools/test_check_dependency_headers.py
+      - tests/agent_tools/test_check_design_doc_claims.py
+
+  - id: graph-client
+    summary: Provides the typed consume-only Python adapter for graph status, query, and context responses.
+    path: tools/agent_tools/graph_client.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: tools/bin/agent-canon graph <status|query|context> --root <repo-root> --format json
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/CLI_ENTRYPOINTS.md
+    tests:
+      - tests/agent_tools/test_check_dependency_headers.py
+      - tests/agent_tools/test_check_design_doc_claims.py
 
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.

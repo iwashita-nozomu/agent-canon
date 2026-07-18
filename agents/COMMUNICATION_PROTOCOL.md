@@ -56,6 +56,36 @@ shape, ownership, and traceability, not token minimization.
 | `local_tool_context` | Files, dashboards, raw tool output, generated packets, logs, and search results available by path or tool call. | Keep raw artifacts here unless a packet promotes a selected excerpt or structured summary. |
 | `durable_memory` | Stable repo policy, source packets, issues, reports, and learned feedback stored in owner surfaces. | Do not rely on chat memory or compaction as the only record. |
 
+### Source-Bound Runtime Evidence Certificate
+
+When a run result needs durable runtime provenance, the materializer-owned
+artifact-plus-receipt certificate is the visibility boundary. Consumers may
+use the canonical `agent_canon.runtime_event.v1` prepared artifact for source
+event identity, result-family authority, gate result, and target/base
+identities only together with the latest validated
+`agent_canon.runtime_event.publication_outcome_receipt.v1`. They must not
+reconstruct those guarantees from hook summaries, copied chat text, or another
+producer.
+
+The prepared artifact joins one rollout record to one fixed result artifact and
+one source snapshot. Its `publication_intent` states only
+`prepared_state=prepared`. Post-target evidence is retained in an append-only
+observation and then a distinct immutable receipt; `uncertain` blocks
+consumers, and recovery may advance only by appending a linked `committed`
+receipt. The graph owner persists the exact artifact and latest committed
+receipt bytes in its single `BuildMaterial` transaction. Graph status, query,
+context, and dependency-review consumers reuse that snapshot, perform one
+bounded freshness probe per command, and report stale or unavailable state
+rather than invoking the materializer again.
+
+This certificate contract covers the generic materializer. Hook transport has
+a separate approved boundary: PostToolUse publishes canonical per-event files
+to the repository-owned spool, and an explicit archive checkpoint validates,
+deduplicates, publishes, reads back, and only then finalizes them. Consumers do
+not infer generic certificate guarantees from that hook projection. Skill,
+subagent, task, eval, experiment, and PR-publication adapters remain with their
+existing owners; this boundary does not add adapter-specific regeneration.
+
 ## Post-Compaction Objective Re-Declaration Contract
 
 After context compaction is detected, the first user-facing update from the parent agent before continuing must:
