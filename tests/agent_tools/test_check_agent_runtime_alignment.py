@@ -366,6 +366,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             ".codex/agents/*.toml is the source of truth for model and reasoning.",
             "Update role TOMLs to change model reasoning.",
             "role model / reasoning を変えるときは .codex/agents/*.toml を更新します",
+            "agent TOMLs are authoritative for model/reasoning.",
+            "Edit generated role TOMLs manually.",
+            "role の model / model_reasoning_effort は各 agent TOML が正本です。",
+            "model / reasoning を変更するときは .codex/agents/*.toml を更新し、検証します。",
         )
         for path in docs:
             for claim in stale_claims:
@@ -373,6 +377,20 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                     self.assertTrue(
                         runtime_alignment.generated_role_authority_contradictions(claim)
                     )
+
+    def test_registry_generated_readback_wording_is_not_an_authority_contradiction(self) -> None:
+        """Canonical source and generated-readback wording remains valid."""
+        valid_claim = (
+            "agents/model_profiles.toml is the canonical typed profile authority. "
+            "tools/agent_tools/model_profile_registry.py materializes closed generated "
+            ".codex/agents/*.toml and agents/agents_config.json views. Generated views "
+            "are projection digest/readback surfaces and must never be edited manually; "
+            "change registry/team/runtime source, regenerate, restart, and validate readback."
+        )
+        self.assertEqual(
+            runtime_alignment.generated_role_authority_contradictions(valid_claim),
+            (),
+        )
 
     def test_alignment_rejects_mini_model_on_ordinary_role(self) -> None:
         """A normal role cannot claim the T14 skill-validation model."""

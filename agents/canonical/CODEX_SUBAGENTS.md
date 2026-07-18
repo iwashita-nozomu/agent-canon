@@ -678,15 +678,13 @@ Activation Conditions:
 
 ## Codex Model Settings
 
-`.codex/agents/*.toml` は Codex runtime が読む materialized role 定義です。
-role の `model` / `model_reasoning_effort` は各 agent TOML が正本です。
-`.codex/config.toml` は project feature、runtime cap、MCP、skill、agent registry
-を持ち、role model / reasoning は agent TOML に集約します。
-
-role の model / reasoning を変更するときは、該当 `.codex/agents/*.toml`
-を更新し、`tools/agent_tools/check_agent_runtime_alignment.py` と
-`tools/agent_tools/evaluate_codex_agent_roles.py` で検証します。Python checker、
-workflow docs、task catalog は agent TOML を参照します。
+`agents/model_profiles.toml` が canonical typed profile authority です。
+`tools/agent_tools/model_profile_registry.py` は closed generated views として
+`.codex/agents/*.toml` と `agents/agents_config.json` を materialize します。
+generated views は projection digest / readback surfaces であり、手動で編集しては
+なりません。model / reasoning の変更は registry / team / runtime source から始め、
+generated views を再生成して projection digest と readback を検証します。Codex
+runtime は再生成後に restart し、readback で反映を確認します。
 
 運用メモ:
 - OpenAI / Codex の current product evidence は `$openai-docs` で確認します。

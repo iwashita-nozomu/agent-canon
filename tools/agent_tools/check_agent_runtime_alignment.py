@@ -1316,11 +1316,23 @@ _STALE_GENERATED_ROLE_AUTHORITY_PATTERNS = (
     ),
     re.compile(r"Child model settings remain in role TOMLs", re.IGNORECASE),
     re.compile(
-        r"(?:model|reasoning).{0,120}\.codex/agents/\*\.toml.{0,80}(?:正本|優先|更新(?:します|する))",
+        r"(?:model|reasoning).{0,120}\.codex/agents/\*\.toml.{0,80}(?:正本|優先|更新(?:し|します|する))",
         re.IGNORECASE,
     ),
     re.compile(
         r"(?:edit|update).{0,80}(?:role TOMLs?|\.codex/agents/\*\.toml).{0,80}(?:model|reasoning)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:agent|role)\s+TOMLs?\s+are\s+authoritative\s+for\s+(?:model|reasoning)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:model|reasoning).{0,80}(?:各\s+)?agent TOML.{0,40}正本",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:edit|update)\b.{0,80}(?:generated\s+)?(?:agent|role)\s+TOMLs?.{0,40}\bmanually\b",
         re.IGNORECASE,
     ),
 )
