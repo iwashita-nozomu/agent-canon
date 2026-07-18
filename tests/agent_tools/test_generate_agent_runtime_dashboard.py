@@ -14,9 +14,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
-
-UTC = timezone.utc
+from datetime import UTC, datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

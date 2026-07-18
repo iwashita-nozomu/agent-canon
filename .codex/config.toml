@@ -163,6 +163,10 @@ path = "../.agents/skills/oop-readability-check/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/oop-type-design/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/paper-writing/SKILL.md"
 enabled = true
 
