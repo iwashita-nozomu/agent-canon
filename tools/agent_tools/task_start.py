@@ -24,6 +24,7 @@ from agent_team import (
     TaskCatalog,
     TeamConfig,
     auto_language_specialists,
+    capacity_start_output_lines,
     codex_agent_model_matrix_for_roles,
     codex_runtime_max_depth,
     codex_runtime_max_threads,
@@ -359,6 +360,8 @@ def emit_task_start_output(
     print(f"REPORT_DIR={context.report_dir}")
     print(f"TASK_AUTHORITY={context.report_dir / 'task_authority.yaml'}")
     print(f"WORKSPACE_ROOT={workspace_root}")
+    for line in capacity_start_output_lines(catalog, workspace_root, context.run_id):
+        print(line)
     print(f"REQUEST_CONTRACT={request_contract_path}")
     print("REQUEST_CONTRACT_REQUIRED=yes")
     print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")

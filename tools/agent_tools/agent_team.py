@@ -23,9 +23,12 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import yaml
+from tools.agent_tools import capacity_handshake
+from tools.agent_tools import implementation_route
+from tools.agent_tools import model_profile_registry
 from route import decide_skills, implementation_handoff_required, load_skill_route_rules
 from skill_tool_commands import (
     PROMPT_PLACEHOLDER,
@@ -680,6 +683,52 @@ class RunBundleSpec:
     selected_skills: tuple[str, ...] = ()
     task_catalog: TaskCatalog | None = None
     agent_type_selections: tuple[AgentTypeSelection, ...] = ()
+    parent_lineage_id: str = ""
+
+
+@dataclass(frozen=True)
+class CapacityHandshakeConsumerBinding:
+    """Closed consumer projection for the provider-owned capacity ledger."""
+
+    binding_version: int = 1
+    provider_owner_id: str = "capacity_handshake"
+    consumer_owner_ids: tuple[str, ...] = ("agent_team", "task_close")
+    allowed_api_ids: tuple[str, ...] = (
+        "reserve_capacity",
+        "enqueue_ready_work",
+        "record_lifecycle_transition",
+        "materialize_closeout_packet",
+    )
+    provider_type_ids: tuple[str, ...] = (
+        "LifecycleStatus",
+        "DescendantLifecycleRecord",
+        "CapacityLedger",
+        "LifecycleTransitionRecord",
+        "LedgerWriteResult",
+        "ParentChildEdge",
+        "DescendantTopologyReadback",
+        "CloseoutPacket",
+        "CloseAgentCallRecord",
+        "LifecycleCloseoutFailure",
+    )
+    duplicate_definition_policy: str = "forbidden"
+
+    @property
+    def shape_id(self) -> str:
+        return "capacity_handshake_consumer_binding_v1"
+
+
+@dataclass
+class _CapacityRuntime:
+    """Runtime-owned objects shared by parent and nested lifecycle consumers."""
+
+    binding: CapacityHandshakeConsumerBinding
+    snapshot: capacity_handshake.CapacitySnapshot
+    ledger: capacity_handshake.CapacityLedger
+    parent_lineage_id: str
+    topology_proof_sha256: str
+    requested_capacity: int
+    write_scope_cap: int
 
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
@@ -1152,39 +1201,393 @@ def resolve_workflow_family(catalog: TaskCatalog, family_id: str) -> dict[str, o
     raise KeyError(f"unknown workflow family: {family_id}")
 
 
+def _capacity_family_record(
+    family: dict[str, object],
+) -> capacity_handshake.DeclaredFamilyCapacity:
+    """Derive one family capacity record from its declared stage topology."""
+    family_id = _as_required_string(family.get("id"), "workflow_family.id")
+    roles = _as_object_mapping(cast(object, family.get("roles", {})), "workflow_family.roles")
+    declared_roles = set(
+        _as_string_tuple(roles.get("always_on"), "workflow_family.roles.always_on")
+        + _as_string_tuple(roles.get("specialists"), "workflow_family.roles.specialists")
+    )
+    topology = _as_object_mapping(
+        cast(object, family.get("role_topology", {})),
+        "workflow_family.role_topology",
+    )
+    waves = _as_mapping_tuple(topology.get("stage_waves"), "workflow_family.stage_waves")
+
+    def stage_roles(stage_class: str) -> tuple[str, ...]:
+        selected: list[str] = []
+        for wave in waves:
+            if wave.get("stage_class") != stage_class:
+                continue
+            for role_id in _as_string_tuple(wave.get("role_ids"), "stage_wave.role_ids"):
+                if role_id in declared_roles and role_id not in selected:
+                    selected.append(role_id)
+        return tuple(selected)
+
+    direct = list(stage_roles("reviewer"))
+    isolated = {"skill_evaluator"} & declared_roles
+    for role_id in sorted(isolated):
+        if role_id not in direct:
+            direct.append(role_id)
+    nested = stage_roles("producer")
+    final = stage_roles("final")
+    return capacity_handshake.DeclaredFamilyCapacity(
+        workflow_family_id=family_id,
+        direct_frontier_role_ids=tuple(direct),
+        nested_owner_role_ids=tuple(
+            role_id for role_id in nested if role_id not in isolated
+        ),
+        final_frontier_role_ids=tuple(final),
+        direct_frontier_count=len(direct),
+        nested_reservation_count=len(tuple(role_id for role_id in nested if role_id not in isolated)),
+        final_frontier_count=len(final),
+    )
+
+
+def declared_team_capacity_derivation(
+    catalog: TaskCatalog,
+) -> capacity_handshake.DeclaredTeamTopologyDerivation:
+    """Materialize the canonical topology-derived capacity witness input."""
+    return capacity_handshake.DeclaredTeamTopologyDerivation(
+        derivation_version=1,
+        topology_source="agents/task_catalog.yaml::role_topology_defaults",
+        workflow_role_source="agents/task_catalog.yaml::workflow_families[].roles",
+        direct_frontier_stage_class="reviewer",
+        nested_owner_stage_class="producer",
+        final_stage_class="final",
+        excluded_nested_role_ids=("skill_evaluator",),
+        isolated_direct_role_ids=("skill_evaluator",),
+        family_records=tuple(
+            _capacity_family_record(family) for family in catalog.workflow_families
+        ),
+    )
+
+
+def _capacity_write_scope_cap(
+    family: capacity_handshake.DeclaredFamilyCapacity,
+) -> int:
+    """Derive write capacity from the selected nested owner frontier."""
+    return max(1, len(family.nested_owner_role_ids))
+
+
+def _capacity_topology_witness(
+    derivation: capacity_handshake.DeclaredTeamTopologyDerivation,
+    target_state_contract_sha256: str = "",
+) -> capacity_handshake.TopologyCapacityWitness:
+    """Build the serializable topology witness consumed by the handshake owner."""
+    nodes: list[capacity_handshake.TopologyCapacityNode] = []
+    for family in derivation.family_records:
+        family_node = f"workflow:{family.workflow_family_id}"
+        nodes.append(
+            capacity_handshake.TopologyCapacityNode(
+                node_id=family_node,
+                node_kind="workflow_family",
+                predecessor_ids=(),
+                descendant_parent_id=None,
+                total_slot_weight=1,
+                write_slot_weight=0,
+                allowed_write_paths=(),
+                exclusion_ids=(),
+            )
+        )
+        for role_id in family.nested_owner_role_ids:
+            nodes.append(
+                capacity_handshake.TopologyCapacityNode(
+                    node_id=f"{family_node}:{role_id}",
+                    node_kind="descendant",
+                    predecessor_ids=(family_node,),
+                    descendant_parent_id=family_node,
+                    total_slot_weight=1,
+                    write_slot_weight=1,
+                    allowed_write_paths=(f"role:{role_id}",),
+                    exclusion_ids=(),
+                )
+            )
+    peak = derivation.peak_family
+    requested = derivation.requested_max_threads()
+    write_cap = _capacity_write_scope_cap(peak)
+    proof_payload = {
+        "families": [
+            {
+                "id": family.workflow_family_id,
+                "direct": list(family.direct_frontier_role_ids),
+                "nested": list(family.nested_owner_role_ids),
+                "final": list(family.final_frontier_role_ids),
+            }
+            for family in derivation.family_records
+        ],
+        "requested_total_capacity": requested,
+        "write_scope_cap": write_cap,
+    }
+    proof_sha256 = hashlib.sha256(
+        json.dumps(proof_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return capacity_handshake.TopologyCapacityWitness(
+        target_state_contract_sha256=target_state_contract_sha256,
+        declared_team_topology_ref="agents/task_catalog.yaml",
+        declared_team_topology_sha256=proof_sha256,
+        node_records=tuple(nodes),
+        legal_frontier_ids=tuple(node.node_id for node in nodes),
+        peak_frontier_node_ids=tuple(
+            f"workflow:{peak.workflow_family_id}:{role_id}"
+            for role_id in peak.direct_frontier_role_ids
+        ),
+        peak_write_frontier_node_ids=tuple(
+            f"workflow:{peak.workflow_family_id}:{role_id}"
+            for role_id in peak.nested_owner_role_ids
+        ),
+        requested_total_capacity=requested,
+        workflow_dag_peak_demand=peak.direct_frontier_count,
+        nested_reservation_count=peak.nested_reservation_count,
+        workflow_dag_budget=peak.direct_frontier_count,
+        write_scope_cap=write_cap,
+        derivation=derivation,
+    )
+
+
+def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
+    """Create one provider-owned ledger and snapshot for a run bundle."""
+    if spec.task_catalog is None:
+        raise RuntimeError("task catalog is required for capacity handshake")
+    derivation = declared_team_capacity_derivation(spec.task_catalog)
+    witness = _capacity_topology_witness(derivation)
+    config_path = spec.workspace_root / ".codex" / "config.toml"
+    contract = capacity_handshake.load_startup_contract(
+        derivation,
+        witness,
+        config_path=str(config_path),
+        contract_id=f"capacity:{spec.run_id}",
+    )
+    peak = derivation.peak_family
+    write_cap = _capacity_write_scope_cap(peak)
+    snapshot = capacity_handshake.make_session_snapshot(
+        contract=contract,
+        requested_capacity=witness.requested_total_capacity,
+        configured_max_threads=contract.input_evidence.max_threads_loader.configured_max_threads,
+        workflow_dag_demand=peak.direct_frontier_count,
+        nested_capacity_reservation=peak.nested_reservation_count,
+        write_scope_cap=write_cap,
+    )
+    parent_lineage_id = spec.parent_lineage_id or f"run:{spec.run_id}"
+    ledger = capacity_handshake.CapacityLedger(
+        topology=capacity_handshake.DescendantTopologyReadback(parent_work_id=spec.run_id)
+    )
+    for role in spec.roles:
+        work_id = f"{spec.run_id}:{role.id}"
+        record = capacity_handshake.DescendantLifecycleRecord(
+            work_id=work_id,
+            parent_work_id=spec.run_id,
+            status=capacity_handshake.LifecycleStatus.SPAWNED,
+            reserved_slots=1,
+            reserved_write_slots=1 if role.write_policy.mode not in {"read_only", "artifacts_only"} else 0,
+        )
+        ledger.open_records[work_id] = record
+        ledger.topology = capacity_handshake.DescendantTopologyReadback(
+            parent_work_id=spec.run_id,
+            descendants=tuple((*ledger.topology.descendants, record)),
+        )
+        ledger.reservations[work_id] = capacity_handshake.ParentChildEdge(
+            parent_work_id=spec.run_id,
+            child_work_id=work_id,
+        )
+    return _CapacityRuntime(
+        binding=CapacityHandshakeConsumerBinding(),
+        snapshot=snapshot,
+        ledger=ledger,
+        parent_lineage_id=parent_lineage_id,
+        topology_proof_sha256=witness.declared_team_topology_sha256,
+        requested_capacity=witness.requested_total_capacity,
+        write_scope_cap=write_cap,
+    )
+
+
+def _json_capacity_record(record: capacity_handshake.DescendantLifecycleRecord) -> dict[str, object]:
+    return {
+        "work_id": record.work_id,
+        "parent_work_id": record.parent_work_id,
+        "status": record.status.value,
+        "durable_handback": record.durable_handback,
+        "descendants_closed": record.descendants_closed,
+        "close_readback": record.close_readback,
+        "reserved_slots": record.reserved_slots,
+        "reserved_write_slots": record.reserved_write_slots,
+    }
+
+
+def _capacity_projection(runtime: _CapacityRuntime, spec: RunBundleSpec) -> dict[str, object]:
+    """Return the machine-readable manifest projection for shared runtime state."""
+    configured = runtime.snapshot.configured_max_threads
+    return {
+        "schema_id": "team_manifest_capacity_request_v1",
+        "requested_total_capacity": runtime.requested_capacity,
+        "topology_proof_ref": "agents/task_catalog.yaml",
+        "topology_proof_sha256": runtime.topology_proof_sha256,
+        "capacity_policy_ref": "agents/capacity_policy.toml",
+        "capacity_policy_sha256": runtime.snapshot.contract.capacity_policy.topology_proof_sha256,
+        "loader_evidence_ref": runtime.snapshot.contract.input_evidence.max_threads_loader.evidence_ref,
+        "configured_max_threads_loader_value": configured,
+        "reload_state": "restart_required" if configured != runtime.requested_capacity else "current",
+        "requested_capacity_loader_status": "completed",
+        "parent_lineage_id": runtime.parent_lineage_id,
+        "ledger_ref": f"runtime://ledger/{spec.run_id}",
+        "capacity_handshake_binding": {
+            "shape_id": runtime.binding.shape_id,
+            "binding_version": runtime.binding.binding_version,
+            "provider_owner_id": runtime.binding.provider_owner_id,
+            "consumer_owner_ids": list(runtime.binding.consumer_owner_ids),
+            "allowed_api_ids": list(runtime.binding.allowed_api_ids),
+            "provider_type_ids": list(runtime.binding.provider_type_ids),
+            "duplicate_definition_policy": runtime.binding.duplicate_definition_policy,
+        },
+        "ledger": {
+            "shape_id": runtime.ledger.shape_id,
+            "parent_work_id": runtime.ledger.topology.parent_work_id,
+            "descendants": [_json_capacity_record(record) for record in runtime.ledger.topology.descendants],
+            "reservations": [
+                {"parent_work_id": edge.parent_work_id, "child_work_id": edge.child_work_id}
+                for edge in runtime.ledger.reservations.values()
+            ],
+            "ready_queue": [],
+        },
+        "lineage": {
+            "parent_lineage_id": runtime.parent_lineage_id,
+            "ancestor_agent_ids": [],
+            "run_id": spec.run_id,
+            "work_id": spec.run_id,
+            "role_ids": [role.id for role in spec.roles],
+        },
+    }
+
+
+def _closeout_projection(
+    runtime: _CapacityRuntime,
+    spec: RunBundleSpec,
+) -> dict[str, object]:
+    """Materialize the provider closeout state with canonical close-agent tokens."""
+    provider_packet = capacity_handshake.materialize_closeout_packet(
+        parent_work_id=spec.run_id,
+        ledger=runtime.ledger,
+        descendants=(runtime.ledger.topology,),
+    )
+    calls: list[dict[str, object]] = []
+    registry = model_profile_registry.load_model_profile_registry(spec.workspace_root)
+    for record in runtime.ledger.topology.descendants:
+        if record.status not in {
+            capacity_handshake.LifecycleStatus.DURABLE_RESULT,
+            capacity_handshake.LifecycleStatus.ERROR,
+            capacity_handshake.LifecycleStatus.CLOSED,
+        }:
+            continue
+        token = model_profile_registry.materialize_tool_call_token(
+            model_profile_registry.ToolCallMaterializationRequest(
+                profile_id="luna_implementation_xhigh",
+                terminal_agent_id=record.work_id,
+            ),
+            "luna_implementation_xhigh",
+            registry,
+        )
+        calls.append(
+            {
+                "agent_id": record.work_id,
+                "terminal_execution_status": (
+                    "errored"
+                    if record.status == capacity_handshake.LifecycleStatus.ERROR
+                    else "completed"
+                ),
+                "ledger_ref": f"runtime://ledger/{spec.run_id}",
+                "tool_call_token": {
+                    "schema_id": token.schema_id,
+                    "skill_id": token.skill_id,
+                    "tool_id": token.tool_id,
+                    "arguments": dict(token.arguments),
+                    "argument_schema_id": token.argument_schema_id,
+                    "failure_schema_id": token.failure_schema_id,
+                    "target": token.target,
+                },
+                "close_readback_status": "completed" if record.close_readback else "pending",
+                "status": "closed" if record.close_readback else "materialized",
+            }
+        )
+    failures = [
+        {"work_id": failure.work_id, "detail": failure.detail}
+        for failure in provider_packet.failures
+    ]
+    return {
+        "schema_id": "closeout_tool_call_projection_v1",
+        "parent_work_id": spec.run_id,
+        "parent_lineage_id": runtime.parent_lineage_id,
+        "ledger_ref": f"runtime://ledger/{spec.run_id}",
+        "close_agent_tool_calls": calls,
+        "failures": failures,
+        "status": "completed" if not failures else "failed",
+        "natural_language_intent": "close terminal descendants in postorder and release reservations",
+    }
+
+
+def capacity_manifest_output_lines(
+    spec: RunBundleSpec,
+    runtime: _CapacityRuntime | None = None,
+) -> tuple[str, ...]:
+    """Return task-start/bootstrap fields projected from one typed capacity runtime."""
+    runtime = runtime or capacity_runtime_for_spec(spec)
+    projection = _capacity_projection(runtime, spec)
+    return (
+        "CAPACITY_REQUEST_SCHEMA=team_manifest_capacity_request_v1",
+        f"REQUESTED_TOTAL_CAPACITY={projection['requested_total_capacity']}",
+        f"CAPACITY_TOPOLOGY_PROOF_REF={projection['topology_proof_ref']}",
+        f"CAPACITY_TOPOLOGY_PROOF_SHA256={projection['topology_proof_sha256']}",
+        f"CAPACITY_POLICY_REF={projection['capacity_policy_ref']}",
+        f"CAPACITY_LOADER_EVIDENCE_REF={projection['loader_evidence_ref']}",
+        f"CAPACITY_RELOAD_STATE={projection['reload_state']}",
+        f"PARENT_LINEAGE_ID={runtime.parent_lineage_id}",
+        f"CAPACITY_LEDGER_REF={projection['ledger_ref']}",
+    )
+
+
+def capacity_start_output_lines(
+    catalog: TaskCatalog,
+    workspace_root: Path,
+    run_id: str,
+) -> tuple[str, ...]:
+    """Return startup fields from the same topology-derived capacity owner."""
+    derivation = declared_team_capacity_derivation(catalog)
+    witness = _capacity_topology_witness(derivation)
+    contract = capacity_handshake.load_startup_contract(
+        derivation,
+        witness,
+        config_path=str(workspace_root / ".codex" / "config.toml"),
+        contract_id=f"capacity:{run_id}",
+    )
+    configured = contract.input_evidence.max_threads_loader.configured_max_threads
+    parent_lineage_id = f"run:{run_id}"
+    reload_state = "restart_required" if configured != witness.requested_total_capacity else "current"
+    return (
+        "CAPACITY_REQUEST_SCHEMA=team_manifest_capacity_request_v1",
+        f"REQUESTED_TOTAL_CAPACITY={witness.requested_total_capacity}",
+        "CAPACITY_TOPOLOGY_PROOF_REF=agents/task_catalog.yaml",
+        f"CAPACITY_TOPOLOGY_PROOF_SHA256={witness.declared_team_topology_sha256}",
+        "CAPACITY_POLICY_REF=agents/capacity_policy.toml",
+        "CAPACITY_POLICY_DIGEST="
+        f"{contract.capacity_policy.topology_proof_sha256}",
+        "CAPACITY_LOADER_EVIDENCE_REF="
+        f"{contract.input_evidence.max_threads_loader.evidence_ref}",
+        f"CAPACITY_LOADED_CONFIGURED_VALUE={configured}",
+        f"CAPACITY_RELOAD_STATE={reload_state}",
+        f"PARENT_LINEAGE_ID={parent_lineage_id}",
+        f"CAPACITY_LEDGER_REF=runtime://ledger/{run_id}",
+    )
+
+
 def workflow_spawn_budget(catalog: TaskCatalog, family_id: str) -> tuple[int, int]:
     """Return the active and write-capable spawn budget for one workflow family."""
-    family = resolve_workflow_family(catalog, family_id)
-    raw_budget = family.get("spawn_budget")
-    if not isinstance(raw_budget, dict):
-        raise RuntimeError(
-            f"workflow family spawn_budget must be a mapping for {family_id}"
-        )
-    raw_budget = _as_object_mapping(
-        cast(object, raw_budget), f"workflow_families[{family_id}].spawn_budget"
+    derivation = declared_team_capacity_derivation(catalog)
+    family = next(
+        record for record in derivation.family_records if record.workflow_family_id == family_id
     )
-    active = raw_budget.get("active_subagents")
-    max_write = raw_budget.get("max_write_subagents")
-    if not isinstance(active, int) or active < 1:
-        raise RuntimeError(
-            f"workflow family active_subagents must be >= 1 for {family_id}"
-        )
-    if not isinstance(max_write, int) or max_write < 1:
-        raise RuntimeError(
-            f"workflow family max_write_subagents must be >= 1 for {family_id}"
-        )
-    if max_write > active:
-        raise RuntimeError(
-            "workflow family max_write_subagents exceeds active_subagents "
-            f"for {family_id}: {max_write} > {active}"
-        )
-    runtime_max_threads = codex_runtime_max_threads()
-    if active > runtime_max_threads:
-        raise RuntimeError(
-            "workflow family active_subagents exceeds runtime max_threads "
-            f"for {family_id}: {active} > {runtime_max_threads}"
-        )
-    return active, max_write
+    return family.workflow_thread_request, _capacity_write_scope_cap(family)
 
 
 def workflow_topology_policy_violations(
@@ -1248,22 +1651,20 @@ def workflow_topology_policy_violations(
         if family_id == "skill_evaluation":
             if always_on or specialists != ("skill_evaluator",):
                 violations.append((family_id, "evaluator-only-topology"))
-            expected_budget = (1, 1)
         elif family_id == "owner_bounded_change":
             if always_on != owner_bounded_always_on:
                 violations.append((family_id, "owner-bounded-producer-core"))
             if "change_reviewer" not in specialists:
                 violations.append((family_id, "change-reviewer-not-deferred"))
-            expected_budget = (4, 2)
         else:
             if always_on != delivery_always_on:
                 violations.append((family_id, "delivery-producer-core"))
             missing_reviews = deferred_delivery_reviews - set(specialists)
             if missing_reviews:
                 violations.append((family_id, "reviewers-not-deferred"))
-            expected_budget = (4, 2)
-        if workflow_spawn_budget(catalog, family_id) != expected_budget:
-            violations.append((family_id, "spawn-budget"))
+        active_budget, write_budget = workflow_spawn_budget(catalog, family_id)
+        if active_budget < 1 or write_budget < 1 or write_budget > active_budget:
+            violations.append((family_id, "derived-spawn-budget"))
     return tuple(violations)
 
 
@@ -2023,6 +2424,7 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
         "OWNER": spec.owner,
         "CREATED_AT": spec.created_at_iso,
     }
+    capacity_runtime = capacity_runtime_for_spec(spec)
     spec.report_dir.mkdir(parents=True, exist_ok=True)
     created_files = list(iter_artifacts(spec.config, spec.roles))
     for artifact in created_files:
@@ -2032,9 +2434,22 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
                 encoding="utf-8",
             )
     (spec.report_dir / spec.config.artifacts["team_manifest"]).write_text(
-        build_manifest(spec),
+        build_manifest(spec, capacity_runtime),
         encoding="utf-8",
     )
+    (spec.report_dir / "closeout_packet.json").write_text(
+        json.dumps(
+            {
+                "capacity_request": _capacity_projection(capacity_runtime, spec),
+                "closeout_packet": _closeout_projection(capacity_runtime, spec),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    created_files.append("closeout_packet.json")
     (spec.report_dir / spec.config.artifacts["verification"]).write_text(
         "\n".join(
             [
@@ -2218,7 +2633,10 @@ def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def build_manifest(spec: RunBundleSpec) -> str:
+def build_manifest(
+    spec: RunBundleSpec,
+    capacity_runtime: _CapacityRuntime | None = None,
+) -> str:
     """Build the team manifest yaml."""
     workflow_family = None
     if spec.workflow_family_id:
@@ -2228,7 +2646,7 @@ def build_manifest(spec: RunBundleSpec) -> str:
             spec.task_catalog,
             spec.workflow_family_id,
         )
-    lines = manifest_run_lines(spec, workflow_family)
+    lines = manifest_run_lines(spec, workflow_family, capacity_runtime)
     lines.extend(manifest_role_lines(spec, workflow_family))
     lines.extend(manifest_context_policy_lines(spec.config))
     lines.extend(manifest_quality_gate_lines(spec.config))
@@ -2239,8 +2657,12 @@ def build_manifest(spec: RunBundleSpec) -> str:
 def manifest_run_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
+    capacity_runtime: _CapacityRuntime | None = None,
 ) -> list[str]:
     """Render run-level manifest fields."""
+    capacity_runtime = capacity_runtime or capacity_runtime_for_spec(spec)
+    capacity_projection = _capacity_projection(capacity_runtime, spec)
+    closeout_projection = _closeout_projection(capacity_runtime, spec)
     lines = [
         "run:",
         f"  id: {spec.run_id}",
@@ -2252,6 +2674,38 @@ def manifest_run_lines(
         f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
         f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
         f"  task_catalog: {str(ROOT / str(spec.config.team['task_catalog']))!r}",
+        "  parent_lineage_id: " + repr(capacity_runtime.parent_lineage_id),
+        "  implementation_execution:",
+        "    schema_id: 'implementation_execution_contract_v1'",
+        "    route_owner: 'implementation_route'",
+        "    route_import: 'tools.agent_tools.implementation_route'",
+        "    profile_registry_import: 'tools.agent_tools.model_profile_registry'",
+        "    dispatch: 'immediate_one_pass'",
+        "    same_spark_gap_continuation: 'resume_same_spark_after_gap'",
+        "    deterministic_search_route: 'python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json'",
+        "  capacity_request:",
+    ]
+    capacity_yaml = yaml.safe_dump(
+        capacity_projection,
+        sort_keys=False,
+        default_flow_style=False,
+    ).splitlines()
+    for line in capacity_yaml:
+        lines.append(f"    {line}")
+    lines.extend(
+        [
+            "  closeout_packet:",
+        ]
+    )
+    closeout_yaml = yaml.safe_dump(
+        closeout_projection,
+        sort_keys=False,
+        default_flow_style=False,
+    ).splitlines()
+    for line in closeout_yaml:
+        lines.append(f"    {line}")
+    lines.extend(
+        [
         "  subagent_lifecycle_policy:",
         "    fresh_subagents_required: true",
         "    reuse_for_new_task: forbidden",
@@ -2293,7 +2747,8 @@ def manifest_run_lines(
         f"    archive_current_run_command: 'python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {spec.report_dir}'",
         "    sync_command: 'python3 tools/agent_tools/runtime_log_archive_git.py sync'",
         "    archive_index: '.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl'",
-    ]
+        ]
+    )
     insert_index = (
         lines.index("    broad_cross_cutting_packet: available_not_default_read") + 1
     )

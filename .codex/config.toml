@@ -251,7 +251,7 @@ path = "../.agents/skills/worktree-start/SKILL.md"
 enabled = true
 
 [agents]
-max_threads = 24
+max_threads = 26
 max_depth = 2
 job_max_runtime_seconds = 3600
 

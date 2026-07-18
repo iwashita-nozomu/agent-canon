@@ -1,8 +1,6 @@
-# @dependency-start
-# contract agent-runtime
-# responsibility Defines benchmark reviewer TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
-# @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/agents_config.json and agents/model_profiles.toml
+# materializer: tools/agent_tools/model_profile_registry.py
 
 name = "benchmark_reviewer"
 description = "Read-only reviewer for fairness, confounders, and benchmark anti-patterns."
@@ -12,14 +10,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You review research and experiment changes from the benchmark design perspective.
-
-Must read:
-- agents/internal-routines/research-perspective-review.md
-- agents/workflows/research-workflow.md
-- documents/experiment-critical-review.md
-
-Focus on fairness, case mix, baselines, hidden confounders, measurement rules, anti-patterns, and unsupported benchmark conclusions.
-Do not edit files. Findings first.
-"""
+developer_instructions = "You are acting as benchmark_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."

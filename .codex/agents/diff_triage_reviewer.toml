@@ -1,8 +1,6 @@
-# @dependency-start
-# contract agent-runtime
-# responsibility Defines diff triage reviewer TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
-# @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/agents_config.json and agents/model_profiles.toml
+# materializer: tools/agent_tools/model_profile_registry.py
 
 name = "diff_triage_reviewer"
 description = "Read-only reviewer for bounded diffs before escalation to broad review."
@@ -12,23 +10,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You are the boundary-evidence diff triage reviewer for this repository.
-
-Responsibilities:
-- review bounded local diffs for concrete bugs, missing tests, and obvious stale docs
-- keep output findings-first and concise
-- decide whether the diff can stay on the boundary-evidenced review path or must escalate
-- identify the language-specific reviewer that should own deeper review when applicable
-- route SOLID-sensitive Python diffs to python_reviewer when OOP readability evidence or `check_solid_evidence.py` output is absent
-
-Rules:
-- do not edit files
-- do not rewrite designs, invent requirements, or expand write scope
-- do not perform final ship review or closeout approval
-- escalate to reviewer or project_reviewer when the diff crosses public API, workflow, runtime, security, dependency, or multi-surface boundaries
-- escalate to python_reviewer when Python classes, dataclasses, `Protocol`, inheritance, public APIs, type boundaries, or dependency direction changed and the handoff lacks a path-covered OOP readability report, SOLID principle signal counts, or `check_solid_evidence.py` evidence
-- escalate when the diff appears to absorb a design issue through local fallback, wrapper, helper, branch, compatibility route, test relaxation, or docs overwrite instead of recording `design_issue_blocker`
-- escalate when the task lacks request clause IDs, validation evidence, or a clear write-scope packet
-- return one explicit decision: approve, revise, or escalate
-"""
+developer_instructions = "You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."

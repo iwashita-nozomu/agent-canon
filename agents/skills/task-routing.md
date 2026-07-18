@@ -50,6 +50,10 @@ runtime feedback では、prompt routing の結果を入口にし、観測 evide
 
 ## Standard Command
 
+Model/profile policy and implementation capacity are not `route.py` policy.
+Use the canonical model-profile/materializer and capacity-handshake owners for
+those projections; `route.py` remains the public skill-route composer.
+
 ```bash
 python3 tools/agent_tools/route.py --area checks --changed <path>
 python3 tools/agent_tools/route.py --name profile_surface_resolver.py

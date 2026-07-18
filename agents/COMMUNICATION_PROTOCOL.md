@@ -137,6 +137,23 @@ the structure contract is not a root view, pass
 
 ## Handoff Packet
 
+Implementation handoffs project the canonical TargetStateContract and
+ImplementationExecutionContract: complete owner/type/API/config/schema/path/
+dependency/transition/deletion/validation structure, immutable packet identity,
+Decision Sufficiency record, and empty unresolved decisions. An identical
+owner/edit/validation action transitions directly to one complete materializer
+pass and one post-completion owning gate. `ImplementationFeedback` covers
+compile/static/deterministic failures; only an exact `StructuralDesignGap` is
+repaired once and resumed by the same Spark. Tool calls are registry-issued
+machine-readable `ToolCallToken` values.
+
+Capacity and lifecycle fields use the canonical requested/configured/
+platform-effective/workflow-demand/write-cap/nested-reserved/available terms;
+effective is the minimum of available constraints after reservations. Closeout
+must carry full descendant topology, durable handback, closure verification,
+reservation release, and the canonical `close_agent` ToolCall. Open terminal
+descendants, unknown descendants, missing handback, and reservation leaks fail.
+
 - `from`
 - `to`
 - `stage`

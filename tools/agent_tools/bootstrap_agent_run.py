@@ -24,6 +24,7 @@ from agent_team import (
     TaskCatalog,
     TeamConfig,
     auto_language_specialists,
+    capacity_start_output_lines,
     codex_agent_model_matrix_for_roles,
     codex_runtime_max_depth,
     codex_runtime_max_threads,
@@ -353,6 +354,8 @@ def emit_bootstrap_output(
     print(f"REPORT_DIR={context.report_dir}")
     print(f"TASK_AUTHORITY={context.report_dir / 'task_authority.yaml'}")
     print(f"WORKSPACE_ROOT={workspace_root}")
+    for line in capacity_start_output_lines(catalog, workspace_root, context.run_id):
+        print(line)
     print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
     print(f"RUNTIME_MAX_DEPTH={codex_runtime_max_depth()}")
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")

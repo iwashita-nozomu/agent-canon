@@ -1,0 +1,42 @@
+policy_version = 1
+policy_id = "topology_derived_v1"
+
+[topology_derivation]
+total_slot_derivation = "max_legal_concurrent_open_frontier"
+workflow_budget_derivation = "requested_total_capacity"
+write_slot_derivation = "max_pairwise_disjoint_write_frontier"
+parent_slot_weight = 1
+descendant_slot_weight = 1
+nested_reservation_accounting = "count_once"
+unknown_platform_behavior = "min_known_then_queue_on_runtime_rejection"
+
+[reservation_policy]
+idempotency_fields = ["work_id", "packet_sha256"]
+terminal_open_consumes_slot = true
+release_requires = ["durable_handback", "descendants_closure_verified", "close_readback"]
+completed_open_action = "close_then_readback"
+errored_open_action = "durable_error_handback_then_close_then_readback"
+unknown_descendant_action = "fail_closeout"
+
+[queue_policy]
+preserve_packet_and_profile = true
+promotion_order = ["dependency_then_priority_then_work_id"]
+thread_rejection_action = "queue_ready_work"
+model_rejection_action = "queue_same_model_packet"
+compatibility_fallback = false
+
+[runtime_config_change_policy]
+config_key = "agents.max_threads"
+target_value_derivation = "declared_team_peak_plus_nested_reservations"
+target_value = 26
+required_predicates = ["approved_target_state", "valid_declared_team_topology", "generated_value_matches_topology_witness", "source_anchor_matches_current_24"]
+missing_predicate_action = "fail_generation"
+unavailable_reload_action = "emit_restart_required"
+disposable_spawn_probe = false
+
+[generated_manifest_policy]
+output_key = "run.capacity_request.requested_total_capacity"
+topology_proof_key = "run.capacity_request.topology_proof_ref"
+capacity_policy_key = "run.capacity_request.capacity_policy_ref"
+loader_evidence_key = "run.capacity_request.loader_evidence_ref"
+numeric_family_default = false

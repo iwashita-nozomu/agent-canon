@@ -19,6 +19,7 @@ import json
 import re
 import subprocess
 import tempfile
+import shutil
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -28,9 +29,14 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
 import yaml
+import capacity_handshake
+import model_profile_registry
 from agent_team import (
     ROOT,
     Role,
@@ -39,6 +45,7 @@ from agent_team import (
     TeamConfig,
     codex_runtime_max_depth,
     codex_runtime_max_threads,
+    declared_team_capacity_derivation,
     create_run_bundle,
     default_specialists_for_task,
     load_task_catalog,
@@ -70,7 +77,7 @@ INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
 EXPECTED_MODEL_CONTEXT_WINDOW = 1_000_000
 EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
-EXPECTED_MAX_THREADS = 24
+EXPECTED_MAX_THREADS = 26
 EXPECTED_MAX_DEPTH = 2
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
 MIN_DYNAMIC_SPAWN_BUDGET = 4
@@ -86,6 +93,7 @@ EVALUATOR_AGENT_ID = "skill_evaluator"
 EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
 SKILL_VALIDATION_AGENT_IDS = {EVALUATOR_AGENT_ID}
 FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
+GENERATED_ROLE_VIEW_MATERIALIZER = "generate_role_views"
 SCOPED_MODEL_POLICY_KEYS = {
     "model",
     "model_reasoning_effort",
@@ -529,61 +537,89 @@ def configured_dispatcher_scripts() -> set[str]:
     return scripts
 
 
+def validate_generated_role_views() -> None:
+    """Validate the closed role-view projection against canonical sources."""
+    config = load_team_config()
+    raw = config.raw
+    agent_views = require_mapping(raw.get("agent_views"), "agents_config.agent_views must be a mapping")
+    bindings_raw = require_list(raw.get("roles"), "agents_config.roles must be a list")
+    bindings: dict[str, dict[str, object]] = {}
+    for raw_binding in bindings_raw:
+        binding = require_mapping(raw_binding, "agents_config.roles entries must be mappings")
+        role_id = require_string(binding.get("id"), "agents_config.roles[].id must be a string")
+        ensure(role_id not in bindings, f"duplicate generated role binding: {role_id}")
+        bindings[role_id] = binding
+    configs = parse_codex_agents()
+    expected_fields = {
+        "name", "description", "nickname_candidates", "sandbox_mode",
+        "approval_policy", "model", "model_reasoning_effort", "developer_instructions",
+    }
+    model_by_profile = {
+        "luna_reasoning_high": (LUNA_MODEL, "high"),
+        "luna_implementation_xhigh": (LUNA_MODEL, "xhigh"),
+        "luna_ship_xhigh": (LUNA_MODEL, "xhigh"),
+        "spark_implementation_low": (SPARK_MODEL, "low"),
+        "mini_skill_evaluator_medium": (SKILL_VALIDATION_MODEL, "medium"),
+    }
+    registry = model_profile_registry.load_model_profile_registry(ROOT)
+    registry_ids = {profile.id for profile in registry.model_profiles}
+    generated = {}
+    for binding in bindings_raw:
+        binding = require_mapping(binding, "agents_config.roles entries must be mappings")
+        role_id = require_string(binding.get("id"), "agents_config.roles[].id must be a string")
+        profile = registry.by_profile(require_string(binding.get("profile_id") or binding.get("model_profile"), f"roles.{role_id}.profile_id"))
+        clauses = " ".join(clause.text for clause in sorted(profile.role_instruction_template.clauses, key=lambda item: item.priority))
+        template = profile.role_instruction_template.template_text.replace("{role_id in evaluator mode}", role_id)
+        generated[role_id] = template.format(role_id=role_id, model_alias=profile.model_alias, base_prompt=clauses)
+    ensure(set(configs) == set(agent_views) == set(bindings), "generated role-view sets must be identical")
+    ensure(len(configs) == 34, "generated role-view projection must contain 34 views")
+    ensure("sol_parent_high" in registry_ids, "registry must retain sol_parent_high")
+    ensure(raw.get("team", {}).get("parent_profile_id", "sol_parent_high") == "sol_parent_high", "team parent profile must be Sol")
+    for role_id, config_view in sorted(configs.items()):
+        source = require_mapping(agent_views.get(role_id), f"agent_views.{role_id} must be a mapping")
+        binding = bindings[role_id]
+        ensure({key for key in config_view if not key.startswith("__")} == expected_fields, f"{role_id} generated view must be closed eight-field projection")
+        for field in ("name", "description", "nickname_candidates", "sandbox_mode", "approval_policy"):
+            ensure(config_view.get(field) == source.get(field), f"{role_id} {field} must project agents_config.agent_views")
+        profile_id = require_string(source.get("profile_id"), f"agent_views.{role_id}.profile_id must be a string")
+        ensure(profile_id in registry_ids, f"{role_id} profile is not in model profile registry")
+        ensure(binding.get("profile_id") == profile_id, f"{role_id} profile binding diverges from agent view")
+        ensure(binding.get("capsule_schema_id") == source.get("capsule_schema_id"), f"{role_id} capsule schema diverges")
+        ensure(require_string(source.get("logical_role_id"), f"agent_views.{role_id}.logical_role_id must be a string"), "logical role id must be non-empty")
+        ensure(require_string(source.get("role_contract_ref"), f"agent_views.{role_id}.role_contract_ref must be a string"), "role contract ref must be non-empty")
+        ensure(require_string_list(binding.get("capabilities"), f"roles.{role_id}.capabilities"), f"{role_id} capability references must be non-empty")
+        expected_model, expected_effort = model_by_profile.get(profile_id, (None, None))
+        ensure(expected_model is not None, f"{role_id} profile lacks executable model projection")
+        ensure(config_view.get("model") == expected_model, f"{role_id} model must be generated from profile {profile_id}")
+        ensure(config_view.get("model_reasoning_effort") == expected_effort, f"{role_id} reasoning effort must be generated from profile {profile_id}")
+        expected = generated[role_id].strip()
+        ensure(config_view.get("developer_instructions", "").strip() == expected, f"{role_id} developer instructions diverge from registry materializer")
+        ensure("generated_role_view_v1" in (CODEX_AGENT_ROOT / f"{role_id}.toml").read_text(encoding="utf-8"), f"{role_id} missing generated header")
+
+
 def validate_codex_agent_settings() -> None:
-    """Check that Codex agent TOML files carry the executable model settings."""
+    """Check executable settings and the canonical generated role projection."""
     configs = parse_codex_agents()
     valid_efforts = {"low", "medium", "high", "xhigh"}
     for role_id, config in sorted(configs.items()):
         forbidden_keys = sorted(FORBIDDEN_AGENT_PROFILE_KEYS & set(config))
-        ensure(
-            not forbidden_keys,
-            f"{role_id} agent TOML contains unsupported profile keys: {', '.join(forbidden_keys)}",
-        )
+        ensure(not forbidden_keys, f"{role_id} agent TOML contains unsupported profile keys: {', '.join(forbidden_keys)}")
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
-        model = config.get("model")
-        effort = config.get("model_reasoning_effort")
-        ensure(
-            isinstance(model, str) and bool(model),
-            f"{role_id} model must be a non-empty string",
-        )
-        ensure(
-            isinstance(effort, str) and effort in valid_efforts,
-            f"{role_id} model_reasoning_effort must be one of {sorted(valid_efforts)}",
-        )
-        if model == SKILL_VALIDATION_MODEL:
-            ensure(
-                role_id in SKILL_VALIDATION_AGENT_IDS,
-                f"{role_id} may use {SKILL_VALIDATION_MODEL} only for explicit T14 skill_evaluation via skill_evaluator",
-            )
-        if role_id in LUNA_XHIGH_AGENT_IDS:
-            expected_model, expected_effort = LUNA_MODEL, "xhigh"
-        elif role_id in SKILL_VALIDATION_AGENT_IDS:
-            expected_model, expected_effort = SKILL_VALIDATION_MODEL, "medium"
-        elif role_id in SPARK_LOW_AGENT_IDS:
-            expected_model, expected_effort = SPARK_MODEL, "low"
+        ensure(isinstance(config.get("model"), str) and bool(config.get("model")), f"{role_id} model must be a non-empty string")
+        ensure(isinstance(config.get("model_reasoning_effort"), str) and config.get("model_reasoning_effort") in valid_efforts, f"{role_id} model_reasoning_effort must be valid")
+        if config.get("model") == SKILL_VALIDATION_MODEL:
+            ensure(role_id == EVALUATOR_AGENT_ID, f"{role_id} may use gpt-5.4-mini only for explicit T14 skill_evaluation via skill_evaluator")
+        if role_id == EVALUATOR_AGENT_ID:
+            ensure(config.get("model") == SKILL_VALIDATION_MODEL and config.get("model_reasoning_effort") == "medium", "skill_evaluator must use gpt-5.4-mini/medium")
+            ensure(config.get("sandbox_mode") == "read-only", "skill_evaluator sandbox_mode must be read-only")
+        elif role_id == "spark_worker":
+            ensure(config.get("model") == SPARK_MODEL and config.get("model_reasoning_effort") == "low", "spark_worker must use Spark/low")
+        elif role_id in {"worker", "ship_reviewer"}:
+            ensure(config.get("model") == LUNA_MODEL and config.get("model_reasoning_effort") == "xhigh", f"{role_id} model must be {LUNA_MODEL}")
         else:
-            expected_model, expected_effort = LUNA_MODEL, "high"
-        ensure(
-            model == expected_model,
-            f"{role_id} model must be {expected_model}",
-        )
-        ensure(
-            effort == expected_effort,
-            f"{role_id} model_reasoning_effort must be {expected_effort}",
-        )
-        ensure(model != PARENT_MODEL, f"{role_id} child model must not use Sol")
-        ensure(model != "gpt-5.5", f"{role_id} child model must not use gpt-5.5")
-    evaluator = configs[EVALUATOR_AGENT_ID]
-    ensure(evaluator.get("sandbox_mode") == "read-only", f"{EVALUATOR_AGENT_ID} sandbox_mode must be read-only")
-    ensure(evaluator.get("approval_policy") == "never", f"{EVALUATOR_AGENT_ID} approval_policy must be never")
-    evaluator_instructions = str(evaluator.get("developer_instructions", "")).lower()
-    for phrase in ("scenario packet", "do not edit", "nested agents", "reused", "output:", "requirement results:", "telemetry:", "result metadata:"):
-        ensure(phrase in evaluator_instructions, f"{EVALUATOR_AGENT_ID} instructions missing {phrase}")
-
-    for role_id, marker in INITIAL_INTAKE_MARKERS.items():
-        instructions = str(configs[role_id].get("developer_instructions", ""))
-        ensure(marker in instructions, f"{role_id} missing intake responsibility marker")
-
+            ensure(config.get("model") == LUNA_MODEL and config.get("model_reasoning_effort") == "high", f"{role_id} model must be {LUNA_MODEL}")
+        ensure(config.get("model") != PARENT_MODEL, f"{role_id} child model must not use Sol")
+    validate_generated_role_views()
 
 def validate_team_config_references() -> None:
     """Check role references inside the team config."""
@@ -745,6 +781,10 @@ def validate_task_catalog_references() -> None:
     topology = require_mapping(
         catalog.raw.get("role_topology_defaults"),
         "role_topology_defaults must be a mapping",
+    )
+    ensure(
+        topology.get("capacity_derivation") == "declared_team_peak_plus_nested_reservations_v1",
+        "role_topology_defaults must declare the approved capacity derivation",
     )
     topology_role_families = require_mapping(
         topology.get("role_families"),
@@ -981,19 +1021,14 @@ def validate_task_catalog_references() -> None:
                     role_id in role_ids,
                     f"family {family_id} references unknown role {role_id}",
                 )
-        active_budget, max_write_budget = workflow_spawn_budget(catalog, family_id)
-        ensure(
-            active_budget <= runtime_max_threads,
-            f"family {family_id} active_subagents exceeds runtime max_threads",
+        ensure("spawn_budget" not in family, f"family {family_id} must not declare numeric spawn_budget")
+        capacity_request = require_mapping(
+            family.get("capacity_request"), f"family {family_id} capacity_request must be a mapping"
         )
-        ensure(
-            max_write_budget >= 1,
-            f"family {family_id} max_write_subagents must be >= 1",
-        )
-        ensure(
-            max_write_budget <= active_budget,
-            f"family {family_id} max_write_subagents exceeds active_subagents",
-        )
+        ensure(capacity_request.get("schema_id") == "task_catalog_capacity_request_v1", f"family {family_id} capacity_request schema mismatch")
+        ensure(capacity_request.get("policy_id") == "topology_derived_v1", f"family {family_id} capacity policy mismatch")
+        ensure(capacity_request.get("topology_source") == "role_topology", f"family {family_id} capacity topology source mismatch")
+        ensure(capacity_request.get("write_scope_source") == "team_manifest.run.write_scopes", f"family {family_id} write scope source mismatch")
 
     for task_id in task_ids(catalog):
         task = next(task for task in catalog.tasks if task["id"] == task_id)
@@ -1024,6 +1059,12 @@ def validate_task_catalog_references() -> None:
         ),
         f"T12 default-active specialists must be the five role topology defaults, got {t12_specialists}",
     )
+    derivation = declared_team_capacity_derivation(catalog)
+    ensure(derivation.requested_max_threads() == 26, "declared topology must derive max_threads=26")
+    peak = derivation.peak_family
+    ensure(peak.workflow_family_id == "research_driven_change", "research_driven_change must be the peak family")
+    ensure(peak.direct_frontier_count == 20, "declared direct frontier must be 20")
+    ensure(peak.nested_reservation_count == 6, "declared nested reservations must be 6")
     topology_violations = workflow_topology_policy_violations(catalog)
     ensure(
         not topology_violations,
@@ -1393,6 +1434,17 @@ def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
     (workspace.workspace_root / "python").mkdir()
     (workspace.workspace_root / "documents").mkdir()
     (workspace.workspace_root / "reports" / "runtime").mkdir(parents=True)
+    (workspace.workspace_root / ".codex").mkdir()
+    (workspace.workspace_root / "agents").mkdir()
+    for relative_path in (
+        ".codex/config.toml",
+        "agents/agents_config.json",
+        "agents/task_catalog.yaml",
+        "agents/model_profiles.toml",
+        "agents/capacity_policy.toml",
+    ):
+        destination = workspace.workspace_root / relative_path
+        shutil.copy2(ROOT / relative_path, destination)
     (workspace.workspace_root / "WORKTREE_SCOPE.md").write_text(
         "\n".join(
             [

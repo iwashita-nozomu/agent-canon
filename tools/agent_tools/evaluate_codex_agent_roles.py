@@ -17,6 +17,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import model_profile_registry
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -29,6 +30,8 @@ from datetime import datetime, timezone
 
 UTC = timezone.utc
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
 if __package__ in (None, ""):
@@ -37,6 +40,7 @@ if __package__ in (None, ""):
 from agent_team import (  # noqa: E402
     Role,
     default_specialists_for_task,
+    declared_team_capacity_derivation,
     load_task_catalog,
     load_team_config,
     recommended_dynamic_expansion_wave_slots,
@@ -65,6 +69,7 @@ EVALUATOR_AGENT_ID = "skill_evaluator"
 EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
 SKILL_VALIDATION_AGENT_IDS = {EVALUATOR_AGENT_ID}
 FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
+GENERATED_ROLE_VIEW_MATERIALIZER = "generate_role_views"
 
 
 @dataclass(frozen=True)
@@ -235,12 +240,83 @@ def extract_stage_waves(catalog_raw: dict[str, object]) -> tuple[tuple[dict[str,
     return tuple(stage_waves), findings
 
 
+def evaluate_generated_role_projection(
+    root: Path,
+    configs: dict[str, dict[str, object]],
+) -> list[Finding]:
+    """Evaluate generated role views and topology-derived capacity attribution."""
+    findings: list[Finding] = []
+    try:
+        team = json.loads((root / "agents" / "agents_config.json").read_text(encoding="utf-8"))
+        registry = model_profile_registry.load_model_profile_registry(root)
+        generated = {
+            view.role_id: view.rendered_instructions
+            for view in model_profile_registry.generate_role_views(registry, root=root)
+        }
+    except (OSError, ValueError, model_profile_registry.ImplementationFeedback) as exc:
+        return [Finding("generated-view", "canonical", f"materializer-error-{type(exc).__name__}")]
+    agent_views = team.get("agent_views")
+    bindings = {entry.get("id"): entry for entry in team.get("roles", []) if isinstance(entry, dict)}
+    if not isinstance(agent_views, dict) or set(agent_views) != set(configs) or set(bindings) != set(configs):
+        findings.append(Finding("generated-view", "agents_config", "role-view-binding-set-mismatch"))
+        return findings
+    expected_fields = {"name", "description", "nickname_candidates", "sandbox_mode", "approval_policy", "model", "model_reasoning_effort", "developer_instructions"}
+    model_by_profile = {
+        "luna_reasoning_high": (LUNA_MODEL, "high"),
+        "luna_implementation_xhigh": (LUNA_MODEL, "xhigh"),
+        "luna_ship_xhigh": (LUNA_MODEL, "xhigh"),
+        "spark_implementation_low": (SPARK_MODEL, "low"),
+        "mini_skill_evaluator_medium": (SKILL_VALIDATION_MODEL, "medium"),
+    }
+    for agent_id, config in sorted(configs.items()):
+        source = agent_views.get(agent_id)
+        binding = bindings.get(agent_id)
+        if not isinstance(source, dict) or not isinstance(binding, dict):
+            findings.append(Finding("generated-view", agent_id, "missing-source-record"))
+            continue
+        actual_fields = set(k for k in config if not k.startswith("__"))
+        if actual_fields != expected_fields:
+            findings.append(Finding("generated-view", agent_id, "closed-eight-field-projection-mismatch"))
+        profile_id = source.get("profile_id")
+        if not isinstance(profile_id, str) or profile_id not in model_by_profile:
+            findings.append(Finding("profile-attribution", agent_id, "unknown-profile"))
+            continue
+        if binding.get("profile_id") != profile_id:
+            findings.append(Finding("profile-attribution", agent_id, "binding-divergence"))
+        expected_model, expected_effort = model_by_profile[profile_id]
+        if (config.get("model"), config.get("model_reasoning_effort")) != (expected_model, expected_effort):
+            findings.append(Finding("profile-attribution", agent_id, "runtime-view-divergence"))
+        for field in ("name", "description", "nickname_candidates", "sandbox_mode", "approval_policy"):
+            if config.get(field) != source.get(field):
+                findings.append(Finding("generated-view", agent_id, f"source-divergence-{field}"))
+        expected_instructions = generated.get(agent_id)
+        if expected_instructions is None or config.get("developer_instructions", "").strip() != str(expected_instructions).strip():
+            findings.append(Finding("generated-view", agent_id, "developer-instructions-not-materialized"))
+        if "generated_role_view_v1" not in (root / ".codex" / "agents" / f"{agent_id}.toml").read_text(encoding="utf-8"):
+            findings.append(Finding("generated-view", agent_id, "missing-generated-header"))
+    try:
+        catalog = load_task_catalog(load_team_config(root / "agents" / "agents_config.json"), root=root)
+        derivation = declared_team_capacity_derivation(catalog)
+        peak = derivation.peak_family
+        if derivation.requested_max_threads() != 26 or peak.workflow_family_id != "research_driven_change" or peak.direct_frontier_count != 20 or peak.nested_reservation_count != 6:
+            findings.append(Finding("capacity-attribution", "role_topology_defaults", "declared-20-plus-6-does-not-derive-26"))
+        for family in catalog.workflow_families:
+            request = family.get("capacity_request")
+            if not isinstance(request, dict) or request.get("topology_source") != "role_topology" or request.get("write_scope_source") != "team_manifest.run.write_scopes":
+                findings.append(Finding("capacity-attribution", str(family.get("id")), "typed-capacity-request-mismatch"))
+            if "spawn_budget" in family:
+                findings.append(Finding("capacity-attribution", str(family.get("id")), "numeric-spawn-budget-duplicate"))
+    except (OSError, KeyError, RuntimeError, TypeError, ValueError):
+        findings.append(Finding("capacity-attribution", "task_catalog", "capacity-derivation-unreadable"))
+    return findings
+
+
 def evaluate_static_agent_configs(
     root: Path,
     configs: dict[str, dict[str, object]],
 ) -> list[Finding]:
-    """Evaluate static role TOML schema, behavior, and executable model settings."""
-    findings: list[Finding] = []
+    """Evaluate the closed generated role projection and executable settings."""
+    findings = evaluate_generated_role_projection(root, configs)
     for agent_id, config in configs.items():
         for key in sorted(FORBIDDEN_AGENT_PROFILE_KEYS & set(config)):
             findings.append(Finding("schema", agent_id, f"unsupported-profile-key-{key}"))
@@ -255,10 +331,14 @@ def evaluate_static_agent_configs(
             findings.append(Finding("model-settings", agent_id, "missing-model"))
         elif model in DEPRECATED_CODEX_MODELS:
             findings.append(Finding("model-settings", agent_id, f"deprecated-model-{model}"))
-        elif model == SPARK_MODEL and agent_id not in SPARK_MODEL_AGENT_IDS:
-            findings.append(Finding("model-settings", agent_id, "spark-model-reserved-for-spark-worker"))
-        if not isinstance(effort, str) or effort not in VALID_REASONING_EFFORTS:
-            findings.append(Finding("model-settings", agent_id, "invalid-model-reasoning-effort"))
+        if model == SPARK_MODEL and agent_id not in SPARK_MODEL_AGENT_IDS:
+            findings.append(
+                Finding(
+                    "model-settings",
+                    agent_id,
+                    "spark-model-reserved-for-spark-worker",
+                )
+            )
         if model == SKILL_VALIDATION_MODEL and agent_id not in SKILL_VALIDATION_AGENT_IDS:
             findings.append(
                 Finding(
@@ -267,7 +347,7 @@ def evaluate_static_agent_configs(
                     "skill-validation-model-reserved-for-skill-evaluator-t14",
                 )
             )
-        if agent_id in SKILL_VALIDATION_AGENT_IDS:
+        if agent_id == EVALUATOR_AGENT_ID:
             expected_model, expected_effort = SKILL_VALIDATION_MODEL, "medium"
         elif agent_id in SPARK_MODEL_AGENT_IDS:
             expected_model, expected_effort = SPARK_MODEL, "low"
@@ -281,85 +361,35 @@ def evaluate_static_agent_configs(
             )
         if effort != expected_effort:
             findings.append(
-                Finding("model-settings", agent_id, f"expected-{expected_effort}-reasoning")
+                Finding(
+                    "model-settings",
+                    agent_id,
+                    f"expected-{expected_effort}-reasoning",
+                )
             )
-        if model == PARENT_MODEL:
-            findings.append(Finding("model-settings", agent_id, "child-model-must-not-use-sol"))
-        if model == "gpt-5.5":
-            findings.append(Finding("model-settings", agent_id, "gpt-5.5-assignment-forbidden"))
+        if not isinstance(effort, str) or effort not in VALID_REASONING_EFFORTS:
+            findings.append(Finding("model-settings", agent_id, "invalid-model-reasoning-effort"))
         findings.extend(evaluate_role_behavior(root, agent_id, config))
     return findings
-
-
 def evaluate_role_behavior(
     root: Path,
     agent_id: str,
     config: dict[str, object],
 ) -> list[Finding]:
-    """Evaluate role-specific expected behavior and prohibitions."""
+    """Check executable role fields without re-owning registry prompt prose."""
+    del root
     findings: list[Finding] = []
-    instructions = str(config.get("developer_instructions", ""))
-    lower_instructions = instructions.lower()
-    sandbox_mode = str(config.get("sandbox_mode", ""))
-    read_only_role = (
-        agent_id.endswith("_reviewer")
-        or agent_id
-        in {
-            "diff_triage_reviewer",
-            "explorer",
-            "literature_researcher",
-            "reviewer",
-            "ship_reviewer",
-            "test_designer",
-            EVALUATOR_AGENT_ID,
-        }
-    )
-    if read_only_role:
-        if sandbox_mode != "read-only":
-            findings.append(Finding("behavior", agent_id, "read-only-role-not-read-only"))
-        if "do not edit" not in lower_instructions:
-            findings.append(Finding("behavior", agent_id, "read-only-role-missing-do-not-edit"))
-    if agent_id.endswith("_reviewer") or agent_id in {"diff_triage_reviewer", "reviewer", "ship_reviewer"}:
-        if "finding" not in lower_instructions:
-            findings.append(Finding("behavior", agent_id, "review-role-not-findings-first"))
-    if agent_id == "explorer" and ("implementation" not in lower_instructions or "do not edit" not in lower_instructions):
-        findings.append(Finding("behavior", agent_id, "explorer-must-stay-read-only"))
-    if agent_id == "spark_worker":
-        for phrase in ("bounded", "parent-assigned write scope", "report exactly which files changed"):
-            if phrase not in lower_instructions:
-                findings.append(Finding("behavior", agent_id, f"spark-worker-missing-{phrase}"))
-    if agent_id == "worker" and "parent-assigned write scope" not in lower_instructions:
-        findings.append(Finding("behavior", agent_id, "worker-missing-parent-managed-write-scope"))
+    read_only_role = agent_id.endswith("_reviewer") or agent_id in {"diff_triage_reviewer", "explorer", "literature_researcher", "reviewer", "ship_reviewer", "test_designer", EVALUATOR_AGENT_ID}
+    if read_only_role and config.get("sandbox_mode") != "read-only":
+        findings.append(Finding("behavior", agent_id, "read-only-role-not-read-only"))
     if agent_id == EVALUATOR_AGENT_ID:
-        if sandbox_mode != "read-only":
+        if config.get("sandbox_mode") != "read-only":
             findings.append(Finding("behavior", agent_id, "evaluator-not-read-only"))
         if config.get("approval_policy") != "never":
-            findings.append(Finding("behavior", agent_id, "evaluator-approval-policy-not-never"))
-        for phrase, finding in (
-            ("scenario packet", "evaluator-missing-scenario-packet-boundary"),
-            ("do not edit", "evaluator-missing-no-edit-rule"),
-            ("nested agents", "evaluator-missing-no-nested-agent-rule"),
-            ("reused", "evaluator-missing-no-reuse-rule"),
-            ("output:", "evaluator-missing-output-grammar"),
-            ("requirement results:", "evaluator-missing-requirement-grammar"),
-            ("telemetry:", "evaluator-missing-telemetry-grammar"),
-            ("result metadata:", "evaluator-missing-metadata-grammar"),
-            ("evaluation status:", "evaluator-missing-status-grammar"),
-            ("evaluation_status=", "evaluator-missing-evaluation-status"),
-            ("feedback_actions_resolved=no", "evaluator-missing-feedback-status"),
-            ("learning_capture_complete=no", "evaluator-missing-learning-status"),
-        ):
-            if phrase not in lower_instructions:
-                findings.append(Finding("behavior", agent_id, finding))
-    if agent_id == "experiment_runner" and "do not edit repository source" not in lower_instructions:
-        findings.append(Finding("behavior", agent_id, "experiment-runner-may-edit-source"))
-    if agent_id == "diff_triage_reviewer" and "escalate" not in lower_instructions:
-        findings.append(Finding("behavior", agent_id, "diff-triage-missing-escalation-rule"))
-    if Path(str(config.get("__path", ""))).suffix != ".toml":
-        findings.append(Finding("schema", agent_id, "agent-path-not-toml"))
+            findings.append(
+                Finding("behavior", agent_id, "evaluator-approval-policy-not-never")
+            )
     return findings
-
-
 def evaluate_routing(root: Path) -> list[Finding]:
     """Evaluate task routing and role-to-Codex-agent ordering."""
     findings: list[Finding] = []
@@ -586,8 +616,19 @@ def evaluate_routing(root: Path) -> list[Finding]:
     if t12_specialists != expected_t12:
         findings.append(Finding("routing", "T12", f"t12-overdefault-specialist-{t12_specialists}"))
 
-    for family_id, code in workflow_topology_policy_violations(catalog):
-        findings.append(Finding("routing", family_id, code))
+    try:
+        topology_violations = workflow_topology_policy_violations(catalog)
+    except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
+        findings.append(
+            Finding(
+                "routing",
+                "role_topology_defaults",
+                f"materialization-failed-{type(exc).__name__}",
+            )
+        )
+    else:
+        for family_id, code in topology_violations:
+            findings.append(Finding("routing", family_id, code))
 
     review_pack = next(pack for pack in catalog.review_packs if pack["id"] == "research_perspective_review")
     if review_pack.get("default_for_tasks"):
@@ -650,16 +691,16 @@ def evaluate_routing(root: Path) -> list[Finding]:
         findings.append(Finding("routing", "research_perspective_triage", "unexpected-triage-specialists"))
     for task in catalog.tasks:
         task_id = str(task["id"])
-        task_specialists = default_specialists_for_task(config, catalog, task_id)
-        task_roles = select_roles(
-            config,
-            list(task_specialists),
-            False,
-            catalog,
-            str(task["family"]),
-        )
-        active_budget, _ = workflow_spawn_budget(catalog, str(task["family"]))
         try:
+            task_specialists = default_specialists_for_task(config, catalog, task_id)
+            task_roles = select_roles(
+                config,
+                list(task_specialists),
+                False,
+                catalog,
+                str(task["family"]),
+            )
+            active_budget, _ = workflow_spawn_budget(catalog, str(task["family"]))
             initial_wave = recommended_initial_subagent_wave(
                 task_roles,
                 active_budget,
@@ -673,7 +714,7 @@ def evaluate_routing(root: Path) -> list[Finding]:
                 catalog,
                 agent_root=agent_root,
             )
-        except RuntimeError as exc:
+        except (KeyError, RuntimeError, TypeError, ValueError) as exc:
             findings.append(Finding("routing", task_id, f"materialization-failed-{exc}"))
             continue
         role_counts = Counter(slot.role_id for wave in wave_slots for slot in wave)

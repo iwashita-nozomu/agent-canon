@@ -15,6 +15,14 @@ repositories consume it through `vendor/agent-canon/` and root runtime views.
 
 ## Reader Map
 
+Target-State-First, Decision Sufficiency, model/profile, ToolCall, capacity,
+and lifecycle behavior is projected from the canonical owners:
+[workflow](agents/canonical/CODEX_WORKFLOW.md),
+[subagents](agents/canonical/CODEX_SUBAGENTS.md),
+[communication](agents/COMMUNICATION_PROTOCOL.md), and the approved
+[implementation contract](documents/design/codex-spark-implementation-routing.md).
+This entrypoint does not create a second policy source.
+
 This repository entrypoint maps agents working inside the standalone
 AgentCanon source tree to the canonical owner surfaces. Use `Read First` for
 the initial document path, `Scope` to identify the source area, `Runtime Owner

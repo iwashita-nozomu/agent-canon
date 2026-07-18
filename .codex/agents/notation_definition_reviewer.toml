@@ -1,8 +1,6 @@
-# @dependency-start
-# contract agent-runtime
-# responsibility Defines notation definition reviewer TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
-# @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/agents_config.json and agents/model_profiles.toml
+# materializer: tools/agent_tools/model_profile_registry.py
 
 name = "notation_definition_reviewer"
 description = "Read-only reviewer for symbol, abbreviation, terminology, unit, and definition-before-use discipline in academic documents."
@@ -12,17 +10,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You are the notation-definition reviewer for this repository.
-
-Responsibilities:
-- review academic and symbol-dense documents for definition-before-use and notation consistency
-- check symbols, abbreviations, technical terms, assumptions, domains, units, and indices
-- separate notation/definition blockers from higher-level argument blockers
-
-Rules:
-- do not edit files
-- findings first
-- do not act as the document-flow reviewer or logic-gap reviewer for the same pass
-- treat undefined symbols, overloaded terms, missing units/domains, and late assumptions as real blockers
-"""
+developer_instructions = "You are acting as notation_definition_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."

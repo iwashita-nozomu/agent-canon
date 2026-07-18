@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from agent_team import resolve_report_root
+from tools.agent_tools import capacity_handshake
 from report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
     COMPLETION_COVERAGE_TAXONOMY_REFS,
@@ -46,6 +47,207 @@ DOCUMENT_SPLIT_DECISION_PREFIXES = (
 )
 DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
+
+
+def _lifecycle_status(value: object) -> capacity_handshake.LifecycleStatus:
+    """Map the serialized ledger value to the provider-owned enum."""
+    if isinstance(value, capacity_handshake.LifecycleStatus):
+        return value
+    aliases = {
+        "completed": capacity_handshake.LifecycleStatus.DURABLE_RESULT,
+        "durable_result": capacity_handshake.LifecycleStatus.DURABLE_RESULT,
+        "errored": capacity_handshake.LifecycleStatus.ERROR,
+        "error": capacity_handshake.LifecycleStatus.ERROR,
+        "handed_back": capacity_handshake.LifecycleStatus.HANDED_BACK,
+        "descendants_verified": capacity_handshake.LifecycleStatus.DESCENDANTS_VERIFIED,
+        "closed": capacity_handshake.LifecycleStatus.CLOSED,
+        "active": capacity_handshake.LifecycleStatus.ACTIVE,
+        "spawned": capacity_handshake.LifecycleStatus.SPAWNED,
+    }
+    try:
+        return aliases[str(value)]
+    except KeyError as exc:
+        raise ValueError(f"unknown lifecycle status: {value}") from exc
+
+
+def _ledger_from_projection(projection: dict[str, object]) -> capacity_handshake.CapacityLedger:
+    ledger_data = projection.get("ledger")
+    if not isinstance(ledger_data, dict):
+        raise ValueError("capacity_ledger_missing")
+    parent_work_id = str(ledger_data.get("parent_work_id", ""))
+    if not parent_work_id:
+        raise ValueError("capacity_ledger_parent_missing")
+    records: list[capacity_handshake.DescendantLifecycleRecord] = []
+    for raw in ledger_data.get("descendants", []):
+        if not isinstance(raw, dict):
+            raise ValueError("capacity_ledger_record_invalid")
+        record = capacity_handshake.DescendantLifecycleRecord(
+            work_id=str(raw.get("work_id", "")),
+            parent_work_id=raw.get("parent_work_id"),
+            status=_lifecycle_status(raw.get("status")),
+            durable_handback=bool(raw.get("durable_handback", False)),
+            descendants_closed=bool(raw.get("descendants_closed", False)),
+            close_readback=bool(raw.get("close_readback", False)),
+            reserved_slots=int(raw.get("reserved_slots", 1)),
+            reserved_write_slots=int(raw.get("reserved_write_slots", 0)),
+        )
+        if not record.work_id:
+            raise ValueError("capacity_ledger_record_work_id_missing")
+        records.append(record)
+    ledger = capacity_handshake.CapacityLedger(
+        topology=capacity_handshake.DescendantTopologyReadback(
+            parent_work_id=parent_work_id,
+            descendants=tuple(records),
+        )
+    )
+    for record in records:
+        ledger.open_records[record.work_id] = record
+    for raw_edge in ledger_data.get("reservations", []):
+        if not isinstance(raw_edge, dict):
+            raise ValueError("capacity_reservation_invalid")
+        child_work_id = str(raw_edge.get("child_work_id", ""))
+        ledger.reservations[child_work_id] = capacity_handshake.ParentChildEdge(
+            parent_work_id=str(raw_edge.get("parent_work_id", parent_work_id)),
+            child_work_id=child_work_id,
+        )
+    return ledger
+
+
+def _validate_close_agent_token(token: object, terminal_agent_id: str) -> str | None:
+    if not isinstance(token, dict):
+        return f"{terminal_agent_id}:close_agent_tool_call_missing"
+    if token.get("tool_id") != "close_agent":
+        return f"{terminal_agent_id}:close_agent_tool_id_invalid"
+    if token.get("argument_schema_id") != "close_agent_args_v1":
+        return f"{terminal_agent_id}:close_agent_argument_schema_invalid"
+    if token.get("target") != "terminal_agent_id":
+        return f"{terminal_agent_id}:close_agent_target_invalid"
+    arguments = token.get("arguments")
+    if not isinstance(arguments, dict) or arguments.get("terminal_agent_id") != terminal_agent_id:
+        return f"{terminal_agent_id}:close_agent_target_binding_invalid"
+    return None
+
+
+def validate_capacity_lifecycle_closeout(
+    ledger: capacity_handshake.CapacityLedger,
+    close_agent_tool_calls: Sequence[object] = (),
+    snapshot: capacity_handshake.CapacitySnapshot | None = None,
+) -> tuple[bool, tuple[str, ...]]:
+    """Validate postorder handback, close readback, release, and queue promotion."""
+    descendants = tuple(ledger.topology.descendants)
+    descendant_ids = {record.work_id for record in descendants}
+    failures: list[str] = []
+    for work_id in ledger.open_records:
+        if work_id not in descendant_ids:
+            failures.append(f"{work_id}:unknown_descendant")
+    for record in descendants:
+        if record.parent_work_id != ledger.topology.parent_work_id:
+            failures.append(f"{record.work_id}:unknown_descendant_parent")
+        if record.status in {
+            capacity_handshake.LifecycleStatus.SPAWNED,
+            capacity_handshake.LifecycleStatus.ACTIVE,
+        }:
+            failures.append(f"{record.work_id}:open_descendant")
+        if record.status in {
+            capacity_handshake.LifecycleStatus.DURABLE_RESULT,
+            capacity_handshake.LifecycleStatus.ERROR,
+        }:
+            if not record.durable_handback:
+                failures.append(f"{record.work_id}:missing_handback")
+            failures.append(f"{record.work_id}:terminal_but_open")
+        if record.status == capacity_handshake.LifecycleStatus.HANDED_BACK:
+            if not record.durable_handback:
+                failures.append(f"{record.work_id}:missing_handback")
+            failures.append(f"{record.work_id}:close_not_requested")
+        if record.status == capacity_handshake.LifecycleStatus.DESCENDANTS_VERIFIED:
+            failures.append(f"{record.work_id}:close_not_requested")
+        if record.status == capacity_handshake.LifecycleStatus.CLOSED:
+            if not record.durable_handback:
+                failures.append(f"{record.work_id}:missing_handback")
+            if not record.descendants_closed:
+                failures.append(f"{record.work_id}:open_descendant")
+            if not record.close_readback:
+                failures.append(f"{record.work_id}:close_rejected")
+    if ledger.reservations and not failures:
+        for work_id in ledger.reservations:
+            if work_id not in descendant_ids:
+                failures.append(f"{work_id}:reservation_leak")
+
+    terminal_ids = {
+        record.work_id
+        for record in descendants
+        if record.status
+        in {
+            capacity_handshake.LifecycleStatus.DURABLE_RESULT,
+            capacity_handshake.LifecycleStatus.ERROR,
+            capacity_handshake.LifecycleStatus.CLOSED,
+        }
+    }
+    seen_calls: set[str] = set()
+    for raw_call in close_agent_tool_calls:
+        if not isinstance(raw_call, dict):
+            failures.append("close_agent_tool_call_invalid")
+            continue
+        work_id = str(raw_call.get("agent_id", ""))
+        seen_calls.add(work_id)
+        failure = _validate_close_agent_token(raw_call.get("tool_call_token"), work_id)
+        if failure:
+            failures.append(failure)
+    for work_id in sorted(terminal_ids - seen_calls):
+        failures.append(f"{work_id}:close_agent_tool_call_missing")
+
+    if not failures and snapshot is not None:
+        for record in descendants:
+            capacity_handshake.queued_reclaim(snapshot, ledger, record.work_id)
+
+    if not failures:
+        provider_packet = capacity_handshake.materialize_closeout_packet(
+            parent_work_id=ledger.topology.parent_work_id,
+            ledger=ledger,
+            descendants=(ledger.topology,),
+        )
+        failures.extend(
+            f"{failure.work_id}:{failure.detail}" for failure in provider_packet.failures
+        )
+    if failures:
+        return False, tuple(dict.fromkeys(failures))
+
+    if snapshot is None:
+        for record in descendants:
+            ledger.open_records.pop(record.work_id, None)
+            ledger.reservations.pop(record.work_id, None)
+    if any(work_id in descendant_ids for work_id in ledger.open_records) or any(
+        work_id in descendant_ids for work_id in ledger.reservations
+    ):
+        return False, ("reservation_leak",)
+    return True, ()
+
+
+def capacity_lifecycle_closeout_from_report(report_dir: Path) -> tuple[bool, tuple[str, ...]]:
+    """Read the generated closeout projection and validate its shared ledger."""
+    packet_path = report_dir / "closeout_packet.json"
+    if not packet_path.is_file():
+        return False, ("closeout_packet_missing",)
+    try:
+        payload = json.loads(packet_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            return False, ("closeout_packet_invalid",)
+        capacity_projection = payload.get("capacity_request", payload)
+        closeout_projection = payload.get("closeout_packet", payload)
+        if not isinstance(capacity_projection, dict) or not isinstance(closeout_projection, dict):
+            return False, ("closeout_packet_projection_invalid",)
+        ledger = _ledger_from_projection(capacity_projection)
+        calls = closeout_projection.get("close_agent_tool_calls", ())
+        if not isinstance(calls, list):
+            return False, ("close_agent_tool_calls_invalid",)
+        valid, failures = validate_capacity_lifecycle_closeout(ledger, calls)
+        expected_status = "completed" if valid else "failed"
+        if closeout_projection.get("status") != expected_status:
+            failures = tuple((*failures, "closeout_status_mismatch"))
+            valid = False
+        return valid, tuple(dict.fromkeys(failures))
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        return False, (f"closeout_packet_error:{exc}",)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -717,6 +919,9 @@ def main() -> int:
         report_dir,
         workspace,
     )
+    capacity_lifecycle_ready, capacity_lifecycle_blockers = (
+        capacity_lifecycle_closeout_from_report(report_dir)
+    )
 
     checks = {
         "verification_status": verification.get("status") == "pass",
@@ -727,6 +932,7 @@ def main() -> int:
         "validation_complete": closeout.get("validation_complete") == "yes",
         "request_contract_complete": closeout.get("request_contract_complete") == "yes",
         "completion_coverage_consumer": completion_decision.get("ready") is True,
+        "capacity_lifecycle_closeout": capacity_lifecycle_ready,
         "all_planned_chunks_complete": (
             completion_decision.get("all_planned_chunks_complete") is True
             and closeout.get("all_planned_chunks_complete") == "yes"
@@ -964,6 +1170,14 @@ def main() -> int:
     print(f"COMPLETION_COVERAGE_ARTIFACT={report_dir / COMPLETION_COVERAGE_ARTIFACT_NAME}")
     print(f"COMPLETION_COVERAGE_CONSUMER_READY={completion_decision.get('ready', False)}")
     print(f"COMPLETION_COVERAGE_CONSUMER_REASON={completion_decision.get('reason', '')}")
+    print(
+        "CAPACITY_LIFECYCLE_CLOSEOUT="
+        f"{'yes' if capacity_lifecycle_ready else 'no'}"
+    )
+    print(
+        "CAPACITY_LIFECYCLE_BLOCKERS="
+        f"{join_blockers(list(capacity_lifecycle_blockers))}"
+    )
     print(
         "MAPPING_ERROR_SETS_EMPTY="
         f"{closeout.get('mapping_error_sets_empty', canonical_evidence.get('mapping_error_sets_empty', ''))}"

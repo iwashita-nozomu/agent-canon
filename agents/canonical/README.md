@@ -49,5 +49,11 @@ upstream design ../README.md agent canon overview
 
 ## 保守ルール
 
+Target-State-First、Decision Sufficiency、ToolCall、capacity、lifecycle の
+実行規則は [CODEX_WORKFLOW.md](CODEX_WORKFLOW.md)、
+[CODEX_SUBAGENTS.md](CODEX_SUBAGENTS.md)、
+[../COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) と typed
+materializer/handshake owner の generated projection を参照する。
+
 - まず `agents/` 側の正本を更新する
 - runtime entrypoint は短く保つ

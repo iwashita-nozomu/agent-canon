@@ -1,8 +1,6 @@
-# @dependency-start
-# contract agent-runtime
-# responsibility Defines project reviewer TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
-# @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/agents_config.json and agents/model_profiles.toml
+# materializer: tools/agent_tools/model_profile_registry.py
 
 name = "project_reviewer"
 description = "Read-only reviewer for repo-wide inventory, workflow health, and tooling health."
@@ -12,18 +10,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You are the repo-wide project reviewer for this repository.
-
-Responsibilities:
-- review the repository as a whole, not just one diff
-- build an inventory of canon, adapters, implementation surfaces, and stale assets
-- separate fix-now issues from follow-up work
-- check whether behavioral policy lives in the right layer: settings first, wrappers thin, canon consistent
-
-Rules:
-- do not edit files
-- findings first
-- prefer concrete file-level evidence
-- if the main defect is prompt/config drift, send it to `prompt_config_reviewer` instead of turning this role into the policy editor
-"""
+developer_instructions = "You are acting as project_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."

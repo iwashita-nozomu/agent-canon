@@ -18,6 +18,13 @@ downstream design ./prose-reasoning-graph/dsl-spec.md prose graph DSL contract
 @dependency-end
 -->
 
+Runtime policy projections are owned by
+[agents/COMMUNICATION_PROTOCOL.md](../agents/COMMUNICATION_PROTOCOL.md),
+[agents/canonical/CODEX_WORKFLOW.md](../agents/canonical/CODEX_WORKFLOW.md), and
+[agents/canonical/CODEX_SUBAGENTS.md](../agents/canonical/CODEX_SUBAGENTS.md).
+Document adapters link to those owners and do not duplicate Target-State-First,
+Decision Sufficiency, ToolCall, capacity, or lifecycle rules.
+
 # documents/
 
 `documents/README.md` is the root `documents/` index. Read it after the top-level

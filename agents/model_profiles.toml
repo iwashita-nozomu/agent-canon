@@ -1,0 +1,122 @@
+schema_id = "model_profile_registry_v1"
+registry_id = "model_profile_registry"
+registry_version = 1
+
+[[model_profiles]]
+id = "sol_parent_high"
+model_alias = "sol"
+owner = "sol_parent"
+role_template = "You are acting as {role_id} under the {model_alias} profile. {base_prompt}"
+prompt_capsule_schema_id = "prompt_capsule_v1"
+prompt_capsule_template = "SOL_PROFILE::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"
+prompt_capsule_required_context = ["objective", "context"]
+close_skill_id = "subagent-bootstrap"
+close_tool_id = "close_agent"
+close_tool_argument_schema_id = "close_agent_args_v1"
+close_tool_failure_schema_id = "close_agent_failure_v1"
+close_tool_target_binding = "terminal_agent_id"
+
+[[model_profiles.role_instructions]]
+id = "sol_core"
+text = "Use deterministic planning, request explicit evidence, and avoid speculative assumptions."
+priority = 1
+
+[[model_profiles.role_instructions]]
+id = "sol_execution"
+text = "Emit concrete step-by-step implementation plans and concrete completion checks."
+priority = 2
+
+[[model_profiles]]
+id = "luna_reasoning_high"
+model_alias = "luna_reasoning"
+owner = "luna"
+role_template = "You are acting as {role_id} with {model_alias} reasoning capacity. {base_prompt}"
+prompt_capsule_schema_id = "prompt_capsule_v1"
+prompt_capsule_template = "LUNA_REASONING::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"
+prompt_capsule_required_context = ["objective", "context"]
+close_skill_id = "subagent-bootstrap"
+close_tool_id = "close_agent"
+close_tool_argument_schema_id = "close_agent_args_v1"
+close_tool_failure_schema_id = "close_agent_failure_v1"
+close_tool_target_binding = "terminal_agent_id"
+
+[[model_profiles.role_instructions]]
+id = "luna_reasoning"
+text = "Prioritize rigorous decomposition and evidence-first conclusions."
+priority = 1
+
+[[model_profiles]]
+id = "luna_implementation_xhigh"
+model_alias = "luna_implementation"
+owner = "luna"
+role_template = "You are acting as {role_id} with {model_alias} implementation rigor. {base_prompt}"
+prompt_capsule_schema_id = "prompt_capsule_v1"
+prompt_capsule_template = "LUNA_IMPLEMENTATION::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"
+prompt_capsule_required_context = ["objective", "context"]
+close_skill_id = "subagent-bootstrap"
+close_tool_id = "close_agent"
+close_tool_argument_schema_id = "close_agent_args_v1"
+close_tool_failure_schema_id = "close_agent_failure_v1"
+close_tool_target_binding = "terminal_agent_id"
+
+[[model_profiles.role_instructions]]
+id = "luna_impl"
+text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion."
+priority = 1
+
+[[model_profiles]]
+id = "luna_ship_xhigh"
+model_alias = "luna_ship"
+owner = "luna"
+role_template = "You are acting as {role_id} for ship readiness under {model_alias}. {base_prompt}"
+prompt_capsule_schema_id = "prompt_capsule_v1"
+prompt_capsule_template = "LUNA_SHIP::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"
+prompt_capsule_required_context = ["objective", "context"]
+close_skill_id = "subagent-bootstrap"
+close_tool_id = "close_agent"
+close_tool_argument_schema_id = "close_agent_args_v1"
+close_tool_failure_schema_id = "close_agent_failure_v1"
+close_tool_target_binding = "terminal_agent_id"
+
+[[model_profiles.role_instructions]]
+id = "luna_ship"
+text = "Constrain edits to one responsibility unit and one-pass materialization only when selected."
+priority = 1
+
+[[model_profiles]]
+id = "spark_implementation_low"
+model_alias = "spark_implementation"
+owner = "spark"
+role_template = "You are acting as {role_id} for implementation execution with {model_alias}. {base_prompt}"
+prompt_capsule_schema_id = "prompt_capsule_v1"
+prompt_capsule_template = "SPARK::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"
+prompt_capsule_required_context = ["objective", "context"]
+close_skill_id = "subagent-bootstrap"
+close_tool_id = "close_agent"
+close_tool_argument_schema_id = "close_agent_args_v1"
+close_tool_failure_schema_id = "close_agent_failure_v1"
+close_tool_target_binding = "terminal_agent_id"
+
+[[model_profiles.role_instructions]]
+id = "spark_impl"
+text = "Produce mechanical, reproducible code edits with immediate schema and validation parity checks."
+priority = 1
+
+[[model_profiles]]
+id = "mini_skill_evaluator_medium"
+model_alias = "skill_evaluator"
+owner = "skill_evaluator"
+role_template = "You are acting as {role_id} with {model_alias} policy. {base_prompt}"
+prompt_capsule_schema_id = "prompt_capsule_v1"
+prompt_capsule_template = "SKILL_EVALUATOR::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"
+prompt_capsule_required_context = ["objective", "context"]
+close_skill_id = "subagent-bootstrap"
+close_tool_id = "close_agent"
+close_tool_argument_schema_id = "close_agent_args_v1"
+close_tool_failure_schema_id = "close_agent_failure_v1"
+close_tool_target_binding = "terminal_agent_id"
+
+[[model_profiles.role_instructions]]
+id = "skill_eval"
+text = "Evaluate policy conformance with explicit evidence and typed outputs."
+priority = 1

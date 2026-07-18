@@ -1695,5 +1695,859 @@
     "artifact_review": "artifact_review.md",
     "fair_data_review": "fair_data_review.md",
     "ml_science_review": "ml_science_review.md"
-  }
+  },
+  "agent_views": {
+    "artifact_reviewer": {
+      "name": "artifact_reviewer",
+      "description": "Read-only reviewer for code, scripts, raw results, environment capture, and artifact-readiness.",
+      "nickname_candidates": [
+        "artifact",
+        "rerun-bundle",
+        "artifact-check"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "artifact_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/artifact_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "benchmark_reviewer": {
+      "name": "benchmark_reviewer",
+      "description": "Read-only reviewer for fairness, confounders, and benchmark anti-patterns.",
+      "nickname_candidates": [
+        "benchmark",
+        "fairness",
+        "confounders"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "benchmark_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/benchmark_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "citation_evidence_reviewer": {
+      "name": "citation_evidence_reviewer",
+      "description": "Read-only reviewer for paper claims, citations, figures, tables, and evidence traceability.",
+      "nickname_candidates": [
+        "citation-trace",
+        "evidence-gate",
+        "source-check"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "citation_evidence_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/citation_evidence_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "cpp_reviewer": {
+      "name": "cpp_reviewer",
+      "description": "Read-only reviewer for C and C++ diffs, build/test evidence, ABI-boundary changes, and native-code regressions.",
+      "nickname_candidates": [
+        "cpp-gate",
+        "native-review",
+        "abi-review"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "change_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/change_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "detailed_design_reviewer": {
+      "name": "detailed_design_reviewer",
+      "description": "Read-only reviewer for detailed design docs, implementation readiness, side-effect mapping, reuse-first discipline, and style continuity.",
+      "nickname_candidates": [
+        "design-gate",
+        "design-review",
+        "reuse-review"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "design_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/design_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "detailed_designer": {
+      "name": "detailed_designer",
+      "description": "Detailed-design authoring agent for writing implementation-ready design docs with reuse-first, side-effect mapping, and style-continuity guidance.",
+      "nickname_candidates": [
+        "design-doc",
+        "detailed-design",
+        "design-author"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "logical_role_id": "designer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/designer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "diff_triage_reviewer": {
+      "name": "diff_triage_reviewer",
+      "description": "Read-only reviewer for bounded diffs before escalation to broad review.",
+      "nickname_candidates": [
+        "diff-triage",
+        "bounded-review",
+        "first-pass"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "change_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/change_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "docs_workflow_steward": {
+      "name": "docs_workflow_steward",
+      "description": "Docs and workflow steward for canonical instructions, notes, and agent workflows.",
+      "nickname_candidates": [
+        "canon",
+        "docs",
+        "workflow-docs"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "logical_role_id": "docs_workflow_steward",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/docs_workflow_steward",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "document_flow_reviewer": {
+      "name": "document_flow_reviewer",
+      "description": "Read-only reviewer for top-down document coherence, section order, term introduction order, and first-reader comprehension.",
+      "nickname_candidates": [
+        "doc-flow",
+        "readthrough-gate",
+        "top-down-review"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "document_flow_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/document_flow_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "execution_planner": {
+      "name": "execution_planner",
+      "description": "Execution-planning agent for stage order, subagent assignment, validation sequence, and rollback-aware task plans.",
+      "nickname_candidates": [
+        "planner",
+        "stage-plan",
+        "execution-plan"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "logical_role_id": "scheduler",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/scheduler",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "experiment_runner": {
+      "name": "experiment_runner",
+      "description": "Execution-only agent for running bounded experiments and summarizing logs.",
+      "nickname_candidates": [
+        "run-log",
+        "experiment",
+        "measure"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "logical_role_id": "experimenter",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/experimenter",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "explorer": {
+      "name": "explorer",
+      "description": "Read-only agent for tracing code paths, docs, and workflow state.",
+      "nickname_candidates": [
+        "trace",
+        "map",
+        "survey"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "researcher",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/researcher",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "fair_data_reviewer": {
+      "name": "fair_data_reviewer",
+      "description": "Read-only reviewer for metadata quality, naming, reuse, and FAIR-style data organization.",
+      "nickname_candidates": [
+        "fair-data",
+        "metadata",
+        "reuse-check"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "fair_data_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/fair_data_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "literature_researcher": {
+      "name": "literature_researcher",
+      "description": "Read-only agent for paper search, prior-art mapping, and contradictory-source hunting.",
+      "nickname_candidates": [
+        "literature",
+        "prior-art",
+        "paper-survey"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "researcher",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/researcher",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "logic_gap_reviewer": {
+      "name": "logic_gap_reviewer",
+      "description": "Read-only reviewer for academic-argument continuity, claim-to-evidence links, hidden assumptions, and unsupported inferential jumps.",
+      "nickname_candidates": [
+        "logic-gap",
+        "argument-check",
+        "claim-audit"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "logic_gap_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/logic_gap_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "long_form_writer": {
+      "name": "long_form_writer",
+      "description": "Long-form document author for README, workflow, guide, migration, and other reader-facing documents that need roadmap-first drafting.",
+      "nickname_candidates": [
+        "doc-writer",
+        "long-doc",
+        "guide-writer"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "logical_role_id": "docs_workflow_steward",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/docs_workflow_steward",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "manager_reviewer": {
+      "name": "manager_reviewer",
+      "description": "Read-only requirements reviewer for scope, source buckets, accumulated-context resolution, and escalation discipline.",
+      "nickname_candidates": [
+        "requirements-review",
+        "intake-review",
+        "scope-gate"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "manager_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/manager_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "ml_science_reviewer": {
+      "name": "ml_science_reviewer",
+      "description": "Read-only reviewer for assumptions, limitations, uncertainty, and reader-facing scientific reporting.",
+      "nickname_candidates": [
+        "ml-science",
+        "checklist",
+        "limitations"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "ml_science_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/ml_science_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "notation_definition_reviewer": {
+      "name": "notation_definition_reviewer",
+      "description": "Read-only reviewer for symbol, abbreviation, terminology, unit, and definition-before-use discipline in academic documents.",
+      "nickname_candidates": [
+        "notation-check",
+        "definition-gate",
+        "symbol-review"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "notation_definition_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/notation_definition_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "oop_readability_reviewer": {
+      "name": "oop_readability_reviewer",
+      "description": "Read-only reviewer that documents mechanical OOP readability reports without changing their verdicts.",
+      "nickname_candidates": [
+        "oop-readability",
+        "readability-doc",
+        "oop-report"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "change_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/change_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "plan_reviewer": {
+      "name": "plan_reviewer",
+      "description": "Read-only reviewer for execution plans, stage order, reviewer separation, validation sequencing, and rollback readiness.",
+      "nickname_candidates": [
+        "plan-review",
+        "schedule-gate",
+        "sequence-review"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "schedule_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/schedule_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "project_reviewer": {
+      "name": "project_reviewer",
+      "description": "Read-only reviewer for repo-wide inventory, workflow health, and tooling health.",
+      "nickname_candidates": [
+        "project-review",
+        "repo-audit",
+        "inventory"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "final_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/final_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "prompt_config_reviewer": {
+      "name": "prompt_config_reviewer",
+      "description": "Read-only reviewer for prompt, routing, and subagent-config drift.",
+      "nickname_candidates": [
+        "prompt-audit",
+        "config-review",
+        "role-review"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "prompt_config_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/prompt_config_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "python_reviewer": {
+      "name": "python_reviewer",
+      "description": "Read-only reviewer for Python diffs, pyright, pytest, ruff, and type-boundary changes.",
+      "nickname_candidates": [
+        "py-review",
+        "type-review",
+        "python-gate"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "change_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/change_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "report_reviewer": {
+      "name": "report_reviewer",
+      "description": "Read-only reviewer for experiment reports and evidence traceability.",
+      "nickname_candidates": [
+        "report-review",
+        "reader-check",
+        "report-gate"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "experiment_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/experiment_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "reproducibility_reviewer": {
+      "name": "reproducibility_reviewer",
+      "description": "Read-only reviewer for provenance, seeds, commands, environments, and rerunability.",
+      "nickname_candidates": [
+        "repro",
+        "provenance",
+        "rerun-check"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "reproducibility_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/reproducibility_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "requirements_organizer": {
+      "name": "requirements_organizer",
+      "description": "Requirements-organizing agent for turning user intent and local precedent into concrete scope, acceptance criteria, and reuse targets.",
+      "nickname_candidates": [
+        "requirements",
+        "intake",
+        "scope"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "logical_role_id": "manager",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/manager",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "reviewer": {
+      "name": "reviewer",
+      "description": "Read-only review agent for diffs, regressions, and documentation alignment.",
+      "nickname_candidates": [
+        "review",
+        "findings",
+        "gate"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "change_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/change_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "scientific_computing_reviewer": {
+      "name": "scientific_computing_reviewer",
+      "description": "Read-only reviewer for incremental change, testing, automation, and prototype discipline in research code.",
+      "nickname_candidates": [
+        "sci-comp",
+        "prototype-check",
+        "research-eng"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "scientific_computing_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/scientific_computing_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "ship_reviewer": {
+      "name": "ship_reviewer",
+      "description": "High-assurance read-only reviewer for final clause coverage and release readiness.",
+      "nickname_candidates": [
+        "ship-gate",
+        "final-gate",
+        "release-check"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "final_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/final_reviewer",
+      "profile_id": "luna_ship_xhigh",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "skill_evaluator": {
+      "name": "skill_evaluator",
+      "description": "Fresh read-only evaluator for explicit empirical skill scenarios.",
+      "nickname_candidates": [
+        "skill-eval",
+        "fresh-eval",
+        "scenario-eval"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "skill_evaluator",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/skill_evaluator",
+      "profile_id": "mini_skill_evaluator_medium",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "spark_worker": {
+      "name": "spark_worker",
+      "description": "Low-latency implementation agent for bounded code, docs, tests, or mechanical cleanup slices derived from the Abstract Design Frame and design trace.",
+      "nickname_candidates": [
+        "spark-impl",
+        "fast-change",
+        "bounded-fix"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "logical_role_id": "implementer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/implementer",
+      "profile_id": "spark_implementation_low",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "test_designer": {
+      "name": "test_designer",
+      "description": "Read-only agent for post-implementation static analysis when an explicit unresolved oracle, specification, regression, or failure-mode risk remains beyond existing validation.",
+      "nickname_candidates": [
+        "test-plan",
+        "nasty-tests",
+        "edge-cases"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "logical_role_id": "test_designer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/test_designer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1"
+    },
+    "worker": {
+      "name": "worker",
+      "description": "Implementation agent for bounded code, docs, or test changes.",
+      "nickname_candidates": [
+        "impl",
+        "change",
+        "fix"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "logical_role_id": "implementer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/implementer",
+      "profile_id": "luna_implementation_xhigh",
+      "capsule_schema_id": "prompt_capsule_v1"
+    }
+  },
+  "roles": [
+    {
+      "id": "artifact_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "benchmark_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "citation_evidence_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "cpp_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "detailed_design_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "detailed_designer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "diff_triage_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "docs_workflow_steward",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "document_flow_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "execution_planner",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "experiment_runner",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "explorer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "fair_data_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "literature_researcher",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "logic_gap_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "long_form_writer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "manager_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "ml_science_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "notation_definition_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "oop_readability_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "plan_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "project_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "prompt_config_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "python_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "report_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "reproducibility_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "requirements_organizer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "scientific_computing_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "ship_reviewer",
+      "profile_id": "luna_ship_xhigh",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "final_review",
+        "release_readiness"
+      ],
+      "model_profile": "luna_ship_xhigh"
+    },
+    {
+      "id": "skill_evaluator",
+      "profile_id": "mini_skill_evaluator_medium",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "skill_evaluation"
+      ],
+      "model_profile": "mini_skill_evaluator_medium"
+    },
+    {
+      "id": "spark_worker",
+      "profile_id": "spark_implementation_low",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "implementation",
+        "fixed_packet"
+      ],
+      "model_profile": "spark_implementation_low"
+    },
+    {
+      "id": "test_designer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "model_profile": "luna_reasoning_high"
+    },
+    {
+      "id": "worker",
+      "profile_id": "luna_implementation_xhigh",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "implementation",
+        "causal_repair",
+        "cross_owner_integration"
+      ],
+      "model_profile": "luna_implementation_xhigh"
+    }
+  ]
 }

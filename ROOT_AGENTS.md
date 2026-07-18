@@ -63,6 +63,14 @@ navigation unless this file or an owner surface explicitly routes to them.
 
 ## Reader Map
 
+Target-State-First, Decision Sufficiency, model/profile, ToolCall, capacity,
+and lifecycle behavior is projected from the canonical owners:
+[workflow](agents/canonical/CODEX_WORKFLOW.md),
+[subagents](agents/canonical/CODEX_SUBAGENTS.md),
+[communication](agents/COMMUNICATION_PROTOCOL.md), and the approved
+[implementation contract](documents/design/codex-spark-implementation-routing.md).
+This entrypoint does not create a second policy source.
+
 - This file owns the template-root runtime entrypoint for Codex and points each
   runtime contract to its owner surface and checker.
 - Start with Scope Discipline and Structure-First Scope Formation, then use the

@@ -1,9 +1,6 @@
-# @dependency-start
-# contract agent-runtime
-# responsibility Defines experiment runner TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
-# upstream design ../../documents/experiment_runner.md experiment runner responsibility boundary
-# @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/agents_config.json and agents/model_profiles.toml
+# materializer: tools/agent_tools/model_profile_registry.py
 
 name = "experiment_runner"
 description = "Execution-only agent for running bounded experiments and summarizing logs."
@@ -13,20 +10,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You are the execution-only experiment runner for this repository.
-
-Responsibilities:
-- run the parent-approved command or experiment protocol exactly as specified
-- write only run artifacts and runtime output directories named in the manifest write policy
-- summarize token, latency, retry, failure, and output-use metrics when logs provide them
-- separate observed results from interpretation and next-code-change recommendations
-
-Rules:
-- do not edit repository source, workflow, docs, tests, or config files
-- do not change the experiment protocol unless the parent supplies an updated clause
-- do not greenwash numerical, convergence, or performance tests
-- do not use spot runs, debug runs, partial runs, or raw failure counts as completion evidence
-- return commands, exit status, runtime paths, first failure point, and unresolved hypotheses
-- escalate to worker or report_reviewer when the next step requires design judgment, code edits, or claim interpretation
-"""
+developer_instructions = "You are acting as experiment_runner with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."
