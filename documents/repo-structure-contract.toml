@@ -49,6 +49,7 @@ allowed_top_level = [
   ".codex",
   ".devcontainer",
   ".dockerignore",
+  ".gitattributes",
   ".github",
   ".gitignore",
   ".vscode",
@@ -159,6 +160,11 @@ kind = "dir"
 category = "tooling"
 
 [[profile.required]]
+path = "tools/agent_tools/update_lifecycle_contract.py"
+kind = "file"
+category = "update_lifecycle_contract"
+
+[[profile.required]]
 path = "tools/user"
 kind = "dir"
 category = "tooling"
@@ -222,6 +228,11 @@ category = "research_artifacts"
 path = "vendor"
 kind = "dir"
 category = "vendored_assets"
+
+[[profile.optional]]
+path = ".agent-canon/update-lifecycle"
+kind = "dir"
+category = "task_owned_update_runtime"
 
 [[profile]]
 id = "template_or_derived_repo"
@@ -339,3 +350,8 @@ category = "environment"
 path = "python"
 kind = "dir"
 category = "implementation"
+
+[[profile.optional]]
+path = ".agent-canon/update-lifecycle"
+kind = "dir"
+category = "task_owned_update_runtime"

@@ -46,6 +46,9 @@ workflow for changes to shared surfaces.
 | AgentCanon-owned shared policy | standalone under `vendor/agent-canon/documents/` | AgentCanon source | no |
 | Template-owned active contract | regular root file when the template or derived repo creates one | template or derived repo root | yes |
 | Project-owned durable state / content | regular project-local file or directory | project root | yes |
+| Update transaction state | regular task-owned records under `.agent-canon/update-lifecycle/state/` | AgentCanon update transaction | no |
+| Update generated evidence | regular generated records under `.agent-canon/update-lifecycle/evidence/` | named lifecycle evidence producer | no |
+| Update projection view | regular queue/frontier records under `.agent-canon/update-lifecycle/projection-queue/` | AgentCanon update transaction | no |
 | GitHub path constraint copy surface | regular root copy from AgentCanon source | AgentCanon source, then `link-root` copy | no |
 | AgentCanon standalone-only surface | absent from template root; `link-root` removes stale root views | standalone AgentCanon repo | no |
 
@@ -197,7 +200,9 @@ Project state remains regular root content. AgentCanon must not restore these as
 shared symlinks or shared copies:
 
 - `goal.md`
-- `.agent-canon/update-state.toml`
+- `.agent-canon/update-lifecycle/state/`
+- `.agent-canon/update-lifecycle/evidence/`
+- `.agent-canon/update-lifecycle/projection-queue/`
 - `experiments/README.md`
 - `experiments/registry.toml`
 - `experiments/<topic>/`
@@ -207,6 +212,11 @@ shared symlinks or shared copies:
 
 `goal.md` is always repo-local state. If a legacy root has `goal.md` symlinked
 to AgentCanon, `link-root` converts it to a repo-local placeholder.
+
+The three update-lifecycle children are one owner namespace with distinct
+roles: resumable state, generated evidence, and a projection-only queue view.
+The update transaction may clean its own records after remote readback; it must
+leave every unknown sibling under `.agent-canon/` unchanged.
 
 ## GitHub Path Constraint Copies
 
@@ -232,6 +242,11 @@ AgentCanon documents stay under `vendor/agent-canon/documents/`; root docs may
 link there when readers need shared conventions or workflow policy. Generated or
 experiment artifacts stay under `reports/` or `experiments/` unless they become
 a durable repo-local design or policy surface.
+
+`documents/agent-canon-update-route.md` is the standalone source entry for the
+update transaction. A parent consumes it under `vendor/agent-canon/documents/`;
+it does not copy that contract into root `documents/` or treat projection queue
+records as source canon.
 
 ## Evidence Contract Boundary
 

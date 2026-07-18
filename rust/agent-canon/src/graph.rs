@@ -508,8 +508,8 @@ fn decode_base64(value: &str) -> Result<Vec<u8>, GraphError> {
         let final_chunk = index + 1 == bytes.len() / 4;
         if chunk[0] == b'='
             || chunk[1] == b'='
-            || (chunk[2] == b'=' && chunk[3] != b'=')
-            || (!final_chunk && (chunk[2] == b'=' || chunk[3] == b'='))
+            || chunk[2] == b'=' && chunk[3] != b'='
+            || chunk[3] == b'=' && !final_chunk
         {
             return Err(GraphError::Validation(
                 "runtime base64 padding is invalid".to_string(),

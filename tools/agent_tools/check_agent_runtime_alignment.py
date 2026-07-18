@@ -1739,9 +1739,27 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     )
     for route in routes:
         route = require_mapping(route, f"task {task_id} tool route must be a mapping")
+        tool_call_token = require_mapping(
+            route.get("tool_call_token"),
+            f"task {task_id} tool route missing tool_call_token",
+        )
+        for field in (
+            "schema",
+            "tool_id",
+            "argument_schema",
+            "arguments",
+            "intent",
+            "typed_failure_semantics",
+            "token_id",
+            "token_body_sha256",
+        ):
+            ensure(
+                field in tool_call_token,
+                f"task {task_id} tool_call_token missing {field}",
+            )
         ensure(
-            "packet_command" in route,
-            f"task {task_id} tool route missing packet_command",
+            "packet_command" not in route,
+            f"task {task_id} tool route must not embed packet_command prose",
         )
         ensure(
             "commands" not in route,
@@ -1756,12 +1774,13 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         f"task {task_id} manifest missing run.subagent_prompt_packet object",
     )
     ensure(
-        "tool_command_packet_command" in prompt_packet,
-        f"task {task_id} subagent_prompt_packet missing tool_command_packet_command",
+        "tool_call_tokens" in prompt_packet,
+        f"task {task_id} subagent_prompt_packet missing tool_call_tokens",
     )
     ensure(
-        "tool_commands" not in prompt_packet,
-        f"task {task_id} subagent_prompt_packet must not keep tool_commands alias",
+        "tool_command_packet_command" not in prompt_packet
+        and "tool_commands" not in prompt_packet,
+        f"task {task_id} subagent_prompt_packet must not keep prose command aliases",
     )
     ensure(
         "fresh_subagents_required: true" in manifest_text

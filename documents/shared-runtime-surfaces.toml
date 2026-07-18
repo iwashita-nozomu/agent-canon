@@ -68,6 +68,7 @@ paths = [
   "documents/SHARED_RUNTIME_SURFACES.md",
   "documents/shared-runtime-surfaces.toml",
   "documents/log-surface-inventory.json",
+  "documents/agent-canon-update-route.md",
   "documents/agent-canon-parent-repo-latest-checklist.md",
   "documents/agent-canon-update-tasks.toml",
   "documents/runtime-profiles-and-check-matrix.md",
@@ -314,11 +315,25 @@ class = "durable_state"
 local_override_allowed = true
 
 [[surface]]
-path = ".agent-canon/update-state.toml"
+path = ".agent-canon/update-lifecycle/state"
 mode = "repo_state"
-owner = "project"
-class = "durable_state"
-local_override_allowed = true
+owner = "agent-canon-update"
+class = "transaction_state"
+local_override_allowed = false
+
+[[surface]]
+path = ".agent-canon/update-lifecycle/evidence"
+mode = "repo_state"
+owner = "agent-canon-update"
+class = "generated_evidence"
+local_override_allowed = false
+
+[[surface]]
+path = ".agent-canon/update-lifecycle/projection-queue"
+mode = "repo_state"
+owner = "agent-canon-update"
+class = "projection_view"
+local_override_allowed = false
 
 [[group]]
 mode = "removed_legacy"

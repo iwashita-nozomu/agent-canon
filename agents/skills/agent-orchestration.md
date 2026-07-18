@@ -22,6 +22,9 @@ upstream design ../COMMUNICATION_PROTOCOL.md pre-edit investigation and fresh su
   review, runtime entrypoint, or run-bundle policy.
 - Boundary: this skill routes and records the packet; task-specific execution
   stays with the selected workflow and task-shape skills.
+- Decision Sufficiency policy and `validate_decision_sufficiency_packet` live
+  only in `Decision Sufficiency Packet`; downstream skills and tools preserve
+  its verdict without defining a second validator.
 
 ## Purpose
 
@@ -64,6 +67,11 @@ Spark; only an exact `StructuralDesignGap` is repaired once before the same
 Spark resumes.
 
 1. 他の task-shape skill を選ぶ前に、この skill で request が `repo-changing execution` か `routing-only/advisory` かを先に分ける
+1. owner、edit mechanism、validation action を選ぶ前に `Decision Sufficiency
+   Packet` を materialize する。現在の evidence と両立する plausible repository
+   state の集合 `H` の全要素で owner / edit / validation が同一なら、追加の
+   read / search / review / check は decision value がゼロです。その調査を行わず、
+   固定 route の実行を開始します。
 1. repo-changing execution で実装 owner が明示 path と source packet でまだ固定されていない場合は、編集 path を選ぶ前に `python3 tools/agent_tools/search.py --query-file <request.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json` を走らせる。bounded candidate path を source packet seed にし、owner、responsibility、dependency evidence から `allowed_paths`、`do_not_read`、required checks を導く。deterministic search が失敗した場合は path selection を `router_unavailable_blocker` へ遷移させ、owner、responsibility、dependency evidence が一つの canonical route を示した時点で継続する
 1. 広い prose 読み込み、raw log 探索、subagent 起動の前に、その判定を正本として持つ canonical tool があるか確認する。tool-covered surface では tool を先に呼び、pass / finding の structured output を信頼する。ただし tool が返した path は作業 packet であり、`requested_scope` を縮める許可ではありません。owner、依存、downstream、意図的に外す surface を確認し、packet が user request を覆うことを証明してから編集に入ります
 1. repo-changing execution で構造、ownership、path selection、stale surface、document responsibility が scope に入る場合は、手作業の広い読み込みより前に `agents/COMMUNICATION_PROTOCOL.md` の `Structure Intake Packet` を作るか引用する。正本の構造読み込み tool は `repo_structure_contract.py`、`responsibility_scope.py`、`file_surface_inventory.py --submodule-aware`、`agent-canon structured-analysis document-inventory`、import boundary が関係する場合の `import_responsibility.py` です。artifact path と選択した構造要約を `llm_visible_context` に入れ、complete JSON、Markdown inventory、raw log、full document list は `local_tool_context` に残します
@@ -106,9 +114,121 @@ mode の意味:
   - repo state 確認、shell / GitHub check を走らせず、会話だけで応答する
   - user が repo inspection、file edit、validation、PR / issue 処理、CI 確認、または実装作業を求めた時点で `repo-changing execution` へ切り替え、切り替えをユーザー向け update で明示してから preflight へ進む
 
+## Decision Sufficiency Packet
+
+この節は Decision Sufficiency / Value-of-Information policy の唯一の正本であり、
+`validate_decision_sufficiency_packet` の唯一の意味論 owner です。consumer は
+owner-produced verdict を parse、serialize、import、forward できますが、field の
+別名、緩和 validator、独自の task-size 分類、または別の threshold policy を
+定義できません。
+
+`DecisionSufficiencyPacket` は次の JSON object をそのまま使います。
+
+```json
+{
+  "schema": "agent-canon.decision-sufficiency.v1",
+  "decision_id": "dsv:<sha256>",
+  "request_clause_ids": ["request-clause-id"],
+  "H": [
+    {
+      "state_id": "h-1",
+      "description": "plausible repository state consistent with evidence",
+      "evidence_refs": ["evidence:<64-lowercase-hex>"]
+    }
+  ],
+  "downstream_decision": "owner_edit_validation_route",
+  "possible_branches": [
+    {
+      "branch_id": "b-1",
+      "condition": "condition that selects this branch",
+      "owner": "canonical owner",
+      "edit_surface": "absolute path",
+      "validation": "absolute path#symbol",
+      "terminal": false
+    }
+  ],
+  "invariant": {
+    "owner": "agent-orchestration",
+    "owner_path": "absolute path to agents/skills/agent-orchestration.md",
+    "owner_symbol": "validate_decision_sufficiency_packet",
+    "edit": "absolute path#symbol or NEW file#NEW symbol",
+    "validation": "absolute path#symbol",
+    "request_clause_ids": ["request-clause-id"]
+  },
+  "value_of_information": [
+    {
+      "question_id": "q-1",
+      "read_or_check": "exact file/symbol/check",
+      "downstream_decision": "owner_edit_validation_route",
+      "possible_branches": ["b-1"],
+      "decision_value": "changes_route|zero"
+    }
+  ],
+  "route_verdict": {
+    "route": "spark_worker|worker|design_gate|reject",
+    "owner_gate": "G1|G2|G3|G4|G5|G6|S6",
+    "reason_code": "fixed_contract|design_unresolved|zero_value_investigation|typed_rejection"
+  },
+  "irrelevant_unknowns": [
+    {
+      "schema": "agent-canon.irrelevant-unknown.v1",
+      "unknown_id": "unknown:<64-lowercase-hex>",
+      "field": "field name",
+      "description": "why this cannot change the next action",
+      "evidence_refs": ["evidence:<64-lowercase-hex>"],
+      "affects_owner_edit_validation": false,
+      "blocking": false,
+      "serialized_in_decision_packet": true,
+      "validator_owner": "absolute path to agents/skills/agent-orchestration.md#validate_decision_sufficiency_packet"
+    }
+  ],
+  "rejection": null,
+  "threshold_policy": "none"
+}
+```
+
+`H` は現在の evidence と両立する plausible repository states の集合です。
+validator は一つ以上の state と、各 state の一つ以上の evidence reference を要求します。
+各追加 read / search / review / check は `value_of_information` entry を一つ持ち、
+変更し得る `downstream_decision` と `possible_branches` を列挙します。branch は packet
+の `possible_branches` の部分集合でなければなりません。対応する decision や branch
+がない追加調査は拒否します。
+
+全ての `h in H` で選択される owner、edit surface、validation が同一なら、追加情報の
+decision value は `zero` です。`validate_decision_sufficiency_packet` は追加調査を
+`zero_value_investigation` として拒否し、その固定 route の実行開始を要求します。
+design、path、failure semantics が固定された packet は `route=spark_worker` と
+exactly one `owner_gate` を持ちます。repo survey、run bundle、broad tests、alternative
+generation、追加 reviewer、compatibility route を足しません。三つのいずれかが未解決の
+場合だけ `route=design_gate` を選べます。unknown fact が次の owner / edit /
+validation を変えない場合は `IrrelevantUnknown` として正に serialize し、blocker に
+しません。
+
+`validate_decision_sufficiency_packet` は schema、identity、request clauses、`H`、
+downstream decision、branches、invariant tuple、value-of-information mapping、route、
+irrelevant unknown、rejection、`threshold_policy=none` を一体で検証します。evidence
+reference は `evidence:` と 64 lowercase hexadecimal、`decision_id` は canonical packet
+body の SHA-256 に結びます。固定 route に複数 owner gate がある packet、count / time /
+line / inspection 数を cutoff に使う packet、および unknown policy owner を拒否します。
+
+typed rejection code は
+`missing_hypothesis_space`、`missing_downstream_decision`、
+`missing_possible_branches`、`missing_invariant_tuple`、
+`missing_value_of_information`、`zero_value_investigation`、
+`fixed_route_not_spark`、`multiple_owning_gates`、
+`irrelevant_unknown_as_blocker`、`threshold_logic_present`、
+`compatibility_route`、`unknown_policy_owner` です。rejection object は `code`、
+`decision_id`、`downstream_decision`、`failed_field`、`evidence_refs`、
+`successor_decision_id` を持ち、最後の field は changed input が successor を作る場合
+以外 `null` です。観測した duration、attempt、read count は evidence にはできますが、
+判定 cutoff にはできません。
+
 ## Outputs
 
 - current provisional workflow route, plus the evidence that will freeze or revise it
+- owner-produced `DecisionSufficiencyPacket` reference and its route verdict;
+  every planned read/search/review/check names the downstream decision and
+  possible branches it can change
 - request mode (`repo-changing execution` or `routing-only/advisory`)
 - 必要な role / specialist
 - 契約に必要な review と handoff 構成

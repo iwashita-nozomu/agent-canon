@@ -661,6 +661,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "tool_catalog.py tool_drift.py notebook_quality.py "
         "check_github_workflows.py container_config.py check_runtime_profile_inventory.py\n"
     ),
+    "tools/ci/check_agent_canon_pr.sh": (
+        "python3 tools/agent_tools/check_convention_compliance.py\n"
+        "python3 tools/ci/check_github_workflows.py\n"
+    ),
     "rust/agent-canon/src/docs.rs": "runtime profile inventory\n",
     "documents/tools/agent-canon.md": "docs\n",
     "tools/sync_agent_canon.sh": "surface_manifest.py build_regular_specs regular_path\n",
@@ -736,8 +740,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "`agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |\n"
         "| public skill registry | `agents/skills/catalog.yaml` | "
         "`check_agent_runtime_alignment.py` |\n"
-        "| shared-canon update | `tools/update_agent_canon.sh` | "
-        "AgentCanon PR gate |\n"
+        "| AgentCanon update transaction | "
+        "`documents/agent-canon-update-route.md` | "
+        "`update_lifecycle_contract.py` |\n"
     ),
 }
 
@@ -801,18 +806,18 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("missing-tool-commands-section", result.stdout)
 
     def test_missing_workflow_hook_fails(self) -> None:
-        """A workflow prompt without the verifier marker is rejected."""
+        """The canonical source gate cannot omit convention verification."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "workflows" / "example-workflow.md"
-            workflow.write_text("# Example\nNo verifier here.\n", encoding="utf-8")
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
 
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "workflow_hook:agents/workflows/example-workflow.md",
+                "workflow_hook:tools/ci/check_agent_canon_pr.sh",
                 result.stdout,
             )
             self.assertIn("missing-convention-compliance-gate", result.stdout)
@@ -822,9 +827,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "workflows" / "example-workflow.md"
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             workflow.write_text(
-                "# Example\nMention check_convention_compliance.py in prose only.\n",
+                "#!/usr/bin/env bash\n# Mention check_convention_compliance.py only.\n",
                 encoding="utf-8",
             )
 
@@ -841,12 +846,11 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "workflows" / "example-workflow.md"
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             workflow.write_text(
-                "# Example\n"
-                "Before closeout, run "
-                "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
-                "Do not run check_convention_compliance.py for quick tasks.\n",
+                "#!/usr/bin/env bash\n"
+                "python3 tools/agent_tools/check_convention_compliance.py\n"
+                "# Do not run check_convention_compliance.py for quick tasks.\n",
                 encoding="utf-8",
             )
 
@@ -1060,10 +1064,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            skill = root / ".agents" / "skills" / "agent-orchestration" / "SKILL.md"
+            skill = root / "agents" / "skills" / "agent-orchestration.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8").replace(
-                    " $codex-task-workflow",
+                    "$codex-task-workflow ",
                     "",
                 ),
                 encoding="utf-8",
@@ -1080,10 +1084,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            skill = root / ".agents" / "skills" / "agent-orchestration" / "SKILL.md"
+            skill = root / "agents" / "skills" / "agent-orchestration.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8").replace(
-                    " $subagent-bootstrap",
+                    "$subagent-bootstrap ",
                     "",
                     1,
                 ),
@@ -1365,8 +1369,12 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
     def test_literature_backed_skill_call_order_contract_is_manifest_backed(self) -> None:
         """Literature-backed skill-call order surfaces are manifest-backed."""
-        self.assertIn(
+        self.assertNotIn(
             ".agents/skills/agent-orchestration/SKILL.md",
+            LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
+        )
+        self.assertIn(
+            "agents/skills/agent-orchestration.md",
             LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
         )
         self.assertIn(

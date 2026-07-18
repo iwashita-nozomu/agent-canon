@@ -307,6 +307,48 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         self.assertEqual(mini_roles, {"skill_evaluator"})
         self.assertEqual(configs["skill_evaluator"]["model_reasoning_effort"], "medium")
 
+    def test_decision_sufficiency_has_one_owner_and_pointer_only_consumers(self) -> None:
+        """DSV semantics stay canonical while packets, Spark, closeout, and evals consume it."""
+        owner = (
+            PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
+        ).read_text(encoding="utf-8")
+        agent_team = (
+            PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
+        ).read_text(encoding="utf-8")
+        lifecycle_contract = (
+            PROJECT_ROOT
+            / "tools"
+            / "agent_tools"
+            / "update_lifecycle_contract.py"
+        ).read_text(encoding="utf-8")
+        subagents = (
+            PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
+        ).read_text(encoding="utf-8")
+        consumer_docs = [
+            PROJECT_ROOT / ".agents" / "skills" / "agent-orchestration" / "SKILL.md",
+            PROJECT_ROOT / "agents" / "skills" / "task-routing.md",
+            PROJECT_ROOT / "agents" / "skills" / "agent-canon-update.md",
+            PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
+        ]
+
+        self.assertEqual(owner.count("## Decision Sufficiency Packet"), 1)
+        self.assertIn("唯一の意味論 owner", owner)
+        self.assertNotIn("def validate_decision_sufficiency_packet", agent_team)
+        self.assertNotIn("def validate_decision_sufficiency_packet", lifecycle_contract)
+        self.assertIn(
+            'DECISION_SUFFICIENCY_OWNER = "agents/skills/agent-orchestration.md#Decision Sufficiency Packet"',
+            agent_team,
+        )
+        self.assertIn("import_decision_sufficiency_verdict", agent_team)
+        self.assertIn("route=spark_worker", subagents)
+        self.assertIn("exactly one owner gate", subagents)
+        self.assertIn("decision_sufficiency_packet_ref", agent_team)
+        for path in consumer_docs:
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                self.assertNotIn("## Decision Sufficiency Packet", text)
+                self.assertNotIn('"schema": "agent-canon.decision-sufficiency.v1"', text)
+
     def test_alignment_rejects_mini_model_on_ordinary_role(self) -> None:
         """A normal role cannot claim the T14 skill-validation model."""
         configs = runtime_alignment.parse_codex_agents()
