@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Owns public skill-route catalog parsing, frozen rule/index values, root errors, and related-skill projections.
-# upstream design ../../documents/design/oop-type-design.md approved OOP/type-design owner and module contract
+# upstream design ../../agents/skills/oop-type-design.md approved OOP/type-design owner and module contract
 # upstream implementation ../../agents/skills/catalog.yaml complete public skill-route catalog and capability metadata
 # downstream implementation ./capability_route.py immutable capability decision consumer
 # downstream implementation ./route.py public route composition and compatibility facade

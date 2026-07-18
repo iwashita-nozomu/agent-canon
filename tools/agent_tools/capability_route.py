@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Owns capability raw-argv preflight and immutable route decisions.
-# upstream design ../../documents/design/oop-type-design.md approved OOP/type-design owner and module contract
+# upstream design ../../agents/skills/oop-type-design.md approved OOP/type-design owner and module contract
 # upstream implementation ./skill_route_catalog.py immutable catalog/index and decision-support API
 # downstream implementation ./route.py public route composition and rendering
 # downstream implementation ../../tests/agent_tools/test_route.py capability-owned route tests
