@@ -6,8 +6,6 @@ upstream design ../../agents/canonical/skills.md skill canon registry
 downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
 downstream implementation ../../tools/agent_tools/evaluate_agent_run.py runs behavior evals
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated result evidence
-downstream implementation ../../rust/agent-canon/src/local_llm.rs routes local LLM eval commands
-downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility evals
 downstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py runs workflow selection evals
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
 downstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py runs Codex subagent role evals

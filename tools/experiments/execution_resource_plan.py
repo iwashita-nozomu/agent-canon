@@ -3050,6 +3050,40 @@ def _xml_required_child_text(element: ET.Element, tag: str, evidence: EvidenceFd
     return value
 
 
+_NvidiaXmlEventName: TypeAlias = Literal["start", "end", "comment", "pi"]
+_NvidiaXmlEvent: TypeAlias = tuple[_NvidiaXmlEventName, ET.Element]
+_NVIDIA_XML_EVENT_NAMES = frozenset({"start", "end", "comment", "pi"})
+
+
+def _typed_nvidia_xml_events(
+    parser: ET.XMLPullParser,
+    evidence: EvidenceFd,
+) -> tuple[_NvidiaXmlEvent, ...]:
+    """Validate and narrow ElementTree's heterogeneous pull-event boundary."""
+    events: list[_NvidiaXmlEvent] = []
+    raw_events = cast(Sequence[object], tuple(parser.read_events()))
+    for raw_event in raw_events:
+        if not isinstance(raw_event, tuple) or len(raw_event) != 2:
+            raise _nvidia_parser_failure(
+                "gpu_structured_probe_malformed",
+                "NVIDIA XML parser returned an invalid event record",
+                evidence=evidence,
+            )
+        raw_name, raw_element = raw_event
+        if (
+            not isinstance(raw_name, str)
+            or raw_name not in _NVIDIA_XML_EVENT_NAMES
+            or not isinstance(raw_element, ET.Element)
+        ):
+            raise _nvidia_parser_failure(
+                "gpu_structured_probe_malformed",
+                "NVIDIA XML parser returned an unsupported event payload",
+                evidence=evidence,
+            )
+        events.append((cast(_NvidiaXmlEventName, raw_name), raw_element))
+    return tuple(events)
+
+
 def _parse_nvidia_smi_xml_document(evidence: EvidenceFd) -> _ParsedNvidiaXmlDocument:
     data = _read_evidence_fd(evidence)
     if _NVIDIA_UNSAFE_XML_RE.search(data.decode("ascii", errors="ignore")):
@@ -3062,15 +3096,24 @@ def _parse_nvidia_smi_xml_document(evidence: EvidenceFd) -> _ParsedNvidiaXmlDocu
     try:
         parser = ET.XMLPullParser(events=("start", "end", "comment", "pi"))
         parser.feed(data)
-        parser_events = tuple(parser.read_events())
+        parser_events = _typed_nvidia_xml_events(parser, evidence)
         parser.close()
-        root = next(node for event, node in parser_events if event == "start")
+        root = next(
+            (node for event, node in parser_events if event == "start"),
+            None,
+        )
     except ET.ParseError as exc:
         raise _nvidia_parser_failure(
             "gpu_structured_probe_malformed",
             "NVIDIA XML could not be parsed",
             evidence=evidence,
         ) from exc
+    if root is None:
+        raise _nvidia_parser_failure(
+            "gpu_structured_probe_malformed",
+            "NVIDIA XML contains no document root",
+            evidence=evidence,
+        )
     physical: list[FullGpuUuid] = []
     mig: list[FullMigUuid] = []
     joins: list[NvidiaTopologyJoin] = []
@@ -3784,14 +3827,20 @@ class RunGpuAdmissionReceipt:
                 "actual_gpu_processes",
                 tuple(self.actual_gpu_processes),
             )
-        if not self.admission_fingerprint:
-            object.__setattr__(
-                self,
-                "admission_fingerprint",
-                hashlib.sha256(
-                    _canonical_json(_admission_receipt_payload(self)).encode("utf-8")
-                ).hexdigest(),
+        supplied_fingerprint = self.admission_fingerprint
+        computed_fingerprint = hashlib.sha256(
+            _canonical_json(_admission_receipt_payload(self)).encode("utf-8")
+        ).hexdigest()
+        if supplied_fingerprint and not secrets.compare_digest(
+            supplied_fingerprint,
+            computed_fingerprint,
+        ):
+            raise TypedPreflightFailure(
+                "gpu_admission_fingerprint_mismatch",
+                "GPU admission fingerprint does not match the complete receipt preimage",
+                supplied_fingerprint=supplied_fingerprint,
             )
+        object.__setattr__(self, "admission_fingerprint", computed_fingerprint)
 
 
 def _admission_receipt_payload(value: RunGpuAdmissionReceipt) -> dict[str, object]:
@@ -4175,12 +4224,21 @@ class GpuReservationTransaction:
                 0o660,
                 dir_fd=self._root_fd,
             )
-            lock_stat = os.fstat(descriptor)
-            path_stat = os.stat(name, dir_fd=self._root_fd, follow_symlinks=False)
         except OSError as exc:
             raise TypedPreflightFailure(
                 "gpu_lock_open_failed",
                 "GPU candidate lock could not be opened",
+                uuid=uuid,
+                errno=exc.errno,
+            ) from exc
+        try:
+            lock_stat = os.fstat(descriptor)
+            path_stat = os.stat(name, dir_fd=self._root_fd, follow_symlinks=False)
+        except OSError as exc:
+            self._close_descriptor_once(descriptor, uuid, "rolled_back")
+            raise TypedPreflightFailure(
+                "gpu_lock_open_failed",
+                "GPU candidate lock identity could not be read",
                 uuid=uuid,
                 errno=exc.errno,
             ) from exc

@@ -1,16 +1,13 @@
 <!--
 @dependency-start
 contract reference
-responsibility Defines coordinated AgentCanon search across exact text, local LLM semantic cards, tool catalog, dependency headers, and code facts.
+responsibility Defines coordinated AgentCanon search across exact text, deterministic semantic cards, tool catalog, dependency headers, and code facts.
 upstream design ../tools/README.md shared tool command surface
 upstream design tools/README.md operator-facing tool guide
-upstream design local-llm-responsibility-analysis.md local LLM runtime boundary
 downstream implementation ../tools/agent_tools/search.py coordinates search providers from one purpose string
 downstream implementation ../tools/agent_tools/search_index.py builds repo-local semantic search cards
-downstream implementation ../rust/agent-canon/src/local_llm.rs exposes local LLM search and index commands through the Rust CLI
 downstream implementation ../rust/agent-canon/src/semantic_index.rs builds SQLite-backed semantic vector candidate indexes
 downstream implementation ../tests/agent_tools/test_search.py validates provider coordination
-downstream implementation ../tests/agent_tools/test_search_index.py validates index generation
 @dependency-end
 -->
 

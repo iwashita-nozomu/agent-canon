@@ -97,7 +97,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 reservation_fingerprint="g" * 64,
                 runtime_identity_fingerprint="h" * 64,
                 plan_fingerprint="b" * 64,
-                admission_fingerprint="a" * 64,
+                admission_fingerprint="",
                 container_visible_uuid_mapping=visibility,
             )
             outcome = ManagedGpuOutcomeReducer().reduce_terminal(
@@ -366,6 +366,28 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
         assert base.effective_environment is not None
         with self.assertRaises(TypeError):
             base.effective_environment["CUDA_VISIBLE_DEVICES"] = physical_uuid  # type: ignore[index]
+
+    def test_r5_admission_fingerprint_rejects_supplied_mismatch(self) -> None:
+        """The receipt owner rejects rather than trusts a supplied wrong hash."""
+        uuid = "GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        with self.assertRaises(TypedPreflightFailure) as raised:
+            RunGpuAdmissionReceipt(
+                schema_version="gpu-admission/v1",
+                candidate_uuids=(uuid,),
+                occupied_uuids=(),
+                reserved_uuids=(),
+                selected_uuids=(uuid,),
+                inventory_fingerprint="1" * 64,
+                occupancy_fingerprint="2" * 64,
+                reservation_fingerprint="3" * 64,
+                runtime_identity_fingerprint="4" * 64,
+                plan_fingerprint="5" * 64,
+                admission_fingerprint="f" * 64,
+            )
+        self.assertEqual(
+            raised.exception.code,
+            "gpu_admission_fingerprint_mismatch",
+        )
 
     def make_request(self, root: Path) -> ResourceRequest:
         """Build a declared caller/scheduler resource request."""
@@ -761,6 +783,56 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                     retry_evidence = retry.try_reserve((first,))
                     self.assertEqual(retry_evidence.disposition, "ACQUIRED")
                     self.assertEqual(retry.close()[0].close_attempts, 1)
+            finally:
+                os.umask(previous_umask)
+
+    def test_gpu_reservation_post_open_stat_failure_closes_candidate_fd_once(self) -> None:
+        """A post-open identity failure registers and closes its descriptor once."""
+        candidate = "GPU-99999999999999999999999999999999"
+        with tempfile.TemporaryDirectory() as temporary:
+            previous_umask = os.umask(0o0007)
+            try:
+                with patch.object(
+                    GpuReservationTransaction,
+                    "_read_filesystem_type",
+                    return_value="ext4",
+                ):
+                    transaction = GpuReservationTransaction(temporary)
+                    real_open = os.open
+                    real_close = os.close
+                    opened_candidate_fds: list[int] = []
+                    closed_fds: list[int] = []
+
+                    def tracking_open(*args, **kwargs):
+                        descriptor = real_open(*args, **kwargs)
+                        opened_candidate_fds.append(descriptor)
+                        return descriptor
+
+                    def tracking_close(descriptor: int) -> None:
+                        closed_fds.append(descriptor)
+                        real_close(descriptor)
+
+                    with (
+                        patch.object(os, "open", side_effect=tracking_open),
+                        patch.object(
+                            os,
+                            "fstat",
+                            side_effect=OSError(5, "injected post-open fstat failure"),
+                        ),
+                        patch.object(os, "close", side_effect=tracking_close),
+                    ):
+                        with self.assertRaises(TypedPreflightFailure) as raised:
+                            transaction.try_reserve((candidate,))
+                    self.assertEqual(raised.exception.code, "gpu_lock_open_failed")
+                    self.assertEqual(len(opened_candidate_fds), 1)
+                    candidate_fd = opened_candidate_fds[0]
+                    self.assertEqual(closed_fds.count(candidate_fd), 1)
+                    rollback = transaction.close()
+                    self.assertEqual(len(rollback), 1)
+                    self.assertEqual(rollback[0].disposition, "rolled_back")
+                    self.assertEqual(rollback[0].close_attempts, 1)
+                    with self.assertRaises(OSError):
+                        os.fstat(candidate_fd)
             finally:
                 os.umask(previous_umask)
 

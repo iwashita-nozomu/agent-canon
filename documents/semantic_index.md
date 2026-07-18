@@ -3,7 +3,6 @@
 contract reference
 responsibility Documents the semantic-index candidate-generation tool and Eval harness.
 upstream design search-coordination.md coordinated search provider boundary
-upstream design local-llm-responsibility-analysis.md local model advisory boundary
 upstream design rust-agent-tool-migration.md Rust CLI migration policy
 downstream implementation ../rust/agent-canon/src/semantic_index.rs implements the Rust semantic-index CLI
 downstream implementation ../rust/agent-canon/src/main.rs routes the semantic-index command
