@@ -4,6 +4,7 @@
 # contract test
 # responsibility Tests dependency manifest graph bundle and projection public contracts.
 # upstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders deterministic graph bundles and projections.
+# upstream implementation ../../tools/agent_tools/visualization_contract.py validates complete projection and readback coverage.
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh produces graph TSV inputs.
 # upstream design ../../documents/tools/render_dependency_manifest_graph.md defines renderer bundle, projection, and Graph IR contracts.
 # @dependency-end
@@ -123,6 +124,99 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             self.assertEqual(stdout_manifest["checker"]["status"], "pass")
             self.assertEqual(stdout_manifest["summary"]["node_count"], 2)
             self.assertEqual(stdout_manifest["summary"]["edge_count"], 1)
+            universe = stdout_manifest["visualization_source_universe"]
+            self.assertEqual(len(universe["items"]), 6)
+            self.assertEqual(
+                {item["origin"] for item in universe["items"]},
+                {"literal_request", "dependency_closure"},
+            )
+            calls = stdout_manifest["visualization_tool_calls"]
+            self.assertEqual(
+                [(call["tool_id"], call["argument_schema"]) for call in calls],
+                [
+                    (
+                        "agent_canon.visualization.coverage",
+                        "agent_canon.visualization.arguments.coverage.v1",
+                    ),
+                    (
+                        "agent_canon.visualization.adapter.dependency_manifest",
+                        "agent_canon.visualization.arguments.dependency_manifest.v1",
+                    ),
+                ],
+            )
+            coverage = stdout_manifest["visualization_coverage"]
+            self.assertEqual(
+                set(coverage),
+                {
+                    "dependency_graph.ir.json",
+                    "dependency_graph.md",
+                    "dependency_graph.dot",
+                    "dependency_graph.html",
+                },
+            )
+            for artifact_coverage in coverage.values():
+                report = artifact_coverage["report"]
+                self.assertEqual(report["status"], "pass")
+                self.assertEqual(set(report["source_counts"]), {
+                    "identity", "edge", "field", "phase", "branch", "module", "evidence", "time"
+                })
+                self.assertEqual(report["source_counts"]["identity"], 2)
+                self.assertEqual(report["source_counts"]["edge"], 3)
+                self.assertEqual(report["source_counts"]["module"], 1)
+                self.assertEqual(report["source_counts"], report["rendered_counts"])
+                self.assertEqual(report["source_counts"], report["readback_counts"])
+                self.assertEqual(report["violations"], [])
+                self.assertEqual(len(report["coverage_digest"]), 64)
+                self.assertEqual(artifact_coverage["readback"]["status"], "pass")
+            ir_payload = json.loads(
+                (bundle / "dependency_graph.ir.json").read_text(encoding="utf-8")
+            )
+            self.assertTrue(
+                ir_payload["visualization_coverage"]["marker"].startswith(
+                    "agent_canon_visualization_coverage_v1:"
+                )
+            )
+            directory_ids = {
+                node["id"] for node in ir_payload["nodes"] if node["kind"] == "directory"
+            }
+            containment_ids = {
+                edge["id"]
+                for edge in ir_payload["edges"]
+                if edge["relation"] == "contains"
+            }
+            universe_directory_ids = {
+                item["item_id"] for item in universe["items"] if item["kind"] == "module"
+            }
+            derived_edge_ids = {
+                item["item_id"]
+                for item in universe["items"]
+                if json.loads(item["payload_json"]).get("provenance_kind")
+                == "derived_directory_containment"
+                and item["kind"] == "edge"
+            }
+            self.assertEqual(universe_directory_ids, directory_ids)
+            self.assertEqual(derived_edge_ids, containment_ids)
+            universe_ids = {item["item_id"] for item in universe["items"]}
+            for artifact_coverage in coverage.values():
+                self.assertEqual(
+                    {
+                        entry["source_item_id"]
+                        for entry in artifact_coverage["manifest"]["entries"]
+                    },
+                    universe_ids,
+                )
+            markdown = (bundle / "dependency_graph.md").read_text(encoding="utf-8")
+            self.assertIn("agent_canon_visualization_coverage_v1:", markdown)
+            self.assertIn("-->\n```mermaid", markdown)
+            self.assertEqual(markdown.count("```mermaid"), 1)
+            self.assertTrue(
+                (bundle / "dependency_graph.dot")
+                .read_text(encoding="utf-8")
+                .startswith("// agent_canon_visualization_coverage_v1:")
+            )
+            rendered_html = (bundle / "dependency_graph.html").read_text(encoding="utf-8")
+            self.assertIn('id="agent-canon-visualization-coverage"', rendered_html)
+            self.assertFalse((bundle / "dependency_graph.coverage.json").exists())
             self.assertEqual(stdout_manifest["manifest_sha256"], sha256_file(bundle / "manifest.json"))
             self.assertEqual(
                 {artifact["path"] for artifact in committed_manifest["artifacts"]},
@@ -171,6 +265,7 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             self.assertEqual(manifest["source"]["origin_kind"], "supplied")
             self.assertEqual(manifest["source"]["origin_locator"], graph.resolve().as_posix())
             self.assertEqual(manifest["checker"]["status"], "not_run")
+            self.assertNotIn("dependency_graph.tsv", manifest["visualization_coverage"])
 
     def test_tp02_projection_envelope_and_cli_mode_rules(self) -> None:
         """Projection mode writes only requested named outputs and returns schema envelopes."""
@@ -206,6 +301,20 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             )
             self.assertTrue(ir_out.exists())
             self.assertTrue(html_out.exists())
+            self.assertEqual(
+                set(envelope["visualization_coverage"]),
+                {"dependency_graph.html", "dependency_graph.ir.json"},
+            )
+            self.assertEqual(
+                [call["tool_id"] for call in envelope["visualization_tool_calls"]],
+                [
+                    "agent_canon.visualization.coverage",
+                    "agent_canon.visualization.adapter.dependency_manifest",
+                ],
+            )
+            for artifact_coverage in envelope["visualization_coverage"].values():
+                self.assertEqual(artifact_coverage["report"]["status"], "pass")
+                self.assertEqual(artifact_coverage["readback"]["status"], "pass")
             for artifact in envelope["artifacts"]:
                 output_path = html_out if artifact["path"] == "dependency_graph.html" else ir_out
                 self.assertEqual(artifact["sha256"], sha256_file(output_path))
@@ -516,6 +625,7 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             "MAX_DATALIST_OPTIONS",
             "nodeRecords.slice",
             "incident.slice",
+            "viz_contract._",
         ):
             self.assertNotIn(forbidden, source_text)
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -528,9 +638,27 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             write_graph(graph, rows)
             html_out = root / "graph.html"
 
-            result = run_renderer("--root", str(root), "--graph-tsv", str(graph), "--html-out", str(html_out))
+            result = run_renderer(
+                "--root",
+                str(root),
+                "--graph-tsv",
+                str(graph),
+                "--html-out",
+                str(html_out),
+                "--format",
+                "json",
+            )
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            envelope = json.loads(result.stdout)
+            coverage = envelope["visualization_coverage"]["dependency_graph.html"]
+            report = coverage["report"]
+            self.assertEqual(report["status"], "pass")
+            self.assertEqual(report["source_counts"]["identity"], 1206)
+            self.assertEqual(report["source_counts"]["edge"], 2411)
+            self.assertEqual(report["source_counts"]["module"], 1)
+            self.assertEqual(report["source_counts"], report["rendered_counts"])
+            self.assertEqual(report["source_counts"], report["readback_counts"])
             rendered_html = html_out.read_text(encoding="utf-8")
             self.assertIn("nodeRecords.forEach", rendered_html)
             self.assertIn("Complete node list (1206)", rendered_html)
@@ -614,6 +742,16 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             self.assertEqual(ir_payload["schema"], "agent_canon.graph_ir.v2")
             self.assertEqual(ir_payload["summary"]["nodes"], 506)
             self.assertEqual(ir_payload["summary"]["edges"], 505)
+            coverage = json.loads(result.stdout)["visualization_coverage"][
+                "dependency_graph.html"
+            ]
+            report = coverage["report"]
+            self.assertEqual(report["status"], "pass")
+            self.assertEqual(report["source_counts"]["identity"], 506)
+            self.assertEqual(report["source_counts"]["edge"], 1011)
+            self.assertEqual(report["source_counts"]["module"], 1)
+            self.assertEqual(report["source_counts"], report["rendered_counts"])
+            self.assertEqual(report["source_counts"], report["readback_counts"])
             self.assertNotIn("MAX_RENDER_NODES", rendered_html)
             self.assertNotIn("fetch(", rendered_html)
             self.assertNotIn("XMLHttpRequest", rendered_html)
@@ -631,6 +769,56 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             self.assertIn("Complete node list (506)", rendered_html)
             self.assertIn("Complete edge list (505)", rendered_html)
             self.assertIn("node-505.md", rendered_html)
+
+    def test_algorithm_like_full_mapping_fixture_has_no_identity_loss(self) -> None:
+        """JIT/HLO, branch, helper, proof, evidence, phase, and time identities survive."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            graph = root / "algorithm.tsv"
+            identities = [
+                "jit-op-entry",
+                "hlo-op-dot",
+                "branch-accept",
+                "helper-line-search",
+                "phase-backend-lowering",
+                "dtype-fp64-evidence",
+                "proof-overlay-descent",
+                "timing-iteration-17",
+            ]
+            write_graph(
+                graph,
+                [
+                    ("downstream", "implementation", source, target)
+                    for source, target in zip(identities, identities[1:])
+                ],
+            )
+            html_out = root / "algorithm.html"
+
+            result = run_renderer(
+                "--root",
+                str(root),
+                "--graph-tsv",
+                str(graph),
+                "--html-out",
+                str(html_out),
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            coverage = json.loads(result.stdout)["visualization_coverage"][
+                "dependency_graph.html"
+            ]
+            report = coverage["report"]
+            self.assertEqual(report["status"], "pass")
+            self.assertEqual(
+                sum(report["source_counts"].values()),
+                len(identities) + len(identities) - 1 + 1 + len(identities),
+            )
+            self.assertEqual(report["source_counts"], report["readback_counts"])
+            rendered_html = html_out.read_text(encoding="utf-8")
+            for identity in identities:
+                self.assertIn(identity, rendered_html)
 
 
 if __name__ == "__main__":

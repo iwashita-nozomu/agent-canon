@@ -2,6 +2,7 @@
 # contract test
 # responsibility Tests Rust Mermaid fenced-block formatter behavior.
 # upstream implementation ../../rust/agent-canon/src/docs.rs implements docs format and fix-mermaid.
+# upstream implementation ../../tools/agent_tools/visualization_contract.py owns projection manifest and final coverage semantics.
 # @dependency-end
 """Tests for Mermaid fenced-block formatting."""
 
@@ -141,3 +142,94 @@ flowchart LR
         assert "```mermaid" in text
         assert "graph_node[(SQLite graph DB)]" in text
         assert "graph_node --> analyze[analyze]" in text
+
+
+def test_formatter_preserves_canonical_marker_while_fixing_mermaid_syntax() -> None:
+    """Rust formats Mermaid syntax without owning canonical marker semantics."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        target = Path(tmp_dir) / "algorithm.md"
+        target.write_text(
+            """# Algorithm
+
+<!-- agent_canon_visualization_coverage_v1:canonical-marker-payload -->
+
+```mermeid
+flowchart LR
+  start[Start] --> graph[(Graph)]
+  graph --> analyze[Analyze]
+```
+""",
+            encoding="utf-8",
+        )
+
+        result = subprocess.run(
+            [str(AGENT_CANON), "docs", "format", str(target)],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        fixed = target.read_text(encoding="utf-8")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "DOCS_CHECK=pass" in result.stdout
+    assert "agent_canon_visualization_coverage_v1:canonical-marker-payload" in fixed
+    assert "graph_node[(Graph)]" in fixed
+
+
+def test_formatter_does_not_validate_projection_identity_coverage() -> None:
+    """Final identity readback belongs only to visualization_contract.py."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        target = Path(tmp_dir) / "missing.md"
+        target.write_text(
+            """# Missing
+
+```mermaid
+flowchart LR
+  start[Start]
+```
+""",
+            encoding="utf-8",
+        )
+
+        result = subprocess.run(
+            [str(AGENT_CANON), "docs", "fix-mermaid", str(target)],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "DOCS_CHECK=pass" in result.stdout
+
+
+def test_formatter_leaves_algorithm_table_coverage_to_canonical_readback() -> None:
+    """Rust permits Markdown structure that canonical readback may reject."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        target = Path(tmp_dir) / "table-fallback.md"
+        target.write_text(
+            """# Algorithm
+
+```mermaid
+flowchart LR
+  start[Start] --> finish[Finish]
+```
+
+| Step | State |
+| --- | --- |
+| 1 | start |
+""",
+            encoding="utf-8",
+        )
+
+        result = subprocess.run(
+            [str(AGENT_CANON), "docs", "fix-mermaid", str(target)],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "DOCS_CHECK=pass" in result.stdout
