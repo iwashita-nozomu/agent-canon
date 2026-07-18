@@ -342,6 +342,88 @@ def test_r5_admitted_environment_and_context_are_composition_only() -> None:
     assert check.returncode == 0, check.stderr
 
 
+def test_r5_runner_lifecycle_fingerprint_uses_ff97_typed_projection() -> None:
+    """The terminal reducer fingerprints the pinned lifecycle `.to_dict()` value."""
+    runner_root = (
+        Path(__file__).resolve().parents[2].parent
+        / "experiment_runner-w1-r4-lifecycle-design"
+        / "python"
+    )
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = os.pathsep.join(
+        [str(runner_root), str(Path(__file__).resolve().parents[2])]
+    )
+    check = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import hashlib, json\n"
+                "from experiment_runner import (\n"
+                "    DescendantQuiescenceStatus, RunnerLifecycleEvidence,\n"
+                ")\n"
+                "from tools.experiments.execution_resource_plan import ManagedGpuOutcomeReducer\n"
+                "lifecycle = RunnerLifecycleEvidence(\n"
+                "    run_id='r5-lifecycle', terminal_event_id='terminal-1',\n"
+                "    observed_at_ns=1, terminal_status='finished',\n"
+                "    total_case_count_at_start=1, completion_count_before=0,\n"
+                "    completion_count_after=1, scheduler_completed=True,\n"
+                "    admitted_case_count=1, terminal_notification_count=1,\n"
+                "    child_process_ids=(), process_group_ids=(),\n"
+                "    direct_children_quiescent=True,\n"
+                "    descendant_quiescence=DescendantQuiescenceStatus.NO_CHILD,\n"
+                ")\n"
+                "outcome = ManagedGpuOutcomeReducer().reduce_terminal(\n"
+                "    run_id='r5-lifecycle', planned_chunk_ids=('chunk-1',),\n"
+                "    admission=None, source_freeze=None, runtime_identity=None,\n"
+                "    runner_lifecycle=lifecycle, primary_failure=None,\n"
+                "    secondary_failures=(), release_disposition=(),\n"
+                "    context_state='closed', exit_code=0,\n"
+                ")\n"
+                "expected = hashlib.sha256(json.dumps(\n"
+                "    lifecycle.to_dict(), sort_keys=True, separators=(',', ':'),\n"
+                "    ensure_ascii=True, allow_nan=False,\n"
+                ").encode('utf-8')).hexdigest()\n"
+                "assert outcome.runner_lifecycle_fingerprint == expected\n"
+            ),
+        ],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert check.returncode == 0, check.stderr
+
+
+def test_r5_runner_lifecycle_capture_is_finally_bound_for_interruptions() -> None:
+    """The composition root captures lifecycle in `finally` and preserves a primary."""
+    source = SCRIPT.read_text(encoding="utf-8")
+    launch_contract = "\n".join(
+        [
+            "            try:",
+            "                runner.run(worker)",
+            "            except BaseException as exc:",
+            "                runner_exception = exc",
+            "            finally:",
+            "                runner_lifecycle = _capture_runner_lifecycle(runner)",
+        ]
+    )
+    missing_evidence_contract = "\n".join(
+        [
+            "                if runner_exception is None:",
+            "                    raise missing_lifecycle",
+            "                lifecycle_failure = _normalize_failure(",
+            "                    missing_lifecycle,",
+            "                    \"runner_lifecycle\",",
+            "                )",
+            "            if runner_exception is not None:",
+            "                raise runner_exception",
+        ]
+    )
+    assert launch_contract in source
+    assert missing_evidence_contract in source
+
+
 def test_public_alternate_gpu_routes_are_typed_or_managed() -> None:
     """Template and JIT entrypoints cannot launch GPU work beside the managed owner."""
     template_source = (

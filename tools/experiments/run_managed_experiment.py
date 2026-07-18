@@ -1790,6 +1790,7 @@ def execute_managed_run(
     coverage_descendants: DescendantRetentionEvidence | None = None
     coverage_attempted: set[EvidenceAbsenceField] = set()
     primary_exception: BaseException | None = None
+    lifecycle_failure: FailureRecord | None = None
     execution_result: ExecutionResult | None = None
     runner_lifecycle: RunnerLifecycleEvidence | None = None
     runner_invoked = False
@@ -2236,13 +2237,26 @@ def execute_managed_run(
                 on_case_finished=None,
             )
             runner_invoked = True
-            runner.run(worker)
-            runner_lifecycle = _capture_runner_lifecycle(runner)
+            runner_exception: BaseException | None = None
+            try:
+                runner.run(worker)
+            except BaseException as exc:
+                runner_exception = exc
+            finally:
+                runner_lifecycle = _capture_runner_lifecycle(runner)
             if runner_lifecycle is None:
-                raise TypedPreflightFailure(
+                missing_lifecycle = TypedPreflightFailure(
                     "experiment_runner_lifecycle_missing",
                     "generic runner completed without typed lifecycle evidence",
                 )
+                if runner_exception is None:
+                    raise missing_lifecycle
+                lifecycle_failure = _normalize_failure(
+                    missing_lifecycle,
+                    "runner_lifecycle",
+                )
+            if runner_exception is not None:
+                raise runner_exception
             if not scheduler.completions:
                 raise TypedPreflightFailure(
                     "experiment_runner_completion_missing",
@@ -2266,9 +2280,12 @@ def execute_managed_run(
             )
         outcome_exit_code = _execution_exit_code(execution_result)
     secondary_failures = tuple(
-        release_failures
-        if primary_exception is not None
-        else release_failures[1:]
+        ([lifecycle_failure] if lifecycle_failure is not None else [])
+        + (
+            release_failures
+            if primary_exception is not None
+            else release_failures[1:]
+        )
     )
     if runner_invoked:
         lifecycle = runner_lifecycle

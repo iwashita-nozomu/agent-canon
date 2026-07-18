@@ -3401,6 +3401,7 @@ class GpuProcessOccupancyProbe:
             )
         known_uuids = physical_set | mig_set
         children_by_parent: dict[str, tuple[str, ...]] = {}
+        parent_by_child: dict[str, str] = {}
         seen_join_keys: set[tuple[str, int]] = set()
         seen_join_mig_uuids: set[str] = set()
         for join in self._inventory.joins:
@@ -3420,6 +3421,7 @@ class GpuProcessOccupancyProbe:
                 )
             seen_join_keys.add(join_key)
             seen_join_mig_uuids.add(join.mig_uuid)
+            parent_by_child[join.mig_uuid] = join.parent_uuid
             children_by_parent[join.parent_uuid] = tuple(
                 sorted((*children_by_parent.get(join.parent_uuid, ()), join.mig_uuid))
             )
@@ -3488,6 +3490,9 @@ class GpuProcessOccupancyProbe:
                 occupied.update(children_by_parent.get(process.gpu_uuid, ()))
             else:
                 occupied.add(process.gpu_uuid)
+                parent_uuid = parent_by_child.get(process.gpu_uuid)
+                if parent_uuid is not None:
+                    occupied.add(parent_uuid)
         occupied_uuids = tuple(sorted(occupied))
         fingerprint = hashlib.sha256(
             _canonical_json(
@@ -3635,6 +3640,18 @@ class RunGpuAdmissionReceipt:
             "selected_uuids",
         ):
             object.__setattr__(self, field_name, tuple(getattr(self, field_name)))
+        if self.effective_environment is not None:
+            object.__setattr__(
+                self,
+                "effective_environment",
+                _freeze_mapping(self.effective_environment),
+            )
+        if self.actual_gpu_processes is not None:
+            object.__setattr__(
+                self,
+                "actual_gpu_processes",
+                tuple(self.actual_gpu_processes),
+            )
         if not self.admission_fingerprint:
             object.__setattr__(
                 self,
@@ -3646,6 +3663,24 @@ class RunGpuAdmissionReceipt:
 
 
 def _admission_receipt_payload(value: RunGpuAdmissionReceipt) -> dict[str, object]:
+    def full_lock_readback(lock: LockReadback) -> dict[str, object]:
+        payload = _lock_readback_payload(lock)
+        payload["fingerprint"] = lock.fingerprint
+        payload["selected"] = tuple(
+            full_reservation_evidence(item) for item in lock.selected
+        )
+        return payload
+
+    def full_reservation_evidence(
+        reservation: ReservationEvidence,
+    ) -> dict[str, object]:
+        payload = _reservation_evidence_payload(reservation)
+        payload["evidence_fingerprint"] = reservation.evidence_fingerprint
+        payload["locks"] = tuple(
+            full_lock_readback(item) for item in reservation.locks
+        )
+        return payload
+
     return {
         "schema_version": value.schema_version,
         "candidate_uuids": value.candidate_uuids,
@@ -3657,6 +3692,92 @@ def _admission_receipt_payload(value: RunGpuAdmissionReceipt) -> dict[str, objec
         "reservation_fingerprint": value.reservation_fingerprint,
         "runtime_identity_fingerprint": value.runtime_identity_fingerprint,
         "plan_fingerprint": value.plan_fingerprint,
+        "lock_readback": (
+            full_lock_readback(value.lock_readback)
+            if value.lock_readback is not None
+            else None
+        ),
+        "effective_environment": value.effective_environment,
+        "actual_gpu_processes": (
+            tuple(
+                {
+                    "schema_version": item.schema_version,
+                    "namespace_inode": item.namespace_inode,
+                    "processes": tuple(
+                        _process_record(process) for process in item.processes
+                    ),
+                    "occupied_uuids": item.occupied_uuids,
+                    "inventory_scope": item.inventory_scope,
+                    "evidence_fingerprint": item.evidence_fingerprint,
+                }
+                for item in value.actual_gpu_processes
+            )
+            if value.actual_gpu_processes is not None
+            else None
+        ),
+        "concurrent_run_evidence": (
+            {
+                "initial_snapshot_fingerprint": value.concurrent_run_evidence.initial_snapshot_fingerprint,
+                "admission_snapshot_fingerprint": value.concurrent_run_evidence.admission_snapshot_fingerprint,
+                "final_snapshot_fingerprint": value.concurrent_run_evidence.final_snapshot_fingerprint,
+                "initial_event_id": value.concurrent_run_evidence.initial_event_id,
+                "admission_event_id": value.concurrent_run_evidence.admission_event_id,
+                "final_event_id": value.concurrent_run_evidence.final_event_id,
+                "fingerprint": value.concurrent_run_evidence.fingerprint,
+            }
+            if value.concurrent_run_evidence is not None
+            else None
+        ),
+        "mig_evidence": (
+            {
+                "parent_by_uuid": value.mig_evidence.parent_by_uuid,
+                "executable_leaf_uuids": value.mig_evidence.executable_leaf_uuids,
+                "selected_physical_uuids": value.mig_evidence.selected_physical_uuids,
+                "fingerprint": value.mig_evidence.fingerprint,
+            }
+            if value.mig_evidence is not None
+            else None
+        ),
+        "container_visible_uuid_mapping": (
+            {
+                "cuda_visible_devices": value.container_visible_uuid_mapping.cuda_visible_devices,
+                "nvidia_visible_devices": value.container_visible_uuid_mapping.nvidia_visible_devices,
+                "disposition": value.container_visible_uuid_mapping.disposition,
+                "visible_uuids": value.container_visible_uuid_mapping.visible_uuids,
+                "namespace_id": value.container_visible_uuid_mapping.namespace_id,
+                "provision_receipt_fingerprint": value.container_visible_uuid_mapping.provision_receipt_fingerprint,
+                "fingerprint": value.container_visible_uuid_mapping.fingerprint,
+            }
+            if value.container_visible_uuid_mapping is not None
+            else None
+        ),
+        "os_safe_lock_placement": (
+            {
+                "runtime_root": value.os_safe_lock_placement.runtime_root,
+                "filesystem_type": value.os_safe_lock_placement.filesystem_type,
+                "filesystem_source": value.os_safe_lock_placement.filesystem_source,
+                "device": value.os_safe_lock_placement.device,
+                "inode": value.os_safe_lock_placement.inode,
+                "group_name": value.os_safe_lock_placement.group_name,
+                "mode": value.os_safe_lock_placement.mode,
+                "local_flock_filesystem": value.os_safe_lock_placement.local_flock_filesystem,
+                "fingerprint": value.os_safe_lock_placement.fingerprint,
+            }
+            if value.os_safe_lock_placement is not None
+            else None
+        ),
+        "descendant_retention_evidence": (
+            {
+                "child_process_ids": value.descendant_retention_evidence.child_process_ids,
+                "process_group_ids": value.descendant_retention_evidence.process_group_ids,
+                "descendant_quiescence": value.descendant_retention_evidence.descendant_quiescence,
+                "retained_gpu_process_uuids": value.descendant_retention_evidence.retained_gpu_process_uuids,
+                "release_blocked": value.descendant_retention_evidence.release_blocked,
+                "fingerprint": value.descendant_retention_evidence.fingerprint,
+            }
+            if value.descendant_retention_evidence is not None
+            else None
+        ),
     }
 
 
@@ -5759,7 +5880,7 @@ class ManagedGpuOutcomeReducer:
         )
         lifecycle_fingerprint = (
             hashlib.sha256(
-                _canonical_json(_json_safe(runner_lifecycle)).encode("utf-8")
+                _canonical_json(_json_safe(runner_lifecycle.to_dict())).encode("utf-8")
             ).hexdigest()
             if runner_lifecycle is not None
             else None

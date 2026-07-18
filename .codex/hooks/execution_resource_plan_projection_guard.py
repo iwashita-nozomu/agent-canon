@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -27,6 +28,15 @@ PROJECTION_KEYS = {
     "run_id",
     "schema_version",
 }
+NORMALIZED_INPUT_KEYS = {
+    "hook_event_name",
+    "schema_version",
+    "tool_input_fingerprint",
+    "tool_name",
+    "tool_input",
+    "tool_response",
+}
+NORMALIZED_INPUT_SCHEMA = "agent-canon-post-tool-use-input/v1"
 ADMISSION_KEYS = {
     "admission_fingerprint",
     "guarantee",
@@ -70,6 +80,41 @@ def canonical_bytes(value: dict[str, Any]) -> bytes:
 def require_sha256(value: object, field: str) -> None:
     if not isinstance(value, str) or SHA256_RE.fullmatch(value) is None:
         raise ProjectionError(f"{field} is not a lowercase SHA-256 fingerprint")
+
+
+def validate_normalized_input(payload: dict[str, Any]) -> None:
+    """Validate the exact dispatcher-owned six-field PostToolUse input."""
+    if set(payload) != NORMALIZED_INPUT_KEYS:
+        raise ProjectionError("normalized PostToolUse fields are not exact")
+    if payload["hook_event_name"] != "PostToolUse":
+        raise ProjectionError("normalized Hook event is not PostToolUse")
+    if payload["schema_version"] != NORMALIZED_INPUT_SCHEMA:
+        raise ProjectionError("normalized Hook schema_version is not exact")
+    if not isinstance(payload["tool_name"], str):
+        raise ProjectionError("normalized tool_name is not a string")
+    tool_input = payload["tool_input"]
+    if not isinstance(tool_input, dict):
+        raise ProjectionError("normalized tool_input is not an object")
+    require_sha256(payload["tool_input_fingerprint"], "tool_input_fingerprint")
+    expected_fingerprint = hashlib.sha256(
+        canonical_bytes(tool_input)
+    ).hexdigest()
+    if payload["tool_input_fingerprint"] != expected_fingerprint:
+        raise ProjectionError("tool_input_fingerprint does not match tool_input")
+    tool_response = payload["tool_response"]
+    if not isinstance(tool_response, dict) or set(tool_response) != {
+        "exit_code",
+        "stderr",
+        "stdout",
+    }:
+        raise ProjectionError("normalized tool_response fields are not exact")
+    if (
+        isinstance(tool_response["exit_code"], bool)
+        or not isinstance(tool_response["exit_code"], int)
+        or not isinstance(tool_response["stderr"], str)
+        or not isinstance(tool_response["stdout"], str)
+    ):
+        raise ProjectionError("normalized tool_response field types are invalid")
 
 
 def validate_admission(value: object) -> None:
@@ -150,16 +195,14 @@ def main() -> int:
         )
         if not isinstance(payload, dict):
             raise ProjectionError("Hook input is not an object")
-        event = payload.get("hookEventName", payload.get("hook_event_name"))
+        validate_normalized_input(payload)
+        event = payload["hook_event_name"]
         if event != "PostToolUse":
             return reject("unrelated event")
-        if payload.get("tool_name") != "Bash":
+        if payload["tool_name"] != "Bash":
             return reject("unrelated tool")
-        if not isinstance(payload.get("tool_input"), dict):
-            raise ProjectionError("tool_input is not an object")
-        tool_response = payload.get("tool_response")
-        if not isinstance(tool_response, dict):
-            raise ProjectionError("tool_response is not an object")
+        tool_response = payload["tool_response"]
+        assert isinstance(tool_response, dict)
         if type(tool_response.get("exit_code")) is not int or tool_response["exit_code"] != 0:
             return reject("tool response is not successful")
         stdout = tool_response.get("stdout")

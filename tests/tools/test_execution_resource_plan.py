@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,12 +33,17 @@ from tools.experiments.execution_resource_plan import (
     CompletionCoverageAdapter,
     CompletionCoverageFailure,
     CompletionCoverageInput,
+    ConcurrentRunEvidence,
+    DescendantRetentionEvidence,
     EvidenceFd,
     EvidenceAbsence,
     GPUDevice,
     GpuProcessOccupancyProbe,
     GpuReservationTransaction,
     GpuRunRequest,
+    LockPlacementEvidence,
+    LockReadback,
+    MigEvidence,
     RunGpuAdmissionReceipt,
     ManagedGpuOutcomeReducer,
     PostToolUseProjectionReducer,
@@ -171,10 +177,22 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             )
             hook_input = json.dumps(
                 {
-                    "hookEventName": "PostToolUse",
+                    "hook_event_name": "PostToolUse",
+                    "schema_version": "agent-canon-post-tool-use-input/v1",
+                    "tool_input_fingerprint": hashlib.sha256(
+                        json.dumps(
+                            {"command": "managed-run"},
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode("utf-8")
+                    ).hexdigest(),
                     "tool_name": "Bash",
                     "tool_input": {"command": "managed-run"},
-                    "tool_response": {"exit_code": 0, "stdout": projection.decode("utf-8")},
+                    "tool_response": {
+                        "exit_code": 0,
+                        "stderr": "",
+                        "stdout": projection.decode("utf-8"),
+                    },
                 }
             )
             hook_result = subprocess.run(
@@ -187,6 +205,167 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             self.assertEqual(hook_result.returncode, 0, hook_result.stderr)
             with self.assertRaises(CompletionCoverageFailure):
                 coverage_adapter.record_once(coverage_input)
+
+    def test_r5_admission_fingerprint_covers_every_nested_evidence_owner(self) -> None:
+        """One receipt oracle proves every U-06 nested owner enters the preimage."""
+        physical_uuid = "GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        mig_uuid = "MIG-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        nested_lock = LockReadback(
+            runtime_root="/var/lib/agent-canon/runtime",
+            filesystem_type="ext4",
+            device=7,
+            inode=11,
+            selected=(),
+            fingerprint="1" * 64,
+        )
+        reservation = ReservationEvidence(
+            schema_version="gpu-reservation/v1",
+            selected_uuids=(mig_uuid,),
+            locks=(nested_lock,),
+            disposition="ACQUIRED",
+            evidence_fingerprint="2" * 64,
+        )
+        lock_readback = replace(nested_lock, selected=(reservation,))
+        process = ProcessIdentity(
+            pid=401,
+            process_start_identity="401:17",
+            gpu_uuid=mig_uuid,
+            relationship="direct",
+            observation_timestamp="2026-07-18T00:00:00Z",
+            observation_fingerprint="3" * 64,
+            container_namespace_identity="pid:[4026531836]",
+        )
+        occupancy = ProcessOccupancyEvidence(
+            schema_version="gpu-process-occupancy/v1",
+            namespace_inode=4026531836,
+            processes=(process,),
+            occupied_uuids=(physical_uuid, mig_uuid),
+            inventory_scope="local-namespace-complete",
+            evidence_fingerprint="4" * 64,
+        )
+        concurrent = ConcurrentRunEvidence(
+            initial_snapshot_fingerprint="5" * 64,
+            admission_snapshot_fingerprint="6" * 64,
+            final_snapshot_fingerprint="7" * 64,
+            initial_event_id="S0",
+            admission_event_id="S-lock",
+            final_event_id="S-final",
+            fingerprint="8" * 64,
+        )
+        mig = MigEvidence(
+            parent_by_uuid={mig_uuid: physical_uuid},
+            executable_leaf_uuids=(mig_uuid,),
+            selected_physical_uuids=(),
+            fingerprint="9" * 64,
+        )
+        visibility = UuidVisibilityEvidence(
+            cuda_visible_devices=mig_uuid,
+            nvidia_visible_devices=mig_uuid,
+            disposition="explicit",
+            visible_uuids=(mig_uuid,),
+            namespace_id="pid:[4026531836]",
+            provision_receipt_fingerprint="a" * 64,
+            fingerprint="b" * 64,
+        )
+        placement = LockPlacementEvidence(
+            runtime_root="/var/lib/agent-canon/runtime",
+            filesystem_type="ext4",
+            filesystem_source="/dev/nvme0n1p1",
+            device=7,
+            inode=13,
+            group_name="agent-canon-runtime",
+            mode="0660",
+            local_flock_filesystem=True,
+            fingerprint="c" * 64,
+        )
+        descendants = DescendantRetentionEvidence(
+            child_process_ids=(401,),
+            process_group_ids=(401,),
+            descendant_quiescence="PROVEN",
+            retained_gpu_process_uuids=(),
+            release_blocked=False,
+            fingerprint="d" * 64,
+        )
+        base = RunGpuAdmissionReceipt(
+            schema_version="gpu-admission/v1",
+            candidate_uuids=(mig_uuid,),
+            occupied_uuids=(),
+            reserved_uuids=(),
+            selected_uuids=(mig_uuid,),
+            inventory_fingerprint="e" * 64,
+            occupancy_fingerprint="f" * 64,
+            reservation_fingerprint="0" * 64,
+            runtime_identity_fingerprint="1" * 64,
+            plan_fingerprint="2" * 64,
+            admission_fingerprint="",
+            lock_readback=lock_readback,
+            effective_environment={"CUDA_VISIBLE_DEVICES": mig_uuid},
+            actual_gpu_processes=(occupancy,),
+            concurrent_run_evidence=concurrent,
+            mig_evidence=mig,
+            container_visible_uuid_mapping=visibility,
+            os_safe_lock_placement=placement,
+            descendant_retention_evidence=descendants,
+        )
+        variants = {
+            "lock": replace(
+                base,
+                lock_readback=replace(lock_readback, fingerprint="e" * 64),
+                admission_fingerprint="",
+            ),
+            "environment": replace(
+                base,
+                effective_environment={"CUDA_VISIBLE_DEVICES": physical_uuid},
+                admission_fingerprint="",
+            ),
+            "process": replace(
+                base,
+                actual_gpu_processes=(
+                    replace(occupancy, evidence_fingerprint="f" * 64),
+                ),
+                admission_fingerprint="",
+            ),
+            "concurrent": replace(
+                base,
+                concurrent_run_evidence=replace(concurrent, final_event_id="S-final-2"),
+                admission_fingerprint="",
+            ),
+            "mig": replace(
+                base,
+                mig_evidence=replace(mig, selected_physical_uuids=(physical_uuid,)),
+                admission_fingerprint="",
+            ),
+            "visibility": replace(
+                base,
+                container_visible_uuid_mapping=replace(
+                    visibility,
+                    namespace_id="pid:[4026531837]",
+                ),
+                admission_fingerprint="",
+            ),
+            "placement": replace(
+                base,
+                os_safe_lock_placement=replace(placement, inode=14),
+                admission_fingerprint="",
+            ),
+            "descendant": replace(
+                base,
+                descendant_retention_evidence=replace(
+                    descendants,
+                    retained_gpu_process_uuids=(mig_uuid,),
+                ),
+                admission_fingerprint="",
+            ),
+        }
+        for owner, variant in variants.items():
+            with self.subTest(owner=owner):
+                self.assertNotEqual(
+                    base.admission_fingerprint,
+                    variant.admission_fingerprint,
+                )
+        assert base.effective_environment is not None
+        with self.assertRaises(TypeError):
+            base.effective_environment["CUDA_VISIBLE_DEVICES"] = physical_uuid  # type: ignore[index]
 
     def make_request(self, root: Path) -> ResourceRequest:
         """Build a declared caller/scheduler resource request."""
@@ -394,8 +573,8 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             for descriptor in descriptors:
                 os.close(descriptor.fd)
 
-    def test_gpu_process_occupancy_keeps_mig_holder_at_leaf_scope(self) -> None:
-        """A MIG holder occupies the exact full MIG UUID, without parent synthesis."""
+    def test_gpu_process_occupancy_excludes_mig_leaf_and_physical_parent(self) -> None:
+        """A MIG holder conservatively excludes its leaf and physical parent."""
         inventory, disposition, descriptors = self._fixture_nvidia_inventory()
         try:
             evidence = GpuProcessOccupancyProbe(
@@ -406,9 +585,11 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             ).observe()
             self.assertEqual(
                 evidence.occupied_uuids,
-                ("MIG-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",),
+                (
+                    "GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "MIG-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                ),
             )
-            self.assertNotIn("GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", evidence.occupied_uuids)
         finally:
             for descriptor in descriptors:
                 os.close(descriptor.fd)
