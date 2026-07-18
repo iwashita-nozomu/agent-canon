@@ -8,6 +8,7 @@
 # upstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans
 # upstream implementation ../../tools/agent_tools/check_dependency_header_format.sh format checks
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh graph checks
+# upstream implementation ../../tools/agent_tools/visualization_contract.py owns complete projection/readback coverage after graph extraction
 # upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps
 # upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh scans code
 # @dependency-end
@@ -1344,6 +1345,53 @@ class DependencyManifestToolTest(unittest.TestCase):
                     "upstream\timplementation\ttests/test_source.py\tsource.py",
                 ],
             )
+
+    def test_graph_tsv_preserves_large_dependency_set_without_cap(self) -> None:
+        """Graph extraction emits every declared edge for downstream coverage."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source_dir = root / "sources"
+            source_dir.mkdir()
+            (root / "design.md").write_text("# Design\n", encoding="utf-8")
+            edge_count = 1205
+            source_paths: list[str] = []
+            expected_edges: set[str] = set()
+            for index in range(edge_count):
+                relative_source = f"sources/source-{index}.py"
+                (root / relative_source).write_text(
+                    "\n".join(
+                        [
+                            "# @dependency-start",
+                            "# contract test",
+                            "# responsibility Exercises uncapped dependency graph output.",
+                            "# upstream design ../design.md complete edge",
+                            "# @dependency-end",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+                source_paths.append(relative_source)
+                expected_edges.add(
+                    f"upstream\tdesign\t{relative_source}\tdesign.md"
+                )
+            graph_tsv = root / "reports" / "dependency_graph.tsv"
+
+            result = run_tool(
+                str(GRAPH),
+                "--root",
+                str(root),
+                "--graph-tsv",
+                str(graph_tsv),
+                *source_paths,
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            rows = graph_tsv.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(rows), edge_count + 1)
+            self.assertEqual(rows[0], "direction\tkind\tsource\ttarget")
+            self.assertEqual(set(rows[1:]), expected_edges)
 
     def test_graph_expands_search_hits_to_edit_scope(self) -> None:
         """Search hit files should expand to declared and incoming dependency scope."""

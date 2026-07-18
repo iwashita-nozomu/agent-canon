@@ -208,7 +208,8 @@ def iter_command_lines(text: str) -> Iterable[str]:
             yield candidate
         for inline in INLINE_CODE_RE.findall(raw_line):
             command = inline.strip()
-            if is_command_candidate(command):
+            is_bare_tool_reference = command.startswith("tools/") and len(command.split()) == 1
+            if is_command_candidate(command) and not is_bare_tool_reference:
                 yield command
 
 

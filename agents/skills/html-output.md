@@ -9,8 +9,20 @@ upstream design structure-planning.md reusable structure contract skill
 upstream design report-writing.md reader-facing report quality skill and Markdown default
 downstream design html-experiment-report.md experiment-specific HTML report workflow
 downstream implementation ../../.agents/skills/html-output/SKILL.md exposes this workflow as a runtime skill
+upstream design code-visualization.md sole public visualization owner and typed projection contract
+downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
+
+## Visualization Adapter Boundary
+
+HTML composition, accessibility, layout, and interactive controls are renderer
+concerns. Every embedded graph hands its complete selected native facts to
+`code-visualization` and consumes that owner's `VisualizationSourceUniverse`,
+canonical `ToolCall`, `ProjectionCoverageManifest`, post-format readback, and
+final coverage status. Filtering changes display state only; the complete data
+and identities remain present and discoverable. This skill does not own or
+repeat the universal omission/granularity policy.
 
 ## Reader Map
 

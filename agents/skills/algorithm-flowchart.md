@@ -4,9 +4,12 @@ contract skill
 responsibility Documents JIT-canonical algorithm Mermaid flowcharts for proof review.
 upstream design algorithm-proof-exploration.md JIT-canonical IR and theorem graph workflow.
 upstream design formal-proof-workflow.md checker-backed proof workflow.
+upstream design code-visualization.md sole public visualization owner and typed projection contract.
+upstream implementation ../../tools/agent_tools/visualization_contract.py owns ToolCall, identity, manifest, readback, and coverage serialization.
 upstream implementation ../../tools/agent_tools/jit_canonical_ir.py builds StableHLO-derived JIT-canonical IR and backend traces.
 upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
 downstream implementation ../../.agents/skills/algorithm-flowchart/SKILL.md exposes the skill to Codex.
+downstream implementation ../../tests/tools/test_fix_mermaid.py checks syntax-only Mermaid formatting.
 @dependency-end
 -->
 
@@ -22,7 +25,9 @@ downstream implementation ../../.agents/skills/algorithm-flowchart/SKILL.md expo
   mandatory checklist; Interpretation and Guardrails define what the diagram may
   claim.
 - Boundary: diagrams visualize existing evidence; they do not replace proof or
-  implementation validation.
+  implementation validation. Rendering is adapter-only through canonical
+  projection routes and must return structured outputs to the canonical
+  formatter, including Mermaid and Markdown docs check.
 
 ## Purpose
 
@@ -33,6 +38,31 @@ graph overlay を重ね、実装されている反復法と証明状態を Merma
 この skill は証明そのものを与えません。証明探索の前後で、今の実装 path、
 solver chain、code fact、証明済み fragment、open / external / operational
 assumption の位置を一目で確認するための visualization layer です。
+
+## Canonical Visualization Handoff
+
+`algorithm-flowchart` owns the native JIT-canonical IR, StableHLO/HLO,
+backend/dtype, theorem/proof, source-locator, helper, branch, phase, evidence,
+edge, and timing facts. Before rendering, it hands every selected fact to the
+sole public visualization owner, `code-visualization`, as a complete
+`VisualizationSourceUniverse`. That owner normalizes the universe and emits the
+canonical schema-bearing `ToolCall`; this skill is a renderer adapter and owns
+only Mermaid syntax and layout.
+
+The adapter first serializes the canonical owner ToolCall and then
+`agent_canon.visualization.adapter.algorithm_flowchart` with identical shared
+source arguments and `renderer_id` equal to that adapter ToolID. Every universe
+item receives a locator only from `serialize_projection_identity` and a
+one-to-one entry in the `ProjectionCoverageManifest`; its marker comes only
+from `serialize_projection_coverage_manifest(owner_tool_call=...,
+adapter_tool_call=...)`. The adapter emits exactly one Mermaid diagram and no
+table or summary fallback. `--include-code-facts` changes reversible view state
+only; it never changes the universe, manifest, final artifact contents, or
+coverage decision. Run `tools/bin/agent-canon docs format <artifact.md>`, then
+call `readback_projection` on those final bytes and
+`validate_projection_coverage(..., readback=...)`. Rust owns syntax only; typed
+`diagram_count_mismatch` and `table_fallback` violations come from the canonical
+readback owner.
 
 ## Use When
 
@@ -70,8 +100,19 @@ assumption の位置を一目で確認するための visualization layer です
      --out lean/<topic>/<LeanNamespace>/Generated<Root>JitCanonical.lean
    ```
 
+1. Literal user scope, producer-selected items, owner closure, and dependency
+   closure are combined into the complete `VisualizationSourceUniverse` before
+   renderer selection. Serialize the canonical owner ToolCall followed by the
+   algorithm adapter ToolCall, preserving identical shared source arguments.
+
 1. Renderer は現在の JIT-canonical record と theorem graph overlay を入力にします。
    旧 record だけを読む renderer しかない場合は、renderer を先に更新します。
+   Serialize every locator, build the complete manifest, and serialize its
+   marker through the canonical seven-function API. Render exactly one Mermaid
+   diagram with no table fallback, run
+   `tools/bin/agent-canon docs format <artifact.md>`, read every identity back
+   from the formatted artifact, and require the owner-issued final coverage
+   status before handoff.
 
 1. 図を reader-facing proof note へ貼る場合は、生成済み Markdown から
    fenced `mermaid` block を引用します。手書きで Mermaid を更新せず、
@@ -98,8 +139,13 @@ assumption の位置を一目で確認するための visualization layer です
   同じ順で再生成します。
 - proof-only production field を追加して図を作りません。必要な値は IR、
   LemmaGraph、`proof_status.json`、`lean/lib` profile から読みます。
-- 大きな graph では `--include-code-facts` を必要な review だけに使い、
-  proof note には対象 theorem に関係する diagram を載せます。
+- Large graphs retain every selected JIT/HLO operation, edge, branch, phase,
+  backend/dtype field, theorem/proof overlay, source locator, helper, evidence,
+  and timing item in the one canonical diagram. Top-N, representative-only,
+  main-path-only, helper hiding, aggregation, fixed-cap substitution, and table
+  or summary fallback are typed coverage failures. Interactive filtering and
+  `--include-code-facts` are view-only; all identities stay present and
+  discoverable.
 - runtime diagram に proof-only boundary、proof obligation、手書きの分岐を
   足しません。定理に必要な equation section は JIT-canonical record、
   theorem graph overlay、または対象 domain の projection tool から生成します。

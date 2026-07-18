@@ -4,6 +4,7 @@
 # contract test
 # responsibility Tests structured AgentCanon tool catalog validation.
 # upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog
+# upstream implementation ../../tools/agent_tools/visualization_contract.py owns the canonical visualization contract tool.
 # upstream design ../../tools/catalog.yaml structured tool catalog fixture
 # upstream design ../../documents/gpu-admission-r5-source-packet.md canonical managed GPU admission route
 # @dependency-end
@@ -54,6 +55,39 @@ class CheckToolCatalogTest(unittest.TestCase):
             renderer["command"],
             "python3 tools/agent_tools/render_dependency_manifest_graph.py "
             "--root . --scope full --bundle-dir reports/dependency-graph --format json",
+        )
+        visualization_entries = [
+            entry
+            for entry in catalog["entries"]
+            if entry["id"] == "visualization-contract"
+            or entry["path"] == "tools/agent_tools/visualization_contract.py"
+        ]
+        self.assertEqual(len(visualization_entries), 1)
+        visualization = visualization_entries[0]
+        self.assertEqual(visualization["status"], "canonical")
+        self.assertEqual(visualization["audience"], "skill")
+        self.assertIn(
+            visualization["placement"],
+            {"support_library", "validation_checker"},
+        )
+        self.assertEqual(
+            visualization["docs"],
+            [
+                "tools/README.md",
+                "documents/tools/README.md",
+                "documents/tools/visualization_contract.md",
+            ],
+        )
+        tool_docs = (
+            PROJECT_ROOT / "documents" / "tools" / "tool-docs.toml"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(
+            tool_docs.count('tool = "tools/agent_tools/visualization_contract.py"'),
+            1,
+        )
+        self.assertEqual(
+            tool_docs.count('doc = "documents/tools/visualization_contract.md"'),
+            1,
         )
 
     def test_gpu_admission_route(self) -> None:

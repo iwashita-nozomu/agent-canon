@@ -13,8 +13,21 @@ downstream design html-output.md consumes report content for explicit HTML rende
 downstream design ../../evidence/agent-evals/report_quality_eval.toml report quality checklist eval manifest
 downstream implementation ../../.agents/skills/report-writing/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report writing prompt surfaces
+upstream design code-visualization.md sole public visualization owner and typed projection contract
+downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
+
+## Visualization Adapter Boundary
+
+Report source packets and evidence remain native report-writing facts. Any
+Mermaid, report, storyboard, wiki, or browser graph embedding passes the
+complete selected facts to `code-visualization` and consumes its
+`VisualizationSourceUniverse`, canonical `ToolCall`,
+`ProjectionCoverageManifest`, mandatory post-format readback, and final
+coverage status. Report composition and visual placement are adapter concerns;
+the universal omission and granularity policy is owned only by
+`code-visualization`.
 
 ## Reader Map
 

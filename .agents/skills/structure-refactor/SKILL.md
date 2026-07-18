@@ -15,10 +15,21 @@ upstream design ../../../documents/SHARED_RUNTIME_SURFACES.md defines shared run
 upstream implementation ../../../tools/agent_tools/responsibility_scope.py validates responsibility scopes
 upstream implementation ../../../tools/agent_tools/import_responsibility.py validates import boundaries
 upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py validates structure-related design evidence claims
+upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
+downstream implementation ../../../tests/agent_tools/test_check_dependency_headers.py validates this adapter dependency header.
 @dependency-end
 -->
 
 # Structure Refactor
+
+## Visualization Adapter Boundary
+
+Keep architecture and responsibility facts under `$structure-refactor`, then
+hand the complete selected map to `$code-visualization` as a
+`VisualizationSourceUniverse`. Use the owner's canonical `ToolCall`,
+`ProjectionCoverageManifest`, mandatory post-format readback, and final
+coverage status. This runtime shim owns no canonical filtered map and delegates
+all universal omission/granularity policy to the sole public owner.
 
 ## Tool Commands
 

@@ -7,6 +7,7 @@
 # upstream design ../../agents/skills/catalog.yaml public skill catalog and related skill metadata
 # upstream implementation ./skill_route_catalog.py catalog/rule/index owner
 # upstream implementation ./capability_route.py capability preflight/decision owner
+# upstream implementation ./visualization_contract.py exact D2.3 visualization ToolCall schema and validator
 # upstream design ../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
 # upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill routing
 # upstream design ../../agents/skills/pr-processing.md PR and Issue queue processing skill routing
@@ -24,6 +25,7 @@ import sys
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import cast
 
 from capability_route import (
     FORMAT_VALUES,
@@ -39,17 +41,33 @@ from skill_lane_detector import (
     validation_failure_repair_concept_matches,
 )
 from skill_route_catalog import (
+    VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
+    VISUALIZATION_OWNER_SKILL,
+    VISUALIZATION_OWNER_TOOL_ID,
+    VISUALIZATION_ROLE_VALUES,
     CapabilityRootError,
     SkillRoutingRule,
+    VisualizationOwnerSkill,
+    VisualizationRejection,
     build_capability_index,
+    build_visualization_owner_tool_call,
     load_skill_related_map as _load_skill_related_map,
     load_skill_route_rules,
     load_skill_route_rules_from_root,
     ordered_unique,
     related_skill_candidates,
+    visualization_rejection_from_error,
+)
+from visualization_contract import (
+    TOOL_ARGUMENT_SCHEMAS,
+    TOOL_CALL_SCHEMA,
+    CoverageArguments,
+    ToolCall,
+    serialize_tool_call,
 )
 
 load_skill_related_map = _load_skill_related_map
+
 
 ROUTE_NAME = "task-routing"
 SKILL_NAME = "task-routing"
@@ -58,6 +76,18 @@ TOOL_NAME = "route.py"
 AreaData = tuple[str, str, str, str, tuple[str, ...], tuple[str, ...]]
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 SUBAGENT_BOOTSTRAP_SKILL = "subagent-bootstrap"
+VISUALIZATION_PROSE_TERMS = (
+    "visualization",
+    "visualize",
+    "diagram",
+    "flowchart",
+    "dependency graph",
+    "可視化",
+    "図示",
+)
+VISUALIZATION_TOOL_TOKEN_RE = re.compile(
+    r"(?<![A-Za-z0-9_])agent_canon\.visualization(?:\.[a-z0-9_]+)+(?![A-Za-z0-9_])"
+)
 PRIVATE_SUBAGENT_ROUTE_ALIASES = (
     "subagent-beginning",
     "_subagent-beginning",
@@ -452,6 +482,9 @@ class SkillRouteDecision:
     related_skill_candidates: tuple[str, ...]
     related_skills: dict[str, tuple[str, ...]]
     reasons: tuple[str, ...]
+    visualization_owner_skill: VisualizationOwnerSkill | None
+    visualization_tool_call: ToolCall | None
+    visualization_rejection: VisualizationRejection | None
     evidence: str
 
 
@@ -713,6 +746,153 @@ def strip_private_route_aliases(text: str) -> str:
     return scrubbed
 
 
+def _parse_explicit_visualization_tool_call(
+    prompt: str,
+) -> tuple[ToolCall | None, VisualizationRejection | None, bool]:
+    """Parse and validate one explicit JSON visualization ToolCall."""
+    stripped = prompt.strip()
+    looks_like_tool_call = any(
+        marker in prompt
+        for marker in ('"tool_id"', '"argument_schema"', TOOL_CALL_SCHEMA)
+    )
+    if not stripped.startswith(("{", "[")):
+        return None, None, False
+    try:
+        value = json.loads(stripped)
+    except json.JSONDecodeError:
+        if looks_like_tool_call or "agent_canon.visualization" in prompt:
+            return None, "invalid_tool_call", True
+        return None, None, False
+    if not isinstance(value, Mapping):
+        if looks_like_tool_call or "agent_canon.visualization" in prompt:
+            return None, "invalid_tool_call", True
+        return None, None, False
+    tool_call_fields = frozenset(ToolCall.__required_keys__)
+    has_visualization_field = bool(tool_call_fields.intersection(value)) or (
+        "agent_canon.visualization" in prompt
+    )
+    if not has_visualization_field:
+        return None, None, False
+    if set(value) != tool_call_fields:
+        return None, "invalid_tool_call", True
+    if (
+        not isinstance(value.get("schema"), str)
+        or not isinstance(value.get("tool_id"), str)
+        or not isinstance(value.get("argument_schema"), str)
+        or not isinstance(value.get("arguments"), dict)
+    ):
+        return None, "invalid_tool_call", True
+    tool_call = cast(ToolCall, value)
+    try:
+        serialize_tool_call(tool_call)
+    except ValueError as exc:
+        return None, visualization_rejection_from_error(exc), True
+    return tool_call, None, True
+
+
+def _owner_tool_call_from_explicit_call(tool_call: ToolCall) -> ToolCall:
+    """Normalize one valid owner/adapter call to the sole owner ToolCall."""
+    arguments = tool_call["arguments"]
+    owner_arguments = {
+        field: arguments[field]
+        for field in sorted(CoverageArguments.__annotations__)
+        if field in arguments
+    }
+    owner_call: ToolCall = {
+        "schema": "agent_canon.visualization_tool_call.v1",
+        "tool_id": VISUALIZATION_OWNER_TOOL_ID,
+        "argument_schema": VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
+        "arguments": owner_arguments,
+    }
+    serialize_tool_call(owner_call)
+    return owner_call
+
+
+def _visualization_tool_tokens(prompt: str) -> tuple[str, ...]:
+    """Return canonical-looking visualization ToolID tokens in prompt order."""
+    return ordered_unique(VISUALIZATION_TOOL_TOKEN_RE.findall(prompt))
+
+
+def _visualization_prompt_contract(
+    prompt: str,
+    rules_by_skill: Mapping[str, SkillRoutingRule],
+) -> tuple[
+    VisualizationOwnerSkill | None,
+    ToolCall | None,
+    VisualizationRejection | None,
+    str,
+]:
+    """Return the exact owner call or deterministic visualization rejection."""
+    explicit_call, rejection, call_present = _parse_explicit_visualization_tool_call(
+        prompt
+    )
+    if rejection is not None:
+        return None, None, rejection, "explicit visualization ToolCall rejected"
+
+    tokens = _visualization_tool_tokens(prompt)
+    known_tokens = set(TOOL_ARGUMENT_SCHEMAS) | set(TOOL_ARGUMENT_SCHEMAS.values()) | {
+        TOOL_CALL_SCHEMA
+    }
+    if any(token not in known_tokens for token in tokens):
+        return None, None, "invalid_tool_call", "unknown visualization ToolID"
+
+    explicit_owner = public_skill_name_mentioned(prompt, VISUALIZATION_OWNER_SKILL)
+    explicit_adapter = any(
+        rule.visualization_role == "adapter"
+        and public_skill_name_mentioned(prompt, rule.skill)
+        for rule in rules_by_skill.values()
+    )
+    explicit_tool_id = any(token in TOOL_ARGUMENT_SCHEMAS for token in tokens)
+    explicitly_routed = call_present or explicit_owner or explicit_adapter or explicit_tool_id
+    if not explicitly_routed:
+        if any(text_matches_term(prompt.lower(), term) for term in VISUALIZATION_PROSE_TERMS):
+            return None, None, "prose_only", "visualization prose has no explicit owner route"
+        return None, None, None, ""
+
+    owner_rule = rules_by_skill.get(VISUALIZATION_OWNER_SKILL)
+    if (
+        owner_rule is None
+        or owner_rule.visualization_owner_skill != VISUALIZATION_OWNER_SKILL
+        or owner_rule.visualization_role != "owner"
+        or owner_rule.visualization_tool_call is None
+    ):
+        return None, None, "missing_owner", "canonical visualization owner missing"
+
+    if (
+        owner_rule.visualization_tool_call["tool_id"] != VISUALIZATION_OWNER_TOOL_ID
+    ):
+        return None, None, "missing_owner", "canonical visualization owner missing"
+    try:
+        serialize_tool_call(owner_rule.visualization_tool_call)
+    except ValueError as exc:
+        return (
+            None,
+            None,
+            visualization_rejection_from_error(exc),
+            "catalog visualization owner ToolCall rejected",
+        )
+
+    try:
+        owner_call = (
+            _owner_tool_call_from_explicit_call(explicit_call)
+            if explicit_call is not None
+            else build_visualization_owner_tool_call(prompt, "route:prompt")
+        )
+    except ValueError as exc:
+        return (
+            None,
+            None,
+            visualization_rejection_from_error(exc),
+            "canonical visualization owner ToolCall rejected",
+        )
+    return (
+        cast(VisualizationOwnerSkill, VISUALIZATION_OWNER_SKILL),
+        owner_call,
+        None,
+        "explicit visualization owner, capability, adapter, or ToolID route",
+    )
+
+
 def matched_skill_routes(prompt: str, rules: Sequence[SkillRoutingRule]) -> tuple[SkillRouteMatch, ...]:
     """Return public skill matches for one prompt."""
     text = prompt.lower()
@@ -843,10 +1023,31 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
         *validation_failure_repair_rules(catalog_rules_by_skill, public_prompt),
     )
     rules_by_skill = {rule.skill: rule for rule in effective_rules}
+    (
+        visualization_owner_skill,
+        visualization_tool_call,
+        visualization_rejection,
+        visualization_reason,
+    ) = _visualization_prompt_contract(public_prompt, rules_by_skill)
+    catalog_matches = matched_skill_routes(public_prompt, effective_rules)
+    if visualization_rejection is not None:
+        visualization_skills = {
+            rule.skill
+            for rule in effective_rules
+            if rule.visualization_role in VISUALIZATION_ROLE_VALUES
+        }
+        catalog_matches = tuple(
+            match for match in catalog_matches if match.skill not in visualization_skills
+        )
     matches = dedupe_skill_route_matches(
         (
+            *(
+                (SkillRouteMatch(VISUALIZATION_OWNER_SKILL, visualization_reason),)
+                if visualization_owner_skill is not None
+                else ()
+            ),
             *broad_refactor_routes(public_prompt),
-            *matched_skill_routes(public_prompt, effective_rules),
+            *catalog_matches,
             *structural_skill_lane_routes(public_prompt),
             *validation_failure_repair_routes(public_prompt),
             *supplemental_skill_routes(public_prompt),
@@ -884,8 +1085,13 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
         f"mode={active_mode};matched={','.join(matched_skills) if matched_skills else 'none'};"
         f"active={','.join(active_skills)};"
         f"deferred={','.join(deferred_skills) if deferred_skills else 'none'};"
-        f"related={','.join(related_candidates) if related_candidates else 'none'}"
+        f"related={','.join(related_candidates) if related_candidates else 'none'};"
+        f"visualization_owner={visualization_owner_skill or 'none'};"
+        f"visualization_rejection={visualization_rejection or 'none'}"
     )
+    reasons = tuple(f"{match.skill}:{match.reason}" for match in matches)
+    if visualization_rejection is not None:
+        reasons = (*reasons, f"visualization:{visualization_rejection}")
     return SkillRouteDecision(
         route="skill-selection",
         mode=active_mode,
@@ -895,7 +1101,10 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
         matched_skills=matched_skills,
         related_skill_candidates=related_candidates,
         related_skills=related_by_source,
-        reasons=tuple(f"{match.skill}:{match.reason}" for match in matches),
+        reasons=reasons,
+        visualization_owner_skill=visualization_owner_skill,
+        visualization_tool_call=visualization_tool_call,
+        visualization_rejection=visualization_rejection,
         evidence=evidence,
     )
 
@@ -950,6 +1159,13 @@ class RouteRenderer:
         if self._format == "json":
             payload = {"schema": "agent_canon.route.skill_route.v1", **asdict(decision)}
             return json.dumps(payload, indent=2, sort_keys=True)
+        owner_skill = decision.visualization_owner_skill or "none"
+        tool_call = (
+            serialize_tool_call(decision.visualization_tool_call)
+            if decision.visualization_tool_call is not None
+            else "none"
+        )
+        rejection = decision.visualization_rejection or "none"
         if self._format == "markdown":
             skills = ", ".join(f"`${skill}`" for skill in decision.skills)
             reasons = "<br>".join(f"`{reason}`" for reason in decision.reasons) or "`none`"
@@ -974,6 +1190,9 @@ class RouteRenderer:
                         else "`none`"
                     ),
                     f"- Reasons: {reasons}",
+                    f"- Visualization owner skill: `{owner_skill}`",
+                    f"- Visualization ToolCall: `{tool_call}`",
+                    f"- Visualization rejection: `{rejection}`",
                     f"- Evidence: `{decision.evidence}`",
                 ]
             )
@@ -1007,6 +1226,9 @@ class RouteRenderer:
                     else "-"
                 ),
                 f"REASONS={';'.join(decision.reasons) or '-'}",
+                f"VISUALIZATION_OWNER_SKILL={owner_skill}",
+                f"VISUALIZATION_TOOL_CALL={tool_call}",
+                f"VISUALIZATION_REJECTION={rejection}",
                 f"EVIDENCE={decision.evidence}",
             ]
         )
@@ -1024,6 +1246,13 @@ class RouteRenderer:
         active_skills = ",".join(decision.active_skills) or "-"
         deferred_skills = ",".join(decision.deferred_skills) or "-"
         related_candidates = ",".join(decision.related_skill_candidates) or "-"
+        visualization_owner = decision.visualization_owner_skill or "none"
+        visualization_tool_call = (
+            serialize_tool_call(decision.visualization_tool_call)
+            if decision.visualization_tool_call is not None
+            else "none"
+        )
+        visualization_rejection = decision.visualization_rejection or "none"
         if self._format == "json":
             return json.dumps(data, indent=2, sort_keys=False)
         if self._format == "markdown":
@@ -1042,6 +1271,9 @@ class RouteRenderer:
                     f"- Related skill candidates: `{related_candidates}`",
                     f"- Related skills: `{related_skills}`",
                     f"- Reasons: `{reasons}`",
+                    f"- Visualization owner skill: `{visualization_owner}`",
+                    f"- Visualization ToolCall: `{visualization_tool_call}`",
+                    f"- Visualization rejection: `{visualization_rejection}`",
                 ]
             )
         return "\n".join(
@@ -1059,6 +1291,9 @@ class RouteRenderer:
                 f"RELATED_SKILL_CANDIDATES={related_candidates}",
                 f"RELATED_SKILLS={related_skills}",
                 f"REASONS={reasons}",
+                f"VISUALIZATION_OWNER_SKILL={visualization_owner}",
+                f"VISUALIZATION_TOOL_CALL={visualization_tool_call}",
+                f"VISUALIZATION_REJECTION={visualization_rejection}",
             ]
         )
 
@@ -1125,6 +1360,9 @@ def capability_decision_to_json_data(
             for skill, related in decision.related_skills.items()
         },
         "reasons": list(decision.reasons),
+        "visualization_owner_skill": decision.visualization_owner_skill,
+        "visualization_tool_call": decision.visualization_tool_call,
+        "visualization_rejection": decision.visualization_rejection,
     }
 
 

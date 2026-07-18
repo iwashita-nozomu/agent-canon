@@ -5,8 +5,20 @@
 contract skill
 responsibility Documents md-style-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design code-visualization.md sole public visualization owner and typed projection contract
+downstream implementation ../../tests/tools/test_fix_mermaid.py tests formatter and post-format coverage behavior
 @dependency-end
 -->
+
+## Visualization Formatter Gate
+
+For Mermaid artifacts, `md-style-check` is a formatter/checker adapter to
+`code-visualization`. It receives the owner's `VisualizationSourceUniverse`,
+canonical `ToolCall`, and `ProjectionCoverageManifest`, formats the complete
+artifact, and returns post-format readback identities for the owner's final
+coverage status. Formatting owns syntax only: it cannot repair an omission by
+rewriting, aggregating, substituting, or deleting content, and a pre-format
+marker is not readback evidence.
 
 ## Reader Map
 
