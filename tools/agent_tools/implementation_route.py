@@ -2,8 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Routes one immutable fixed implementation packet to Spark or the saturation queue.
-# upstream implementation ./model_profile_registry.py owns profile, prompt, and Decision Sufficiency contracts
+# upstream implementation ./model_profile_registry.py owns profile and prompt materialization
 # upstream implementation ./capacity_handshake.py owns typed capacity availability and queue semantics
+# upstream implementation ./update_lifecycle_contract.py imports the canonical owner-produced Decision Sufficiency verdict
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md defines fixed Spark continuation policy
 # downstream implementation ./agent_team.py performs actual typed implementation dispatch
 # downstream implementation ../../tests/agent_tools/test_implementation_route.py tests fail-closed routing
@@ -15,16 +16,27 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Iterable, Mapping
 
 if __package__:
+    from . import artifact_identity as _artifact_identity
     from . import capacity_handshake
     from . import model_profile_registry
+
+    _direct_artifact_identity = sys.modules.get("artifact_identity")
+    sys.modules["artifact_identity"] = _artifact_identity
+    from . import update_lifecycle_contract
+    if _direct_artifact_identity is None:
+        del sys.modules["artifact_identity"]
+    else:
+        sys.modules["artifact_identity"] = _direct_artifact_identity
 else:
     import capacity_handshake
     import model_profile_registry
+    import update_lifecycle_contract
 
 SCHEMA_IDS = {
     "fixed_implementation_packet": "fixed_implementation_packet_v1",
@@ -48,6 +60,7 @@ _REQUIRED_SHAPE_IDS = {
 _REQUIRED_DEPENDENCY_DIRECTIONS = {
     "implementation_route->model_profile_registry",
     "implementation_route->capacity_handshake",
+    "implementation_route->update_lifecycle_contract",
     "implementation_route-X->route",
     "implementation_route-X->capability_route",
     "implementation_route-X->skill_route_catalog",
@@ -270,8 +283,10 @@ class ValidationAction:
 
 @dataclass(frozen=True)
 class DecisionSufficiencyProjection:
-    record: model_profile_registry.DecisionSufficiencyRecord
-    fixed_action: model_profile_registry.OwnerEditValidationAction
+    verdict: Mapping[str, Any]
+    owner_action: str
+    edit_action: str
+    validation_action: str
 
 
 @dataclass(frozen=True)
@@ -620,12 +635,49 @@ def _parse_request(value: Mapping[str, Any] | ImplementationRouteRequest) -> Imp
     )
 
 
-def _decision_projection(value: object) -> DecisionSufficiencyProjection:
-    record = model_profile_registry.parse_decision_sufficiency_record(value)
-    validation = model_profile_registry.validate_decision_sufficiency(record)
-    if not validation.valid or record.fixed_action is None:
-        raise ValueError("decision_sufficiency:actions_not_invariant")
-    return DecisionSufficiencyProjection(record, record.fixed_action)
+def _decision_projection(
+    value: object,
+    packet: FixedImplementationPacket,
+) -> DecisionSufficiencyProjection:
+    try:
+        verdict = update_lifecycle_contract.import_decision_sufficiency_verdict(
+            value,
+            expected_digest=f"sha256:{packet.decision_sufficiency_sha256}",
+        )
+    except update_lifecycle_contract.LifecycleContractError as exc:
+        raise ValueError(str(exc)) from exc
+    if verdict.get("decision_id") != packet.decision_sufficiency_ref:
+        raise ValueError("decision_sufficiency:decision_identity_mismatch")
+    request_clause_ids = verdict.get("request_clause_ids")
+    if (
+        not isinstance(request_clause_ids, list)
+        or tuple(request_clause_ids) != packet.request_clause_ids
+    ):
+        raise ValueError("decision_sufficiency:source_identity_mismatch")
+    invariant = verdict.get("invariant")
+    if not isinstance(invariant, Mapping):
+        raise ValueError("decision_sufficiency:invariant_binding_missing")
+    invariant_clause_ids = invariant.get("request_clause_ids")
+    if (
+        not isinstance(invariant_clause_ids, list)
+        or tuple(invariant_clause_ids) != packet.request_clause_ids
+    ):
+        raise ValueError("decision_sufficiency:invariant_source_identity_mismatch")
+    owner_action = invariant.get("owner")
+    edit_action = invariant.get("edit")
+    validation_action = invariant.get("validation")
+    if (
+        owner_action != packet.exact_owner
+        or edit_action != packet.deletion_replacement_set_ref
+        or validation_action != packet.implementation_execution_contract_ref
+    ):
+        raise ValueError("decision_sufficiency:packet_action_binding_mismatch")
+    return DecisionSufficiencyProjection(
+        verdict,
+        str(owner_action),
+        str(edit_action),
+        str(validation_action),
+    )
 
 
 def _continuity(value: object) -> Mapping[str, Any]:
@@ -688,13 +740,6 @@ def _validate_identity(request: ImplementationRouteRequest, packet: FixedImpleme
         raise ValueError(f"packet_identity_mismatch:{','.join(mismatches)}")
 
 
-def _validate_action(packet: FixedImplementationPacket, decision: DecisionSufficiencyProjection) -> None:
-    expected_validation = tuple(action.command for action in packet.acceptance_checks) + packet.static_validation_commands
-    action = decision.fixed_action
-    if action.owner != packet.exact_owner or action.edit != packet.exact_write_set or action.validation != expected_validation:
-        raise ValueError("decision_sufficiency:fixed_action_mismatch")
-
-
 def _evidence(packet: FixedImplementationPacket, decision: DecisionSufficiencyProjection, fresh_cheaper: bool, capacity_refs: tuple[str, ...]) -> SparkEligibilityEvidence:
     return SparkEligibilityEvidence(
         evidence_version=1,
@@ -711,15 +756,18 @@ def _evidence(packet: FixedImplementationPacket, decision: DecisionSufficiencyPr
         no_cross_owner_integration=not packet.cross_owner_integration_required,
         public_shape_fixed=packet.public_shape_fixed,
         dependency_direction_fixed=True,
-        decision_sufficiency_identical=decision.fixed_action is not None,
+        decision_sufficiency_identical=True,
         fresh_packet_cheaper_than_suitable_continuation=fresh_cheaper,
         capacity_slot_granted_or_queueable=True,
         evidence_refs=(
             packet.abstract_design_frame_ref,
             packet.target_state_contract_ref,
             packet.immutable_source_packet_ref,
-            decision.record.record_id,
-            *decision.record.declared_decision_evidence,
+            str(decision.verdict["decision_id"]),
+            f"sha256:{packet.decision_sufficiency_sha256}",
+            decision.owner_action,
+            decision.edit_action,
+            decision.validation_action,
             *capacity_refs,
         ),
         source_anchors=packet.immutable_source_anchors,
@@ -735,8 +783,7 @@ def resolve_implementation_candidate(
 ) -> SparkEligibilityDecision:
     packet = _parse_fixed_packet(fixed_implementation_packet)
     continuity = _continuity(continuity_decision)
-    decision = _decision_projection(continuity["decision_sufficiency"])
-    _validate_action(packet, decision)
+    decision = _decision_projection(continuity["decision_sufficiency"], packet)
     available_total, available_write, capacity_refs = _capacity_available(capacity_snapshot)
     fresh_cheaper = bool(continuity["fresh_packet_cheaper_than_suitable_continuation"])
     evidence = _evidence(packet, decision, fresh_cheaper, capacity_refs)

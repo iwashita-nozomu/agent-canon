@@ -12,11 +12,13 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 import agent_team  # noqa: E402
+import task_close  # noqa: E402
 from agent_team import render_template, suggested_public_skills  # noqa: E402
 from tools.agent_tools import implementation_route  # noqa: E402
 
@@ -106,6 +108,55 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertEqual(
             dispatch.close_agent_token.arguments,
             {"terminal_agent_id": "spark-1"},
+        )
+
+    def test_closeout_projection_uses_provider_child_before_parent_order(self) -> None:
+        """Returned close tokens preserve provider-computed descendant postorder."""
+        lifecycle = agent_team.capacity_handshake
+        ledger = lifecycle.CapacityLedger(
+            topology=lifecycle.DescendantTopologyReadback("run", ())
+        )
+        snapshot = SimpleNamespace(remaining_total_slots=2, remaining_write_slots=0)
+
+        def successful_terminal(work_id: str, parent_work_id: str):
+            reservation = lifecycle.record_successful_spawn(
+                snapshot,
+                ledger,
+                lifecycle.ReadyWorkItem(
+                    work_id=work_id,
+                    packet_sha256=f"packet://{work_id}",
+                    profile_id="spark_implementation_low",
+                ),
+                spawn_succeeded=True,
+                parent_work_id=parent_work_id,
+            )
+            self.assertEqual(reservation.status, "granted")
+            record = ledger.open_records[work_id]
+            record.status = lifecycle.LifecycleStatus.READBACK_VERIFIED
+            record.durable_result_evidence_ref = f"result://{work_id}"
+            record.durable_handback = True
+            record.descendants_closed = True
+            record.close_readback = True
+            return record
+
+        parent = successful_terminal("parent", "run")
+        child = successful_terminal("child", "parent")
+        self.assertEqual(tuple(ledger.open_records), ("parent", "child"))
+        self.assertEqual(tuple(ledger.reservations), ("parent", "child"))
+        projection = agent_team._closeout_projection(
+            SimpleNamespace(ledger=ledger, parent_lineage_id="lineage"),
+            SimpleNamespace(workspace_root=PROJECT_ROOT, run_id="run"),
+        )
+        calls = projection["close_agent_tool_calls"]
+        self.assertIsInstance(calls, list)
+        targets = [
+            call["tool_call_token"]["arguments"]["terminal_agent_id"]
+            for call in calls
+        ]
+        self.assertEqual(targets, ["child", "parent"])
+        self.assertEqual(
+            task_close.validate_capacity_lifecycle_closeout(ledger, calls),
+            (True, ()),
         )
 
 

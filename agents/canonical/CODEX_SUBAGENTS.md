@@ -16,7 +16,9 @@ downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP 
 この文書は、Codex を primary runtime とする場合の subagent routing と inventory の正本です。
 shared workflow は `agents/canonical/CODEX_WORKFLOW.md` に置き、この文書は inventory、mapping、activation に寄せます。
 permanent team role ownership、required output、write policy は `agents/agents_config.json` を正本にします。
-role ごとの実行条件、handoff 条件、review separation は `.codex/agents/*.toml` を正本にします。
+role profile/instruction authority は `agents/model_profiles.toml` と
+`tools/agent_tools/model_profile_registry.py` が所有し、`.codex/agents/*.toml`
+は closed generated readback view です。
 project-level subagent registration と runtime budget は `.codex/config.toml` の `[agents]` と `[agents.<name>]` を正本にします。
 prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` を先に通し、
 この file は inventory と activation の入口に保ちます。
@@ -30,13 +32,17 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
   child profile authority は `agents/model_profiles.toml` が所有します。
   `.codex/agents/*.toml` と `agents/agents_config.json` の profile fields は
   canonical materializer が生成する readback view です。
-- chunked reading では、実行中の wave に関係する policy 節だけを開き、role behavior の詳細は `.codex/agents/*.toml` へ戻します。
+- chunked reading では、実行中の wave に関係する policy 節だけを開き、
+  profile/instruction authority は `agents/model_profiles.toml`、生成済みの
+  runtime readback は `.codex/agents/*.toml` で確認します。
 
 ## Principles
 
-- role behavior は docs より `.codex/agents/*.toml` を優先します
+- role profile/instruction は `agents/model_profiles.toml` を優先し、
+  `.codex/agents/*.toml` は generated readback として扱います
 - permanent team ownership、artifact output、write policy は `agents/agents_config.json` を優先します
-- subagent registration と runtime budget は `.codex/config.toml` を優先し、role model / reasoning は `.codex/agents/*.toml` を優先します
+- subagent registration と runtime budget は `.codex/config.toml` を優先し、
+  role model / reasoning は `agents/model_profiles.toml` を優先します
 - prompt / config drift を見つけたら、親がその場で policy prose を増やす前に `prompt_config_reviewer` の監査結果を要求します
 - parent agent は最終責任を持つ orchestrator / integrator です。repo-changing
   implementation / patch / doc-edit work では、親は handoff packet、agent
@@ -715,13 +721,18 @@ workflow docs、task catalog は agent TOML を参照します。
 - permanent team ownership and write policy: `agents/agents_config.json`
 - skill shim: `.agents/skills/`
 - Codex project config: `.codex/config.toml`
-- Codex subagent definitions: `.codex/agents/*.toml`
+- generated Codex subagent readback views: `.codex/agents/*.toml`
 
 設定運用メモ:
 - role ownership や required output を変えるときは `agents/agents_config.json` を更新します
-- project subagent registration と runtime budget を変えるときは `.codex/config.toml` を更新し、role model / reasoning を変えるときは `.codex/agents/*.toml` を更新します
-- stage 固有の実行条件を増やすときは、この文書より先に `.codex/agents/*.toml` を更新します
+- project subagent registration と runtime budget を変えるときは
+  `.codex/config.toml`、role model / reasoning を変えるときは
+  `agents/model_profiles.toml` を更新して canonical materializer を実行します
+- stage 固有の profile/instruction 条件は `agents/model_profiles.toml` の owner
+  route で変更し、generated view を手動編集しません
 - wrapper や root entrypoint は `.codex/agents/*.toml` の参照入口に保ちます
+- generation 後は alignment readback を確認し、load 済み session の projection
+  が古い場合は role TOML を編集せず restart します
 
 ## Smoke Test
 

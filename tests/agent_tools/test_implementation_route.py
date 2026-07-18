@@ -9,13 +9,16 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 
 from tools.agent_tools import capacity_handshake
 from tools.agent_tools import implementation_route as route
+from tools.agent_tools import update_lifecycle_contract
 
 SHA = "a" * 64
 PACKET_SHA = "b" * 64
 PACKET_REF = "packet://P3_implementation_route"
+DECISION_REF = "dsv:" + "d" * 64
 WRITE_SET = (
     "tools/agent_tools/implementation_route.py",
     "tests/agent_tools/test_implementation_route.py",
@@ -39,8 +42,8 @@ def _packet() -> dict[str, object]:
         "target_state_contract_sha256": SHA,
         "implementation_execution_contract_ref": "implementation-execution://v1",
         "materialization_mode": "one_direct_pass",
-        "decision_sufficiency_ref": "decision://P3",
-        "decision_sufficiency_sha256": SHA,
+        "decision_sufficiency_ref": DECISION_REF,
+        "decision_sufficiency_sha256": _decision_sha(_decision()),
         "abstract_design_frame_ref": "design://abstract-frame",
         "abstract_design_frame_sha256": SHA,
         "exact_owner": "implementation_route",
@@ -104,6 +107,7 @@ def _packet() -> dict[str, object]:
         "dependency_import_direction": [
             "implementation_route->model_profile_registry",
             "implementation_route->capacity_handshake",
+            "implementation_route->update_lifecycle_contract",
             "implementation_route-X->route",
             "implementation_route-X->capability_route",
             "implementation_route-X->skill_route_catalog",
@@ -113,17 +117,34 @@ def _packet() -> dict[str, object]:
 
 
 def _decision() -> dict[str, object]:
-    action = {"owner": "implementation_route", "edit": list(WRITE_SET), "validation": list(VALIDATION)}
     return {
-        "schema_id": "decision_sufficiency_record_v1",
-        "record_id": "decision-record-P3",
-        "decision_id": "materialize-P3",
-        "declared_decision_evidence": ["evidence://frozen-owner-edit-validation"],
-        "plausible_branches": [
-            {"branch_id": "continue-context", "outcome_id": "same-actions-1", "action": action},
-            {"branch_id": "fresh-context", "outcome_id": "same-actions-2", "action": action},
+        "schema": "agent-canon.decision-sufficiency.v1",
+        "decision_id": DECISION_REF,
+        "request_clause_ids": ["RC-1", "RC-2"],
+        "H": [{"state_id": "h-1", "description": "owner-produced", "evidence_refs": ["evidence:" + SHA]}],
+        "downstream_decision": "owner_edit_validation_route",
+        "possible_branches": [
+            {"branch_id": "b-1", "condition": "owner policy", "owner": "opaque", "edit_surface": "opaque", "validation": "opaque", "terminal": False},
         ],
+        "invariant": {
+            "owner": "implementation_route",
+            "owner_path": "tools/agent_tools/implementation_route.py",
+            "owner_symbol": "route_implementation",
+            "edit": "replacement://generic-route",
+            "validation": "implementation-execution://v1",
+            "request_clause_ids": ["RC-1", "RC-2"],
+        },
+        "value_of_information": [],
+        "route_verdict": {"route": "spark_worker", "owner_gate": "S6", "reason_code": "fixed_contract"},
+        "irrelevant_unknowns": [],
+        "rejection": None,
     }
+
+
+def _decision_sha(decision: dict[str, object]) -> str:
+    return hashlib.sha256(
+        update_lifecycle_contract.serialize_decision_sufficiency_verdict(decision)
+    ).hexdigest()
 
 
 def _capacity(available: int = 2, write: int = 1) -> dict[str, object]:
@@ -150,8 +171,11 @@ def _continuity(*, resume: str | None = None, resume_sha: str | None = None, rep
     }
 
 
-def _request(packet: dict[str, object], *, capacity=None, continuity=None, gap=None) -> dict[str, object]:
-    decision = _decision()
+def _request(packet: dict[str, object], *, capacity=None, continuity=None, gap=None, decision=None) -> dict[str, object]:
+    decision = decision or _decision()
+    decision_sha256 = _decision_sha(decision)
+    packet["decision_sufficiency_ref"] = DECISION_REF
+    packet["decision_sufficiency_sha256"] = decision_sha256
     continuity = continuity or _continuity()
     continuity["decision_sufficiency"] = decision
     return {
@@ -163,8 +187,8 @@ def _request(packet: dict[str, object], *, capacity=None, continuity=None, gap=N
         "target_state_contract_ref": "target-state://v1",
         "target_state_contract_sha256": SHA,
         "implementation_execution_contract_ref": "implementation-execution://v1",
-        "decision_sufficiency_ref": "decision://P3",
-        "decision_sufficiency_sha256": SHA,
+        "decision_sufficiency_ref": DECISION_REF,
+        "decision_sufficiency_sha256": decision_sha256,
         "context_continuity_decision_ref": "continuity://P3",
         "capacity_snapshot_ref": "capacity://current",
         "parent_lineage_id": "parent/P3",
@@ -200,6 +224,15 @@ def test_closed_fixed_packet_routes_to_one_spark_and_preserves_evidence(monkeypa
     assert result.source_anchors[1].manifest_canonicalization == "sorted-paths-v1"
     assert result.acceptance_checks[0].command == VALIDATION[0]
     assert result.static_validation_commands == (VALIDATION[1],)
+    eligibility = route.resolve_implementation_candidate(packet, _capacity(), _continuity())
+    assert eligibility.evidence is not None
+    assert eligibility.evidence.evidence_refs[3:8] == (
+        DECISION_REF,
+        f"sha256:{_decision_sha(_decision())}",
+        "implementation_route",
+        "replacement://generic-route",
+        "implementation-execution://v1",
+    )
 
 
 def test_unknown_missing_empty_or_mismatched_packet_evidence_fails_before_profile(monkeypatch) -> None:
@@ -291,14 +324,37 @@ def test_typed_capacity_snapshot_requires_complete_readback(monkeypatch, tmp_pat
     assert result.status == "completed"
 
 
-def test_fixed_action_is_derived_not_arbitrary_text(monkeypatch) -> None:
+def test_owner_verdict_policy_fields_are_not_recomputed(monkeypatch) -> None:
     _registry(monkeypatch)
-    request = _request(_packet())
-    decision = request["fixed_decision_sufficiency"]
+    decision = _decision()
+    decision["H"] = []
+    decision["possible_branches"] = [{"branch_id": "opaque", "owner": "different"}]
+    decision["value_of_information"] = [{"decision_value": "changes_route"}]
+    decision["route_verdict"] = {"route": "worker"}
+    result = route.route_implementation(_request(_packet(), decision=decision))
+    assert result.status == "completed"
+
+
+def test_missing_or_mismatched_owner_verdict_binding_fails_closed(monkeypatch) -> None:
+    _registry(monkeypatch)
+    malformed = _request(_packet())
+    decision = malformed["fixed_decision_sufficiency"]
     assert isinstance(decision, dict)
-    decision["action_equivalence"] = "identical"
-    continuity = request["continuity_decision"]
+    decision["schema"] = "decision_sufficiency_record_v1"
+    continuity = malformed["continuity_decision"]
     assert isinstance(continuity, dict)
     continuity["decision_sufficiency"] = decision
-    result = route.route_implementation(request)
+    assert route.route_implementation(malformed).status == "blocked"
+
+    for field, value in (
+        ("owner", "other-owner"),
+        ("edit", "replacement://other"),
+        ("validation", "implementation-execution://other"),
+    ):
+        decision = _decision()
+        invariant = decision["invariant"]
+        assert isinstance(invariant, dict)
+        invariant[field] = value
+        result = route.route_implementation(_request(_packet(), decision=decision))
+        assert result.status == "blocked"
     assert result.status == "blocked"

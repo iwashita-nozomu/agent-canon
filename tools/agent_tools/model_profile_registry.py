@@ -34,7 +34,6 @@ SCHEMA_IDS = {
     "role_instruction_template": "role_instruction_template_v1",
     "tool_call_token": "tool_call_token_v1",
     "generated_role_view": "generated_role_view_v1",
-    "decision_sufficiency": "decision_sufficiency_record_v1",
 }
 
 _ROOT_FIELDS = {
@@ -71,17 +70,6 @@ _PROFILE_FIELDS = {
     "role_instructions",
 }
 _CLAUSE_FIELDS = {"id", "text", "priority"}
-_DECISION_RECORD_FIELDS = {
-    "schema_id",
-    "record_id",
-    "decision_id",
-    "declared_decision_evidence",
-    "plausible_branches",
-}
-_DECISION_BRANCH_FIELDS = {"branch_id", "outcome_id", "action"}
-_ACTION_FIELDS = {"owner", "edit", "validation"}
-
-
 class StructuralDesignGap(Exception):
     """An input contract contradicts the fixed implementation boundary."""
 
@@ -275,50 +263,6 @@ class GeneratedRoleView:
     logical_role_id: str
     role_contract_ref: str
     capsule_schema_id: str
-
-
-@dataclass(frozen=True)
-class OwnerEditValidationAction:
-    owner: str
-    edit: tuple[str, ...]
-    validation: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class PlausibleDecisionBranch:
-    branch_id: str
-    outcome_id: str
-    action: OwnerEditValidationAction
-
-
-@dataclass(frozen=True)
-class DecisionSufficiencyRecord:
-    record_id: str
-    decision_id: str
-    declared_decision_evidence: tuple[str, ...]
-    plausible_branches: tuple[PlausibleDecisionBranch, ...]
-    schema_id: str = SCHEMA_IDS["decision_sufficiency"]
-
-    @property
-    def fixed_action(self) -> OwnerEditValidationAction | None:
-        actions = {branch.action for branch in self.plausible_branches}
-        return next(iter(actions)) if len(actions) == 1 else None
-
-
-@dataclass(frozen=True)
-class EvidenceRequest:
-    evidence_request_id: str
-    next_decision_id: str
-    changed_branch_ids: tuple[str, ...]
-    outcome_branch_ids: tuple[str, ...]
-    rationale: str
-
-
-@dataclass(frozen=True)
-class EvidenceRequestDecision:
-    evidence_request_id: str
-    authorized: bool
-    rationale: str
 
 
 @dataclass(frozen=True)
@@ -888,80 +832,6 @@ def write_role_views(root: os.PathLike[str] | str = ".") -> tuple[GeneratedRoleV
     raw["roles"] = roles
     config_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return views
-
-
-def parse_decision_sufficiency_record(value: object) -> DecisionSufficiencyRecord:
-    record = _closed_mapping(value, fields=_DECISION_RECORD_FIELDS, label="decision_sufficiency")
-    if record["schema_id"] != SCHEMA_IDS["decision_sufficiency"]:
-        raise ModelProfileRegistryError("decision_sufficiency:schema_id_mismatch")
-    raw_branches = record["plausible_branches"]
-    if not isinstance(raw_branches, list) or not raw_branches:
-        raise ModelProfileRegistryError("decision_sufficiency:plausible_branches_required")
-    branches: list[PlausibleDecisionBranch] = []
-    branch_ids: set[str] = set()
-    outcome_ids: set[str] = set()
-    for index, raw_branch in enumerate(raw_branches):
-        branch = _closed_mapping(raw_branch, fields=_DECISION_BRANCH_FIELDS, label=f"plausible_branches[{index}]")
-        action_raw = _closed_mapping(branch["action"], fields=_ACTION_FIELDS, label=f"plausible_branches[{index}].action")
-        branch_id = _text(branch["branch_id"], "branch_id")
-        outcome_id = _text(branch["outcome_id"], "outcome_id")
-        if branch_id in branch_ids or outcome_id in outcome_ids:
-            raise ModelProfileRegistryError("decision_sufficiency:duplicate_branch_or_outcome")
-        branch_ids.add(branch_id)
-        outcome_ids.add(outcome_id)
-        branches.append(
-            PlausibleDecisionBranch(
-                branch_id=branch_id,
-                outcome_id=outcome_id,
-                action=OwnerEditValidationAction(
-                    owner=_text(action_raw["owner"], "action.owner"),
-                    edit=_string_tuple(action_raw["edit"], "action.edit"),
-                    validation=_string_tuple(action_raw["validation"], "action.validation"),
-                ),
-            )
-        )
-    return DecisionSufficiencyRecord(
-        record_id=_text(record["record_id"], "decision_sufficiency.record_id"),
-        decision_id=_text(record["decision_id"], "decision_sufficiency.decision_id"),
-        declared_decision_evidence=_string_tuple(
-            record["declared_decision_evidence"],
-            "decision_sufficiency.declared_decision_evidence",
-        ),
-        plausible_branches=tuple(branches),
-    )
-
-
-def validate_decision_sufficiency(
-    record: DecisionSufficiencyRecord,
-    request: EvidenceRequest | None = None,
-) -> ValidationResult:
-    issues: list[ValidationIssue] = []
-    if not record.record_id or not record.decision_id or not record.declared_decision_evidence:
-        issues.append(ValidationIssue("decision_sufficiency.evidence_missing", "declared decision evidence is required"))
-    if not record.plausible_branches:
-        issues.append(ValidationIssue("decision_sufficiency.branches_missing", "plausible branches are required"))
-    if request is not None:
-        branch_ids = {branch.branch_id for branch in record.plausible_branches}
-        outcome_ids = {branch.outcome_id for branch in record.plausible_branches}
-        if request.next_decision_id != record.decision_id:
-            issues.append(ValidationIssue("evidence_request.decision_mismatch", "next decision must be named"))
-        if len(request.changed_branch_ids) < 2 or not set(request.changed_branch_ids).issubset(branch_ids):
-            issues.append(ValidationIssue("evidence_request.changed_branches_invalid", "changed branches must name plausible alternatives"))
-        if len(request.outcome_branch_ids) < 2 or not set(request.outcome_branch_ids).issubset(outcome_ids):
-            issues.append(ValidationIssue("evidence_request.outcomes_invalid", "outcome branches must name plausible alternatives"))
-    return ValidationResult.fail(issues) if issues else ValidationResult.ok()
-
-
-def authorize_evidence_request(
-    record: DecisionSufficiencyRecord,
-    request: EvidenceRequest,
-) -> EvidenceRequestDecision:
-    validation = validate_decision_sufficiency(record, request)
-    if not validation.valid:
-        raise ModelProfileRegistryError("evidence_request:unauthorized")
-    if record.fixed_action is not None:
-        raise ModelProfileRegistryError("evidence_request:forbidden_equivalent_actions")
-    return EvidenceRequestDecision(request.evidence_request_id, True, "authorized_divergent_action_branches")
 
 
 def validate_target_state_contract(

@@ -349,6 +349,31 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 self.assertNotIn("## Decision Sufficiency Packet", text)
                 self.assertNotIn('"schema": "agent-canon.decision-sufficiency.v1"', text)
 
+    def test_generated_role_views_cannot_claim_model_authority(self) -> None:
+        """Both runtime docs reject generated-view authority and manual model edits."""
+        docs = (
+            PROJECT_ROOT / ".codex" / "README.md",
+            PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
+        )
+        for path in docs:
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                self.assertEqual(
+                    runtime_alignment.generated_role_authority_contradictions(text),
+                    (),
+                )
+        stale_claims = (
+            ".codex/agents/*.toml is the source of truth for model and reasoning.",
+            "Update role TOMLs to change model reasoning.",
+            "role model / reasoning を変えるときは .codex/agents/*.toml を更新します",
+        )
+        for path in docs:
+            for claim in stale_claims:
+                with self.subTest(path=path, claim=claim):
+                    self.assertTrue(
+                        runtime_alignment.generated_role_authority_contradictions(claim)
+                    )
+
     def test_alignment_rejects_mini_model_on_ordinary_role(self) -> None:
         """A normal role cannot claim the T14 skill-validation model."""
         configs = runtime_alignment.parse_codex_agents()

@@ -13,22 +13,17 @@ from pathlib import Path
 
 import pytest
 
+from tools.agent_tools import model_profile_registry as registry_module
 from tools.agent_tools.model_profile_registry import (
     ContextItem,
-    DecisionSufficiencyRecord,
-    EvidenceRequest,
     ModelProfileRegistryError,
-    OwnerEditValidationAction,
-    PlausibleDecisionBranch,
     PromptMaterializationRequest,
     ToolCallMaterializationRequest,
-    authorize_evidence_request,
     generate_role_views,
     load_model_profile_registry,
     main,
     materialize_prompt_capsule,
     materialize_tool_call_token,
-    validate_decision_sufficiency,
 )
 
 
@@ -146,38 +141,18 @@ def test_close_token_is_target_only_and_request_schema_is_closed(workspace: Path
         ToolCallMaterializationRequest("sol_parent_high", "agent-1", metadata={})  # type: ignore[call-arg]
 
 
-def test_decision_sufficiency_routes_equivalent_actions_without_investigation() -> None:
-    action = OwnerEditValidationAction("owner", ("a.py",), ("pytest a.py",))
-    record = DecisionSufficiencyRecord(
-        "record",
-        "next-decision",
-        ("evidence://fixed",),
-        (
-            PlausibleDecisionBranch("b1", "o1", action),
-            PlausibleDecisionBranch("b2", "o2", action),
-        ),
-    )
-    assert validate_decision_sufficiency(record).valid
-    assert record.fixed_action == action
-    request = EvidenceRequest("er", "next-decision", ("b1", "b2"), ("o1", "o2"), "would change action")
-    with pytest.raises(ModelProfileRegistryError, match="forbidden_equivalent_actions"):
-        authorize_evidence_request(record, request)
-
-
-def test_evidence_request_requires_named_decision_and_changed_outcomes() -> None:
-    record = DecisionSufficiencyRecord(
-        "record",
-        "decision",
-        ("evidence://declared",),
-        (
-            PlausibleDecisionBranch("b1", "o1", OwnerEditValidationAction("a", ("a",), ("v",))),
-            PlausibleDecisionBranch("b2", "o2", OwnerEditValidationAction("b", ("b",), ("w",))),
-        ),
-    )
-    bad = EvidenceRequest("er", "wrong", ("b1",), ("o1",), "insufficient")
-    assert not validate_decision_sufficiency(record, bad).valid
-    good = EvidenceRequest("er", "decision", ("b1", "b2"), ("o1", "o2"), "branches change action")
-    assert authorize_evidence_request(record, good).authorized
+def test_registry_exposes_no_decision_sufficiency_policy_api() -> None:
+    forbidden = {
+        "DecisionSufficiencyRecord",
+        "EvidenceRequest",
+        "OwnerEditValidationAction",
+        "PlausibleDecisionBranch",
+        "authorize_evidence_request",
+        "parse_decision_sufficiency_record",
+        "validate_decision_sufficiency",
+    }
+    assert forbidden.isdisjoint(vars(registry_module))
+    assert "decision_sufficiency" not in registry_module.SCHEMA_IDS
 
 
 def test_canonical_generator_and_readback(workspace: Path, capsys: pytest.CaptureFixture[str]) -> None:

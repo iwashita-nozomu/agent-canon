@@ -1724,7 +1724,6 @@ def _closeout_projection(
     spec: RunBundleSpec,
 ) -> dict[str, object]:
     """Materialize the provider closeout state with canonical close-agent tokens."""
-    calls: list[dict[str, object]] = []
     tokens: dict[str, dict[str, object]] = {}
     registry = model_profile_registry.load_model_profile_registry(spec.workspace_root)
     for record in runtime.ledger.topology.descendants:
@@ -1748,18 +1747,19 @@ def _closeout_projection(
             "arguments": dict(token.arguments),
         }
         tokens[record.work_id] = token_projection
-        calls.append(
-            {
-                "agent_id": record.work_id,
-                "tool_call_token": token_projection,
-            }
-        )
     provider_packet = capacity_handshake.materialize_closeout_packet(
         parent_work_id=spec.run_id,
         ledger=runtime.ledger,
         descendants=(runtime.ledger.topology,),
         close_agent_tokens=tokens,
     )
+    calls = [
+        {
+            "agent_id": call.work_id,
+            "tool_call_token": dict(call.close_agent_call_token),
+        }
+        for call in provider_packet.close_agent_calls
+    ]
     failures = [
         {"work_id": failure.work_id, "detail": failure.detail}
         for failure in provider_packet.failures

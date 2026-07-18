@@ -1309,8 +1309,59 @@ def validate_official_system_skill_delegation(
             )
 
 
+_STALE_GENERATED_ROLE_AUTHORITY_PATTERNS = (
+    re.compile(
+        r"\.codex/agents/\*\.toml`?\s+is the source of truth for[^\n]*(?:model|reasoning)",
+        re.IGNORECASE,
+    ),
+    re.compile(r"Child model settings remain in role TOMLs", re.IGNORECASE),
+    re.compile(
+        r"(?:model|reasoning).{0,120}\.codex/agents/\*\.toml.{0,80}(?:正本|優先|更新(?:します|する))",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:edit|update).{0,80}(?:role TOMLs?|\.codex/agents/\*\.toml).{0,80}(?:model|reasoning)",
+        re.IGNORECASE,
+    ),
+)
+
+
+def generated_role_authority_contradictions(text: str) -> tuple[str, ...]:
+    """Return stale claims that promote generated role views to policy authority."""
+    normalized = " ".join(text.split())
+    return tuple(
+        pattern.pattern
+        for pattern in _STALE_GENERATED_ROLE_AUTHORITY_PATTERNS
+        if pattern.search(normalized)
+    )
+
+
+def validate_registry_authority_docs() -> None:
+    """Require canonical registry authority and reject manual generated-view policy."""
+    for relative_path in (
+        ".codex/README.md",
+        "agents/canonical/CODEX_SUBAGENTS.md",
+    ):
+        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        contradictions = generated_role_authority_contradictions(text)
+        ensure(
+            not contradictions,
+            f"{relative_path} contains stale generated-role authority: "
+            + ", ".join(contradictions),
+        )
+        for marker in (
+            "agents/model_profiles.toml",
+            "model_profile_registry.py",
+            "generated",
+            "readback",
+            "restart",
+        ):
+            ensure(marker in text, f"{relative_path} missing registry authority marker: {marker}")
+
+
 def validate_subagent_protocol_docs() -> None:
     """Check subagent routing docs keep machine-enforceable boundaries."""
+    validate_registry_authority_docs()
     for path in SUBAGENT_PROTOCOL_DOCS:
         text = path.read_text(encoding="utf-8")
         if path.name == "TASK_WORKFLOWS.md":

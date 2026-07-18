@@ -137,11 +137,11 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 
 ## Model Settings
 
-- `.codex/agents/*.toml` is the source of truth for each Codex subagent's
-  `model` and `model_reasoning_effort`.
-- `.codex/config.toml` owns the Sol/high parent default, the Luna `/review`
-  default, project features, runtime limits, skill registration, and the agent
-  registry. Child model settings remain in role TOMLs.
+- `agents/model_profiles.toml` is the canonical typed authority for every
+  parent and child model, reasoning, capability, context, return, checkpoint,
+  and continuation field.
+- `tools/agent_tools/model_profile_registry.py` materializes closed
+  `.codex/agents/*.toml` and `agents/agents_config.json` generated views.
 - `tools/agent_tools/check_agent_runtime_alignment.py` and
   `tools/agent_tools/evaluate_codex_agent_roles.py` validate the materialized
   agent TOML files directly.
@@ -149,12 +149,16 @@ waive workflow gates and do not authorize dropping decision-relevant context.
   return schema、continuation を所有し、canonical materializer が
   `.codex/agents/*.toml` と `agents/agents_config.json` の role projection を生成します。
   role view を手動の model authority として編集しません。
+- generated view の更新後は alignment readback を確認し、load 済み session
+  との不一致は手動編集せず restart して canonical projection を再読込します。
 - The parent uses Sol/high and owns integration and final approval. Sol/xhigh is
   an explicit high-risk or final escalation, not a child-role default.
 - mode の扱い
   - plan mode や permissions は session 単位で、per-agent TOML には書きません
   - official Codex CLI では `/plan`、`/model`、`/permissions` を使います
-- `.codex/config.toml` の `[agents.<name>]` が role registry、`.codex/agents/*.toml` が role behavior と model / reasoning 設定の正本です
+- `.codex/config.toml` の `[agents.<name>]` は role registration を所有し、
+  model / reasoning authority は `agents/model_profiles.toml`、role TOML は
+  materialized readback view です
 
 ## Current Agents
 
