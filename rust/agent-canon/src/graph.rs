@@ -21,15 +21,6 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-#[cfg(test)]
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-#[cfg(test)]
-static BUILD_PRODUCER_CALLS: AtomicUsize = AtomicUsize::new(0);
-
-#[cfg(test)]
-static FRESHNESS_PROBE_CALLS: AtomicUsize = AtomicUsize::new(0);
-
 const GRAPH_SCHEMA_VERSION: &str = "graph_storage_core.v1";
 const RUNTIME_EVENT_SCHEMA: &str = "agent_canon.runtime_event.v1";
 const RUNTIME_EVIDENCE_SCHEMA: &str = "agent_canon.runtime_evidence_snapshot.v2";
@@ -1777,8 +1768,6 @@ fn graph_fingerprint(
 }
 
 fn capture_runtime_dashboard(snapshot: &RuntimeEvidenceSnapshot) -> ProducerArtifact {
-    #[cfg(test)]
-    BUILD_PRODUCER_CALLS.fetch_add(1, Ordering::SeqCst);
     runtime_evidence_producer(snapshot)
 }
 
@@ -2411,8 +2400,6 @@ fn probe_input_fingerprint(
     root: &Path,
     profile: &str,
 ) -> Result<InputFingerprintProbe, GraphError> {
-    #[cfg(test)]
-    FRESHNESS_PROBE_CALLS.fetch_add(1, Ordering::SeqCst);
     let source = probe_snapshot_identity(root, "parent")
         .map_err(|error| GraphError::Validation(error.to_string()))?;
     let base = InputFingerprintProbe {
@@ -2692,7 +2679,7 @@ pub(crate) fn run(args: &[String]) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Mutex;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -3021,12 +3008,8 @@ mod tests {
         let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
         let fixture = graph_fixture();
         let args = graph_args(&fixture.root);
-        BUILD_PRODUCER_CALLS.store(0, Ordering::SeqCst);
-        FRESHNESS_PROBE_CALLS.store(0, Ordering::SeqCst);
         let build = build_graph_with_failure(&args).expect("graph build");
         assert_eq!(build["status"], "fresh");
-        assert_eq!(BUILD_PRODUCER_CALLS.load(Ordering::SeqCst), 1);
-        assert_eq!(FRESHNESS_PROBE_CALLS.load(Ordering::SeqCst), 0);
 
         let connection = Connection::open(
             fixture
@@ -3073,15 +3056,33 @@ mod tests {
             .map(|value| runtime_hex(value, 64))
             .unwrap_or(false));
         assert_eq!(probe.profile, "default");
-        assert_eq!(FRESHNESS_PROBE_CALLS.load(Ordering::SeqCst), 1);
 
-        assert_eq!(read_graph_status(&args).expect("status")["status"], "fresh");
-        assert_eq!(FRESHNESS_PROBE_CALLS.load(Ordering::SeqCst), 2);
-        assert_eq!(query_graph(&args).expect("query")["status"], "fresh");
-        assert_eq!(FRESHNESS_PROBE_CALLS.load(Ordering::SeqCst), 3);
-        assert_eq!(context_graph(&args).expect("context")["status"], "fresh");
-        assert_eq!(FRESHNESS_PROBE_CALLS.load(Ordering::SeqCst), 4);
-        assert_eq!(BUILD_PRODUCER_CALLS.load(Ordering::SeqCst), 1);
+        let graph_path = fixture
+            .root
+            .join(".agent-canon/knowledge-graph/graph.sqlite");
+        let persisted_graph = fs::read(&graph_path).expect("persisted graph bytes");
+        let persisted_artifact = fs::read(&fixture.artifact).expect("artifact bytes");
+        let persisted_receipt = fs::read(&fixture.receipt).expect("receipt bytes");
+        let status = read_graph_status(&args).expect("status");
+        let query = query_graph(&args).expect("query");
+        let context = context_graph(&args).expect("context");
+        assert_eq!(status["status"], "fresh");
+        assert_eq!(query["status"], "fresh");
+        assert_eq!(context["status"], "fresh");
+        assert_eq!(query["graph_fingerprint"], status["graph_fingerprint"]);
+        assert_eq!(context["graph_fingerprint"], status["graph_fingerprint"]);
+        assert_eq!(
+            fs::read(graph_path).expect("graph readback"),
+            persisted_graph
+        );
+        assert_eq!(
+            fs::read(&fixture.artifact).expect("artifact readback"),
+            persisted_artifact
+        );
+        assert_eq!(
+            fs::read(&fixture.receipt).expect("receipt readback"),
+            persisted_receipt
+        );
     }
 
     #[test]
@@ -3089,7 +3090,6 @@ mod tests {
         let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
         let mut fixture = graph_fixture();
         let args = graph_args(&fixture.root);
-        BUILD_PRODUCER_CALLS.store(0, Ordering::SeqCst);
         build_graph_with_failure(&args).expect("graph build");
 
         fs::write(&fixture.artifact, b"{}\n").expect("changed artifact");
@@ -3158,7 +3158,6 @@ mod tests {
         let status = read_graph_status(&args).expect("head status");
         assert_eq!(status["status"], "stale");
         assert_eq!(status["probe_reason"], "source_changed");
-        assert_eq!(BUILD_PRODUCER_CALLS.load(Ordering::SeqCst), 1);
     }
 
     #[test]

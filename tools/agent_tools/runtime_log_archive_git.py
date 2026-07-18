@@ -44,6 +44,7 @@ from report_artifact_checks import (  # noqa: E402
     MECHANICALLY_REGENERATED_REPORT_FILE_PATTERNS,
     check_final_review_artifact,
     final_review_decision_lines,
+    parse_review_identity,
 )
 from runtime_log_paths import (  # noqa: E402
     LOG_ARCHIVE_REMOTE,
@@ -981,10 +982,18 @@ def discover_rollout_context(codex_thread_id: str, agent_context_id: str) -> dic
     )
     if not files:
         raise RuntimeEventMaterializationError("source_unavailable", "no rollout file matches the context selector")
+    snapshots: dict[Path, bytes] = {}
     contexts: list[tuple[Path, dict[str, object]]] = []
     required = ("agent_id", "agent_context_id", "codex_thread_id", "parent_id", "turn_id", "role")
     for path in files:
-        for record in iter_source_records(path):
+        try:
+            snapshot = path.read_bytes()
+        except OSError as exc:
+            raise RuntimeEventMaterializationError(
+                "source_unavailable", str(exc)
+            ) from exc
+        snapshots[path] = snapshot
+        for record in _iter_source_snapshot_records(snapshot):
             value = cast(dict[str, object], record["value"])
             if value.get("schema") != RUNTIME_EVENT_CONTEXT_SCHEMA or value.get("codex_thread_id") != codex_thread_id:
                 continue
@@ -1007,7 +1016,8 @@ def discover_rollout_context(codex_thread_id: str, agent_context_id: str) -> dic
     if len(selected) != 1:
         raise RuntimeEventMaterializationError("source_identity_mismatch", "rollout path is not unique")
     rollout_path = selected[0]
-    records = tuple(iter_source_records(rollout_path))
+    file_bytes = snapshots[rollout_path]
+    records = tuple(_iter_source_snapshot_records(file_bytes))
     companions: list[dict[str, object]] = []
     for record in records:
         value = cast(dict[str, object], record["value"])
@@ -1033,7 +1043,6 @@ def discover_rollout_context(codex_thread_id: str, agent_context_id: str) -> dic
     if len(complete) != 1:
         raise RuntimeEventMaterializationError("source_identity_mismatch", "task_complete line 872 join is not unique")
     raw = cast(bytes, complete[0]["raw"])
-    file_bytes = rollout_path.read_bytes()
     path_bytes = rollout_path.as_posix().encode("utf-8")
     record_sha = hashlib.sha256(raw).hexdigest()
     return {
@@ -1097,12 +1106,8 @@ def discover_rollout_path(selector: RuntimeEventSelector) -> Path:
     return Path(cast(str, context["rollout_path"]))
 
 
-def iter_source_records(path: Path) -> Iterator[dict[str, object]]:
-    """Yield finite structural JSONL records with exact byte provenance."""
-    try:
-        source = path.read_bytes()
-    except OSError as exc:
-        raise RuntimeEventMaterializationError("source_unavailable", str(exc)) from exc
+def _iter_source_snapshot_records(source: bytes) -> Iterator[dict[str, object]]:
+    """Yield structural JSONL records from one immutable byte snapshot."""
     offset = 0
     for line_number, raw in enumerate(source.splitlines(keepends=True), start=1):
         length = len(raw)
@@ -1114,6 +1119,15 @@ def iter_source_records(path: Path) -> Iterator[dict[str, object]]:
             if isinstance(value, dict):
                 yield {"line": line_number, "offset": offset, "length": length, "raw": raw, "value": value}
         offset += length
+
+
+def iter_source_records(path: Path) -> Iterator[dict[str, object]]:
+    """Yield finite structural JSONL records with exact byte provenance."""
+    try:
+        source = path.read_bytes()
+    except OSError as exc:
+        raise RuntimeEventMaterializationError("source_unavailable", str(exc)) from exc
+    yield from _iter_source_snapshot_records(source)
 
 
 def is_source_snapshot_path(relative: Path) -> bool:
@@ -1195,41 +1209,52 @@ def capture_porcelain_v1(root: Path) -> tuple[dict[str, str], ...]:
     return tuple(statuses)
 
 
-def _review_identity(text: str) -> tuple[str | None, str | None]:
-    """Read the two fixed review identity labels present on current main."""
-    path_matches = re.findall(r"^\s*-\s*Design artifact path:\s*`?([^`\r\n]+?)`?\s*$", text, re.IGNORECASE | re.MULTILINE)
-    sha_matches = re.findall(r"\breview_target_sha256\s*=\s*`?([0-9a-f]{64})`?", text, re.IGNORECASE)
-    return (
-        path_matches[-1].strip().strip("'\"") if path_matches else None,
-        sha_matches[-1].lower() if sha_matches else None,
-    )
-
-
 def validate_markdown_review_result(text: str, expected_gate_id: str) -> dict[str, object]:
     """Validate one fixed Markdown review artifact through W2 review checks."""
-    path, target_sha = _review_identity(text)
+    identity = parse_review_identity(text)
     decisions = final_review_decision_lines(text)
     if len(decisions) != 1 or decisions[0].upper() not in {"APPROVE", "REVISE", "ESCALATE"}:
         raise RuntimeEventMaterializationError("result_authority_mismatch", "review decision is not exactly one supported value")
-    if path is None or target_sha is None:
+    decision = decisions[0].upper()
+    if identity.decision_approved != (decision == "APPROVE"):
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch",
+            "review decision disagrees with canonical identity authority",
+        )
+    if identity.design_artifact_path is None or identity.review_target_sha256 is None:
         raise RuntimeEventMaterializationError("result_authority_mismatch", "review identity fields are incomplete")
-    if check_final_review_artifact(text) and decisions[0].upper() == "APPROVE":
+    if check_final_review_artifact(text) and decision == "APPROVE":
         raise RuntimeEventMaterializationError("result_authority_mismatch", "; ".join(check_final_review_artifact(text)))
     return {
         "schema": "ReviewArtifactV1",
-        "path": path,
-        "target_paths": [path],
+        "path": identity.design_artifact_path,
+        "target_paths": [identity.design_artifact_path],
         "gate_id": expected_gate_id,
-        "gate_result": decisions[0].upper(),
-        "decision": decisions[0].upper(),
-        "review_target_sha256": target_sha,
+        "gate_result": decision,
+        "decision": decision,
+        "review_target_sha256": identity.review_target_sha256,
     }
+
+
+def _validation_json_object(
+    items: list[tuple[str, object]],
+) -> dict[str, object]:
+    """Build one validation JSON object only when every key is unique."""
+    if len({key for key, _value in items}) != len(items):
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "validation result has duplicate keys"
+        )
+    return dict(items)
 
 
 def parse_validation_result(raw: bytes, expected_gate_id: str) -> dict[str, object]:
     """Parse the exact generic validation result input schema."""
     try:
-        value = json.loads(raw.decode("utf-8"))
+        value = json.loads(
+            raw.decode("utf-8"), object_pairs_hook=_validation_json_object
+        )
+    except RuntimeEventMaterializationError:
+        raise
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise RuntimeEventMaterializationError("result_authority_mismatch", "validation result is not UTF-8 JSON") from exc
     expected = ["schema", "result", "gate_id", "target_paths", "base_ref", "observations"]
@@ -1257,16 +1282,54 @@ def parse_validation_result(raw: bytes, expected_gate_id: str) -> dict[str, obje
 
 def parse_lifecycle_result(text: str, expected_gate_id: str) -> dict[str, object]:
     """Parse fixed closeout gate fields without treating prose as authority."""
-    if "## Completion Readiness" not in text:
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "closeout readiness section is absent")
+    owned_fields = (
+        "status",
+        "closeout_gate_id",
+        "target_paths",
+        "base_ref",
+        "evidence_path",
+        "evidence_sha256",
+    )
+    lines = text.splitlines()
+    section_starts = [
+        index
+        for index, line in enumerate(lines)
+        if line.strip() == "## Completion Readiness"
+    ]
+    if len(section_starts) != 1:
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch",
+            "closeout readiness section is not exactly one",
+        )
+    section_start = section_starts[0]
+    section_end = len(lines)
+    for index in range(section_start + 1, len(lines)):
+        if re.match(r"^#{1,2}(?:\s|$)", lines[index].strip()):
+            section_end = index
+            break
+
     fields: dict[str, str] = {}
-    for line in text.splitlines():
+    for index, line in enumerate(lines):
         if ":" not in line:
             continue
         key, value = line.split(":", 1)
         key = key.strip().lower()
-        if key in {"status", "closeout_gate_id", "target_paths", "base_ref", "evidence_path", "evidence_sha256"}:
-            fields[key] = value.strip()
+        if key not in owned_fields:
+            continue
+        if not section_start < index < section_end:
+            raise RuntimeEventMaterializationError(
+                "result_authority_mismatch",
+                "closeout field appears outside readiness section",
+            )
+        if key in fields:
+            raise RuntimeEventMaterializationError(
+                "result_authority_mismatch", "closeout field is duplicated"
+            )
+        fields[key] = value.strip()
+    if set(fields) != set(owned_fields):
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "closeout readiness fields are incomplete"
+        )
     if fields.get("closeout_gate_id") != expected_gate_id:
         raise RuntimeEventMaterializationError("result_authority_mismatch", "closeout gate id mismatch")
     status = fields.get("status")
@@ -1901,7 +1964,13 @@ def _publish_runtime_event_noreplace(target: Path, bytes_: bytes) -> dict[str, o
                 raise RuntimeEventMaterializationError(
                     "record_collision", "publication target has different bytes"
                 )
-            recovered_record = _readback_runtime_event(target)
+            validate_runtime_event_schema(existing)
+            recovered_record = RuntimeEventRecord(
+                cast(
+                    dict[str, object],
+                    json.loads(existing[:-1].decode("utf-8")),
+                )
+            )
             return {
                 "source": "recovery",
                 "causal_gap": True,
@@ -1991,7 +2060,13 @@ def _publish_runtime_event_noreplace(target: Path, bytes_: bytes) -> dict[str, o
                             "schema_invalid", "existing artifact schema is invalid"
                         ) from exc
                 raise RuntimeEventMaterializationError("record_collision", "publication target collision")
-            recovered_record = _readback_runtime_event(target)
+            validate_runtime_event_schema(existing)
+            recovered_record = RuntimeEventRecord(
+                cast(
+                    dict[str, object],
+                    json.loads(existing[:-1].decode("utf-8")),
+                )
+            )
             return {
                 "source": "recovery",
                 "causal_gap": True,
@@ -2016,12 +2091,21 @@ def _publish_runtime_event_noreplace(target: Path, bytes_: bytes) -> dict[str, o
             readback_status = "failed"
             readback_sha256 = None
         else:
-            readback_sha256 = hashlib.sha256(committed).hexdigest()
-            readback_status = "verified" if committed == bytes_ else "mismatch"
-            if readback_status == "verified":
-                readback_sha256 = cast(
-                    str, _readback_runtime_event(target)["artifact_sha256"]
+            if committed != bytes_:
+                raise RuntimeEventMaterializationError(
+                    "publication_observation_invalid",
+                    "artifact target readback differs after publication",
                 )
+            try:
+                validate_runtime_event_schema(committed)
+                committed_value = json.loads(committed[:-1].decode("utf-8"))
+            except RuntimeEventMaterializationError as exc:
+                raise RuntimeEventMaterializationError(
+                    "publication_observation_invalid",
+                    "artifact target readback is malformed after publication",
+                ) from exc
+            readback_status = "verified"
+            readback_sha256 = cast(str, committed_value["artifact_sha256"])
         return {
             "source": "publish",
             "causal_gap": False,
@@ -2063,11 +2147,20 @@ def classify_publication_outcome(
     evidence: dict[str, object],
 ) -> dict[str, object]:
     """Classify post-target evidence and emit one immutable observation."""
+    readback_status = evidence.get("readback_status")
+    readback_sha256 = evidence.get("readback_sha256")
+    if readback_status == "mismatch" or (
+        readback_status == "verified" and readback_sha256 != artifact_sha256
+    ):
+        raise RuntimeEventMaterializationError(
+            "publication_observation_invalid",
+            "artifact readback proves an invalid publication observation",
+        )
     committed = (
         evidence.get("causal_gap") is False
         and evidence.get("target_directory_fsync_status") == "succeeded"
-        and evidence.get("readback_status") == "verified"
-        and evidence.get("readback_sha256") == artifact_sha256
+        and readback_status == "verified"
+        and readback_sha256 == artifact_sha256
     )
     value: dict[str, object] = {
         "schema": RUNTIME_EVENT_OBSERVATION_SCHEMA,
@@ -2204,6 +2297,7 @@ def validate_publication_outcome_observation(raw: bytes) -> dict[str, object]:
         or evidence.get("target_directory_fsync_status")
         not in ("succeeded", "failed", "unknown")
         or readback_status not in ("verified", "failed", "mismatch")
+        or readback_status == "mismatch"
         or (
             readback_status == "failed"
             and readback_sha256 is not None
@@ -2214,6 +2308,10 @@ def validate_publication_outcome_observation(raw: bytes) -> dict[str, object]:
                 not isinstance(readback_sha256, str)
                 or RUNTIME_EVENT_HEX64.fullmatch(readback_sha256) is None
             )
+        )
+        or (
+            readback_status == "verified"
+            and readback_sha256 != observation.get("artifact_sha256")
         )
         or (
             evidence.get("source") == "publish"
@@ -3190,12 +3288,13 @@ def reconcile_runtime_event_publication(
                 readback_status = "failed"
                 readback_sha256: str | None = None
             else:
-                readback_sha256 = hashlib.sha256(readback).hexdigest()
-                readback_status = (
-                    "verified" if readback == artifact_bytes else "mismatch"
-                )
-                if readback_status == "verified":
-                    readback_sha256 = artifact_sha256
+                if readback != artifact_bytes:
+                    raise RuntimeEventMaterializationError(
+                        "publication_observation_invalid",
+                        "artifact recovery readback differs",
+                    )
+                readback_status = "verified"
+                readback_sha256 = artifact_sha256
             orphan = classify_publication_outcome(
                 attempt_id=attempt_id,
                 artifact_path=artifact_path,
@@ -3243,12 +3342,13 @@ def reconcile_runtime_event_publication(
             recovery_readback = "failed"
             recovery_sha256: str | None = None
         else:
-            recovery_sha256 = hashlib.sha256(recovery_bytes).hexdigest()
-            recovery_readback = (
-                "verified" if recovery_bytes == artifact_bytes else "mismatch"
-            )
-            if recovery_readback == "verified":
-                recovery_sha256 = artifact_sha256
+            if recovery_bytes != artifact_bytes:
+                raise RuntimeEventMaterializationError(
+                    "publication_observation_invalid",
+                    "artifact recovery readback differs",
+                )
+            recovery_readback = "verified"
+            recovery_sha256 = artifact_sha256
         recovery_evidence: dict[str, object] = {
             "source": "recovery",
             "causal_gap": False,

@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import contextlib
 import fcntl
 import hashlib
@@ -1229,6 +1230,82 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(source_event["agent_id"], "33333333-3333-4333-8333-333333333333")
             self.assertEqual(source_event["parent_id"], "44444444-4444-4444-8444-444444444444")
 
+    def test_materialize_runtime_event_uses_one_immutable_rollout_snapshot(self) -> None:
+        """V-02 binds discovery, selected bytes, offsets, and hashes to one read."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
+            original_read_bytes = Path.read_bytes
+            original_snapshot = original_read_bytes(fixture.rollout)
+            mutated_lines = original_snapshot.splitlines(keepends=True)
+            mutated_lines[871] = (
+                json.dumps(
+                    {
+                        "type": "task_complete",
+                        "payload": {
+                            "turn_id": "66666666-6666-4666-8666-666666666666"
+                        },
+                    },
+                    separators=(",", ":"),
+                )
+                + "\n"
+            ).encode("utf-8")
+            mutated_snapshot = b"".join(mutated_lines)
+            mutation_applied = False
+
+            def mutate_after_rollout_snapshot(path: Path) -> bytes:
+                """Mutate the live rollout only after returning its first snapshot."""
+                nonlocal mutation_applied
+                snapshot = original_read_bytes(path)
+                if path == fixture.rollout and not mutation_applied:
+                    mutation_applied = True
+                    fixture.rollout.write_bytes(mutated_snapshot)
+                return snapshot
+
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "AGENT_CANON_CODEX_SESSION_ROOT": str(
+                            fixture.session_root
+                        )
+                    },
+                    clear=False,
+                ),
+                patch.object(
+                    Path,
+                    "read_bytes",
+                    new=mutate_after_rollout_snapshot,
+                ),
+            ):
+                identity = runtime_log_archive_git.discover_rollout_context(
+                    fixture.thread_id,
+                    "22222222-2222-4222-8222-222222222222",
+                )
+
+            self.assertTrue(mutation_applied)
+            self.assertEqual(fixture.rollout.read_bytes(), mutated_snapshot)
+            self.assertEqual(
+                identity["rollout_file_sha256"],
+                hashlib.sha256(original_snapshot).hexdigest(),
+            )
+            self.assertEqual(
+                identity["rollout_path_sha256"],
+                hashlib.sha256(
+                    fixture.rollout.resolve().as_posix().encode("utf-8")
+                ).hexdigest(),
+            )
+            self.assertEqual(
+                base64.b64decode(cast(str, identity["record_bytes_b64"])),
+                fixture.raw_record,
+            )
+            self.assertEqual(
+                identity["record_byte_offset"],
+                sum(
+                    len(line)
+                    for line in original_snapshot.splitlines(keepends=True)[:871]
+                ),
+            )
+
     def test_materialize_runtime_event_uses_fixed_result_family_specs(self) -> None:
         """All five result families have one fixed artifact and gate schema."""
         expected = {
@@ -1244,6 +1321,57 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual((spec.artifact_name, spec.gate_id, spec.schema), (artifact, gate, schema))
         with self.assertRaises(runtime_log_archive_git.RuntimeEventMaterializationError):
             runtime_log_archive_git.fixed_result_family_spec("review", "requirements-review")
+
+    def test_materialize_runtime_event_rejects_nested_validation_duplicate_keys(self) -> None:
+        """V-03 rejects duplicate keys at nested validation-object depth."""
+        raw = (
+            b'{"schema":"agent_canon.runtime_result_input.v1",'
+            b'"result":"PASS","gate_id":"validation",'
+            b'"target_paths":["tools/target.py"],"base_ref":"main",'
+            b'"observations":{"head_oid":"1111111111111111111111111111111111111111",'
+            b'"head_oid":"2222222222222222222222222222222222222222",'
+            b'"base_oid":"3333333333333333333333333333333333333333"}}\n'
+        )
+        with self.assertRaises(
+            runtime_log_archive_git.RuntimeEventMaterializationError
+        ) as raised:
+            runtime_log_archive_git.parse_validation_result(raw, "validation")
+        self.assertEqual(raised.exception.code, "result_authority_mismatch")
+
+    def test_materialize_runtime_event_lifecycle_fields_are_section_bounded(self) -> None:
+        """V-03 accepts one readiness section and rejects every authority impostor."""
+        valid = (
+            "# Closeout\n\n"
+            "## Completion Readiness\n"
+            "status: READY\n"
+            "closeout_gate_id: closeout\n"
+            "target_paths: tools/target.py, reports/evidence.json\n"
+            "base_ref: main\n"
+            "evidence_path: reports/evidence.json\n"
+            f"evidence_sha256: {'a' * 64}\n\n"
+            "## References\n"
+            "terminal prose\n"
+        )
+        parsed = runtime_log_archive_git.parse_lifecycle_result(valid, "closeout")
+        self.assertEqual(parsed["gate_result"], "READY")
+
+        invalid_documents = (
+            valid + "\n## Completion Readiness\n",
+            valid.replace("status: READY\n", "status: READY\nstatus: BLOCKED\n"),
+            "status: BLOCKED\n" + valid,
+            valid.replace("base_ref: main\n", ""),
+        )
+        for document in invalid_documents:
+            with self.subTest(document=document):
+                with self.assertRaises(
+                    runtime_log_archive_git.RuntimeEventMaterializationError
+                ) as raised:
+                    runtime_log_archive_git.parse_lifecycle_result(
+                        document, "closeout"
+                    )
+                self.assertEqual(
+                    raised.exception.code, "result_authority_mismatch"
+                )
 
     def test_materialize_runtime_event_derives_target_blob_and_base_identities(self) -> None:
         """Target identity verification is bound to external Git object identities."""
@@ -1404,6 +1532,56 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assert_materializer_failure(malformed_artifact, "schema_invalid")
 
+            mismatched_readback = self.make_valid_materialization_fixture(
+                root / "mismatched-readback"
+            )
+            original_path_read_bytes = Path.read_bytes
+            mismatch_injected = False
+
+            def mismatch_after_artifact_rename(path: Path) -> bytes:
+                """Return proven wrong bytes for the first committed-target readback."""
+                nonlocal mismatch_injected
+                value = original_path_read_bytes(path)
+                if path == mismatched_readback.target and not mismatch_injected:
+                    mismatch_injected = True
+                    return b"{}\n"
+                return value
+
+            with patch.object(
+                Path,
+                "read_bytes",
+                new=mismatch_after_artifact_rename,
+            ):
+                self.assert_materializer_failure(
+                    mismatched_readback, "publication_observation_invalid"
+                )
+            self.assertTrue(mismatch_injected)
+            self.assertTrue(mismatched_readback.target.is_file())
+            mismatched_attempt = cast(
+                str,
+                json.loads(mismatched_readback.target.read_text(encoding="utf-8"))[
+                    "publication_intent"
+                ]["attempt_id"],
+            )
+            self.assertEqual(
+                [
+                    path
+                    for path in self.observation_directory(
+                        mismatched_readback, mismatched_attempt
+                    ).iterdir()
+                    if path.name != ".attempt.lock"
+                ],
+                [],
+            )
+            self.assertEqual(
+                list(
+                    mismatched_readback.target.parent.glob(
+                        f"{mismatched_readback.target.stem}.outcome.*"
+                    )
+                ),
+                [],
+            )
+
             observation_failure = self.make_valid_materialization_fixture(
                 root / "observation-failure"
             )
@@ -1519,17 +1697,48 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             malformed_observation = self.make_valid_materialization_fixture(
                 root / "malformed-observation"
             )
-            malformed_observation_attempt = assert_success(malformed_observation)
-            malformed_observation_path = next(
+            with patch.object(
+                runtime_log_archive_git,
+                "_fsync_directory",
+                side_effect=fail_observation_parent,
+            ):
+                self.assert_materializer_failure(
+                    malformed_observation, "publication_observation_uncertain"
+                )
+            malformed_observation_attempt = cast(
+                str,
+                json.loads(
+                    malformed_observation.target.read_text(encoding="utf-8")
+                )["publication_intent"]["attempt_id"],
+            )
+            malformed_observation_paths = [
                 path
                 for path in self.observation_directory(
                     malformed_observation, malformed_observation_attempt
                 ).iterdir()
                 if path.name != ".attempt.lock"
+            ]
+            self.assertEqual(len(malformed_observation_paths), 1)
+            self.assertEqual(
+                list(
+                    malformed_observation.target.parent.glob(
+                        f"{malformed_observation.target.stem}.outcome.*"
+                    )
+                ),
+                [],
             )
+            malformed_observation_path = malformed_observation_paths[0]
             malformed_observation_path.write_bytes(b"{}\n")
             self.assert_materializer_failure(
                 malformed_observation, "publication_observation_invalid"
+            )
+            self.assertEqual(
+                list(
+                    malformed_observation.target.parent.glob(
+                        f"{malformed_observation.target.stem}.outcome.*"
+                    )
+                ),
+                [],
             )
 
             receipt_collision = self.make_valid_materialization_fixture(
