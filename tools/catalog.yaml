@@ -1051,6 +1051,25 @@ entries:
     tests: []
     test_exempt_reason: Validated by rust/agent-canon cargo tests and devcontainer smoke.
 
+  - id: materialize-agent-canon-pr-g2
+    summary: Materializes the canonical G2 receipt from the ordered passing AgentCanon generated-completeness checks.
+    path: tools/ci/check_agent_canon_pr.py
+    family: ci
+    role: checker
+    status: canonical
+    audience: workflow
+    placement: workflow_helper
+    command: python3 tools/ci/check_agent_canon_pr.py --g1-bundle <path> --source-root .
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/agent-canon-update-route.md
+      - agents/workflows/agent-canon-pr-workflow.md
+    tests:
+      - tests/tools/test_update_agent_canon.py
+
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
     path: tools/ci/check_agent_canon_pr.sh
