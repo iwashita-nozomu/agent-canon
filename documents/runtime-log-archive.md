@@ -49,19 +49,24 @@ in-tree migration and agent report archiving boundaries.
 
 ## Source-Bound Runtime Event Materialization
 
-`tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event` is the
-owner of generic, source-bound runtime evidence. It reads the active run
-pointer, selects one fixed result family (`requirements`, `design`, `review`,
-`validation`, or `lifecycle`), joins it to one structurally identified rollout
-record, and prepares one canonical `runtime_event.<unit-id>.json` artifact in
-the active run bundle. It does not modify hook serializers, runtime summaries,
+`tools/agent_tools/runtime_log_archive_git.py` owns the complete source-bound
+runtime-evidence handoff. First, the explicit checkpoint command
+`append-context-discovery` reads native `session_meta` and selected
+`event_msg` / `task_complete` records from the finite Codex rollout source and
+publishes exactly one immutable
+`context_discovery.<certificate-id>.json` certificate in the active run bundle.
+Then `materialize-runtime-event` reads exactly one certificate, selects one
+fixed result family (`requirements`, `design`, `review`, `validation`, or
+`lifecycle`), verifies the certificate's repository, rollout, native-record,
+and hash identities, and prepares one canonical `runtime_event.<unit-id>.json`
+artifact. Neither command modifies hook serializers, runtime summaries,
 accumulated-family registries, or pull-request adapters.
 
 The prepared artifact has schema `agent_canon.runtime_event.v1`. Its ordered top-level
 fields are `schema`, `materialization_id`, `result_family`, `gate`,
 `source_event`, `result_artifact`, `target_identities`, `source_snapshot`,
 `publication_intent`, and `artifact_sha256`. The nested record preserves the rollout
-path and bytes, line-872 byte range, source record hash, exact result-artifact
+path and bytes, certified native byte range, source record hash, exact result-artifact
 path/schema/hash/blob, target content/blob identities, source `HEAD`/base OIDs,
 and porcelain-v1 status lines. `publication_intent` contains the deterministic
 attempt ID, exact target path, and only `prepared_state=prepared`; it never
@@ -101,11 +106,14 @@ receipt append/confirmation (`publication_receipt_failed`,
 For a typed failure the command prints only the exact error code and
 `RUNTIME_EVENT_MATERIALIZE=fail`, writes no stderr, and exits `1`.
 
-The materializer requires `CODEX_THREAD_ID`, a matching
-`reports/agents/.active_run`, the fixed result artifact, and a valid
+The producer requires a matching `reports/agents/.active_run`,
+`--agent-context-id`, and `--turn-id`; the materializer requires the resulting
+single context certificate, the fixed result artifact, and a valid
 `--base-ref`. Example:
 
 ```bash
+python3 tools/agent_tools/runtime_log_archive_git.py append-context-discovery \
+  --run-id <run-id> --agent-context-id <agent-context-id> --turn-id <turn-id>
 python3 tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
   --result-family review --run-id <run-id> --gate-id change-review \
   --base-ref <base-ref>

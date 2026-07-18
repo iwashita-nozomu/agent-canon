@@ -634,12 +634,12 @@ entries:
       - tests/agent_tools/test_run_accumulated_agent_evals.py
 
   - id: runtime-log-archive-git
-    summary: Materializes prepared runtime artifacts with confirmed outcome receipts and checkpoints atomic hook-event spool files through one prepared archive transaction.
+    summary: Produces immutable native context certificates, materializes prepared runtime artifacts with confirmed outcome receipts, and checkpoints atomic hook-event spool files through one prepared archive transaction.
     path: tools/agent_tools/runtime_log_archive_git.py
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/agent_tools/runtime_log_archive_git.py <materialize-runtime-event|check-hook-hot-path|sync>
+    command: python3 tools/agent_tools/runtime_log_archive_git.py <append-context-discovery|materialize-runtime-event|check-hook-hot-path|sync>
     writes: true
     default_wiring:
       ci: false
