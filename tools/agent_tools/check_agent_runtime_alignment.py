@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Checks agent runtime alignment agent workflow state.
+# responsibility Checks public catalog/document/shim/config registration and path parity plus agent workflow state.
 # upstream design ../README.md shared automation index
 # upstream design ../../agents/skills/README.md public skill surface contract
 # upstream design ../../agents/canonical/skills.md official system skill delegation boundary
 # upstream design ../../agents/internal-routines/README.md internal routine surface contract
 # upstream design ../../agents/skills/catalog.yaml public skill routing and related-skill catalog
+# upstream implementation ./skill_route_catalog.py canonical skill-route rules and capability metadata
 # upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
 # @dependency-end
 
@@ -23,11 +24,9 @@ try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
-from collections.abc import Mapping
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timezone
-
-UTC = timezone.utc
 from pathlib import Path
 from typing import cast
 
@@ -55,7 +54,10 @@ from agent_team import (
     workflow_spawn_budget,
     workflow_topology_policy_violations,
 )
+from skill_route_catalog import load_skill_route_rules
 from vendor_skill_adapters import VendorSkillValidator
+
+UTC = timezone.utc
 
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
 PROJECT_SKILL_CONFIG_PATH = ROOT / ".codex" / "project-config.toml"
@@ -65,7 +67,6 @@ SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
 PROJECT_SKILL_LANE = ".codex/project-skills"
 PUBLIC_SKILL_DOC_ROOT = ROOT / "agents" / "skills"
 INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
-FRONTMATTER_OPEN_MARKER = "---\n"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
 EXPECTED_MODEL_CONTEXT_WINDOW = 1_000_000
 EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
@@ -98,7 +99,6 @@ ALLOWED_AGENT_RUNTIME_KEYS = {
     "max_depth",
     "job_max_runtime_seconds",
 }
-SKILL_ROUTING_STAGE_POLICIES = {"active", "deferred"}
 PRIVATE_SKILL_PREFIX = "_"
 PUBLIC_SKILL_README_DUPLICATE_ROW = re.compile(
     r"^\|\s*`[^`]+`\s*\|.*`agents/skills/[^`]+\.md`.*`\.agents/skills/[^`]+/SKILL\.md`",
@@ -1134,52 +1134,40 @@ def validate_public_skill_shims() -> None:
     raw_data: object = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
     data = require_mapping(raw_data, "skill catalog must parse as a mapping")
     families = require_list(data.get("skill_families", []), "skill_families must be a list")
+    try:
+        rules = load_skill_route_rules(ROOT)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"blocked-by=catalog-gate:{exc}") from exc
+    ensure(
+        len(families) == len(rules),
+        "blocked-by=catalog-gate:catalog rule/source order mismatch",
+    )
 
-    observed_skill_ids: set[str] = set()
-    for entry in families:
-        entry = require_mapping(entry, "skill_families entries must be mappings")
-        skill_id = require_string(
-            entry.get("id"), "skill_families id must be a string"
-        )
-        ensure(
-            is_public_skill_id(skill_id),
-            f"public skill catalog id must not start with {PRIVATE_SKILL_PREFIX}: {skill_id}",
-        )
-        ensure(skill_id not in observed_skill_ids, f"duplicate skill catalog id: {skill_id}")
-        observed_skill_ids.add(skill_id)
-        canonical_doc = ROOT / require_string(
+    observed_skill_ids = {rule.skill for rule in rules}
+    registrations: list[tuple[str, str]] = []
+    for rule, raw_entry in zip(rules, families, strict=True):
+        entry = require_mapping(raw_entry, "skill registration entries must be mappings")
+        skill_id = rule.skill
+        canonical_doc_value = require_string(
             entry.get("canonical_doc"),
             f"{skill_id} canonical_doc must be a string",
         )
         shim = ROOT / require_string(entry.get("shim"), f"{skill_id} shim must be a string")
+        canonical_doc = ROOT / canonical_doc_value
         ensure(canonical_doc.is_file(), f"{skill_id} canonical doc missing: {canonical_doc}")
         ensure(shim.is_file(), f"{skill_id} shim missing: {shim}")
         ensure(
             shim.resolve().is_relative_to(SKILL_SHIM_ROOT.resolve()),
             f"{skill_id} shim is outside the Codex skill root: {shim}",
         )
-        text = shim.read_text(encoding="utf-8")
-        ensure(text.startswith(FRONTMATTER_OPEN_MARKER), f"{skill_id} shim must start with YAML frontmatter")
-        ensure(
-            "\n---\n" in text[len(FRONTMATTER_OPEN_MARKER) :],
-            f"{skill_id} shim YAML frontmatter must close",
-        )
-        ensure(f"name: {skill_id}" in text, f"{skill_id} shim frontmatter name mismatch")
-        validate_skill_routing_entry(skill_id, entry.get("routing"))
-    validate_skill_related_entries(families, observed_skill_ids)
+        registrations.append((skill_id, canonical_doc_value))
     observed_shim_ids = {
         path.parent.name
         for path in SKILL_SHIM_ROOT.glob("*/SKILL.md")
     }
     public_shim_ids = {skill_id for skill_id in observed_shim_ids if is_public_skill_id(skill_id)}
-    private_catalog_ids = sorted(skill_id for skill_id in observed_skill_ids if is_private_skill_id(skill_id))
     extra_shims = sorted(public_shim_ids - observed_skill_ids)
     missing_shims = sorted(observed_skill_ids - observed_shim_ids)
-    ensure(
-        not private_catalog_ids,
-        "private skill ids must stay out of public skill catalog: "
-        + ", ".join(private_catalog_ids),
-    )
     ensure(
         not extra_shims,
         "public skill shims missing catalog entries: " + ", ".join(extra_shims),
@@ -1188,14 +1176,14 @@ def validate_public_skill_shims() -> None:
         not missing_shims,
         "skill catalog entries missing public shims: " + ", ".join(missing_shims),
     )
-    validate_public_skill_document_contract(data)
-    validate_official_system_skill_delegation(data)
+    validate_public_skill_document_contract(tuple(registrations))
+    validate_official_system_skill_delegation(observed_skill_ids)
 
 
 def validate_public_skill_document_contract(
-    data: Mapping[str, object], root: Path | None = None
+    registrations: tuple[tuple[str, str], ...], root: Path | None = None
 ) -> None:
-    """Check that agents/skills contains only catalog-backed public skills."""
+    """Check public skill docs against the canonical registration projection."""
     if root is None:
         root = ROOT
     public_doc_root = root / "agents" / "skills"
@@ -1209,26 +1197,14 @@ def validate_public_skill_document_contract(
         (internal_routine_root / "README.md").is_file(),
         "internal routine README missing: agents/internal-routines/README.md",
     )
-    families = require_list(data.get("skill_families", []), "skill_families must be a list")
     catalog_docs: set[str] = set()
-    for entry in families:
-        entry = require_mapping(entry, "skill_families entries must be mappings")
-        canonical_doc = require_string(
-            entry.get("canonical_doc"),
-            "skill_families canonical_doc must be non-empty",
-        ).strip()
-        skill_id = require_string(
-            entry.get("id"), "skill_families id must be a string"
-        ).strip()
-        ensure(
-            is_public_skill_id(skill_id),
-            f"public skill catalog id must not start with {PRIVATE_SKILL_PREFIX}: {skill_id}",
-        )
-        ensure(bool(canonical_doc), "skill_families canonical_doc must be non-empty")
+    for skill_id, canonical_doc in registrations:
+        ensure(bool(skill_id), "skill registration id must be non-empty")
+        ensure(bool(canonical_doc), "skill registration canonical_doc must be non-empty")
         canonical_path = root / canonical_doc
         ensure(
             canonical_path.resolve().is_relative_to(public_doc_root.resolve()),
-            f"{entry.get('id')} canonical doc must live under agents/skills: {canonical_doc}",
+            f"{skill_id} canonical doc must live under agents/skills: {canonical_doc}",
         )
         catalog_docs.add(canonical_path.relative_to(root).as_posix())
     public_docs = {
@@ -1264,20 +1240,12 @@ def validate_public_skill_readme_single_source(root: Path) -> None:
 
 
 def validate_official_system_skill_delegation(
-    data: Mapping[str, object], root: Path | None = None
+    catalog_skill_ids: Collection[str], root: Path | None = None
 ) -> None:
     """Check that host-provided system skills stay in the delegation lane."""
     if root is None:
         root = ROOT
-    families = require_list(data.get("skill_families", []), "skill_families must be a list")
-    catalog_skill_ids: set[str] = set()
-    for entry in families:
-        if not isinstance(entry, dict):
-            continue
-        entry = require_mapping(cast(object, entry), "skill_families entries must be mappings")
-        catalog_skill_ids.add(
-            require_string(entry.get("id"), "skill_families id must be a string").strip()
-        )
+    catalog_skill_ids = set(catalog_skill_ids)
     catalog_official_skills = sorted(set(OFFICIAL_SYSTEM_SKILLS) & catalog_skill_ids)
     ensure(
         not catalog_official_skills,
@@ -1309,71 +1277,6 @@ def validate_official_system_skill_delegation(
             ensure(
                 f"${skill_id}" in text,
                 f"{relative_path} missing official system skill route: ${skill_id}",
-            )
-
-
-def validate_skill_routing_entry(skill_id: str, routing: object) -> None:
-    """Check one optional catalog-backed prompt routing block."""
-    if routing is None:
-        return
-    routing = require_mapping(routing, f"{skill_id} routing must be a mapping")
-    stage_policy = routing.get("stage_policy", "deferred")
-    ensure(
-        isinstance(stage_policy, str) and stage_policy in SKILL_ROUTING_STAGE_POLICIES,
-        f"{skill_id} routing.stage_policy must be one of {sorted(SKILL_ROUTING_STAGE_POLICIES)}",
-    )
-    reason = routing.get("reason")
-    ensure(
-        isinstance(reason, str) and bool(reason.strip()),
-        f"{skill_id} routing.reason must be a non-empty string",
-    )
-    triggers = require_list(
-        routing.get("triggers", []), f"{skill_id} routing.triggers must be a list"
-    )
-    for group_index, group in enumerate(triggers):
-        group = require_string_list(
-            group,
-            f"{skill_id} routing.triggers[{group_index}] must be a non-empty list",
-        )
-        ensure(
-            bool(group),
-            f"{skill_id} routing.triggers[{group_index}] must be a non-empty list",
-        )
-        for term_index, term in enumerate(group):
-            ensure(
-                bool(term.strip()),
-                f"{skill_id} routing.triggers[{group_index}][{term_index}] must be a non-empty string",
-            )
-
-
-def validate_skill_related_entries(families: object, observed_skill_ids: set[str]) -> None:
-    """Check related-skill metadata points to public catalog entries."""
-    families = require_list(families, "skill_families must be a list")
-    for entry in families:
-        entry = require_mapping(entry, "skill_families entries must be mappings")
-        skill_id = require_string(
-            entry.get("id"), "skill_families id must be a string"
-        ).strip()
-        related_skills = require_string_list(
-            entry.get("related_skills", []),
-            f"{skill_id} related_skills must be a list",
-        )
-        for related_index, related_skill in enumerate(related_skills):
-            ensure(
-                bool(related_skill.strip()),
-                f"{skill_id} related_skills[{related_index}] must be a non-empty string",
-            )
-            ensure(
-                related_skill != skill_id,
-                f"{skill_id} related_skills[{related_index}] must not self-reference",
-            )
-            ensure(
-                is_public_skill_id(related_skill),
-                f"{skill_id} related_skills[{related_index}] must be public: {related_skill}",
-            )
-            ensure(
-                related_skill in observed_skill_ids,
-                f"{skill_id} related_skills[{related_index}] unknown skill: {related_skill}",
             )
 
 
