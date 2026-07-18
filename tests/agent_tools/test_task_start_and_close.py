@@ -174,14 +174,15 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
         )
     ]
     closeout = agent_team.materialize_close_agent_tool_call(
-        binding=binding,
         run_id="run-update-lifecycle",
         agent_id="agent:owner",
-        gate_verdicts=gates,
-        cleanup_proof=cleanup,
-        durable_handback=handback,
-        descendant_close_receipts=descendants,
-        reservation_release_receipts=reservations,
+        evidence=agent_team.CloseAgentLifecycleEvidence(
+            gate_verdicts=gates,
+            cleanup_proof=cleanup,
+            durable_handback=handback,
+            descendant_close_receipts=descendants,
+            reservation_release_receipts=reservations,
+        ),
     )
     g6 = cast("dict[str, object]", closeout["g6_gate"])
     token = cast("dict[str, object]", closeout["close_agent_tool_call"])

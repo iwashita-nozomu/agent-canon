@@ -21,7 +21,11 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from agent_team import materialize_close_agent_tool_call, resolve_report_root
+from agent_team import (
+    CloseAgentLifecycleEvidence,
+    materialize_close_agent_tool_call,
+    resolve_report_root,
+)
 from report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
     COMPLETION_COVERAGE_TAXONOMY_REFS,
@@ -717,14 +721,15 @@ def update_lifecycle_closeout_consumer(report_dir: Path) -> dict[str, object]:
         if not isinstance(run_id, str) or not run_id.strip():
             raise ValueError("close_agent:token_invalid")
         materialized = materialize_close_agent_tool_call(
-            binding=handback["binding"],
             run_id=run_id,
             agent_id=str(handback["agent_id"]),
-            gate_verdicts=source_gates,
-            cleanup_proof=cleanup,
-            durable_handback=handback,
-            descendant_close_receipts=descendant_values,
-            reservation_release_receipts=reservation_values,
+            evidence=CloseAgentLifecycleEvidence(
+                gate_verdicts=source_gates,
+                cleanup_proof=cleanup,
+                durable_handback=handback,
+                descendant_close_receipts=descendant_values,
+                reservation_release_receipts=reservation_values,
+            ),
         )
     except (TypeError, ValueError) as exc:
         return {

@@ -1011,33 +1011,40 @@ def materialize_dynamic_route_tool_call_token() -> dict[str, object]:
     )
 
 
+@dataclass(frozen=True)
+class CloseAgentLifecycleEvidence:
+    """Validated-input domain for G6 and terminal close materialization."""
+
+    gate_verdicts: Sequence[Mapping[str, object]]
+    cleanup_proof: Mapping[str, object]
+    durable_handback: Mapping[str, object]
+    descendant_close_receipts: Sequence[Mapping[str, object]]
+    reservation_release_receipts: Sequence[Mapping[str, object]]
+
+
 def materialize_close_agent_tool_call(
     *,
-    binding: Mapping[str, object],
     run_id: str,
     agent_id: str,
-    gate_verdicts: Sequence[Mapping[str, object]],
-    cleanup_proof: Mapping[str, object],
-    durable_handback: Mapping[str, object],
-    descendant_close_receipts: Sequence[Mapping[str, object]],
-    reservation_release_receipts: Sequence[Mapping[str, object]],
+    evidence: CloseAgentLifecycleEvidence,
 ) -> dict[str, object]:
     """Own G6 by validating closure receipts before issuing the terminal token."""
-    checked_binding = validate_record_binding(binding)
+    handback = validate_durable_handback(evidence.durable_handback)
+    checked_binding = validate_record_binding(handback["binding"])
     gates = list(
         validate_gate_chain(
-            list(gate_verdicts),
+            list(evidence.gate_verdicts),
             expected_gate_ids=("G1", "G2", "G3", "G4", "G5"),
             require_pass=True,
         )
     )
-    handback = validate_durable_handback(durable_handback)
     descendants = [
-        validate_descendant_close_receipt(item) for item in descendant_close_receipts
+        validate_descendant_close_receipt(item)
+        for item in evidence.descendant_close_receipts
     ]
     reservations = [
         validate_reservation_release_receipt(item)
-        for item in reservation_release_receipts
+        for item in evidence.reservation_release_receipts
     ]
     declared_descendants = set(cast(Sequence[str], handback["descendant_ids"]))
     observed_descendants = {cast(str, item["agent_id"]) for item in descendants}
@@ -1076,7 +1083,7 @@ def materialize_close_agent_tool_call(
     reservations_released_evidence_ref = "evidence:" + hashlib.sha256(
         canonical_json_bytes(reservations)
     ).hexdigest()
-    cleanup = validate_cleanup_proof(cleanup_proof)
+    cleanup = validate_cleanup_proof(evidence.cleanup_proof)
     cleanup_binding = cast(Mapping[str, object], cleanup["binding"])
     if tuple(cleanup_binding[field] for field in binding_identity_fields) != expected_identity:
         raise ValueError("close_agent:identity_mismatch")
@@ -1112,7 +1119,7 @@ def materialize_close_agent_tool_call(
         verdict="pass",
     )
     token = materialize_lifecycle_close_agent_tool_call(
-        binding=binding,
+        binding=checked_binding,
         run_id=run_id,
         agent_id=agent_id,
         gate_verdicts=[*gates, g6],

@@ -59,6 +59,14 @@ class CommandResult:
 
 
 @dataclass(frozen=True)
+class GithubPublicationAuthority:
+    """One validated immutable lifecycle/G3 authority used by mutations."""
+
+    lifecycle: Mapping[str, object]
+    g3_gate: Mapping[str, object]
+
+
+@dataclass(frozen=True)
 class CommandFailure(Exception):
     """Raised when an external command fails."""
 
@@ -1176,64 +1184,13 @@ def base_summary(args: argparse.Namespace, verification: RemoteVerification, bra
     }
 
 
-def publication_context(
-    args: argparse.Namespace,
-    runner: Runner,
-    verification: RemoteVerification,
-    branch: str,
-    *,
-    pr_lifecycle: Mapping[str, object] | None,
-    candidate_cas_receipt: Mapping[str, object] | None,
-    source_main_rebind_receipt: Mapping[str, object] | None,
-    upstream_gate_verdicts: Sequence[Mapping[str, object]],
-    g3_gate: Mapping[str, object] | None,
-) -> tuple[dict[str, object], dict[str, object]]:
-    """Return one topology/G3 pair, materializing it only when absent."""
-    lifecycle = (
-        build_pull_request_lifecycle(args, runner, verification, branch)
-        if pr_lifecycle is None
-        else validate_pull_request_lifecycle(pr_lifecycle)
-    )
-    if candidate_cas_receipt is None:
-        raise UserVisibleFailure(
-            message="GitHub publication requires the exact reviewed CAS receipt",
-            next_action="materialize_CandidateCasReceipt_after_independent_review",
-        )
-    if source_main_rebind_receipt is None:
-        raise UserVisibleFailure(
-            message="GitHub publication requires the exact source-main rebind receipt",
-            next_action="materialize_CandidateCasReceipt_from_SourceMainRebindReceipt",
-        )
-    gate = (
-        materialize_pr_identity_gate(
-            lifecycle,
-            candidate_cas_receipt,
-            source_main_rebind_receipt,
-            upstream_gate_verdicts,
-        )
-        if g3_gate is None
-        else dict(g3_gate)
-    )
-    return require_pr_identity_gate(
-        lifecycle,
-        candidate_cas_receipt,
-        source_main_rebind_receipt,
-        upstream_gate_verdicts,
-        gate,
-    )
-
-
 def perform_push(
     args: argparse.Namespace,
     runner: Runner,
     verification: RemoteVerification,
     branch: str,
     *,
-    pr_lifecycle: Mapping[str, object] | None = None,
-    candidate_cas_receipt: Mapping[str, object] | None = None,
-    source_main_rebind_receipt: Mapping[str, object] | None = None,
-    upstream_gate_verdicts: Sequence[Mapping[str, object]] = (),
-    g3_gate: Mapping[str, object] | None = None,
+    authority: GithubPublicationAuthority,
 ) -> dict[str, object]:
     """Push the verified branch to origin."""
     if branch == "main" and not getattr(args, "allow_main", False):
@@ -1241,17 +1198,8 @@ def perform_push(
             message="refusing to push main without --allow-main",
             next_action="publish_a_topic_branch_or_pass_--allow-main_with_explicit_authority",
         )
-    lifecycle, gate = publication_context(
-        args,
-        runner,
-        verification,
-        branch,
-        pr_lifecycle=pr_lifecycle,
-        candidate_cas_receipt=candidate_cas_receipt,
-        source_main_rebind_receipt=source_main_rebind_receipt,
-        upstream_gate_verdicts=upstream_gate_verdicts,
-        g3_gate=g3_gate,
-    )
+    lifecycle = authority.lifecycle
+    gate = authority.g3_gate
     if lifecycle["state"] not in {
         "draft",
         "ready",
@@ -1294,25 +1242,12 @@ def perform_pr(
     verification: RemoteVerification,
     branch: str,
     *,
-    pr_lifecycle: Mapping[str, object] | None = None,
-    candidate_cas_receipt: Mapping[str, object] | None = None,
-    source_main_rebind_receipt: Mapping[str, object] | None = None,
-    upstream_gate_verdicts: Sequence[Mapping[str, object]] = (),
-    g3_gate: Mapping[str, object] | None = None,
+    authority: GithubPublicationAuthority,
 ) -> dict[str, object]:
     """Create or update a pull request for the verified branch."""
     body_file = require_body_file(args.body_file)
-    lifecycle, gate = publication_context(
-        args,
-        runner,
-        verification,
-        branch,
-        pr_lifecycle=pr_lifecycle,
-        candidate_cas_receipt=candidate_cas_receipt,
-        source_main_rebind_receipt=source_main_rebind_receipt,
-        upstream_gate_verdicts=upstream_gate_verdicts,
-        g3_gate=g3_gate,
-    )
+    lifecycle = authority.lifecycle
+    gate = authority.g3_gate
     if lifecycle["state"] not in {
         "draft",
         "ready",
@@ -1429,40 +1364,11 @@ def perform_checks(
     verification: RemoteVerification,
     branch: str,
     *,
-    pr_lifecycle: Mapping[str, object] | None = None,
-    candidate_cas_receipt: Mapping[str, object] | None = None,
-    source_main_rebind_receipt: Mapping[str, object] | None = None,
-    upstream_gate_verdicts: Sequence[Mapping[str, object]] = (),
-    g3_gate: Mapping[str, object] | None = None,
-    g5_gate: Mapping[str, object] | None = None,
+    authority: GithubPublicationAuthority,
 ) -> dict[str, object]:
     """Show pull-request checks through gh."""
-    lifecycle, gate = publication_context(
-        args,
-        runner,
-        verification,
-        branch,
-        pr_lifecycle=pr_lifecycle,
-        candidate_cas_receipt=candidate_cas_receipt,
-        source_main_rebind_receipt=source_main_rebind_receipt,
-        upstream_gate_verdicts=upstream_gate_verdicts,
-        g3_gate=g3_gate,
-    )
-    checked_g5: dict[str, object] | None = None
-    if g5_gate is not None:
-        checked_g5 = validate_gate_verdict(g5_gate)
-        if checked_g5["gate_id"] != "G5" or checked_g5["verdict"] != "pass":
-            raise UserVisibleFailure(
-                message="publication readback evidence is not a passing G5 verdict",
-                next_action="read_back_the_exact_remote_publication_identity",
-            )
-        if binding_identity(lifecycle["binding"]) != binding_identity(
-            checked_g5["binding"]
-        ):
-            raise UserVisibleFailure(
-                message="G5 evidence does not bind the selected PR lifecycle",
-                next_action="create_a_successor_lifecycle_for_the_changed_identity",
-            )
+    lifecycle = authority.lifecycle
+    gate = authority.g3_gate
     pr_selector = args.pr or branch
     command = ["gh", "pr", "checks", pr_selector, "--repo", verification.repo]
     if args.watch:
@@ -1485,7 +1391,6 @@ def perform_checks(
             "checks_stdout": result.stdout.strip(),
             "pull_request_lifecycle": lifecycle,
             "g3_gate": gate,
-            "g5_gate": checked_g5,
         }
     )
     if result.returncode == 8:
@@ -1590,12 +1495,11 @@ def run(
         publication_packet = cast(Mapping[str, object], loaded)
     packet = validate_github_publication_packet(publication_packet)
     lifecycle = cast(Mapping[str, object], packet["pull_request_lifecycle"])
-    cas = cast(Mapping[str, object], packet["candidate_cas_receipt"])
-    rebind = cast(Mapping[str, object], packet["source_main_rebind_receipt"])
-    upstream = cast(
-        Sequence[Mapping[str, object]], packet["upstream_gate_verdicts"]
-    )
     g3_gate = cast(Mapping[str, object], packet["g3_gate"])
+    authority = GithubPublicationAuthority(
+        lifecycle=lifecycle,
+        g3_gate=g3_gate,
+    )
     remote_identity = cast(Mapping[str, object], lifecycle["remote_identity"])
     base_identity = cast(Mapping[str, object], lifecycle["base_identity"])
     permission = cast(Mapping[str, object], lifecycle["permission_identity"])
@@ -1621,11 +1525,7 @@ def run(
             runner,
             verification,
             branch,
-            pr_lifecycle=lifecycle,
-            candidate_cas_receipt=cas,
-            source_main_rebind_receipt=rebind,
-            upstream_gate_verdicts=upstream,
-            g3_gate=g3_gate,
+            authority=authority,
         )
     if args.action == "pr":
         return perform_pr(
@@ -1633,11 +1533,7 @@ def run(
             runner,
             verification,
             branch,
-            pr_lifecycle=lifecycle,
-            candidate_cas_receipt=cas,
-            source_main_rebind_receipt=rebind,
-            upstream_gate_verdicts=upstream,
-            g3_gate=g3_gate,
+            authority=authority,
         )
     if args.action == "publish-pr":
         push_summary = perform_push(
@@ -1645,22 +1541,14 @@ def run(
             runner,
             verification,
             branch,
-            pr_lifecycle=lifecycle,
-            candidate_cas_receipt=cas,
-            source_main_rebind_receipt=rebind,
-            upstream_gate_verdicts=upstream,
-            g3_gate=g3_gate,
+            authority=authority,
         )
         pr_summary = perform_pr(
             args,
             runner,
             verification,
             branch,
-            pr_lifecycle=lifecycle,
-            candidate_cas_receipt=cas,
-            source_main_rebind_receipt=rebind,
-            upstream_gate_verdicts=upstream,
-            g3_gate=g3_gate,
+            authority=authority,
         )
         summary = dict(pr_summary)
         summary["action"] = "publish-pr"
@@ -1672,11 +1560,7 @@ def run(
             runner,
             verification,
             branch,
-            pr_lifecycle=lifecycle,
-            candidate_cas_receipt=cas,
-            source_main_rebind_receipt=rebind,
-            upstream_gate_verdicts=upstream,
-            g3_gate=g3_gate,
+            authority=authority,
         )
     raise UserVisibleFailure(
         message=f"unknown action: {args.action}",

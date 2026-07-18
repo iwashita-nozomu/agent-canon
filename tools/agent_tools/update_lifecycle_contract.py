@@ -27,11 +27,20 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import cast
 
 from artifact_identity import canonical_body_sha256, canonical_json_bytes
+
+
+@dataclass(frozen=True)
+class SourceMainReadbackIdentity:
+    """Authoritative source-main commit/tree observed after publication."""
+
+    commit_sha: str
+    tree_sha: str
 
 DECISION_SUFFICIENCY_SCHEMA = "agent-canon.decision-sufficiency.v1"
 SNAPSHOT_SCHEMA = "agent-canon.snapshot.v1"
@@ -2005,8 +2014,7 @@ def validate_dependency_frontier_transition(
     *,
     queue_receipt: object,
     rebind_receipt: object,
-    origin_main_commit_sha: str,
-    origin_main_tree_sha: str,
+    origin_main_readback: SourceMainReadbackIdentity,
     ordered_oracle: Sequence[str],
 ) -> dict[str, object]:
     before = validate_dependency_frontier(pending)
@@ -2043,6 +2051,16 @@ def validate_dependency_frontier_transition(
     if rebind_binding["evidence_ref"] != after["source_main_rebind_evidence_ref"]:
         _fail("frontier:rebind_evidence_mismatch")
     publication = cast(Mapping[str, object], after["source_publication_identity"])
+    origin_main_commit_sha = _pattern(
+        origin_main_readback.commit_sha,
+        _HEX40,
+        "dependency_frontier.origin_main_readback.commit_sha",
+    )
+    origin_main_tree_sha = _pattern(
+        origin_main_readback.tree_sha,
+        _HEX40,
+        "dependency_frontier.origin_main_readback.tree_sha",
+    )
     if (
         publication["merge_commit_sha"] != origin_main_commit_sha
         or publication["merge_tree_sha"] != origin_main_tree_sha
@@ -2476,6 +2494,7 @@ __all__ = [
     "PULL_REQUEST_BRANCH_RULES",
     "PR_KINDS",
     "PR_STATES",
+    "SourceMainReadbackIdentity",
     "TRANSACTION_STATES",
     "binding_identity",
     "frontier_key",

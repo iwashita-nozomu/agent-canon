@@ -706,6 +706,7 @@ from pathlib import Path
 
 from artifact_identity import canonical_json_bytes
 from update_lifecycle_contract import (
+    SourceMainReadbackIdentity,
     materialize_gate_verdict,
     validate_dependency_frontier,
     validate_dependency_frontier_transition,
@@ -739,8 +740,10 @@ accepted = validate_dependency_frontier_transition(
     accepted,
     queue_receipt=queue,
     rebind_receipt=rebind,
-    origin_main_commit_sha=source_main_sha,
-    origin_main_tree_sha=source_main_tree,
+    origin_main_readback=SourceMainReadbackIdentity(
+        commit_sha=source_main_sha,
+        tree_sha=source_main_tree,
+    ),
     ordered_oracle=[
         "source_pr:#388",
         "source_pr:#389",
