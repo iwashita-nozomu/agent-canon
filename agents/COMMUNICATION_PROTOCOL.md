@@ -86,6 +86,19 @@ not infer generic certificate guarantees from that hook projection. Skill,
 subagent, task, eval, experiment, and PR-publication adapters remain with their
 existing owners; this boundary does not add adapter-specific regeneration.
 
+Before the generic runtime-event artifact exists, the sole context handoff is
+the immutable `agent_canon.context_discovery_certificate.v1` produced by
+`runtime_log_archive_git.py append-context-discovery`. The producer reads the
+native `session_meta` and selected `event_msg` / `task_complete` records from
+the finite Codex rollout source, binds repository and byte-range identities,
+and publishes one no-replace certificate at
+`reports/agents/<run-id>/context_discovery.<certificate-id>.json`.
+`materialize-runtime-event` enumerates exactly one such certificate, validates
+its repository, rollout, native-record, and hash joins, and uses the certified
+task-completion bytes as its source event. It must not scan for an injected
+`codex.context_discovery.v1` row, use a legacy top-level `task_complete`, or
+re-derive context fields from another source.
+
 ## Post-Compaction Objective Re-Declaration Contract
 
 After context compaction is detected, the first user-facing update from the parent agent before continuing must:

@@ -95,7 +95,15 @@ RUNTIME_EVENT_RECEIPT_SCHEMA = (
     "agent_canon.runtime_event.publication_outcome_receipt.v1"
 )
 RUNTIME_EVENT_CONTEXT_SCHEMA = "codex.context_discovery.v1"
-RUNTIME_EVENT_RECORD_LINE = 872
+CONTEXT_DISCOVERY_CERTIFICATE_SCHEMA = (
+    "agent_canon.context_discovery_certificate.v1"
+)
+CONTEXT_DISCOVERY_CERTIFICATE_PREFIX = (
+    CONTEXT_DISCOVERY_CERTIFICATE_SCHEMA + "\0"
+).encode("ascii")
+CONTEXT_DISCOVERY_CERTIFICATE_NAME = re.compile(
+    r"^context_discovery\.(?P<certificate_id>[0-9a-f]{64})\.json$"
+)
 RUNTIME_EVENT_FAMILY_NAMES = ("requirements", "design", "review", "validation", "lifecycle")
 RUNTIME_EVENT_GATE_RESULTS = (
     "APPROVE", "REVISE", "ESCALATE", "PASS", "FAIL", "BLOCKED", "READY", "INCOMPLETE"
@@ -663,6 +671,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     check_hot_path.add_argument("--path", type=Path, default=None)
 
+    context_discovery = subparsers.add_parser(
+        "append-context-discovery",
+        help="Publish one immutable native ContextDiscoveryV1 certificate.",
+    )
+    context_discovery.add_argument("--run-id", required=True, help="Active reports/agents run id.")
+    context_discovery.add_argument(
+        "--agent-context-id", required=True, help="Native Codex session context UUID."
+    )
+    context_discovery.add_argument(
+        "--turn-id", required=True, help="Native task-completion turn UUID."
+    )
+
     materialize = subparsers.add_parser(
         "materialize-runtime-event",
         help="Materialize one source-bound runtime event into the active run bundle.",
@@ -943,127 +963,231 @@ def _rollout_files(agent_context_id: str) -> tuple[Path, ...]:
     for root in _runtime_session_roots():
         try:
             years = sorted(
-                (path for path in root.iterdir() if path.is_dir() and RUNTIME_EVENT_YEAR.fullmatch(path.name)),
+                (
+                    path
+                    for path in root.iterdir()
+                    if not path.is_symlink()
+                    and path.is_dir()
+                    and RUNTIME_EVENT_YEAR.fullmatch(path.name)
+                ),
                 key=lambda path: path.name.encode("utf-8"),
             )
             for year in years:
                 months = sorted(
-                    (path for path in year.iterdir() if path.is_dir() and RUNTIME_EVENT_MONTH_DAY.fullmatch(path.name)),
+                    (
+                        path
+                        for path in year.iterdir()
+                        if not path.is_symlink()
+                        and path.is_dir()
+                        and RUNTIME_EVENT_MONTH_DAY.fullmatch(path.name)
+                    ),
                     key=lambda path: path.name.encode("utf-8"),
                 )
                 for month in months:
                     days = sorted(
-                        (path for path in month.iterdir() if path.is_dir() and RUNTIME_EVENT_MONTH_DAY.fullmatch(path.name)),
+                        (
+                            path
+                            for path in month.iterdir()
+                            if not path.is_symlink()
+                            and path.is_dir()
+                            and RUNTIME_EVENT_MONTH_DAY.fullmatch(path.name)
+                        ),
                         key=lambda path: path.name.encode("utf-8"),
                     )
                     for day in days:
                         for path in sorted(
-                            (item for item in day.iterdir() if item.is_file()),
+                            (
+                                item
+                                for item in day.iterdir()
+                                if not item.is_symlink() and item.is_file()
+                            ),
                             key=lambda item: item.name.encode("utf-8"),
                         ):
                             identity = _rollout_name_identity(path)
                             if identity is None or identity[1] != agent_context_id:
                                 continue
                             if identity[0] == f"{year.name}-{month.name}-{day.name}":
-                                files.add(path.resolve())
+                                resolved = path.resolve(strict=True)
+                                if resolved.is_relative_to(root):
+                                    files.add(resolved)
         except OSError as exc:
             raise RuntimeEventMaterializationError("source_unavailable", str(exc)) from exc
     return tuple(sorted(files, key=lambda path: path.as_posix().encode("utf-8")))
 
 
-def discover_rollout_context(codex_thread_id: str, agent_context_id: str) -> dict[str, object]:
-    """Certify the ContextDiscoveryV1, rollout, structural, and turn joins."""
-    if not RUNTIME_EVENT_UUID.fullmatch(codex_thread_id):
-        raise RuntimeEventMaterializationError("source_identity_mismatch", "CODEX_THREAD_ID is not a UUID")
+def _native_session_meta(value: dict[str, object]) -> dict[str, object] | None:
+    """Read one native session metadata record or reject its malformed shape."""
+    if value.get("type") != "session_meta":
+        return None
+    payload = value.get("payload")
+    if not isinstance(payload, dict):
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "session_meta payload is not an object"
+        )
+    identity = payload.get("id")
+    parent_id = payload.get("parent_thread_id")
+    role = payload.get("agent_role")
+    cwd = payload.get("cwd")
+    source = payload.get("source")
+    if (
+        not isinstance(identity, str)
+        or not RUNTIME_EVENT_UUID.fullmatch(identity)
+        or not isinstance(parent_id, str)
+        or not RUNTIME_EVENT_UUID.fullmatch(parent_id)
+        or not isinstance(role, str)
+        or not role
+        or not isinstance(cwd, str)
+        or not cwd
+        or not isinstance(source, dict)
+    ):
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "session_meta native identity is invalid"
+        )
+    subagent = source.get("subagent")
+    spawn = subagent.get("thread_spawn") if isinstance(subagent, dict) else None
+    if not isinstance(spawn, dict):
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "session_meta thread_spawn is absent"
+        )
+    spawn_parent = spawn.get("parent_thread_id")
+    spawn_role = spawn.get("agent_role")
+    if (
+        not isinstance(spawn_parent, str)
+        or not RUNTIME_EVENT_UUID.fullmatch(spawn_parent)
+        or not isinstance(spawn_role, str)
+        or not spawn_role
+        or spawn_parent != parent_id
+        or spawn_role != role
+    ):
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "session_meta structural joins do not match"
+        )
+    return {
+        "identity": identity,
+        "parent_id": parent_id,
+        "role": role,
+        "cwd": cwd,
+    }
+
+
+def _native_task_complete(
+    value: dict[str, object], turn_id: str
+) -> dict[str, object] | None:
+    """Read one native task-completion record for the selected turn."""
+    if value.get("type") != "event_msg":
+        return None
+    payload = value.get("payload")
+    if not isinstance(payload, dict) or payload.get("type") != "task_complete":
+        return None
+    native_turn_id = payload.get("turn_id")
+    if not isinstance(native_turn_id, str) or not RUNTIME_EVENT_UUID.fullmatch(native_turn_id):
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "task_complete turn id is invalid"
+        )
+    if native_turn_id != turn_id:
+        return None
+    return {"turn_id": native_turn_id}
+
+
+def discover_rollout_context(agent_context_id: str, turn_id: str) -> dict[str, object]:
+    """Certify native session metadata, rollout identity, and task joins."""
+    if not RUNTIME_EVENT_UUID.fullmatch(agent_context_id) or not RUNTIME_EVENT_UUID.fullmatch(turn_id):
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "context or turn selector is not a UUID"
+        )
     if not _runtime_session_roots():
-        raise RuntimeEventMaterializationError("source_unavailable", "no Codex session root exists")
-    files = _rollout_files(agent_context_id) if agent_context_id else tuple(
-        path for root in _runtime_session_roots() for path in _rollout_files_from_root(root)
-    )
+        raise RuntimeEventMaterializationError(
+            "context_source_absent", "no Codex session root exists"
+        )
+    files = _rollout_files(agent_context_id)
     if not files:
-        raise RuntimeEventMaterializationError("source_unavailable", "no rollout file matches the context selector")
+        raise RuntimeEventMaterializationError(
+            "context_source_absent", "no rollout file matches the context selector"
+        )
+    if len(files) != 1:
+        raise RuntimeEventMaterializationError(
+            "context_source_ambiguous", "rollout path is not unique for the context selector"
+        )
     snapshots: dict[Path, bytes] = {}
-    contexts: list[tuple[Path, dict[str, object]]] = []
-    required = ("agent_id", "agent_context_id", "codex_thread_id", "parent_id", "turn_id", "role")
+    sessions: list[tuple[Path, dict[str, object], dict[str, object]]] = []
+    completions: list[tuple[Path, dict[str, object], dict[str, object]]] = []
     for path in files:
         try:
             snapshot = path.read_bytes()
         except OSError as exc:
-            raise RuntimeEventMaterializationError(
-                "source_unavailable", str(exc)
-            ) from exc
+            raise RuntimeEventMaterializationError("source_unavailable", str(exc)) from exc
         snapshots[path] = snapshot
         for record in _iter_source_snapshot_records(snapshot):
             value = cast(dict[str, object], record["value"])
-            if value.get("schema") != RUNTIME_EVENT_CONTEXT_SCHEMA or value.get("codex_thread_id") != codex_thread_id:
-                continue
-            if list(value) != ["schema", *required]:
-                raise RuntimeEventMaterializationError("context_schema_invalid", "ContextDiscoveryV1 fields are not canonical")
-            if any(not isinstance(value.get(key), str) or not value[key] for key in required):
-                raise RuntimeEventMaterializationError("context_schema_invalid", "ContextDiscoveryV1 field is empty")
-            if any(not RUNTIME_EVENT_UUID.fullmatch(cast(str, value[key])) for key in required[:-1]):
-                raise RuntimeEventMaterializationError("context_schema_invalid", "ContextDiscoveryV1 UUID is invalid")
-            contexts.append((path, value))
-    if len(contexts) == 0:
-        raise RuntimeEventMaterializationError("source_unavailable", "ContextDiscoveryV1 record is absent")
-    if len(contexts) != 1:
-        raise RuntimeEventMaterializationError("source_identity_mismatch", "multiple ContextDiscoveryV1 candidates")
-    context_path, context = contexts[0]
-    discovered_context_id = cast(str, context["agent_context_id"])
-    if agent_context_id and discovered_context_id != agent_context_id:
-        raise RuntimeEventMaterializationError("source_identity_mismatch", "context id mismatch")
-    selected = tuple(path for path in files if path.name.endswith(f"-{discovered_context_id}.jsonl"))
-    if len(selected) != 1:
-        raise RuntimeEventMaterializationError("source_identity_mismatch", "rollout path is not unique")
-    rollout_path = selected[0]
-    file_bytes = snapshots[rollout_path]
-    records = tuple(_iter_source_snapshot_records(file_bytes))
-    companions: list[dict[str, object]] = []
-    for record in records:
-        value = cast(dict[str, object], record["value"])
-        payload = value.get("payload")
-        spawn = payload.get("subagent", {}).get("thread_spawn") if isinstance(payload, dict) else None
-        if isinstance(spawn, dict) and "agent_id" in spawn and "parent_thread_id" in spawn:
-            companions.append(cast(dict[str, object], spawn))
-    if len(companions) != 1:
-        raise RuntimeEventMaterializationError("source_identity_mismatch", "rollout structural join is not unique")
-    companion = companions[0]
-    agent_id, parent_id, role = (companion.get("agent_id"), companion.get("parent_thread_id"), companion.get("agent_role"))
-    if not all(isinstance(value, str) and value for value in (agent_id, parent_id, role)):
-        raise RuntimeEventMaterializationError("source_identity_mismatch", "rollout structural identity is incomplete")
-    if agent_id != context["agent_id"] or parent_id != context["parent_id"] or role != context["role"]:
-        raise RuntimeEventMaterializationError("source_identity_mismatch", "rollout identity does not match context")
-    complete = tuple(
-        record for record in records
-        if record["line"] == RUNTIME_EVENT_RECORD_LINE
-        and cast(dict[str, object], record["value"]).get("type") == "task_complete"
-        and isinstance(cast(dict[str, object], record["value"]).get("payload"), dict)
-        and cast(dict[str, object], cast(dict[str, object], record["value"])["payload"]).get("turn_id") == context["turn_id"]
-    )
-    if len(complete) != 1:
-        raise RuntimeEventMaterializationError("source_identity_mismatch", "task_complete line 872 join is not unique")
-    raw = cast(bytes, complete[0]["raw"])
-    path_bytes = rollout_path.as_posix().encode("utf-8")
-    record_sha = hashlib.sha256(raw).hexdigest()
+            session = _native_session_meta(value)
+            if session is not None:
+                if cast(str, session["identity"]) != agent_context_id:
+                    raise RuntimeEventMaterializationError(
+                        "source_identity_mismatch", "session_meta id does not match selector"
+                    )
+                sessions.append((path, record, session))
+            completion = _native_task_complete(value, turn_id)
+            if completion is not None:
+                completions.append((path, record, completion))
+    if not sessions:
+        raise RuntimeEventMaterializationError(
+            "context_source_absent", "native session_meta record is absent"
+        )
+    if len(sessions) != 1:
+        raise RuntimeEventMaterializationError(
+            "context_source_ambiguous", "native session_meta record is not unique"
+        )
+    if not completions:
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "selected task_complete record is absent"
+        )
+    if len(completions) != 1:
+        raise RuntimeEventMaterializationError(
+            "context_source_ambiguous", "selected task_complete record is not unique"
+        )
+    session_path, session_record, session = sessions[0]
+    task_path, task_record, _task = completions[0]
+    if session_path != task_path:
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "session_meta and task_complete use different rollouts"
+        )
+    name_identity = _rollout_name_identity(session_path)
+    if name_identity is None or name_identity[1] != agent_context_id:
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "rollout filename does not match context selector"
+        )
+    file_bytes = snapshots[session_path]
+    path_bytes = session_path.as_posix().encode("utf-8")
+    task_raw = cast(bytes, task_record["raw"])
+    session_raw = cast(bytes, session_record["raw"])
+    task_sha = hashlib.sha256(task_raw).hexdigest()
     return {
-        "agent_id": cast(str, context["agent_id"]),
-        "agent_context_id": discovered_context_id,
-        "codex_thread_id": codex_thread_id,
-        "parent_id": cast(str, context["parent_id"]),
-        "turn_id": cast(str, context["turn_id"]),
-        "role": cast(str, context["role"]),
-        "rollout_path": rollout_path.as_posix(),
+        "agent_id": agent_context_id,
+        "agent_context_id": agent_context_id,
+        "codex_thread_id": agent_context_id,
+        "parent_id": cast(str, session["parent_id"]),
+        "turn_id": turn_id,
+        "role": cast(str, session["role"]),
+        "rollout_path": session_path.as_posix(),
         "rollout_path_bytes_b64": base64.b64encode(path_bytes).decode("ascii"),
         "rollout_path_sha256": hashlib.sha256(path_bytes).hexdigest(),
         "rollout_file_sha256": hashlib.sha256(file_bytes).hexdigest(),
-        "record_line": RUNTIME_EVENT_RECORD_LINE,
-        "record_byte_offset": cast(int, complete[0]["offset"]),
-        "record_byte_length": len(raw),
-        "record_bytes_b64": base64.b64encode(raw).decode("ascii"),
-        "record_sha256": record_sha,
-        "stable_record_id": record_sha,
-        "decision": "NONE",
-        "context_path": context_path.as_posix(),
+        "session_cwd": cast(str, session["cwd"]),
+        "session_meta": {
+            "line": cast(int, session_record["line"]),
+            "byte_offset": cast(int, session_record["offset"]),
+            "byte_length": len(session_raw),
+            "record_sha256": hashlib.sha256(session_raw).hexdigest(),
+        },
+        "task_complete": {
+            "line": cast(int, task_record["line"]),
+            "byte_offset": cast(int, task_record["offset"]),
+            "byte_length": len(task_raw),
+            "record_sha256": task_sha,
+        },
+        "record_bytes_b64": base64.b64encode(task_raw).decode("ascii"),
+        "record_sha256": task_sha,
+        "stable_record_id": task_sha,
     }
 
 
@@ -1102,7 +1226,7 @@ def _rollout_files_from_root(root: Path) -> tuple[Path, ...]:
 
 def discover_rollout_path(selector: RuntimeEventSelector) -> Path:
     """Return the exact rollout path certified by ContextDiscoveryV1."""
-    context = discover_rollout_context(selector.codex_thread_id, selector.agent_context_id)
+    context = discover_rollout_context(selector.agent_context_id, selector.turn_id)
     return Path(cast(str, context["rollout_path"]))
 
 
@@ -1159,6 +1283,256 @@ def _path_has_traversal(value: str) -> bool:
     return any(part in {".", ".."} for part in parts)
 
 
+def _context_certificate_path(value: object, field: str) -> str:
+    """Validate one absolute, normalized POSIX certificate path."""
+    if (
+        not isinstance(value, str)
+        or not value.startswith("/")
+        or _path_has_traversal(value)
+        or Path(value).as_posix() != value
+    ):
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", f"{field} is not a canonical absolute path"
+        )
+    return value
+
+
+def _context_certificate_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate keys while parsing a context certificate."""
+    if len({key for key, _value in pairs}) != len(pairs):
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate has duplicate keys"
+        )
+    return dict(pairs)
+
+
+def _context_certificate_bytes(value: dict[str, object]) -> bytes:
+    """Render one context certificate as compact canonical JSONL bytes."""
+    return (
+        json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+        + "\n"
+    ).encode("utf-8")
+
+
+def _context_certificate_id(value: dict[str, object]) -> str:
+    """Calculate the certificate id from its zeroed-id canonical preimage."""
+    preimage = dict(value)
+    preimage["certificate_id"] = "0" * 64
+    return hashlib.sha256(
+        CONTEXT_DISCOVERY_CERTIFICATE_PREFIX + _context_certificate_bytes(preimage)
+    ).hexdigest()
+
+
+def validate_context_discovery_certificate(raw: bytes) -> None:
+    """Validate exact ContextDiscoveryV1 certificate shape, bytes, and hashes."""
+    if not raw.endswith(b"\n") or b"\n" in raw[:-1] or not raw[:-1]:
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate must be one JSON line"
+        )
+    try:
+        value = json.loads(
+            raw[:-1].decode("utf-8"), object_pairs_hook=_context_certificate_pairs
+        )
+    except RuntimeEventMaterializationError:
+        raise
+    except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate JSON is invalid"
+        ) from exc
+    def matches(pattern: re.Pattern[str], item: object) -> bool:
+        return isinstance(item, str) and pattern.fullmatch(item) is not None
+
+    if not isinstance(value, dict):
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate is not an object"
+        )
+    if list(value) != ["schema", "certificate_id", "context", "repository", "rollout"]:
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate top-level keys are not canonical"
+        )
+    if value["schema"] != CONTEXT_DISCOVERY_CERTIFICATE_SCHEMA or not matches(RUNTIME_EVENT_HEX64, value["certificate_id"]):
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate schema or id is invalid"
+        )
+    context = value["context"]
+    repository = value["repository"]
+    rollout = value["rollout"]
+    if not isinstance(context, dict) or list(context) != [
+        "schema", "agent_id", "agent_context_id", "codex_thread_id",
+        "parent_id", "turn_id", "role",
+    ]:
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate context shape is invalid"
+        )
+    if context["schema"] != RUNTIME_EVENT_CONTEXT_SCHEMA:
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate context schema is invalid"
+        )
+    for field in ("agent_id", "agent_context_id", "codex_thread_id", "parent_id", "turn_id"):
+        if not isinstance(context[field], str) or not RUNTIME_EVENT_UUID.fullmatch(context[field]):
+            raise RuntimeEventMaterializationError(
+                "context_schema_invalid", f"context certificate {field} is invalid"
+            )
+    if (
+        not isinstance(context["role"], str)
+        or not context["role"]
+        or context["agent_id"] != context["agent_context_id"]
+        or context["agent_context_id"] != context["codex_thread_id"]
+    ):
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate identity joins are invalid"
+        )
+    if not isinstance(repository, dict) or list(repository) != [
+        "root", "root_path_sha256", "head_oid", "tree_oid",
+    ]:
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate repository shape is invalid"
+        )
+    _context_certificate_path(repository["root"], "repository.root")
+    if (
+        not matches(RUNTIME_EVENT_HEX64, repository["root_path_sha256"])
+        or not matches(RUNTIME_EVENT_OID40, repository["head_oid"])
+        or not matches(RUNTIME_EVENT_OID40, repository["tree_oid"])
+    ):
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate repository identity is invalid"
+        )
+    if not isinstance(rollout, dict) or list(rollout) != [
+        "path", "path_sha256", "file_sha256", "session_cwd", "session_meta", "task_complete",
+    ]:
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate rollout shape is invalid"
+        )
+    rollout_path = _context_certificate_path(rollout["path"], "rollout.path")
+    if (
+        not matches(RUNTIME_EVENT_HEX64, rollout["path_sha256"])
+        or not matches(RUNTIME_EVENT_HEX64, rollout["file_sha256"])
+        or not isinstance(rollout["session_cwd"], str)
+        or not rollout["session_cwd"]
+    ):
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate rollout identity is invalid"
+        )
+    for field in ("session_meta", "task_complete"):
+        descriptor = rollout[field]
+        if not isinstance(descriptor, dict) or list(descriptor) != [
+            "line", "byte_offset", "byte_length", "record_sha256",
+        ]:
+            raise RuntimeEventMaterializationError(
+                "context_schema_invalid", f"context certificate {field} shape is invalid"
+            )
+        if (
+            type(descriptor["line"]) is not int
+            or descriptor["line"] <= 0
+            or type(descriptor["byte_offset"]) is not int
+            or descriptor["byte_offset"] < 0
+            or type(descriptor["byte_length"]) is not int
+            or descriptor["byte_length"] <= 0
+            or not matches(RUNTIME_EVENT_HEX64, descriptor["record_sha256"])
+        ):
+            raise RuntimeEventMaterializationError(
+                "context_schema_invalid", f"context certificate {field} range is invalid"
+            )
+    if _context_certificate_id(value) != value["certificate_id"]:
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate id does not cover canonical bytes"
+        )
+    if _context_certificate_bytes(value) != raw:
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context certificate is not canonical"
+        )
+    if not rollout_path:
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "rollout path is empty"
+        )
+
+
+def _source_git_identity(root: Path) -> tuple[str, str]:
+    """Read the current source repository HEAD and tree identities."""
+    head = run(["git", "-C", str(root), "rev-parse", "--verify", "HEAD"], check=False)
+    tree = run(["git", "-C", str(root), "rev-parse", "--verify", "HEAD^{tree}"], check=False)
+    head_oid = head.stdout.strip()
+    tree_oid = tree.stdout.strip()
+    if (
+        head.returncode != 0
+        or tree.returncode != 0
+        or not RUNTIME_EVENT_OID40.fullmatch(head_oid)
+        or not RUNTIME_EVENT_OID40.fullmatch(tree_oid)
+    ):
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "source Git HEAD/tree identity is unavailable"
+        )
+    return head_oid, tree_oid
+
+
+def _build_context_discovery_certificate(
+    context: ArchiveContext, run_id: str, agent_context_id: str, turn_id: str
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Build one certificate from the selected native rollout snapshot."""
+    source = discover_rollout_context(agent_context_id, turn_id)
+    root = context.source_root.resolve()
+    root_bytes = root.as_posix().encode("utf-8")
+    head_oid, tree_oid = _source_git_identity(root)
+    value: dict[str, object] = {
+        "schema": CONTEXT_DISCOVERY_CERTIFICATE_SCHEMA,
+        "certificate_id": "0" * 64,
+        "context": {
+            "schema": RUNTIME_EVENT_CONTEXT_SCHEMA,
+            "agent_id": source["agent_id"],
+            "agent_context_id": source["agent_context_id"],
+            "codex_thread_id": source["codex_thread_id"],
+            "parent_id": source["parent_id"],
+            "turn_id": source["turn_id"],
+            "role": source["role"],
+        },
+        "repository": {
+            "root": root.as_posix(),
+            "root_path_sha256": hashlib.sha256(root_bytes).hexdigest(),
+            "head_oid": head_oid,
+            "tree_oid": tree_oid,
+        },
+        "rollout": {
+            "path": source["rollout_path"],
+            "path_sha256": source["rollout_path_sha256"],
+            "file_sha256": source["rollout_file_sha256"],
+            "session_cwd": source["session_cwd"],
+            "session_meta": source["session_meta"],
+            "task_complete": source["task_complete"],
+        },
+    }
+    value["certificate_id"] = _context_certificate_id(value)
+    raw = _context_certificate_bytes(value)
+    validate_context_discovery_certificate(raw)
+    return value, source
+
+
+def _active_run_directory(context: ArchiveContext, run_id: str) -> Path:
+    """Resolve and verify the selected run against the active-run pointer."""
+    safe_id = safe_run_id(run_id)
+    pointer = context.source_root / ACTIVE_RUN_POINTER
+    if not pointer.is_file():
+        raise RuntimeEventMaterializationError(
+            "source_unavailable", "active run pointer is absent"
+        )
+    active_value = pointer.read_text(encoding="utf-8").strip()
+    if not active_value:
+        raise RuntimeEventMaterializationError(
+            "source_unavailable", "active run pointer is empty"
+        )
+    active_run = Path(active_value)
+    if not active_run.is_absolute():
+        active_run = pointer.parent / active_run
+    active_run = active_run.resolve()
+    expected_run = (context.source_root / DEFAULT_AGENT_REPORT_ROOT / safe_id).resolve()
+    if active_run != expected_run:
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "run id does not match the active run pointer"
+        )
+    if not active_run.is_dir():
+        raise RuntimeEventMaterializationError(
+            "source_unavailable", "active run directory is absent"
+        )
+    return active_run
 def _require_relative_schema_path(value: object, field: str) -> str:
     """Validate one canonical repository-relative schema path."""
     if (
@@ -1576,7 +1950,7 @@ def validate_runtime_event_schema(raw: bytes) -> None:
         or _path_has_traversal(cast(str, source["rollout_path"]))
     ):
         raise RuntimeEventMaterializationError("schema_invalid", "rollout path is invalid")
-    if source["record_line"] != RUNTIME_EVENT_RECORD_LINE or type(source["record_byte_offset"]) is not int or source["record_byte_offset"] < 0 or type(source["record_byte_length"]) is not int or source["record_byte_length"] <= 0:
+    if type(source["record_line"]) is not int or source["record_line"] <= 0 or type(source["record_byte_offset"]) is not int or source["record_byte_offset"] < 0 or type(source["record_byte_length"]) is not int or source["record_byte_length"] <= 0:
         raise RuntimeEventMaterializationError("schema_invalid", "record range is invalid")
     for field in ("rollout_path_sha256", "rollout_file_sha256", "record_sha256", "stable_record_id"):
         if not matches(RUNTIME_EVENT_HEX64, source[field]):
@@ -1929,6 +2303,350 @@ def acquire_publication_attempt_lock(
             if body_error is not None:
                 raise error from body_error
             raise error from release_error
+
+
+def _publish_context_discovery_noreplace(target: Path, bytes_: bytes) -> None:
+    """Publish one immutable context certificate with exact readback."""
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.is_symlink() or (target.exists() and not target.is_file()):
+            raise RuntimeEventMaterializationError(
+                "context_record_collision", "certificate target is not a regular file"
+            )
+        if target.is_file():
+            existing = target.read_bytes()
+            if existing != bytes_:
+                raise RuntimeEventMaterializationError(
+                    "context_record_collision", "certificate target has different bytes"
+                )
+            validate_context_discovery_certificate(existing)
+            return
+    except RuntimeEventMaterializationError:
+        raise
+    except OSError as exc:
+        raise RuntimeEventMaterializationError(
+            "context_publication_failure", "certificate target preparation failed"
+        ) from exc
+
+    fd = -1
+    temporary: Path | None = None
+    identity: tuple[int, int] | None = None
+    published = False
+    try:
+        fd, temporary_name = tempfile.mkstemp(
+            prefix=f".{target.name}.", suffix=".tmp", dir=target.parent
+        )
+        temporary = Path(temporary_name)
+        os.fchmod(fd, 0o600)
+        nofollow = getattr(os, "O_NOFOLLOW", 0)
+        if not nofollow:
+            raise RuntimeEventMaterializationError(
+                "context_publication_failure", "O_NOFOLLOW is unavailable"
+            )
+        os.close(fd)
+        fd = os.open(temporary, os.O_RDWR | nofollow)
+        metadata = os.fstat(fd)
+        identity = (metadata.st_dev, metadata.st_ino)
+        if (
+            not S_ISREG(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or metadata.st_nlink != 1
+            or S_IMODE(metadata.st_mode) != 0o600
+        ):
+            raise RuntimeEventMaterializationError(
+                "context_publication_failure", "identity-owned temp metadata is invalid"
+            )
+        view = memoryview(bytes_)
+        while view:
+            written = os.write(fd, view)
+            if written <= 0:
+                raise RuntimeEventMaterializationError(
+                    "context_publication_failure", "certificate write made no progress"
+                )
+            view = view[written:]
+        os.fsync(fd)
+        if os.pread(fd, len(bytes_) + 1, 0) != bytes_:
+            raise RuntimeEventMaterializationError(
+                "context_publication_failure", "certificate temporary readback differs"
+            )
+        os.close(fd)
+        fd = -1
+        latest = temporary.lstat()
+        if (
+            not S_ISREG(latest.st_mode)
+            or latest.st_uid != os.geteuid()
+            or identity != (latest.st_dev, latest.st_ino)
+            or latest.st_nlink != 1
+            or S_IMODE(latest.st_mode) != 0o600
+        ):
+            raise RuntimeEventMaterializationError(
+                "context_publication_failure", "identity-owned temp verification failed"
+            )
+        try:
+            _renameat2_noreplace(temporary, target)
+        except FileExistsError:
+            if target.is_symlink() or not target.is_file():
+                raise RuntimeEventMaterializationError(
+                    "context_record_collision", "certificate target collision"
+                )
+            existing = target.read_bytes()
+            if existing != bytes_:
+                raise RuntimeEventMaterializationError(
+                    "context_record_collision", "certificate target collision"
+                )
+            validate_context_discovery_certificate(existing)
+            return
+        published = True
+        temporary = None
+        _fsync_directory(target.parent, "artifact-parent")
+        committed = target.read_bytes()
+        if committed != bytes_:
+            raise RuntimeEventMaterializationError(
+                "context_publication_failure", "certificate target readback differs"
+            )
+        validate_context_discovery_certificate(committed)
+    except RuntimeEventMaterializationError:
+        raise
+    except OSError as exc:
+        raise RuntimeEventMaterializationError(
+            "context_publication_failure", "certificate publication failed"
+        ) from exc
+    finally:
+        if fd >= 0:
+            try:
+                os.close(fd)
+            except OSError as exc:
+                raise RuntimeEventMaterializationError(
+                    "context_publication_failure", "certificate temporary close failed"
+                ) from exc
+        if temporary is not None:
+            try:
+                current = temporary.stat()
+                if not published and identity == (current.st_dev, current.st_ino):
+                    temporary.unlink()
+            except OSError:
+                pass
+
+
+def _certificate_record(
+    records: tuple[dict[str, object], ...],
+    descriptor: dict[str, object],
+    field: str,
+) -> dict[str, object]:
+    """Return the one rollout record covered by a certificate descriptor."""
+    matches = tuple(
+        record
+        for record in records
+        if record["line"] == descriptor["line"]
+        and record["offset"] == descriptor["byte_offset"]
+        and record["length"] == descriptor["byte_length"]
+        and hashlib.sha256(cast(bytes, record["raw"])).hexdigest()
+        == descriptor["record_sha256"]
+    )
+    if len(matches) != 1:
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", f"{field} certificate range is not unique"
+        )
+    return matches[0]
+
+
+def _verify_context_discovery_certificate(
+    context: ArchiveContext, value: dict[str, object]
+) -> dict[str, object]:
+    """Revalidate a certificate against the current repository and rollout."""
+    certificate_context = cast(dict[str, object], value["context"])
+    repository = cast(dict[str, object], value["repository"])
+    rollout = cast(dict[str, object], value["rollout"])
+    root = context.source_root.resolve()
+    root_bytes = root.as_posix().encode("utf-8")
+    if (
+        repository["root"] != root.as_posix()
+        or repository["root_path_sha256"] != hashlib.sha256(root_bytes).hexdigest()
+    ):
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "certificate repository path identity differs"
+        )
+    head_oid, tree_oid = _source_git_identity(root)
+    if repository["head_oid"] != head_oid or repository["tree_oid"] != tree_oid:
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "certificate repository Git identity differs"
+        )
+    rollout_path = Path(cast(str, rollout["path"]))
+    try:
+        resolved_rollout_path = rollout_path.resolve(strict=True)
+    except OSError as exc:
+        raise RuntimeEventMaterializationError(
+            "source_unavailable", "certificate rollout path is unavailable"
+        ) from exc
+    session_roots = _runtime_session_roots()
+    if (
+        rollout_path.is_symlink()
+        or resolved_rollout_path.as_posix() != rollout["path"]
+        or not any(
+            resolved_rollout_path.is_relative_to(root) for root in session_roots
+        )
+        or _rollout_name_identity(rollout_path) is None
+        or cast(tuple[str, str], _rollout_name_identity(rollout_path))[1]
+        != certificate_context["agent_context_id"]
+    ):
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "certificate rollout path identity differs"
+        )
+    rollout_path = resolved_rollout_path
+    eligible = _rollout_files(cast(str, certificate_context["agent_context_id"]))
+    if len(eligible) != 1 or eligible[0] != rollout_path:
+        raise RuntimeEventMaterializationError(
+            "context_source_ambiguous" if len(eligible) > 1 else "source_identity_mismatch",
+            "certificate rollout is absent or not unique",
+        )
+    try:
+        file_bytes = rollout_path.read_bytes()
+    except OSError as exc:
+        raise RuntimeEventMaterializationError(
+            "source_unavailable", "certificate rollout cannot be read"
+        ) from exc
+    path_bytes = rollout_path.as_posix().encode("utf-8")
+    if (
+        hashlib.sha256(path_bytes).hexdigest() != rollout["path_sha256"]
+        or hashlib.sha256(file_bytes).hexdigest() != rollout["file_sha256"]
+    ):
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "certificate rollout bytes differ"
+        )
+    records = tuple(_iter_source_snapshot_records(file_bytes))
+    session_descriptor = cast(dict[str, object], rollout["session_meta"])
+    task_descriptor = cast(dict[str, object], rollout["task_complete"])
+    session_record = _certificate_record(records, session_descriptor, "session_meta")
+    task_record = _certificate_record(records, task_descriptor, "task_complete")
+    session = _native_session_meta(cast(dict[str, object], session_record["value"]))
+    task = _native_task_complete(
+        cast(dict[str, object], task_record["value"]),
+        cast(str, certificate_context["turn_id"]),
+    )
+    if session is None or task is None:
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "certificate native record shape differs"
+        )
+    if (
+        session["identity"] != certificate_context["agent_context_id"]
+        or session["parent_id"] != certificate_context["parent_id"]
+        or session["role"] != certificate_context["role"]
+        or session["cwd"] != rollout["session_cwd"]
+        or task["turn_id"] != certificate_context["turn_id"]
+    ):
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "certificate native joins differ"
+        )
+    if sum(
+        _native_session_meta(cast(dict[str, object], record["value"])) is not None
+        for record in records
+    ) != 1:
+        raise RuntimeEventMaterializationError(
+            "context_source_ambiguous", "session_meta record is no longer unique"
+        )
+    selected_tasks = tuple(
+        record
+        for record in records
+        if _native_task_complete(
+            cast(dict[str, object], record["value"]),
+            cast(str, certificate_context["turn_id"]),
+        )
+        is not None
+    )
+    if len(selected_tasks) != 1 or selected_tasks[0] != task_record:
+        raise RuntimeEventMaterializationError(
+            "context_source_ambiguous" if len(selected_tasks) > 1 else "source_identity_mismatch",
+            "selected task_complete record is no longer unique",
+        )
+    task_raw = cast(bytes, task_record["raw"])
+    return {
+        "agent_id": certificate_context["agent_id"],
+        "agent_context_id": certificate_context["agent_context_id"],
+        "codex_thread_id": certificate_context["codex_thread_id"],
+        "parent_id": certificate_context["parent_id"],
+        "turn_id": certificate_context["turn_id"],
+        "role": certificate_context["role"],
+        "rollout_path": rollout["path"],
+        "rollout_path_bytes_b64": base64.b64encode(path_bytes).decode("ascii"),
+        "rollout_path_sha256": rollout["path_sha256"],
+        "rollout_file_sha256": rollout["file_sha256"],
+        "record_line": task_descriptor["line"],
+        "record_byte_offset": task_descriptor["byte_offset"],
+        "record_byte_length": task_descriptor["byte_length"],
+        "record_bytes_b64": base64.b64encode(task_raw).decode("ascii"),
+        "record_sha256": task_descriptor["record_sha256"],
+        "stable_record_id": task_descriptor["record_sha256"],
+    }
+
+
+def _load_context_discovery_certificate(
+    context: ArchiveContext, active_run: Path
+) -> dict[str, object]:
+    """Load exactly one active-run certificate and return its certified source event."""
+    try:
+        candidates = tuple(
+            sorted(
+                (
+                    path
+                    for path in active_run.iterdir()
+                    if CONTEXT_DISCOVERY_CERTIFICATE_NAME.fullmatch(path.name)
+                ),
+                key=lambda path: path.name.encode("utf-8"),
+            )
+        )
+    except OSError as exc:
+        raise RuntimeEventMaterializationError(
+            "source_unavailable", "active run certificate directory cannot be read"
+        ) from exc
+    if not candidates:
+        raise RuntimeEventMaterializationError(
+            "context_source_absent", "context discovery certificate is absent"
+        )
+    if len(candidates) != 1:
+        raise RuntimeEventMaterializationError(
+            "context_source_ambiguous", "context discovery certificate is not unique"
+        )
+    certificate_path = candidates[0]
+    if certificate_path.is_symlink() or not certificate_path.is_file():
+        raise RuntimeEventMaterializationError(
+            "context_schema_invalid", "context discovery certificate is not a regular file"
+        )
+    try:
+        raw = certificate_path.read_bytes()
+    except OSError as exc:
+        raise RuntimeEventMaterializationError(
+            "source_unavailable", "context discovery certificate cannot be read"
+        ) from exc
+    validate_context_discovery_certificate(raw)
+    value = cast(
+        dict[str, object],
+        json.loads(raw[:-1].decode("utf-8"), object_pairs_hook=_context_certificate_pairs),
+    )
+    certificate_id = cast(str, value["certificate_id"])
+    filename_id = cast(re.Match[str], CONTEXT_DISCOVERY_CERTIFICATE_NAME.fullmatch(certificate_path.name)).group("certificate_id")
+    if certificate_id != filename_id:
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "certificate filename id differs"
+        )
+    return _verify_context_discovery_certificate(context, value)
+
+
+def command_append_context_discovery(
+    context: ArchiveContext, args: argparse.Namespace
+) -> int:
+    """Produce and publish one native ContextDiscoveryV1 certificate."""
+    active_run = _active_run_directory(context, args.run_id)
+    value, source = _build_context_discovery_certificate(
+        context, args.run_id, args.agent_context_id, args.turn_id
+    )
+    certificate_id = cast(str, value["certificate_id"])
+    target = active_run / f"context_discovery.{certificate_id}.json"
+    _publish_context_discovery_noreplace(target, _context_certificate_bytes(value))
+    print(f"CONTEXT_DISCOVERY_PATH={target.relative_to(context.source_root).as_posix()}")
+    print(f"CONTEXT_DISCOVERY_CERTIFICATE_ID={certificate_id}")
+    print(f"CONTEXT_DISCOVERY_RECORD_SHA256={source['record_sha256']}")
+    print("CONTEXT_DISCOVERY_APPEND=pass")
+    return 0
 
 
 def _publish_runtime_event_noreplace(target: Path, bytes_: bytes) -> dict[str, object]:
@@ -3386,25 +4104,8 @@ def command_materialize_runtime_event(context: ArchiveContext, args: argparse.Na
     """Materialize one fixed result-family event into the active run bundle."""
     spec = fixed_result_family_spec(args.result_family, args.gate_id)
     run_id = safe_run_id(args.run_id)
-    pointer = context.source_root / ACTIVE_RUN_POINTER
-    if not pointer.is_file():
-        raise RuntimeEventMaterializationError("source_unavailable", "active run pointer is absent")
-    active_value = pointer.read_text(encoding="utf-8").strip()
-    if not active_value:
-        raise RuntimeEventMaterializationError("source_unavailable", "active run pointer is empty")
-    active_run = Path(active_value)
-    if not active_run.is_absolute():
-        active_run = pointer.parent / active_run
-    active_run = active_run.resolve()
-    expected_run = (context.source_root / DEFAULT_AGENT_REPORT_ROOT / run_id).resolve()
-    if active_run != expected_run:
-        raise RuntimeEventMaterializationError("source_identity_mismatch", "run id does not match the active run pointer")
-    if not active_run.is_dir():
-        raise RuntimeEventMaterializationError("source_unavailable", "active run directory is absent")
-    thread_id = os.environ.get("CODEX_THREAD_ID", "").strip()
-    if not thread_id:
-        raise RuntimeEventMaterializationError("source_identity_mismatch", "CODEX_THREAD_ID is required")
-    source_event = discover_rollout_context(thread_id, "")
+    active_run = _active_run_directory(context, run_id)
+    source_event = _load_context_discovery_certificate(context, active_run)
     result_path = active_run / spec.artifact_name
     try:
         result_bytes = result_path.read_bytes()
@@ -3446,7 +4147,6 @@ def command_materialize_runtime_event(context: ArchiveContext, args: argparse.Na
     target = active_run / f"runtime_event.{unit_id}.json"
     source_event["decision"] = cast(str, result.get("decision", "NONE"))
     source_event["applicable_gate_result"] = gate_result
-    source_event.pop("context_path", None)
     value: dict[str, object] = {
         "schema": RUNTIME_EVENT_SCHEMA, "materialization_id": "0" * 64, "result_family": spec.result_family,
         "gate": {"id": spec.gate_id, "result": gate_result}, "source_event": {
@@ -5133,6 +5833,8 @@ def main(argv: list[str] | None = None) -> int:
         return command_check_hook_hot_path(path.resolve())
     try:
         context = build_context(args)
+        if args.command == "append-context-discovery":
+            return command_append_context_discovery(context, args)
         if args.command == "materialize-runtime-event":
             return command_materialize_runtime_event(context, args)
         if args.command == "repo-key":
@@ -5156,10 +5858,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "sync":
             return command_sync(context, args)
     except RuntimeEventMaterializationError as exc:
+        if args.command == "append-context-discovery":
+            print(f"CONTEXT_DISCOVERY_ERROR_CODE={exc.code}")
+            print("CONTEXT_DISCOVERY_APPEND=fail")
+            return 1
         print(f"RUNTIME_EVENT_ERROR_CODE={exc.code}")
         print("RUNTIME_EVENT_MATERIALIZE=fail")
         return 1
     except ArchiveGitError as exc:
+        if args.command == "append-context-discovery":
+            print("CONTEXT_DISCOVERY_ERROR_CODE=source_unavailable")
+            print("CONTEXT_DISCOVERY_APPEND=fail")
+            return 1
         print(f"RUNTIME_LOG_ARCHIVE_ERROR={exc}")
         print("RUNTIME_LOG_ARCHIVE=fail")
         return 1

@@ -51,6 +51,8 @@ class RuntimeMaterializationFixture:
     context: runtime_log_archive_git.ArchiveContext
     args: argparse.Namespace
     thread_id: str
+    context_id: str
+    turn_id: str
     session_root: Path
     rollout: Path
     raw_record: bytes
@@ -200,7 +202,6 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
         thread_id = "11111111-1111-4111-8111-111111111111"
         context_id = "22222222-2222-4222-8222-222222222222"
-        agent_id = "33333333-3333-4333-8333-333333333333"
         parent_id = "44444444-4444-4444-8444-444444444444"
         turn_id = "55555555-5555-4555-8555-555555555555"
         session_root = root / "sessions"
@@ -209,38 +210,36 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         rollout = session_day / (
             f"rollout-2026-07-17T12-00-00.123Z-{context_id}.jsonl"
         )
-        context_record = {
-            "schema": "codex.context_discovery.v1",
-            "agent_id": agent_id,
-            "agent_context_id": context_id,
-            "codex_thread_id": thread_id,
-            "parent_id": parent_id,
-            "turn_id": turn_id,
-            "role": "worker",
-        }
-        companion = {
-            "type": "thread_spawn",
+        session_meta = {
+            "type": "session_meta",
             "payload": {
-                "subagent": {
-                    "thread_spawn": {
-                        "agent_id": agent_id,
-                        "parent_thread_id": parent_id,
-                        "agent_role": "worker",
+                "id": context_id,
+                "parent_thread_id": parent_id,
+                "agent_role": "worker",
+                "cwd": str(source),
+                "source": {
+                    "subagent": {
+                        "thread_spawn": {
+                            "parent_thread_id": parent_id,
+                            "agent_role": "worker",
+                        }
                     }
                 }
-            },
+            }
         }
         records = [
             json.dumps({"type": "noop", "index": index}, separators=(",", ":"))
             + "\n"
-            for index in range(869)
+            for index in range(870)
         ]
         records.extend(
             [
-                json.dumps(context_record, separators=(",", ":")) + "\n",
-                json.dumps(companion, separators=(",", ":")) + "\n",
+                json.dumps(session_meta, separators=(",", ":")) + "\n",
                 json.dumps(
-                    {"type": "task_complete", "payload": {"turn_id": turn_id}},
+                    {
+                        "type": "event_msg",
+                        "payload": {"type": "task_complete", "turn_id": turn_id},
+                    },
                     separators=(",", ":"),
                 )
                 + "\n",
@@ -268,11 +267,46 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             base_ref=base_oid,
             unit_id=None,
         )
+        producer_stdout = io.StringIO()
+        producer_stderr = io.StringIO()
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_CANON_CODEX_SESSION_ROOT": str(session_root)},
+                clear=False,
+            ),
+            contextlib.redirect_stdout(producer_stdout),
+            contextlib.redirect_stderr(producer_stderr),
+        ):
+            self.assertEqual(
+                runtime_log_archive_git.main(
+                    [
+                        "--source-root",
+                        str(source),
+                        "--canon-root",
+                        str(source),
+                        "--archive-root",
+                        str(context.archive_root),
+                        "append-context-discovery",
+                        "--run-id",
+                        run_id,
+                        "--agent-context-id",
+                        context_id,
+                        "--turn-id",
+                        turn_id,
+                    ]
+                ),
+                0,
+            )
+        self.assertEqual(producer_stderr.getvalue(), "")
+        self.assertIn("CONTEXT_DISCOVERY_APPEND=pass\n", producer_stdout.getvalue())
         return RuntimeMaterializationFixture(
             source=source,
             context=context,
             args=args,
             thread_id=thread_id,
+            context_id=context_id,
+            turn_id=turn_id,
             session_root=session_root,
             rollout=rollout,
             raw_record=raw_record,
@@ -283,6 +317,57 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             target_relative=target_relative,
             result_path=result_path,
         )
+
+    def producer_argv(self, fixture: RuntimeMaterializationFixture) -> list[str]:
+        """Return the exact public argv for one context producer invocation."""
+        return [
+            "--source-root",
+            str(fixture.source),
+            "--canon-root",
+            str(fixture.source),
+            "--archive-root",
+            str(fixture.context.archive_root),
+            "append-context-discovery",
+            "--run-id",
+            fixture.args.run_id,
+            "--agent-context-id",
+            fixture.context_id,
+            "--turn-id",
+            fixture.turn_id,
+        ]
+
+    def invoke_producer(
+        self, fixture: RuntimeMaterializationFixture
+    ) -> tuple[int, str, str]:
+        """Invoke the public context producer and capture its exact streams."""
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_CANON_CODEX_SESSION_ROOT": str(fixture.session_root)},
+                clear=False,
+            ),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = runtime_log_archive_git.main(self.producer_argv(fixture))
+        return result, stdout.getvalue(), stderr.getvalue()
+
+    def assert_producer_failure(
+        self,
+        fixture: RuntimeMaterializationFixture,
+        code: str,
+    ) -> None:
+        """Require one exact typed public context-producer failure."""
+        result, stdout, stderr = self.invoke_producer(fixture)
+        self.assertEqual(result, 1)
+        self.assertEqual(
+            stdout,
+            f"CONTEXT_DISCOVERY_ERROR_CODE={code}\n"
+            "CONTEXT_DISCOVERY_APPEND=fail\n",
+        )
+        self.assertEqual(stderr, "")
 
     def materializer_argv(self, fixture: RuntimeMaterializationFixture) -> list[str]:
         """Return the exact public argv for one fixture materialization."""
@@ -314,7 +399,6 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             patch.dict(
                 os.environ,
                 {
-                    "CODEX_THREAD_ID": fixture.thread_id,
                     "AGENT_CANON_CODEX_SESSION_ROOT": str(fixture.session_root),
                 },
                 clear=False,
@@ -1193,14 +1277,13 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             with patch.dict(
                 os.environ,
                 {
-                    "CODEX_THREAD_ID": fixture.thread_id,
                     "AGENT_CANON_CODEX_SESSION_ROOT": str(fixture.session_root),
                 },
                 clear=False,
             ):
                 identity = runtime_log_archive_git.discover_rollout_context(
-                    fixture.thread_id,
-                    "22222222-2222-4222-8222-222222222222",
+                    fixture.context_id,
+                    fixture.turn_id,
                 )
                 self.assertEqual(
                     runtime_log_archive_git.command_materialize_runtime_event(
@@ -1213,22 +1296,206 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIsInstance(source_event, dict)
             source_event = source_event
             self.assertEqual(identity["rollout_path"], fixture.rollout.resolve().as_posix())
-            self.assertEqual(identity["record_line"], 872)
-            self.assertEqual(identity["record_byte_length"], len(fixture.raw_record))
+            task_complete = cast(dict[str, object], identity["task_complete"])
+            self.assertEqual(task_complete["line"], 872)
+            self.assertEqual(task_complete["byte_length"], len(fixture.raw_record))
             self.assertEqual(
-                identity["record_byte_offset"],
+                task_complete["byte_offset"],
                 sum(
                     len(item)
                     for item in fixture.rollout.read_bytes().splitlines(keepends=True)[:871]
                 ),
             )
             self.assertEqual(
-                identity["record_sha256"], hashlib.sha256(fixture.raw_record).hexdigest()
+                task_complete["record_sha256"], hashlib.sha256(fixture.raw_record).hexdigest()
             )
             self.assertEqual(source_event["record_bytes_b64"], identity["record_bytes_b64"])
-            self.assertEqual(source_event["record_byte_offset"], identity["record_byte_offset"])
-            self.assertEqual(source_event["agent_id"], "33333333-3333-4333-8333-333333333333")
+            self.assertEqual(source_event["record_byte_offset"], task_complete["byte_offset"])
+            self.assertEqual(source_event["agent_id"], fixture.context_id)
             self.assertEqual(source_event["parent_id"], "44444444-4444-4444-8444-444444444444")
+
+    def test_context_discovery_certificate_is_canonical_and_idempotent(self) -> None:
+        """The native producer publishes one hash-bound certificate and retries safely."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
+            certificate = next(fixture.result_path.parent.glob("context_discovery.*.json"))
+            first_bytes = certificate.read_bytes()
+            value = json.loads(first_bytes)
+            self.assertEqual(
+                certificate.name,
+                f"context_discovery.{value['certificate_id']}.json",
+            )
+            runtime_log_archive_git.validate_context_discovery_certificate(first_bytes)
+            self.assertEqual(value["rollout"]["task_complete"]["line"], 872)
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with (
+                patch.dict(
+                    os.environ,
+                    {"AGENT_CANON_CODEX_SESSION_ROOT": str(fixture.session_root)},
+                    clear=False,
+                ),
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
+            ):
+                self.assertEqual(
+                    runtime_log_archive_git.main(
+                        [
+                            "--source-root",
+                            str(fixture.source),
+                            "--canon-root",
+                            str(fixture.source),
+                            "--archive-root",
+                            str(fixture.context.archive_root),
+                            "append-context-discovery",
+                            "--run-id",
+                            fixture.args.run_id,
+                            "--agent-context-id",
+                            fixture.context_id,
+                            "--turn-id",
+                            fixture.turn_id,
+                        ]
+                    ),
+                    0,
+                )
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertEqual(certificate.read_bytes(), first_bytes)
+
+    def test_context_discovery_producer_rejects_symlinked_rollout_outside_session_root(
+        self,
+    ) -> None:
+        """An outside-root JSONL reached through a symlink cannot be certified."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
+            certificate = next(
+                fixture.result_path.parent.glob("context_discovery.*.json")
+            )
+            certificate.unlink()
+            outside = Path(tmp_dir) / "outside" / fixture.rollout.name
+            outside.parent.mkdir()
+            outside.write_bytes(fixture.rollout.read_bytes())
+            fixture.rollout.unlink()
+            fixture.rollout.symlink_to(outside)
+
+            self.assert_producer_failure(fixture, "context_source_absent")
+            self.assertEqual(
+                tuple(fixture.result_path.parent.glob("context_discovery.*.json")),
+                (),
+            )
+
+    def test_context_discovery_producer_rejects_invalid_native_evidence_cardinality(
+        self,
+    ) -> None:
+        """C-04 rejects absent, duplicate, and malformed native evidence."""
+        cases = (
+            ("rollout_absent", "context_source_absent"),
+            ("rollout_ambiguous", "context_source_ambiguous"),
+            ("session_meta_absent", "context_source_absent"),
+            ("session_meta_duplicate", "context_source_ambiguous"),
+            ("task_complete_absent", "source_identity_mismatch"),
+            ("task_complete_duplicate", "context_source_ambiguous"),
+            ("malformed_structural_join", "source_identity_mismatch"),
+        )
+        for case, expected_code in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp_dir:
+                fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
+                certificate = next(
+                    fixture.result_path.parent.glob("context_discovery.*.json")
+                )
+                certificate.unlink()
+                if case == "rollout_absent":
+                    fixture.rollout.unlink()
+                elif case == "rollout_ambiguous":
+                    duplicate = fixture.rollout.with_name(
+                        "rollout-2026-07-17T12-00-01.123Z-"
+                        f"{fixture.context_id}.jsonl"
+                    )
+                    duplicate.write_bytes(fixture.rollout.read_bytes())
+                else:
+                    lines = fixture.rollout.read_bytes().splitlines(keepends=True)
+                    if case == "session_meta_absent":
+                        del lines[870]
+                    elif case == "session_meta_duplicate":
+                        lines.insert(871, lines[870])
+                    elif case == "task_complete_absent":
+                        del lines[871]
+                    elif case == "task_complete_duplicate":
+                        lines.append(lines[871])
+                    else:
+                        session_meta = json.loads(lines[870])
+                        session_meta["payload"]["source"]["subagent"]["thread_spawn"][
+                            "parent_thread_id"
+                        ] = "33333333-3333-4333-8333-333333333333"
+                        lines[870] = (
+                            json.dumps(session_meta, separators=(",", ":")) + "\n"
+                        ).encode("utf-8")
+                    fixture.rollout.write_bytes(b"".join(lines))
+
+                self.assert_producer_failure(fixture, expected_code)
+                self.assertEqual(
+                    tuple(fixture.result_path.parent.glob("context_discovery.*.json")),
+                    (),
+                )
+
+    def test_context_discovery_producer_no_replace_collision_and_failure(
+        self,
+    ) -> None:
+        """C-03 preserves existing bytes and fails before a replacement is visible."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            collision = self.make_valid_materialization_fixture(
+                Path(tmp_dir) / "collision"
+            )
+            collision_target = next(
+                collision.result_path.parent.glob("context_discovery.*.json")
+            )
+            conflicting_bytes = b"existing collision bytes\n"
+            collision_target.write_bytes(conflicting_bytes)
+
+            self.assert_producer_failure(collision, "context_record_collision")
+            self.assertEqual(collision_target.read_bytes(), conflicting_bytes)
+
+            publication_failure = self.make_valid_materialization_fixture(
+                Path(tmp_dir) / "publication-failure"
+            )
+            publication_target = next(
+                publication_failure.result_path.parent.glob(
+                    "context_discovery.*.json"
+                )
+            )
+            publication_target.unlink()
+            with patch.object(
+                runtime_log_archive_git,
+                "_renameat2_noreplace",
+                side_effect=OSError("forced publication failure"),
+            ):
+                self.assert_producer_failure(
+                    publication_failure, "context_publication_failure"
+                )
+            self.assertFalse(publication_target.exists())
+            self.assertEqual(
+                tuple(
+                    publication_failure.result_path.parent.glob(
+                        f".{publication_target.name}.*.tmp"
+                    )
+                ),
+                (),
+            )
+
+    def test_materialize_runtime_event_requires_exactly_one_context_certificate(self) -> None:
+        """The materializer rejects absent and ambiguous certificate handoffs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            absent = self.make_valid_materialization_fixture(Path(tmp_dir) / "absent")
+            certificate = next(absent.result_path.parent.glob("context_discovery.*.json"))
+            certificate.unlink()
+            self.assert_materializer_failure(absent, "context_source_absent")
+
+            ambiguous = self.make_valid_materialization_fixture(Path(tmp_dir) / "ambiguous")
+            certificate = next(ambiguous.result_path.parent.glob("context_discovery.*.json"))
+            duplicate = certificate.with_name(
+                "context_discovery." + "f" * 64 + ".json"
+            )
+            duplicate.write_bytes(certificate.read_bytes())
+            self.assert_materializer_failure(ambiguous, "context_source_ambiguous")
 
     def test_materialize_runtime_event_uses_one_immutable_rollout_snapshot(self) -> None:
         """V-02 binds discovery, selected bytes, offsets, and hashes to one read."""
@@ -1240,8 +1507,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             mutated_lines[871] = (
                 json.dumps(
                     {
-                        "type": "task_complete",
+                        "type": "event_msg",
                         "payload": {
+                            "type": "task_complete",
                             "turn_id": "66666666-6666-4666-8666-666666666666"
                         },
                     },
@@ -1278,8 +1546,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 ),
             ):
                 identity = runtime_log_archive_git.discover_rollout_context(
-                    fixture.thread_id,
-                    "22222222-2222-4222-8222-222222222222",
+                    fixture.context_id,
+                    fixture.turn_id,
                 )
 
             self.assertTrue(mutation_applied)
@@ -1299,7 +1567,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 fixture.raw_record,
             )
             self.assertEqual(
-                identity["record_byte_offset"],
+                cast(dict[str, object], identity["task_complete"])["byte_offset"],
                 sum(
                     len(line)
                     for line in original_snapshot.splitlines(keepends=True)[:871]
@@ -1380,7 +1648,6 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             with patch.dict(
                 os.environ,
                 {
-                    "CODEX_THREAD_ID": fixture.thread_id,
                     "AGENT_CANON_CODEX_SESSION_ROOT": str(fixture.session_root),
                 },
                 clear=False,
@@ -1916,7 +2183,6 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 patch.dict(
                     os.environ,
                     {
-                        "CODEX_THREAD_ID": fixture.thread_id,
                         "AGENT_CANON_CODEX_SESSION_ROOT": str(fixture.session_root),
                     },
                     clear=False,
@@ -1961,7 +2227,6 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 patch.dict(
                     os.environ,
                     {
-                        "CODEX_THREAD_ID": fixture.thread_id,
                         "AGENT_CANON_CODEX_SESSION_ROOT": str(fixture.session_root),
                     },
                     clear=False,
@@ -2047,7 +2312,6 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 patch.dict(
                     os.environ,
                     {
-                        "CODEX_THREAD_ID": fixture.thread_id,
                         "AGENT_CANON_CODEX_SESSION_ROOT": str(fixture.session_root),
                     },
                     clear=False,

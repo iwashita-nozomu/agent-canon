@@ -414,10 +414,15 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 
 ## Source-Bound Runtime and Graph Consumers
 
-`runtime_log_archive_git.py` owns generic runtime-event materialization. The
-`materialize-runtime-event` command joins a fixed result-family artifact to a
-structurally identified rollout record and source Git identities, then
-publishes an immutable prepared `agent_canon.runtime_event.v1` artifact. Its
+`runtime_log_archive_git.py` owns the complete runtime-evidence producer and
+consumer boundary. The explicit `append-context-discovery` command reads the
+native rollout `session_meta` and selected `event_msg` / `task_complete`
+records, then publishes exactly one immutable
+`agent_canon.context_discovery_certificate.v1` certificate. The
+`materialize-runtime-event` command consumes exactly one such certificate,
+joins a fixed result-family artifact to its certified rollout record and source
+Git identities, then publishes an immutable prepared
+`agent_canon.runtime_event.v1` artifact. Its
 `publication_intent` contains only the deterministic attempt and
 `prepared_state=prepared`. Post-target evidence is appended to the repo-local
 outcome spool before a separate hash-linked receipt is published. The command

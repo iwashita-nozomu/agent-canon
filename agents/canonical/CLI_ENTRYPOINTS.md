@@ -114,8 +114,20 @@ GitHub Actions から回すときは `.github/workflows/agent-coordination.yml` 
 
 ## Runtime Evidence and Knowledge Graph
 
-The generic source-bound runtime certificate is created from the source
-checkout and active run bundle:
+The generic source-bound context certificate is created first from native
+Codex rollout evidence and the active run bundle:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py append-context-discovery \
+  --run-id <run-id> --agent-context-id <agent-context-id> --turn-id <turn-id>
+```
+
+The producer accepts only those three selectors. It reads the finite native
+`session_meta` / `event_msg` rollout source, publishes exactly one immutable
+`context_discovery.<certificate-id>.json` certificate, and prints its path,
+certificate ID, task-completion record hash, and `CONTEXT_DISCOVERY_APPEND=pass`.
+Missing, duplicate, malformed, or mismatched native evidence fails closed.
+The runtime-event materializer then consumes exactly one certificate:
 
 ```bash
 python3 tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
