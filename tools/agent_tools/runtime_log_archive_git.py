@@ -2109,6 +2109,15 @@ def _renameat2_noreplace(source: Path, target: Path) -> None:
     raise OSError(error_number, os.strerror(error_number), target)
 
 
+def _owner_mutation_exclusive_mode(mode: int, required_owner_bits: int) -> bool:
+    """Require owner mutation bits without group or other write access."""
+    permissions = S_IMODE(mode)
+    return (
+        permissions & required_owner_bits == required_owner_bits
+        and permissions & 0o022 == 0
+    )
+
+
 def _validate_publication_attempt_directories(attempt_directory: Path) -> Path:
     """Validate every fixed 0700 directory in one publication attempt path."""
     spool_root = attempt_directory.parent
@@ -2136,7 +2145,7 @@ def _validate_publication_attempt_directories(attempt_directory: Path) -> Path:
             or directory.is_symlink()
             or not S_ISDIR(metadata.st_mode)
             or metadata.st_uid != os.geteuid()
-            or S_IMODE(metadata.st_mode) != 0o700
+            or not _owner_mutation_exclusive_mode(metadata.st_mode, 0o700)
         ):
             raise ValueError("attempt directory metadata mismatch")
     return spool_root
@@ -2175,8 +2184,8 @@ def validate_publication_attempt_lock(attempt_lock: PublicationAttemptLock) -> N
             or fd_metadata.st_uid != os.geteuid()
             or path_metadata.st_nlink != 1
             or fd_metadata.st_nlink != 1
-            or S_IMODE(path_metadata.st_mode) != 0o600
-            or S_IMODE(fd_metadata.st_mode) != 0o600
+            or not _owner_mutation_exclusive_mode(path_metadata.st_mode, 0o600)
+            or not _owner_mutation_exclusive_mode(fd_metadata.st_mode, 0o600)
             or (path_metadata.st_dev, path_metadata.st_ino)
             != (fd_metadata.st_dev, fd_metadata.st_ino)
         ):
@@ -2226,7 +2235,7 @@ def acquire_publication_attempt_lock(
                 directory.is_symlink()
                 or not S_ISDIR(metadata.st_mode)
                 or metadata.st_uid != os.geteuid()
-                or S_IMODE(metadata.st_mode) != 0o700
+                or not _owner_mutation_exclusive_mode(metadata.st_mode, 0o700)
             ):
                 raise RuntimeEventMaterializationError(
                     "publication_attempt_lock_invalid",
@@ -2351,7 +2360,7 @@ def _publish_context_discovery_noreplace(target: Path, bytes_: bytes) -> None:
             not S_ISREG(metadata.st_mode)
             or metadata.st_uid != os.geteuid()
             or metadata.st_nlink != 1
-            or S_IMODE(metadata.st_mode) != 0o600
+            or not _owner_mutation_exclusive_mode(metadata.st_mode, 0o600)
         ):
             raise RuntimeEventMaterializationError(
                 "context_publication_failure", "identity-owned temp metadata is invalid"
@@ -2377,7 +2386,7 @@ def _publish_context_discovery_noreplace(target: Path, bytes_: bytes) -> None:
             or latest.st_uid != os.geteuid()
             or identity != (latest.st_dev, latest.st_ino)
             or latest.st_nlink != 1
-            or S_IMODE(latest.st_mode) != 0o600
+            or not _owner_mutation_exclusive_mode(latest.st_mode, 0o600)
         ):
             raise RuntimeEventMaterializationError(
                 "context_publication_failure", "identity-owned temp verification failed"
@@ -2728,7 +2737,7 @@ def _publish_runtime_event_noreplace(target: Path, bytes_: bytes) -> dict[str, o
             not S_ISREG(metadata.st_mode)
             or metadata.st_uid != os.geteuid()
             or metadata.st_nlink != 1
-            or S_IMODE(metadata.st_mode) != 0o600
+            or not _owner_mutation_exclusive_mode(metadata.st_mode, 0o600)
         ):
             raise RuntimeEventMaterializationError("publication_failure", "identity-owned temp metadata is invalid")
         view = memoryview(bytes_)
@@ -2748,7 +2757,7 @@ def _publish_runtime_event_noreplace(target: Path, bytes_: bytes) -> dict[str, o
             or latest.st_uid != os.geteuid()
             or identity != (latest.st_dev, latest.st_ino)
             or latest.st_nlink != 1
-            or S_IMODE(latest.st_mode) != 0o600
+            or not _owner_mutation_exclusive_mode(latest.st_mode, 0o600)
         ):
             raise RuntimeEventMaterializationError("publication_failure", "identity-owned temp verification failed")
         try:
