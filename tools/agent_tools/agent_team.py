@@ -29,7 +29,7 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Mapping, cast
+from typing import Callable, Mapping, cast
 
 import yaml
 if __package__:

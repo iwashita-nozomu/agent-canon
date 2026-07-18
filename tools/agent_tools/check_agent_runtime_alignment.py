@@ -37,7 +37,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
 import yaml
-import capacity_handshake
 import model_profile_registry
 from agent_team import (
     ROOT,

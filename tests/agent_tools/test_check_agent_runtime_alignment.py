@@ -28,13 +28,11 @@ import check_agent_runtime_alignment as runtime_alignment  # noqa: E402
 from agent_team import (  # noqa: E402
     TaskCatalog,
     codex_runtime_max_depth,
-    codex_runtime_max_threads,
     load_team_config,
     resolve_cross_cutting_document_packet,
     resolve_document_section_locators,
     resolve_role,
     resolve_role_document_packet,
-    workflow_spawn_budget,
     workflow_topology_policy_violations,
 )
 from check_agent_runtime_alignment import validate_permanent_team_mapping  # noqa: E402

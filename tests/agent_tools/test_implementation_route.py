@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import hashlib
 
 from tools.agent_tools import capacity_handshake
