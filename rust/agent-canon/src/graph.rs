@@ -498,7 +498,7 @@ fn decode_base64(value: &str) -> Result<Vec<u8>, GraphError> {
         }
     }
     let bytes = value.as_bytes();
-    if bytes.len() % 4 != 0 {
+    if !bytes.len().is_multiple_of(4) {
         return Err(GraphError::Validation(
             "runtime base64 length is invalid".to_string(),
         ));
