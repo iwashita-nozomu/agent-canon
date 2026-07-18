@@ -44,7 +44,7 @@ AgentCanon 自体の source、shared runtime、sync、PR 運用、責務 scope �
 - workflow canon の正本
 - skill / subagent / runtime instruction の正本
 - shared runtime helper と validation helper の正本
-- shared canon の upstream sync と PR 運用の正本
+- shared canon の evidence-keyed update transaction と source PR 運用の正本
 - design-time philosophy の正本
 
 この役割を読んだ後は、どの責務がどの path に属するかを次の構造モデルで確認する。
@@ -160,7 +160,7 @@ tool / skill の個別一覧は、それぞれの hub と machine-readable sourc
 | agent workflow を選ぶ | `agents/README.md` | workflow、skill、subagent、runtime entrypoint の入口 |
 | workflow family を選ぶ | `agents/workflows/README.md` | task family、stage、review route |
 | shared surface を修復する | `documents/SHARED_RUNTIME_SURFACES.md` | root view、symlink/copy、submodule source の扱い |
-| AgentCanon 更新を進める | `documents/agent-canon-update-route.md` | parent pin、AgentCanon branch / PR、rollback への分岐 |
+| AgentCanon 更新を進める | `documents/agent-canon-update-route.md` | source transaction、PR/readback、projection frontier の唯一の入口 |
 | runtime profile と validation を選ぶ | `documents/runtime-profiles-and-check-matrix.md` | changed path と risk class から実行 gate を選ぶ |
 | shared tool を使う | `tools/README.md` | root `tools/` view から呼ぶ実行入口 |
 

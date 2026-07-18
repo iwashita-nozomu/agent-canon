@@ -11,7 +11,7 @@
 # upstream design ../../.github/workflows/agent-improvement-guide.yml PR and push improvement guide workflow
 # upstream design ../../.github/workflows/agent-runtime-dashboard.yml standalone AgentCanon runtime dashboard workflow
 # upstream design ../../.github/workflows/issue-mirror.yml standalone local/GitHub issue mirror workflow
-# upstream design ../../.github/workflows/agent-canon-static-gates.yml PR and push static gate workflow
+# upstream design ../../.github/workflows/agent-canon-static-gates.yml PR candidate gate workflow
 # upstream implementation ./checkout_agent_canon_submodule.sh private submodule helper
 # upstream implementation ../agent_tools/check_skill_frontmatter.py validates runtime skill frontmatter in static gates
 # downstream implementation ../../tests/tools/test_check_github_workflows.py tests
@@ -191,6 +191,12 @@ VENDOR_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
     "actions/upload-artifact@v4",
 )
 AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
+    "pull_request:",
+    "workflow_dispatch:",
+    "github.event.pull_request.head.sha || github.sha",
+    "bash tools/ci/check_agent_canon_pr.sh",
+)
+AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS = (
     "tool_catalog.py",
     "tool_drift.py",
     "responsibility_scope.py",
@@ -492,9 +498,53 @@ def check_workflow(root: Path, path: Path) -> list[Finding]:
             if path.name == WORKFLOW_DISPATCH_INPUT_CHECK_WORKFLOW
             else []
         ),
+        *(
+            agent_canon_static_gate_findings(path, workflow, workflow_text)
+            if path.name == "agent-canon-static-gates.yml"
+            else []
+        ),
         *agent_canon_checkout_policy_findings(root, path, workflow, workflow_text),
         *checkout_step_findings(path, workflow),
     ]
+
+
+def agent_canon_static_gate_findings(
+    path: Path,
+    workflow: dict[str, object],
+    workflow_text: str,
+) -> list[Finding]:
+    """Require one candidate-tree gate consumer and reject duplicate gate loops."""
+    findings: list[Finding] = []
+    wrapper = "bash tools/ci/check_agent_canon_pr.sh"
+    run_steps = [
+        (context.index, run)
+        for context in step_contexts(workflow)
+        if isinstance((run := context.step.get("run")), str)
+    ]
+    wrapper_steps = [index for index, run in run_steps if wrapper in run]
+    if len(wrapper_steps) != 1:
+        findings.append(
+            Finding(
+                "error",
+                path,
+                f"canonical_candidate_gate_consumer_count:{len(wrapper_steps)}",
+            )
+        )
+    if re.search(r"(?m)^  push:\s*$", workflow_text):
+        findings.append(Finding("error", path, "duplicate_push_trigger_for_candidate_gate"))
+    for index, run in run_steps:
+        if wrapper in run:
+            continue
+        for command in AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS:
+            if command in run:
+                findings.append(
+                    Finding(
+                        "error",
+                        path,
+                        f"run_step_{index}_duplicates_canonical_gate:{command}",
+                    )
+                )
+    return findings
 
 
 def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
@@ -645,29 +695,26 @@ def check_github_support_surfaces(root: Path) -> list[Finding]:
 
 
 def check_pr_flow_docs(root: Path) -> list[Finding]:
-    """Check that PR flow docs route standalone and template PRs separately."""
+    """Check that the source PR lane binds typed identity, CAS, and readback."""
     workflow_path = (
         agent_canon_root(root) / "agents" / "workflows" / "agent-canon-pr-workflow.md"
     )
     return require_text(
         workflow_path,
         [
-            "standalone AgentCanon repo",
-            "`.github/PULL_REQUEST_TEMPLATE.md`",
-            "template / derived repo",
-            "`.github/PULL_REQUEST_TEMPLATE/agent_canon.md`",
-            "Freshness Gate Route",
-            "Issues / Findings Gate",
-            "issues/open/AC-YYYYMMDD-short-slug.md",
-            "issues/closed",
-            "Agent Improvement Guide",
-            "run_repo_dependency_review.sh",
-            "--search-hits-file",
-            "tool addition",
-            "memory addition",
-            "AgentCanon PR merge 後にこの check を再実行します",
-            "agentcanon_structure_followup=required",
-            "agentcanon_structure_followup=pass",
+            "SourceMainRebindReceipt",
+            "CandidateFreezeReceipt",
+            "CandidateReviewReceipt",
+            "CandidateCasReceipt",
+            "PullRequestLifecycle",
+            "user|fork|contributor",
+            "PR Essence",
+            "permission_state=unknown|verified_false",
+            "PublicationReadbackReceipt",
+            "QueueReceipt",
+            "DependencyFrontier",
+            "tools/agent_tools/github_publish.py",
+            "parent pin/root sync before accepted frontier",
         ],
     )
 

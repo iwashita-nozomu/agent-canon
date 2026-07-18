@@ -4,6 +4,7 @@
 # responsibility Provides task close agent workflow automation.
 # upstream implementation ./agent_team.py resolves report root defaults
 # upstream implementation ./report_artifact_checks.py validates schedule and work log artifacts
+# upstream implementation ./update_lifecycle_contract.py owns gate, cleanup, handback, and terminal ToolCall identities.
 # upstream design ../../agents/templates/closeout_gate.md defines closeout status contract
 # upstream design ../../agents/templates/agent_evaluation.md defines evaluation contract
 # downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests closeout
@@ -20,7 +21,11 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from agent_team import resolve_report_root
+from agent_team import (
+    CloseAgentLifecycleEvidence,
+    materialize_close_agent_tool_call,
+    resolve_report_root,
+)
 from report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
     COMPLETION_COVERAGE_TAXONOMY_REFS,
@@ -32,6 +37,13 @@ from report_artifact_checks import (
     report_artifact_placement_blockers,
     token_fields,
     wave_reconciliation_blockers,
+)
+from update_lifecycle_contract import (
+    GATE_IDS,
+    binding_identity,
+    validate_cleanup_proof,
+    validate_durable_handback,
+    validate_gate_chain,
 )
 
 STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
@@ -46,8 +58,8 @@ DOCUMENT_SPLIT_DECISION_PREFIXES = (
 )
 DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
-
-
+UPDATE_LIFECYCLE_CLOSEOUT_ARTIFACT_NAME = "update_lifecycle_closeout.json"
+UPDATE_LIFECYCLE_CLOSEOUT_SCHEMA = "agent-canon.update-lifecycle-closeout.v1"
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(
@@ -610,6 +622,157 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         return {"ready": False, "reason": str(exc)}
 
 
+def update_lifecycle_closeout_consumer(report_dir: Path) -> dict[str, object]:
+    """Consume six gate IDs and terminal cleanup evidence without rerunning gates."""
+    artifact_path = report_dir / UPDATE_LIFECYCLE_CLOSEOUT_ARTIFACT_NAME
+    if not artifact_path.is_file():
+        return {"ready": True, "applicable": False, "reason": "not_applicable"}
+    try:
+        raw = json.loads(artifact_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": f"close_agent:artifact_unreadable:{exc}",
+        }
+    if not isinstance(raw, dict) or raw.get("schema") != UPDATE_LIFECYCLE_CLOSEOUT_SCHEMA:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:schema_invalid",
+        }
+    required = {
+        "schema",
+        "gate_verdicts",
+        "durable_handback",
+        "descendants",
+        "reservations",
+        "descendants_closed_evidence_ref",
+        "reservations_released_evidence_ref",
+        "cleanup_proof",
+        "close_agent_tool_call",
+    }
+    if set(raw) != required:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:artifact_fields_invalid",
+        }
+    try:
+        gate_values = raw["gate_verdicts"]
+        if not isinstance(gate_values, list) or len(gate_values) != len(GATE_IDS):
+            raise ValueError("close_agent:all_six_gate_evidence_required")
+        source_gates = list(
+            validate_gate_chain(
+                gate_values[:5],
+                expected_gate_ids=GATE_IDS[:5],
+                require_pass=True,
+            )
+        )
+        identity = binding_identity(source_gates[0]["binding"])
+        if any(
+            binding_identity(gate["binding"]) != identity
+            for gate in source_gates[1:]
+        ):
+            raise ValueError("close_agent:identity_mismatch")
+        handback = validate_durable_handback(raw["durable_handback"])
+        cleanup = validate_cleanup_proof(raw["cleanup_proof"])
+        if binding_identity(handback["binding"]) != identity:
+            raise ValueError("close_agent:identity_mismatch")
+        if binding_identity(cleanup["binding"]) != identity:
+            raise ValueError("close_agent:identity_mismatch")
+    except (TypeError, ValueError) as exc:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": str(exc),
+        }
+    descendant_values = raw["descendants"]
+    if not isinstance(descendant_values, list):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:descendant_evidence_invalid",
+        }
+    if any(
+        isinstance(item, dict) and item.get("state") == "completed"
+        for item in descendant_values
+    ):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:completed_but_open",
+        }
+    reservation_values = raw["reservations"]
+    if not isinstance(reservation_values, list):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:reservation_evidence_invalid",
+        }
+    supplied_token = raw["close_agent_tool_call"]
+    try:
+        if not isinstance(supplied_token, dict):
+            raise ValueError("close_agent:token_invalid")
+        supplied_args = supplied_token.get("args")
+        if not isinstance(supplied_args, dict):
+            raise ValueError("close_agent:token_invalid")
+        run_id = supplied_args.get("run_id")
+        if not isinstance(run_id, str) or not run_id.strip():
+            raise ValueError("close_agent:token_invalid")
+        materialized = materialize_close_agent_tool_call(
+            run_id=run_id,
+            agent_id=str(handback["agent_id"]),
+            evidence=CloseAgentLifecycleEvidence(
+                gate_verdicts=source_gates,
+                cleanup_proof=cleanup,
+                durable_handback=handback,
+                descendant_close_receipts=descendant_values,
+                reservation_release_receipts=reservation_values,
+            ),
+        )
+    except (TypeError, ValueError) as exc:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": str(exc),
+        }
+    canonical_g6 = materialized["g6_gate"]
+    token = materialized["close_agent_tool_call"]
+    descendants_ref = materialized["descendants_closed_evidence_ref"]
+    reservations_ref = materialized["reservations_released_evidence_ref"]
+    if gate_values[5] != canonical_g6:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:g6_not_owner_materialized",
+        }
+    if (
+        raw["descendants_closed_evidence_ref"] != descendants_ref
+        or raw["reservations_released_evidence_ref"] != reservations_ref
+    ):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:lifecycle_evidence_mismatch",
+        }
+    if supplied_token != token:
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:token_evidence_mismatch",
+        }
+    gates = [*source_gates, canonical_g6]
+    gate_refs = [gate["binding"]["evidence_ref"] for gate in gates]
+    return {
+        "ready": True,
+        "applicable": True,
+        "reason": "pass",
+        "gate_evidence_refs": gate_refs,
+        "close_agent_token_id": token["token_id"],
+    }
+
+
 def main() -> int:
     """Run the closeout check."""
     args = build_parser().parse_args()
@@ -710,6 +873,7 @@ def main() -> int:
     )
     report_artifact_blockers = report_artifact_placement_blockers(workspace, report_dir)
     completion_decision = completion_coverage_consumer(report_dir)
+    update_lifecycle_decision = update_lifecycle_closeout_consumer(report_dir)
     wave_reconciliation = wave_reconciliation_blockers(
         schedule_text,
         workflow_monitoring_text,
@@ -727,6 +891,8 @@ def main() -> int:
         "validation_complete": closeout.get("validation_complete") == "yes",
         "request_contract_complete": closeout.get("request_contract_complete") == "yes",
         "completion_coverage_consumer": completion_decision.get("ready") is True,
+        "update_lifecycle_closeout_consumer": update_lifecycle_decision.get("ready")
+        is True,
         "all_planned_chunks_complete": (
             completion_decision.get("all_planned_chunks_complete") is True
             and closeout.get("all_planned_chunks_complete") == "yes"
@@ -964,6 +1130,18 @@ def main() -> int:
     print(f"COMPLETION_COVERAGE_ARTIFACT={report_dir / COMPLETION_COVERAGE_ARTIFACT_NAME}")
     print(f"COMPLETION_COVERAGE_CONSUMER_READY={completion_decision.get('ready', False)}")
     print(f"COMPLETION_COVERAGE_CONSUMER_REASON={completion_decision.get('reason', '')}")
+    print(
+        "UPDATE_LIFECYCLE_CLOSEOUT_APPLICABLE="
+        f"{update_lifecycle_decision.get('applicable', False)}"
+    )
+    print(
+        "UPDATE_LIFECYCLE_CLOSEOUT_READY="
+        f"{update_lifecycle_decision.get('ready', False)}"
+    )
+    print(
+        "UPDATE_LIFECYCLE_CLOSEOUT_REASON="
+        f"{update_lifecycle_decision.get('reason', '')}"
+    )
     print(
         "MAPPING_ERROR_SETS_EMPTY="
         f"{closeout.get('mapping_error_sets_empty', canonical_evidence.get('mapping_error_sets_empty', ''))}"

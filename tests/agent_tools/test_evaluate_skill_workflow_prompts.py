@@ -166,10 +166,10 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         ):
             self.assertIn(required_glob, target_globs)
 
-    def test_default_manifest_includes_convention_compliance_eval_coverage(
+    def test_default_manifest_routes_convention_and_toolcall_eval_coverage(
         self,
     ) -> None:
-        """The canonical manifest verifies workflow convention gates and skill calls."""
+        """Generic workflows stay structural while owner shims test tool routing."""
         manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
         data = load_toml_document(manifest)
         evals = cast(list[dict[str, object]], data["evals"])
@@ -180,7 +180,10 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             for item in cast(list[dict[str, object]], workflow_eval["checklist"])
         }
 
-        self.assertIn("CONVENTION-WORKFLOW-1", workflow_check_ids)
+        self.assertEqual(
+            workflow_check_ids,
+            {"WORKFLOW-GENERIC-1", "WORKFLOW-GENERIC-2"},
+        )
         self.assertEqual(
             by_id["agent-orchestration-skill-call-routing"]["target"],
             ".agents/skills/agent-orchestration/SKILL.md",
@@ -189,12 +192,65 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             by_id["codex-task-workflow-convention-gate"]["target"],
             ".agents/skills/codex-task-workflow/SKILL.md",
         )
+        orchestration_check_ids = {
+            str(item["id"])
+            for item in cast(
+                list[dict[str, object]],
+                by_id["agent-orchestration-skill-call-routing"]["checklist"],
+            )
+        }
+        self.assertEqual(
+            orchestration_check_ids,
+            {
+                "ORCH-SHIM-POINTER-1",
+                "ORCH-SHIM-TOOLCALL-1",
+                "ORCH-SHIM-DISCOVERY-1",
+            },
+        )
         for eval_id in (
             "agent-orchestration-skill-call-routing",
             "codex-task-workflow-convention-gate",
         ):
             checklists = cast(list[dict[str, object]], by_id[eval_id]["checklist"])
             self.assertTrue(all(bool(item["critical"]) for item in checklists))
+
+    def test_default_manifest_contains_exact_decision_sufficiency_scenarios(
+        self,
+    ) -> None:
+        """The canonical DSV owner carries exactly the six approved mini evals."""
+        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+        data = load_toml_document(manifest)
+        evals = cast(list[dict[str, object]], data["evals"])
+        owner_eval = next(
+            entry
+            for entry in evals
+            if entry.get("target") == "agents/skills/agent-orchestration.md"
+        )
+        checklist = cast(list[dict[str, object]], owner_eval["checklist"])
+        dsv_ids = {
+            str(item["id"])
+            for item in checklist
+            if str(item["id"]).startswith("DSV-")
+        }
+
+        self.assertEqual(
+            dsv_ids,
+            {
+                "DSV-ZERO-VALUE-1",
+                "DSV-BRANCH-NAMING-1",
+                "DSV-SPARK-FAST-PATH-1",
+                "DSV-IRRELEVANT-UNKNOWN-POSITIVE-1",
+                "DSV-IRRELEVANT-UNKNOWN-NEGATIVE-1",
+                "DSV-NO-THRESHOLD-1",
+            },
+        )
+        self.assertTrue(
+            all(
+                item["critical"] is True
+                for item in checklist
+                if str(item["id"]).startswith("DSV-")
+            )
+        )
 
     def test_default_manifest_includes_validation_failure_response_eval_coverage(
         self,

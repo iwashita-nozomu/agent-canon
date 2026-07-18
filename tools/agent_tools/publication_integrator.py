@@ -9,6 +9,7 @@
 # upstream implementation ./review_dispatch.py resolves current explicit APPROVE state.
 # upstream implementation ./report_artifact_checks.py regenerates materializer-produced validation results.
 # upstream implementation ./artifact_identity.py provides canonical serialization and artifact readback.
+# upstream implementation ./update_lifecycle_contract.py owns G1/G3/G5 verdict identity and lifecycle guards.
 # downstream implementation ./github_publish.py exposes verified remote and PR publication.
 # downstream implementation ../../tests/agent_tools/test_publication_integrator.py validates CAS, dirty-checkout, and race behavior.
 # @dependency-end
@@ -27,6 +28,12 @@ from typing import cast
 
 from artifact_identity import canonical_body_sha256, canonical_json_bytes
 from review_dispatch import resolve_current_review_state, resolve_review_eligibility
+from update_lifecycle_contract import (
+    binding_identity,
+    materialize_gate_verdict,
+    validate_publication_readback_receipt,
+    validate_record_binding,
+)
 
 TREE_DELTA_SCHEMA = "agent-canon.git-tree-delta-observation.v1"
 TREE_DELTA_SERIALIZATION = "agent-canon.git-tree-delta.v1"
@@ -313,7 +320,50 @@ def _validation_provenance(workspace: Path) -> dict[str, object]:
     return result
 
 
-def resolve_publication_authority(workspace: Path) -> dict[str, object]:
+def _lifecycle_gate_inputs(
+    binding: Mapping[str, object],
+    ordered_input_evidence_refs: Sequence[str],
+) -> tuple[str, ...]:
+    """Return explicit ordered inputs, defaulting only to the bound evidence."""
+    checked = validate_record_binding(binding)
+    if ordered_input_evidence_refs:
+        return tuple(ordered_input_evidence_refs)
+    return (cast(str, checked["evidence_ref"]),)
+
+
+def _publication_gate(
+    *,
+    binding: Mapping[str, object],
+    gate_id: str,
+    ordered_input_evidence_refs: Sequence[str],
+    invariant: str,
+    owner_symbol: str,
+    output: Mapping[str, object],
+    verdict: str,
+) -> dict[str, object]:
+    """Materialize one lifecycle verdict without rechecking earlier gates."""
+    return materialize_gate_verdict(
+        binding=binding,
+        gate_id=gate_id,
+        ordered_input_evidence_refs=_lifecycle_gate_inputs(
+            binding, ordered_input_evidence_refs
+        ),
+        invariant=invariant,
+        output_digest="sha256:"
+        + hashlib.sha256(canonical_json_bytes(output)).hexdigest(),
+        owner=f"{Path(__file__).resolve()}#{owner_symbol}",
+        verdict=verdict,
+        retry_reason=None,
+        next_checkpoint=None,
+    )
+
+
+def resolve_publication_authority(
+    workspace: Path,
+    *,
+    lifecycle_binding: Mapping[str, object] | None = None,
+    ordered_input_evidence_refs: Sequence[str] = (),
+) -> dict[str, object]:
     """Resolve the unique current APPROVE-only publication authority."""
     root = workspace.resolve()
     candidate, decision = _review_approval(root)
@@ -446,8 +496,19 @@ def resolve_publication_authority(workspace: Path) -> dict[str, object]:
         },
         "candidate_attestation": attestation,
         "result": None,
+        "pr_identity_cas_gate": None,
         "publication_authority_body_sha256": "",
     }
+    if lifecycle_binding is not None:
+        authority["pr_identity_cas_gate"] = _publication_gate(
+            binding=lifecycle_binding,
+            gate_id="G3",
+            ordered_input_evidence_refs=ordered_input_evidence_refs,
+            invariant="pr_identity_cas",
+            owner_symbol="resolve_publication_authority",
+            output=selection_payload,
+            verdict="pass",
+        )
     authority["publication_authority_body_sha256"] = canonical_body_sha256(
         authority,
         "publication_authority_body_sha256",
@@ -455,14 +516,23 @@ def resolve_publication_authority(workspace: Path) -> dict[str, object]:
     return authority
 
 
-def resolve_publication_eligibility(workspace: Path) -> dict[str, object]:
+def resolve_publication_eligibility(
+    workspace: Path,
+    *,
+    lifecycle_binding: Mapping[str, object] | None = None,
+    ordered_input_evidence_refs: Sequence[str] = (),
+) -> dict[str, object]:
     """Return one pure publication-eligibility projection."""
     review_eligibility: dict[str, object] | None = None
     try:
         review_eligibility = resolve_review_eligibility(workspace)
         if review_eligibility.get("outcome") != "eligible":
             raise PublicationError("publication_eligibility:review_not_eligible")
-        authority = resolve_publication_authority(workspace)
+        authority = resolve_publication_authority(
+            workspace,
+            lifecycle_binding=lifecycle_binding,
+            ordered_input_evidence_refs=ordered_input_evidence_refs,
+        )
     except (PublicationError, ValueError) as exc:
         failure_code = (
             exc.code
@@ -505,8 +575,19 @@ def resolve_publication_eligibility(workspace: Path) -> dict[str, object]:
         "publication_authority": authority,
         "outcome": outcome,
         "failure_codes": failure_codes,
+        "source_correctness_gate": None,
         "publication_eligibility_body_sha256": "",
     }
+    if lifecycle_binding is not None:
+        projection["source_correctness_gate"] = _publication_gate(
+            binding=lifecycle_binding,
+            gate_id="G1",
+            ordered_input_evidence_refs=ordered_input_evidence_refs,
+            invariant="source_correctness",
+            owner_symbol="resolve_publication_eligibility",
+            output=seed,
+            verdict="pass" if outcome == "eligible" else "fail",
+        )
     projection["publication_eligibility_body_sha256"] = canonical_body_sha256(
         projection,
         "publication_eligibility_body_sha256",
@@ -669,10 +750,16 @@ def integrate_publication(
     *,
     runner: Runner = subprocess_runner,
     pr_merge_adapter: PrMergeAdapter | None = None,
+    lifecycle_binding: Mapping[str, object] | None = None,
+    ordered_input_evidence_refs: Sequence[str] = (),
 ) -> dict[str, object]:
     """Execute exactly one current publication authority with CAS and readback."""
     root = workspace.resolve()
-    authority = resolve_publication_authority(root)
+    authority = resolve_publication_authority(
+        root,
+        lifecycle_binding=lifecycle_binding,
+        ordered_input_evidence_refs=ordered_input_evidence_refs,
+    )
     target = authority.get("target")
     if not isinstance(target, Mapping):
         raise PublicationError("publication_authority:target_tuple_mismatch")
@@ -697,8 +784,24 @@ def integrate_publication(
     ):
         raise PublicationError("publication_authority:target_tree_mismatch")
     status_before = _worktree_status(root, runner=runner)
-    result_commit = _construct_result_commit(root, authority, runner=runner)
-    authority_second = resolve_publication_authority(root)
+    result_commit: str | None = None
+    if route != "pull_request":
+        result_commit = _construct_result_commit(root, authority, runner=runner)
+    candidate_authority = cast(
+        Mapping[str, object], authority["candidate_authority"]
+    )
+    candidate_commit = _hex_oid(
+        candidate_authority["candidate_commit"], "candidate_commit"
+    )
+    candidate_tree = _hex_oid(
+        candidate_authority["candidate_tree"], "candidate_tree"
+    )
+    publication_pr_number: int | None = None
+    authority_second = resolve_publication_authority(
+        root,
+        lifecycle_binding=lifecycle_binding,
+        ordered_input_evidence_refs=ordered_input_evidence_refs,
+    )
     if authority_second != authority:
         raise PublicationError("publication_authority:readback_changed")
     if (
@@ -711,6 +814,8 @@ def integrate_publication(
     ):
         raise PublicationError("integration_target_moved")
     if route == "local_ref":
+        if result_commit is None:
+            raise PublicationError("publication_integrator:result_commit_missing")
         if target_ref in _checked_out_refs(root, runner=runner):
             raise PublicationError("publication_integrator:checked_out_target")
         _run(
@@ -719,7 +824,12 @@ def integrate_publication(
             code="integration_target_moved",
         )
         observed_result = _git_text(root, ["rev-parse", target_ref], runner=runner)
+        observed_result_tree = _git_text(
+            root, ["rev-parse", f"{observed_result}^{{tree}}"], runner=runner
+        )
     elif route == "remote_ref":
+        if result_commit is None:
+            raise PublicationError("publication_integrator:result_commit_missing")
         remote = target.get("remote_name")
         if not isinstance(remote, str) or not remote:
             raise PublicationError("publication_authority:target_tuple_mismatch")
@@ -741,6 +851,9 @@ def integrate_publication(
             ["ls-remote", remote, target_ref],
             runner=runner,
         ).split()[0]
+        observed_result_tree = _git_text(
+            root, ["rev-parse", f"{result_commit}^{{tree}}"], runner=runner
+        )
     else:
         if pr_merge_adapter is None:
             raise PublicationError(
@@ -749,20 +862,58 @@ def integrate_publication(
         response = pr_merge_adapter(
             {
                 "expected_base_oid": expected,
-                "expected_head_oid": cast(
-                    Mapping[str, object], authority["candidate_authority"]
-                )["candidate_commit"],
-                "result_commit": result_commit,
+                "expected_base_tree": target["expected_target_tree"],
+                "expected_head_oid": candidate_commit,
+                "expected_head_tree": candidate_tree,
                 "target": dict(target),
             }
         )
         if response.get("status") != "merged":
             raise PublicationError("integration_target_moved")
-        observed_result = _hex_oid(response.get("result_oid"), "result_oid")
+        try:
+            readback_receipt = validate_publication_readback_receipt(
+                response.get("publication_readback_receipt")
+            )
+        except (TypeError, ValueError) as exc:
+            raise PublicationError(
+                "publication_integrator:authoritative_pr_readback_invalid"
+            ) from exc
+        if lifecycle_binding is None or binding_identity(
+            readback_receipt["binding"]
+        ) != binding_identity(lifecycle_binding):
+            raise PublicationError(
+                "publication_integrator:authoritative_pr_readback_identity_mismatch"
+            )
+        readback_candidate = cast(
+            Mapping[str, object], readback_receipt["candidate_identity"]
+        )
+        readback_pr = cast(Mapping[str, object], readback_receipt["pr_identity"])
+        if (
+            readback_candidate["candidate_sha"] != candidate_commit
+            or readback_candidate["tree_sha"] != candidate_tree
+            or readback_pr["head_sha"] != candidate_commit
+            or readback_pr["merge_cas_base_sha"] != expected
+            or readback_pr["merge_cas_base_tree_sha"]
+            != target["expected_target_tree"]
+        ):
+            raise PublicationError("publication_integrator:pr_identity_mismatch")
+        publication_pr_number = cast(int, readback_pr["number"])
+        observed_result = _hex_oid(
+            readback_pr["merge_commit_sha"], "merge_commit_sha"
+        )
+        observed_result_tree = _hex_oid(
+            readback_pr["merge_tree_sha"], "merge_tree_sha"
+        )
         post_cas_ref_oid = _hex_oid(
             response.get("post_cas_ref_oid"), "post_cas_ref_oid"
         )
-        if post_cas_ref_oid != observed_result:
+        post_cas_tree_oid = _hex_oid(
+            response.get("post_cas_tree_oid"), "post_cas_tree_oid"
+        )
+        if (
+            post_cas_ref_oid != observed_result
+            or post_cas_tree_oid != observed_result_tree
+        ):
             raise PublicationError("publication_integrator:post_cas_readback_mismatch")
     if route != "pull_request" and observed_result != result_commit:
         raise PublicationError("publication_integrator:post_cas_readback_mismatch")
@@ -775,11 +926,13 @@ def integrate_publication(
         "route": route,
         "target_ref": target_ref,
         "expected_old_oid": expected,
-        "candidate_oid": cast(Mapping[str, object], authority["candidate_authority"])[
-            "candidate_commit"
-        ],
+        "candidate_oid": candidate_commit,
+        "candidate_tree_oid": candidate_tree,
         "result_oid": observed_result,
+        "result_tree_oid": observed_result_tree,
         "post_cas_ref_oid": observed_result,
+        "post_cas_tree_oid": observed_result_tree,
+        "pr_number": publication_pr_number,
         "checkout_status_before_sha256": hashlib.sha256(
             status_before.encode()
         ).hexdigest(),
@@ -793,8 +946,19 @@ def integrate_publication(
         "receipt_id": "integration-cas-receipt:"
         + hashlib.sha256(canonical_json_bytes(receipt_core)).hexdigest(),
         **receipt_core,
+        "remote_publication_readback_gate": None,
         "receipt_body_sha256": "",
     }
+    if lifecycle_binding is not None:
+        receipt["remote_publication_readback_gate"] = _publication_gate(
+            binding=lifecycle_binding,
+            gate_id="G5",
+            ordered_input_evidence_refs=ordered_input_evidence_refs,
+            invariant="remote_publication_readback",
+            owner_symbol="integrate_publication",
+            output=receipt_core,
+            verdict="pass",
+        )
     receipt["receipt_body_sha256"] = canonical_body_sha256(
         receipt,
         "receipt_body_sha256",

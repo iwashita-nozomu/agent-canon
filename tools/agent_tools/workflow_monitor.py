@@ -6,6 +6,7 @@
 # upstream implementation ./work_log.py owns canonical semantic-ledger append/read
 # upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
 # upstream implementation ./work_log.py appends canonical logical-ledger events
+# upstream implementation ./update_lifecycle_contract.py owns update states and evidence identity.
 # downstream implementation ../../tests/agent_tools/test_workflow_monitor.py tests it
 # @dependency-end
 """Append machine-readable workflow monitoring evidence to one run bundle."""
@@ -15,6 +16,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import re
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -36,6 +38,7 @@ from mid_task_user_input_policy import (
     is_empty_policy_value,
 )
 from work_log import MONITOR_PASSTHROUGH_FIELDS, append_ledger_event
+from update_lifecycle_contract import TRANSACTION_STATES
 
 DECISION_KEYS = (
     "skill_improvement_decision",
@@ -174,7 +177,10 @@ VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES = validation_failure_taxonomy_val
 )
 STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
     "skill_invocation=$agent-orchestration status=observed",
-    "subagent_lifecycle=closed subagents_closed=yes fresh_subagents_required=true",
+    (
+        "close_agent_tool_call=machine_token_required "
+        "schema=agent-canon.close-agent-tool-call.v1 prose_substitute=forbidden"
+    ),
     (
         "tool_call=run_repo_dependency_review.sh repo_dependency_review=pass "
         "scope=repo-wide"
@@ -206,11 +212,24 @@ STANDARD_CLOSEOUT_SIGNALS = (
     "validation_status=pass",
     "drift_risk=checked",
 )
+UPDATE_LIFECYCLE_MONITORING_SCHEMA = "agent-canon.update-lifecycle-monitoring.v1"
+EVIDENCE_REF_RE = re.compile(r"^evidence:[0-9a-f]{64}$")
 
 
 def empty_decisions() -> dict[str, str]:
     """Return an empty decision mapping."""
     return {}
+
+
+@dataclass(frozen=True)
+class LifecycleMonitoringEvidence:
+    """Pointer-only update lifecycle evidence consumed by the monitor."""
+
+    decision_sufficiency_packet_ref: str
+    decision_sufficiency_rejection_ref: str | None
+    lifecycle_state: str
+    evidence_refs: tuple[str, ...]
+    close_agent_tool_call_ref: str | None
 
 
 @dataclass(frozen=True)
@@ -228,6 +247,7 @@ class MonitoringEntries:
     interventions: tuple[str, ...] = ()
     decisions: Mapping[str, str] = field(default_factory=empty_decisions)
     timestamp: str = ""
+    lifecycle_evidence: LifecycleMonitoringEvidence | None = None
 
 
 EMPTY_MONITORING_ENTRIES = MonitoringEntries()
@@ -414,9 +434,10 @@ def add_closeout_decision_arguments(parser: argparse.ArgumentParser) -> None:
         "--closeout-token-preset",
         action="store_true",
         help=(
-            "Append the standard closeout behavior tokens consumed by "
-            "evaluate_agent_run.py. Use only after the corresponding evidence "
-            "has already been verified in the run bundle."
+            "Append standard closeout observations consumed by "
+            "evaluate_agent_run.py. This preset never substitutes for a canonical "
+            "CloseAgentToolCall; use only after lifecycle evidence and the token "
+            "reference have been recorded through append_monitoring."
         ),
     )
     parser.add_argument(
@@ -1265,6 +1286,50 @@ def append_wave_schedule_rows(
     upsert_subagent_wave_schedule_rows(report_dir, subagent_wave_rows)
 
 
+def lifecycle_monitoring_record(
+    evidence: LifecycleMonitoringEvidence,
+) -> dict[str, object]:
+    """Validate and return one pointer-only lifecycle monitor record."""
+    if not evidence.decision_sufficiency_packet_ref:
+        raise ValueError("lifecycle_monitoring:decision_packet_ref_missing")
+    if evidence.lifecycle_state not in TRANSACTION_STATES:
+        raise ValueError("lifecycle_monitoring:state_invalid")
+    if not evidence.evidence_refs:
+        raise ValueError("lifecycle_monitoring:evidence_refs_missing")
+    if any(EVIDENCE_REF_RE.fullmatch(ref) is None for ref in evidence.evidence_refs):
+        raise ValueError("lifecycle_monitoring:evidence_ref_invalid")
+    if len(evidence.evidence_refs) != len(set(evidence.evidence_refs)):
+        raise ValueError("lifecycle_monitoring:evidence_ref_duplicate")
+    if (
+        evidence.lifecycle_state == "closed"
+        and not evidence.close_agent_tool_call_ref
+    ):
+        raise ValueError("lifecycle_monitoring:close_tool_call_ref_missing")
+    return {
+        "schema": UPDATE_LIFECYCLE_MONITORING_SCHEMA,
+        "decision_sufficiency_packet_ref": evidence.decision_sufficiency_packet_ref,
+        "decision_sufficiency_rejection_ref": evidence.decision_sufficiency_rejection_ref,
+        "lifecycle_state": evidence.lifecycle_state,
+        "evidence_refs": list(evidence.evidence_refs),
+        "close_agent_tool_call_ref": evidence.close_agent_tool_call_ref,
+    }
+
+
+def append_lifecycle_monitoring_record(
+    lines: list[str],
+    evidence: LifecycleMonitoringEvidence | None,
+) -> None:
+    """Append one canonical JSON record through the locked monitor path."""
+    if evidence is None:
+        return
+    record = lifecycle_monitoring_record(evidence)
+    insert_entries(
+        lines,
+        "## Update Lifecycle Evidence",
+        [json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":"))],
+    )
+
+
 def append_monitoring_sections(
     lines: list[str],
     entries: MonitoringEntries,
@@ -1327,6 +1392,7 @@ def append_monitoring_sections(
         inferred_tool_warning_status,
     )
     insert_entries(lines, "## Interventions", intervention_entries)
+    append_lifecycle_monitoring_record(lines, entries.lifecycle_evidence)
     apply_decisions(lines, dict(entries.decisions))
 
 

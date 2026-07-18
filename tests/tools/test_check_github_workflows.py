@@ -34,6 +34,36 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
 
+    def test_agent_canon_candidate_tree_has_one_remote_gate_consumer(self) -> None:
+        """PR CI invokes the canonical gate once and has no duplicate push trigger."""
+        workflow = REPO_ROOT / ".github" / "workflows" / "agent-canon-static-gates.yml"
+        text = workflow.read_text(encoding="utf-8")
+        run_lines = [
+            line.strip()
+            for line in text.splitlines()
+            if line.lstrip().startswith("run:")
+        ]
+
+        self.assertNotIn("\n  push:", text)
+        self.assertEqual(
+            [line for line in run_lines if "check_agent_canon_pr.sh" in line],
+            ["run: bash tools/ci/check_agent_canon_pr.sh"],
+        )
+        self.assertIn(
+            "github.event.pull_request.head.sha || github.sha",
+            text,
+        )
+        self.assertFalse(
+            any(
+                command in "\n".join(run_lines)
+                for command in (
+                    "check_agent_runtime_alignment.py",
+                    "evaluate_skill_workflow_prompts.py",
+                    "check_github_workflows.py",
+                )
+            )
+        )
+
     def test_direct_workflow_dispatch_input_in_run_fails(self) -> None:
         """Shell run blocks must not interpolate workflow-dispatch inputs."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -252,8 +282,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_text:Operational Findings / Issues", result.stdout)
 
-    def test_static_gates_require_accumulated_eval_parity(self) -> None:
-        """Static gates must keep parity with accumulated eval checks."""
+    def test_static_gates_require_the_canonical_candidate_gate(self) -> None:
+        """Static gates cannot replace the one candidate-tree gate consumer."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_valid_workflow(root)
@@ -265,8 +295,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             )
             workflow.write_text(
                 workflow.read_text(encoding="utf-8").replace(
-                    "run_accumulated_agent_evals.py",
-                    "run_accumulated_agent_evals_REMOVED.py",
+                    "bash tools/ci/check_agent_canon_pr.sh",
+                    "bash tools/ci/check_agent_canon_pr_REMOVED.sh",
                 ),
                 encoding="utf-8",
             )
@@ -280,7 +310,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "missing_text:run_accumulated_agent_evals.py",
+                "missing_text:bash tools/ci/check_agent_canon_pr.sh",
                 result.stdout,
             )
 
@@ -455,8 +485,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_pr_flow_requires_separate_standalone_and_template_templates(self) -> None:
-        """Ensure PR workflow does not route all PRs to one template."""
+    def test_pr_flow_requires_typed_candidate_and_pr_identity(self) -> None:
+        """The PR workflow cannot replace typed lifecycle records with prose."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_valid_workflow(root)
@@ -476,8 +506,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             )
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("missing_text:standalone AgentCanon repo", result.stdout)
-            self.assertIn("missing_text:template / derived repo", result.stdout)
+            self.assertIn("missing_text:SourceMainRebindReceipt", result.stdout)
+            self.assertIn("missing_text:PullRequestLifecycle", result.stdout)
 
     def test_vendor_path_without_gitmodules_uses_standalone_mode(self) -> None:
         """A vendor path alone must not trigger template-mode checks."""

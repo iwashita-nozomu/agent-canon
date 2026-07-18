@@ -62,16 +62,23 @@ inventory、authority、conflict、validation、merge、Issue 処理、closeout 
 
 ```mermaid
 flowchart TD
-  A["Snapshot open PRs and issues"] --> B["Check mutation authority"]
-  B --> C["Classify PR state"]
-  C --> D["Order by dependency and conflict"]
-  D --> E["Repair branch or conflict"]
-  E --> F["Run surface validation"]
-  F --> G["Merge only when gates pass"]
-  G --> H["Sync dependent parent pin PRs"]
-  H --> I["Triage issues with evidence"]
-  I --> J["Record final counts and blockers"]
+  A["Immutable remote/base/head/permission snapshot"] --> B["PullRequestLifecycle validator"]
+  B --> C["G3 PR identity/CAS receipt"]
+  C --> D["Authorized PR mutation"]
+  D --> E["Exact PR/merge readback"]
+  E --> F["Source QueueReceipt"]
+  F --> G["Ordered DependencyFrontier"]
+  G --> H["Parent projection after acceptance"]
 ```
+
+`PullRequestLifecycle` in
+`tools/agent_tools/update_lifecycle_contract.py` is the only PR state machine.
+This skill consumes its `user|fork|contributor` discriminator and transition
+verdict; it does not define another draft/ready/review/conflict graph. Base/head
+repo, owner, ref, fork and permission identities remain immutable. PR Essence,
+reviews, and contributor diff are retained through draft/ready,
+changes-requested, external-review, closed-head, multiple-remote, merge, and
+conflict-successor handling. Unknown permission never implies push authority.
 
 ## PR Log Report Contract
 
@@ -192,16 +199,15 @@ route を短く書きます。
 
 ## AgentCanon Queue
 
-AgentCanon source PR と template / derived PR が連動している場合は、次を固定します。
+Source merge/readback は exact `(source_namespace, candidate_sha, tree_sha,
+input_digest)` の `QueueReceipt` を一度だけ enqueue します。同じ input の retry
+は accepted receipt を再利用し、再 enqueue しません。
 
-1. Source PR を先に green にする。
-1. Source PR を merge する。
-1. Parent repo の read-only plan を確認し、mutation が必要なら current-task
-   user approval と全 4 inline Git authority/reason field を得て protected
-   latest route を実行する。
-1. `bash tools/sync_agent_canon.sh link-root` と `check` を通す。
-1. Parent pin / root-view diff を PR Essence と source PR の最終差分に照合し、必要な差分修正を head branch 上で行う。
-1. Parent pin / root-view PR を作るか更新する。
-1. Parent PR gate を通してから ready / merge 判断を行う。
+`DependencyFrontier` は `#388 -> #389 -> current transaction` の機械順序、
+source-main publication readback、accepted QueueReceipt を一つの acceptance
+record に束ねます。pending frontier では parent pin/root projection を開始せず、
+accepted record と current publication readback の後だけ parent PR lane を一度
+進めます。source correctness、generated completeness、source PR CAS は parent
+lane で再検査しません。
 
 この細部は `agents/workflows/pr-queue-cleanup-workflow.md` を正本にします。
