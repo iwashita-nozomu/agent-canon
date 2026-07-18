@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Renders dependency manifest graph TSV artifacts into deterministic bundle and projection reports.
 # upstream implementation ./check_dependency_graph.sh writes dependency graph TSV artifacts.
+# upstream implementation ./visualization_contract.py owns the seven-function projection serialization and coverage API.
 # upstream design ../../documents/dependency-manifest-design.md defines manifest graph semantics.
 # downstream design ../../documents/tools/render_dependency_manifest_graph.md documents report generation.
 # downstream implementation ../../tests/agent_tools/test_render_dependency_manifest_graph.py tests graph rendering.
@@ -25,13 +26,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, cast
 
+import visualization_contract as viz_contract
+
 GRAPH_TSV_FIELD_COUNT = 4
 GRAPH_IR_SCHEMA = "agent_canon.graph_ir.v2"
 BUNDLE_SCHEMA = "agent_canon.dependency_graph_bundle.v1"
 PROJECTION_SCHEMA = "agent_canon.dependency_graph_projection.v1"
 CHECKER_AUTHORITY = "tools/agent_tools/check_dependency_graph.sh"
+PRODUCER_PATH = "tools/agent_tools/render_dependency_manifest_graph.py"
 CHECKER_GRAPH_TSV_LOCATOR = f"{CHECKER_AUTHORITY}#graph-tsv"
 BUNDLE_GRAPH_TSV_LOCATOR = "dependency_graph.tsv"
+VISUALIZATION_OWNER_TOOL_ID = "agent_canon.visualization.coverage"
+VISUALIZATION_OWNER_ARGUMENT_SCHEMA = "agent_canon.visualization.arguments.coverage.v1"
+DEPENDENCY_ADAPTER_TOOL_ID = "agent_canon.visualization.adapter.dependency_manifest"
+DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA = (
+    "agent_canon.visualization.arguments.dependency_manifest.v1"
+)
+VISUALIZATION_RENDERER_ID = "dependency-manifest-graph"
 BUNDLE_ARTIFACTS = (
     "dependency_graph.tsv",
     "dependency_graph.ir.json",
@@ -299,6 +310,17 @@ class OptionalManifestFields(TypedDict, total=False):
 
     manifest_path: str
     manifest_sha256: str
+    visualization_source_universe: viz_contract.VisualizationSourceUniverse
+    visualization_coverage: dict[str, "VisualizationArtifactCoverage"]
+    visualization_tool_calls: list[viz_contract.ToolCall]
+
+
+class VisualizationArtifactCoverage(TypedDict):
+    """Exact manifest, final readback, and report for one artifact."""
+
+    manifest: viz_contract.ProjectionCoverageManifest
+    readback: viz_contract.ReadbackProjection
+    report: viz_contract.CoverageReport
 
 
 class OutputEnvelope(OptionalManifestFields):
@@ -607,6 +629,24 @@ def render_markdown(report: GraphReport) -> str:
         lines.extend(f"- `{path}`" for path in report.broken_targets)
     else:
         lines.append("- none")
+    node_ids = {
+        node: f"N{index}"
+        for index, node in enumerate(sorted(report.nodes))
+    }
+    lines.extend(["", "## Complete Dependency Projection", "", "```mermaid", "flowchart TD"])
+    for node in sorted(report.nodes):
+        lines.append(f'    {node_ids[node]}["{html.escape(node, quote=True)}"]')
+    for edge in sorted(
+        report.edges,
+        key=lambda item: (item.source, item.target, item.direction, item.kind),
+    ):
+        edge_label = html.escape(f"{edge.direction}:{edge.kind}", quote=True).replace(
+            "|", "&#124;"
+        )
+        lines.append(
+            f"    {node_ids[edge.source]} -->|{edge_label}| {node_ids[edge.target]}"
+        )
+    lines.append("```")
     return "\n".join(lines) + "\n"
 
 
@@ -984,9 +1024,13 @@ def graph_ir(report: GraphReport, *, source_locator: str | None = None) -> Graph
     }
 
 
-def graph_payload(report: GraphReport) -> HtmlGraphPayload:
+def graph_payload(
+    report: GraphReport,
+    *,
+    ir_payload: GraphIR | None = None,
+) -> HtmlGraphPayload:
     """Return the JSON-serializable graph payload used by the HTML viewer."""
-    ir = graph_ir(report)
+    ir = ir_payload if ir_payload is not None else graph_ir(report)
     dependency_nodes = [node for node in ir["nodes"] if node["kind"] == "repo_path"]
     directory_nodes = [node for node in ir["nodes"] if node["kind"] == "directory"]
     dependency_edges = [edge for edge in ir["edges"] if edge["relation"] != "contains"]
@@ -1037,9 +1081,18 @@ def graph_payload(report: GraphReport) -> HtmlGraphPayload:
     }
 
 
-def render_ir(report: GraphReport, *, source_locator: str) -> str:
+def render_ir(
+    report: GraphReport,
+    *,
+    source_locator: str,
+    ir_payload: GraphIR | None = None,
+) -> str:
     """Render the repo-local graph IR JSON."""
-    return json.dumps(graph_ir(report, source_locator=source_locator), indent=2, sort_keys=True) + "\n"
+    ir = ir_payload if ir_payload is not None else graph_ir(
+        report,
+        source_locator=source_locator,
+    )
+    return json.dumps(ir, indent=2, sort_keys=True) + "\n"
 
 
 def script_json(payload: object) -> str:
@@ -2399,13 +2452,17 @@ def render_html(
     *,
     title: str,
     source_locator: str,
+    ir_payload: GraphIR | None = None,
 ) -> str:
     """Render a self-contained dependency graph HTML viewer."""
-    payload = graph_payload(report)
-    ir_payload = graph_ir(report, source_locator=source_locator)
+    complete_ir = ir_payload if ir_payload is not None else graph_ir(
+        report,
+        source_locator=source_locator,
+    )
+    payload = graph_payload(report, ir_payload=complete_ir)
     page_title = html.escape(title, quote=True)
     source = html.escape(source_locator, quote=True)
-    data = script_json(ir_payload)
+    data = script_json(complete_ir)
     territory_svg = territory_map_svg(report)
     static_svg = static_graph_svg(report)
     static_zoom_links = "\n".join(
@@ -2567,13 +2624,418 @@ def checker_envelope(graph_input: GraphInput) -> CheckerEnvelope:
     }
 
 
-def render_outputs(report: GraphReport, *, title: str, source_locator: str) -> dict[str, str]:
-    """Return every deterministic projection body keyed by bundle basename."""
+def _canonical_payload(value: object) -> str:
+    """Return canonical JSON for source and projection payload fields."""
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
+
+
+def _build_source_universe(
+    *,
+    report: GraphReport,
+    graph: GraphIR,
+    source_locator: str,
+    scope: str,
+) -> viz_contract.VisualizationSourceUniverse:
+    """Build the native plus GraphIR-derived universe before projection."""
+    literal_items: list[viz_contract.VisualizationSourceItem] = []
+    for index, node_id in enumerate(sorted(report.nodes)):
+        literal_items.append(
+            {
+                "item_id": f"node:{node_id}",
+                "kind": "identity",
+                "origin": "literal_request",
+                "source_locator": source_locator,
+                "source_start": None,
+                "source_end": None,
+                "ordinal": index,
+                "payload_json": _canonical_payload({"node": node_id}),
+            }
+        )
+    dependency_items: list[viz_contract.VisualizationSourceItem] = []
+    ordered_edges = sorted(
+        report.edges,
+        key=lambda edge: (
+            edge.source,
+            edge.target,
+            edge.direction,
+            edge.kind,
+        ),
+    )
+    for index, edge in enumerate(ordered_edges):
+        row = "\t".join((edge.direction, edge.kind, edge.source, edge.target))
+        dependency_items.append(
+            {
+                "item_id": (
+                    f"edge:{index}:{edge.direction}:{edge.kind}:"
+                    f"{edge.source}:{edge.target}"
+                ),
+                "kind": "edge",
+                "origin": "dependency_closure",
+                "source_locator": source_locator,
+                "source_start": None,
+                "source_end": None,
+                "ordinal": index,
+                "payload_json": _canonical_payload(
+                    {
+                        "direction": edge.direction,
+                        "kind": edge.kind,
+                        "row": row,
+                        "source": edge.source,
+                        "target": edge.target,
+                    }
+                ),
+            }
+        )
+    native_source_identities = {
+        node_id: f"node:{node_id}" for node_id in sorted(report.nodes)
+    }
+
+    def derived_native_sources(path: str) -> list[str]:
+        if path == ".":
+            return list(native_source_identities.values())
+        prefix = path.rstrip("/") + "/"
+        return [
+            source_identity
+            for node_id, source_identity in native_source_identities.items()
+            if node_id == path or node_id.startswith(prefix)
+        ]
+
+    directory_nodes = sorted(
+        (node for node in graph["nodes"] if node["kind"] == "directory"),
+        key=lambda node: node["id"],
+    )
+    containment_edges = sorted(
+        (edge for edge in graph["edges"] if edge["relation"] == "contains"),
+        key=lambda edge: edge["id"],
+    )
+    next_ordinal = len(dependency_items)
+    for offset, node in enumerate(directory_nodes):
+        directory_path = str(node["payload_json"]["path"])
+        dependency_items.append(
+            {
+                "item_id": node["id"],
+                "kind": "module",
+                "origin": "dependency_closure",
+                "source_locator": node["source_locator"],
+                "source_start": None,
+                "source_end": None,
+                "ordinal": next_ordinal + offset,
+                "payload_json": _canonical_payload(
+                    {
+                        "provenance_kind": "derived_directory_containment",
+                        "producer_path": PRODUCER_PATH,
+                        "graph_ir_id": node["id"],
+                        "directory_path": directory_path,
+                        "native_source_identities": derived_native_sources(
+                            directory_path
+                        ),
+                    }
+                ),
+            }
+        )
+    next_ordinal += len(directory_nodes)
+    for offset, edge in enumerate(containment_edges):
+        child_path = str(edge["payload_json"]["childPath"])
+        dependency_items.append(
+            {
+                "item_id": edge["id"],
+                "kind": "edge",
+                "origin": "dependency_closure",
+                "source_locator": edge["source_locator"],
+                "source_start": None,
+                "source_end": None,
+                "ordinal": next_ordinal + offset,
+                "payload_json": _canonical_payload(
+                    {
+                        "provenance_kind": "derived_directory_containment",
+                        "producer_path": PRODUCER_PATH,
+                        "graph_ir_id": edge["id"],
+                        "source": edge["from_node_id"],
+                        "target": edge["to_node_id"],
+                        "parent_path": edge["payload_json"]["parentPath"],
+                        "child_path": child_path,
+                        "child_kind": edge["payload_json"]["childKind"],
+                        "native_source_identities": derived_native_sources(child_path),
+                    }
+                ),
+            }
+        )
+    request_payload = {
+        "scope": scope,
+        "source_locator": source_locator,
+        "nodes": list(sorted(report.nodes)),
+        "edges": [item["item_id"] for item in dependency_items],
+    }
+    request_id = "dependency-manifest:" + sha256_bytes(
+        _canonical_payload(request_payload).encode("utf-8")
+    )
+    return viz_contract.build_source_universe(
+        request_id=request_id,
+        literal_request=(
+            f"dependency manifest graph scope={scope} source={source_locator}"
+        ),
+        literal_items=literal_items,
+        owner_closure=[],
+        dependency_closure=dependency_items,
+    )
+
+
+def _shared_tool_arguments(
+    universe: viz_contract.VisualizationSourceUniverse,
+    *,
+    artifact_id: str,
+    artifact_format: viz_contract.ArtifactFormat,
+) -> dict[str, viz_contract.JsonValue]:
+    """Return exact shared owner/adapter argument fields."""
+    literal_items = [
+        item for item in universe["items"] if item["origin"] == "literal_request"
+    ]
+    return cast(
+        dict[str, viz_contract.JsonValue],
+        {
+            "request_id": universe["request_id"],
+            "literal_request": universe["literal_request"],
+            "literal_items": literal_items,
+            "owner_closure": universe["owner_closure"],
+            "dependency_closure": universe["dependency_closure"],
+            "artifact_id": artifact_id,
+            "renderer_id": VISUALIZATION_RENDERER_ID,
+            "artifact_format": artifact_format,
+            "filters": universe["filters"],
+        },
+    )
+
+
+def _build_visualization_tool_calls(
+    universe: viz_contract.VisualizationSourceUniverse,
+    *,
+    dependency_manifest_locator: str,
+    artifact_id: str,
+    artifact_format: viz_contract.ArtifactFormat,
+) -> list[viz_contract.ToolCall]:
+    """Return exactly one owner call followed by one dependency adapter call."""
+    shared = _shared_tool_arguments(
+        universe,
+        artifact_id=artifact_id,
+        artifact_format=artifact_format,
+    )
+    owner_call: viz_contract.ToolCall = {
+        "schema": "agent_canon.visualization_tool_call.v1",
+        "tool_id": VISUALIZATION_OWNER_TOOL_ID,
+        "argument_schema": VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
+        "arguments": dict(shared),
+    }
+    adapter_arguments = dict(shared)
+    adapter_arguments["dependency_manifest_locator"] = dependency_manifest_locator
+    adapter_call: viz_contract.ToolCall = {
+        "schema": "agent_canon.visualization_tool_call.v1",
+        "tool_id": DEPENDENCY_ADAPTER_TOOL_ID,
+        "argument_schema": DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA,
+        "arguments": adapter_arguments,
+    }
+    viz_contract.serialize_tool_call(owner_call)
+    viz_contract.serialize_tool_call(adapter_call)
+    return [owner_call, adapter_call]
+
+
+def _projection_entries(
+    universe: viz_contract.VisualizationSourceUniverse,
+) -> list[viz_contract.ProjectionCoverageEntry]:
+    """Return one stable rendered/readback identity for every source item."""
+    entries: list[viz_contract.ProjectionCoverageEntry] = []
+    for item in universe["items"]:
+        locator = viz_contract.serialize_projection_identity(item["item_id"])
+        entries.append(
+            {
+                "source_item_id": item["item_id"],
+                "source_kind": item["kind"],
+                "rendered_identity": item["item_id"],
+                "artifact_locator": [str(locator)],
+                "renderer_id": VISUALIZATION_RENDERER_ID,
+                "readback_identity": item["item_id"],
+                "payload_json": _canonical_payload({"projection": "one_to_one"}),
+                "view_state": "visible",
+            }
+        )
+    return entries
+
+
+def _expected_readback(
+    entries: list[viz_contract.ProjectionCoverageEntry],
+    *,
+    artifact_id: str,
+    artifact_format: viz_contract.ArtifactFormat,
+) -> viz_contract.ReadbackProjection:
+    """Return expected pre-marker identities used to construct the manifest."""
+    counts = {kind: 0 for kind in viz_contract.SOURCE_ITEM_KINDS}
+    for entry in entries:
+        counts[entry["source_kind"]] += 1
     return {
-        "dependency_graph.ir.json": render_ir(report, source_locator=source_locator),
+        "artifact_id": artifact_id,
+        "artifact_format": artifact_format,
+        "renderer_id": VISUALIZATION_RENDERER_ID,
+        "identities": {entry["readback_identity"]: entry for entry in entries},
+        "readback_counts": counts,
+        "coverage_digest": "",
+        "status": "pass",
+        "violations": [],
+    }
+
+
+def _projection_manifest(
+    universe: viz_contract.VisualizationSourceUniverse,
+    *,
+    artifact_id: str,
+    artifact_format: viz_contract.ArtifactFormat,
+) -> viz_contract.ProjectionCoverageManifest:
+    """Build one complete artifact-specific manifest before marker insertion."""
+    entries = _projection_entries(universe)
+    return viz_contract.build_projection_coverage_manifest(
+        universe,
+        artifact_id=artifact_id,
+        renderer_id=VISUALIZATION_RENDERER_ID,
+        artifact_format=artifact_format,
+        entries=entries,
+        readback=_expected_readback(
+            entries,
+            artifact_id=artifact_id,
+            artifact_format=artifact_format,
+        ),
+    )
+
+
+def _embed_coverage_marker(
+    body: str,
+    manifest: viz_contract.ProjectionCoverageManifest,
+    marker: str,
+) -> str:
+    """Embed one format-specific marker and every separate identity token."""
+    tokens = [
+        locator
+        for entry in manifest["entries"]
+        for locator in entry["artifact_locator"]
+    ]
+    artifact_format = manifest["artifact_format"]
+    if artifact_format == "graph_ir":
+        payload = json.loads(body)
+        payload["visualization_coverage"] = {"marker": marker}
+        payload["visualization_identity_tokens"] = tokens
+        return json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    if artifact_format == "markdown_mermaid":
+        fence = "```mermaid"
+        if fence not in body:
+            raise ValueError("dependency Markdown projection must contain Mermaid")
+        marked = body.replace(fence, f"<!-- {marker} -->\n{fence}", 1)
+        token_comments = "\n".join(f"<!-- {token} -->" for token in tokens)
+        return marked.rstrip() + "\n\n" + token_comments + "\n"
+    if artifact_format == "dot":
+        token_comments = "\n".join(f"// {token}" for token in tokens)
+        return f"// {marker}\n{token_comments}\n{body}"
+    if artifact_format == "html":
+        coverage_script = (
+            '<script type="application/json" '
+            'id="agent-canon-visualization-coverage">'
+            f"{json.dumps(marker)}"
+            "</script>"
+        )
+        token_payload = html.escape(_canonical_payload(tokens))
+        token_element = (
+            '<div id="agent-canon-visualization-identities" hidden>'
+            f"{token_payload}</div>"
+        )
+        insertion = coverage_script + token_element
+        if "</body>" not in body:
+            raise ValueError("dependency HTML projection has no body boundary")
+        return body.replace("</body>", insertion + "\n</body>", 1)
+    raise ValueError(f"marker embedding unsupported for {artifact_format}")
+
+
+def _finalize_text_coverage(
+    path: Path,
+    body: str,
+    universe: viz_contract.VisualizationSourceUniverse,
+    *,
+    artifact_id: str,
+    artifact_format: viz_contract.ArtifactFormat,
+    dependency_manifest_locator: str,
+) -> VisualizationArtifactCoverage:
+    """Write final syntax, parse it back, and validate complete coverage."""
+    owner_call, adapter_call = _build_visualization_tool_calls(
+        universe,
+        dependency_manifest_locator=dependency_manifest_locator,
+        artifact_id=artifact_id,
+        artifact_format=artifact_format,
+    )
+    manifest = _projection_manifest(
+        universe,
+        artifact_id=artifact_id,
+        artifact_format=artifact_format,
+    )
+    marker = viz_contract.serialize_projection_coverage_manifest(
+        manifest,
+        owner_tool_call=owner_call,
+        adapter_tool_call=adapter_call,
+    )
+    atomic_write_text(path, _embed_coverage_marker(body, manifest, marker))
+    readback = viz_contract.readback_projection(
+        path,
+        artifact_format,
+        artifact_id=artifact_id,
+        renderer_id=VISUALIZATION_RENDERER_ID,
+    )
+    report = viz_contract.validate_projection_coverage(
+        universe,
+        manifest,
+        readback=readback,
+    )
+    return {"manifest": manifest, "readback": readback, "report": report}
+
+
+def _artifact_format(artifact_name: str) -> viz_contract.ArtifactFormat:
+    """Return the exact visualization format for one fixed artifact basename."""
+    if artifact_name == "dependency_graph.ir.json":
+        return "graph_ir"
+    if artifact_name == "dependency_graph.md":
+        return "markdown_mermaid"
+    if artifact_name == "dependency_graph.dot":
+        return "dot"
+    if artifact_name == "dependency_graph.html":
+        return "html"
+    raise KeyError(f"unknown dependency visualization artifact: {artifact_name}")
+
+
+def render_outputs(
+    report: GraphReport,
+    *,
+    title: str,
+    source_locator: str,
+    ir_payload: GraphIR | None = None,
+) -> dict[str, str]:
+    """Return every deterministic projection body keyed by bundle basename."""
+    complete_ir = ir_payload if ir_payload is not None else graph_ir(
+        report,
+        source_locator=source_locator,
+    )
+    return {
+        "dependency_graph.ir.json": render_ir(
+            report,
+            source_locator=source_locator,
+            ir_payload=complete_ir,
+        ),
         "dependency_graph.md": render_markdown(report),
         "dependency_graph.dot": render_dot(report),
-        "dependency_graph.html": render_html(report, title=title, source_locator=source_locator),
+        "dependency_graph.html": render_html(
+            report,
+            title=title,
+            source_locator=source_locator,
+            ir_payload=complete_ir,
+        ),
     }
 
 
@@ -2583,20 +3045,33 @@ def build_manifest(
     scope: str,
     graph_input: GraphInput,
     report: GraphReport,
-    bundle_dir: Path,
+    artifact_dir: Path,
+    source_universe: viz_contract.VisualizationSourceUniverse,
+    visualization_coverage: dict[str, VisualizationArtifactCoverage],
+    visualization_tool_calls: list[viz_contract.ToolCall],
 ) -> OutputEnvelope:
     """Return the committed bundle manifest object, excluding manifest itself."""
     return {
         "schema": BUNDLE_SCHEMA,
-        "status": "pass",
+        "status": (
+            "pass"
+            if all(
+                coverage["report"]["status"] == "pass"
+                for coverage in visualization_coverage.values()
+            )
+            else "fail"
+        ),
         "scope": scope,
         "source": source_envelope(root, graph_input),
         "checker": checker_envelope(graph_input),
         "summary": graph_summary(report),
         "artifacts": [
-            file_descriptor(bundle_dir / artifact_name, artifact_name=artifact_name)
+            file_descriptor(artifact_dir / artifact_name, artifact_name=artifact_name)
             for artifact_name in BUNDLE_ARTIFACTS
         ],
+        "visualization_source_universe": source_universe,
+        "visualization_coverage": visualization_coverage,
+        "visualization_tool_calls": visualization_tool_calls,
     }
 
 
@@ -2634,18 +3109,46 @@ def write_bundle(
                 origin_locator=normalized_cli_token(supplied),
             )
         report = build_report(root, load_edges(staged_tsv))
+        ir_payload = graph_ir(
+            report,
+            source_locator=BUNDLE_GRAPH_TSV_LOCATOR,
+        )
+        source_universe = _build_source_universe(
+            report=report,
+            graph=ir_payload,
+            source_locator=graph_input.origin_locator,
+            scope=scope,
+        )
+        visualization_tool_calls = _build_visualization_tool_calls(
+            source_universe,
+            dependency_manifest_locator=graph_input.origin_locator,
+            artifact_id="dependency_graph.html",
+            artifact_format="html",
+        )
+        visualization_coverage: dict[str, VisualizationArtifactCoverage] = {}
         for artifact_name, body in render_outputs(
             report,
             title=title,
             source_locator=BUNDLE_GRAPH_TSV_LOCATOR,
+            ir_payload=ir_payload,
         ).items():
-            (staging_dir / artifact_name).write_text(body, encoding="utf-8", newline="\n")
+            visualization_coverage[artifact_name] = _finalize_text_coverage(
+                staging_dir / artifact_name,
+                body,
+                source_universe,
+                artifact_id=artifact_name,
+                artifact_format=_artifact_format(artifact_name),
+                dependency_manifest_locator=graph_input.origin_locator,
+            )
         manifest = build_manifest(
             root=root,
             scope=scope,
             graph_input=graph_input,
             report=report,
-            bundle_dir=staging_dir,
+            artifact_dir=staging_dir,
+            source_universe=source_universe,
+            visualization_coverage=visualization_coverage,
+            visualization_tool_calls=visualization_tool_calls,
         )
         manifest_text = json.dumps(manifest, sort_keys=True, indent=2) + "\n"
         (staging_dir / "manifest.json").write_text(manifest_text, encoding="utf-8", newline="\n")
@@ -2662,9 +3165,9 @@ def write_bundle(
     committed_payload: object = json.loads(
         committed_manifest_path.read_text(encoding="utf-8")
     )
-    if not isinstance(committed_payload, dict):
-        raise TypeError("invalid committed manifest")
-    committed_manifest = cast(OutputEnvelope, committed_payload)
+    if committed_payload != manifest:
+        raise TypeError("committed manifest differs from staged manifest")
+    committed_manifest: OutputEnvelope = manifest
     committed_manifest["manifest_path"] = (target_dir / "manifest.json").as_posix()
     committed_manifest["manifest_sha256"] = sha256_bytes(committed_manifest_path.read_bytes())
     return committed_manifest, report
@@ -2747,11 +3250,21 @@ def build_projection_envelope(
     graph_input: GraphInput,
     report: GraphReport,
     paths: dict[str, Path],
+    source_universe: viz_contract.VisualizationSourceUniverse,
+    visualization_coverage: dict[str, VisualizationArtifactCoverage],
+    visualization_tool_calls: list[viz_contract.ToolCall],
 ) -> OutputEnvelope:
     """Return the projection stdout JSON envelope."""
     return {
         "schema": PROJECTION_SCHEMA,
-        "status": "pass",
+        "status": (
+            "pass"
+            if all(
+                coverage["report"]["status"] == "pass"
+                for coverage in visualization_coverage.values()
+            )
+            else "fail"
+        ),
         "scope": scope,
         "source": source_envelope(root, graph_input),
         "checker": checker_envelope(graph_input),
@@ -2760,6 +3273,9 @@ def build_projection_envelope(
             file_descriptor(path, artifact_name=projection_artifact_name(option_name))
             for option_name, path in sorted(paths.items())
         ],
+        "visualization_source_universe": source_universe,
+        "visualization_coverage": visualization_coverage,
+        "visualization_tool_calls": visualization_tool_calls,
     }
 
 
@@ -2795,16 +3311,46 @@ def write_projection(
                 origin_locator=normalized_cli_token(supplied),
             )
         report = build_report(root, load_edges(graph_input.path))
-        outputs = render_outputs(report, title=title, source_locator=graph_input.origin_locator)
+        ir_payload = graph_ir(report, source_locator=graph_input.origin_locator)
+        source_universe = _build_source_universe(
+            report=report,
+            graph=ir_payload,
+            source_locator=graph_input.origin_locator,
+            scope=scope,
+        )
+        outputs = render_outputs(
+            report,
+            title=title,
+            source_locator=graph_input.origin_locator,
+            ir_payload=ir_payload,
+        )
+        visualization_coverage: dict[str, VisualizationArtifactCoverage] = {}
         for option_name, target_path in sorted(paths.items()):
             artifact_name = projection_artifact_name(option_name)
-            atomic_write_text(target_path, outputs[artifact_name])
+            visualization_coverage[artifact_name] = _finalize_text_coverage(
+                target_path,
+                outputs[artifact_name],
+                source_universe,
+                artifact_id=artifact_name,
+                artifact_format=_artifact_format(artifact_name),
+                dependency_manifest_locator=graph_input.origin_locator,
+            )
+        first_artifact = sorted(visualization_coverage)[0]
+        visualization_tool_calls = _build_visualization_tool_calls(
+            source_universe,
+            dependency_manifest_locator=graph_input.origin_locator,
+            artifact_id=first_artifact,
+            artifact_format=_artifact_format(first_artifact),
+        )
         envelope = build_projection_envelope(
             root=root,
             scope=scope,
             graph_input=graph_input,
             report=report,
             paths=paths,
+            source_universe=source_universe,
+            visualization_coverage=visualization_coverage,
+            visualization_tool_calls=visualization_tool_calls,
         )
         return envelope, report
     finally:
@@ -2832,6 +3378,18 @@ def print_text_envelope(envelope: OutputEnvelope) -> None:
         print(f"manifest.path={envelope['manifest_path']}")
     if "manifest_sha256" in envelope:
         print(f"manifest.hash={envelope['manifest_sha256']}")
+    if "visualization_coverage" in envelope:
+        for artifact_name, coverage in sorted(envelope["visualization_coverage"].items()):
+            report = coverage["report"]
+            print(f"visualization.{artifact_name}.status={report['status']}")
+            print(
+                f"visualization.{artifact_name}.coverage_digest="
+                f"{report['coverage_digest']}"
+            )
+            print(
+                f"visualization.{artifact_name}.violation_count="
+                f"{len(report['violations'])}"
+            )
     for artifact in envelope["artifacts"]:
         print(f"artifact.{artifact['path']}.sha256={artifact['sha256']}")
 

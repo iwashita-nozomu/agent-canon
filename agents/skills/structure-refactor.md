@@ -16,8 +16,21 @@ upstream design dependency-analysis.md dependency and change-impact packets
 upstream design prose-reasoning-graph.md graph-backed prose and README analysis
 upstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates structure-related design evidence claims
 downstream implementation ../../.agents/skills/structure-refactor/SKILL.md exposes this workflow as a runtime skill
+upstream design code-visualization.md sole public visualization owner and typed projection contract
+downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
+
+## Visualization Adapter Boundary
+
+`structure-refactor` owns architecture, path, directory-responsibility, source/
+view, and ownership facts. Architecture or responsibility maps pass the complete
+native selection to `code-visualization` through its
+`VisualizationSourceUniverse`, canonical `ToolCall`,
+`ProjectionCoverageManifest`, post-format readback, and final coverage status.
+This skill may choose layout and reversible view state, but no locally filtered
+map becomes canon; omission and granularity policy stays with the sole public
+visualization owner.
 
 ## Reader Map
 

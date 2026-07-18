@@ -8,8 +8,11 @@ upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py own
 upstream implementation ../../tools/agent_tools/publication_integrator.py owns candidate CAS and publication authority.
 upstream implementation ../../tools/agent_tools/github_publish.py adapts verified GitHub remote and PR operations.
 upstream implementation ../../tools/ci/check_agent_canon_pr.sh owns the one source PR gate invocation.
+upstream design ../skills/code-visualization.md owns visualization source-publication policy.
+upstream implementation ../../tools/agent_tools/visualization_contract.py owns typed visualization coverage evidence.
 downstream design pr-queue-cleanup-workflow.md consumes source publication readback.
 downstream design ../skills/pr-processing.md consumes PullRequestLifecycle and queue receipts.
+downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py validates workflow dependency edges.
 @dependency-end
 -->
 
@@ -25,6 +28,17 @@ consumer and cannot begin here.
 - Read `Publication` for merge/readback and queue handoff.
 - Machine schemas live only in `update_lifecycle_contract.py`; this workflow
   names their use and does not define alternate records.
+
+## Specialized Owner Prerequisites
+
+When `code-visualization` owns the source change, its sole public owner and
+`visualization_contract.py` supply the exact independent review, route,
+coverage, post-format readback, formatter, and producer-checker evidence before
+source merge. After merge, that owner executes its canonical source-main
+readback gate against every merged path. This workflow consumes the typed
+result and does not restate its schema or omission/granularity policy. The
+isolated visualization route records `parent_pin_update=forbidden` and does not
+modify a parent checkout or pin.
 
 ## Source And Branch Ownership
 

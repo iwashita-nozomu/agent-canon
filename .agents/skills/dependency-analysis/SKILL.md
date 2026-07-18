@@ -14,10 +14,22 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md sepa
 upstream implementation ../../../tools/agent_tools/scan_code_dependencies.sh extracts file-level code dependency evidence
 upstream implementation ../../../tools/agent_tools/helper_function_inventory.py extracts Python function-level call graph context
 upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py validates design-document evidence claims
+upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
+downstream implementation ../../../tests/agent_tools/test_check_dependency_headers.py validates this adapter dependency header.
 @dependency-end
 -->
 
 # Dependency Analysis
+
+## Visualization Adapter Boundary
+
+The dependency checker remains authority for native manifest facts, nodes,
+edges, and owner/dependency closure. For any graph projection, hand the complete
+fact set to `$code-visualization` as its `VisualizationSourceUniverse` and use
+the owner's canonical `ToolCall`, `ProjectionCoverageManifest`, post-format
+readback, and final coverage status. Dependency renderers own syntax, layout,
+and reversible filters only; omission and granularity rules remain solely in
+the canonical owner contract.
 
 ## Reader Map
 

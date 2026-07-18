@@ -560,6 +560,32 @@ required_regex = [
 [[evals.checklist]]
 id = "CODE-VISUALIZATION-4"
 critical = true
+description = "Requires canonical typed omission prevention and post-format coverage/readback oracle evidence."
+required_regex = [
+  "literal user scope",
+  "source-owner and dependency\\s+closure",
+  "VisualizationSourceUniverse",
+  "ProjectionCoverageManifest",
+  "canonical owner ToolCall",
+  "agent_canon\\.visualization\\.coverage",
+  "agent_canon\\.visualization\\.arguments\\.coverage\\.v1",
+  "mandatory format",
+  "final-artifact readback|post-format readback",
+  "source_counts",
+  "rendered_counts",
+  "readback_counts",
+  "coverage_digest",
+  "final_token_readback",
+  "clustering",
+  "zoom",
+  "filtering",
+  "view[- ]only|reversible view[- ]state",
+  "typed renderer-capacity blocker|typed renderer-capacity rejection",
+]
+
+[[evals.checklist]]
+id = "CODE-VISUALIZATION-5"
+critical = true
 description = "Routes document-embedded diagrams through context and visual-plan selection."
 required_regex = ["Document Embedded Diagrams", "visual_plan", "section claim", "reader", "Mermaid"]
 

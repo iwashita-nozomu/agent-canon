@@ -19,10 +19,21 @@ upstream implementation ../../../tools/agent_tools/cpp_template_to_lean.py fully
 upstream implementation ../../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
 upstream implementation ../../../tools/agent_tools/theorem_graph_circularity_check.py checks proposition-graph circularity for theorem routes
 upstream design ../../../agents/skills/literature-survey.md source search policy
+upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
+downstream implementation ../../../tests/agent_tools/test_check_dependency_headers.py validates this adapter dependency header.
 @dependency-end
 -->
 
 # Formal Proof Workflow
+
+## Visualization Adapter Boundary
+
+Proof checkers and generated/theorem-graph evidence retain proof authority. For
+proof or algorithm visualization, hand every selected native fact to
+`$code-visualization` and use its `VisualizationSourceUniverse`, canonical
+`ToolCall`, `ProjectionCoverageManifest`, post-format readback, and final
+coverage status. Rendering controls layout only and does not duplicate the
+owner's omission/granularity contract or turn projection coverage into proof.
 
 ## Reader Map
 

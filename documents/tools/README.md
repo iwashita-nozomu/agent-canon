@@ -6,7 +6,9 @@ upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 upstream design ../prose-reasoning-graph/dsl-spec.md graph visualization projection contract
+upstream design ../../agents/skills/code-visualization.md sole public visualization owner and closeout boundary
 downstream implementation ../../tools/agent_tools/tool_catalog.py validates catalog/docs consistency
+downstream implementation ../../tools/agent_tools/visualization_contract.py validates typed visualization coverage and readback
 downstream implementation ../../tools/agent_tools/tool_drift.py validates tool/convention trace contracts
 downstream implementation ../../tools/agent_tools/responsibility_scope.py validates responsibility scope ownership
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local issue sync state
@@ -63,6 +65,7 @@ first and then return here only for reader-facing context.
 | Find one reader-facing document for a tool | `documents/tools/tool-docs.toml` | One-to-one map validated by `tool_catalog.py`; do not mirror it as prose. |
 | Run Markdown, link, math, Mermaid, or runtime-profile docs checks | `tools/bin/agent-canon docs check` | Use `docs format`, `docs fix-math`, or `docs fix-mermaid` only for mechanical repairs. |
 | Check tool catalog or drift after docs / tool edits | `tools/agent_tools/tool_catalog.py`, `tools/agent_tools/tool_drift.py` | These are validation commands, not reader navigation lists. |
+| Validate visualization coverage and post-format readback | [Visualization Contract](visualization_contract.md), then `$code-visualization` | Producers retain native domain validation; the sole public owner has final projection coverage/readback authority, and renderers are adapters. |
 | Understand dependency tool purpose and license evidence | [Dependency Tools And Licenses](dependency-tools-and-licenses.md) | Human-facing summary of external tools and license evidence. |
 | Check design-document claims against code and dependency evidence | [check_design_doc_claims.py](check_design_doc_claims.md) | Use before accepting implementation-backed design prose or structure-refactor handoff claims. |
 | Materialize source-bound runtime evidence or consume its graph snapshot | [Runtime Log Archive](../runtime-log-archive.md), then Source-Bound Runtime and Graph Consumers below | The materializer owns prepared artifact/outcome receipts; graph status/query/context are consume-only. |
@@ -110,11 +113,14 @@ to choose a route:
   `cpp_template_to_lean.py`,
   `agent-canon jit-ir-to-lean`, and `agent-canon test-design check`.
 
-Graph visualization follows the Prose Reasoning Graph DSL projection contract.
+Graph visualization enters through the sole public `code-visualization` owner
+and the typed [Visualization Contract](visualization_contract.md).
 `render_dependency_manifest_graph.py`, `semantic_provider_html_report.py`, and
 runtime dashboard diagrams are adapters or projections; their domain producers
-keep validation authority. Proof and JIT-canonical IR tools provide source facts
-that future graph viewers map through the same DSL contract.
+keep native fact validation authority, while the canonical owner decides final
+projection coverage and post-format readback status. Proof and JIT-canonical IR
+tools provide source facts to that route. Source publication guidance is owned
+by the canonical `code-visualization` closeout and is not copied here.
 
 ## Evidence And Assumption Ledger
 

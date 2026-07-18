@@ -3,10 +3,12 @@
 # responsibility Defines the structured AgentCanon tool catalog.
 # upstream design README.md shared tool family ownership
 # upstream design ../documents/repo-local-tool-imports.md legacy import disposition ledger
+# upstream design ../documents/tools/visualization_contract.md canonical visualization coverage and readback tool contract
 # downstream implementation agent_tools/tool_catalog.py validates this catalog
 # downstream implementation agent_tools/tool_drift.py checks catalog drift contracts
 # downstream implementation agent_tools/check_design_doc_claims.py validates design-document evidence claims
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
+# downstream implementation ../tests/agent_tools/test_tool_catalog.py validates canonical visualization tool registration
 # @dependency-end
 
 version: 1
@@ -199,6 +201,26 @@ entries:
       - documents/github-first-module-and-devcontainer-policy.md
     tests:
       - tests/agent_tools/test_parent_repo_readiness.py
+
+  - id: visualization-contract
+    summary: Validates typed visualization source universes, projection manifests, canonical ToolCalls, and post-format readback coverage.
+    path: tools/agent_tools/visualization_contract.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    audience: skill
+    placement: validation_checker
+    command: python3 tools/agent_tools/visualization_contract.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/visualization_contract.md
+    tests:
+      - tests/agent_tools/test_visualization_contract.py
 
   - id: render-dependency-manifest-graph
     summary: Renders dependency manifest graph TSV artifacts into repo-local Graph IR JSON with directory containment, Markdown, DOT, and HTML projection reports under the shared Graph DSL Core projection contract.

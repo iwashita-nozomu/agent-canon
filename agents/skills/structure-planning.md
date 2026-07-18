@@ -11,8 +11,20 @@ downstream implementation ../../.agents/skills/structure-planning/SKILL.md expos
 downstream implementation ../../tools/agent_tools/task_close.py consumes document_split_decision closeout evidence
 downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates document split decision wiring
 downstream design html-output.md consumes structure contracts for explicit HTML output
+upstream design code-visualization.md sole public visualization owner and typed projection contract
+downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
+
+## Visualization Adapter Boundary
+
+When a structure contract selects a Mermaid, document, report, wiki, or browser
+graph, preserve the structure plan as native planning facts and pass the
+complete selected set to `code-visualization`. That owner alone supplies the
+`VisualizationSourceUniverse`, canonical `ToolCall`,
+`ProjectionCoverageManifest`, post-format readback, and final coverage status.
+This skill owns reader order, visual intent, and layout choices only; it does
+not restate the owner's omission or granularity policy.
 
 ## Reader Map
 

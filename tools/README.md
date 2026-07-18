@@ -6,9 +6,11 @@ contract tool
 responsibility Documents tools for this repository.
 upstream design ../AGENTS.md shared canon runtime contract
 upstream design ../documents/prose-reasoning-graph/dsl-spec.md shared graph visualization projection and adapter contract
+upstream design ../agents/skills/code-visualization.md sole public visualization owner and projection coverage contract
 downstream design catalog.yaml structured AgentCanon tool catalog
 downstream design ../documents/tools/tool-docs.toml same-named tool documentation map
 downstream implementation agent_tools/tool_catalog.py validates catalog/docs consistency
+downstream implementation agent_tools/visualization_contract.py validates typed visualization coverage and readback
 downstream implementation agent_tools/tool_drift.py validates tool/convention trace contracts
 downstream implementation agent_tools/responsibility_scope.py validates responsibility scopes and protecting tools
 downstream implementation agent_tools/issue_sync.py validates local issue sync state
@@ -118,6 +120,7 @@ Common execution routes:
 | Need                                                          | Command                                                                                           |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Catalog shape, docs wiring, and retired legacy paths          | `python3 tools/agent_tools/tool_catalog.py`                                                       |
+| Visualization universe, ToolCall, projection coverage, and final readback | `python3 tools/agent_tools/visualization_contract.py --universe <universe.json> --manifest <manifest.json> --readback <readback.json> --tool-call <tool-call.json>` |
 | Tool / workflow / PR checklist drift                          | `python3 tools/agent_tools/tool_drift.py`                                                         |
 | Runtime profile and path-risk routing                         | `python3 tools/agent_tools/classify_path_risk.py`                                                 |
 | Markdown, links, math, Mermaid, and docs drift                | `tools/bin/agent-canon docs check`                                                                |
@@ -159,6 +162,12 @@ environment surfaces before an agent treats the repo as ready.
 directory / file layout with `documents/repo-structure-contract.toml`.
 The TOML contract owns profiles, ignored generated paths, required paths, and
 unexpected top-level severity.
+`visualization_contract.py` is the single cataloged typed visualization
+contract/checker used by the sole public `code-visualization` skill. Native
+producer checkers retain domain-fact authority; renderer and formatter tools
+remain adapters, while `code-visualization` owns final projection coverage and
+post-format readback status. Publication routing is defined only by the
+canonical skill closeout.
 `render_dependency_manifest_graph.py` turns a dependency graph TSV from
 `check_dependency_graph.sh --graph-tsv` into a repo-local Graph IR JSON,
 Markdown, DOT, and a single-file HTML Graph Workbench with a Voronoi-style code

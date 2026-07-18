@@ -3,7 +3,9 @@
 # responsibility Maps canonical tools to same-named explanatory documents.
 # upstream design README.md tool documentation placement policy
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
+# upstream design visualization_contract.md canonical visualization contract/checker documentation
 # downstream implementation ../../tools/agent_tools/tool_catalog.py validates one-to-one tool docs
+# downstream implementation ../../tests/agent_tools/test_tool_catalog.py validates visualization tool-doc registration
 # @dependency-end
 
 catalog_kind = "agent_canon_tool_docs"
@@ -99,6 +101,13 @@ tool = "tools/agent_tools/github_publish.py"
 doc = "documents/tools/github_publish.md"
 language = "python"
 summary = "gh-backed GitHub branch and PR publish tool documentation."
+
+[[tool]]
+id = "visualization-contract"
+tool = "tools/agent_tools/visualization_contract.py"
+doc = "documents/tools/visualization_contract.md"
+language = "python"
+summary = "Typed visualization universe, ToolCall, projection coverage, and post-format readback checker documentation."
 
 [[tool]]
 id = "render-dependency-manifest-graph"

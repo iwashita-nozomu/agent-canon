@@ -276,6 +276,44 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             checklists = cast(list[dict[str, object]], by_id[eval_id]["checklist"])
             self.assertTrue(all(bool(item["critical"]) for item in checklists))
 
+    def test_default_manifest_uses_stable_code_visualization_omission_oracle_contract(
+        self,
+    ) -> None:
+        """The manifest requires canonical typed omission/readback semantics."""
+        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+        data = load_toml_document(manifest)
+        evals = cast(list[dict[str, object]], data["evals"])
+        by_id = {str(entry["id"]): entry for entry in evals}
+        code_vis_eval = by_id["code-visualization-skill"]
+        checklists = cast(list[dict[str, object]], code_vis_eval["checklist"])
+        check_by_id = {str(item["id"]): item for item in checklists}
+        omission = check_by_id["CODE-VISUALIZATION-4"]
+        required = set(cast(list[str], omission["required_regex"]))
+        expected_semantics = {
+            "literal user scope",
+            "source-owner and dependency\\s+closure",
+            "VisualizationSourceUniverse",
+            "ProjectionCoverageManifest",
+            "canonical owner ToolCall",
+            "agent_canon\\.visualization\\.coverage",
+            "agent_canon\\.visualization\\.arguments\\.coverage\\.v1",
+            "mandatory format",
+            "final-artifact readback|post-format readback",
+            "source_counts",
+            "rendered_counts",
+            "readback_counts",
+            "coverage_digest",
+            "final_token_readback",
+            "clustering",
+            "zoom",
+            "filtering",
+            "view[- ]only|reversible view[- ]state",
+            "typed renderer-capacity blocker|typed renderer-capacity rejection",
+        }
+
+        self.assertIs(omission["critical"], True)
+        self.assertEqual(required, expected_semantics)
+
     def test_missing_required_pattern_fails(self) -> None:
         """A target missing required prompt language fails."""
         with tempfile.TemporaryDirectory() as tmp_dir:
