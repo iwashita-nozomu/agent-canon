@@ -16,6 +16,7 @@ import base64
 import contextlib
 import fcntl
 import hashlib
+import inspect
 import io
 import json
 import os
@@ -77,6 +78,244 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         )
 
         self.assertTrue(runtime_log_archive_git.git_index_locked(result))
+
+    def test_owner_mutation_exclusive_mode_is_access_only_and_shared(self) -> None:
+        """Projected mode is an access check, not file-identity evidence."""
+        cases = (
+            (0o600, 0o600, True),
+            (0o700, 0o600, True),
+            (0o755, 0o600, True),
+            (0o700, 0o700, True),
+            (0o755, 0o700, True),
+            (0o555, 0o600, False),
+            (0o655, 0o700, False),
+            (0o660, 0o600, False),
+            (0o775, 0o600, False),
+            (0o775, 0o700, False),
+            (0o777, 0o600, False),
+            (0o777, 0o700, False),
+        )
+        for mode, required_owner_bits, accepted in cases:
+            with self.subTest(
+                mode=oct(mode), required_owner_bits=oct(required_owner_bits)
+            ):
+                self.assertEqual(
+                    runtime_log_archive_git._owner_mutation_exclusive_mode(
+                        mode, required_owner_bits
+                    ),
+                    accepted,
+                )
+
+        predicate_source = inspect.getsource(
+            runtime_log_archive_git._owner_mutation_exclusive_mode
+        )
+        for identity_field in ("st_uid", "st_nlink", "st_dev", "st_ino"):
+            self.assertNotIn(identity_field, predicate_source)
+        call_sites = (
+            (runtime_log_archive_git._validate_publication_attempt_directories, 1),
+            (runtime_log_archive_git.validate_publication_attempt_lock, 2),
+            (runtime_log_archive_git.acquire_publication_attempt_lock, 1),
+            (runtime_log_archive_git._publish_context_discovery_noreplace, 2),
+            (runtime_log_archive_git._publish_runtime_event_noreplace, 2),
+        )
+        for function, expected_calls in call_sites:
+            with self.subTest(function=function.__name__):
+                source = inspect.getsource(function)
+                self.assertEqual(
+                    source.count("_owner_mutation_exclusive_mode("),
+                    expected_calls,
+                )
+        for function in (
+            runtime_log_archive_git._publish_context_discovery_noreplace,
+            runtime_log_archive_git._publish_runtime_event_noreplace,
+        ):
+            source = inspect.getsource(function)
+            for retained_oracle in (
+                "os.fchmod",
+                "O_NOFOLLOW",
+                "st_uid",
+                "st_nlink",
+                "st_dev",
+                "st_ino",
+                "_renameat2_noreplace",
+                "os.fsync",
+                "os.pread",
+            ):
+                self.assertIn(retained_oracle, source)
+
+    def test_publication_paths_accept_0755_projection_without_identity_drift(
+        self,
+    ) -> None:
+        """A fixed read/execute projection does not replace freshness or identity."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "source"
+            source.mkdir()
+            original_fstat = os.fstat
+            original_lstat = Path.lstat
+
+            def project_mode(metadata: os.stat_result) -> os.stat_result:
+                values = list(metadata)
+                values[stat.ST_MODE] = stat.S_IFMT(metadata.st_mode) | 0o755
+                projected = os.stat_result(values)
+                self.assertEqual(
+                    stat.S_IFMT(projected.st_mode), stat.S_IFMT(metadata.st_mode)
+                )
+                for identity_field in (
+                    "st_uid",
+                    "st_nlink",
+                    "st_dev",
+                    "st_ino",
+                    "st_size",
+                ):
+                    self.assertEqual(
+                        getattr(projected, identity_field),
+                        getattr(metadata, identity_field),
+                    )
+                return projected
+
+            def projected_fstat(fd: int) -> os.stat_result:
+                return project_mode(original_fstat(fd))
+
+            def projected_lstat(path: Path) -> os.stat_result:
+                return project_mode(original_lstat(path))
+
+            context_bytes = b"{}\n"
+            runtime_bytes = (
+                json.dumps(
+                    {"artifact_sha256": "a" * 64}, separators=(",", ":")
+                )
+                + "\n"
+            ).encode("utf-8")
+            context_target = root / "context" / "certificate.json"
+            runtime_target = root / "runtime" / "runtime-event.json"
+            with (
+                patch.object(os, "fstat", new=projected_fstat),
+                patch.object(Path, "lstat", new=projected_lstat),
+                patch.object(
+                    runtime_log_archive_git,
+                    "validate_context_discovery_certificate",
+                ),
+                patch.object(
+                    runtime_log_archive_git,
+                    "validate_runtime_event_schema",
+                ),
+            ):
+                with runtime_log_archive_git.acquire_publication_attempt_lock(
+                    source, "a" * 64
+                ) as attempt_lock:
+                    path_metadata = original_lstat(attempt_lock.lock_path)
+                    fd_metadata = original_fstat(attempt_lock.fd)
+                    self.assertEqual(
+                        (path_metadata.st_dev, path_metadata.st_ino),
+                        (fd_metadata.st_dev, fd_metadata.st_ino),
+                    )
+                runtime_log_archive_git._publish_context_discovery_noreplace(
+                    context_target, context_bytes
+                )
+                evidence = runtime_log_archive_git._publish_runtime_event_noreplace(
+                    runtime_target, runtime_bytes
+                )
+
+            self.assertEqual(context_target.read_bytes(), context_bytes)
+            self.assertEqual(runtime_target.read_bytes(), runtime_bytes)
+            self.assertEqual(evidence["readback_status"], "verified")
+            self.assertEqual(evidence["readback_sha256"], "a" * 64)
+
+    def test_publication_paths_reject_group_or_other_writable_projection(
+        self,
+    ) -> None:
+        """Writable projections fail closed without weakening identity checks."""
+        for scenario in ("attempt_directory", "attempt_lock"):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as tmp_dir:
+                source = Path(tmp_dir) / "source"
+                source.mkdir()
+                original_fstat = os.fstat
+                original_lstat = Path.lstat
+
+                def projected_fstat(fd: int) -> os.stat_result:
+                    metadata = original_fstat(fd)
+                    mode = 0o775 if scenario == "attempt_lock" else 0o755
+                    values = list(metadata)
+                    values[stat.ST_MODE] = stat.S_IFMT(metadata.st_mode) | mode
+                    return os.stat_result(values)
+
+                def projected_lstat(path: Path) -> os.stat_result:
+                    metadata = original_lstat(path)
+                    writable = scenario == "attempt_directory" or (
+                        scenario == "attempt_lock" and path.name == ".attempt.lock"
+                    )
+                    values = list(metadata)
+                    values[stat.ST_MODE] = stat.S_IFMT(metadata.st_mode) | (
+                        0o775 if writable else 0o755
+                    )
+                    return os.stat_result(values)
+
+                with (
+                    patch.object(os, "fstat", new=projected_fstat),
+                    patch.object(Path, "lstat", new=projected_lstat),
+                    self.assertRaises(
+                        runtime_log_archive_git.RuntimeEventMaterializationError
+                    ) as raised,
+                ):
+                    with runtime_log_archive_git.acquire_publication_attempt_lock(
+                        source, "b" * 64
+                    ):
+                        self.fail("writable attempt metadata was accepted")
+                self.assertEqual(
+                    raised.exception.code, "publication_attempt_lock_invalid"
+                )
+
+        publishers = (
+            (
+                "context",
+                runtime_log_archive_git._publish_context_discovery_noreplace,
+                b"{}\n",
+                "context_publication_failure",
+            ),
+            (
+                "runtime_event",
+                runtime_log_archive_git._publish_runtime_event_noreplace,
+                b"{}\n",
+                "publication_failure",
+            ),
+        )
+        for label, publisher, bytes_, expected_code in publishers:
+            for phase in ("initial", "final"):
+                with (
+                    self.subTest(label=label, phase=phase),
+                    tempfile.TemporaryDirectory() as tmp_dir,
+                ):
+                    target = Path(tmp_dir) / label / "artifact.json"
+                    original_fstat = os.fstat
+                    original_lstat = Path.lstat
+
+                    def projected_fstat(fd: int) -> os.stat_result:
+                        metadata = original_fstat(fd)
+                        values = list(metadata)
+                        values[stat.ST_MODE] = stat.S_IFMT(metadata.st_mode) | (
+                            0o775 if phase == "initial" else 0o755
+                        )
+                        return os.stat_result(values)
+
+                    def projected_lstat(path: Path) -> os.stat_result:
+                        metadata = original_lstat(path)
+                        values = list(metadata)
+                        values[stat.ST_MODE] = stat.S_IFMT(metadata.st_mode) | (
+                            0o775 if phase == "final" else 0o755
+                        )
+                        return os.stat_result(values)
+
+                    with (
+                        patch.object(os, "fstat", new=projected_fstat),
+                        patch.object(Path, "lstat", new=projected_lstat),
+                        self.assertRaises(
+                            runtime_log_archive_git.RuntimeEventMaterializationError
+                        ) as raised,
+                    ):
+                        publisher(target, bytes_)
+                    self.assertEqual(raised.exception.code, expected_code)
+                    self.assertFalse(target.exists())
 
     def run_tool(
         self,
