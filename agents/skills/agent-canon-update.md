@@ -78,6 +78,10 @@ TODO state up to date.
    -> PullRequestLifecycle -> merge -> PublicationReadbackReceipt ->
    source-main readback -> QueueReceipt -> DependencyFrontier acceptance -> parent
    projection/G4 -> remote readback/G5`.
+   `CandidateCasReceipt` derives its base only from the preceding
+   `SourceMainRebindReceipt` new origin/main commit/tree. Publication retains
+   the candidate head and authoritative merge commit/tree as distinct
+   identities.
 1. A passed checkpoint with the same candidate/tree/input/tool version returns
    its receipt with replay timing and does not rerun its invariant. Changed
    identity creates an explicit successor and leaves the old transaction

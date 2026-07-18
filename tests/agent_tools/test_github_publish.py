@@ -23,14 +23,21 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from tools.agent_tools import github_publish
 from tools.agent_tools.update_lifecycle_contract import (
     materialize_gate_verdict,
+    materialize_source_main_rebind_receipt,
     validate_pull_request_lifecycle,
     validate_pull_request_transition,
+)
+from tools.ci.check_agent_canon_pr import (
+    GENERATED_COMPLETENESS_CHECK_IDS,
+    materialize_generated_completeness_receipt,
 )
 
 CANDIDATE_SHA = "a" * 40
 CANDIDATE_TREE = "b" * 40
 BASE_SHA = "c" * 40
 BASE_TREE = "d" * 40
+MERGE_SHA = "1" * 40
+MERGE_TREE = "2" * 40
 
 
 class FakeRunner:
@@ -124,13 +131,31 @@ class GithubPublishTest(unittest.TestCase):
     def publication_components(
         self,
         lifecycle: dict[str, object],
-    ) -> tuple[dict[str, object], list[dict[str, object]]]:
+    ) -> tuple[
+        dict[str, object], dict[str, object], list[dict[str, object]]
+    ]:
         """Build exact reviewed-CAS and canonical G1/G2 fixtures."""
         binding = dict(lifecycle["binding"])
         head = lifecycle["head_identity"]
         base = lifecycle["base_identity"]
         assert isinstance(head, dict)
         assert isinstance(base, dict)
+        rebind = materialize_source_main_rebind_receipt(
+            binding=binding,
+            old_base_identity={
+                "remote": "origin",
+                "ref": "refs/heads/main",
+                "commit_sha": base["commit_sha"],
+                "tree_sha": base["tree_sha"],
+            },
+            new_base_identity={
+                "remote": "origin",
+                "ref": "refs/heads/main",
+                "commit_sha": base["commit_sha"],
+                "tree_sha": base["tree_sha"],
+            },
+            origin_main_readback_evidence_ref="evidence:" + "7" * 64,
+        )
         cas_evidence_ref = "evidence:" + "8" * 64
         cas_binding = dict(binding)
         cas_binding["evidence_ref"] = cas_evidence_ref
@@ -140,7 +165,7 @@ class GithubPublishTest(unittest.TestCase):
             "cas_receipt_id": "cas:" + "9" * 64,
             "binding": cas_binding,
             "predecessor_evidence_id": binding["evidence_ref"],
-            "rebind_receipt_evidence_id": "rebind:" + "a" * 64,
+            "rebind_receipt_evidence_id": rebind["rebind_receipt_id"],
             "candidate_identity": {
                 "candidate_sha": head["commit_sha"],
                 "tree_sha": head["tree_sha"],
@@ -166,23 +191,16 @@ class GithubPublishTest(unittest.TestCase):
             + "#resolve_publication_eligibility",
             verdict="pass",
         )
-        g1_binding = g1["binding"]
-        assert isinstance(g1_binding, dict)
-        g2 = materialize_gate_verdict(
-            binding=binding,
-            gate_id="G2",
-            ordered_input_evidence_refs=[str(g1_binding["evidence_ref"])],
-            invariant="generated_completeness",
-            output_digest="sha256:" + "c" * 64,
-            owner=str(
-                PROJECT_ROOT / "tools"
-                / "ci"
-                / "check_agent_canon_pr.sh"
-            )
-            + "#run_pr_agent_checks",
-            verdict="pass",
+        g2 = materialize_generated_completeness_receipt(
+            g1_gate=g1,
+            candidate_sha=str(head["commit_sha"]),
+            tree_sha=str(head["tree_sha"]),
+            check_results=[
+                {"check_id": check_id, "status": "pass"}
+                for check_id in GENERATED_COMPLETENESS_CHECK_IDS
+            ],
         )
-        return cas, [g1, g2]
+        return rebind, cas, [g1, g2]
 
     def publication_packet(
         self,
@@ -202,10 +220,11 @@ class GithubPublishTest(unittest.TestCase):
             verification,
             branch,
         )
-        cas, upstream = self.publication_components(lifecycle)
+        rebind, cas, upstream = self.publication_components(lifecycle)
         return github_publish.materialize_github_publication_packet(
             lifecycle=lifecycle,
             candidate_cas_receipt=cas,
+            source_main_rebind_receipt=rebind,
             upstream_gate_verdicts=upstream,
         )
 
@@ -424,11 +443,45 @@ class GithubPublishTest(unittest.TestCase):
             state="permission_unknown",
         )
 
-        cas, upstream = self.publication_components(lifecycle)
+        rebind, cas, upstream = self.publication_components(lifecycle)
         with self.assertRaises(github_publish.UserVisibleFailure) as raised:
-            github_publish.materialize_pr_identity_gate(lifecycle, cas, upstream)
+            github_publish.materialize_pr_identity_gate(
+                lifecycle, cas, rebind, upstream
+            )
 
         self.assertIn("permission", raised.exception.message)
+
+    def test_publication_packet_rejects_cas_base_not_owned_by_rebind(self) -> None:
+        """G3 cannot accept a CAS base independent of SourceMainRebindReceipt."""
+        lifecycle = self.lifecycle_fixture()
+        rebind, cas, upstream = self.publication_components(lifecycle)
+        moved_rebind = copy.deepcopy(rebind)
+        moved_base = moved_rebind["new_base_identity"]
+        moved_readback = moved_rebind["origin_main_readback"]
+        assert isinstance(moved_base, dict)
+        assert isinstance(moved_readback, dict)
+        moved_base["commit_sha"] = "f" * 40
+        moved_readback["commit_sha"] = "f" * 40
+
+        with self.assertRaises(ValueError) as raised:
+            github_publish.materialize_github_publication_packet(
+                lifecycle=lifecycle,
+                candidate_cas_receipt=cas,
+                source_main_rebind_receipt=moved_rebind,
+                upstream_gate_verdicts=upstream,
+            )
+
+        self.assertIn("rebind_cas_base_identity_mismatch", str(raised.exception))
+
+    def test_reviewable_state_requires_verified_permission(self) -> None:
+        """Review/merge-authorizing states cannot retain false permission."""
+        with self.assertRaises(ValueError) as raised:
+            self.lifecycle_fixture(
+                permission_state="verified_false",
+                state="external_review",
+            )
+
+        self.assertIn("verified_permission_required", str(raised.exception))
 
     def test_user_fork_and_contributor_topologies_preserve_typed_identity(self) -> None:
         """All three discriminated PR kinds retain Essence, reviews, and diff state."""
@@ -487,7 +540,7 @@ class GithubPublishTest(unittest.TestCase):
                 remote_slug="contributor/repo",
                 topology_kind="contributor",
                 head_repo="contributor/repo",
-                permission_state="verified_false",
+                permission_state="verified_true",
                 permission_evidence_id="evidence:" + "d" * 64,
                 actor_id="github-user:7",
                 actor_display_name="Owner",
@@ -586,6 +639,59 @@ class GithubPublishTest(unittest.TestCase):
         self.assertEqual(updated["state"], "changes_requested")
         self.assertEqual(updated["pr_essence"], lifecycle["pr_essence"])
         self.assertEqual(updated["reviews"][0]["reviewer_id"], "external-reviewer")
+
+    def test_merged_publication_uses_authoritative_pr_and_merge_tree_readback(self) -> None:
+        """Merged identity comes from gh PR/API readback, not caller merge fields."""
+        lifecycle = self.lifecycle_fixture()
+        _rebind, cas, _upstream = self.publication_components(lifecycle)
+        runner = FakeRunner()
+        runner.add(
+            [
+                "gh",
+                "pr",
+                "view",
+                "7",
+                "--repo",
+                "owner/repo",
+                "--json",
+                "number,url,state,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
+            ],
+            stdout=(
+                '{"number":7,"url":"https://github.com/owner/repo/pull/7",'
+                f'"state":"MERGED","isDraft":false,"baseRefName":"main",'
+                f'"baseRefOid":"{MERGE_SHA}","headRefName":"topic",'
+                f'"headRefOid":"{CANDIDATE_SHA}",'
+                '"headRepository":{"nameWithOwner":"owner/repo"},'
+                f'"reviewDecision":"APPROVED","reviews":[],"mergeCommit":{{"oid":"{MERGE_SHA}"}}}}'
+            ),
+        )
+        runner.add(
+            [
+                "gh",
+                "api",
+                f"repos/owner/repo/git/commits/{MERGE_SHA}",
+                "--jq",
+                "{commit_sha: .sha, tree_sha: .tree.sha}",
+            ],
+            stdout=f'{{"commit_sha":"{MERGE_SHA}","tree_sha":"{MERGE_TREE}"}}',
+        )
+
+        result = github_publish.authoritative_publication_readback(
+            runner,
+            repo="owner/repo",
+            selector="7",
+            candidate_cas_receipt=cas,
+            pull_request_lifecycle=lifecycle,
+        )
+
+        receipt = result["publication_readback_receipt"]
+        assert isinstance(receipt, dict)
+        identity = receipt["pr_identity"]
+        assert isinstance(identity, dict)
+        self.assertEqual(identity["head_sha"], CANDIDATE_SHA)
+        self.assertEqual(identity["base_sha"], MERGE_SHA)
+        self.assertEqual(identity["merge_commit_sha"], MERGE_SHA)
+        self.assertEqual(identity["merge_tree_sha"], MERGE_TREE)
 
 
 if __name__ == "__main__":

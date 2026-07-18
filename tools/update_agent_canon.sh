@@ -547,15 +547,17 @@ emit_queue_receipt() {
   local source_main_readback_evidence_ref="$3"
   local predecessor_388_evidence_ref="$4"
   local predecessor_389_evidence_ref="$5"
-  local queue_output="${6:-$UPDATE_PROJECTION_DIR/queue.accepted.json}"
-  local frontier_output="${7:-$UPDATE_PROJECTION_DIR/frontier.pending.json}"
+  local source_projection_packet="$6"
+  local queue_output="${7:-$UPDATE_PROJECTION_DIR/queue.accepted.json}"
+  local frontier_output="${8:-$UPDATE_PROJECTION_DIR/frontier.pending.json}"
   local current_marker="$UPDATE_STATE_DIR/current-transaction"
 
   mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
   PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
     python3 - "$binding_file" "$rebind_receipt_file" \
       "$source_main_readback_evidence_ref" "$predecessor_388_evidence_ref" \
-      "$predecessor_389_evidence_ref" "$queue_output" "$frontier_output" \
+      "$predecessor_389_evidence_ref" "$source_projection_packet" \
+      "$queue_output" "$frontier_output" \
       "$AGENT_CANON_DIR" "$current_marker" <<'PY'
 import json
 import os
@@ -577,6 +579,7 @@ from update_lifecycle_contract import (
     readback_ref,
     predecessor_388_ref,
     predecessor_389_ref,
+    packet_path,
     queue_path,
     frontier_path,
     source_namespace,
@@ -584,11 +587,13 @@ from update_lifecycle_contract import (
 ) = sys.argv[1:]
 binding = json.loads(Path(binding_path).read_text(encoding="utf-8"))
 rebind = json.loads(Path(rebind_path).read_text(encoding="utf-8"))
+packet = json.loads(Path(packet_path).read_text(encoding="utf-8"))
 queue = materialize_queue_receipt(
     binding=binding,
     source_namespace=str(Path(source_namespace).resolve()),
     source_main_rebind_receipt_id=rebind["rebind_receipt_id"],
     source_main_readback_evidence_ref=readback_ref,
+    publication_readback_receipt=packet["publication_readback_receipt"],
     state="accepted",
 )
 predecessors = [
@@ -677,15 +682,19 @@ accept_dependency_frontier() {
   local rebind_receipt_file="$3"
   local acceptance_evidence_ref="$4"
   local source_main_sha="$5"
-  local accepted_output="${6:-$UPDATE_PROJECTION_DIR/frontier.accepted.json}"
+  local source_main_tree="$6"
+  local accepted_output="${7:-$UPDATE_PROJECTION_DIR/frontier.accepted.json}"
   local g4_output="$UPDATE_EVIDENCE_DIR/g4.parent-projection-integrity.json"
 
   [[ "$source_main_sha" =~ ^[0-9a-f]{40}$ ]] \
     || die "accepted frontier requires exact origin/main readback identity"
+  [[ "$source_main_tree" =~ ^[0-9a-f]{40}$ ]] \
+    || die "accepted frontier requires exact origin/main tree readback identity"
   mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
   PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
     python3 - "$pending_frontier_file" "$queue_receipt_file" \
-      "$rebind_receipt_file" "$source_main_sha" "$acceptance_evidence_ref" \
+      "$rebind_receipt_file" "$source_main_sha" "$source_main_tree" \
+      "$acceptance_evidence_ref" \
       "$accepted_output" "$SOURCE_PROJECTION_PACKET" "$g4_output" \
       "$ROOT_DIR" <<'PY'
 import hashlib
@@ -710,6 +719,7 @@ from update_lifecycle_contract import (
     queue_path,
     rebind_path,
     source_main_sha,
+    source_main_tree,
     acceptance_ref,
     output_path,
     packet_path,
@@ -730,6 +740,7 @@ accepted = validate_dependency_frontier_transition(
     queue_receipt=queue,
     rebind_receipt=rebind,
     origin_main_commit_sha=source_main_sha,
+    origin_main_tree_sha=source_main_tree,
     ordered_oracle=[
         "source_pr:#388",
         "source_pr:#389",
@@ -825,14 +836,18 @@ advance_source_projection() {
   local binding_file="$UPDATE_STATE_DIR/source-projection.binding.json"
   local rebind_file="$UPDATE_STATE_DIR/source-projection.rebind.json"
   local source_main_sha=""
+  local source_main_tree=""
   local projection_values=()
 
   [ -f "$packet" ] || die "source projection packet is missing"
   source_main_sha="$(resolve_remote_branch_sha origin main)"
+  ensure_remote_commit_object "$AGENT_CANON_DIR" origin "$source_main_sha"
+  source_main_tree="$(git -C "$AGENT_CANON_DIR" rev-parse "$source_main_sha^{tree}")"
   mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
   mapfile -t projection_values < <(
     PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
-      python3 - "$packet" "$binding_file" "$rebind_file" "$source_main_sha" <<'PY'
+      python3 - "$packet" "$binding_file" "$rebind_file" \
+        "$source_main_sha" "$source_main_tree" <<'PY'
 import json
 import os
 import sys
@@ -841,12 +856,22 @@ from pathlib import Path
 
 from update_lifecycle_contract import validate_source_projection_packet
 
-packet_path, binding_path, rebind_path, observed_source_main = sys.argv[1:]
+(
+    packet_path,
+    binding_path,
+    rebind_path,
+    observed_source_main,
+    observed_source_tree,
+) = sys.argv[1:]
 packet = validate_source_projection_packet(
     json.loads(Path(packet_path).read_text(encoding="utf-8"))
 )
 binding = packet["binding"]
-if binding["candidate_sha"] != observed_source_main:
+publication = packet["publication_readback_receipt"]["pr_identity"]
+if (
+    publication["merge_commit_sha"] != observed_source_main
+    or publication["merge_tree_sha"] != observed_source_tree
+):
     raise SystemExit("frontier:origin_main_readback_mismatch")
 
 def persist_projection(path_text, value):
@@ -885,13 +910,15 @@ PY
     "$rebind_file" \
     "${projection_values[0]}" \
     "${projection_values[1]}" \
-    "${projection_values[2]}"
+    "${projection_values[2]}" \
+    "$packet"
   accept_dependency_frontier \
     "$UPDATE_PROJECTION_DIR/frontier.pending.json" \
     "$UPDATE_PROJECTION_DIR/queue.accepted.json" \
     "$rebind_file" \
     "${projection_values[3]}" \
-    "$source_main_sha"
+    "$source_main_sha" \
+    "$source_main_tree"
 }
 
 require_accepted_dependency_frontier() {

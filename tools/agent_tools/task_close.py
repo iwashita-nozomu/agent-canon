@@ -21,8 +21,7 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from agent_team import resolve_report_root
-from artifact_identity import canonical_json_bytes
+from agent_team import materialize_close_agent_tool_call, resolve_report_root
 from report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
     COMPLETION_COVERAGE_TAXONOMY_REFS,
@@ -39,11 +38,8 @@ from update_lifecycle_contract import (
     GATE_IDS,
     binding_identity,
     validate_cleanup_proof,
-    validate_close_agent_tool_call,
-    validate_descendant_close_receipt,
     validate_durable_handback,
     validate_gate_chain,
-    validate_reservation_release_receipt,
 )
 
 STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
@@ -60,9 +56,6 @@ DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
 UPDATE_LIFECYCLE_CLOSEOUT_ARTIFACT_NAME = "update_lifecycle_closeout.json"
 UPDATE_LIFECYCLE_CLOSEOUT_SCHEMA = "agent-canon.update-lifecycle-closeout.v1"
-EVIDENCE_REF_PATTERN = re.compile(r"^evidence:[0-9a-f]{64}$")
-
-
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(
@@ -665,24 +658,24 @@ def update_lifecycle_closeout_consumer(report_dir: Path) -> dict[str, object]:
         gate_values = raw["gate_verdicts"]
         if not isinstance(gate_values, list) or len(gate_values) != len(GATE_IDS):
             raise ValueError("close_agent:all_six_gate_evidence_required")
-        gates = list(
+        source_gates = list(
             validate_gate_chain(
-                gate_values,
-                expected_gate_ids=GATE_IDS,
+                gate_values[:5],
+                expected_gate_ids=GATE_IDS[:5],
                 require_pass=True,
             )
         )
-        identity = binding_identity(gates[0]["binding"])
-        if any(binding_identity(gate["binding"]) != identity for gate in gates[1:]):
+        identity = binding_identity(source_gates[0]["binding"])
+        if any(
+            binding_identity(gate["binding"]) != identity
+            for gate in source_gates[1:]
+        ):
             raise ValueError("close_agent:identity_mismatch")
         handback = validate_durable_handback(raw["durable_handback"])
         cleanup = validate_cleanup_proof(raw["cleanup_proof"])
-        token = validate_close_agent_tool_call(raw["close_agent_tool_call"])
         if binding_identity(handback["binding"]) != identity:
             raise ValueError("close_agent:identity_mismatch")
         if binding_identity(cleanup["binding"]) != identity:
-            raise ValueError("close_agent:identity_mismatch")
-        if binding_identity(token["binding"]) != identity:
             raise ValueError("close_agent:identity_mismatch")
     except (TypeError, ValueError) as exc:
         return {
@@ -706,34 +699,6 @@ def update_lifecycle_closeout_consumer(report_dir: Path) -> dict[str, object]:
             "applicable": True,
             "reason": "close_agent:completed_but_open",
         }
-    try:
-        descendants = [
-            validate_descendant_close_receipt(item) for item in descendant_values
-        ]
-    except (TypeError, ValueError) as exc:
-        return {
-            "ready": False,
-            "applicable": True,
-            "reason": str(exc),
-        }
-    declared_descendants = set(handback["descendant_ids"])
-    observed_descendants = {str(item["agent_id"]) for item in descendants}
-    if observed_descendants != declared_descendants:
-        return {
-            "ready": False,
-            "applicable": True,
-            "reason": "close_agent:unknown_descendant",
-        }
-    if any(
-        binding_identity(item["binding"]) != identity
-        or item["durable_handback_evidence_ref"] != handback["evidence_ref"]
-        for item in descendants
-    ):
-        return {
-            "ready": False,
-            "applicable": True,
-            "reason": "close_agent:descendant_identity_mismatch",
-        }
     reservation_values = raw["reservations"]
     if not isinstance(reservation_values, list):
         return {
@@ -741,76 +706,59 @@ def update_lifecycle_closeout_consumer(report_dir: Path) -> dict[str, object]:
             "applicable": True,
             "reason": "close_agent:reservation_evidence_invalid",
         }
+    supplied_token = raw["close_agent_tool_call"]
     try:
-        reservations = [
-            validate_reservation_release_receipt(item)
-            for item in reservation_values
-        ]
+        if not isinstance(supplied_token, dict):
+            raise ValueError("close_agent:token_invalid")
+        supplied_args = supplied_token.get("args")
+        if not isinstance(supplied_args, dict):
+            raise ValueError("close_agent:token_invalid")
+        run_id = supplied_args.get("run_id")
+        if not isinstance(run_id, str) or not run_id.strip():
+            raise ValueError("close_agent:token_invalid")
+        materialized = materialize_close_agent_tool_call(
+            binding=handback["binding"],
+            run_id=run_id,
+            agent_id=str(handback["agent_id"]),
+            gate_verdicts=source_gates,
+            cleanup_proof=cleanup,
+            durable_handback=handback,
+            descendant_close_receipts=descendant_values,
+            reservation_release_receipts=reservation_values,
+        )
     except (TypeError, ValueError) as exc:
         return {
             "ready": False,
             "applicable": True,
             "reason": str(exc),
         }
-    declared_reservations = set(handback["reservation_ids"])
-    observed_reservations = {str(item["reservation_id"]) for item in reservations}
-    if observed_reservations != declared_reservations or any(
-        binding_identity(item["binding"]) != identity
-        or item["durable_handback_evidence_ref"] != handback["evidence_ref"]
-        for item in reservations
-    ):
+    canonical_g6 = materialized["g6_gate"]
+    token = materialized["close_agent_tool_call"]
+    descendants_ref = materialized["descendants_closed_evidence_ref"]
+    reservations_ref = materialized["reservations_released_evidence_ref"]
+    if gate_values[5] != canonical_g6:
         return {
             "ready": False,
             "applicable": True,
-            "reason": "close_agent:reservation_leak",
+            "reason": "close_agent:g6_not_owner_materialized",
         }
-    descendants_ref = raw["descendants_closed_evidence_ref"]
-    reservations_ref = raw["reservations_released_evidence_ref"]
     if (
-        EVIDENCE_REF_PATTERN.fullmatch(str(descendants_ref)) is None
-        or EVIDENCE_REF_PATTERN.fullmatch(str(reservations_ref)) is None
-    ):
-        return {
-            "ready": False,
-            "applicable": True,
-            "reason": "close_agent:lifecycle_evidence_invalid",
-        }
-    expected_descendants_ref = "evidence:" + hashlib.sha256(
-        canonical_json_bytes(descendants)
-    ).hexdigest()
-    expected_reservations_ref = "evidence:" + hashlib.sha256(
-        canonical_json_bytes(reservations)
-    ).hexdigest()
-    if (
-        descendants_ref != expected_descendants_ref
-        or reservations_ref != expected_reservations_ref
+        raw["descendants_closed_evidence_ref"] != descendants_ref
+        or raw["reservations_released_evidence_ref"] != reservations_ref
     ):
         return {
             "ready": False,
             "applicable": True,
             "reason": "close_agent:lifecycle_evidence_mismatch",
         }
-    gate_refs = [gate["binding"]["evidence_ref"] for gate in gates]
-    if cleanup["remote_readback_evidence_ref"] != gate_refs[4]:
-        return {
-            "ready": False,
-            "applicable": True,
-            "reason": "close_agent:cleanup_before_remote_readback",
-        }
-    args = token["args"]
-    if (
-        args["gate_verdict_evidence_refs"] != gate_refs
-        or args["cleanup_proof_evidence_ref"] != cleanup["evidence_ref"]
-        or args["durable_handback_evidence_ref"] != handback["evidence_ref"]
-        or args["descendants_closed_evidence_ref"] != descendants_ref
-        or args["reservations_released_evidence_ref"] != reservations_ref
-        or token["agent_id"] != handback["agent_id"]
-    ):
+    if supplied_token != token:
         return {
             "ready": False,
             "applicable": True,
             "reason": "close_agent:token_evidence_mismatch",
         }
+    gates = [*source_gates, canonical_g6]
+    gate_refs = [gate["binding"]["evidence_ref"] for gate in gates]
     return {
         "ready": True,
         "applicable": True,

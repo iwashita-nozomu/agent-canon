@@ -162,7 +162,9 @@ GATE_CONTRACTS: dict[str, dict[str, object]] = {
     },
     "G2": {
         "invariant": "generated_completeness",
-        "owners": ("tools/ci/check_agent_canon_pr.sh#run_pr_agent_checks",),
+        "owners": (
+            "tools/ci/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+        ),
     },
     "G3": {
         "invariant": "pr_identity_cas",
@@ -1006,12 +1008,20 @@ def validate_candidate_cas_receipt(value: object) -> dict[str, object]:
 def materialize_candidate_cas_receipt(
     *,
     candidate_review_receipt: Mapping[str, object],
-    cas_base_identity: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
     cas_evidence_ref: str,
 ) -> dict[str, object]:
-    """Append one exact-base CAS receipt after independent review."""
+    """Append CAS using only the reviewed rebind's exact origin/main base."""
     review = validate_candidate_review_receipt(candidate_review_receipt)
-    _validate_git_identity(cas_base_identity, "candidate_cas_receipt.cas_base_identity")
+    rebind = validate_source_main_rebind_receipt(source_main_rebind_receipt)
+    _same_binding(review["binding"], rebind["binding"], "candidate_cas.rebind")
+    if review["rebind_receipt_evidence_id"] != rebind["rebind_receipt_id"]:
+        _fail("lifecycle:rebind_mismatch", "candidate_cas")
+    rebind_base = cast(Mapping[str, object], rebind["new_base_identity"])
+    cas_base_identity = {
+        "commit_sha": rebind_base["commit_sha"],
+        "tree_sha": rebind_base["tree_sha"],
+    }
     _pattern(cas_evidence_ref, _EVIDENCE, "candidate_cas_receipt.cas_evidence_ref")
     review_binding = cast(Mapping[str, object], review["binding"])
     binding = dict(review_binding)
@@ -1038,7 +1048,8 @@ def materialize_candidate_cas_receipt(
         "cas_evidence_ref": cas_evidence_ref,
         "cas_stage": "cas",
     }
-    return validate_candidate_cas_transition(review, receipt)
+    checked = validate_candidate_cas_transition(review, receipt)
+    return validate_candidate_cas_rebind_transition(rebind, checked)
 
 
 def validate_candidate_freeze_transition(rebind: object, freeze: object) -> dict[str, object]:
@@ -1085,6 +1096,28 @@ def validate_candidate_cas_transition(review: object, cas: object) -> dict[str, 
         validate_candidate_cas_receipt(cas),
         field="candidate_cas",
     )
+
+
+def validate_candidate_cas_rebind_transition(
+    rebind: object,
+    cas: object,
+) -> dict[str, object]:
+    """Require CAS to use the exact new origin/main identity from rebind."""
+    checked_rebind = validate_source_main_rebind_receipt(rebind)
+    checked_cas = validate_candidate_cas_receipt(cas)
+    _same_binding(checked_rebind["binding"], checked_cas["binding"], "candidate_cas.rebind")
+    if checked_cas["rebind_receipt_evidence_id"] != checked_rebind["rebind_receipt_id"]:
+        _fail("lifecycle:rebind_mismatch", "candidate_cas")
+    rebind_base = cast(Mapping[str, object], checked_rebind["new_base_identity"])
+    cas_base = cast(Mapping[str, object], checked_cas["cas_base_identity"])
+    if (
+        rebind_base["remote"] != "origin"
+        or rebind_base["ref"] != "refs/heads/main"
+        or cas_base["commit_sha"] != rebind_base["commit_sha"]
+        or cas_base["tree_sha"] != rebind_base["tree_sha"]
+    ):
+        _fail("lifecycle:rebind_cas_base_identity_mismatch")
+    return checked_cas
 
 
 def validate_candidate_cas_pr_transition(
@@ -1253,6 +1286,8 @@ def validate_pull_request_lifecycle(value: object) -> dict[str, object]:
         _fail("pr_lifecycle:permission_state_mismatch")
     if state == "permission_denied" and permission_state != "verified_false":
         _fail("pr_lifecycle:permission_state_mismatch")
+    if state in PR_REVIEWABLE_STATES | {"merged"} and permission_state != "verified_true":
+        _fail("pr_lifecycle:verified_permission_required", state)
     essence = _mapping(lifecycle["pr_essence"], "pull_request_lifecycle.pr_essence")
     _exact_keys(essence, ("problem", "intent", "canonical_owner", "contract_delta", "evidence_refs"), field="pull_request_lifecycle.pr_essence")
     for field in ("problem", "intent", "canonical_owner", "contract_delta"):
@@ -1347,7 +1382,11 @@ def validate_publication_readback_receipt(value: object) -> dict[str, object]:
         receipt_id_prefix="publication-readback:",
         stage_field="readback_stage",
         stage_value="publication_readback",
-        extra_fields=("pr_identity", "publication_evidence_ref"),
+        extra_fields=(
+            "pr_identity",
+            "publication_evidence_ref",
+            "authoritative_readback_digest",
+        ),
     )
     pr = _mapping(receipt["pr_identity"], "publication_readback_receipt.pr_identity")
     _exact_keys(
@@ -1355,36 +1394,38 @@ def validate_publication_readback_receipt(value: object) -> dict[str, object]:
         (
             "number",
             "remote_name",
-            "ref",
-            "base_commit_sha",
-            "base_tree_sha",
+            "base_ref",
+            "head_ref",
+            "head_repo_owner",
+            "head_repo_name",
+            "base_sha",
             "head_sha",
-            "head_tree_sha",
             "merge_commit_sha",
             "merge_tree_sha",
         ),
         field="publication_readback_receipt.pr_identity",
     )
     _positive_int(pr["number"], "publication_readback_receipt.pr_identity.number")
-    if pr["remote_name"] != "origin" or pr["ref"] != "refs/heads/main":
+    if pr["remote_name"] != "origin" or pr["base_ref"] != "refs/heads/main":
         _fail("lifecycle:publication_remote_identity_mismatch")
+    for field in ("head_ref", "head_repo_owner", "head_repo_name"):
+        _string(pr[field], f"publication_readback_receipt.pr_identity.{field}")
     for field in (
-        "base_commit_sha",
-        "base_tree_sha",
+        "base_sha",
         "head_sha",
-        "head_tree_sha",
         "merge_commit_sha",
         "merge_tree_sha",
     ):
         _pattern(pr[field], _HEX40, f"publication_readback_receipt.pr_identity.{field}")
     candidate = cast(Mapping[str, object], receipt["candidate_identity"])
-    if (
-        pr["head_sha"] != candidate["candidate_sha"]
-        or pr["head_tree_sha"] != candidate["tree_sha"]
-        or pr["merge_tree_sha"] != candidate["tree_sha"]
-    ):
+    if pr["head_sha"] != candidate["candidate_sha"]:
         _fail("lifecycle:publication_candidate_mismatch")
     _pattern(receipt["publication_evidence_ref"], _EVIDENCE, "publication_readback_receipt.publication_evidence_ref")
+    _pattern(
+        receipt["authoritative_readback_digest"],
+        _SHA256,
+        "publication_readback_receipt.authoritative_readback_digest",
+    )
     return receipt
 
 
@@ -1409,19 +1450,17 @@ def validate_publication_readback_transition(
     if (
         cas_base["commit_sha"] != pr_base["commit_sha"]
         or cas_base["tree_sha"] != pr_base["tree_sha"]
-        or readback_pr["base_commit_sha"] != pr_base["commit_sha"]
-        or readback_pr["base_tree_sha"] != pr_base["tree_sha"]
     ):
         _fail("lifecycle:cas_base_identity_mismatch")
-    if (
-        readback_pr["head_sha"] != pr_head["commit_sha"]
-        or readback_pr["head_tree_sha"] != pr_head["tree_sha"]
-    ):
+    if readback_pr["head_sha"] != pr_head["commit_sha"]:
         _fail("lifecycle:publication_head_identity_mismatch")
     remote = cast(Mapping[str, object], checked_pr["remote_identity"])
     if (
         readback_pr["remote_name"] != remote["remote_name"]
-        or readback_pr["ref"] != pr_base["ref"]
+        or readback_pr["base_ref"] != pr_base["ref"]
+        or readback_pr["head_ref"] != pr_head["ref"]
+        or readback_pr["head_repo_owner"] != pr_head["repo_owner"]
+        or readback_pr["head_repo_name"] != pr_head["repo_name"]
     ):
         _fail("lifecycle:publication_remote_identity_mismatch")
     pr_binding = cast(Mapping[str, object], checked_pr["binding"])
@@ -1436,46 +1475,83 @@ def materialize_publication_readback_receipt(
     *,
     candidate_cas_receipt: Mapping[str, object],
     pull_request_lifecycle: Mapping[str, object],
-    pr_number: int,
-    merge_commit_sha: str,
-    merge_tree_sha: str,
-    publication_evidence_ref: str,
+    authoritative_pr_readback: Mapping[str, object],
 ) -> dict[str, object]:
-    """Append exact PR/base/head/merge publication readback identity."""
+    """Append PR/base/head/merge identity from one authoritative readback."""
     cas = validate_candidate_cas_receipt(candidate_cas_receipt)
     lifecycle = validate_candidate_cas_pr_transition(
         cas, pull_request_lifecycle
     )
     if lifecycle["state"] != "merged":
         _fail("lifecycle:pr_not_merged")
-    _positive_int(pr_number, "publication_readback_receipt.pr_identity.number")
-    _pattern(merge_commit_sha, _HEX40, "publication_readback_receipt.merge_commit_sha")
-    _pattern(merge_tree_sha, _HEX40, "publication_readback_receipt.merge_tree_sha")
-    _pattern(
-        publication_evidence_ref,
-        _EVIDENCE,
-        "publication_readback_receipt.publication_evidence_ref",
+    readback = _mapping(authoritative_pr_readback, "authoritative_pr_readback")
+    pr_number = _positive_int(
+        readback.get("number"), "authoritative_pr_readback.number"
     )
+    if str(readback.get("state", "")).upper() != "MERGED":
+        _fail("lifecycle:pr_not_merged")
     lifecycle_binding = cast(Mapping[str, object], lifecycle["binding"])
-    binding = dict(lifecycle_binding)
-    evidence_hex = publication_evidence_ref.removeprefix("evidence:")
-    binding["evidence_ref"] = publication_evidence_ref
-    binding["evidence_digest"] = "sha256:" + evidence_hex
     candidate = cast(Mapping[str, object], cas["candidate_identity"])
     base = cast(Mapping[str, object], lifecycle["base_identity"])
     head = cast(Mapping[str, object], lifecycle["head_identity"])
     remote = cast(Mapping[str, object], lifecycle["remote_identity"])
+    head_repository = _mapping(
+        readback.get("headRepository"), "authoritative_pr_readback.headRepository"
+    )
+    head_repo = _string(
+        head_repository.get("nameWithOwner"),
+        "authoritative_pr_readback.headRepository.nameWithOwner",
+    )
+    expected_head_repo = f"{head['repo_owner']}/{head['repo_name']}"
+    merge_commit = _mapping(
+        readback.get("mergeCommit"), "authoritative_pr_readback.mergeCommit"
+    )
+    merge_commit_sha = _pattern(
+        merge_commit.get("oid"), _HEX40, "authoritative_pr_readback.mergeCommit.oid"
+    )
+    merge_tree_sha = _pattern(
+        readback.get("mergeTreeOid"),
+        _HEX40,
+        "authoritative_pr_readback.mergeTreeOid",
+    )
+    base_sha = _pattern(
+        readback.get("baseRefOid"),
+        _HEX40,
+        "authoritative_pr_readback.baseRefOid",
+    )
+    head_sha = _pattern(
+        readback.get("headRefOid"),
+        _HEX40,
+        "authoritative_pr_readback.headRefOid",
+    )
+    if (
+        readback.get("baseRefName") != str(base["ref"]).removeprefix("refs/heads/")
+        or readback.get("headRefName") != str(head["ref"]).removeprefix("refs/heads/")
+        or head_sha != head["commit_sha"]
+        or head_repo != expected_head_repo
+    ):
+        _fail("lifecycle:authoritative_pr_readback_mismatch")
     pr_identity = {
         "number": pr_number,
         "remote_name": remote["remote_name"],
-        "ref": base["ref"],
-        "base_commit_sha": base["commit_sha"],
-        "base_tree_sha": base["tree_sha"],
-        "head_sha": head["commit_sha"],
-        "head_tree_sha": head["tree_sha"],
+        "base_ref": base["ref"],
+        "head_ref": head["ref"],
+        "head_repo_owner": head["repo_owner"],
+        "head_repo_name": head["repo_name"],
+        "base_sha": base_sha,
+        "head_sha": head_sha,
         "merge_commit_sha": merge_commit_sha,
         "merge_tree_sha": merge_tree_sha,
     }
+    authoritative_readback_digest = "sha256:" + hashlib.sha256(
+        canonical_json_bytes(pr_identity)
+    ).hexdigest()
+    publication_evidence_ref = "evidence:" + authoritative_readback_digest.removeprefix(
+        "sha256:"
+    )
+    binding = dict(lifecycle_binding)
+    binding["evidence_ref"] = publication_evidence_ref
+    binding["evidence_digest"] = authoritative_readback_digest
     key = {
         "binding_identity": binding_identity(binding),
         "predecessor_evidence_id": lifecycle_binding["evidence_ref"],
@@ -1483,6 +1559,7 @@ def materialize_publication_readback_receipt(
         "candidate_identity": candidate,
         "pr_identity": pr_identity,
         "publication_evidence_ref": publication_evidence_ref,
+        "authoritative_readback_digest": authoritative_readback_digest,
     }
     receipt = {
         "schema": PUBLICATION_READBACK_SCHEMA,
@@ -1494,6 +1571,7 @@ def materialize_publication_readback_receipt(
         "candidate_identity": candidate,
         "pr_identity": pr_identity,
         "publication_evidence_ref": publication_evidence_ref,
+        "authoritative_readback_digest": authoritative_readback_digest,
         "readback_stage": "publication_readback",
     }
     return validate_publication_readback_transition(cas, lifecycle, receipt)
@@ -1544,6 +1622,7 @@ def validate_source_projection_packet(value: object) -> dict[str, object]:
         ("readback", readback["binding"]),
     ):
         _same_binding(binding, record_binding, f"source_projection_packet.{field}")
+    validate_candidate_cas_rebind_transition(rebind, cas)
     if any(
         binding_identity(gate["binding"]) != binding_identity(binding)
         for gate in source_gates
@@ -1555,9 +1634,6 @@ def validate_source_projection_packet(value: object) -> dict[str, object]:
         _fail("lifecycle:gate_predecessor_mismatch", "G3")
     if readback["rebind_receipt_evidence_id"] != rebind["rebind_receipt_id"]:
         _fail("lifecycle:rebind_mismatch", "source_projection_packet")
-    publication = cast(Mapping[str, object], readback["pr_identity"])
-    if publication["merge_commit_sha"] != binding["candidate_sha"]:
-        _fail("lifecycle:publication_candidate_mismatch")
     predecessors = _sequence(
         packet["ordered_predecessor_evidence"],
         "source_projection_packet.ordered_predecessor_evidence",
@@ -1628,14 +1704,62 @@ def materialize_source_projection_packet(
     )
 
 
-def queue_once_key(source_namespace: str, binding: Mapping[str, object]) -> str:
+def source_publication_identity(value: object) -> dict[str, object]:
+    """Return the authoritative merge identity carried into projection."""
+    readback = validate_publication_readback_receipt(value)
+    pr = cast(Mapping[str, object], readback["pr_identity"])
+    return {
+        "readback_receipt_id": readback["readback_receipt_id"],
+        "merge_commit_sha": pr["merge_commit_sha"],
+        "merge_tree_sha": pr["merge_tree_sha"],
+        "publication_evidence_ref": readback["publication_evidence_ref"],
+    }
+
+
+def _validate_source_publication_identity(value: object, field: str) -> dict[str, object]:
+    identity = _mapping(value, field)
+    _exact_keys(
+        identity,
+        (
+            "readback_receipt_id",
+            "merge_commit_sha",
+            "merge_tree_sha",
+            "publication_evidence_ref",
+        ),
+        field=field,
+    )
+    readback_id = _pattern(
+        identity["readback_receipt_id"], _HASH_ID, f"{field}.readback_receipt_id"
+    )
+    if not readback_id.startswith("publication-readback:"):
+        _fail("lifecycle:identity_invalid", f"{field}.readback_receipt_id")
+    _pattern(identity["merge_commit_sha"], _HEX40, f"{field}.merge_commit_sha")
+    _pattern(identity["merge_tree_sha"], _HEX40, f"{field}.merge_tree_sha")
+    _pattern(
+        identity["publication_evidence_ref"],
+        _EVIDENCE,
+        f"{field}.publication_evidence_ref",
+    )
+    return _clone(identity)
+
+
+def queue_once_key(
+    source_namespace: str,
+    binding: Mapping[str, object],
+    publication_identity: Mapping[str, object],
+) -> str:
     checked = validate_record_binding(binding)
+    publication = _validate_source_publication_identity(
+        publication_identity, "queue_once_key.publication_identity"
+    )
     body = "|".join(
         (
             source_namespace,
             cast(str, checked["candidate_sha"]),
             cast(str, checked["tree_sha"]),
             cast(str, checked["input_digest"]),
+            cast(str, publication["merge_commit_sha"]),
+            cast(str, publication["merge_tree_sha"]),
         )
     )
     return "queue-key:" + hashlib.sha256(body.encode()).hexdigest()
@@ -1652,6 +1776,7 @@ def validate_queue_receipt(value: object) -> dict[str, object]:
             "source_namespace",
             "source_main_rebind_receipt_id",
             "source_main_readback_evidence_ref",
+            "source_publication_identity",
             "enqueue_once_key",
             "state",
         ),
@@ -1669,7 +1794,11 @@ def validate_queue_receipt(value: object) -> dict[str, object]:
     if not rebind_id.startswith("rebind:"):
         _fail("lifecycle:identity_invalid", "queue_receipt.source_main_rebind_receipt_id")
     _pattern(receipt["source_main_readback_evidence_ref"], _EVIDENCE, "queue_receipt.source_main_readback_evidence_ref")
-    if receipt["enqueue_once_key"] != queue_once_key(namespace, binding):
+    publication = _validate_source_publication_identity(
+        receipt["source_publication_identity"],
+        "queue_receipt.source_publication_identity",
+    )
+    if receipt["enqueue_once_key"] != queue_once_key(namespace, binding, publication):
         _fail("lifecycle:queue_key_mismatch")
     _one_of(receipt["state"], ("accepted", "retry_pending", "failed"), "queue_receipt.state")
     return _clone(receipt)
@@ -1681,10 +1810,12 @@ def materialize_queue_receipt(
     source_namespace: str,
     source_main_rebind_receipt_id: str,
     source_main_readback_evidence_ref: str,
+    publication_readback_receipt: Mapping[str, object],
     state: str,
 ) -> dict[str, object]:
     checked = validate_record_binding(binding)
-    key = queue_once_key(source_namespace, checked)
+    publication = source_publication_identity(publication_readback_receipt)
+    key = queue_once_key(source_namespace, checked, publication)
     receipt_id = "queue:" + hashlib.sha256(key.encode()).hexdigest()
     return validate_queue_receipt(
         {
@@ -1694,6 +1825,7 @@ def materialize_queue_receipt(
             "source_namespace": source_namespace,
             "source_main_rebind_receipt_id": source_main_rebind_receipt_id,
             "source_main_readback_evidence_ref": source_main_readback_evidence_ref,
+            "source_publication_identity": publication,
             "enqueue_once_key": key,
             "state": state,
         }
@@ -1720,14 +1852,23 @@ def validate_immutable_replay(
         _fail("input_identity_mismatch", field)
 
 
-def frontier_key(source_namespace: str, binding: Mapping[str, object]) -> str:
+def frontier_key(
+    source_namespace: str,
+    binding: Mapping[str, object],
+    publication_identity: Mapping[str, object],
+) -> str:
     checked = validate_record_binding(binding)
+    publication = _validate_source_publication_identity(
+        publication_identity, "frontier_key.publication_identity"
+    )
     body = "|".join(
         (
             source_namespace,
             cast(str, checked["candidate_sha"]),
             cast(str, checked["tree_sha"]),
             cast(str, checked["input_digest"]),
+            cast(str, publication["merge_commit_sha"]),
+            cast(str, publication["merge_tree_sha"]),
         )
     )
     return "frontier-key:" + hashlib.sha256(body.encode()).hexdigest()
@@ -1747,6 +1888,7 @@ def validate_dependency_frontier(value: object) -> dict[str, object]:
             "source_main_rebind_receipt_id",
             "source_main_rebind_evidence_ref",
             "source_main_readback_evidence_ref",
+            "source_publication_identity",
             "ordered_predecessor_evidence",
             "frontier_key",
             "preceding_frontier_evidence_id",
@@ -1772,6 +1914,10 @@ def validate_dependency_frontier(value: object) -> dict[str, object]:
         _fail("lifecycle:identity_invalid", "dependency_frontier.source_main_rebind_receipt_id")
     _pattern(frontier["source_main_rebind_evidence_ref"], _EVIDENCE, "dependency_frontier.source_main_rebind_evidence_ref")
     _pattern(frontier["source_main_readback_evidence_ref"], _EVIDENCE, "dependency_frontier.source_main_readback_evidence_ref")
+    publication = _validate_source_publication_identity(
+        frontier["source_publication_identity"],
+        "dependency_frontier.source_publication_identity",
+    )
     predecessors = _sequence(frontier["ordered_predecessor_evidence"], "dependency_frontier.ordered_predecessor_evidence")
     if len(predecessors) != 2:
         _fail("frontier:predecessor_order_invalid")
@@ -1786,7 +1932,7 @@ def validate_dependency_frontier(value: object) -> dict[str, object]:
         _pattern(record["publication_evidence_id"], _EVIDENCE, f"dependency_frontier.ordered_predecessor_evidence[{index}].publication_evidence_id")
         if number == 389:
             _pattern(record.get("source_pr_sha"), _HEX40, "dependency_frontier.ordered_predecessor_evidence[1].source_pr_sha")
-    if frontier["frontier_key"] != frontier_key(namespace, binding):
+    if frontier["frontier_key"] != frontier_key(namespace, binding, publication):
         _fail("frontier:key_mismatch")
     preceding = frontier["preceding_frontier_evidence_id"]
     acceptance = frontier["acceptance_evidence_ref"]
@@ -1821,7 +1967,13 @@ def materialize_dependency_frontier(
         _fail("frontier:queue_not_accepted")
     if queue["source_main_rebind_receipt_id"] != rebind["rebind_receipt_id"]:
         _fail("frontier:rebind_mismatch")
-    key = frontier_key(cast(str, queue["source_namespace"]), checked_binding)
+    publication = _validate_source_publication_identity(
+        queue["source_publication_identity"],
+        "dependency_frontier.queue.source_publication_identity",
+    )
+    key = frontier_key(
+        cast(str, queue["source_namespace"]), checked_binding, publication
+    )
     frontier_id = "frontier:" + hashlib.sha256(key.encode()).hexdigest()
     rebind_binding = cast(Mapping[str, object], rebind["binding"])
     return validate_dependency_frontier(
@@ -1835,6 +1987,7 @@ def materialize_dependency_frontier(
             "source_main_rebind_receipt_id": rebind["rebind_receipt_id"],
             "source_main_rebind_evidence_ref": rebind_binding["evidence_ref"],
             "source_main_readback_evidence_ref": source_main_readback_evidence_ref,
+            "source_publication_identity": publication,
             "ordered_predecessor_evidence": [
                 dict(item) for item in ordered_predecessor_evidence
             ],
@@ -1853,6 +2006,7 @@ def validate_dependency_frontier_transition(
     queue_receipt: object,
     rebind_receipt: object,
     origin_main_commit_sha: str,
+    origin_main_tree_sha: str,
     ordered_oracle: Sequence[str],
 ) -> dict[str, object]:
     before = validate_dependency_frontier(pending)
@@ -1869,6 +2023,7 @@ def validate_dependency_frontier_transition(
         "source_main_rebind_receipt_id",
         "source_main_rebind_evidence_ref",
         "source_main_readback_evidence_ref",
+        "source_publication_identity",
         "ordered_predecessor_evidence",
         "frontier_key",
         "parent_projection_evidence_ref",
@@ -1887,8 +2042,11 @@ def validate_dependency_frontier_transition(
     rebind_binding = cast(Mapping[str, object], rebind["binding"])
     if rebind_binding["evidence_ref"] != after["source_main_rebind_evidence_ref"]:
         _fail("frontier:rebind_evidence_mismatch")
-    after_binding = cast(Mapping[str, object], after["binding"])
-    if after_binding["candidate_sha"] != origin_main_commit_sha:
+    publication = cast(Mapping[str, object], after["source_publication_identity"])
+    if (
+        publication["merge_commit_sha"] != origin_main_commit_sha
+        or publication["merge_tree_sha"] != origin_main_tree_sha
+    ):
         _fail("frontier:origin_main_readback_mismatch")
     expected_oracle = (
         "source_pr:#388",
@@ -2337,7 +2495,9 @@ __all__ = [
     "pull_request_branch_table",
     "queue_once_key",
     "serialize_decision_sufficiency_verdict",
+    "source_publication_identity",
     "validate_candidate_cas_receipt",
+    "validate_candidate_cas_rebind_transition",
     "validate_candidate_cas_pr_transition",
     "validate_candidate_cas_transition",
     "validate_candidate_freeze_receipt",

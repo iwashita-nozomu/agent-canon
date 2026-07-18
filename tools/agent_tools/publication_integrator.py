@@ -28,7 +28,12 @@ from typing import cast
 
 from artifact_identity import canonical_body_sha256, canonical_json_bytes
 from review_dispatch import resolve_current_review_state, resolve_review_eligibility
-from update_lifecycle_contract import materialize_gate_verdict, validate_record_binding
+from update_lifecycle_contract import (
+    binding_identity,
+    materialize_gate_verdict,
+    validate_publication_readback_receipt,
+    validate_record_binding,
+)
 
 TREE_DELTA_SCHEMA = "agent-canon.git-tree-delta-observation.v1"
 TREE_DELTA_SERIALIZATION = "agent-canon.git-tree-delta.v1"
@@ -779,7 +784,19 @@ def integrate_publication(
     ):
         raise PublicationError("publication_authority:target_tree_mismatch")
     status_before = _worktree_status(root, runner=runner)
-    result_commit = _construct_result_commit(root, authority, runner=runner)
+    result_commit: str | None = None
+    if route != "pull_request":
+        result_commit = _construct_result_commit(root, authority, runner=runner)
+    candidate_authority = cast(
+        Mapping[str, object], authority["candidate_authority"]
+    )
+    candidate_commit = _hex_oid(
+        candidate_authority["candidate_commit"], "candidate_commit"
+    )
+    candidate_tree = _hex_oid(
+        candidate_authority["candidate_tree"], "candidate_tree"
+    )
+    publication_pr_number: int | None = None
     authority_second = resolve_publication_authority(
         root,
         lifecycle_binding=lifecycle_binding,
@@ -797,6 +814,8 @@ def integrate_publication(
     ):
         raise PublicationError("integration_target_moved")
     if route == "local_ref":
+        if result_commit is None:
+            raise PublicationError("publication_integrator:result_commit_missing")
         if target_ref in _checked_out_refs(root, runner=runner):
             raise PublicationError("publication_integrator:checked_out_target")
         _run(
@@ -805,7 +824,12 @@ def integrate_publication(
             code="integration_target_moved",
         )
         observed_result = _git_text(root, ["rev-parse", target_ref], runner=runner)
+        observed_result_tree = _git_text(
+            root, ["rev-parse", f"{observed_result}^{{tree}}"], runner=runner
+        )
     elif route == "remote_ref":
+        if result_commit is None:
+            raise PublicationError("publication_integrator:result_commit_missing")
         remote = target.get("remote_name")
         if not isinstance(remote, str) or not remote:
             raise PublicationError("publication_authority:target_tuple_mismatch")
@@ -827,6 +851,9 @@ def integrate_publication(
             ["ls-remote", remote, target_ref],
             runner=runner,
         ).split()[0]
+        observed_result_tree = _git_text(
+            root, ["rev-parse", f"{result_commit}^{{tree}}"], runner=runner
+        )
     else:
         if pr_merge_adapter is None:
             raise PublicationError(
@@ -835,20 +862,55 @@ def integrate_publication(
         response = pr_merge_adapter(
             {
                 "expected_base_oid": expected,
-                "expected_head_oid": cast(
-                    Mapping[str, object], authority["candidate_authority"]
-                )["candidate_commit"],
-                "result_commit": result_commit,
+                "expected_base_tree": target["expected_target_tree"],
+                "expected_head_oid": candidate_commit,
+                "expected_head_tree": candidate_tree,
                 "target": dict(target),
             }
         )
         if response.get("status") != "merged":
             raise PublicationError("integration_target_moved")
-        observed_result = _hex_oid(response.get("result_oid"), "result_oid")
+        try:
+            readback_receipt = validate_publication_readback_receipt(
+                response.get("publication_readback_receipt")
+            )
+        except (TypeError, ValueError) as exc:
+            raise PublicationError(
+                "publication_integrator:authoritative_pr_readback_invalid"
+            ) from exc
+        if lifecycle_binding is None or binding_identity(
+            readback_receipt["binding"]
+        ) != binding_identity(lifecycle_binding):
+            raise PublicationError(
+                "publication_integrator:authoritative_pr_readback_identity_mismatch"
+            )
+        readback_candidate = cast(
+            Mapping[str, object], readback_receipt["candidate_identity"]
+        )
+        readback_pr = cast(Mapping[str, object], readback_receipt["pr_identity"])
+        if (
+            readback_candidate["candidate_sha"] != candidate_commit
+            or readback_candidate["tree_sha"] != candidate_tree
+            or readback_pr["head_sha"] != candidate_commit
+        ):
+            raise PublicationError("publication_integrator:pr_identity_mismatch")
+        publication_pr_number = cast(int, readback_pr["number"])
+        observed_result = _hex_oid(
+            readback_pr["merge_commit_sha"], "merge_commit_sha"
+        )
+        observed_result_tree = _hex_oid(
+            readback_pr["merge_tree_sha"], "merge_tree_sha"
+        )
         post_cas_ref_oid = _hex_oid(
             response.get("post_cas_ref_oid"), "post_cas_ref_oid"
         )
-        if post_cas_ref_oid != observed_result:
+        post_cas_tree_oid = _hex_oid(
+            response.get("post_cas_tree_oid"), "post_cas_tree_oid"
+        )
+        if (
+            post_cas_ref_oid != observed_result
+            or post_cas_tree_oid != observed_result_tree
+        ):
             raise PublicationError("publication_integrator:post_cas_readback_mismatch")
     if route != "pull_request" and observed_result != result_commit:
         raise PublicationError("publication_integrator:post_cas_readback_mismatch")
@@ -861,11 +923,13 @@ def integrate_publication(
         "route": route,
         "target_ref": target_ref,
         "expected_old_oid": expected,
-        "candidate_oid": cast(Mapping[str, object], authority["candidate_authority"])[
-            "candidate_commit"
-        ],
+        "candidate_oid": candidate_commit,
+        "candidate_tree_oid": candidate_tree,
         "result_oid": observed_result,
+        "result_tree_oid": observed_result_tree,
         "post_cas_ref_oid": observed_result,
+        "post_cas_tree_oid": observed_result_tree,
+        "pr_number": publication_pr_number,
         "checkout_status_before_sha256": hashlib.sha256(
             status_before.encode()
         ).hexdigest(),

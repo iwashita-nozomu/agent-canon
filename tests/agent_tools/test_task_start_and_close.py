@@ -24,9 +24,9 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "ci"))
 
 import agent_team  # noqa: E402
-from artifact_identity import canonical_json_bytes  # noqa: E402
 from agent_team import (  # noqa: E402
     AgentTypeSelection,
     load_team_config,
@@ -34,8 +34,11 @@ from agent_team import (  # noqa: E402
 )
 from report_artifact_checks import write_completion_coverage_artifact  # noqa: E402
 from task_close import update_lifecycle_closeout_consumer  # noqa: E402
+from check_agent_canon_pr import (  # noqa: E402
+    GENERATED_COMPLETENESS_CHECK_IDS,
+    materialize_generated_completeness_receipt,
+)
 from update_lifecycle_contract import (  # noqa: E402
-    materialize_close_agent_tool_call,
     materialize_descendant_close_receipt,
     materialize_gate_verdict,
     materialize_reservation_release_receipt,
@@ -79,11 +82,6 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
             PROJECT_ROOT / "tools" / "agent_tools" / "publication_integrator.py",
             "resolve_publication_eligibility",
         ),
-        "G2": (
-            "generated_completeness",
-            PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh",
-            "run_pr_agent_checks",
-        ),
         "G3": (
             "pr_identity_cas",
             PROJECT_ROOT / "tools" / "agent_tools" / "github_publish.py",
@@ -99,24 +97,17 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
             PROJECT_ROOT / "tools" / "agent_tools" / "publication_integrator.py",
             "integrate_publication",
         ),
-        "G6": (
-            "nested_lifecycle_cleanup",
-            PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py",
-            "materialize_close_agent_tool_call",
-        ),
     }
-    for index, gate_id in enumerate(("G1", "G2", "G3", "G4", "G5", "G6"), 1):
+    for index, gate_id in enumerate(("G1", "G3", "G4", "G5"), 1):
         evidence_refs = [
             cast("dict[str, object]", gate["binding"])["evidence_ref"]
             for gate in gates
         ]
         ordered_inputs = {
             "G1": [seed_ref],
-            "G2": evidence_refs[:1],
             "G3": evidence_refs[:2],
             "G4": evidence_refs[2:3],
             "G5": evidence_refs[3:4],
-            "G6": evidence_refs[:5],
         }[gate_id]
         invariant, owner_path, owner_symbol = gate_contracts[gate_id]
         gate = materialize_gate_verdict(
@@ -129,6 +120,18 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
             verdict="pass",
         )
         gates.append(gate)
+        if gate_id == "G1":
+            gates.append(
+                materialize_generated_completeness_receipt(
+                    g1_gate=gate,
+                    candidate_sha=str(binding["candidate_sha"]),
+                    tree_sha=str(binding["tree_sha"]),
+                    check_results=[
+                        {"check_id": check_id, "status": "pass"}
+                        for check_id in GENERATED_COMPLETENESS_CHECK_IDS
+                    ],
+                )
+            )
     handback: dict[str, object] = {
         "schema": "agent-canon.durable-handback.v1",
         "binding": binding,
@@ -170,30 +173,30 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
             evidence_ref="evidence:" + "0" * 64,
         )
     ]
-    descendants_ref = "evidence:" + hashlib.sha256(
-        canonical_json_bytes(descendants)
-    ).hexdigest()
-    reservations_ref = "evidence:" + hashlib.sha256(
-        canonical_json_bytes(reservations)
-    ).hexdigest()
-    token = materialize_close_agent_tool_call(
+    closeout = agent_team.materialize_close_agent_tool_call(
         binding=binding,
         run_id="run-update-lifecycle",
         agent_id="agent:owner",
         gate_verdicts=gates,
         cleanup_proof=cleanup,
         durable_handback=handback,
-        descendants_closed_evidence_ref=descendants_ref,
-        reservations_released_evidence_ref=reservations_ref,
+        descendant_close_receipts=descendants,
+        reservation_release_receipts=reservations,
     )
+    g6 = cast("dict[str, object]", closeout["g6_gate"])
+    token = cast("dict[str, object]", closeout["close_agent_tool_call"])
     return {
         "schema": "agent-canon.update-lifecycle-closeout.v1",
-        "gate_verdicts": gates,
+        "gate_verdicts": [*gates, g6],
         "durable_handback": handback,
         "descendants": descendants,
         "reservations": reservations,
-        "descendants_closed_evidence_ref": descendants_ref,
-        "reservations_released_evidence_ref": reservations_ref,
+        "descendants_closed_evidence_ref": closeout[
+            "descendants_closed_evidence_ref"
+        ],
+        "reservations_released_evidence_ref": closeout[
+            "reservations_released_evidence_ref"
+        ],
         "cleanup_proof": cleanup,
         "close_agent_tool_call": token,
     }

@@ -49,6 +49,47 @@ def lifecycle_binding() -> dict[str, object]:
     }
 
 
+def publication_readback_receipt(
+    *,
+    base_sha: str,
+    candidate_sha: str,
+    candidate_tree: str,
+    merge_sha: str,
+    merge_tree: str,
+) -> dict[str, object]:
+    """Return one canonical-shaped authoritative PR readback receipt."""
+    publication_ref = "evidence:" + "9" * 64
+    binding = lifecycle_binding()
+    binding["evidence_ref"] = publication_ref
+    binding["evidence_digest"] = "sha256:" + "9" * 64
+    return {
+        "schema": "agent-canon.publication-readback-receipt.v1",
+        "readback_receipt_id": "publication-readback:" + "a" * 64,
+        "binding": binding,
+        "predecessor_evidence_id": "evidence:" + "b" * 64,
+        "rebind_receipt_evidence_id": "rebind:" + "c" * 64,
+        "candidate_identity": {
+            "candidate_sha": candidate_sha,
+            "tree_sha": candidate_tree,
+        },
+        "pr_identity": {
+            "number": 7,
+            "remote_name": "origin",
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_owner": "owner",
+            "head_repo_name": "repo",
+            "base_sha": base_sha,
+            "head_sha": candidate_sha,
+            "merge_commit_sha": merge_sha,
+            "merge_tree_sha": merge_tree,
+        },
+        "publication_evidence_ref": publication_ref,
+        "authoritative_readback_digest": "sha256:" + "9" * 64,
+        "readback_stage": "publication_readback",
+    }
+
+
 class PublicationIntegratorTest(unittest.TestCase):
     """Verify review state remains a prerequisite for publication CAS."""
 
@@ -89,8 +130,10 @@ class PublicationIntegratorTest(unittest.TestCase):
         """A PR receipt records the actual merge result and post-CAS readback."""
         expected_base = "a" * 40
         expected_tree = "b" * 40
-        candidate = "c" * 40
+        candidate = "3" * 40
+        candidate_tree = "4" * 40
         server_result = "d" * 40
+        server_tree = "e" * 40
         authority = {
             "publication_id": "w2-publication:test",
             "selection_sha256": "e" * 64,
@@ -101,7 +144,10 @@ class PublicationIntegratorTest(unittest.TestCase):
                 "expected_target_oid": expected_base,
                 "expected_target_tree": expected_tree,
             },
-            "candidate_authority": {"candidate_commit": candidate},
+            "candidate_authority": {
+                "candidate_commit": candidate,
+                "candidate_tree": candidate_tree,
+            },
         }
 
         def read_git(_workspace: Path, command: list[str], **_kwargs: object) -> str:
@@ -121,21 +167,31 @@ class PublicationIntegratorTest(unittest.TestCase):
             patch(
                 "publication_integrator._construct_result_commit",
                 return_value=candidate,
-            ),
+            ) as result_builder,
         ):
             receipt = integrate_publication(
                 PROJECT_ROOT,
                 pr_merge_adapter=lambda _request: {
                     "status": "merged",
-                    "result_oid": server_result,
+                    "publication_readback_receipt": publication_readback_receipt(
+                        base_sha=server_result,
+                        candidate_sha=candidate,
+                        candidate_tree=candidate_tree,
+                        merge_sha=server_result,
+                        merge_tree=server_tree,
+                    ),
                     "post_cas_ref_oid": server_result,
+                    "post_cas_tree_oid": server_tree,
                 },
                 lifecycle_binding=lifecycle_binding(),
                 ordered_input_evidence_refs=["evidence:" + "8" * 64],
             )
 
+        result_builder.assert_not_called()
         self.assertEqual(receipt["candidate_oid"], candidate)
+        self.assertEqual(receipt["candidate_tree_oid"], candidate_tree)
         self.assertEqual(receipt["result_oid"], server_result)
+        self.assertEqual(receipt["result_tree_oid"], server_tree)
         self.assertEqual(receipt["post_cas_ref_oid"], server_result)
         gate = receipt["remote_publication_readback_gate"]
         self.assertIsInstance(gate, dict)
@@ -178,7 +234,10 @@ class PublicationIntegratorTest(unittest.TestCase):
         """A server result and publication readback mismatch cannot emit G5."""
         expected_base = "a" * 40
         expected_tree = "b" * 40
-        candidate = "c" * 40
+        candidate = "3" * 40
+        candidate_tree = "4" * 40
+        server_result = "d" * 40
+        server_tree = "e" * 40
         authority = {
             "publication_id": "w2-publication:test",
             "selection_sha256": "e" * 64,
@@ -189,7 +248,10 @@ class PublicationIntegratorTest(unittest.TestCase):
                 "expected_target_oid": expected_base,
                 "expected_target_tree": expected_tree,
             },
-            "candidate_authority": {"candidate_commit": candidate},
+            "candidate_authority": {
+                "candidate_commit": candidate,
+                "candidate_tree": candidate_tree,
+            },
         }
 
         def read_git(_workspace: Path, command: list[str], **_kwargs: object) -> str:
@@ -206,8 +268,15 @@ class PublicationIntegratorTest(unittest.TestCase):
                 PROJECT_ROOT,
                 pr_merge_adapter=lambda _request: {
                     "status": "merged",
-                    "result_oid": "d" * 40,
+                    "publication_readback_receipt": publication_readback_receipt(
+                        base_sha=server_result,
+                        candidate_sha=candidate,
+                        candidate_tree=candidate_tree,
+                        merge_sha=server_result,
+                        merge_tree=server_tree,
+                    ),
                     "post_cas_ref_oid": "f" * 40,
+                    "post_cas_tree_oid": server_tree,
                 },
                 lifecycle_binding=lifecycle_binding(),
             )

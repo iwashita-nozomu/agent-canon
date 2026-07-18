@@ -68,14 +68,17 @@ There is no legacy subtree, snapshot, wrapper, or alternate owner route.
    publication readback. Push, PR, and checks reuse the same G3 tree identity;
    they do not independently prove it again.
 1. Enqueue exactly one accepted `QueueReceipt` keyed by
-   `(source_namespace,candidate_sha,tree_sha,input_digest)`. Create a pending
+   `(source_namespace,candidate_sha,tree_sha,input_digest,
+   publication_merge_sha,publication_merge_tree)`. Create a pending
    `DependencyFrontier` with ordered oracle `#388 -> #389 -> current`.
    The post-readback state machine materializes
    `source-publication-ready.json`; the existing `latest` entry consumes it and
    internally appends queue, frontier acceptance, and G4 evidence.
-1. Accept the frontier only when source-main equals the current candidate,
-   QueueReceipt is accepted, and all predecessor publication evidence is
-   present and ordered. Pending/failed frontier records prohibit parent work.
+1. Accept the frontier only when source-main equals the authoritative
+   publication merge commit/tree, QueueReceipt is accepted, and all predecessor
+   publication evidence is present and ordered. The reviewed candidate remains
+   the immutable PR head identity and is not substituted for the merge result.
+   Pending/failed frontier records prohibit parent work.
 1. G4 permits one parent pin/root projection. Parent-owned validation and
    remote CI run once, then G5 proves exact remote publication readback. Parent
    consumers trust G1-G3 receipts and do not repeat those invariants.
@@ -93,7 +96,7 @@ not elapsed time, line count, read count, retry count, or check count.
 | Gate | Owner invariant | Downstream trust |
 | --- | --- | --- |
 | G1 | source correctness | G2/publication eligibility consume receipt |
-| G2 | generated completeness | PR CI consumes receipt |
+| G2 | generated completeness | G3 consumes the owner-produced receipt |
 | G3 | PR identity, permission, review, CAS | source merge and queue consume receipt |
 | G4 | accepted frontier and parent projection integrity | parent publication consumes receipt |
 | G5 | exact remote publication readback | cleanup may begin |
@@ -111,7 +114,8 @@ identity and ordering only; they do not rerun the owned check.
 | `tools/update_agent_canon.sh apply` | strict clean source rebind or accepted parent projection |
 | `tools/update_agent_canon.sh merge-main-into-current` | clean standalone/source-branch rebind |
 | `tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` | task-dirt-preserving source rebind |
-| `tools/ci/check_agent_canon_pr.sh` | consume G1-G3 and run the one source PR gate |
+| `tools/ci/check_agent_canon_pr.sh` | consume G1, run the one source PR gate, then invoke the G2 owner |
+| `tools/ci/check_agent_canon_pr.py` | materialize/replay G2 from the ordered passing generated-completeness checks |
 | `tools/ci/check_agent_canon_latest.sh` | consume G4-G5 without a second source-main check |
 
 ## Failure And Cleanup Semantics

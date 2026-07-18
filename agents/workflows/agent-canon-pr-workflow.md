@@ -51,9 +51,9 @@ source merge -> PublicationReadbackReceipt/source-main readback`.
 1. Freeze exact candidate commit/tree and append the rebind predecessor.
 1. Obtain one independent exact-SHA/tree review. APPROVE binds the same
    candidate; REVISE repairs the same context and appends a new review receipt.
-1. CAS against the immutable base/head/tree. G3 consumes G1/G2 evidence and
-   proves repository, ref, fork/contributor, permission, review, and expected
-   old identity once.
+1. CAS against the exact `SourceMainRebindReceipt` new origin/main commit/tree.
+   G3 consumes G1/G2 evidence and proves repository, ref, fork/contributor,
+   permission, review, and expected-old identity once.
 1. Push and PR publication consume that G3 receipt. They do not repeat local
    candidate/tree verification.
 
@@ -102,10 +102,13 @@ multiple-remote guessing are invalid routes.
 (plus explicit manual dispatch). It invokes `check_agent_canon_pr.sh` once.
 Branch push and merged-main push do not rerun the same source candidate gate.
 
-`check_agent_canon_pr.sh` consumes G1-G3 once and owns only its static/source PR
-checks. Runtime alignment, prompt/eval, convention, skill-command, GitHub
-workflow, dependency, docs, and quick-CI work are not called through a second
-standalone loop in the same run.
+`check_agent_canon_pr.sh` consumes G1, runs its static/source PR checks once,
+then invokes `check_agent_canon_pr.py` to materialize G2 from those exact
+passing checks. G3 is materialized afterward by the GitHub publication owner;
+tests consume the production G2 owner and do not claim its owner identity.
+Runtime alignment, prompt/eval, convention, skill-command, GitHub workflow,
+dependency, docs, and quick-CI work are not called through a second standalone
+loop in the same run.
 
 The upstream Materializer hook/archive hot-path defect remains an external
 dependency. This workflow records its evidence/blocker and does not implement a
@@ -115,11 +118,12 @@ second report/archive materializer.
 
 1. `publication_integrator.py` verifies expected-old CAS and publishes the
    approved candidate through the selected PR merge authority.
-1. Merge/API readback must prove the same immutable base/head, verified
-   permission authority, merge result, and candidate tree.
+1. Merge/API readback must authoritatively return PR number, base/head identity,
+   merge commit, and merge tree while retaining the reviewed candidate as a
+   separate immutable head identity. Caller-supplied merge identity is invalid.
 1. A distinct post-merge source-main readback proves `origin/main` equals the
-   approved candidate/tree and materializes G5 publication evidence. It is not
-   the pre-freeze rebind receipt.
+   authoritative publication merge commit/tree and materializes G5 publication
+   evidence. It is not the pre-freeze rebind receipt.
 1. The source lane emits one accepted QueueReceipt and one pending frontier.
    Retry of the same input reuses the receipt.
 1. Source PR completion hands off to
@@ -132,7 +136,7 @@ second report/archive materializer.
 - G1-G3 and source PR CI pass for the same RecordBinding;
 - immutable PullRequestLifecycle and permission authority pass;
 - expected-old merge CAS passes;
-- source-main publication readback matches candidate commit/tree;
+- source-main publication readback matches the authoritative merge commit/tree;
 - PR Essence, reviews, and contributor diff where applicable are retained;
 - accepted QueueReceipt and pending DependencyFrontier are materialized;
 - source/reviewer/PR descendants have durable handback, are closed, and their

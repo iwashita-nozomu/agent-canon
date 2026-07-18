@@ -49,6 +49,7 @@ PR_DEPENDENCY_REVIEW_DIR="${AGENT_CANON_PR_TEMP_ROOT}/dependency-review/agent-ca
 PR_AGENT_EVAL_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/agent-canon-pr-gate"
 PR_RUN_ALL_CHECKS_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/run-all-checks"
 PR_QUICK_CI_ARGS=(--quick --skip-docs --skip-github-workflows)
+AGENT_CANON_G1_BUNDLE_ACTIVE=0
 if [[ -d vendor/agent-canon && -f .gitmodules ]]; then
   PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
 else
@@ -180,10 +181,10 @@ run_pr_quick_ci() {
   AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}"
 }
 
-consume_pr_gate_receipts() {
+consume_source_correctness_receipt() {
   local bundle="${AGENT_CANON_PR_GATE_BUNDLE:-}"
   if [[ -z "${bundle}" ]]; then
-    echo "AGENT_CANON_PR_GATE_RECEIPTS=not_materialized_nontransaction"
+    echo "AGENT_CANON_G1_RECEIPT=not_materialized_nontransaction"
     return
   fi
   PYTHONPATH="${PR_AGENT_CANON_SOURCE_ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
@@ -197,14 +198,29 @@ payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 values = payload.get("gate_verdicts") if isinstance(payload, dict) else None
 if not isinstance(values, list):
     raise SystemExit("agent_canon_pr_gate_bundle:gate_verdicts_missing")
-validate_gate_chain(
-    values,
-    expected_gate_ids=("G1", "G2", "G3"),
-    require_pass=True,
-)
-print("AGENT_CANON_PR_GATE_RECEIPTS=consumed")
-print("AGENT_CANON_PR_GATE_ORDER=G1,G2,G3")
+validate_gate_chain(values, expected_gate_ids=("G1",), require_pass=True)
+print("AGENT_CANON_G1_RECEIPT=consumed")
+print("AGENT_CANON_PR_GATE_ORDER=G1")
 PY
+  AGENT_CANON_G1_BUNDLE_ACTIVE=1
+}
+
+emit_generated_completeness_receipt() {
+  local bundle="${AGENT_CANON_PR_GATE_BUNDLE:-}"
+  local output="${AGENT_CANON_G2_OUTPUT:-}"
+  local command=(
+    python3 "${PR_AGENT_CANON_SOURCE_ROOT}/tools/ci/check_agent_canon_pr.py"
+    --g1-bundle "${bundle}"
+    --source-root "${PR_AGENT_CANON_SOURCE_ROOT}"
+  )
+  if [[ "${AGENT_CANON_G1_BUNDLE_ACTIVE}" -ne 1 ]]; then
+    echo "AGENT_CANON_G2_RECEIPT=not_materialized_nontransaction"
+    return
+  fi
+  if [[ -n "${output}" ]]; then
+    command+=(--output "${output}")
+  fi
+  "${command[@]}"
 }
 
 run_standalone_static_gate_ci() {
@@ -277,7 +293,7 @@ echo "workspace_root=${WORKSPACE_ROOT}"
 echo "agent_canon_pr_temp_root=${AGENT_CANON_PR_TEMP_ROOT}"
 echo "agent_canon_repository_mode=${AGENT_CANON_REPOSITORY_MODE}"
 echo "agent_canon_remote=${REMOTE_URL}"
-consume_pr_gate_receipts
+consume_source_correctness_receipt
 if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
   echo "agent_canon_submodule_status=$(git submodule status vendor/agent-canon 2>/dev/null || true)"
   agent_canon_gitmodules_url="$(git config -f .gitmodules --get submodule.vendor/agent-canon.url 2>/dev/null || true)"
@@ -347,6 +363,9 @@ echo ""
 
 echo "8b️⃣  generated artifact guard"
 python3 tools/agent_tools/generated_artifact_guard.py --root "${WORKSPACE_ROOT}"
+echo ""
+
+emit_generated_completeness_receipt
 echo ""
 
 echo "AGENT_CANON_PR_CHECK=pass"

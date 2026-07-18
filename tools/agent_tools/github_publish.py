@@ -30,14 +30,17 @@ from artifact_identity import canonical_json_bytes
 from update_lifecycle_contract import (
     binding_identity,
     materialize_gate_verdict,
+    materialize_publication_readback_receipt,
     pull_request_branch_table,
     validate_candidate_cas_pr_transition,
     validate_candidate_cas_receipt,
+    validate_candidate_cas_rebind_transition,
     validate_gate_chain,
     validate_gate_verdict,
     validate_pull_request_lifecycle,
     validate_pull_request_transition,
     validate_record_binding,
+    validate_source_main_rebind_receipt,
 )
 
 MAX_ERROR_CHARS = 4000
@@ -474,7 +477,38 @@ def pull_request_readback(
         command,
         next_action="read_back_the_exact_pull_request_identity",
     )
-    return json_object(result.stdout, command="gh pr view")
+    readback = dict(json_object(result.stdout, command="gh pr view"))
+    merge_commit = readback.get("mergeCommit")
+    if isinstance(merge_commit, Mapping) and isinstance(merge_commit.get("oid"), str):
+        merge_oid = cast(str, merge_commit["oid"])
+        tree_command = [
+            "gh",
+            "api",
+            f"repos/{repo}/git/commits/{merge_oid}",
+            "--jq",
+            "{commit_sha: .sha, tree_sha: .tree.sha}",
+        ]
+        tree_result = run_command(
+            runner,
+            tree_command,
+            next_action="read_back_the_exact_publication_merge_tree",
+        )
+        merge_identity = json_object(tree_result.stdout, command="gh api merge commit")
+        if merge_identity.get("commit_sha") != merge_oid:
+            raise UserVisibleFailure(
+                message="merge commit API identity differs from PR readback",
+                next_action="reject_publication_readback_and_retry_exact_PR_identity",
+            )
+        merge_tree = merge_identity.get("tree_sha")
+        if not isinstance(merge_tree, str) or re.fullmatch(r"[0-9a-f]{40}", merge_tree) is None:
+            raise UserVisibleFailure(
+                message="merge commit tree identity is incomplete",
+                next_action="read_back_the_exact_publication_merge_tree",
+            )
+        readback["mergeTreeOid"] = merge_tree
+    else:
+        readback["mergeTreeOid"] = None
+    return readback
 
 
 def lifecycle_with_pr_readback(
@@ -485,12 +519,16 @@ def lifecycle_with_pr_readback(
     checked = validate_pull_request_lifecycle(lifecycle)
     base = cast(Mapping[str, object], checked["base_identity"])
     head = cast(Mapping[str, object], checked["head_identity"])
+    remote_state = str(readback.get("state", "")).upper()
     if readback.get("baseRefName") != str(base["ref"]).removeprefix("refs/heads/"):
         raise UserVisibleFailure(
             message="pull request base identity changed after publication",
             next_action="materialize_a_conflict_successor_lifecycle",
         )
-    if readback.get("baseRefOid") != base["commit_sha"]:
+    if (
+        remote_state != "MERGED"
+        and readback.get("baseRefOid") != base["commit_sha"]
+    ):
         raise UserVisibleFailure(
             message="pull request base commit changed after publication",
             next_action="materialize_a_conflict_successor_lifecycle",
@@ -515,9 +553,19 @@ def lifecycle_with_pr_readback(
             message="pull request head repository changed after publication",
             next_action="materialize_a_conflict_successor_lifecycle",
         )
-    remote_state = str(readback.get("state", "")).upper()
     review_decision = str(readback.get("reviewDecision", "")).upper()
     if remote_state == "MERGED":
+        merge_commit = readback.get("mergeCommit")
+        merge_tree = readback.get("mergeTreeOid")
+        if (
+            not isinstance(merge_commit, Mapping)
+            or re.fullmatch(r"[0-9a-f]{40}", str(merge_commit.get("oid", ""))) is None
+            or re.fullmatch(r"[0-9a-f]{40}", str(merge_tree or "")) is None
+        ):
+            raise UserVisibleFailure(
+                message="merged PR readback lacks authoritative merge commit/tree identity",
+                next_action="read_back_the_exact_publication_merge_identity",
+            )
         state = "merged"
     elif remote_state == "CLOSED":
         state = "closed_head"
@@ -574,6 +622,29 @@ def lifecycle_with_pr_readback(
     )
     updated["binding"] = updated_binding
     return validate_pull_request_transition(checked, updated)
+
+
+def authoritative_publication_readback(
+    runner: Runner,
+    *,
+    repo: str,
+    selector: str,
+    candidate_cas_receipt: Mapping[str, object],
+    pull_request_lifecycle: Mapping[str, object],
+) -> dict[str, object]:
+    """Read and materialize one authoritative merged PR publication receipt."""
+    readback = pull_request_readback(runner, repo=repo, selector=selector)
+    merged_lifecycle = lifecycle_with_pr_readback(pull_request_lifecycle, readback)
+    receipt = materialize_publication_readback_receipt(
+        candidate_cas_receipt=candidate_cas_receipt,
+        pull_request_lifecycle=merged_lifecycle,
+        authoritative_pr_readback=readback,
+    )
+    return {
+        "pull_request_lifecycle": merged_lifecycle,
+        "authoritative_pr_readback": dict(readback),
+        "publication_readback_receipt": receipt,
+    }
 
 
 def string_field(mapping: Mapping[str, object], key: str) -> str:
@@ -907,11 +978,14 @@ def build_pull_request_lifecycle(
 def materialize_pr_identity_gate(
     lifecycle: Mapping[str, object],
     candidate_cas_receipt: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
     upstream_gate_verdicts: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
     """Materialize G3 from G1/G2, exact CAS, topology, and permission."""
     checked = validate_pull_request_lifecycle(lifecycle)
     cas = validate_candidate_cas_receipt(candidate_cas_receipt)
+    rebind = validate_source_main_rebind_receipt(source_main_rebind_receipt)
+    validate_candidate_cas_rebind_transition(rebind, cas)
     validate_candidate_cas_pr_transition(cas, checked)
     upstream = validate_gate_chain(
         list(upstream_gate_verdicts),
@@ -947,7 +1021,9 @@ def materialize_pr_identity_gate(
             cast(str, binding["evidence_ref"]),
         ],
         invariant="pr_identity_cas",
-        output_digest=_sha256({"lifecycle": checked, "cas": cas}),
+        output_digest=_sha256(
+            {"lifecycle": checked, "cas": cas, "source_main_rebind": rebind}
+        ),
         owner=f"{Path(__file__).resolve()}#materialize_pr_identity_gate",
         verdict="pass",
         retry_reason=None,
@@ -958,12 +1034,15 @@ def materialize_pr_identity_gate(
 def require_pr_identity_gate(
     lifecycle: Mapping[str, object],
     candidate_cas_receipt: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
     upstream_gate_verdicts: Sequence[Mapping[str, object]],
     gate_verdict: Mapping[str, object],
 ) -> tuple[dict[str, object], dict[str, object]]:
     """Consume, without recomputing, one exact G3 publication authority."""
     checked = validate_pull_request_lifecycle(lifecycle)
     cas = validate_candidate_cas_receipt(candidate_cas_receipt)
+    rebind = validate_source_main_rebind_receipt(source_main_rebind_receipt)
+    validate_candidate_cas_rebind_transition(rebind, cas)
     validate_candidate_cas_pr_transition(cas, checked)
     gate = validate_gate_verdict(gate_verdict)
     if gate["gate_id"] != "G3" or gate["verdict"] != "pass":
@@ -1000,21 +1079,29 @@ def materialize_github_publication_packet(
     *,
     lifecycle: Mapping[str, object],
     candidate_cas_receipt: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
     upstream_gate_verdicts: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
     """Materialize the sole machine packet consumed by GitHub mutations."""
     checked_lifecycle = validate_pull_request_lifecycle(lifecycle)
     checked_cas = validate_candidate_cas_receipt(candidate_cas_receipt)
+    checked_rebind = validate_source_main_rebind_receipt(
+        source_main_rebind_receipt
+    )
+    validate_candidate_cas_rebind_transition(checked_rebind, checked_cas)
     upstream = validate_gate_chain(
         list(upstream_gate_verdicts),
         expected_gate_ids=("G1", "G2"),
         require_pass=True,
     )
-    gate = materialize_pr_identity_gate(checked_lifecycle, checked_cas, upstream)
+    gate = materialize_pr_identity_gate(
+        checked_lifecycle, checked_cas, checked_rebind, upstream
+    )
     return {
         "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
         "pull_request_lifecycle": checked_lifecycle,
         "candidate_cas_receipt": checked_cas,
+        "source_main_rebind_receipt": checked_rebind,
         "upstream_gate_verdicts": list(upstream),
         "g3_gate": gate,
     }
@@ -1026,6 +1113,7 @@ def validate_github_publication_packet(value: object) -> dict[str, object]:
         "schema",
         "pull_request_lifecycle",
         "candidate_cas_receipt",
+        "source_main_rebind_receipt",
         "upstream_gate_verdicts",
         "g3_gate",
     }:
@@ -1049,6 +1137,7 @@ def validate_github_publication_packet(value: object) -> dict[str, object]:
     lifecycle, gate = require_pr_identity_gate(
         cast(Mapping[str, object], value["pull_request_lifecycle"]),
         cast(Mapping[str, object], value["candidate_cas_receipt"]),
+        cast(Mapping[str, object], value["source_main_rebind_receipt"]),
         cast(Sequence[Mapping[str, object]], upstream_value),
         cast(Mapping[str, object], value["g3_gate"]),
     )
@@ -1057,6 +1146,9 @@ def validate_github_publication_packet(value: object) -> dict[str, object]:
         "pull_request_lifecycle": lifecycle,
         "candidate_cas_receipt": validate_candidate_cas_receipt(
             value["candidate_cas_receipt"]
+        ),
+        "source_main_rebind_receipt": validate_source_main_rebind_receipt(
+            value["source_main_rebind_receipt"]
         ),
         "upstream_gate_verdicts": list(
             validate_gate_chain(
@@ -1092,6 +1184,7 @@ def publication_context(
     *,
     pr_lifecycle: Mapping[str, object] | None,
     candidate_cas_receipt: Mapping[str, object] | None,
+    source_main_rebind_receipt: Mapping[str, object] | None,
     upstream_gate_verdicts: Sequence[Mapping[str, object]],
     g3_gate: Mapping[str, object] | None,
 ) -> tuple[dict[str, object], dict[str, object]]:
@@ -1106,10 +1199,16 @@ def publication_context(
             message="GitHub publication requires the exact reviewed CAS receipt",
             next_action="materialize_CandidateCasReceipt_after_independent_review",
         )
+    if source_main_rebind_receipt is None:
+        raise UserVisibleFailure(
+            message="GitHub publication requires the exact source-main rebind receipt",
+            next_action="materialize_CandidateCasReceipt_from_SourceMainRebindReceipt",
+        )
     gate = (
         materialize_pr_identity_gate(
             lifecycle,
             candidate_cas_receipt,
+            source_main_rebind_receipt,
             upstream_gate_verdicts,
         )
         if g3_gate is None
@@ -1118,6 +1217,7 @@ def publication_context(
     return require_pr_identity_gate(
         lifecycle,
         candidate_cas_receipt,
+        source_main_rebind_receipt,
         upstream_gate_verdicts,
         gate,
     )
@@ -1131,6 +1231,7 @@ def perform_push(
     *,
     pr_lifecycle: Mapping[str, object] | None = None,
     candidate_cas_receipt: Mapping[str, object] | None = None,
+    source_main_rebind_receipt: Mapping[str, object] | None = None,
     upstream_gate_verdicts: Sequence[Mapping[str, object]] = (),
     g3_gate: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
@@ -1147,6 +1248,7 @@ def perform_push(
         branch,
         pr_lifecycle=pr_lifecycle,
         candidate_cas_receipt=candidate_cas_receipt,
+        source_main_rebind_receipt=source_main_rebind_receipt,
         upstream_gate_verdicts=upstream_gate_verdicts,
         g3_gate=g3_gate,
     )
@@ -1194,6 +1296,7 @@ def perform_pr(
     *,
     pr_lifecycle: Mapping[str, object] | None = None,
     candidate_cas_receipt: Mapping[str, object] | None = None,
+    source_main_rebind_receipt: Mapping[str, object] | None = None,
     upstream_gate_verdicts: Sequence[Mapping[str, object]] = (),
     g3_gate: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
@@ -1206,6 +1309,7 @@ def perform_pr(
         branch,
         pr_lifecycle=pr_lifecycle,
         candidate_cas_receipt=candidate_cas_receipt,
+        source_main_rebind_receipt=source_main_rebind_receipt,
         upstream_gate_verdicts=upstream_gate_verdicts,
         g3_gate=g3_gate,
     )
@@ -1327,6 +1431,7 @@ def perform_checks(
     *,
     pr_lifecycle: Mapping[str, object] | None = None,
     candidate_cas_receipt: Mapping[str, object] | None = None,
+    source_main_rebind_receipt: Mapping[str, object] | None = None,
     upstream_gate_verdicts: Sequence[Mapping[str, object]] = (),
     g3_gate: Mapping[str, object] | None = None,
     g5_gate: Mapping[str, object] | None = None,
@@ -1339,6 +1444,7 @@ def perform_checks(
         branch,
         pr_lifecycle=pr_lifecycle,
         candidate_cas_receipt=candidate_cas_receipt,
+        source_main_rebind_receipt=source_main_rebind_receipt,
         upstream_gate_verdicts=upstream_gate_verdicts,
         g3_gate=g3_gate,
     )
@@ -1485,6 +1591,7 @@ def run(
     packet = validate_github_publication_packet(publication_packet)
     lifecycle = cast(Mapping[str, object], packet["pull_request_lifecycle"])
     cas = cast(Mapping[str, object], packet["candidate_cas_receipt"])
+    rebind = cast(Mapping[str, object], packet["source_main_rebind_receipt"])
     upstream = cast(
         Sequence[Mapping[str, object]], packet["upstream_gate_verdicts"]
     )
@@ -1516,6 +1623,7 @@ def run(
             branch,
             pr_lifecycle=lifecycle,
             candidate_cas_receipt=cas,
+            source_main_rebind_receipt=rebind,
             upstream_gate_verdicts=upstream,
             g3_gate=g3_gate,
         )
@@ -1527,6 +1635,7 @@ def run(
             branch,
             pr_lifecycle=lifecycle,
             candidate_cas_receipt=cas,
+            source_main_rebind_receipt=rebind,
             upstream_gate_verdicts=upstream,
             g3_gate=g3_gate,
         )
@@ -1538,6 +1647,7 @@ def run(
             branch,
             pr_lifecycle=lifecycle,
             candidate_cas_receipt=cas,
+            source_main_rebind_receipt=rebind,
             upstream_gate_verdicts=upstream,
             g3_gate=g3_gate,
         )
@@ -1548,6 +1658,7 @@ def run(
             branch,
             pr_lifecycle=lifecycle,
             candidate_cas_receipt=cas,
+            source_main_rebind_receipt=rebind,
             upstream_gate_verdicts=upstream,
             g3_gate=g3_gate,
         )
@@ -1563,6 +1674,7 @@ def run(
             branch,
             pr_lifecycle=lifecycle,
             candidate_cas_receipt=cas,
+            source_main_rebind_receipt=rebind,
             upstream_gate_verdicts=upstream,
             g3_gate=g3_gate,
         )

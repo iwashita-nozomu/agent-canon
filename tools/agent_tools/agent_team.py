@@ -36,6 +36,13 @@ from task_authority import AUTHORITY_FILE_NAME, build_default_task_authority
 from update_lifecycle_contract import (
     import_decision_sufficiency_verdict,
     materialize_close_agent_tool_call as materialize_lifecycle_close_agent_tool_call,
+    materialize_gate_verdict,
+    validate_cleanup_proof,
+    validate_descendant_close_receipt,
+    validate_durable_handback,
+    validate_gate_chain,
+    validate_reservation_release_receipt,
+    validate_record_binding,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1012,26 +1019,115 @@ def materialize_close_agent_tool_call(
     gate_verdicts: Sequence[Mapping[str, object]],
     cleanup_proof: Mapping[str, object],
     durable_handback: Mapping[str, object],
-    descendants_closed_evidence_ref: str,
-    reservations_released_evidence_ref: str,
-    completed_but_open: bool = False,
-    unknown_descendants: bool = False,
-    reservation_leak: bool = False,
+    descendant_close_receipts: Sequence[Mapping[str, object]],
+    reservation_release_receipts: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
-    """Delegate terminal close-token mechanics to the lifecycle contract owner."""
-    return materialize_lifecycle_close_agent_tool_call(
+    """Own G6 by validating closure receipts before issuing the terminal token."""
+    checked_binding = validate_record_binding(binding)
+    gates = list(
+        validate_gate_chain(
+            list(gate_verdicts),
+            expected_gate_ids=("G1", "G2", "G3", "G4", "G5"),
+            require_pass=True,
+        )
+    )
+    handback = validate_durable_handback(durable_handback)
+    descendants = [
+        validate_descendant_close_receipt(item) for item in descendant_close_receipts
+    ]
+    reservations = [
+        validate_reservation_release_receipt(item)
+        for item in reservation_release_receipts
+    ]
+    declared_descendants = set(cast(Sequence[str], handback["descendant_ids"]))
+    observed_descendants = {cast(str, item["agent_id"]) for item in descendants}
+    if observed_descendants != declared_descendants:
+        raise ValueError("close_agent:unknown_descendant")
+    declared_reservations = set(cast(Sequence[str], handback["reservation_ids"]))
+    observed_reservations = {
+        cast(str, item["reservation_id"]) for item in reservations
+    }
+    if observed_reservations != declared_reservations:
+        raise ValueError("close_agent:reservation_leak")
+    binding_identity_fields = (
+        "transaction_id",
+        "snapshot_id",
+        "candidate_sha",
+        "tree_sha",
+        "input_digest",
+        "tool_id",
+        "tool_version",
+    )
+    expected_identity = tuple(checked_binding[field] for field in binding_identity_fields)
+    handback_binding = cast(Mapping[str, object], handback["binding"])
+    if handback_binding != checked_binding:
+        raise ValueError("close_agent:identity_mismatch")
+    if handback["agent_id"] != agent_id:
+        raise ValueError("close_agent:agent_identity_mismatch")
+    for item in [*descendants, *reservations]:
+        item_binding = cast(Mapping[str, object], item["binding"])
+        if tuple(item_binding[field] for field in binding_identity_fields) != expected_identity:
+            raise ValueError("close_agent:identity_mismatch")
+        if item["durable_handback_evidence_ref"] != handback["evidence_ref"]:
+            raise ValueError("close_agent:durable_handback_mismatch")
+    descendants_closed_evidence_ref = "evidence:" + hashlib.sha256(
+        canonical_json_bytes(descendants)
+    ).hexdigest()
+    reservations_released_evidence_ref = "evidence:" + hashlib.sha256(
+        canonical_json_bytes(reservations)
+    ).hexdigest()
+    cleanup = validate_cleanup_proof(cleanup_proof)
+    cleanup_binding = cast(Mapping[str, object], cleanup["binding"])
+    if tuple(cleanup_binding[field] for field in binding_identity_fields) != expected_identity:
+        raise ValueError("close_agent:identity_mismatch")
+    gate_refs = [
+        cast(str, cast(Mapping[str, object], gate["binding"])["evidence_ref"])
+        for gate in gates
+    ]
+    if cleanup["remote_readback_evidence_ref"] != gate_refs[4]:
+        raise ValueError("close_agent:cleanup_before_remote_readback")
+    g6 = materialize_gate_verdict(
+        binding=checked_binding,
+        gate_id="G6",
+        ordered_input_evidence_refs=[
+            *gate_refs,
+            cast(str, handback["evidence_ref"]),
+            descendants_closed_evidence_ref,
+            reservations_released_evidence_ref,
+            cast(str, cleanup["evidence_ref"]),
+        ],
+        invariant="nested_lifecycle_cleanup",
+        output_digest="sha256:"
+        + hashlib.sha256(
+            canonical_json_bytes(
+                {
+                    "durable_handback": handback,
+                    "descendants": descendants,
+                    "reservations": reservations,
+                    "cleanup": cleanup,
+                }
+            )
+        ).hexdigest(),
+        owner=f"{Path(__file__).resolve()}#materialize_close_agent_tool_call",
+        verdict="pass",
+    )
+    token = materialize_lifecycle_close_agent_tool_call(
         binding=binding,
         run_id=run_id,
         agent_id=agent_id,
-        gate_verdicts=gate_verdicts,
-        cleanup_proof=cleanup_proof,
-        durable_handback=durable_handback,
+        gate_verdicts=[*gates, g6],
+        cleanup_proof=cleanup,
+        durable_handback=handback,
         descendants_closed_evidence_ref=descendants_closed_evidence_ref,
         reservations_released_evidence_ref=reservations_released_evidence_ref,
-        completed_but_open=completed_but_open,
-        unknown_descendants=unknown_descendants,
-        reservation_leak=reservation_leak,
     )
+    return {
+        "schema": "agent-canon.close-agent-materialization.v1",
+        "g6_gate": g6,
+        "descendants_closed_evidence_ref": descendants_closed_evidence_ref,
+        "reservations_released_evidence_ref": reservations_released_evidence_ref,
+        "close_agent_tool_call": token,
+    }
 
 
 def default_quality_check_role_ids(roles: tuple[Role, ...]) -> tuple[str, ...]:
