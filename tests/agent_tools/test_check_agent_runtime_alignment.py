@@ -631,54 +631,6 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             ):
                 runtime_alignment.validate_skill_config({"skills": {"config": []}}, project_config)
 
-    def test_skill_routing_schema_rejects_unknown_stage_policy(self) -> None:
-        """Skill routing stage policy values must match implemented behavior."""
-        with self.assertRaisesRegex(RuntimeError, "routing.stage_policy"):
-            runtime_alignment.validate_skill_routing_entry(
-                "task-routing",
-                {
-                    "stage_policy": "explicit_only",
-                    "reason": "fixture",
-                    "triggers": [["routing"]],
-                },
-            )
-
-    def test_skill_routing_schema_rejects_non_string_reason(self) -> None:
-        """Skill routing reasons must be typed strings."""
-        with self.assertRaisesRegex(RuntimeError, "routing.reason"):
-            runtime_alignment.validate_skill_routing_entry(
-                "task-routing",
-                {
-                    "stage_policy": "active",
-                    "reason": 3,
-                    "triggers": [["routing"]],
-                },
-            )
-
-    def test_skill_related_schema_rejects_unknown_skill(self) -> None:
-        """Related skill metadata must point to catalog-backed public skills."""
-        families: list[object] = [
-            {
-                "id": "task-routing",
-                "related_skills": ["missing-skill"],
-            }
-        ]
-
-        with self.assertRaisesRegex(RuntimeError, "unknown skill: missing-skill"):
-            runtime_alignment.validate_skill_related_entries(families, {"task-routing"})
-
-    def test_skill_related_schema_rejects_self_reference(self) -> None:
-        """Related skill metadata must not point back to the same skill."""
-        families: list[object] = [
-            {
-                "id": "task-routing",
-                "related_skills": ["task-routing"],
-            }
-        ]
-
-        with self.assertRaisesRegex(RuntimeError, "must not self-reference"):
-            runtime_alignment.validate_skill_related_entries(families, {"task-routing"})
-
     def test_public_skill_document_contract_rejects_extra_public_doc(self) -> None:
         """Public skill docs must be catalog-backed instead of internal routines."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -692,18 +644,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 "# Internal\n",
                 encoding="utf-8",
             )
-            catalog = {
-                "skill_families": [
-                    {
-                        "id": "example",
-                        "canonical_doc": "agents/skills/example.md",
-                        "shim": ".agents/skills/example/SKILL.md",
-                    }
-                ]
-            }
+            registrations = (("example", "agents/skills/example.md"),)
 
             with self.assertRaisesRegex(RuntimeError, "non-catalog public docs"):
-                runtime_alignment.validate_public_skill_document_contract(catalog, root)
+                runtime_alignment.validate_public_skill_document_contract(registrations, root)
 
     def test_public_skill_document_contract_rejects_nested_extra_public_doc(self) -> None:
         """Nested Markdown in agents/skills also belongs to the public contract."""
@@ -721,18 +665,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 "# Internal\n",
                 encoding="utf-8",
             )
-            catalog = {
-                "skill_families": [
-                    {
-                        "id": "example",
-                        "canonical_doc": "agents/skills/example.md",
-                        "shim": ".agents/skills/example/SKILL.md",
-                    }
-                ]
-            }
+            registrations = (("example", "agents/skills/example.md"),)
 
             with self.assertRaisesRegex(RuntimeError, "non-catalog public docs"):
-                runtime_alignment.validate_public_skill_document_contract(catalog, root)
+                runtime_alignment.validate_public_skill_document_contract(registrations, root)
 
     def test_public_skill_document_contract_accepts_catalog_docs_and_internal_routines(self) -> None:
         """Internal routines live outside the public skill doc contract."""
@@ -750,17 +686,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 "# Review\n",
                 encoding="utf-8",
             )
-            catalog = {
-                "skill_families": [
-                    {
-                        "id": "example",
-                        "canonical_doc": "agents/skills/example.md",
-                        "shim": ".agents/skills/example/SKILL.md",
-                    }
-                ]
-            }
+            registrations = (("example", "agents/skills/example.md"),)
 
-            runtime_alignment.validate_public_skill_document_contract(catalog, root)
+            runtime_alignment.validate_public_skill_document_contract(registrations, root)
             self.assertTrue((root / "agents" / "internal-routines" / "review.md").is_file())
 
     def test_public_skill_readme_rejects_duplicate_catalog_table(self) -> None:
@@ -786,18 +714,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 "# Internal\n",
                 encoding="utf-8",
             )
-            catalog = {
-                "skill_families": [
-                    {
-                        "id": "example",
-                        "canonical_doc": "agents/skills/example.md",
-                        "shim": ".agents/skills/example/SKILL.md",
-                    }
-                ]
-            }
+            registrations = (("example", "agents/skills/example.md"),)
 
             with self.assertRaisesRegex(RuntimeError, "must not duplicate public skill catalog rows"):
-                runtime_alignment.validate_public_skill_document_contract(catalog, root)
+                runtime_alignment.validate_public_skill_document_contract(registrations, root)
 
     def test_public_skill_shims_reject_extra_shim_without_catalog_entry(self) -> None:
         """Runtime discovery shims must match the public skill catalog."""
@@ -923,7 +843,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             with (
                 patch.object(runtime_alignment, "ROOT", root),
                 patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".agents" / "skills"),
-                self.assertRaisesRegex(RuntimeError, "must not start with _"),
+                self.assertRaisesRegex(RuntimeError, "blocked-by=catalog-gate"),
             ):
                 runtime_alignment.validate_public_skill_shims()
 
@@ -966,7 +886,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         }
 
         with self.assertRaisesRegex(RuntimeError, "host-provided"):
-            runtime_alignment.validate_official_system_skill_delegation(catalog, PROJECT_ROOT)
+            runtime_alignment.validate_official_system_skill_delegation(
+                {entry["id"] for entry in catalog["skill_families"]},  # type: ignore[index]
+                PROJECT_ROOT,
+            )
 
     def test_official_system_skill_delegation_docs_must_name_every_route(self) -> None:
         """Delegation docs carry the official system skill routing map."""

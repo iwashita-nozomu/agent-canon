@@ -19,9 +19,10 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 UTC = timezone.utc
 from pathlib import Path
@@ -168,6 +169,44 @@ class AccumulatedReportRequest:
     root: Path
     results_dir: Path
     bundle: EvalRunBundle
+
+
+@dataclass(frozen=True)
+class SkillEvaluatorReport:
+    """One validated, parent-owned T14 evaluator observation."""
+
+    raw_report_path: Path
+    command: str
+    artifacts: tuple[str, ...]
+    authority: str
+    route: str
+    retry_count: int
+    ambiguity: str
+    extra_refs: tuple[str, ...]
+    scenario_id: str
+    iteration: int
+    attempt: int
+    provenance: str
+    evaluation_status: str
+    feedback_actions_resolved: str
+    learning_capture_complete: str
+    requirement_results: tuple[tuple[str, str, str], ...]
+
+
+class SkillEvaluatorReportParseError(ValueError):
+    """One fixed malformed T14 report error; never expose free-form traceback."""
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
+
+
+class T14EvaluationError(ValueError):
+    """One fixed parent-accumulator error with a stable code attribute."""
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -744,6 +783,600 @@ def eval_status(results: tuple[ChecklistResult, ...], audit: ManifestAudit) -> s
     """Return the aggregate prompt eval status."""
     prompt_checks_passed = all(result.passed or not result.critical for result in results)
     return "pass" if audit.passed and prompt_checks_passed else "fail"
+
+
+_T14_HEADINGS = (
+    "Output:",
+    "Requirement Results:",
+    "Telemetry:",
+    "Result Metadata:",
+    "Evaluation Status:",
+)
+_T14_FIELDS = {
+    "Output:": ("command", "artifacts", "authority", "route"),
+    "Telemetry:": ("retry_count", "ambiguity", "extra_refs"),
+    "Result Metadata:": ("scenario_id", "iteration", "provenance"),
+    "Evaluation Status:": (
+        "evaluation_status",
+        "feedback_actions_resolved",
+        "learning_capture_complete",
+    ),
+}
+_T14_SCENARIOS = (
+    "OOP-TYPE-SCENARIO-01",
+    "OOP-TYPE-SCENARIO-02",
+    "OOP-TYPE-SCENARIO-03",
+)
+_T14_RUN_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+_T14_INTEGER_RE = re.compile(r"^[0-9]+$")
+_T14_REF_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+_T14_REQUIREMENT_RE = re.compile(r"^(R[0-9]+)=(pass|fail|malformed): ([^\r\n]+)$")
+_T14_PARENT_HEADER = (
+    "schema=agent_canon.t14.agent_evaluation.v1\n"
+    "run_id={run_id}\n"
+    "run_root=reports/agents/{run_id}/\n"
+    "workspace_root=/tmp/agentcanon-type-design-workspaces/{run_id}/\n"
+    "raw_report_base=reports/agents/{run_id}/evaluator_artifacts/\n"
+    "return_artifact_base=/tmp/agentcanon-type-design-workspaces/{run_id}/\n"
+    "iteration_count=2\n"
+    "scenario_count=3\n"
+)
+
+
+def compute_t14_packet_digest(packet_path: Path) -> str:
+    """Return the digest of one canonical, frozen T14 packet."""
+    try:
+        raw = packet_path.read_bytes()
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise T14EvaluationError("t14-packet-digest-mismatch") from exc
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    if normalized.startswith("\ufeff") or not normalized.endswith("\n"):
+        raise T14EvaluationError("t14-packet-digest-mismatch")
+    lines = normalized[:-1].split("\n")
+    if any(line != line.rstrip(" \t") for line in lines):
+        raise T14EvaluationError("t14-packet-digest-mismatch")
+    if normalized.endswith("\n\n"):
+        raise T14EvaluationError("t14-packet-digest-mismatch")
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"
+
+
+def _t14_parse_value(lines: list[str], field: str) -> str:
+    """Parse one ordinary ``key=value`` field."""
+    if lines.count("=") != 1:
+        raise SkillEvaluatorReportParseError("t14-report-lexical-value")
+    key, value = lines.split("=", 1)
+    if key != field:
+        expected = _T14_FIELDS.get(lines, ())
+        if key in expected:
+            raise SkillEvaluatorReportParseError("t14-report-field-order")
+        raise SkillEvaluatorReportParseError("t14-report-unknown-field")
+    if not value or re.fullmatch(r"[ -~]+", value) is None:
+        raise SkillEvaluatorReportParseError("t14-report-lexical-value")
+    if value != value.strip():
+        raise SkillEvaluatorReportParseError("t14-report-lexical-value")
+    return value
+
+
+def _t14_parse_refs(value: str) -> tuple[str, ...]:
+    """Parse the basename-only artifact/reference fields."""
+    if value == "none":
+        return ()
+    refs = tuple(value.split(","))
+    if not refs or any(_T14_REF_RE.fullmatch(ref) is None for ref in refs):
+        raise SkillEvaluatorReportParseError("t14-report-lexical-value")
+    return refs
+
+
+def _t14_parse_blocks(text: str) -> dict[str, list[str]]:
+    """Parse exact headings and field blocks without accepting free text."""
+    if text.startswith("\ufeff") or not text.endswith("\n"):
+        raise SkillEvaluatorReportParseError("t14-report-lexical-value")
+    body = text[:-1]
+    if not body or body.startswith("\n") or body.endswith("\n"):
+        raise SkillEvaluatorReportParseError("t14-report-free-text")
+    lines = body.split("\n")
+    cursor = 0
+    blocks: dict[str, list[str]] = {}
+    for heading_index, heading in enumerate(_T14_HEADINGS):
+        if cursor >= len(lines) or lines[cursor] != heading:
+            raise SkillEvaluatorReportParseError("t14-report-heading")
+        if heading in blocks:
+            raise SkillEvaluatorReportParseError("t14-report-heading")
+        blocks[heading] = []
+        cursor += 1
+        while cursor < len(lines) and lines[cursor] not in _T14_HEADINGS:
+            line = lines[cursor]
+            if line == "":
+                if cursor + 1 >= len(lines) or lines[cursor + 1] not in _T14_HEADINGS:
+                    raise SkillEvaluatorReportParseError("t14-report-free-text")
+                cursor += 1
+                break
+            if line != line.rstrip(" \t"):
+                raise SkillEvaluatorReportParseError("t14-report-lexical-value")
+            blocks[heading].append(line)
+            cursor += 1
+        if heading_index < len(_T14_HEADINGS) - 1:
+            if cursor >= len(lines) or lines[cursor] != _T14_HEADINGS[heading_index + 1]:
+                raise SkillEvaluatorReportParseError("t14-report-heading")
+    if cursor != len(lines):
+        raise SkillEvaluatorReportParseError("t14-report-free-text")
+    return blocks
+
+
+def _t14_parse_ordinary_block(heading: str, lines: list[str]) -> dict[str, str]:
+    """Validate one fixed ordinary-field block."""
+    expected = _T14_FIELDS[heading]
+    values: dict[str, str] = {}
+    for line in lines:
+        if line.count("=") != 1:
+            if "=" not in line:
+                raise SkillEvaluatorReportParseError("t14-report-free-text")
+            raise SkillEvaluatorReportParseError("t14-report-lexical-value")
+        key = line.split("=", 1)[0]
+        if key not in expected:
+            raise SkillEvaluatorReportParseError("t14-report-unknown-field")
+        if key in values:
+            raise SkillEvaluatorReportParseError("t14-report-duplicate-field")
+        if len(values) != expected.index(key):
+            raise SkillEvaluatorReportParseError("t14-report-field-order")
+        values[key] = _t14_parse_value(line, key)
+    if len(values) != len(expected):
+        raise SkillEvaluatorReportParseError("t14-report-missing-field")
+    return values
+
+
+def parse_skill_evaluator_report(
+    raw_evaluator_report: Path,
+    expected_raw_evaluator_report: Path,
+    expected_requirement_ids: Sequence[str],
+    expected_scenario_id: str,
+    expected_iteration: int,
+    expected_attempt: int,
+) -> SkillEvaluatorReport:
+    """Parse one exact five-section, parent-owned T14 evaluator report."""
+    if raw_evaluator_report != expected_raw_evaluator_report:
+        raise SkillEvaluatorReportParseError("t14-report-path-mismatch")
+    if (
+        raw_evaluator_report.parent.name != f"attempt-{expected_attempt}"
+        or raw_evaluator_report.parent.parent.name != f"iteration-{expected_iteration}"
+    ):
+        if raw_evaluator_report.parent.name != f"attempt-{expected_attempt}":
+            raise SkillEvaluatorReportParseError("t14-report-attempt-path-mismatch")
+        raise SkillEvaluatorReportParseError("t14-report-iteration-path-mismatch")
+    if raw_evaluator_report.stem != expected_scenario_id:
+        raise SkillEvaluatorReportParseError("t14-report-path-mismatch")
+    try:
+        text = raw_evaluator_report.read_bytes().decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise SkillEvaluatorReportParseError("t14-report-invalid-utf8") from exc
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    blocks = _t14_parse_blocks(normalized)
+    output = _t14_parse_ordinary_block("Output:", blocks["Output:"])
+    telemetry = _t14_parse_ordinary_block("Telemetry:", blocks["Telemetry:"])
+    metadata = _t14_parse_ordinary_block("Result Metadata:", blocks["Result Metadata:"])
+    status = _t14_parse_ordinary_block("Evaluation Status:", blocks["Evaluation Status:"])
+
+    requirement_results: list[tuple[str, str, str]] = []
+    seen_ids: set[str] = set()
+    expected_ids = tuple(expected_requirement_ids)
+    for line in blocks["Requirement Results:"]:
+        match = _T14_REQUIREMENT_RE.fullmatch(line)
+        if match is None:
+            raise SkillEvaluatorReportParseError("t14-report-requirement-id")
+        requirement_id, result_status, evidence = match.groups()
+        if requirement_id in seen_ids or requirement_id not in expected_ids:
+            raise SkillEvaluatorReportParseError("t14-report-requirement-id")
+        seen_ids.add(requirement_id)
+        requirement_results.append((requirement_id, result_status, evidence))
+    if set(seen_ids) != set(expected_ids) or len(requirement_results) != len(expected_ids):
+        raise SkillEvaluatorReportParseError("t14-report-requirement-id")
+    if tuple(row[0] for row in requirement_results) != expected_ids:
+        raise SkillEvaluatorReportParseError("t14-report-requirement-id")
+
+    retry_count = telemetry["retry_count"]
+    iteration = metadata["iteration"]
+    if _T14_INTEGER_RE.fullmatch(retry_count) is None or _T14_INTEGER_RE.fullmatch(iteration) is None:
+        raise SkillEvaluatorReportParseError("t14-report-metadata")
+    parsed_iteration = int(iteration)
+    if parsed_iteration != expected_iteration or metadata["scenario_id"] != expected_scenario_id:
+        raise SkillEvaluatorReportParseError("t14-report-metadata")
+    if telemetry["ambiguity"] not in {"none", "token"}:
+        raise SkillEvaluatorReportParseError("t14-report-enum")
+    if metadata["provenance"] != "fresh":
+        raise SkillEvaluatorReportParseError("t14-report-enum")
+    if status["evaluation_status"] not in {"pass", "fail"}:
+        raise SkillEvaluatorReportParseError("t14-report-enum")
+    if status["feedback_actions_resolved"] != "no" or status["learning_capture_complete"] != "no":
+        raise SkillEvaluatorReportParseError("t14-report-enum")
+    if not output["command"] or not output["authority"] or not output["route"]:
+        raise SkillEvaluatorReportParseError("t14-report-metadata")
+    return SkillEvaluatorReport(
+        raw_report_path=raw_evaluator_report,
+        command=output["command"],
+        artifacts=_t14_parse_refs(output["artifacts"]),
+        authority=output["authority"],
+        route=output["route"],
+        retry_count=int(retry_count),
+        ambiguity=telemetry["ambiguity"],
+        extra_refs=_t14_parse_refs(telemetry["extra_refs"]),
+        scenario_id=metadata["scenario_id"],
+        iteration=parsed_iteration,
+        attempt=expected_attempt,
+        provenance=metadata["provenance"],
+        evaluation_status=status["evaluation_status"],
+        feedback_actions_resolved=status["feedback_actions_resolved"],
+        learning_capture_complete=status["learning_capture_complete"],
+        requirement_results=tuple(requirement_results),
+    )
+
+
+def _t14_parent_blocks(text: str) -> list[dict[str, str]]:
+    """Read scenario blocks from the parent evaluation without rewriting them."""
+    blocks: list[dict[str, str]] = []
+    marker = "## Scenario "
+    for chunk in text.split(marker)[1:]:
+        lines = chunk.splitlines()
+        if not lines:
+            continue
+        values: dict[str, str] = {"scenario_id": lines[0].strip()}
+        for line in lines[1:]:
+            if line.startswith("## "):
+                break
+            if "=" in line:
+                key, value = line.split("=", 1)
+                values[key] = value
+        blocks.append(values)
+    return blocks
+
+
+def _t14_summary_blocks(text: str) -> list[dict[str, str]]:
+    """Read iteration summaries from the parent evaluation."""
+    summaries: list[dict[str, str]] = []
+    marker = "## Iteration "
+    for chunk in text.split(marker)[1:]:
+        lines = chunk.splitlines()
+        if not lines or not lines[0].endswith(" Summary"):
+            continue
+        values: dict[str, str] = {}
+        match = re.fullmatch(r"([0-9]+) Summary", lines[0])
+        if match is None:
+            continue
+        values["iteration"] = match.group(1)
+        for line in lines[1:]:
+            if line.startswith("## "):
+                break
+            if "=" in line:
+                key, value = line.split("=", 1)
+                values[key] = value
+        summaries.append(values)
+    return summaries
+
+
+def _t14_parent_text(parent_evaluation: Path, run_id: str) -> str:
+    """Return an existing parent file or the exact initial header."""
+    if not parent_evaluation.exists():
+        return _T14_PARENT_HEADER.format(run_id=run_id) + "\n"
+    text = parent_evaluation.read_text(encoding="utf-8")
+    header = _T14_PARENT_HEADER.format(run_id=run_id)
+    if not text.startswith(header):
+        raise T14EvaluationError("t14-iteration-order")
+    return text
+
+
+def _t14_relative_raw_path(raw_report: Path, parent_evaluation: Path) -> str:
+    """Render a raw report path relative to the parent run root."""
+    try:
+        return raw_report.relative_to(parent_evaluation.parent).as_posix()
+    except ValueError as exc:
+        raise T14EvaluationError("t14-raw-report-exists") from exc
+
+
+def _t14_validate_effective_retry_counts(text: str) -> None:
+    """Reject an already-persisted retry arithmetic contradiction."""
+    for block in _t14_parent_blocks(text):
+        if not {"retry_count", "malformed_attempts", "evaluator_retry_count"}.issubset(block):
+            continue
+        try:
+            retry_count = int(block["retry_count"])
+            malformed = int(block["malformed_attempts"])
+            evaluator = int(block["evaluator_retry_count"])
+        except ValueError as exc:
+            raise T14EvaluationError("t14-retry-count-mismatch") from exc
+        if retry_count != malformed + evaluator:
+            raise T14EvaluationError("t14-retry-count-mismatch")
+
+
+def _t14_validate_record_order(
+    text: str,
+    expected_scenario_id: str,
+    expected_iteration: int,
+) -> None:
+    """Validate the fixed two-iteration, three-scenario append order."""
+    blocks = _t14_parent_blocks(text)
+    if any(block.get("scenario_id") == expected_scenario_id for block in blocks):
+        raise T14EvaluationError("t14-duplicate-scenario")
+    expected_index = len(blocks)
+    expected_round = expected_index // len(_T14_SCENARIOS) + 1
+    if expected_iteration != expected_round:
+        raise T14EvaluationError(
+            "t14-unexpected-iteration" if expected_iteration not in {1, 2} else "t14-iteration-order"
+        )
+    expected_scenario = _T14_SCENARIOS[expected_index % len(_T14_SCENARIOS)]
+    if expected_scenario_id != expected_scenario:
+        raise T14EvaluationError("t14-iteration-order")
+
+
+def record_t14_evaluation(
+    run_id: str,
+    evaluator_bytes: bytes,
+    raw_evaluator_report: Path,
+    expected_raw_evaluator_report: Path,
+    expected_requirement_ids: Sequence[str],
+    expected_scenario_id: str,
+    expected_iteration: int,
+    expected_attempt: int,
+    scenario_packet: Path,
+    expected_packet_digest: str,
+    parent_evaluation: Path,
+) -> SkillEvaluatorReport:
+    """Persist and parse one fresh evaluator return, then append its observation."""
+    if _T14_RUN_ID_RE.fullmatch(run_id) is None:
+        raise T14EvaluationError("t14-iteration-order")
+    if expected_iteration not in {1, 2} or expected_attempt < 0:
+        raise T14EvaluationError("t14-unexpected-iteration")
+    if raw_evaluator_report != expected_raw_evaluator_report:
+        raise T14EvaluationError("t14-raw-report-exists")
+    parent_text = _t14_parent_text(parent_evaluation, run_id)
+    _t14_validate_effective_retry_counts(parent_text)
+    _t14_validate_record_order(parent_text, expected_scenario_id, expected_iteration)
+    if raw_evaluator_report.exists():
+        raise T14EvaluationError("t14-raw-report-exists")
+    if expected_attempt > 0:
+        prior = raw_evaluator_report.parent.parent / f"attempt-{expected_attempt - 1}" / raw_evaluator_report.name
+        if not prior.is_file():
+            raise T14EvaluationError("t14-attempt-order")
+    actual_digest = compute_t14_packet_digest(scenario_packet)
+    if actual_digest != expected_packet_digest:
+        raise T14EvaluationError("t14-packet-digest-mismatch")
+    return_artifact = Path(
+        "/tmp/agentcanon-type-design-workspaces"
+    ) / run_id / f"iteration-{expected_iteration}" / f"attempt-{expected_attempt}" / expected_scenario_id / "evaluator_return.bin"
+    if not return_artifact.is_file() or return_artifact.read_bytes() != evaluator_bytes:
+        raise T14EvaluationError("t14-report-failure")
+    raw_evaluator_report.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with raw_evaluator_report.open("xb") as handle:
+            handle.write(evaluator_bytes)
+    except FileExistsError as exc:
+        raise T14EvaluationError("t14-raw-report-exists") from exc
+    report = parse_skill_evaluator_report(
+        raw_evaluator_report,
+        expected_raw_evaluator_report,
+        expected_requirement_ids,
+        expected_scenario_id,
+        expected_iteration,
+        expected_attempt,
+    )
+    relative_raw = _t14_relative_raw_path(raw_evaluator_report, parent_evaluation)
+    effective_retry = expected_attempt + report.retry_count
+    block = (
+        f"## Scenario {report.scenario_id}\n"
+        f"iteration={report.iteration}\n"
+        f"attempt={report.attempt}\n"
+        f"scenario_id={report.scenario_id}\n"
+        f"packet_digest={actual_digest}\n"
+        f"raw_report={relative_raw}\n"
+        f"retry_count={effective_retry}\n"
+        f"malformed_attempts={expected_attempt}\n"
+        f"evaluator_retry_count={report.retry_count}\n"
+        f"ambiguity={report.ambiguity}\n"
+        f"provenance={report.provenance}\n"
+        f"evaluation_status={report.evaluation_status}\n"
+        "requirement_results="
+        + ";".join(f"{requirement_id}:{result_status}" for requirement_id, result_status, _ in report.requirement_results)
+        + "\nparser_status=pass\n"
+    )
+    parent_evaluation.parent.mkdir(parents=True, exist_ok=True)
+    if parent_evaluation.exists():
+        parent_evaluation.write_text(parent_text + "\n" + block, encoding="utf-8")
+    else:
+        parent_evaluation.write_text(parent_text + block, encoding="utf-8")
+    return report
+
+
+def _t14_decimal(value: Decimal) -> Decimal:
+    """Parse one finite decimal and enforce the inclusive 0..100 range."""
+    try:
+        decimal_value = Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise T14EvaluationError("t14-score-out-of-range") from exc
+    if not decimal_value.is_finite() or decimal_value < Decimal("0") or decimal_value > Decimal("100"):
+        raise T14EvaluationError("t14-score-out-of-range")
+    return decimal_value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _t14_summary_line_values(
+    iteration: int,
+    scenario_reports: Sequence[SkillEvaluatorReport],
+    graph_check_status: Mapping[str, bool],
+    parent_score: Decimal,
+    parent_critical_pass: bool,
+    holdout_gap: Decimal,
+) -> str:
+    """Serialize one complete structural T14 iteration summary."""
+    retry_counts = ";".join(
+        f"{report.scenario_id}:{report.attempt + report.retry_count}" for report in scenario_reports
+    )
+    ambiguities = ";".join(f"{report.scenario_id}:{report.ambiguity}" for report in scenario_reports)
+    provenance = ";".join(f"{report.scenario_id}:{report.provenance}" for report in scenario_reports)
+    graph_checks = ";".join(
+        f"{report.scenario_id}:{'pass' if graph_check_status[report.scenario_id] else 'fail'}"
+        for report in scenario_reports
+    )
+    all_reports_pass = all(
+        report.evaluation_status == "pass"
+        and report.ambiguity == "none"
+        and report.provenance == "fresh"
+        and all(status == "pass" for _, status, _ in report.requirement_results)
+        for report in scenario_reports
+    )
+    all_graphs_pass = all(graph_check_status[report.scenario_id] for report in scenario_reports)
+    if all_reports_pass and all_graphs_pass and parent_critical_pass:
+        convergence = "converged"
+        reason = "none"
+    elif not all_reports_pass:
+        convergence = "not_converged"
+        reason = "t14-report-failure"
+        if any(report.ambiguity != "none" for report in scenario_reports):
+            reason = "t14-ambiguity"
+    elif not all_graphs_pass:
+        convergence = "not_converged"
+        reason = "t14-graph-failure"
+    else:
+        convergence = "not_converged"
+        reason = "t14-critical-failure"
+    return (
+        f"## Iteration {iteration} Summary\n"
+        f"iteration={iteration}\n"
+        f"parent_score_percent={parent_score:.2f}\n"
+        f"parent_critical_pass={'yes' if parent_critical_pass else 'no'}\n"
+        f"holdout_gap_percent={holdout_gap:.2f}\n"
+        f"retry_counts={retry_counts}\n"
+        f"ambiguities={ambiguities}\n"
+        f"provenance={provenance}\n"
+        f"graph_checks={graph_checks}\n"
+        f"convergence={convergence}\n"
+        f"convergence_reason={reason}\n"
+    )
+
+
+def append_t14_iteration_summary(
+    parent_evaluation: Path,
+    iteration: int,
+    scenario_reports: Sequence[SkillEvaluatorReport],
+    graph_check_status: Mapping[str, bool],
+    parent_score_percent: Decimal,
+    parent_critical_pass: bool,
+    holdout_gap_percent: Decimal,
+) -> None:
+    """Append exactly one deterministic summary for one completed iteration."""
+    if iteration not in {1, 2}:
+        raise T14EvaluationError("t14-iteration-order")
+    text = parent_evaluation.read_text(encoding="utf-8")
+    summaries = _t14_summary_blocks(text)
+    if any(summary.get("iteration") == str(iteration) for summary in summaries):
+        raise T14EvaluationError("t14-duplicate-summary")
+    if iteration != len(summaries) + 1:
+        raise T14EvaluationError("t14-iteration-order")
+    reports = tuple(scenario_reports)
+    complete_structure = (
+        len(reports) == len(_T14_SCENARIOS)
+        and tuple(report.scenario_id for report in reports) == _T14_SCENARIOS
+        and all(report.iteration == iteration for report in reports)
+        and set(graph_check_status) == set(_T14_SCENARIOS)
+    )
+    try:
+        score = _t14_decimal(parent_score_percent)
+        gap = _t14_decimal(holdout_gap_percent)
+    except T14EvaluationError:
+        score = Decimal("0")
+        gap = Decimal("0")
+        complete_structure = False
+        blocked_reason = "t14-score-out-of-range"
+    else:
+        blocked_reason = "t14-incomplete-iteration"
+    if not complete_structure:
+        blocked = (
+            f"## Iteration {iteration} Summary\n"
+            f"iteration={iteration}\n"
+            "parent_score_percent=unscored\n"
+            "parent_critical_pass=unknown\n"
+            "holdout_gap_percent=unscored\n"
+            "retry_counts=none\n"
+            "ambiguities=none\n"
+            "provenance=none\n"
+            "graph_checks=none\n"
+            "convergence=blocked\n"
+            f"convergence_reason={blocked_reason}\n"
+        )
+        parent_evaluation.write_text(text.rstrip("\n") + "\n\n" + blocked, encoding="utf-8")
+        return
+    summary = _t14_summary_line_values(
+        iteration,
+        reports,
+        graph_check_status,
+        score,
+        parent_critical_pass,
+        gap,
+    )
+    parent_evaluation.write_text(text.rstrip("\n") + "\n\n" + summary, encoding="utf-8")
+
+
+def _t14_summary_map(text: str) -> dict[int, dict[str, str]]:
+    """Return iteration summaries keyed by iteration number."""
+    result: dict[int, dict[str, str]] = {}
+    for summary in _t14_summary_blocks(text):
+        try:
+            iteration = int(summary["iteration"])
+        except (KeyError, ValueError):
+            continue
+        result[iteration] = summary
+    return result
+
+
+def _t14_failure_code_for_summaries(summaries: Mapping[int, Mapping[str, str]]) -> str:
+    """Apply the fixed finalization failure precedence."""
+    if len(summaries) != 2 or 1 not in summaries or 2 not in summaries:
+        return "t14-incomplete-iteration"
+    for summary in summaries.values():
+        convergence = summary.get("convergence")
+        reason = summary.get("convergence_reason")
+        if convergence == "blocked" and reason == "t14-score-out-of-range":
+            return "t14-score-out-of-range"
+    if any(summary.get("convergence") == "blocked" for summary in summaries.values()):
+        return "t14-incomplete-iteration"
+    if any(summary.get("convergence") == "not_converged" for summary in summaries.values()):
+        return "t14-iteration-not-converged"
+    retry_values = [summary.get("retry_counts", "") for summary in summaries.values()]
+    if len(set(retry_values)) != 1:
+        return "t14-retry-mismatch"
+    if any(value != "none" and any(part.split(":", 1)[-1] != "0" for part in value.split(";")) for value in retry_values):
+        return "t14-nonzero-retry"
+    for summary in summaries.values():
+        try:
+            gaps = [Decimal(part) for part in summary.get("holdout_gap_percent", "unscored").split(";")]
+        except InvalidOperation:
+            return "t14-holdout-gap"
+        if not gaps or any(gap >= Decimal("15.00") for gap in gaps):
+            return "t14-holdout-gap"
+    return "none"
+
+
+def finalize_t14_evaluation(parent_evaluation: Path) -> None:
+    """Append the sole final parent summary after the two iteration summaries."""
+    text = parent_evaluation.read_text(encoding="utf-8")
+    if "## Parent Summary" in text:
+        raise T14EvaluationError("t14-duplicate-summary")
+    summaries = _t14_summary_map(text)
+    failure_code = _t14_failure_code_for_summaries(summaries)
+    converged = sum(1 for summary in summaries.values() if summary.get("convergence") == "converged")
+    second = summaries.get(2, {})
+    score = second.get("parent_score_percent", "unscored")
+    critical = second.get("parent_critical_pass", "unknown")
+    if failure_code == "none" and critical != "yes":
+        failure_code = "t14-retry-mismatch"
+    completion = "complete" if failure_code == "none" else "incomplete"
+    block = (
+        "## Parent Summary\n"
+        f"consecutive_converged_iterations={converged}\n"
+        f"parent_score_percent={score}\n"
+        f"parent_critical_pass={critical}\n"
+        f"completion={completion}\n"
+        f"failure_code={failure_code}\n"
+    )
+    parent_evaluation.write_text(text.rstrip("\n") + "\n\n" + block, encoding="utf-8")
 
 
 def append_prompt_eval_monitoring(

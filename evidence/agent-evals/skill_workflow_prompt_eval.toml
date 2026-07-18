@@ -58,6 +58,50 @@ description = "Includes a top-level Markdown title."
 required_regex = ["(?m)^#\\s+"]
 
 [[evals]]
+id = "oop-type-design-runtime-contract"
+target = ".agents/skills/oop-type-design/SKILL.md"
+kind = "skill"
+description = "The runtime shim exposes the pre-implementation OOP/type-design contract and forbids post-hoc/static duplication."
+
+[[evals.checklist]]
+id = "OOP-TYPE-RUNTIME-1"
+critical = true
+required_regex = ["oop-type-design", "@dependency-start", "@dependency-end", "^1\\."]
+
+[[evals.checklist]]
+id = "OOP-TYPE-RUNTIME-2"
+critical = true
+required_regex = ["Protocol|interface", "value object", "aggregate", "constructor", "state transition", "composition", "dependency direction", "responsibility", "cohesive|cohesion"]
+
+[[evals.checklist]]
+id = "OOP-TYPE-RUNTIME-3"
+critical = true
+required_regex = ["statically decidable|static type|static checker", "runtime guard|runtime validation", "test-first|test first", "oop-readability-check", "python-review", "cpp-review"]
+forbidden_regex = ["keyword routing|keyword trigger"]
+
+[[evals]]
+id = "oop-type-design-human-contract"
+target = "agents/skills/oop-type-design.md"
+kind = "skill"
+description = "The human-facing skill doc fixes the packet order, boundary matrix, and delegated validation owners."
+
+[[evals.checklist]]
+id = "OOP-TYPE-HUMAN-1"
+critical = true
+required_regex = ["Abstract Design Frame|Responsibility model", "Implementation Source Packet", "Design Side-Effect Map", "Design-To-Implementation Trace"]
+
+[[evals.checklist]]
+id = "OOP-TYPE-HUMAN-2"
+critical = true
+required_regex = ["API", "serialization", "external input", "constructor invariant", "legal state transition", "Protocol|interface", "independent invariant", "change reason", "external effect", "substitutability", "dependency graph", "indivisible edge|shared transaction|consistency boundary", "coordination[_ ]cost", "connected-components"]
+
+[[evals.checklist]]
+id = "OOP-TYPE-HUMAN-3"
+critical = true
+required_regex = ["check_static_any.py", "pyright", "ruff", "oop-readability-check", "gpt-5.4-mini", "T14", "responsibility accumulation|oversized responsibility", "line/function count|function count", "composition root"]
+forbidden_regex = ["test-first", "keyword routing", "split.*line count|split.*function count"]
+
+[[evals]]
 id = "all-internal-routine-docs"
 target_glob = "agents/internal-routines/*.md"
 kind = "skill"

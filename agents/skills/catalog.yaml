@@ -3,6 +3,7 @@ version: 1
 # contract registry
 # responsibility Catalogs canonical agent skills and their descriptions.
 # downstream design ../canonical/CODEX_WORKFLOW.md consumes the skill catalog during task routing
+# downstream implementation ../../tools/agent_tools/skill_route_catalog.py parses complete rule and capability metadata
 # downstream implementation ../../tools/agent_tools/route.py consumes routing and related-skill metadata
 # downstream implementation ../../tools/agent_tools/skill_tool_commands.py prints skill command packets with related skills
 # downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates public skill catalog consistency
@@ -267,6 +268,23 @@ skill_families:
         - ["Dependency inversion"]
         - ["責務", "class"]
         - ["Protocol", "境界"]
+  - id: oop-type-design
+    purpose: Write pre-implementation OOP designs with explicit types, invariants, state transitions, ownership, composition, and API/external boundaries.
+    canonical_doc: agents/skills/oop-type-design.md
+    shim: .agents/skills/oop-type-design/SKILL.md
+    related_skills:
+      - oop-readability-check
+      - python-review
+      - cpp-review
+    routing:
+      stage_policy: active
+      reason: explicit pre-implementation OOP/type design capability owns responsibility and boundary modeling
+      capabilities:
+        - id: oop_type_design
+          owner: pre_implementation_oop_type_design
+          phase: pre_implementation_design
+          activation: explicit_capability
+          exclusive: true
   - id: result-artifact-writeout
     purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
     canonical_doc: agents/skills/result-artifact-writeout.md
