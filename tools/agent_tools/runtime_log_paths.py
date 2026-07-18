@@ -25,6 +25,7 @@ import subprocess
 from pathlib import Path
 
 HOOK_ARCHIVE_DIR_ENV = "AGENT_CANON_HOOK_ARCHIVE_DIR"
+HOOK_EVENT_SPOOL_DIR_ENV = "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
 LOG_ENV_ENV = "AGENT_CANON_LOG_ENV"
 LOG_ARCHIVE_PARENT = Path(".agent-canon") / "log-archive"
 LOG_ARCHIVE_REMOTE = "git@github.com:iwashita-nozomu/agent-canon-log.git"
@@ -59,6 +60,35 @@ def repo_log_key(root: Path) -> str:
     canonical = root.resolve()
     name = safe_slug(canonical.name or "repo")
     return f"{name}-{short_hash(str(canonical))}"
+
+
+def hook_event_spool_root(active_root: Path) -> Path:
+    """Return the O(1) repo-owned hook-event spool root."""
+    override = os.environ.get(HOOK_EVENT_SPOOL_DIR_ENV, "").strip()
+    if override:
+        return Path(override).resolve() / repo_log_key(active_root)
+    return (
+        active_root.resolve()
+        / ".agent-canon"
+        / "runtime-event-spool"
+        / "hook-events"
+        / repo_log_key(active_root)
+    )
+
+
+def runtime_event_publication_outcome_spool_root(active_root: Path) -> Path:
+    """Return the repo-local publication-outcome observation spool root."""
+    return (
+        active_root.resolve()
+        / ".agent-canon"
+        / "runtime-event-spool"
+        / "publication-outcome"
+    )
+
+
+def post_tooluse_spool_path(root: Path, hook_run_id: str) -> Path:
+    """Return the O(1) default PostToolUse event path."""
+    return hook_event_spool_root(root) / "post-tool-use" / "hook" / f"{hook_run_id}.json"
 
 
 def _log_environment_key(root: Path) -> str:
