@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: ffca4cc21fb154fd574b3a0c592631cb3fd7c939df943bc9750bc1fb28041985
+# source canonical digest: d5a3cb22678268ce586373c889e66cba569891c7507cde55c6112b90f5037037
 
 name = "spark_worker"
 description = "Low-latency implementation agent for bounded code, docs, tests, or mechanical cleanup slices derived from the Abstract Design Frame and design trace."

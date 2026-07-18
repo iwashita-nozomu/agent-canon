@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: f709c0a74b8286c27e6735dbac5685e905869e576c7661dc1679a9b5a8138897
+# source canonical digest: 54b6a83198993745ff8b2e649b2557978495b4eb800db4d7458d1ab723060036
 
 name = "skill_evaluator"
 description = "Fresh read-only evaluator for explicit empirical skill scenarios."

@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb
+# source canonical digest: a750bbf5f7f2576b4e900120599e88ed22c580385ee16e5ee0959bcd035bd332
 
 name = "diff_triage_reviewer"
 description = "Read-only reviewer for bounded diffs before escalation to broad review."
@@ -18,4 +18,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = "You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."
+developer_instructions = "You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review bounded diffs findings-first; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope."

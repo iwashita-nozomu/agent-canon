@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb
+# source canonical digest: 8d887cf425cdd3ceef59f7aefe1ab5763ed6b00f39a7601700b6bb26ca95070e
 
 name = "fair_data_reviewer"
 description = "Read-only reviewer for metadata quality, naming, reuse, and FAIR-style data organization."

@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb
+# source canonical digest: 02deb282af5558b31f6556fd10739ee6e811ea9c1d540784c3d3dd2b48e55cc5
 
 name = "manager_reviewer"
 description = "Read-only requirements reviewer for scope, source buckets, accumulated-context resolution, and escalation discipline."

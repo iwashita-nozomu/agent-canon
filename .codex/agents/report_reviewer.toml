@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb
+# source canonical digest: 0237d90b3a51c6fffcc5edaab0153864ba29a223e3ea099d3fdaed56abecef64
 
 name = "report_reviewer"
 description = "Read-only reviewer for experiment reports and evidence traceability."

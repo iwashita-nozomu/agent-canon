@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb
+# source canonical digest: 732a021da775136cec0f7aa322cd4a7307937de8cb71dd923ead6a5ae975cd6e
 
 name = "long_form_writer"
 description = "Long-form document author for README, workflow, guide, migration, and other reader-facing documents that need roadmap-first drafting."

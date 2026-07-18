@@ -1729,7 +1729,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "ecc40306ef40d15ee99e86bd780c996d54d97edd75acdc24469632157f1c14af"
     },
     "benchmark_reviewer": {
       "name": "benchmark_reviewer",
@@ -1763,7 +1763,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "9a146f7073e9d58802fb9fea370658d1653b41bb5deec9408b07db44cdf808eb"
     },
     "citation_evidence_reviewer": {
       "name": "citation_evidence_reviewer",
@@ -1797,7 +1797,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "68f23dc8017f0da2c76f62e1fbbe6cd0a1aa123c578fb6ed1b6d1eea569d76b8"
     },
     "cpp_reviewer": {
       "name": "cpp_reviewer",
@@ -1831,7 +1831,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "1245aa61500823d856e19369264f3186fc55b8d8e58dc14775818db276fcbc36"
     },
     "detailed_design_reviewer": {
       "name": "detailed_design_reviewer",
@@ -1865,7 +1865,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "1e50e4a6cec4b8fa59afd8d84118e816cea24a3bb500e6a78238e9e01097449e"
     },
     "detailed_designer": {
       "name": "detailed_designer",
@@ -1899,7 +1899,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "04b88bc705194b571d8b10ae90998c81b0bdbcab4659f8296744e488f95b1d2d"
     },
     "diff_triage_reviewer": {
       "name": "diff_triage_reviewer",
@@ -1911,7 +1911,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review bounded diffs findings-first; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope.",
       "logical_role_id": "change_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/7",
       "profile_id": "luna_reasoning_high",
@@ -1933,7 +1933,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "a750bbf5f7f2576b4e900120599e88ed22c580385ee16e5ee0959bcd035bd332"
     },
     "docs_workflow_steward": {
       "name": "docs_workflow_steward",
@@ -1967,7 +1967,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "ba53a4d54a94ea83fd73306fa3e06a1510f02c0bf5754f1cf6b7f34dd6a3dd63"
     },
     "document_flow_reviewer": {
       "name": "document_flow_reviewer",
@@ -2001,7 +2001,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "800da34d508fe3599d06aef4791e2deb5df7a7e3a1e30aa9e99f82eff23ce574"
     },
     "execution_planner": {
       "name": "execution_planner",
@@ -2035,7 +2035,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "f40955788532d5672936855d5bce0287765aba5f11d5b288cb1b13af988e34dc"
     },
     "experiment_runner": {
       "name": "experiment_runner",
@@ -2069,7 +2069,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "e16b0021fde54dccd820ef6a155ff994938d8f87433864208c14d3c98b1b3386"
     },
     "explorer": {
       "name": "explorer",
@@ -2103,7 +2103,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "491e2305089346a2b5d9feadaf7458b35a6d85660613374b0472876994297ee4"
     },
     "fair_data_reviewer": {
       "name": "fair_data_reviewer",
@@ -2137,7 +2137,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "8d887cf425cdd3ceef59f7aefe1ab5763ed6b00f39a7601700b6bb26ca95070e"
     },
     "literature_researcher": {
       "name": "literature_researcher",
@@ -2171,7 +2171,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "460ea2610226ca9243f006cd7294f20aac7436b319744497b6b6d89b9a6e51c7"
     },
     "logic_gap_reviewer": {
       "name": "logic_gap_reviewer",
@@ -2205,7 +2205,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "3a210e08c3417638f783a01434c56189bd5b29afda8f78413b189041e7b948e0"
     },
     "long_form_writer": {
       "name": "long_form_writer",
@@ -2239,7 +2239,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "732a021da775136cec0f7aa322cd4a7307937de8cb71dd923ead6a5ae975cd6e"
     },
     "manager_reviewer": {
       "name": "manager_reviewer",
@@ -2273,7 +2273,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "02deb282af5558b31f6556fd10739ee6e811ea9c1d540784c3d3dd2b48e55cc5"
     },
     "ml_science_reviewer": {
       "name": "ml_science_reviewer",
@@ -2307,7 +2307,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "7d47e4a8a9dbddb4c68ae684375009dc4396c11af462224e7de991f23c60487a"
     },
     "notation_definition_reviewer": {
       "name": "notation_definition_reviewer",
@@ -2341,7 +2341,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "829092681e2bf0913d47ab74003e16c950ede8a539557f8f76b95347f6a2b801"
     },
     "oop_readability_reviewer": {
       "name": "oop_readability_reviewer",
@@ -2375,7 +2375,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "7d95842f1dffc3441f2de0147534c7e358e16f02db000b13ec70862e722c41d0"
     },
     "plan_reviewer": {
       "name": "plan_reviewer",
@@ -2409,7 +2409,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "4718ce49cfb3fdd3ad73a2fefb5042ff07f6a2116ecf9b3e2ed5b1a7b9d344ef"
     },
     "project_reviewer": {
       "name": "project_reviewer",
@@ -2443,7 +2443,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "39d39d0f82067761372c5b3aab58b8723418691491fc4b0fd94641109aa8d016"
     },
     "prompt_config_reviewer": {
       "name": "prompt_config_reviewer",
@@ -2477,7 +2477,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "e26e35c63898843f16041d103c4844eae5a0e77d092ceba763d59b4ec9213228"
     },
     "python_reviewer": {
       "name": "python_reviewer",
@@ -2489,7 +2489,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Require a path-covered OOP readability report and check_solid_evidence.py evidence; return revise when SOLID principle signal counts or Single responsibility, Open/closed, Liskov substitution, Interface segregation, and Dependency inversion evidence is missing.",
       "logical_role_id": "change_reviewer+python_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/20",
       "profile_id": "luna_reasoning_high",
@@ -2511,7 +2511,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "72556cfd35b032e0822754a5790ad8a820e94a0bf950ea1cc67eda2f9cbf5a2e"
     },
     "report_reviewer": {
       "name": "report_reviewer",
@@ -2545,7 +2545,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "0237d90b3a51c6fffcc5edaab0153864ba29a223e3ea099d3fdaed56abecef64"
     },
     "reproducibility_reviewer": {
       "name": "reproducibility_reviewer",
@@ -2579,7 +2579,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "c352d794b5666b560ce7ca1393856322bce9a460a4b15f844634966ecfc1eea3"
     },
     "requirements_organizer": {
       "name": "requirements_organizer",
@@ -2613,7 +2613,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "47b289b06b0174a392ebd5a114a6ca379ad342a7486d16ad72949b44a132c1fd"
     },
     "reviewer": {
       "name": "reviewer",
@@ -2625,7 +2625,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review exact diffs findings-first against request clauses and owning evidence. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete.",
       "logical_role_id": "change_reviewer+final_reviewer+research_reviewer+experiment_reviewer+infra_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/specialist_roles/1+agents/agents_config.json#/specialist_roles/3+agents/agents_config.json#/specialist_roles/10",
       "profile_id": "luna_reasoning_high",
@@ -2647,7 +2647,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "04fcb18036e91b6d5fa05df507799411d8c3d915cdc1686f4a4982ed81e505b9"
     },
     "scientific_computing_reviewer": {
       "name": "scientific_computing_reviewer",
@@ -2681,7 +2681,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "eac6268e089e91bd95194f611311ce86ed52965003024c06a5a4d7c9faee3059"
     },
     "ship_reviewer": {
       "name": "ship_reviewer",
@@ -2715,7 +2715,7 @@
       "return_schema_id": "ship_review_result_v1",
       "checkpoint_policy": "single_owner_gate",
       "continuation_policy": "terminal_after_gate",
-      "projection_digest": "ce0e1c43d81d30defd3ffa1286dfc737bf1114a73cfdfc9957ead24e5546cfca"
+      "projection_digest": "e43497eb12555e119a32e79cbb9a721f789da8081a4d4ffda441aa15c7973ce1"
     },
     "skill_evaluator": {
       "name": "skill_evaluator",
@@ -2748,7 +2748,7 @@
       "return_schema_id": "skill_evaluation_result_v1",
       "checkpoint_policy": "terminal_evaluation",
       "continuation_policy": "fresh_only_no_continuation",
-      "projection_digest": "f709c0a74b8286c27e6735dbac5685e905869e576c7661dc1679a9b5a8138897"
+      "projection_digest": "54b6a83198993745ff8b2e649b2557978495b4eb800db4d7458d1ab723060036"
     },
     "spark_worker": {
       "name": "spark_worker",
@@ -2784,7 +2784,7 @@
       "return_schema_id": "spark_implementation_result_v1",
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
-      "projection_digest": "ffca4cc21fb154fd574b3a0c592631cb3fd7c939df943bc9750bc1fb28041985"
+      "projection_digest": "d5a3cb22678268ce586373c889e66cba569891c7507cde55c6112b90f5037037"
     },
     "test_designer": {
       "name": "test_designer",
@@ -2818,7 +2818,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "b1805de39dcbc003fdd7bfb13eb7931872184c8d9a2bf067ee4edda4c909dae3"
     },
     "worker": {
       "name": "worker",
@@ -2853,7 +2853,7 @@
       "return_schema_id": "implementation_feedback_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "732c5b181401fbc7491220ffb33cd79768706923fe4cdaaaa1fcbe18957c1731"
+      "projection_digest": "47f3d5cd4dd94af2f4974a7891424c17cf46928b4a899bfdbcebf761dfccb123"
     }
   },
   "roles": [
@@ -2878,7 +2878,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "ecc40306ef40d15ee99e86bd780c996d54d97edd75acdc24469632157f1c14af"
     },
     {
       "id": "benchmark_reviewer",
@@ -2901,7 +2901,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "9a146f7073e9d58802fb9fea370658d1653b41bb5deec9408b07db44cdf808eb"
     },
     {
       "id": "citation_evidence_reviewer",
@@ -2924,7 +2924,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "68f23dc8017f0da2c76f62e1fbbe6cd0a1aa123c578fb6ed1b6d1eea569d76b8"
     },
     {
       "id": "cpp_reviewer",
@@ -2947,7 +2947,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "1245aa61500823d856e19369264f3186fc55b8d8e58dc14775818db276fcbc36"
     },
     {
       "id": "detailed_design_reviewer",
@@ -2970,7 +2970,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "1e50e4a6cec4b8fa59afd8d84118e816cea24a3bb500e6a78238e9e01097449e"
     },
     {
       "id": "detailed_designer",
@@ -2993,7 +2993,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "04b88bc705194b571d8b10ae90998c81b0bdbcab4659f8296744e488f95b1d2d"
     },
     {
       "id": "diff_triage_reviewer",
@@ -3016,7 +3016,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "a750bbf5f7f2576b4e900120599e88ed22c580385ee16e5ee0959bcd035bd332"
     },
     {
       "id": "docs_workflow_steward",
@@ -3039,7 +3039,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "ba53a4d54a94ea83fd73306fa3e06a1510f02c0bf5754f1cf6b7f34dd6a3dd63"
     },
     {
       "id": "document_flow_reviewer",
@@ -3062,7 +3062,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "800da34d508fe3599d06aef4791e2deb5df7a7e3a1e30aa9e99f82eff23ce574"
     },
     {
       "id": "execution_planner",
@@ -3085,7 +3085,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "f40955788532d5672936855d5bce0287765aba5f11d5b288cb1b13af988e34dc"
     },
     {
       "id": "experiment_runner",
@@ -3108,7 +3108,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "e16b0021fde54dccd820ef6a155ff994938d8f87433864208c14d3c98b1b3386"
     },
     {
       "id": "explorer",
@@ -3131,7 +3131,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "491e2305089346a2b5d9feadaf7458b35a6d85660613374b0472876994297ee4"
     },
     {
       "id": "fair_data_reviewer",
@@ -3154,7 +3154,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "8d887cf425cdd3ceef59f7aefe1ab5763ed6b00f39a7601700b6bb26ca95070e"
     },
     {
       "id": "literature_researcher",
@@ -3177,7 +3177,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "460ea2610226ca9243f006cd7294f20aac7436b319744497b6b6d89b9a6e51c7"
     },
     {
       "id": "logic_gap_reviewer",
@@ -3200,7 +3200,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "3a210e08c3417638f783a01434c56189bd5b29afda8f78413b189041e7b948e0"
     },
     {
       "id": "long_form_writer",
@@ -3223,7 +3223,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "732a021da775136cec0f7aa322cd4a7307937de8cb71dd923ead6a5ae975cd6e"
     },
     {
       "id": "manager_reviewer",
@@ -3246,7 +3246,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "02deb282af5558b31f6556fd10739ee6e811ea9c1d540784c3d3dd2b48e55cc5"
     },
     {
       "id": "ml_science_reviewer",
@@ -3269,7 +3269,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "7d47e4a8a9dbddb4c68ae684375009dc4396c11af462224e7de991f23c60487a"
     },
     {
       "id": "notation_definition_reviewer",
@@ -3292,7 +3292,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "829092681e2bf0913d47ab74003e16c950ede8a539557f8f76b95347f6a2b801"
     },
     {
       "id": "oop_readability_reviewer",
@@ -3315,7 +3315,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "7d95842f1dffc3441f2de0147534c7e358e16f02db000b13ec70862e722c41d0"
     },
     {
       "id": "plan_reviewer",
@@ -3338,7 +3338,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "4718ce49cfb3fdd3ad73a2fefb5042ff07f6a2116ecf9b3e2ed5b1a7b9d344ef"
     },
     {
       "id": "project_reviewer",
@@ -3361,7 +3361,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "39d39d0f82067761372c5b3aab58b8723418691491fc4b0fd94641109aa8d016"
     },
     {
       "id": "prompt_config_reviewer",
@@ -3384,7 +3384,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "e26e35c63898843f16041d103c4844eae5a0e77d092ceba763d59b4ec9213228"
     },
     {
       "id": "python_reviewer",
@@ -3407,7 +3407,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "72556cfd35b032e0822754a5790ad8a820e94a0bf950ea1cc67eda2f9cbf5a2e"
     },
     {
       "id": "report_reviewer",
@@ -3430,7 +3430,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "0237d90b3a51c6fffcc5edaab0153864ba29a223e3ea099d3fdaed56abecef64"
     },
     {
       "id": "reproducibility_reviewer",
@@ -3453,7 +3453,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "c352d794b5666b560ce7ca1393856322bce9a460a4b15f844634966ecfc1eea3"
     },
     {
       "id": "requirements_organizer",
@@ -3476,7 +3476,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "47b289b06b0174a392ebd5a114a6ca379ad342a7486d16ad72949b44a132c1fd"
     },
     {
       "id": "reviewer",
@@ -3499,7 +3499,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "04fcb18036e91b6d5fa05df507799411d8c3d915cdc1686f4a4982ed81e505b9"
     },
     {
       "id": "scientific_computing_reviewer",
@@ -3522,7 +3522,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "eac6268e089e91bd95194f611311ce86ed52965003024c06a5a4d7c9faee3059"
     },
     {
       "id": "ship_reviewer",
@@ -3545,7 +3545,7 @@
       "return_schema_id": "ship_review_result_v1",
       "checkpoint_policy": "single_owner_gate",
       "continuation_policy": "terminal_after_gate",
-      "projection_digest": "ce0e1c43d81d30defd3ffa1286dfc737bf1114a73cfdfc9957ead24e5546cfca"
+      "projection_digest": "e43497eb12555e119a32e79cbb9a721f789da8081a4d4ffda441aa15c7973ce1"
     },
     {
       "id": "skill_evaluator",
@@ -3567,7 +3567,7 @@
       "return_schema_id": "skill_evaluation_result_v1",
       "checkpoint_policy": "terminal_evaluation",
       "continuation_policy": "fresh_only_no_continuation",
-      "projection_digest": "f709c0a74b8286c27e6735dbac5685e905869e576c7661dc1679a9b5a8138897"
+      "projection_digest": "54b6a83198993745ff8b2e649b2557978495b4eb800db4d7458d1ab723060036"
     },
     {
       "id": "spark_worker",
@@ -3592,7 +3592,7 @@
       "return_schema_id": "spark_implementation_result_v1",
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
-      "projection_digest": "ffca4cc21fb154fd574b3a0c592631cb3fd7c939df943bc9750bc1fb28041985"
+      "projection_digest": "d5a3cb22678268ce586373c889e66cba569891c7507cde55c6112b90f5037037"
     },
     {
       "id": "test_designer",
@@ -3615,7 +3615,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb"
+      "projection_digest": "b1805de39dcbc003fdd7bfb13eb7931872184c8d9a2bf067ee4edda4c909dae3"
     },
     {
       "id": "worker",
@@ -3639,7 +3639,7 @@
       "return_schema_id": "implementation_feedback_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "732c5b181401fbc7491220ffb33cd79768706923fe4cdaaaa1fcbe18957c1731"
+      "projection_digest": "47f3d5cd4dd94af2f4974a7891424c17cf46928b4a899bfdbcebf761dfccb123"
     }
   ],
   "generated_profile_projection": {
@@ -3647,6 +3647,6 @@
     "materializer": "tools/agent_tools/model_profile_registry.py",
     "registry_ref": "agents/model_profiles.toml",
     "role_count": 34,
-    "projection_digest": "12a1809edb08ebdcf38f1807663421aebc6dc55868a3428493d3bfe7e3c45fba"
+    "projection_digest": "19f85dafb4acdc58432693f0aa08b3b2a13c607ad80c2338a01e6f55156529ed"
   }
 }

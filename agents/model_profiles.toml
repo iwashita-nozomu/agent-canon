@@ -83,6 +83,23 @@ spark_worker = "workspace-write"
 test_designer = "read-only"
 worker = "workspace-write"
 
+[role_instruction_templates]
+
+[[role_instruction_templates.diff_triage_reviewer]]
+id = "diff_triage_solid_boundary"
+text = "Review bounded diffs findings-first; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope."
+priority = 100
+
+[[role_instruction_templates.python_reviewer]]
+id = "python_solid_boundary"
+text = "Review Python diffs findings-first for behavior, types, tests, and public boundaries. Require a path-covered OOP readability report and check_solid_evidence.py evidence; return revise when SOLID principle signal counts or Single responsibility, Open/closed, Liskov substitution, Interface segregation, and Dependency inversion evidence is missing."
+priority = 100
+
+[[role_instruction_templates.reviewer]]
+id = "reviewer_solid_boundary"
+text = "Review exact diffs findings-first against request clauses and owning evidence. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete."
+priority = 100
+
 [standalone_role_metadata.long_form_writer]
 logical_role_id = "long_form_writer"
 role_contract_ref = "agents/model_profiles.toml#/standalone_role_metadata/long_form_writer"

@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb
+# source canonical digest: 39d39d0f82067761372c5b3aab58b8723418691491fc4b0fd94641109aa8d016
 
 name = "project_reviewer"
 description = "Read-only reviewer for repo-wide inventory, workflow health, and tooling health."

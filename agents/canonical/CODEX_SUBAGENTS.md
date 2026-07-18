@@ -477,8 +477,8 @@ Candidate pre-goal roles:
 - `execution_planner`: group open `GW*` rows into the next cohesive slice after
   `goal_loop.py plan` exists.
 - `plan_reviewer`: verify that the complete responsibility unit is checkable;
-  checkpoints are nonblocking observations and do not create rollback or
-  micro-slice gates.
+  checkpoints remain nonblocking observations outside rollback and micro-slice
+  gates.
 
 Start with the roles needed for the current stage, keep unused roles as dynamic
 wave triggers, and add them when goal evidence, dependency state, or review
@@ -689,7 +689,7 @@ runtime は再生成後に restart し、readback で反映を確認します。
 運用メモ:
 - OpenAI / Codex の current product evidence は `$openai-docs` で確認します。
   この文書は product-evidence route を示します。
-- `agents/model_profiles.toml` の closed registry が parent / reasoning / implementation / ship / Spark / evaluator profiles と explicit role bindings を所有します。`.codex/agents/*.toml` と `agents/agents_config.json` はその generated projection で、手動の model authority ではありません。`spark_worker` は typed fixed-packet route が選んだ機械的実装だけに使います。
+- `agents/model_profiles.toml` の closed registry が parent / reasoning / implementation / ship / Spark / evaluator profiles と explicit role bindings を所有します。`.codex/agents/*.toml` と `agents/agents_config.json` は generated projection と runtime readback を提供します。`spark_worker` は typed fixed-packet route が選んだ機械的実装だけに使います。
 - 親の既定は Sol/high とし、Sol/xhigh は high-risk / final escalation evidence があるときに起動します
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
 - 極端に狭く、待ち時間が支配的な implementation loop は `spark_worker` selection の evidence になり得ますが、`worker` 既定を切り替えるには explicit parent-packet selection が必要です
@@ -727,10 +727,11 @@ runtime は再生成後に restart し、readback で反映を確認します。
   `.codex/config.toml`、role model / reasoning を変えるときは
   `agents/model_profiles.toml` を更新して canonical materializer を実行します
 - stage 固有の profile/instruction 条件は `agents/model_profiles.toml` の owner
-  route で変更し、generated view を手動編集しません
+  route で変更し、canonical materializer による generated view regeneration を
+  必須とします
 - wrapper や root entrypoint は `.codex/agents/*.toml` の参照入口に保ちます
 - generation 後は alignment readback を確認し、load 済み session の projection
-  が古い場合は role TOML を編集せず restart します
+  freshness は registry materialization と fresh-session restart/readback で回復します
 
 ## Smoke Test
 

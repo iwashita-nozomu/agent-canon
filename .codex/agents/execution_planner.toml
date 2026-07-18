@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb
+# source canonical digest: f40955788532d5672936855d5bce0287765aba5f11d5b288cb1b13af988e34dc
 
 name = "execution_planner"
 description = "Execution-planning agent for stage order, subagent assignment, validation sequence, and rollback-aware task plans."

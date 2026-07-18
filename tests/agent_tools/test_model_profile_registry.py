@@ -40,6 +40,11 @@ registry_version = 1
 sol_parent = "sol_parent_high"
 [role_sandbox_bindings]
 sol_parent = "workspace-write"
+[role_instruction_templates]
+[[role_instruction_templates.sol_parent]]
+id = "role-contract"
+text = "Use the role-specific contract."
+priority = 100
 [standalone_role_metadata]
 [[model_profiles]]
 id = "sol_parent_high"
@@ -104,6 +109,9 @@ def test_registry_is_closed_and_has_typed_projection(workspace: Path) -> None:
     assert profile.reasoning_effort == "high"
     assert len(profile.projection_digest) == 64
     assert profile.capabilities == ("orchestration",)
+    assert registry.instruction_clauses_for_role("sol_parent")[-1].text == (
+        "Use the role-specific contract."
+    )
 
 
 def test_registry_rejects_unknown_profile_field(workspace: Path) -> None:
@@ -161,6 +169,7 @@ def test_canonical_generator_and_readback(workspace: Path, capsys: pytest.Captur
     role_text = (workspace / ".codex" / "agents" / "sol_parent.toml").read_text(encoding="utf-8")
     assert "@dependency-start" in role_text
     assert 'model = "model-sol"' in role_text
+    assert "Use the role-specific contract." in role_text
     projection = json.loads((workspace / "agents" / "agents_config.json").read_text(encoding="utf-8"))
     assert projection["roles"][0]["projection_digest"]
     assert main(["--root", str(workspace), "--check-role-views"]) == 0

@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 64d335a326c24ae4f0cf73c9ef7ef44738b318ec84a4a72c0ec9e47163c61eeb
+# source canonical digest: e16b0021fde54dccd820ef6a155ff994938d8f87433864208c14d3c98b1b3386
 
 name = "experiment_runner"
 description = "Execution-only agent for running bounded experiments and summarizing logs."

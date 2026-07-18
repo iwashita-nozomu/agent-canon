@@ -42,6 +42,7 @@ _ROOT_FIELDS = {
     "registry_version",
     "role_profile_bindings",
     "role_sandbox_bindings",
+    "role_instruction_templates",
     "standalone_role_metadata",
     "model_profiles",
 }
@@ -316,6 +317,7 @@ class ModelProfileRegistry:
     model_profiles: tuple[ModelProfile, ...]
     role_profile_bindings: Mapping[str, str]
     role_sandbox_bindings: Mapping[str, str]
+    role_instruction_templates: Mapping[str, tuple[RoleInstructionClause, ...]]
     standalone_role_metadata: Mapping[str, tuple[str, str, str]]
 
     def by_profile(self, profile_id: str) -> ModelProfile:
@@ -330,6 +332,44 @@ class ModelProfileRegistry:
         except KeyError as exc:
             raise ModelProfileRegistryError(f"role_profile:{role_id}:not_found") from exc
         return self.by_profile(profile_id)
+
+    def instruction_clauses_for_role(
+        self, role_id: str, profile_id: str | None = None
+    ) -> tuple[RoleInstructionClause, ...]:
+        """Return one closed ordered profile-plus-role instruction projection."""
+        profile = self.profile_for_role(role_id)
+        if profile_id is not None and profile.id != profile_id:
+            raise ModelProfileRegistryError(
+                f"role_profile:{role_id}:profile_mismatch:{profile_id}"
+            )
+        clauses = (
+            *profile.role_instruction_template.clauses,
+            *self.role_instruction_templates.get(role_id, ()),
+        )
+        clause_ids = [clause.clause_id for clause in clauses]
+        if len(clause_ids) != len(set(clause_ids)):
+            raise ModelProfileRegistryError(f"role_instruction:{role_id}:duplicate")
+        return tuple(sorted(clauses, key=lambda value: (value.priority, value.clause_id)))
+
+    def projection_digest_for_role(self, role_id: str, profile_id: str) -> str:
+        """Bind generated views and capsules to profile and role-specific clauses."""
+        profile = self.profile_for_role(role_id)
+        clauses = self.instruction_clauses_for_role(role_id, profile_id)
+        return _stable_digest(
+            {
+                "profile_id": profile.id,
+                "profile_projection_digest": profile.projection_digest,
+                "role_id": role_id,
+                "role_instructions": [
+                    {
+                        "id": clause.clause_id,
+                        "text": clause.text,
+                        "priority": clause.priority,
+                    }
+                    for clause in clauses
+                ],
+            }
+        )
 
 
 def _read_toml_file(path: Path) -> Mapping[str, Any]:
@@ -378,6 +418,51 @@ def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProf
         if sandbox not in {"read-only", "workspace-write"}:
             raise ModelProfileRegistryError(f"role_sandbox_bindings.{role_id}:invalid")
         sandboxes[str(role_id)] = sandbox
+    raw_role_templates = data["role_instruction_templates"]
+    if not isinstance(raw_role_templates, Mapping):
+        raise ModelProfileRegistryError("role_instruction_templates:must_be_mapping")
+    unknown_role_templates = sorted(set(raw_role_templates) - set(bindings))
+    if unknown_role_templates:
+        raise ModelProfileRegistryError(
+            "role_instruction_templates:unknown_roles:"
+            + ",".join(str(role_id) for role_id in unknown_role_templates)
+        )
+    role_templates: dict[str, tuple[RoleInstructionClause, ...]] = {}
+    for role_id, raw_clauses in raw_role_templates.items():
+        role = _text(role_id, "role_instruction_templates.role_id")
+        if not isinstance(raw_clauses, list) or not raw_clauses:
+            raise ModelProfileRegistryError(
+                f"role_instruction_templates.{role}:must_be_nonempty_list"
+            )
+        clauses: list[RoleInstructionClause] = []
+        seen_clauses: set[str] = set()
+        for clause_index, raw_clause in enumerate(raw_clauses):
+            clause = _closed_mapping(
+                raw_clause,
+                fields=_CLAUSE_FIELDS,
+                label=f"role_instruction_templates.{role}[{clause_index}]",
+            )
+            clause_id = _text(clause["id"], "role_instruction.id")
+            if clause_id in seen_clauses:
+                raise ModelProfileRegistryError(
+                    f"role_instruction:{role}:{clause_id}:duplicate"
+                )
+            seen_clauses.add(clause_id)
+            priority = clause["priority"]
+            if not isinstance(priority, int):
+                raise ModelProfileRegistryError(
+                    f"role_instruction:{role}:{clause_id}:priority_must_be_int"
+                )
+            clauses.append(
+                RoleInstructionClause(
+                    clause_id,
+                    _text(clause["text"], "role_instruction.text"),
+                    priority,
+                )
+            )
+        role_templates[role] = tuple(
+            sorted(clauses, key=lambda value: (value.priority, value.clause_id))
+        )
     raw_standalone = data["standalone_role_metadata"]
     if not isinstance(raw_standalone, Mapping):
         raise ModelProfileRegistryError("standalone_role_metadata:must_be_mapping")
@@ -481,15 +566,19 @@ def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProf
     unknown_profiles = sorted(set(bindings.values()) - profile_ids)
     if unknown_profiles:
         raise ModelProfileRegistryError(f"role_profile_bindings:unknown_profiles:{','.join(unknown_profiles)}")
-    return ModelProfileRegistry(
+    registry = ModelProfileRegistry(
         schema_id=SCHEMA_IDS["registry"],
         registry_id=_text(data["registry_id"], "registry_id"),
         registry_version=version,
         model_profiles=tuple(profiles),
         role_profile_bindings=bindings,
         role_sandbox_bindings=sandboxes,
+        role_instruction_templates=role_templates,
         standalone_role_metadata=standalone,
     )
+    for role_id in role_templates:
+        registry.instruction_clauses_for_role(role_id)
+    return registry
 
 
 def _context_block(context: tuple[ContextItem, ...]) -> str:
@@ -500,7 +589,11 @@ def materialize_prompt_capsule(
     request: PromptMaterializationRequest,
     registry: ModelProfileRegistry,
 ) -> MaterializedPromptCapsule:
-    profile = registry.by_profile(request.profile_id)
+    profile = registry.profile_for_role(request.role_id)
+    if profile.id != request.profile_id:
+        raise ModelProfileRegistryError(
+            f"prompt_request:role_profile_mismatch:{request.role_id}:{request.profile_id}"
+        )
     if not request.role_id or not request.objective.strip():
         raise ModelProfileRegistryError("prompt_request:role_and_objective_required")
     keys = [item.key for item in request.context]
@@ -516,7 +609,13 @@ def materialize_prompt_capsule(
         raise ModelProfileRegistryError(f"prompt_context:forbidden:{','.join(forbidden)}")
     if missing:
         raise ModelProfileRegistryError(f"prompt_context:missing:{','.join(missing)}")
-    clauses = " ".join(clause.text for clause in profile.role_instruction_template.clauses)
+    role_clauses = registry.instruction_clauses_for_role(
+        request.role_id, request.profile_id
+    )
+    clauses = " ".join(clause.text for clause in role_clauses)
+    projection_digest = registry.projection_digest_for_role(
+        request.role_id, request.profile_id
+    )
     base_prompt = profile.role_template.format(
         role_id=request.role_id,
         model_alias=profile.model_alias,
@@ -532,7 +631,7 @@ def materialize_prompt_capsule(
     materialization_id = _stable_digest(
         {
             "profile_id": profile.id,
-            "projection_digest": profile.projection_digest,
+            "projection_digest": projection_digest,
             "role_id": request.role_id,
             "context": [(item.key, item.value) for item in request.context],
             "objective": request.objective,
@@ -546,7 +645,7 @@ def materialize_prompt_capsule(
         context=request.context,
         materialization_id=materialization_id,
         return_schema_id=profile.return_schema_id,
-        projection_digest=profile.projection_digest,
+        projection_digest=projection_digest,
     )
 
 
@@ -694,7 +793,8 @@ def generate_role_views(
     for role_id in sorted(expected_roles):
         profile = registry.profile_for_role(role_id)
         logical_role, contract_ref, sandbox = metadata[role_id]
-        clauses = " ".join(clause.text for clause in profile.role_instruction_template.clauses)
+        role_clauses = registry.instruction_clauses_for_role(role_id, profile.id)
+        clauses = " ".join(clause.text for clause in role_clauses)
         instructions = profile.role_template.format(
             role_id=role_id,
             model_alias=profile.model_alias,
@@ -720,7 +820,9 @@ def generate_role_views(
                 return_schema_id=profile.return_schema_id,
                 checkpoint_policy=profile.checkpoint_policy,
                 continuation_policy=profile.continuation_policy,
-                source_canonical_digest=profile.projection_digest,
+                source_canonical_digest=registry.projection_digest_for_role(
+                    role_id, profile.id
+                ),
                 logical_role_id=logical_role,
                 role_contract_ref=contract_ref,
                 capsule_schema_id=profile.prompt_capsule_schema.schema_id,
