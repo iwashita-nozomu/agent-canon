@@ -842,7 +842,7 @@ def compute_t14_packet_digest(packet_path: Path) -> str:
     return f"sha256:{digest}"
 
 
-def _t14_parse_value(lines: list[str], field: str) -> str:
+def _t14_parse_value(lines: str, field: str) -> str:
     """Parse one ordinary ``key=value`` field."""
     if lines.count("=") != 1:
         raise SkillEvaluatorReportParseError("t14-report-lexical-value")
