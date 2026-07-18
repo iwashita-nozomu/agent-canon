@@ -2,11 +2,10 @@
 # contract configuration
 # responsibility Defines machine-readable AgentCanon development environment expectations.
 # upstream design CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
+# upstream design documents/gpu-admission-r5-source-packet.md exact shared runtime artifact identity
 # upstream design documents/rust-agent-tool-migration.md Rust tool migration policy
 # upstream implementation .devcontainer/post-create.sh installs shared development tooling
-# downstream implementation tools/install_llama_cpp.sh installs local LLM llama.cpp tooling
 # downstream implementation tools/rebuild_agent_tools.sh rebuilds compiled AgentCanon tools
-# downstream implementation rust/agent-canon/src/local_llm.rs implements the local LLM CLI entrypoint
 # downstream implementation rust/agent-canon/src/structured_analysis.rs implements structured-analysis cache build tooling
 # downstream implementation tools/agent_tools/prose_reasoning_graph.py creates prose graph DBs under user-home cache by default
 # @dependency-end
@@ -51,27 +50,9 @@ validation_commands = [
   "agent-canon --version",
   "agent-canon rust-migration-audit --root .",
   "agent-canon rust-migration-plan --root . --limit 12",
-  "agent-canon local-llm --help",
-  "agent-canon local-llm classify-responsibility --root . --print-prompt rust/agent-canon/src/local_llm.rs",
   "agent-canon semantic-index --help",
   "agent-canon structured-analysis build --root . --profile manual --out-dir ${TMPDIR:-/tmp}/agent-canon-structured-analysis-smoke",
 ]
-
-[compiled_tools.llama_cpp]
-owner = "agent-canon"
-source_repository = "https://github.com/ggml-org/llama.cpp.git"
-source_ref_env = "AGENT_CANON_LLAMA_CPP_REF"
-source_ref_default = "master"
-source_checkout = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/src/llama.cpp"
-build_dir = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/build/llama.cpp"
-cli_binary = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-cli"
-server_binary = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server"
-post_create_command = "bash tools/install_llama_cpp.sh --allow-fetch"
-canon_update_command = "bash tools/install_llama_cpp.sh --skip-missing-source --force"
-default_model_selector = "ggml-org/SmolLM3-3B-GGUF:Q4_K_M"
-model_fetch_policy = "lazy llama.cpp Hugging Face cache; never commit model weights"
-accelerator_policy = "cpu_only"
-cuda_env_policy = "AGENT_CANON_LLAMA_CPP_CUDA is compatibility-only; cuda/auto requests are ignored and llama.cpp is built CPU-only; accelerator-enabling CMake extras are rejected"
 
 [json_cli_tools]
 owner = "agent-canon"
@@ -86,21 +67,29 @@ post_create_validation_commands = [
 ]
 dockerfile_policy = "forbidden for agent-only JSON inspection helpers; use shared post-create"
 
-[local_llm]
-owner = "agent-canon"
-install_surface = ".devcontainer/post-create.sh"
-tools_home = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}"
-llama_cli = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-cli"
-llama_server = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server"
-default_model = "ggml-org/SmolLM3-3B-GGUF:Q4_K_M"
-accelerator_policy = "cpu_only"
-runtime_env_policy = "local LLM subprocesses hide CUDA, NVIDIA container, HIP, and ROCr devices; installer rejects accelerator-enabling CMake extras"
-scope = "single-file responsibility analysis only"
-primary_cli = "agent-canon local-llm classify-responsibility"
-search_cli = "agent-canon local-llm search"
-index_cli = "agent-canon local-llm build-index"
-eval_cli = "agent-canon local-llm eval"
-compatibility_python_entrypoint = "tools/agent_tools/file_responsibility_llm.py"
+
+[container_local_runtime]
+owner = "ExecutionResourcePlan and environment owner"
+runtime_root = "/var/lib/agent-canon/runtime"
+source_projection_root = "/workspace/reports/agents/<run-id>/runtime"
+tool_availability_projection = "tool-availability.json"
+environment_certificate = "ExecutionResourcePlan.EnvironmentCertificate/v1"
+host_codex_home_mount = "forbidden"
+tree_capability = "required; cataloged in EnvironmentCertificate"
+successful_completion_contract = "post-create publishes cataloged tools; plan readback certifies availability before ExperimentRunner execute"
+runtime_route = "MANAGED_CONTAINER"
+shared_runtime_source = "/var/lib/agent-canon/runtime"
+runtime_group = "agent-canon-runtime"
+runtime_directory_mode = "02770"
+runtime_file_mode = "0660"
+runtime_umask = "0007"
+local_flock_filesystems = ["btrfs", "ext4", "xfs"]
+provision_receipt = "/var/lib/agent-canon/runtime/shared-runtime-provision.json"
+readback_receipt = "/var/lib/agent-canon/runtime/shared-runtime-readback.json"
+compose_user = "${LOCAL_UID}:${LOCAL_GID}"
+compose_group_add = "${AGENT_CANON_RUNTIME_GID}"
+compose_bind_source = "/var/lib/agent-canon/runtime"
+compose_bind_target = "/var/lib/agent-canon/runtime"
 
 [structured_analysis_cache]
 owner = "agent-canon"

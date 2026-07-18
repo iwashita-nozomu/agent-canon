@@ -51,6 +51,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
+EXECUTION_RESOURCE_PLAN_PROJECTION_GUARD = (
+    PROJECT_ROOT / ".codex" / "hooks" / "execution_resource_plan_projection_guard.py"
+)
 PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.py"
 GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
 OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_guard.py"
@@ -564,9 +567,10 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(
             post_tool_scripts,
             [
+                "task_authority_schema_guard.py",
+                "execution_resource_plan_projection_guard.py",
                 "skill_usage_logger.py",
                 "reference_capture_guard.py",
-                "task_authority_schema_guard.py",
                 "role_write_policy_guard.py",
                 "oop_readability_guard.py",
                 "module_boundary_guard.py",
@@ -603,6 +607,182 @@ class CodexHooksTest(unittest.TestCase):
                 "runtime_log_auto_sync.py",
             ],
         )
+
+    def test_execution_resource_plan_projection_guard_dispatch(self) -> None:
+        """The guard accepts only the normalized six-field input and exact projection."""
+        run_id = "r5-hook"
+        projection = {
+            "admission": None,
+            "completion_coverage_path": (
+                f"reports/agents/{run_id}/runtime/completion_coverage.json"
+            ),
+            "error": None,
+            "exit_code": 0,
+            "plan_fingerprint": "a" * 64,
+            "plan_path": f"reports/agents/{run_id}/runtime/execution_resource_plan.json",
+            "projection": "post_tool_use",
+            "run_id": run_id,
+            "schema_version": "execution-resource-plan/v1",
+        }
+        projection_stdout = (
+            json.dumps(projection, sort_keys=True, separators=(",", ":")) + "\n"
+        )
+        tool_input = {"command": "python3 experiments/demo_topic/run.py"}
+        normalized = {
+            "hook_event_name": "PostToolUse",
+            "schema_version": "agent-canon-post-tool-use-input/v1",
+            "tool_input_fingerprint": hashlib.sha256(
+                json.dumps(
+                    tool_input,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest(),
+            "tool_name": "Bash",
+            "tool_input": tool_input,
+            "tool_response": {
+                "exit_code": 0,
+                "stderr": "",
+                "stdout": projection_stdout,
+            },
+        }
+        accepted = subprocess.run(
+            [sys.executable, str(EXECUTION_RESOURCE_PLAN_PROJECTION_GUARD)],
+            input=json.dumps(normalized),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        wrapper = cast("dict[str, object]", json.loads(accepted.stdout))
+        hook_output = cast("dict[str, object]", wrapper["hookSpecificOutput"])
+        self.assertEqual(wrapper["schema"], "agent-canon.posttooluse-stop.v1")
+        self.assertEqual(hook_output["hookEventName"], "PostToolUse")
+        self.assertEqual(hook_output["additionalContext"], projection_stdout)
+
+        rejected_input = {**normalized, "unexpected": True}
+        rejected = subprocess.run(
+            [sys.executable, str(EXECUTION_RESOURCE_PLAN_PROJECTION_GUARD)],
+            input=json.dumps(rejected_input),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(rejected.stdout, "")
+        self.assertIn("fields are not exact", rejected.stderr)
+
+    def test_post_tool_projection_dispatch(self) -> None:
+        """Only the projection child receives canonical normalization and owns stdout."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            payload_dir = temp_root / "payloads"
+            hook_dir.mkdir()
+            payload_dir.mkdir()
+            projection_script = "execution_resource_plan_projection_guard.py"
+            child_source = "\n".join(
+                [
+                    "#!/usr/bin/env python3",
+                    "import os",
+                    "import sys",
+                    "from pathlib import Path",
+                    "script_name = Path(__file__).name",
+                    "payload = sys.stdin.buffer.read()",
+                    "(Path(os.environ['HOOK_PAYLOAD_DIR']) / script_name).write_bytes(payload)",
+                    f"if script_name == {projection_script!r}:",
+                    "    sys.stdout.write(os.environ['PROJECTION_WRAPPER'])",
+                    "",
+                ]
+            )
+            for script_name in self._dispatcher_scripts("PostToolUse"):
+                (hook_dir / script_name).write_text(child_source, encoding="utf-8")
+            projection_wrapper = (
+                json.dumps(
+                    {
+                        "schema": "agent-canon.posttooluse-stop.v1",
+                        "hookSpecificOutput": {
+                            "hookEventName": "PostToolUse",
+                            "additionalContext": "projection\n",
+                        },
+                    },
+                    sort_keys=True,
+                )
+                + "\n"
+            )
+            raw_object = {
+                "hookEventName": "PostToolUse",
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": "python3 experiments/demo_topic/run.py",
+                },
+                "tool_response": {
+                    "exit_code": 0,
+                    "stderr": "",
+                    "stdout": "projection\n",
+                },
+            }
+            raw_payload = json.dumps(raw_object, sort_keys=True).encode("utf-8")
+            environment = {
+                **os.environ,
+                "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                "HOOK_PAYLOAD_DIR": str(payload_dir),
+                "PROJECTION_WRAPPER": projection_wrapper,
+            }
+            accepted = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+                cwd=temp_root,
+                input=raw_payload,
+                check=True,
+                capture_output=True,
+                env=environment,
+            )
+            normalized = json.loads(
+                (payload_dir / projection_script).read_text(encoding="utf-8")
+            )
+            authority_payload = (
+                payload_dir / "task_authority_schema_guard.py"
+            ).read_bytes()
+            self.assertEqual(accepted.stdout.decode("utf-8"), projection_wrapper)
+            self.assertEqual(
+                set(normalized),
+                {
+                    "hook_event_name",
+                    "schema_version",
+                    "tool_input_fingerprint",
+                    "tool_name",
+                    "tool_input",
+                    "tool_response",
+                },
+            )
+            self.assertEqual(normalized["hook_event_name"], "PostToolUse")
+            self.assertEqual(
+                normalized["schema_version"],
+                "agent-canon-post-tool-use-input/v1",
+            )
+            self.assertEqual(
+                normalized["tool_input_fingerprint"],
+                hashlib.sha256(
+                    json.dumps(
+                        raw_object["tool_input"],
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                ).hexdigest(),
+            )
+            self.assertEqual(authority_payload, raw_payload)
+
+            (payload_dir / projection_script).unlink()
+            rejected_object = {**raw_object, "unexpected": True}
+            rejected = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+                cwd=temp_root,
+                input=json.dumps(rejected_object).encode("utf-8"),
+                check=True,
+                capture_output=True,
+                env=environment,
+            )
+            self.assertEqual(rejected.stdout, b"")
+            self.assertFalse((payload_dir / projection_script).exists())
+            self.assertIn(b"raw PostToolUse keys are not exact", rejected.stderr)
 
     def test_log_archive_mount_warning_is_non_blocking_when_missing(self) -> None:
         """Missing log archive mount should warn without blocking the hook chain."""

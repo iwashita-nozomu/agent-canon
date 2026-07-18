@@ -22,7 +22,7 @@ logic should remain in Python, and how the migration is validated. Read Goals
 and DevContainer Setup first, then Runtime Boundary, Canonical Layout, Migration
 Order, and Sequential Migration Policy before changing tool implementations.
 The remaining sections list completed migrations, first targets, Python-only
-surfaces, audit and plan commands, MCP/local-LLM Rust surfaces, and validation.
+surfaces, audit and plan commands, MCP surfaces, deterministic search, and validation.
 
 ## Goals
 
@@ -55,21 +55,9 @@ with `/usr/local/bin/agent-canon` as a compatibility symlink. Older containers
 may still have `/opt/agent-canon/bin/agent-canon`; new post-create runs use
 `~/.tools` for compiled agent-tool binaries.
 
-llama.cpp follows the same compiled-tool cache rule:
-
-```text
-${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-cli
-${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server
-```
-
-The default local LLM model selector is
-`ggml-org/SmolLM3-3B-GGUF:Q4_K_M`, used only by
-`agent-canon local-llm classify-responsibility` for single-file advisory
-responsibility review. `tools/agent_tools/file_responsibility_llm.py` is a
-Python compatibility helper for eval and index internals, not the primary
-operator entrypoint. Post-create fetches and builds llama.cpp through
-`tools/install_llama_cpp.sh`; AgentCanon update/rebuild paths reuse the same
-installer and rebuild an existing local llama.cpp checkout after pin updates.
+Repository search uses the deterministic Python `search.py` / `search_index.py`
+surfaces and the Rust `semantic-index` command. No model server, installer,
+model cache, or compatibility dispatch is part of the compiled-tool cache.
 
 After the AgentCanon CLI is built, DevContainer post-create also runs
 `agent-canon structured-analysis build --root <workspace> --profile devcontainer`
@@ -90,9 +78,6 @@ In a template or derived repository, the normal adoption path is:
    `tools/rebuild_agent_tools.sh` after the AgentCanon pin is updated. If the
    host has no Rust toolchain, rerun the same target inside the DevContainer or
    recreate the DevContainer so `.devcontainer/post-create.sh` runs again.
-   If llama.cpp was already installed under
-   `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/src/llama.cpp`, the same rebuild
-   path also recompiles `llama-cli` and `llama-server`.
 1. Use `agent-canon rust-migration-audit --root vendor/agent-canon` to confirm
    the Rust foundation is present.
 1. Use `agent-canon rust-migration-plan --root vendor/agent-canon` before
@@ -255,28 +240,22 @@ It reports:
 
 ## MCP Preflight Rust Tools
 
-## Local LLM Rust CLI
+## Deterministic Search Surfaces
 
-Local LLM responsibility review is now a Rust CLI command:
-
-```bash
-agent-canon local-llm classify-responsibility --print-prompt rust/agent-canon/src/local_llm.rs
-```
-
-The command owns the single-file responsibility prompt boundary and emits
-`FILE_RESP_LLM_*` machine-readable fields. Search, index, and eval subcommands
-are routed through the same CLI surface while their current Python engines
-remain the compatibility implementation:
+Purpose-based repository search remains an explicit deterministic tool surface:
 
 ```bash
-agent-canon local-llm search --purpose "find responsibility scope tooling"
-agent-canon local-llm build-index
-agent-canon local-llm eval
+python3 tools/agent_tools/search_index.py build --root .
+python3 tools/agent_tools/search.py \
+  --purpose "find responsibility scope tooling" \
+  --providers text,semantic,vector,tool,header-deps,code-deps \
+  --format json
 ```
 
-Do not add a second local LLM public entrypoint for responsibility analysis.
-Port the remaining Python engines only when their tests, catalog row, docs, and
-log-surface inventory are updated in the same change.
+The Rust `semantic-index` command owns SQLite-backed vector evidence. The
+Python coordinator combines deterministic cards, exact text, TF-IDF, tool
+catalog, dependency-header, and Python call facts. Neither surface is edit or
+review authority; ownership and dependency evidence remain separate gates.
 
 ## Validation
 
@@ -286,8 +265,8 @@ cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D war
 cargo test --manifest-path rust/agent-canon/Cargo.toml
 agent-canon rust-migration-audit --root .
 agent-canon rust-migration-plan --root .
-agent-canon local-llm --help
-agent-canon local-llm classify-responsibility --root . --print-prompt rust/agent-canon/src/local_llm.rs
+python3 tools/agent_tools/search.py --help
+python3 tools/agent_tools/search_index.py --help
 python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
 python3 tools/ci/container_config.py

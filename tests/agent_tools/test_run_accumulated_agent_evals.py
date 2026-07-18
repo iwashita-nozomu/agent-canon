@@ -49,7 +49,6 @@ class RunAccumulatedAgentEvalsTest(unittest.TestCase):
             {
                 "codex-agent-role",
                 "skill-workflow-prompt",
-                "local-llm-responsibility",
                 "workflow-selection",
                 "report-quality",
             },

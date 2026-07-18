@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents Shared Runtime Surfaces for this repository.
 downstream design ./shared-runtime-surfaces.toml machine-readable surface manifest
+downstream design ./gpu-admission-r5-source-packet.md exact shared runtime identity contract
 downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 downstream implementation ../tools/agent_tools/surface_manifest.py parses the surface manifest
 downstream implementation ../tools/sync_agent_canon.sh enforces root-view synchronization
@@ -134,6 +135,14 @@ scripts, `devcontainer.json`, post-create setup, and attach status reporting are
 edited in AgentCanon. The devcontainer consumes repo-local `docker/Dockerfile`,
 `docker/packs/default.toml`, and `docker/install_python_dependencies.sh`; it
 does not make `docker/` AgentCanon-owned.
+
+The whole `.devcontainer/` symlink is also the single shared owner surface for
+GPU admission runtime identity. Its bootstrap, Compose generator, post-create,
+finalize, and post-attach scripts must stay together so parent repositories
+cannot replace one identity stage independently. The exact receipt paths and
+parser/writer ownership are defined by
+`documents/gpu-admission-r5-source-packet.md` and
+`agent-canon-environment.toml`.
 
 `.vscode/` is also a shared AgentCanon runtime ergonomics surface. It owns
 workspace settings, recommended extensions, and VS Code task entrypoints that

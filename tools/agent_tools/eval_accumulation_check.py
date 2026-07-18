@@ -50,9 +50,6 @@ HOOK_REQUIRED_FIELDS = (
 SKILL_REPORT_RE = re.compile(
     r"^skill-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)-[a-z0-9-]+(?:-[a-z0-9-]+)*\.md$"
 )
-LOCAL_LLM_REPORT_RE = re.compile(
-    r"^local-llm-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail|skip)\.md$"
-)
 WORKFLOW_SELECTION_REPORT_RE = re.compile(
     r"^workflow-selection-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$"
 )
@@ -430,7 +427,6 @@ def render_json(report: EvalAccumulationReport) -> str:
             "hook_namespace_debt": report.hook_legacy_missing_namespace,
             "eval_report_counts": report.eval_report_counts,
             "skill_reports": eval_report_count(report, "skill-workflow-prompt"),
-            "local_llm_reports": eval_report_count(report, "local-llm-responsibility"),
             "workflow_selection_reports": eval_report_count(report, "workflow-selection"),
             "report_quality_reports": eval_report_count(report, "report-quality"),
             "codex_agent_role_reports": eval_report_count(report, "codex-agent-role"),
@@ -475,7 +471,6 @@ def compact_summary(report: EvalAccumulationReport) -> dict[str, object]:
         "hook_namespace_debt": report.hook_legacy_missing_namespace,
         "eval_report_counts": report.eval_report_counts,
         "skill_reports": eval_report_count(report, "skill-workflow-prompt"),
-        "local_llm_reports": eval_report_count(report, "local-llm-responsibility"),
         "workflow_selection_reports": eval_report_count(report, "workflow-selection"),
         "report_quality_reports": eval_report_count(report, "report-quality"),
         "codex_agent_role_reports": eval_report_count(report, "codex-agent-role"),
@@ -520,8 +515,6 @@ def render_text(
             f"{report.hook_legacy_missing_namespace}",
             f"EVAL_ACCUMULATION_HOOK_NAMESPACE_DEBT={report.hook_legacy_missing_namespace}",
             f"EVAL_ACCUMULATION_SKILL_REPORTS={eval_report_count(report, 'skill-workflow-prompt')}",
-            "EVAL_ACCUMULATION_LOCAL_LLM_REPORTS="
-            f"{eval_report_count(report, 'local-llm-responsibility')}",
             "EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS="
             f"{eval_report_count(report, 'workflow-selection')}",
             f"EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS={eval_report_count(report, 'report-quality')}",

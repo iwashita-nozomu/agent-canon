@@ -241,7 +241,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "AGENT_RUNTIME_DASHBOARD_HOOK_FILES=3",
             "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=6",
             "skill-workflow-prompt",
-            "local-llm-responsibility",
             "workflow-selection",
             "test-container",
             "environment-maintenance",
@@ -657,14 +656,13 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         archive = mounted_log_archive_root(root)
         hook_dir = archive / "hook-runs" / repo_log_key(source) / "test-container"
         skill_dir = archive / "eval-results" / "skill-workflow-prompt"
-        local_llm_dir = archive / "eval-results" / "local-llm-responsibility"
         workflow_dir = archive / "eval-results" / "workflow-selection"
         evals_dir = root / "agents" / "evals"
         evals_dir.mkdir(parents=True)
         (evals_dir / "README.md").write_text("# Eval Fixture\n", encoding="utf-8")
-        self.create_fixture_dirs(root, hook_dir, skill_dir, local_llm_dir, workflow_dir)
+        self.create_fixture_dirs(root, hook_dir, skill_dir, workflow_dir)
         self.write_issue_memory_fixture(root)
-        self.write_eval_report_fixture(skill_dir, local_llm_dir, workflow_dir)
+        self.write_eval_report_fixture(skill_dir, workflow_dir)
         self.write_hook_fixture(hook_dir)
         self.write_workflow_monitor_fixture(root)
 
@@ -673,11 +671,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         root: Path,
         hook_dir: Path,
         skill_dir: Path,
-        local_llm_dir: Path,
         workflow_dir: Path,
     ) -> None:
         """Create fixture directories."""
-        for directory in (hook_dir, skill_dir, local_llm_dir, workflow_dir):
+        for directory in (hook_dir, skill_dir, workflow_dir):
             directory.mkdir(parents=True)
         (root / "issues" / "open").mkdir(parents=True)
         (root / "issues" / "closed").mkdir(parents=True)
@@ -708,7 +705,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
     def write_eval_report_fixture(
         self,
         skill_dir: Path,
-        local_llm_dir: Path,
         workflow_dir: Path,
     ) -> None:
         """Write eval report fixture files."""
@@ -718,10 +714,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         )
         (skill_dir / "skill-eval-test-fail-md-style-check.md").write_text(
             "- used_skills: `md-style-check`\nEVAL_STATUS=fail\n",
-            encoding="utf-8",
-        )
-        (local_llm_dir / "local-llm-eval-20260517T010203040506Z-1234567890-pass.md").write_text(
-            "LOCAL_LLM_EVAL_STATUS=pass\n",
             encoding="utf-8",
         )
         (workflow_dir / "workflow-selection-eval-20260517T010203040506Z-1234567890-pass.md").write_text(

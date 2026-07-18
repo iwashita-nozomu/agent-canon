@@ -1,0 +1,3 @@
+GPU 0: Fixture A (UUID: GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
+  MIG 1g.5gb  Device  0: (UUID: MIG-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)
+  MIG 1g.5gb  Device  0: (UUID: MIG-cccccccccccccccccccccccccccccccc)

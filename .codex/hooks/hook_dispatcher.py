@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -76,6 +77,8 @@ CRITICAL_BLOCKING_CHILD_HOOKS = frozenset(
     }
 )
 OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
+POST_TOOL_USE_INPUT_SCHEMA = "agent-canon-post-tool-use-input/v1"
+PROJECTION_GUARD_SCRIPT = "execution_resource_plan_projection_guard.py"
 ADDITIONAL_CONTEXT_EVENTS = frozenset(
     {"UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"}
 )
@@ -223,11 +226,12 @@ EVENT_COMMANDS: dict[str, tuple[HookCommandSpec, ...]] = {
         ),
     ),
     "PostToolUse": (
+        HookCommandSpec("task_authority_schema_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec(PROJECTION_GUARD_SCRIPT, FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec(
             "reference_capture_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS
         ),
-        HookCommandSpec("task_authority_schema_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("role_write_policy_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("oop_readability_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("module_boundary_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
@@ -283,6 +287,85 @@ EVENT_ALIASES = {event.casefold(): event for event in EVENT_COMMANDS} | {
 def load_raw_payload() -> bytes:
     """Read the hook payload once so every child receives identical stdin."""
     return sys.stdin.buffer.read()
+
+
+def unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate keys while decoding a Hook payload."""
+    value: dict[str, object] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON key: {key}")
+        value[key] = item
+    return value
+
+
+def reject_json_constant(value: str) -> None:
+    """Reject non-finite JSON constants in normalized Hook input."""
+    raise ValueError(f"non-finite JSON constant: {value}")
+
+
+def canonical_json_bytes(value: object) -> bytes:
+    """Serialize one JSON value in the exact Hook canonical form."""
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Hook JSON value is not canonicalizable") from exc
+
+
+def _normalize_post_tool_use_input(raw_payload: bytes) -> bytes:
+    """Convert raw runtime keys to the exact six-field projection-guard input."""
+    try:
+        loaded = json.loads(
+            raw_payload.decode("utf-8"),
+            object_pairs_hook=unique_json_object,
+            parse_constant=reject_json_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("raw PostToolUse payload is not valid JSON") from exc
+    if not isinstance(loaded, dict) or set(loaded) != {
+        "hookEventName",
+        "tool_name",
+        "tool_input",
+        "tool_response",
+    }:
+        raise ValueError("raw PostToolUse keys are not exact")
+    if loaded["hookEventName"] != "PostToolUse":
+        raise ValueError("raw Hook event is not PostToolUse")
+    tool_name = loaded["tool_name"]
+    tool_input = loaded["tool_input"]
+    tool_response = loaded["tool_response"]
+    if not isinstance(tool_name, str) or not isinstance(tool_input, dict):
+        raise ValueError("raw PostToolUse tool fields have invalid types")
+    if not isinstance(tool_response, dict) or set(tool_response) != {
+        "exit_code",
+        "stderr",
+        "stdout",
+    }:
+        raise ValueError("raw PostToolUse response keys are not exact")
+    if (
+        isinstance(tool_response["exit_code"], bool)
+        or not isinstance(tool_response["exit_code"], int)
+        or not isinstance(tool_response["stderr"], str)
+        or not isinstance(tool_response["stdout"], str)
+    ):
+        raise ValueError("raw PostToolUse response fields have invalid types")
+    normalized = {
+        "hook_event_name": "PostToolUse",
+        "schema_version": POST_TOOL_USE_INPUT_SCHEMA,
+        "tool_input_fingerprint": hashlib.sha256(
+            canonical_json_bytes(tool_input)
+        ).hexdigest(),
+        "tool_name": tool_name,
+        "tool_input": tool_input,
+        "tool_response": tool_response,
+    }
+    return canonical_json_bytes(normalized) + b"\n"
 
 
 def json_payload(raw_payload: bytes) -> dict[str, object]:
@@ -667,7 +750,7 @@ def run_hook_command(
     hooks_dir: Path,
     env: dict[str, str],
 ) -> HookResult:
-    """Run one child hook script with the original payload."""
+    """Run one child hook script with its selected canonical payload."""
     script = hooks_dir / spec.script
     try:
         result = subprocess.run(
@@ -936,16 +1019,45 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
     child_env = child_hook_environment(payload)
     root = repo_root()
     hooks_dir = hook_directory()
-    results = [
-        run_hook_command(
-            spec,
-            raw_payload=raw_payload,
-            root=root,
-            hooks_dir=hooks_dir,
-            env=child_env,
+    normalized_projection_payload: bytes | None = None
+    if event == "PostToolUse":
+        try:
+            normalized_projection_payload = _normalize_post_tool_use_input(raw_payload)
+        except ValueError as exc:
+            print(f"hook_dispatcher: {exc}", file=sys.stderr)
+    results: list[HookResult] = []
+    for spec in EVENT_COMMANDS[event]:
+        if spec.script == PROJECTION_GUARD_SCRIPT:
+            if normalized_projection_payload is None:
+                continue
+            child_payload = normalized_projection_payload
+        else:
+            child_payload = raw_payload
+        results.append(
+            run_hook_command(
+                spec,
+                raw_payload=child_payload,
+                root=root,
+                hooks_dir=hooks_dir,
+                env=child_env,
+            )
         )
-        for spec in EVENT_COMMANDS[event]
-    ]
+    if event == "PostToolUse":
+        projection_result = next(
+            (
+                result
+                for result in results
+                if result.spec.script == PROJECTION_GUARD_SCRIPT
+            ),
+            None,
+        )
+        if (
+            projection_result is not None
+            and projection_result.returncode == 0
+            and projection_result.stdout
+        ):
+            sys.stdout.write(projection_result.stdout)
+        return 0
     critical_failure = next(
         (result for result in results if critical_child_invalid(result)), None
     )

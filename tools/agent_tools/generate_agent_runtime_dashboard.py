@@ -1100,7 +1100,6 @@ class RuntimeDashboardVisuals:
             f"  ReferenceCapture[\"Reference capture<br/>urls: {summary.reference_capture_breakdown.url_observations}<br/>missing: {summary.reference_capture_breakdown.missing_url_observations}\"]",
             f"  WorkflowEval[\"Workflow selection evals<br/>reports: {family_count(summary, 'workflow-selection')}\"]",
             f"  ReportEval[\"Report quality evals<br/>reports: {family_count(summary, 'report-quality')}\"]",
-            f"  LocalLLM[\"Local LLM evals<br/>reports: {family_count(summary, 'local-llm-responsibility')}\"]",
             f"  RoleEval[\"Codex role evals<br/>reports: {family_count(summary, 'codex-agent-role')}\"]",
             f"  Issues[\"Durable issues<br/>open: {len(summary.evidence.open_issues)}<br/>closed: {len(summary.evidence.closed_issues)}\"]",
             "  Dashboard[\"Runtime dashboard<br/>read-only view\"]",
@@ -1126,7 +1125,6 @@ class RuntimeDashboardVisuals:
             "  ReferenceCapture --> Guide",
             "  WorkflowEval --> Dashboard",
             "  ReportEval --> Dashboard",
-            "  LocalLLM --> Dashboard",
             "  RoleEval --> Dashboard",
             "  Issues --> Dashboard",
             "  Dashboard --> Reviewer",
@@ -1157,11 +1155,6 @@ class RuntimeDashboardVisuals:
                 "report quality eval",
                 "report-quality",
                 "repair report-writing skill or reader-facing report outputs",
-            ),
-            self.family_row(
-                "local LLM eval",
-                "local-llm-responsibility",
-                "repair single-file responsibility prompt or local model harness",
             ),
             self.family_row(
                 "Codex role eval",
@@ -1315,7 +1308,6 @@ class AgentRuntimeDashboard:
         reader = ResultFamilyReader(self.root, self.recent_cutoff_epoch)
         result_families = (
             reader.read_family("skill-workflow-prompt"),
-            reader.read_family("local-llm-responsibility"),
             reader.read_family("workflow-selection"),
             reader.read_family("report-quality"),
             reader.read_family("codex-agent-role"),
@@ -2428,7 +2420,6 @@ def evidence_location_lines(root: Path) -> list[str]:
         "- agent_report_archive_index: `.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl`",
         "- agent_report_archive_command: `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`",
         "- skill_prompt_eval_reports: `.agent-canon/log-archive/eval-results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
-        "- local_llm_eval_reports: `.agent-canon/log-archive/eval-results/local-llm-responsibility/<eval-run-id>-<status>.md`",
         "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
         "- report_quality_eval_reports: `.agent-canon/log-archive/eval-results/report-quality/<eval-run-id>-<status>.md`",
         "- durable_issues: `issues/open/AC-*.md` and `issues/closed/AC-*.md`",
@@ -3405,7 +3396,6 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_HOOK_FILES={len(summary.hook_files)}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES={summary.hook_entries}",
         f"AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_REPORTS={family_count(summary, 'skill-workflow-prompt')}",
-        f"AGENT_RUNTIME_DASHBOARD_LOCAL_LLM_REPORTS={family_count(summary, 'local-llm-responsibility')}",
         f"AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_REPORTS={family_count(summary, 'workflow-selection')}",
         f"AGENT_RUNTIME_DASHBOARD_REPORT_QUALITY_REPORTS={family_count(summary, 'report-quality')}",
         f"AGENT_RUNTIME_DASHBOARD_CODEX_AGENT_ROLE_REPORTS={family_count(summary, 'codex-agent-role')}",

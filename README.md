@@ -315,9 +315,9 @@ remote の正本:
 ```bash
 tools/bin/agent-canon semantic-index context-pack --root . \
   --query-file /tmp/query.txt --max-cells 12 --format text
-tools/bin/agent-canon local-llm search \
+python3 tools/agent_tools/search.py \
   --purpose "find owning responsibility and existing surface" \
-  --providers llm,tool,header-deps,code-deps,vector --format json
+  --providers text,semantic,tool,header-deps,code-deps,vector --format json
 tools/bin/agent-canon semantic-index thin-docs --root . --top-k 10 --format text
 ```
 

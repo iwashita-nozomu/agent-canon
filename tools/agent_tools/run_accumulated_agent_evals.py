@@ -11,7 +11,6 @@
 # upstream implementation ./evaluate_skill_workflow_prompts.py writes skill and workflow prompt eval reports
 # upstream implementation ./evaluate_workflow_selection.py writes workflow selection eval reports
 # upstream implementation ./evaluate_report_quality.py writes report quality eval reports
-# upstream implementation ./local_llm_eval.py writes local LLM responsibility eval reports
 # downstream implementation ../ci/check_agent_canon_pr.sh runs producers before accumulation validation
 # downstream implementation ../ci/run_all_checks.sh runs producers before accumulation validation
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs producers before accumulation validation
@@ -158,17 +157,6 @@ def build_producers(
             ),
         ),
         EvalProducer("skill-workflow-prompt", tuple(prompt_command)),
-        EvalProducer(
-            "local-llm-responsibility",
-            (
-                str(canon / "tools" / "bin" / "agent-canon"),
-                "local-llm",
-                "eval",
-                "--root",
-                str(root),
-                "--accumulate",
-            ),
-        ),
         EvalProducer(
             "workflow-selection",
             (

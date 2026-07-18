@@ -10,7 +10,7 @@
     "@dependency-end"
   ],
   "name": "${localWorkspaceFolderBasename}-devcontainer",
-  "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",
+  "initializeCommand": "bash .devcontainer/bootstrap-shared-runtime.sh && bash .devcontainer/generate-runtime-compose.sh",
   "dockerComposeFile": "docker-compose.generated.yml",
   "service": "workspace",
   "workspaceFolder": "/workspace",

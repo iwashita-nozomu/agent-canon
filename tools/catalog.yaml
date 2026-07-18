@@ -672,27 +672,6 @@ entries:
     tests:
       - tests/agent_tools/test_evaluate_report_quality.py
 
-  - id: agent-canon-local-llm
-    summary: Provides the Rust CLI for single-file responsibility review, implementation-surface routing, bounded-parallel prose IR extraction, local LLM search, index, and eval routing.
-    path: rust/agent-canon/src/local_llm.rs
-    family: root
-    role: runner
-    status: canonical
-    command: tools/bin/agent-canon local-llm route-implementation-surface --request <task>
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/local-llm-responsibility-analysis.md
-      - documents/search-coordination.md
-      - documents/rust-agent-tool-migration.md
-      - agent-canon-environment.toml
-    tests:
-      - rust/agent-canon/src/local_llm.rs
-
   - id: test-design-check
     summary: Runs Rust-native diagnostics for brittle, redundant, or under-specified test design before code changes.
     path: rust/agent-canon/src/test_design.rs
@@ -714,54 +693,13 @@ entries:
     tests:
       - rust/agent-canon/src/test_design.rs
 
-  - id: file-resp-llm
-    summary: Keeps the Python compatibility prompt helper for local LLM responsibility review internals.
-    path: tools/agent_tools/file_responsibility_llm.py
-    family: agent_tools
-    role: checker
-    status: compatibility_wrapper
-    audience: internal
-    placement: compatibility_wrapper
-    command: python3 tools/agent_tools/file_responsibility_llm.py --print-prompt <file>
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/local-llm-responsibility-analysis.md
-    tests:
-      - tests/agent_tools/test_file_responsibility_llm.py
-
-  - id: local-llm-eval
-    summary: Runs configurable prompt and optional model evals for single-file local LLM responsibility review.
-    path: tools/agent_tools/local_llm_eval.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: tools/bin/agent-canon local-llm eval --manifest evidence/agent-evals/local_llm_responsibility_eval.toml
-    writes: true
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/local-llm-responsibility-analysis.md
-      - evidence/agent-evals/README.md
-      - evidence/agent-evals/local_llm_responsibility_eval.toml
-      - documents/runtime-log-archive.md
-    tests:
-      - tests/agent_tools/test_local_llm_eval.py
-
   - id: agent-search
-    summary: Coordinates purpose-based search across text, LLM cards, vector search, tool catalog, dependency headers, and code facts.
+    summary: Coordinates purpose-based search across text, semantic cards, vector search, tool catalog, dependency headers, and code facts.
     path: tools/agent_tools/search.py
     family: agent_tools
     role: inventory
     status: canonical
-    command: tools/bin/agent-canon local-llm search --purpose "<goal>"
+    command: python3 tools/agent_tools/search.py --purpose "<goal>"
     writes: false
     default_wiring:
       ci: false
@@ -774,12 +712,12 @@ entries:
       - tests/agent_tools/test_search.py
 
   - id: search-index
-    summary: Builds repo-local ignored semantic cards for the coordinated LLM search provider.
+    summary: Builds repo-local ignored semantic cards for coordinated search.
     path: tools/agent_tools/search_index.py
     family: agent_tools
     role: inventory
     status: canonical
-    command: tools/bin/agent-canon local-llm build-index
+    command: python3 tools/agent_tools/search_index.py build
     writes: true
     default_wiring:
       ci: false
@@ -790,7 +728,7 @@ entries:
       - documents/search-coordination.md
       - .gitignore
     tests:
-      - tests/agent_tools/test_search_index.py
+      - tests/agent_tools/test_search.py
 
   - id: semantic-index
     summary: Builds ignored SQLite semantic-vector indexes, adds provider-scoped embeddings, and reports search, bounded context-pack, directory responsibility-tree coverage, merge, natural-relation, discourse-relation, thin-doc, provider-comparison, and Eval results.
@@ -1214,25 +1152,6 @@ entries:
       - documents/rust-agent-tool-migration.md
     tests:
       - tests/tools/test_update_agent_canon.py
-
-  - id: install-llama-cpp
-    summary: Builds llama.cpp under AGENT_CANON_TOOLS_HOME for local single-file responsibility analysis.
-    path: tools/install_llama_cpp.sh
-    family: root
-    role: runner
-    status: canonical
-    command: bash tools/install_llama_cpp.sh --allow-fetch
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/local-llm-responsibility-analysis.md
-      - documents/rust-agent-tool-migration.md
-    tests:
-      - tests/tools/test_install_llama_cpp.py
 
   - id: agent-canon-update-todos
     summary: Routes parent-repo agents through AgentCanon update TODOs after submodule pin updates.

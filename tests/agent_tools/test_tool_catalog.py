@@ -5,6 +5,7 @@
 # responsibility Tests structured AgentCanon tool catalog validation.
 # upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog
 # upstream design ../../tools/catalog.yaml structured tool catalog fixture
+# upstream design ../../documents/gpu-admission-r5-source-packet.md canonical managed GPU admission route
 # @dependency-end
 
 from __future__ import annotations
@@ -53,6 +54,36 @@ class CheckToolCatalogTest(unittest.TestCase):
             renderer["command"],
             "python3 tools/agent_tools/render_dependency_manifest_graph.py "
             "--root . --scope full --bundle-dir reports/dependency-graph --format json",
+        )
+
+    def test_gpu_admission_route(self) -> None:
+        """The catalog exposes only the canonical managed GPU admission entrypoint."""
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
+        )
+        managed = next(
+            entry
+            for entry in catalog["entries"]
+            if entry["id"] == "run-managed-experiment"
+        )
+
+        self.assertEqual(
+            managed["path"],
+            "tools/experiments/run_managed_experiment.py",
+        )
+        self.assertEqual(
+            managed["command"],
+            "python3 tools/experiments/run_managed_experiment.py",
+        )
+        self.assertIn(
+            "tests/tools/test_run_managed_experiment.py",
+            managed["tests"],
+        )
+        self.assertFalse(
+            any(
+                entry["path"] == "tools/experiments/execution_resource_plan.py"
+                for entry in catalog["entries"]
+            )
         )
 
     def test_stale_catalog_entry_fails(self) -> None:

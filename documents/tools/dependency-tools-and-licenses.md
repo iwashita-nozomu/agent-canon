@@ -84,7 +84,7 @@ table as stale and rerun the verification policy when any of these events occur:
 - AgentCanon starts distributing a compiled binary, container image, packaged
   archive, or bundled model artifact;
 - a PR changes `.devcontainer/post-create.sh`, `agent-canon-environment.toml`,
-  `tools/install_llama_cpp.sh`, `tools/rebuild_agent_tools.sh`, or
+  `tools/rebuild_agent_tools.sh`, or
   `rust/agent-canon/Cargo.toml`;
 - an upstream license, model card, distro package copyright file, or package
   metadata source is unavailable, inconsistent, or moved.
@@ -119,7 +119,7 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 
 | Tool | Purpose | AgentCanon Surface | License Status |
 | --- | --- | --- | --- |
-| `agent-canon` Rust CLI | docs check、local LLM route、semantic index、structured analysis などの統一 CLI。 | `rust/agent-canon/Cargo.toml`, `tools/bin/agent-canon` | local: Apache-2.0 |
+| `agent-canon` Rust CLI | docs check、semantic index、structured analysis などの統一 CLI。 | `rust/agent-canon/Cargo.toml`, `tools/bin/agent-canon` | local: Apache-2.0 |
 | Rust toolchain: `rustup`, `cargo`, `rustc`, `rustfmt`, `clippy`, `rust-analyzer` | AgentCanon Rust CLI の build、format、lint、editor support。 | `agent-canon-environment.toml`, `.devcontainer/post-create.sh` | upstream: Apache-2.0 OR MIT for official Rust projects; verify component repository |
 | `jq` | JSON / JSONL の compact extraction と CI evidence 整形。 | `agent-canon-environment.toml`, `.devcontainer/post-create.sh` | upstream: MIT for `jq`; docs are CC BY 3.0 |
 | Node.js | `npm` と Codex CLI install の runtime。 | `.devcontainer/post-create.sh` | upstream: MIT for Node.js core, with bundled third-party notices |
@@ -129,11 +129,9 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 | `gitleaks` | secret scanning。 | `.devcontainer/post-create.sh`, `tools/ci/scan_secrets.sh` | upstream: MIT |
 | `trufflehog` | secret discovery / verification。 | `.devcontainer/post-create.sh`, `tools/ci/scan_secrets.sh` | upstream: AGPL-3.0 |
 | `detect-secrets` | current tree / baseline 型の secret scanning。 | `.devcontainer/post-create.sh`, `tools/ci/scan_secrets.sh` | upstream: Apache-2.0 |
-| `llama.cpp`, `llama-cli`, `llama-server` | local LLM による single-file responsibility analysis。 | `tools/install_llama_cpp.sh`, `agent-canon-environment.toml` | upstream: MIT |
-| Default GGUF model: `ggml-org/SmolLM3-3B-GGUF` | AgentCanon local LLM の default model selector。 | `agent-canon-environment.toml` | model-card: apache-2.0 on Hugging Face, verify before model redistribution |
 | `git` | source checkout、submodule、branch / PR workflow。 | `.devcontainer/post-create.sh`, update tools | upstream: GPL-2.0 |
-| `cmake` | `llama.cpp` build。 | `tools/install_llama_cpp.sh` | upstream: BSD-3-Clause |
-| `curl` | installer、release asset、license source fetch。 | `.devcontainer/post-create.sh`, `tools/install_llama_cpp.sh` | upstream: curl license |
+| `cmake` | native tool build。 | `.devcontainer/post-create.sh` | upstream: BSD-3-Clause |
+| `curl` | installer、release asset、license source fetch。 | `.devcontainer/post-create.sh` | upstream: curl license |
 | `python3`, `python3-pip` | Python helper execution and `detect-secrets` install. | `.devcontainer/post-create.sh` | upstream: Python Software Foundation License for Python; package licenses vary |
 | `tar`, `xz-utils`, `ca-certificates`, `build-essential`, `pkg-config` | archive extraction, package bootstrap, native build support。 | `.devcontainer/post-create.sh` | distro: verify package copyright files |
 | TeX Live packages, `latexmk`, pdfLaTeX, XeLaTeX | academic-writing PDF / TeX rendering support。 | `.devcontainer/post-create.sh` | mixed free software; `latexmk` is GPL-2.0; verify TeX Live package notices |
@@ -188,8 +186,6 @@ a binary distribution or container image.
 - gitleaks license: <https://github.com/gitleaks/gitleaks/blob/master/LICENSE>
 - TruffleHog license: <https://github.com/trufflesecurity/trufflehog/blob/main/LICENSE>
 - detect-secrets license: <https://github.com/Yelp/detect-secrets/blob/master/LICENSE>
-- llama.cpp license: <https://github.com/ggml-org/llama.cpp/blob/master/LICENSE>
-- SmolLM3 GGUF model card: <https://huggingface.co/ggml-org/SmolLM3-3B-GGUF>
 - Git license: <https://git-scm.com/about>
 - CMake license: <https://cmake.org/licensing/>
 - curl license: <https://curl.se/docs/copyright.html>
