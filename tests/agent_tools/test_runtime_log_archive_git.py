@@ -318,6 +318,57 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             result_path=result_path,
         )
 
+    def producer_argv(self, fixture: RuntimeMaterializationFixture) -> list[str]:
+        """Return the exact public argv for one context producer invocation."""
+        return [
+            "--source-root",
+            str(fixture.source),
+            "--canon-root",
+            str(fixture.source),
+            "--archive-root",
+            str(fixture.context.archive_root),
+            "append-context-discovery",
+            "--run-id",
+            fixture.args.run_id,
+            "--agent-context-id",
+            fixture.context_id,
+            "--turn-id",
+            fixture.turn_id,
+        ]
+
+    def invoke_producer(
+        self, fixture: RuntimeMaterializationFixture
+    ) -> tuple[int, str, str]:
+        """Invoke the public context producer and capture its exact streams."""
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_CANON_CODEX_SESSION_ROOT": str(fixture.session_root)},
+                clear=False,
+            ),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = runtime_log_archive_git.main(self.producer_argv(fixture))
+        return result, stdout.getvalue(), stderr.getvalue()
+
+    def assert_producer_failure(
+        self,
+        fixture: RuntimeMaterializationFixture,
+        code: str,
+    ) -> None:
+        """Require one exact typed public context-producer failure."""
+        result, stdout, stderr = self.invoke_producer(fixture)
+        self.assertEqual(result, 1)
+        self.assertEqual(
+            stdout,
+            f"CONTEXT_DISCOVERY_ERROR_CODE={code}\n"
+            "CONTEXT_DISCOVERY_APPEND=fail\n",
+        )
+        self.assertEqual(stderr, "")
+
     def materializer_argv(self, fixture: RuntimeMaterializationFixture) -> list[str]:
         """Return the exact public argv for one fixture materialization."""
         return [
@@ -1309,6 +1360,126 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 )
             self.assertEqual(stderr.getvalue(), "")
             self.assertEqual(certificate.read_bytes(), first_bytes)
+
+    def test_context_discovery_producer_rejects_symlinked_rollout_outside_session_root(
+        self,
+    ) -> None:
+        """An outside-root JSONL reached through a symlink cannot be certified."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
+            certificate = next(
+                fixture.result_path.parent.glob("context_discovery.*.json")
+            )
+            certificate.unlink()
+            outside = Path(tmp_dir) / "outside" / fixture.rollout.name
+            outside.parent.mkdir()
+            outside.write_bytes(fixture.rollout.read_bytes())
+            fixture.rollout.unlink()
+            fixture.rollout.symlink_to(outside)
+
+            self.assert_producer_failure(fixture, "context_source_absent")
+            self.assertEqual(
+                tuple(fixture.result_path.parent.glob("context_discovery.*.json")),
+                (),
+            )
+
+    def test_context_discovery_producer_rejects_invalid_native_evidence_cardinality(
+        self,
+    ) -> None:
+        """C-04 rejects absent, duplicate, and malformed native evidence."""
+        cases = (
+            ("rollout_absent", "context_source_absent"),
+            ("rollout_ambiguous", "context_source_ambiguous"),
+            ("session_meta_absent", "context_source_absent"),
+            ("session_meta_duplicate", "context_source_ambiguous"),
+            ("task_complete_absent", "source_identity_mismatch"),
+            ("task_complete_duplicate", "context_source_ambiguous"),
+            ("malformed_structural_join", "source_identity_mismatch"),
+        )
+        for case, expected_code in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp_dir:
+                fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
+                certificate = next(
+                    fixture.result_path.parent.glob("context_discovery.*.json")
+                )
+                certificate.unlink()
+                if case == "rollout_absent":
+                    fixture.rollout.unlink()
+                elif case == "rollout_ambiguous":
+                    duplicate = fixture.rollout.with_name(
+                        "rollout-2026-07-17T12-00-01.123Z-"
+                        f"{fixture.context_id}.jsonl"
+                    )
+                    duplicate.write_bytes(fixture.rollout.read_bytes())
+                else:
+                    lines = fixture.rollout.read_bytes().splitlines(keepends=True)
+                    if case == "session_meta_absent":
+                        del lines[870]
+                    elif case == "session_meta_duplicate":
+                        lines.insert(871, lines[870])
+                    elif case == "task_complete_absent":
+                        del lines[871]
+                    elif case == "task_complete_duplicate":
+                        lines.append(lines[871])
+                    else:
+                        session_meta = json.loads(lines[870])
+                        session_meta["payload"]["source"]["subagent"]["thread_spawn"][
+                            "parent_thread_id"
+                        ] = "33333333-3333-4333-8333-333333333333"
+                        lines[870] = (
+                            json.dumps(session_meta, separators=(",", ":")) + "\n"
+                        ).encode("utf-8")
+                    fixture.rollout.write_bytes(b"".join(lines))
+
+                self.assert_producer_failure(fixture, expected_code)
+                self.assertEqual(
+                    tuple(fixture.result_path.parent.glob("context_discovery.*.json")),
+                    (),
+                )
+
+    def test_context_discovery_producer_no_replace_collision_and_failure(
+        self,
+    ) -> None:
+        """C-03 preserves existing bytes and fails before a replacement is visible."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            collision = self.make_valid_materialization_fixture(
+                Path(tmp_dir) / "collision"
+            )
+            collision_target = next(
+                collision.result_path.parent.glob("context_discovery.*.json")
+            )
+            conflicting_bytes = b"existing collision bytes\n"
+            collision_target.write_bytes(conflicting_bytes)
+
+            self.assert_producer_failure(collision, "context_record_collision")
+            self.assertEqual(collision_target.read_bytes(), conflicting_bytes)
+
+            publication_failure = self.make_valid_materialization_fixture(
+                Path(tmp_dir) / "publication-failure"
+            )
+            publication_target = next(
+                publication_failure.result_path.parent.glob(
+                    "context_discovery.*.json"
+                )
+            )
+            publication_target.unlink()
+            with patch.object(
+                runtime_log_archive_git,
+                "_renameat2_noreplace",
+                side_effect=OSError("forced publication failure"),
+            ):
+                self.assert_producer_failure(
+                    publication_failure, "context_publication_failure"
+                )
+            self.assertFalse(publication_target.exists())
+            self.assertEqual(
+                tuple(
+                    publication_failure.result_path.parent.glob(
+                        f".{publication_target.name}.*.tmp"
+                    )
+                ),
+                (),
+            )
 
     def test_materialize_runtime_event_requires_exactly_one_context_certificate(self) -> None:
         """The materializer rejects absent and ambiguous certificate handoffs."""

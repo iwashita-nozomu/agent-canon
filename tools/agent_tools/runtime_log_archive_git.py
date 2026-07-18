@@ -963,29 +963,53 @@ def _rollout_files(agent_context_id: str) -> tuple[Path, ...]:
     for root in _runtime_session_roots():
         try:
             years = sorted(
-                (path for path in root.iterdir() if path.is_dir() and RUNTIME_EVENT_YEAR.fullmatch(path.name)),
+                (
+                    path
+                    for path in root.iterdir()
+                    if not path.is_symlink()
+                    and path.is_dir()
+                    and RUNTIME_EVENT_YEAR.fullmatch(path.name)
+                ),
                 key=lambda path: path.name.encode("utf-8"),
             )
             for year in years:
                 months = sorted(
-                    (path for path in year.iterdir() if path.is_dir() and RUNTIME_EVENT_MONTH_DAY.fullmatch(path.name)),
+                    (
+                        path
+                        for path in year.iterdir()
+                        if not path.is_symlink()
+                        and path.is_dir()
+                        and RUNTIME_EVENT_MONTH_DAY.fullmatch(path.name)
+                    ),
                     key=lambda path: path.name.encode("utf-8"),
                 )
                 for month in months:
                     days = sorted(
-                        (path for path in month.iterdir() if path.is_dir() and RUNTIME_EVENT_MONTH_DAY.fullmatch(path.name)),
+                        (
+                            path
+                            for path in month.iterdir()
+                            if not path.is_symlink()
+                            and path.is_dir()
+                            and RUNTIME_EVENT_MONTH_DAY.fullmatch(path.name)
+                        ),
                         key=lambda path: path.name.encode("utf-8"),
                     )
                     for day in days:
                         for path in sorted(
-                            (item for item in day.iterdir() if item.is_file()),
+                            (
+                                item
+                                for item in day.iterdir()
+                                if not item.is_symlink() and item.is_file()
+                            ),
                             key=lambda item: item.name.encode("utf-8"),
                         ):
                             identity = _rollout_name_identity(path)
                             if identity is None or identity[1] != agent_context_id:
                                 continue
                             if identity[0] == f"{year.name}-{month.name}-{day.name}":
-                                files.add(path.resolve())
+                                resolved = path.resolve(strict=True)
+                                if resolved.is_relative_to(root):
+                                    files.add(resolved)
         except OSError as exc:
             raise RuntimeEventMaterializationError("source_unavailable", str(exc)) from exc
     return tuple(sorted(files, key=lambda path: path.as_posix().encode("utf-8")))
@@ -2448,8 +2472,19 @@ def _verify_context_discovery_certificate(
             "source_identity_mismatch", "certificate repository Git identity differs"
         )
     rollout_path = Path(cast(str, rollout["path"]))
+    try:
+        resolved_rollout_path = rollout_path.resolve(strict=True)
+    except OSError as exc:
+        raise RuntimeEventMaterializationError(
+            "source_unavailable", "certificate rollout path is unavailable"
+        ) from exc
+    session_roots = _runtime_session_roots()
     if (
-        rollout_path.resolve().as_posix() != rollout["path"]
+        rollout_path.is_symlink()
+        or resolved_rollout_path.as_posix() != rollout["path"]
+        or not any(
+            resolved_rollout_path.is_relative_to(root) for root in session_roots
+        )
         or _rollout_name_identity(rollout_path) is None
         or cast(tuple[str, str], _rollout_name_identity(rollout_path))[1]
         != certificate_context["agent_context_id"]
@@ -2457,6 +2492,7 @@ def _verify_context_discovery_certificate(
         raise RuntimeEventMaterializationError(
             "source_identity_mismatch", "certificate rollout path identity differs"
         )
+    rollout_path = resolved_rollout_path
     eligible = _rollout_files(cast(str, certificate_context["agent_context_id"]))
     if len(eligible) != 1 or eligible[0] != rollout_path:
         raise RuntimeEventMaterializationError(
