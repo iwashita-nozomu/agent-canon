@@ -17,6 +17,13 @@ source = "ROOT_AGENTS.md"
 owner = "agent-canon"
 class = "runtime_surface"
 
+[[surface]]
+path = "documents/design/codex-spark-implementation-routing.md"
+mode = "symlink"
+source = "documents/design/codex-spark-implementation-routing.md"
+owner = "agent-canon"
+class = "runtime_surface"
+
 [[group]]
 mode = "symlink"
 owner = "agent-canon"
@@ -259,6 +266,7 @@ paths = [
   "tests/tools/test_run_codex_in_repo_container.py",
   "tests/tools/test_run_managed_experiment.py",
   "tests/tools/test_run_repo_program.py",
+  "tests/tools/resource_plan_test_evidence.py",
   "tests/tools/test_update_agent_canon.py",
   "tests/tools/test_result_log_tools.py",
   "tests/tools/test_update_latest_result.py",
