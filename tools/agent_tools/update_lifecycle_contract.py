@@ -6,6 +6,8 @@
 # upstream design ../../documents/agent-canon-update-route.md owns the source update and projection transaction.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md owns the source PR sequence.
 # upstream implementation ./artifact_identity.py provides canonical JSON serialization.
+# upstream implementation ../../tools/ci/check_agent_canon_pr.py provides the authoritative G2 owner API consumed through SourceProjectionGateOwnerApis.
+# upstream implementation ./github_publish.py provides the authoritative G3 owner API consumed through SourceProjectionGateOwnerApis.
 # downstream implementation ./agent_team.py materializes lifecycle-bound subagent and close ToolCall packets.
 # downstream implementation ./github_publish.py consumes immutable pull-request lifecycle and gate evidence.
 # downstream implementation ./publication_integrator.py consumes candidate CAS and publication receipts.
@@ -26,7 +28,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +43,15 @@ class SourceMainReadbackIdentity:
 
     commit_sha: str
     tree_sha: str
+
+
+@dataclass(frozen=True)
+class SourceProjectionGateOwnerApis:
+    """Authoritative G2/G3 owner APIs consumed by lifecycle aggregation."""
+
+    generated_completeness_check_ids: tuple[str, ...]
+    materialize_generated_completeness_receipt: Callable[..., dict[str, object]]
+    materialize_pr_identity_gate: Callable[..., dict[str, object]]
 
 DECISION_SUFFICIENCY_SCHEMA = "agent-canon.decision-sufficiency.v1"
 SNAPSHOT_SCHEMA = "agent-canon.snapshot.v1"
@@ -1733,6 +1744,246 @@ def materialize_source_projection_packet(
     )
 
 
+def materialize_fresh_clone_source_projection_packet(
+    *,
+    candidate_sha: str,
+    candidate_tree_sha: str,
+    publication_sha: str,
+    publication_tree_sha: str,
+    gate_owner_apis: SourceProjectionGateOwnerApis,
+) -> dict[str, object]:
+    """Materialize the canonical accepted-source fixture for fresh-clone CI.
+
+    Fresh-clone acceptance has no source PR transaction to consume, but its
+    parent projection must still consume the same source-publication packet as
+    a normal update.  This owner-owned materializer derives every identity and
+    evidence value from the two observed Git identities.  The aggregate owns
+    lifecycle semantics while consuming G2/G3 only through their authoritative
+    owner APIs, then validates the complete packet before it is handed to the
+    update CLI.
+    """
+
+    def digest(label: str, value: object) -> str:
+        return hashlib.sha256(
+            canonical_json_bytes({"label": label, "value": value})
+        ).hexdigest()
+
+    def evidence(label: str, value: object) -> str:
+        return "evidence:" + digest(label, value)
+
+    _pattern(candidate_sha, _HEX40, "fresh_clone.candidate_sha")
+    _pattern(candidate_tree_sha, _HEX40, "fresh_clone.candidate_tree_sha")
+    _pattern(publication_sha, _HEX40, "fresh_clone.publication_sha")
+    _pattern(publication_tree_sha, _HEX40, "fresh_clone.publication_tree_sha")
+
+    identity = {
+        "candidate_sha": candidate_sha,
+        "candidate_tree_sha": candidate_tree_sha,
+        "publication_sha": publication_sha,
+        "publication_tree_sha": publication_tree_sha,
+    }
+    input_digest = "sha256:" + digest("fresh-clone-input", identity)
+    transaction_id = "tx:" + digest("fresh-clone-transaction", identity)
+    snapshot_id = "snapshot:" + digest("fresh-clone-snapshot", identity)
+    binding = {
+        "transaction_id": transaction_id,
+        "snapshot_id": snapshot_id,
+        "candidate_sha": candidate_sha,
+        "tree_sha": candidate_tree_sha,
+        "input_digest": input_digest,
+        "tool_id": "update-agent-canon",
+        "tool_version": "fresh-clone-acceptance.v1",
+        "evidence_ref": evidence("fresh-clone-binding", identity),
+        "evidence_digest": "sha256:" + digest("fresh-clone-binding", identity),
+        "timing": {
+            "started_at": "2026-01-01T00:00:00Z",
+            "finished_at": "2026-01-01T00:00:00Z",
+            "last_attempt_at": "2026-01-01T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": False,
+        },
+    }
+    checked_binding = validate_record_binding(binding)
+    base_identity = {
+        "remote": "origin",
+        "ref": "refs/heads/main",
+        "commit_sha": candidate_sha,
+        "tree_sha": candidate_tree_sha,
+    }
+    rebind = materialize_source_main_rebind_receipt(
+        binding=checked_binding,
+        old_base_identity=base_identity,
+        new_base_identity=base_identity,
+        origin_main_readback_evidence_ref=evidence(
+            "fresh-clone-origin-main-readback", identity
+        ),
+    )
+
+    cas_evidence_ref = evidence("fresh-clone-cas", identity)
+    cas_binding = dict(checked_binding)
+    cas_binding["evidence_ref"] = cas_evidence_ref
+    cas_binding["evidence_digest"] = "sha256:" + digest(
+        "fresh-clone-cas", identity
+    )
+    cas = validate_candidate_cas_rebind_transition(
+        rebind,
+        {
+            "schema": CANDIDATE_CAS_SCHEMA,
+            "cas_receipt_id": "cas:" + digest("fresh-clone-cas-id", identity),
+            "binding": cas_binding,
+            "predecessor_evidence_id": checked_binding["evidence_ref"],
+            "rebind_receipt_evidence_id": rebind["rebind_receipt_id"],
+            "candidate_identity": {
+                "candidate_sha": candidate_sha,
+                "tree_sha": candidate_tree_sha,
+            },
+            "cas_base_identity": {
+                "commit_sha": candidate_sha,
+                "tree_sha": candidate_tree_sha,
+            },
+            "cas_evidence_ref": cas_evidence_ref,
+            "cas_stage": "cas",
+        },
+    )
+
+    repository_digest = "sha256:" + digest(
+        "fresh-clone-remote-url", identity
+    )
+    branch_ref = "refs/heads/canon/fresh-clone-acceptance"
+    lifecycle_binding = dict(checked_binding)
+    lifecycle_binding["evidence_ref"] = evidence(
+        "fresh-clone-pr-lifecycle", identity
+    )
+    lifecycle_binding["evidence_digest"] = "sha256:" + digest(
+        "fresh-clone-pr-lifecycle", identity
+    )
+    lifecycle = {
+        "schema": PULL_REQUEST_LIFECYCLE_SCHEMA,
+        "kind": "user",
+        "binding": lifecycle_binding,
+        "state": "merged",
+        "remote_identity": {
+            "repo_owner": "fresh-clone-acceptance",
+            "repo_name": "agent-canon",
+            "remote_name": "origin",
+            "url_digest": repository_digest,
+            "ref": branch_ref,
+            "commit_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "base_identity": {
+            "repo_owner": "fresh-clone-acceptance",
+            "repo_name": "agent-canon",
+            "ref": "refs/heads/main",
+            "commit_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "head_identity": {
+            "repo_owner": "fresh-clone-acceptance",
+            "repo_name": "agent-canon",
+            "ref": branch_ref,
+            "commit_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "branch": pull_request_branch_table(),
+        "permission_identity": {
+            "actor_id": "fresh-clone-acceptance",
+            "permission_state": "verified_true",
+            "permission_evidence_id": evidence(
+                "fresh-clone-permission", identity
+            ),
+            "authority_source": "canonical fresh-clone acceptance fixture",
+            "assumption_forbidden": True,
+        },
+        "pr_essence": {
+            "problem": "exercise parent projection from a fresh clone",
+            "intent": "queue the observed AgentCanon source update",
+            "canonical_owner": "tools/update_agent_canon.sh",
+            "contract_delta": "fresh-clone source projection",
+            "evidence_refs": [evidence("fresh-clone-pr-essence", identity)],
+        },
+        "reviews": [],
+        "user_identity": {
+            "actor_id": "fresh-clone-acceptance",
+            "display_name": "Fresh Clone Acceptance",
+        },
+    }
+    checked_lifecycle = validate_candidate_cas_pr_transition(cas, lifecycle)
+    readback = materialize_publication_readback_receipt(
+        candidate_cas_receipt=cas,
+        pull_request_lifecycle=checked_lifecycle,
+        authoritative_pr_readback={
+            "number": 1,
+            "state": "MERGED",
+            "baseRefName": "main",
+            "baseRefOid": publication_sha,
+            "mergeCasBaseOid": candidate_sha,
+            "mergeCasBaseTreeOid": candidate_tree_sha,
+            "headRefName": "canon/fresh-clone-acceptance",
+            "headRefOid": candidate_sha,
+            "headRepository": {
+                "nameWithOwner": "fresh-clone-acceptance/agent-canon"
+            },
+            "mergeCommit": {"oid": publication_sha},
+            "mergeTreeOid": publication_tree_sha,
+        },
+    )
+
+    g1 = materialize_gate_verdict(
+        binding=checked_binding,
+        gate_id="G1",
+        ordered_input_evidence_refs=[checked_binding["evidence_ref"]],
+        invariant="source_correctness",
+        output_digest="sha256:" + digest("fresh-clone-g1", identity),
+        owner=f"{Path(__file__).resolve().with_name('publication_integrator.py')}#resolve_publication_eligibility",
+        verdict="pass",
+    )
+    g2 = gate_owner_apis.materialize_generated_completeness_receipt(
+        g1_gate=g1,
+        candidate_sha=candidate_sha,
+        tree_sha=candidate_tree_sha,
+        check_results=[
+            {"check_id": check_id, "status": "pass"}
+            for check_id in gate_owner_apis.generated_completeness_check_ids
+        ],
+    )
+    g3 = gate_owner_apis.materialize_pr_identity_gate(
+        checked_lifecycle,
+        cas,
+        rebind,
+        [g1, g2],
+    )
+    return materialize_source_projection_packet(
+        binding=checked_binding,
+        source_main_rebind_receipt=rebind,
+        candidate_cas_receipt=cas,
+        pull_request_lifecycle=checked_lifecycle,
+        publication_readback_receipt=readback,
+        source_gate_verdicts=[g1, g2, g3],
+        ordered_predecessor_evidence=[
+            {
+                "queue_number": 388,
+                "source_pr": "#388",
+                "publication_evidence_id": evidence(
+                    "fresh-clone-predecessor-388", identity
+                ),
+            },
+            {
+                "queue_number": 389,
+                "source_pr": "#389",
+                "source_pr_sha": digest("fresh-clone-predecessor-389", identity)[:40],
+                "publication_evidence_id": evidence(
+                    "fresh-clone-predecessor-389", identity
+                ),
+            },
+        ],
+        acceptance_evidence_ref=evidence(
+            "fresh-clone-frontier-acceptance", identity
+        ),
+    )
+
+
 def source_publication_identity(value: object) -> dict[str, object]:
     """Return the authoritative merge identity carried into projection."""
     readback = validate_publication_readback_receipt(value)
@@ -2515,6 +2766,7 @@ __all__ = [
     "PR_KINDS",
     "PR_STATES",
     "SourceMainReadbackIdentity",
+    "SourceProjectionGateOwnerApis",
     "TRANSACTION_STATES",
     "binding_identity",
     "frontier_key",
@@ -2524,6 +2776,7 @@ __all__ = [
     "materialize_candidate_cas_receipt",
     "materialize_dependency_frontier",
     "materialize_descendant_close_receipt",
+    "materialize_fresh_clone_source_projection_packet",
     "materialize_gate_verdict",
     "materialize_queue_receipt",
     "materialize_reservation_release_receipt",
