@@ -1132,7 +1132,7 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 id = "ROOT-AGENTS-SHARED-SEARCH-1"
 critical = true
 description = "Routes search, read scope, and reuse survey to deterministic owner surfaces."
-required_regex = ["search, read scope, and reuse survey", "semantic-index", "local-llm search", "dependency review artifacts"]
+required_regex = ["search, read scope, and reuse survey", "semantic-index", "search.py", "dependency review artifacts"]
 
 [[evals.checklist]]
 id = "ROOT-AGENTS-SHARED-PUBLISH-1"

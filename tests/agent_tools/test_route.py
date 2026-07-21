@@ -75,8 +75,8 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("AREA=search", result.stdout)
         self.assertIn("NEXT_ACTION=run_coordinated_search", result.stdout)
-        self.assertIn("agent-canon local-llm search --purpose", result.stdout)
-        self.assertIn("agent-canon local-llm build-index", result.stdout)
+        self.assertIn("python3 tools/agent_tools/search.py --purpose", result.stdout)
+        self.assertIn("python3 tools/agent_tools/search.py --purpose", result.stdout)
 
     def test_search_alias_resolves_to_search_area(self) -> None:
         """Legacy vector-search names should route to coordinated search."""
@@ -675,30 +675,6 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("report-writing", decision["active_skills"])
         self.assertIn("structure-planning", decision["related_skill_candidates"])
         self.assertIn("result-artifact-writeout", decision["related_skill_candidates"])
-
-    def test_legacy_local_llm_route_skill_alias_is_removed(self) -> None:
-        """The shell wrapper must not preserve a local-llm route-skill alias."""
-        result = subprocess.run(
-            [
-                str(AGENT_CANON_CLI),
-                "local-llm",
-                "route-skill",
-                "--prompt",
-                "x",
-                "--format",
-                "json",
-            ],
-            cwd=PROJECT_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-
-        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-        self.assertEqual(result.stdout, "")
-        self.assertIn(
-            "LOCAL_LLM_CLI_ERROR=unknown local-llm command route-skill", result.stderr
-        )
 
     def test_prompt_router_rejects_private_skill_in_public_catalog(self) -> None:
         """Underscore-prefixed skills are private and stay out of public routing."""

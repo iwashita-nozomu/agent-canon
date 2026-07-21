@@ -2272,7 +2272,7 @@ def manifest_run_lines(
         "    broad_cross_cutting_packet: available_not_default_read",
         "  implementation_gate_defaults:",
         "    implementation_surface_route_status: pending",
-        "    implementation_surface_route_command: 'tools/bin/agent-canon local-llm route-implementation-surface --request-file <request-or-design-question.txt> --format text'",
+        "    implementation_surface_route_command: 'python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json'",
         "    tool_reuse_ledger_status: required_before_custom_implementation",
         "    pre_edit_rejection_prediction_status: pending",
         "    pre_edit_rejection_command: 'python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>'",

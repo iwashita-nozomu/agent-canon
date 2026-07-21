@@ -21,7 +21,6 @@
 # upstream implementation ../agent_tools/eval_accumulation_check.py validates eval result accumulation
 # upstream implementation ../agent_tools/runtime_log_archive_git.py manages mounted hook/eval log archive branches
 # upstream implementation ../agent_tools/check_skill_frontmatter.py validates runtime skill YAML frontmatter
-# upstream implementation ../../rust/agent-canon/src/local_llm.rs validates Rust local LLM CLI routing
 # upstream implementation ../agent_tools/evaluate_workflow_selection.py validates workflow selection routing cases
 # upstream implementation ../agent_tools/evaluate_report_quality.py validates report writing quality checklist cases
 # upstream implementation ./check_github_workflows.py validates GitHub workflow and PR checklist contracts

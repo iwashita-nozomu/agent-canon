@@ -23,7 +23,7 @@ downstream design ../../references/agent-canon-technology-bibliography.md catalo
 
 - [AgentCanon Technology Bibliography](../../references/agent-canon-technology-bibliography.md)
   - AgentCanon implementation/runtime surfaces such as Codex runtime,
-    semantic-index, local LLM, SQLite, Rust tooling, dependency analysis,
+    semantic-index, deterministic search, SQLite, Rust tooling, dependency analysis,
     devcontainer, GitHub Actions, scanners, Markdown, YAML, and TOML.
 
 ## OpenAI And Codex Product Source Route

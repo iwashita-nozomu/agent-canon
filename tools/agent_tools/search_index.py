@@ -4,20 +4,17 @@
 # responsibility Builds repo-local semantic search cards for coordinated AgentCanon search.
 # upstream design ../../documents/search-coordination.md coordinated search provider contract
 # upstream implementation ./vector_search.py scans shared text surfaces
-# upstream implementation ./file_responsibility_llm.py resolves llama.cpp local model settings
-# downstream implementation ./search.py consumes search cards as the LLM search provider
-# downstream implementation ../../tests/agent_tools/test_search_index.py validates index generation
+# downstream implementation ./search.py consumes search cards as the deterministic semantic provider
+# downstream implementation ../../tests/agent_tools/test_search.py validates semantic-card generation through the coordinated search surface
 # @dependency-end
-"""Build repo-local search cards for first-class LLM-backed search."""
+"""Build repo-local deterministic semantic search cards."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import os
 import re
-import subprocess
 import sys
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -34,14 +31,12 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import vector_search  # noqa: E402
-from file_responsibility_llm import DEFAULT_MODEL, find_llama_cli, local_llm_cpu_env  # noqa: E402
 
 DEFAULT_INDEX_DIR = ".agent-canon/search-index"
-DEFAULT_CARD_FILE = "llm-cards.jsonl"
+DEFAULT_CARD_FILE = "semantic-cards.jsonl"
 DEFAULT_STATE_FILE = "index-state.json"
 SCHEMA_VERSION = 1
 DEFAULT_MAX_BYTES = 16_000
-DEFAULT_LLM_FILES = 32
 CONCEPT_LIMIT = 16
 SUMMARY_CHARS = 220
 DEFAULT_HASH_LENGTH = 12
@@ -145,9 +140,6 @@ class BuildReport:
     card_file: Path
     state_file: Path
     cards: tuple[SearchCard, ...]
-    llm_requested: bool
-    llm_used: int
-    llm_unavailable: bool
 
 
 @dataclass(frozen=True)
@@ -157,31 +149,6 @@ class BuildOptions:
     root: Path
     surfaces: tuple[str, ...]
     excludes: tuple[str, ...]
-    run_llm: bool
-    require_llm: bool
-    llama_cli_arg: str
-    model: str
-    max_llm_files: int
-    max_bytes: int
-
-
-@dataclass(frozen=True)
-class LlmInvocation:
-    """One local LLM card-refinement request."""
-
-    document: vector_search.Document
-    base_card: SearchCard
-    llama_cli: str
-    model: str
-    max_bytes: int
-
-
-@dataclass(frozen=True)
-class LlmCardResult:
-    """Local LLM refinement result."""
-
-    card: SearchCard
-    used: bool
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -192,12 +159,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--index-dir", default=DEFAULT_INDEX_DIR)
     parser.add_argument("--surface", action="append", default=[])
     parser.add_argument("--exclude", action="append", default=[])
-    parser.add_argument("--run-llm", action="store_true")
-    parser.add_argument("--require-llm", action="store_true")
-    parser.add_argument("--llama-cli", default=os.environ.get("AGENT_CANON_LLAMA_CLI", ""))
-    parser.add_argument("--model", default=os.environ.get("AGENT_CANON_LOCAL_LLM_MODEL", DEFAULT_MODEL))
-    parser.add_argument("--max-llm-files", type=int, default=DEFAULT_LLM_FILES)
-    parser.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES)
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -366,107 +327,7 @@ def deterministic_card(document: vector_search.Document, tool: ToolEntry) -> Sea
     )
 
 
-def llm_prompt(document: vector_search.Document, card: SearchCard, max_bytes: int) -> str:
-    """Return a prompt that asks a local LLM to produce one search card."""
-    text = document.text.encode("utf-8", errors="replace")[:max_bytes].decode(
-        "utf-8",
-        errors="replace",
-    )
-    return "\n".join(
-        [
-            "You create semantic search cards for a software repository.",
-            "Return one compact JSON object only.",
-            "Required keys: summary, concepts, aliases, responsibility, ambiguity_notes.",
-            "Use short arrays of strings for concepts, aliases, and ambiguity_notes.",
-            "The card is used for purpose-based search, tool search, and ambiguous code/document discovery.",
-            "",
-            f"Path: {document.relative_path}",
-            f"Heuristic summary: {card.summary}",
-            f"Heuristic concepts: {', '.join(card.concepts)}",
-            "",
-            "Content:",
-            "```",
-            text,
-            "```",
-        ]
-    )
-
-
-def extract_json_object(text: str) -> dict[str, object] | None:
-    """Extract the first JSON object from model output."""
-    start = text.find("{")
-    end = text.rfind("}")
-    if start < 0 or end <= start:
-        return None
-    try:
-        value = json.loads(text[start : end + 1])
-    except json.JSONDecodeError:
-        return None
-    return cast(dict[str, object], value) if isinstance(value, dict) else None
-
-
-def string_tuple(value: object) -> tuple[str, ...]:
-    """Return a tuple of string values from model JSON."""
-    if isinstance(value, str):
-        return (value,)
-    if isinstance(value, list):
-        items = cast(list[object], value)
-        return tuple(item for item in items if isinstance(item, str))
-    return ()
-
-
-def card_from_llm_payload(base_card: SearchCard, payload: Mapping[str, object]) -> SearchCard:
-    """Merge model JSON into a search card."""
-    summary = str(payload.get("summary", base_card.summary)).strip() or base_card.summary
-    responsibility = str(payload.get("responsibility", base_card.responsibility)).strip()
-    concepts = string_tuple(payload.get("concepts")) or base_card.concepts
-    aliases = string_tuple(payload.get("aliases")) or base_card.aliases
-    ambiguity_notes = string_tuple(payload.get("ambiguity_notes"))
-    return SearchCard(
-        schema_version=base_card.schema_version,
-        card_id=base_card.card_id,
-        path=base_card.path,
-        kind=base_card.kind,
-        line_start=base_card.line_start,
-        line_end=base_card.line_end,
-        chunk_hash=base_card.chunk_hash,
-        summary=summary,
-        concepts=concepts,
-        aliases=aliases,
-        responsibility=responsibility,
-        owner=base_card.owner,
-        related_tools=base_card.related_tools,
-        related_docs=base_card.related_docs,
-        related_tests=base_card.related_tests,
-        ambiguity_notes=ambiguity_notes,
-        generated_by="local-llm",
-    )
-
-
-def card_from_llm_stdout(base_card: SearchCard, stdout: str) -> LlmCardResult:
-    """Convert local LLM stdout into a card refinement result."""
-    payload = extract_json_object(stdout)
-    if payload is None:
-        return LlmCardResult(card=base_card, used=False)
-    return LlmCardResult(card=card_from_llm_payload(base_card, payload), used=True)
-
-
-def run_llm_card(invocation: LlmInvocation) -> LlmCardResult:
-    """Run local LLM refinement for one search card."""
-    prompt = llm_prompt(invocation.document, invocation.base_card, invocation.max_bytes)
-    result = subprocess.run(
-        [invocation.llama_cli, "-hf", invocation.model, "-p", prompt, "-n", "512", "--temp", "0.1"],
-        check=False,
-        capture_output=True,
-        text=True,
-        env=local_llm_cpu_env(),
-    )
-    if result.returncode != 0:
-        return LlmCardResult(card=invocation.base_card, used=False)
-    return card_from_llm_stdout(invocation.base_card, result.stdout)
-
-
-def build_cards(options: BuildOptions) -> tuple[tuple[SearchCard, ...], int, bool]:
+def build_cards(options: BuildOptions) -> tuple[SearchCard, ...]:
     """Build search cards from indexed documents."""
     selected_surfaces = options.surfaces if options.surfaces else vector_search.DEFAULT_SURFACES
     documents = vector_search.read_documents(
@@ -476,31 +337,12 @@ def build_cards(options: BuildOptions) -> tuple[tuple[SearchCard, ...], int, boo
         set(vector_search.EXCLUDED_PARTS),
     )
     tool_entries = load_tool_entries(options.root)
-    executable = find_llama_cli(options.llama_cli_arg) if options.run_llm else ""
-    if options.run_llm and options.require_llm and not executable:
-        raise RuntimeError("llama-cli-not-found")
-
     cards: list[SearchCard] = []
-    llm_used = 0
     for document in documents:
         tool = tool_entries.get(document.relative_path, EMPTY_TOOL_ENTRY)
         base_card = deterministic_card(document, tool)
-        card = base_card
-        if executable and llm_used < max(options.max_llm_files, 0):
-            refined = run_llm_card(
-                LlmInvocation(
-                    document=document,
-                    base_card=base_card,
-                    llama_cli=executable,
-                    model=options.model,
-                    max_bytes=options.max_bytes,
-                )
-            )
-            if refined.used:
-                card = refined.card
-                llm_used += 1
-        cards.append(card)
-    return tuple(cards), llm_used, bool(options.run_llm and not executable)
+        cards.append(base_card)
+    return tuple(cards)
 
 
 def write_jsonl(path: Path, cards: Sequence[SearchCard]) -> None:
@@ -512,17 +354,14 @@ def write_jsonl(path: Path, cards: Sequence[SearchCard]) -> None:
             handle.write("\n")
 
 
-def write_state(path: Path, report: BuildReport, root: Path, model: str) -> None:
+def write_state(path: Path, report: BuildReport, root: Path) -> None:
     """Write machine-readable index state."""
     state = {
         "schema_version": SCHEMA_VERSION,
         "root": str(root),
         "generated_at": datetime.now(UTC).isoformat(),
         "cards": len(report.cards),
-        "llm_requested": report.llm_requested,
-        "llm_used": report.llm_used,
-        "llm_unavailable": report.llm_unavailable,
-        "model": model,
+        "provider": "deterministic_semantic_index",
     }
     path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -533,17 +372,11 @@ def build_index(args: argparse.Namespace) -> BuildReport:
     index_dir = (root / args.index_dir).resolve()
     card_file = index_dir / DEFAULT_CARD_FILE
     state_file = index_dir / DEFAULT_STATE_FILE
-    cards, llm_used, llm_unavailable = build_cards(
+    cards = build_cards(
         BuildOptions(
             root=root,
             surfaces=tuple(args.surface),
             excludes=tuple(args.exclude),
-            run_llm=bool(args.run_llm),
-            require_llm=bool(args.require_llm),
-            llama_cli_arg=str(args.llama_cli),
-            model=str(args.model),
-            max_llm_files=int(args.max_llm_files),
-            max_bytes=int(args.max_bytes),
         )
     )
     report = BuildReport(
@@ -551,12 +384,9 @@ def build_index(args: argparse.Namespace) -> BuildReport:
         card_file=card_file,
         state_file=state_file,
         cards=cards,
-        llm_requested=bool(args.run_llm),
-        llm_used=llm_used,
-        llm_unavailable=llm_unavailable,
     )
     write_jsonl(card_file, cards)
-    write_state(state_file, report, root, str(args.model))
+    write_state(state_file, report, root)
     return report
 
 
@@ -602,9 +432,7 @@ def print_text(report: BuildReport) -> None:
     print(f"SEARCH_INDEX_DIR={report.index_dir}")
     print(f"SEARCH_INDEX_CARD_FILE={report.card_file}")
     print(f"SEARCH_INDEX_CARDS={len(report.cards)}")
-    print(f"SEARCH_INDEX_LLM_REQUESTED={str(report.llm_requested).lower()}")
-    print(f"SEARCH_INDEX_LLM_USED={report.llm_used}")
-    print(f"SEARCH_INDEX_LLM_UNAVAILABLE={str(report.llm_unavailable).lower()}")
+    print("SEARCH_INDEX_PROVIDER=deterministic_semantic_index")
 
 
 def print_json(report: BuildReport) -> None:
@@ -615,9 +443,7 @@ def print_json(report: BuildReport) -> None:
         "card_file": str(report.card_file),
         "state_file": str(report.state_file),
         "cards": len(report.cards),
-        "llm_requested": report.llm_requested,
-        "llm_used": report.llm_used,
-        "llm_unavailable": report.llm_unavailable,
+        "provider": "deterministic_semantic_index",
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
 

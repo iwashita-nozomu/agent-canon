@@ -26,7 +26,7 @@ downstream implementation ../../.agents/skills/agent-eval-accumulation/SKILL.md 
 
 ## Purpose
 
-AgentCanon の prompt / role / local-LLM / workflow / report-quality eval を
+AgentCanon の prompt / role / workflow / report-quality eval を
 append-only evidence として外部 log archive に積み、`eval_accumulation_check.py`
 で family gap を閉じるための skill です。
 
@@ -41,7 +41,7 @@ checker output と archive 側 accumulated report に残します。
 - `eval_accumulation_check.py` が `no-*-eval-reports`、duplicate run id、
   missing run id、legacy source-tree result などを返した
 - `$agent-log-analysis` が structured dashboard / API の後に eval family gap を見つけた
-- skill、workflow、subagent role、router、report-writing、local LLM routing を直した後、
+- skill、workflow、subagent role、router、report-writing、deterministic search routing を直した後、
   accumulated eval evidence を PR / closeout gate に戻す必要がある
 - 過去 run の反復課題を skill / workflow / role prompt に還元する前に、どの eval
   family が evidence を持っているか確認したい

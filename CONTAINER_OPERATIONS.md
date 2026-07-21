@@ -53,7 +53,7 @@ Read this file when a task touches any of these surfaces:
 This file is the source of truth for the Docker / devcontainer / VS Code ownership
 boundary. `agent-canon-environment.toml` is the machine-readable environment
 contract for Rust tooling, compiled tool cache, MCP preflight commands, and
-local LLM tool locations. Other files may summarize the boundary, but they must
+deterministic search tool locations. Other files may summarize the boundary, but they must
 not become a second policy surface.
 
 Use this precedence when wording conflicts:
@@ -61,7 +61,7 @@ Use this precedence when wording conflicts:
 1. `CONTAINER_OPERATIONS.md`: normative owner boundary, forbidden placements,
    and required validation.
 2. `agent-canon-environment.toml`: machine-readable toolchain, compiled tool,
-   MCP preflight, and local LLM environment expectations.
+   MCP preflight, and deterministic search environment expectations.
 3. `tools/docker_dependency_validator.sh`: mechanical enforcement of the
    boundary for template and derived repos.
 4. `docker/README.md`: repo-local implementation runbook for this template's
@@ -162,23 +162,20 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   Ghostscript, and PDF inspection helpers, belongs in `.devcontainer/post-create.sh`.
   This is an agent-side writing toolchain, not a default project runtime
   dependency.
-- llama.cpp and the default 3B-class local LLM model selector belong in
-  `.devcontainer/post-create.sh` and `tools/install_llama_cpp.sh` when they are
-  used only for AgentCanon local LLM analysis. This local LLM surface is
-  CPU-only even on GPU hosts; do not enable CUDA, HIP, Metal, Vulkan, or SYCL for
-  `agent-canon local-llm`, including through extra CMake flags.
+- Model server, installer, model-cache, and compatibility consumers are not
+  part of the container runtime. Former compatibility validation is a read-only
+  `skill_evaluator` route using `gpt-5.4-mini`; the container does not download,
+  start, or mount a local model runtime.
 - Compiled agent convenience binaries belong under
   `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}`. `/usr/local/bin` may contain
   symlinks for stable command discovery, but the compiled binary cache itself
   must not live in the project Dockerfile or tracked repository tree.
 - Devcontainer post-create must publish Rust on PATH for non-interactive
   `devcontainer exec` commands, not only for the current post-create shell.
-- AgentCanon pin updates must refresh compiled AgentCanon tools after the new
+- AgentCanon pin updates must refresh the compiled AgentCanon CLI after the new
   source is checked out. The canonical path is `tools/rebuild_agent_tools.sh`,
   called by `make agent-canon-ensure-latest`, `make agent-canon-latest`, and
-  `make agent-canon-update`. That rebuild path also recompiles an existing
-  `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/src/llama.cpp` checkout so local LLM
-  binaries track the updated AgentCanon tool contract.
+  `make agent-canon-update`.
 - Mount behavior belongs in `.devcontainer/devcontainer.json`.
 - Shared devcontainer names must be repository-specific. Do not use a fixed
   `name` or Compose project name that makes every template-derived repository
