@@ -24,9 +24,7 @@ import subprocess
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
-
-UTC = timezone.utc
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypedDict, cast
 from urllib.parse import quote
@@ -121,6 +119,21 @@ EXPERIMENT_CUES = (
     "ベースライン",
     "期待",
 )
+EXPERIMENT_VOCABULARY_CUES = ("experiment", "protocol", "仮説", "実験", "仮説", "指標", "ベースライン", "期待", "expected", "hypothesis", "metric", "baseline")
+SOFTWARE_ENGINEERING_CORPUS_CUES = (
+    "code",
+    "software",
+    "engineering",
+    "implementation",
+    "developer",
+    "repository",
+    "dependency",
+    "command",
+    "python",
+    "rust",
+    "cli",
+)
+ACADEMIC_CORPUS_CUES = ("academic", "paper", "research", "論文", "学術", "研究")
 EXPERIMENT_ACTIVITY_CUES = ("experiment", "protocol", "実験")
 STOPWORDS = {
     "the",
@@ -1154,10 +1167,8 @@ def semantic_prose_ir_payload(
         if len(token) >= CONCEPT_MIN_TERM_LENGTH and token.casefold() not in STOPWORDS
     )
     top_terms = tuple(token for token, _count in tokens.most_common(CONCEPT_CANDIDATE_LIMIT))
-    combined = "\n".join((*texts, prompt_text))
-    experiment_status = "present" if any(
-        cue in combined.casefold() for cue in EXPERIMENT_ACTIVITY_CUES
-    ) else "absent"
+    experiment_status = experiment_plan_analysis_status(texts)
+    corpus_hints = semantic_corpus_hints(texts, prompt_text)
     ir_path = db_path.parent / "semantic_prose_ir.json"
     payload: dict[str, object] = {
         "schema": "semantic-prose-ir/v1",
@@ -1174,12 +1185,55 @@ def semantic_prose_ir_payload(
                 "score": len(top_terms),
                 "selected": True,
                 "basis": {"source": "deterministic_capability_evidence", "terms": top_terms},
-            }
+            },
+            *corpus_hints,
         ],
     }
     ir_path.parent.mkdir(parents=True, exist_ok=True)
     ir_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return payload
+
+
+def experiment_plan_analysis_status(texts: Sequence[str]) -> str:
+    """Return experiment-plan intent status from deterministic text cues."""
+    if experiment_plan_assignment_kinds(texts):
+        return "present"
+    if any(has_any(text, EXPERIMENT_VOCABULARY_CUES) for text in texts):
+        return "vocabulary_only"
+    return "absent"
+
+
+def semantic_corpus_hints(texts: Sequence[str], prompt_text: str) -> tuple[dict[str, object], ...]:
+    """Return deterministic corpus hints for software engineering and academic writing."""
+    combined = "\n".join((*texts, prompt_text))
+    hints: list[dict[str, object]] = []
+    if has_any(combined, SOFTWARE_ENGINEERING_CORPUS_CUES):
+        hints.append(
+            {
+                "corpus_id": "software_engineering",
+                "label": "Software engineering prose and implementation artifacts",
+                "score": 1,
+                "selected": True,
+                "basis": {"source": "semantic_keyword_matching", "signals": tuple(_for_corpus_matches(combined, SOFTWARE_ENGINEERING_CORPUS_CUES))},
+            }
+        )
+    if has_any(combined, ACADEMIC_CORPUS_CUES):
+        hints.append(
+            {
+                "corpus_id": "academic_writing",
+                "label": "Academic writing and research communication",
+                "score": 1,
+                "selected": True,
+                "basis": {"source": "semantic_keyword_matching", "signals": tuple(_for_corpus_matches(combined, ACADEMIC_CORPUS_CUES))},
+            }
+        )
+    return tuple(hints)
+
+
+def _for_corpus_matches(text: str, cues: tuple[str, ...]) -> list[str]:
+    """Return matched cues in deterministic order."""
+    lowered = text.lower()
+    return [cue for cue in cues if has_any(lowered, (cue,))]
 
 
 def corpus_hints_from_semantic_ir(payload: dict[str, object]) -> list[dict[str, object]]:
@@ -2539,7 +2593,7 @@ def experiment_plan_applicable_for_graph(
     local_status = semantic_experiment_plan_status(connection)
     if local_status == "present":
         return True
-    if local_status == "absent" and profile == "experiment":
+    if local_status in {"present", "vocabulary_only"} and profile == "experiment":
         return True
     if local_status in {"absent", "vocabulary_only"}:
         return False

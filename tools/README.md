@@ -6,11 +6,9 @@ contract tool
 responsibility Documents tools for this repository.
 upstream design ../AGENTS.md shared canon runtime contract
 upstream design ../documents/prose-reasoning-graph/dsl-spec.md shared graph visualization projection and adapter contract
-upstream design ../agents/skills/code-visualization.md sole public visualization owner and projection coverage contract
 downstream design catalog.yaml structured AgentCanon tool catalog
 downstream design ../documents/tools/tool-docs.toml same-named tool documentation map
 downstream implementation agent_tools/tool_catalog.py validates catalog/docs consistency
-downstream implementation agent_tools/visualization_contract.py validates typed visualization coverage and readback
 downstream implementation agent_tools/tool_drift.py validates tool/convention trace contracts
 downstream implementation agent_tools/responsibility_scope.py validates responsibility scopes and protecting tools
 downstream implementation agent_tools/issue_sync.py validates local issue sync state
@@ -120,7 +118,6 @@ Common execution routes:
 | Need                                                          | Command                                                                                           |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Catalog shape, docs wiring, and retired legacy paths          | `python3 tools/agent_tools/tool_catalog.py`                                                       |
-| Visualization universe, ToolCall, projection coverage, and final readback | `python3 tools/agent_tools/visualization_contract.py --universe <universe.json> --manifest <manifest.json> --readback <readback.json> --tool-call <tool-call.json>` |
 | Tool / workflow / PR checklist drift                          | `python3 tools/agent_tools/tool_drift.py`                                                         |
 | Runtime profile and path-risk routing                         | `python3 tools/agent_tools/classify_path_risk.py`                                                 |
 | Markdown, links, math, Mermaid, and docs drift                | `tools/bin/agent-canon docs check`                                                                |
@@ -162,12 +159,6 @@ environment surfaces before an agent treats the repo as ready.
 directory / file layout with `documents/repo-structure-contract.toml`.
 The TOML contract owns profiles, ignored generated paths, required paths, and
 unexpected top-level severity.
-`visualization_contract.py` is the single cataloged typed visualization
-contract/checker used by the sole public `code-visualization` skill. Native
-producer checkers retain domain-fact authority; renderer and formatter tools
-remain adapters, while `code-visualization` owns final projection coverage and
-post-format readback status. Publication routing is defined only by the
-canonical skill closeout.
 `render_dependency_manifest_graph.py` turns a dependency graph TSV from
 `check_dependency_graph.sh --graph-tsv` into a repo-local Graph IR JSON,
 Markdown, DOT, and a single-file HTML Graph Workbench with a Voronoi-style code
@@ -324,11 +315,11 @@ findings for resilient test planning.
     `caller_analysis.integration_candidates` を生成します。
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
-  - `task_start.py` と `bootstrap_agent_run.py` は task 入口で read-only update plan と shared-surface check を実行します。更新が必要でも approval を生成したり mutating make を自動実行したりせず、明示 approval が必要な machine-readable next action を返します。eval transient blocker は planning より先に判定します。
+  - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。
   - `agent_canon_update_todos.py` は AgentCanon pin 更新後に親 repo の agent が先に消化する TODO を `documents/agent-canon-update-tasks.toml` から読み、親 repo ローカルの `.agent-canon/update-state.toml` で適用済み boundary を管理します。pending は停止理由ではなく、task-start の `AGENT_CANON_UPDATE_TODO_NEXT=apply_agent_canon_update_todos` として最初の作業に route します。
-  - `search.py` は `--purpose` から text / deterministic semantic card / vector / tool catalog / dependency header / Python code facts をまとめて検索し、candidate path と provider evidence を返します。tool を探すときは `--providers semantic,tool,vector` のように絞れます。
-  - `search_index.py` は deterministic semantic card を `.agent-canon/search-index/` に生成します。生成 index は repo-local ignored state で、commit しません。
-  - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `git grep` を優先し、広い概念や再利用候補探索では responsibility-based semantic search の比較 evidence として併用します。
+- `search.py` は `--purpose` から text / deterministic semantic card / vector / tool catalog / dependency header / Python code facts をまとめて検索し、candidate path と provider evidence を返します。semantic だけを使うときは `--providers semantic` を指定します。
+- `search_index.py` は semantic provider 向けの `semantic-cards.jsonl` を `.agent-canon/search-index/semantic-cards.jsonl` に生成します。生成 index は repo-local ignored state で、commit しません。
+  - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索では deterministic coordinated search を先に走らせた後の比較 evidence として併用します。
   - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。検索入口を知らない場合は `python3 tools/agent_tools/route.py --area search` から始めます。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。prompt から public skill set を決める場合は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` で `$agent-orchestration` first の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を確認します。
   - `skill_tool_commands.py` は `.agents/skills/*/SKILL.md` の `## Tool Commands` 入口を同期し、`show --skill <skill>` で runtime skill と human skill canon から command packet を表示します。
   - `formal_proof.py` は自然言語の数学的 claim、または `--python-symbol path.py::qualname` で指定した Python AST source を `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command に分解します。AST route は対象 module を import / execute せず provenance と proof obligation を抽出します。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索そのものは `$literature-survey` と browser/search tool が担当し、証明 authority は Lean / Isabelle / Coq / SMT の実行 log に残します。
@@ -388,7 +379,7 @@ findings for resilient test planning.
 - top-level helper
   - `sync_agent_canon.sh`
     - `plan` は derived repo から見た update route を read-only で出します。
-    - `ensure-latest` は明示的に承認された更新時だけ upstream `agent-canon` と local `vendor/agent-canon` を揃えます。submodule repo では `vendor/agent-canon` の local branch、HEAD、dirty state を先に確認し、`agent_canon_latest_submodule_local_state_checked=yes` を evidence として出します。直接入口も branch/worktree authority/reason と destructive authority/reason の全 4 値を要求します。
+    - `ensure-latest` は task 開始時に upstream `agent-canon` と local `vendor/agent-canon` を揃えます。submodule repo では `vendor/agent-canon` の local branch、HEAD、dirty state を先に確認し、`agent_canon_latest_submodule_local_state_checked=yes` を evidence として出します。
     - `agent-canon` remote が未設定なら GitHub canonical remote `https://github.com/iwashita-nozomu/agent-canon.git` を自動追加します。
     - submodule repo では gitlink commit を確認し、必要なら submodule pointer を fast-forward 更新します。
   - legacy subtree repo では subtree metadata / snapshot import route を使います。
@@ -412,8 +403,8 @@ findings for resilient test planning.
 通常の派生 repo では `update_agent_canon.sh latest` を入口にします。
 
 1. `make agent-canon-update-plan` で route を read-only 確認します。
-1. Plan が mutation を要求したら current-task user approval を得て、全 4 inline Git authority/reason field を同じ segment に置いた `make agent-canon-latest` または互換 alias の `make agent-canon-ensure-latest` で更新します。
-1. submodule 内に local branch commit、dirty shared-canon 差分、diverged history、merge conflict がある場合、`latest` は conflict workflow route を出します。current-task user approval と全 4 inline Git authority/reason field を得た場合だけ protected merge wrapper で GitHub `main` を current branch に取り込み、AgentCanon branch と PR に出します。
+1. `make agent-canon-latest` または互換 alias の `make agent-canon-ensure-latest` で通常の AgentCanon `main` 更新、eval / hook log parking、root view check、compiled tool rebuild、親 repo update TODO routing / acknowledge を tool に任せます。
+1. submodule 内に local branch commit、dirty shared-canon 差分、diverged history、merge conflict がある場合、`latest` は停止ではなく `AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md` と `AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` を出します。その場合は agent が conflict workflow に入り、必要なら `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` で GitHub `main` を current branch に取り込み、AgentCanon branch と PR に出します。
 1. AgentCanon PR が merge された後も `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。この target は `update_agent_canon.sh latest` を通り、pin 更新後に `tools/rebuild_agent_tools.sh` を走らせます。
 1. `python3 tools/agent_tools/agent_canon_update_todos.py plan --write` で、その pin 更新に伴う親 repo TODO を生成します。pending があれば `latest` は成功終了のまま `updated_with_pending_todos` を出し、親 repo の agent が先に適用します。完了なら `complete`、明示的な repo 判断が必要なら `defer --reason ... --owner ...` を記録します。
 1. すべての pending TODO が `completed` または `deferred` になったら `python3 tools/agent_tools/agent_canon_update_todos.py acknowledge` で `.agent-canon/update-state.toml` の `tasks_applied_through` を現在 pin へ進めます。
