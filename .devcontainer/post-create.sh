@@ -7,7 +7,6 @@
 # upstream design ../documents/rust-agent-tool-migration.md Rust toolchain and CLI install boundary
 # upstream design ../documents/tools/lean_proof_env.md Lean proof environment toolchain contract
 # upstream environment devcontainer.json postCreateCommand entrypoint
-# upstream implementation ../tools/install_llama_cpp.sh builds llama.cpp local LLM tooling
 # upstream implementation ../tools/ci/scan_secrets.sh runs dedicated secret scanners
 # downstream implementation ../rust/agent-canon/src/structured_analysis.rs builds structured analysis cache DB
 # @dependency-end
@@ -22,8 +21,6 @@ elan_version="${AGENT_CANON_ELAN_VERSION:-v4.2.3}"
 elan_x86_64_sha256="${AGENT_CANON_ELAN_X86_64_SHA256:-df0b2b3a439961ffcbb3985214365ffe40f49bc871df04dff268c7d8e21ca8b2}"
 elan_aarch64_sha256="${AGENT_CANON_ELAN_AARCH64_SHA256:-cb69af0803b04157bc30201c29c12fca882bb3ad8b43476b8d2d3064810bc3ac}"
 tools_home="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
-llama_cpp_ref="${AGENT_CANON_LLAMA_CPP_REF:-master}"
-local_llm_model="${AGENT_CANON_LOCAL_LLM_MODEL:-ggml-org/SmolLM3-3B-GGUF:Q4_K_M}"
 gitleaks_version="${AGENT_CANON_GITLEAKS_VERSION:-8.30.1}"
 trufflehog_version="${AGENT_CANON_TRUFFLEHOG_VERSION:-3.95.3}"
 detect_secrets_version="${AGENT_CANON_DETECT_SECRETS_VERSION:-1.5.0}"
@@ -55,9 +52,6 @@ publish_agent_tools_profile() {
   profile_script="$(mktemp)"
   cat >"$profile_script" <<EOF
 export AGENT_CANON_TOOLS_HOME="${tools_home}"
-export AGENT_CANON_LOCAL_LLM_MODEL="${local_llm_model}"
-export AGENT_CANON_LLAMA_CLI="${tools_home}/bin/llama-cli"
-export AGENT_CANON_LLAMA_CPP_CUDA="disabled"
 case ":\${PATH}:" in
   *:"${tools_home}/bin":*) ;;
   *) export PATH="${tools_home}/bin:\${PATH}" ;;
@@ -434,23 +428,6 @@ install_agent_canon_cli() {
   /usr/local/bin/agent-canon --version
 }
 
-install_llama_cpp() {
-  local canon_root
-  local installer
-
-  apt_install ca-certificates curl git cmake build-essential pkg-config libcurl4-openssl-dev libssl-dev
-  canon_root="$(agent_canon_source_root)"
-  installer="${canon_root}/tools/install_llama_cpp.sh"
-  if [ -z "$canon_root" ] || [ ! -f "$installer" ]; then
-    echo "AgentCanon llama.cpp installer absent; skipping local LLM tool install"
-    return
-  fi
-  AGENT_CANON_TOOLS_HOME="$tools_home" \
-    AGENT_CANON_LLAMA_CPP_REF="$llama_cpp_ref" \
-    AGENT_CANON_LLAMA_CPP_CUDA=disabled \
-    bash "$installer" --allow-fetch
-}
-
 build_structured_analysis_cache() {
   local canon_root
 
@@ -497,7 +474,6 @@ install_tex_tooling
 install_lean_toolchain
 install_secret_scanners
 install_agent_canon_cli
-install_llama_cpp
 build_structured_analysis_cache
 jq --version
 tree --version

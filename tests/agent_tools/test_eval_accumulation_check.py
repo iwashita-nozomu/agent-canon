@@ -167,7 +167,6 @@ class EvalAccumulationCheckTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("EVAL_ACCUMULATION_SKILL_REPORTS=1", result.stdout)
-            self.assertIn("EVAL_ACCUMULATION_LOCAL_LLM_REPORTS=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS=1", result.stdout)
@@ -227,19 +226,6 @@ class EvalAccumulationCheckTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("no-skill-eval-reports", result.stdout)
-
-    def test_missing_local_llm_eval_report_fails(self) -> None:
-        """At least one accumulated local LLM eval report is required."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            self.write_fixture(root)
-            for path in self.eval_family_dir(root, "local-llm-responsibility").glob("*.md"):
-                path.unlink()
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("no-local-llm-eval-reports", result.stdout)
 
     def test_missing_workflow_selection_eval_report_fails(self) -> None:
         """At least one accumulated workflow selection eval report is required."""
@@ -326,13 +312,11 @@ duplicate_run_id_detail = "duplicate-abstract-review-eval-run-id"
         (evals_root / "README.md").write_text("# Eval fixture\n", encoding="utf-8")
         hook_dir = self.hook_path(root).parent
         skill_dir = self.eval_family_dir(root, "skill-workflow-prompt")
-        local_llm_dir = self.eval_family_dir(root, "local-llm-responsibility")
         workflow_selection_dir = self.eval_family_dir(root, "workflow-selection")
         report_quality_dir = self.eval_family_dir(root, "report-quality")
         codex_agent_role_dir = self.eval_family_dir(root, "codex-agent-role")
         hook_dir.mkdir(parents=True)
         skill_dir.mkdir(parents=True)
-        local_llm_dir.mkdir(parents=True)
         workflow_selection_dir.mkdir(parents=True)
         report_quality_dir.mkdir(parents=True)
         codex_agent_role_dir.mkdir(parents=True)
@@ -342,10 +326,6 @@ duplicate_run_id_detail = "duplicate-abstract-review-eval-run-id"
         )
         (skill_dir / "skill-eval-20260517T010203040506Z-1234567890-pass-agent-orchestration.md").write_text(
             "EVAL_RUN_ID=skill-eval-20260517T010203040506Z-1234567890\n",
-            encoding="utf-8",
-        )
-        (local_llm_dir / "local-llm-eval-20260517T010203040506Z-1234567890-pass.md").write_text(
-            "LOCAL_LLM_EVAL_RUN_ID=local-llm-eval-20260517T010203040506Z-1234567890\n",
             encoding="utf-8",
         )
         (

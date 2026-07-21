@@ -176,15 +176,6 @@ def write_valid_docker_runtime(root: Path) -> None:
             [
                 ".git",
                 ".state",
-                "*.gguf",
-                "*.safetensors",
-                "pytorch_model*.bin",
-                "model-*.bin",
-                ".cache/huggingface",
-                ".cache/llama.cpp",
-                "vendor/local-llm-server/llama-cpp/models",
-                "vendor/local-llm-server/llama-cpp/cache",
-                "vendor/local-llm-server/llama-cpp/runtime",
                 "vendor/agent-canon",
                 "",
             ]
@@ -265,10 +256,10 @@ def write_valid_devcontainer_files(root: Path) -> None:
                 "AGENT_CANON_TOOLS_HOME",
                 "${tools_home}/agent-canon/bin/agent-canon",
                 "/usr/local/bin/agent-canon",
-                "install_llama_cpp",
-                "tools/install_llama_cpp.sh",
-                "ggml-org/SmolLM3-3B-GGUF:Q4_K_M",
-                "${tools_home}/bin/llama-cli",
+                "AGENT_CANON_RUNTIME_ROOT",
+                "AGENT_CANON_SOURCE_PROJECTION_ROOT",
+                "tool-availability.json",
+                "tree --version",
                 "install_secret_scanners",
                 "gitleaks",
                 "trufflehog",
@@ -348,10 +339,10 @@ def write_valid_devcontainer_only(root: Path) -> None:
                 "AGENT_CANON_TOOLS_HOME",
                 "${tools_home}/agent-canon/bin/agent-canon",
                 "/usr/local/bin/agent-canon",
-                "install_llama_cpp",
-                "tools/install_llama_cpp.sh",
-                "ggml-org/SmolLM3-3B-GGUF:Q4_K_M",
-                "${tools_home}/bin/llama-cli",
+                "AGENT_CANON_RUNTIME_ROOT",
+                "AGENT_CANON_SOURCE_PROJECTION_ROOT",
+                "tool-availability.json",
+                "tree --version",
                 "install_secret_scanners",
                 "gitleaks",
                 "trufflehog",
@@ -811,8 +802,8 @@ def test_missing_agent_canon_dockerignore_fails(tmp_path: Path) -> None:
     assert "dependency_contract_violation:.dockerignore:missing-ignore:vendor/agent-canon" in result.stdout
 
 
-def test_missing_local_model_cache_dockerignore_fails(tmp_path: Path) -> None:
-    """Docker build context should not include local LLM model artifacts."""
+def test_missing_agent_state_dockerignore_fails(tmp_path: Path) -> None:
+    """Docker build context should not include generated agent state."""
     write_valid_runtime(tmp_path)
     (tmp_path / ".dockerignore").write_text(".git\nvendor/agent-canon\n", encoding="utf-8")
 
@@ -820,4 +811,3 @@ def test_missing_local_model_cache_dockerignore_fails(tmp_path: Path) -> None:
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert "dependency_contract_violation:.dockerignore:missing-ignore:.state" in result.stdout
-    assert "dependency_contract_violation:.dockerignore:missing-ignore:*.gguf" in result.stdout

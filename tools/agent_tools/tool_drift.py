@@ -214,36 +214,6 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
-        name="local_llm_eval",
-        tool="tools/agent_tools/local_llm_eval.py",
-        links=(
-            LinkCheck("evidence/agent-evals/README.md"),
-            LinkCheck("evidence/agent-evals/local_llm_responsibility_eval.toml"),
-            LinkCheck("documents/runtime-log-archive.md"),
-            LinkCheck("documents/local-llm-responsibility-analysis.md"),
-            LinkCheck("tools/catalog.yaml"),
-            LinkCheck("tools/README.md"),
-            LinkCheck("documents/tools/README.md"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
-            LinkCheck("tests/agent_tools/test_local_llm_eval.py"),
-        ),
-    ),
-    ToolContract(
-        name="agent_canon_local_llm",
-        tool="rust/agent-canon/src/local_llm.rs",
-        links=(
-            LinkCheck("agent-canon-environment.toml"),
-            LinkCheck("documents/local-llm-responsibility-analysis.md"),
-            LinkCheck("documents/search-coordination.md"),
-            LinkCheck("documents/rust-agent-tool-migration.md"),
-            LinkCheck("tools/catalog.yaml"),
-            LinkCheck("tools/README.md"),
-            LinkCheck("documents/tools/README.md"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
-            LinkCheck(".github/workflows/agent-canon-static-gates.yml"),
-        ),
-    ),
-    ToolContract(
         name="issue_sync",
         tool="tools/agent_tools/issue_sync.py",
         links=(

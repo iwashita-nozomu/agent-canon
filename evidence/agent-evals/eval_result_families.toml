@@ -20,18 +20,6 @@ missing_run_id_detail = "missing-eval-run-id"
 duplicate_run_id_detail = "duplicate-eval-run-id"
 
 [[families]]
-id = "local-llm-responsibility"
-check_id = "local_llm_eval"
-count_label = "LOCAL_LLM_REPORTS"
-summary = "Local LLM responsibility prompt and optional model-backed eval reports."
-producer = "tools/agent_tools/local_llm_eval.py --accumulate"
-filename_regex = '^local-llm-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail|skip)\.md$'
-run_id_regex = '\bLOCAL_LLM_EVAL_RUN_ID=([A-Za-z0-9_.:-]+)'
-missing_reports_detail = "no-local-llm-eval-reports"
-missing_run_id_detail = "missing-local-llm-eval-run-id"
-duplicate_run_id_detail = "duplicate-local-llm-eval-run-id"
-
-[[families]]
 id = "workflow-selection"
 check_id = "workflow_selection_eval"
 count_label = "WORKFLOW_SELECTION_REPORTS"

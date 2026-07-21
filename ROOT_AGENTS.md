@@ -253,7 +253,7 @@ proof obligation, or replacement unit together even when the chunk is long.
 | skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml`; `vendor/agent-canon/.agents/skills/*/SKILL.md` | `python3 tools/agent_tools/route.py --prompt`; `check_agent_runtime_alignment.py` |
 | internal workflow routines | `vendor/agent-canon/agents/internal-routines/README.md` | `repo_structure_contract.py`; runtime alignment |
 | implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
-| search, read scope, and reuse survey | semantic-index, local-llm search, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
+| search, read scope, and reuse survey | deterministic coordinated search, dependency review artifacts | `search.py`; `run_repo_dependency_review.sh`; bounded search artifacts |
 | repo structure and root views | `vendor/agent-canon/documents/repo-structure-contract.toml`; `responsibility-scope.toml`; `documents/shared-runtime-surfaces.toml` | structure/scope/import tools; `sync_agent_canon.sh` |
 | branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/.codex/hooks/branch_worktree_guard.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation route | `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md` | profile-selected validation |
@@ -288,7 +288,7 @@ short owner/design/validation note.
 - `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md`
 
 Task-specific packet expansion is owned by the generated task packet,
-semantic-index/local-llm search, and dependency review artifacts when those
+deterministic coordinated search and dependency review artifacts when those
 routes are selected. The base packet is not a required reading list for every
 task.
 
