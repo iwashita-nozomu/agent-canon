@@ -357,6 +357,10 @@ The deterministic baseline provider is `deterministic-dense-v1`, model
 `hash-token-char-v1`. It is deterministic and offline so tests and CI can
 measure the tool without a local model.
 
+Repository-owned model server infrastructure is currently absent; search and
+prose reasoning therefore use deterministic providers unless a remote embedding
+provider is explicitly configured.
+
 The remote provider path is `openai-compatible-embedding`. It uses an
 explicitly configured OpenAI-compatible `/v1/embeddings` endpoint. The
 provider writes only vector blobs and provenance keys. It does not write model
