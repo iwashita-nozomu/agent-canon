@@ -14,7 +14,11 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-import tomllib
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,6 +44,7 @@ ALLOWED_OWNERS = frozenset(
         "project",
         "github-path-constraint",
         "agent-canon-standalone",
+        "agent-canon-update",
         "legacy",
     }
 )
@@ -54,7 +59,10 @@ ALLOWED_CLASSES = frozenset(
         "project_content",
         "test_mirror",
         "github_copy",
+        "generated_evidence",
+        "projection_view",
         "standalone_only",
+        "transaction_state",
         "removed_legacy",
     }
 )

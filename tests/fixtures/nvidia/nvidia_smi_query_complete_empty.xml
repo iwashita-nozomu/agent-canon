@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nvidia_smi_log>
+  <gpu>
+    <uuid>GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</uuid>
+    <mig_devices>
+      <mig_device>
+        <device_ordinal>0</device_ordinal>
+        <uuid>MIG-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</uuid>
+        <parent_uuid>GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</parent_uuid>
+      </mig_device>
+    </mig_devices>
+    <processes />
+    <compute_processes />
+    <graphics_processes />
+  </gpu>
+</nvidia_smi_log>

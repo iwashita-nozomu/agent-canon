@@ -20,7 +20,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
-import tomllib
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 
 DEFAULT_CONTRACT = "documents/repo-structure-contract.toml"
 ERROR = "error"

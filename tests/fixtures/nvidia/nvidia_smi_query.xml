@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?fixture nvidia-smi?>
+<!-- fixture topology -->
+<nvidia_smi_log>
+  <gpu>
+    <uuid>GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</uuid>
+    <mig_devices>
+      <mig_device>
+        <device_ordinal>0</device_ordinal>
+        <uuid>MIG-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</uuid>
+        <parent_uuid>GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</parent_uuid>
+      </mig_device>
+    </mig_devices>
+    <processes>
+      <process_info>
+        <pid>123</pid>
+        <process_name>fixture</process_name>
+        <used_memory>1 MiB</used_memory>
+      </process_info>
+    </processes>
+    <compute_processes />
+    <graphics_processes />
+  </gpu>
+</nvidia_smi_log>

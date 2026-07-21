@@ -17,6 +17,11 @@ import re
 import subprocess
 from pathlib import Path
 
+try:
+    from .graph_client import GraphClient, GraphClientError
+except ImportError:  # pragma: no cover - direct CLI execution
+    from graph_client import GraphClient, GraphClientError
+
 CHECKABLE_SUFFIXES = {
     ".bash",
     ".cfg",
@@ -38,6 +43,7 @@ SKIP_PREFIXES = (
     ".ruff_cache/",
     "reports/",
 )
+RAW_NVIDIA_FIXTURE_PREFIX = "tests/fixtures/nvidia/"
 HEADER_SCAN_LINES = 80
 BINARY_SNIFF_BYTES = 4096
 CONTRACT_REGISTRY = Path("documents/dependency-contract-kinds.toml")
@@ -105,6 +111,20 @@ def repo_relative(root: Path, path: Path) -> str:
         return path.as_posix()
 
 
+def path_is_repository_scoped(root: Path, path: Path) -> bool:
+    """Return whether graph facts can canonically identify this source path."""
+    if not (
+        (root / ".git").exists()
+        or (root / "vendor" / "agent-canon" / ".git").exists()
+    ):
+        return False
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
 def is_binary(path: Path) -> bool:
     """Return whether a file appears to be binary."""
     try:
@@ -119,6 +139,11 @@ def should_check(root: Path, path: Path) -> bool:
         return False
     relative = repo_relative(root, path)
     if any(relative.startswith(prefix) for prefix in SKIP_PREFIXES):
+        return False
+    if relative.startswith(RAW_NVIDIA_FIXTURE_PREFIX) and path.suffix.lower() == ".txt":
+        # These files are exact fd-bound NVIDIA byte evidence; their dependency
+        # owner is tests/fixtures/nvidia/README.md and manifest.json. Injecting
+        # a header would change the parser oracle bytes and manifest SHA.
         return False
     return path.suffix.lower() in CHECKABLE_SUFFIXES
 
@@ -235,6 +260,56 @@ def contract_kind_findings(root: Path, path: Path, allowed_kinds: set[str]) -> l
     return []
 
 
+def graph_manifest_facts(root: Path) -> tuple[dict[str, dict[str, object]], list[str]]:
+    """Read manifest facts from one fresh graph snapshot."""
+    try:
+        client = GraphClient(root)
+        response = client.query(relation="all", direction="both", all_nodes=True)
+        if response.status != "fresh" or response.exit_code != 0:
+            return {}, [
+                "graph snapshot is not fresh; run the canonical graph build before "
+                "consuming dependency-header facts"
+            ]
+        nodes = response.payload.get("nodes")
+        if not isinstance(nodes, list):
+            return {}, ["graph query omitted its canonical node snapshot"]
+        facts: dict[str, dict[str, object]] = {}
+        for raw_node in nodes:
+            if not isinstance(raw_node, dict):
+                return {}, ["graph query returned a malformed node"]
+            path = raw_node.get("path")
+            payload = raw_node.get("payload")
+            if not isinstance(path, str) or not isinstance(payload, dict):
+                return {}, ["graph query returned an incomplete source node"]
+            facts[path] = payload
+        return facts, []
+    except GraphClientError as error:
+        return {}, [f"graph snapshot unavailable: {error}"]
+
+
+def graph_contract_kind_findings(
+    root: Path,
+    path: Path,
+    allowed_kinds: set[str],
+    facts: dict[str, dict[str, object]],
+) -> list[str]:
+    """Validate a graph-owned manifest fact without reparsing the source file."""
+    relative = repo_relative(root, path)
+    payload = facts.get(relative)
+    if payload is None or payload.get("manifest_present") is not True:
+        return [f"{relative}: missing top dependency manifest block"]
+    contract_kind = payload.get("contract_kind")
+    if not isinstance(contract_kind, str) or not contract_kind:
+        return [f"{relative}: dependency manifest contract kind is absent from graph snapshot"]
+    if contract_kind not in allowed_kinds:
+        return [
+            f"{relative}: unregistered dependency contract kind '{contract_kind}'; "
+            f"fix: use an existing allowed_kinds entry from {contract_registry_path(root).as_posix()} "
+            "or update the registry with review"
+        ]
+    return []
+
+
 def main() -> int:
     """Run dependency header validation."""
     args = build_parser().parse_args()
@@ -255,16 +330,27 @@ def main() -> int:
         )
         return 1
 
+    repository_paths: list[Path] = []
     for path in paths:
         resolved = path if path.is_absolute() else root / path
         if not should_check(root, resolved):
             continue
-        if not has_dependency_header(resolved):
-            findings.append(
-                f"{repo_relative(root, resolved)}: missing top dependency manifest block"
-            )
+        if path_is_repository_scoped(root, resolved):
+            repository_paths.append(resolved)
+            continue
+        if not has_dependency_manifest(resolved):
+            findings.append(f"{repo_relative(root, resolved)}: missing top dependency manifest block")
             continue
         findings.extend(contract_kind_findings(root, resolved, allowed_kinds))
+
+    if repository_paths:
+        graph_facts, graph_findings = graph_manifest_facts(root)
+        findings.extend(graph_findings)
+        if not graph_findings:
+            for resolved in repository_paths:
+                findings.extend(
+                    graph_contract_kind_findings(root, resolved, allowed_kinds, graph_facts)
+                )
 
     if findings:
         print("DEPENDENCY_HEADERS=fail")

@@ -6,6 +6,7 @@
 # upstream design ../../tools/README.md shared tool family ownership
 # upstream design ../../documents/tools/README.md root-facing tool entrypoint policy
 # upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
+# upstream implementation ./visualization_contract.py canonical typed visualization contract/checker
 # upstream design ../../documents/repo-local-tool-imports.md legacy tool disposition policy
 # upstream implementation ./tool_path_policy.py defines retired legacy path policy
 # downstream implementation ../../tools/ci/run_all_checks.sh runs catalog validation
@@ -18,7 +19,11 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import tomllib
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -48,6 +53,9 @@ CATALOG_DOCS = (
     TOOL_DOCS_PATH,
     "documents/repo-local-tool-imports.md",
 )
+VISUALIZATION_CONTRACT_ID = "visualization-contract"
+VISUALIZATION_CONTRACT_PATH = "tools/agent_tools/visualization_contract.py"
+VISUALIZATION_CONTRACT_DOC = "documents/tools/visualization_contract.md"
 
 
 @dataclass(frozen=True)
@@ -426,6 +434,70 @@ def check_tool_docs_manifest(
     return findings
 
 
+def check_visualization_contract_entry(
+    root: Path,
+    entries: Sequence[Mapping[str, object]],
+    family_defaults: Mapping[str, Mapping[str, object]],
+) -> list[Finding]:
+    """Require exactly one canonical skill-facing visualization contract tool."""
+    findings: list[Finding] = []
+    candidates = [
+        entry
+        for entry in entries
+        if entry.get("id") == VISUALIZATION_CONTRACT_ID
+        or entry.get("path") == VISUALIZATION_CONTRACT_PATH
+    ]
+    if not candidates and not resolve_repo_path(root, VISUALIZATION_CONTRACT_PATH).exists():
+        return findings
+    if len(candidates) != 1:
+        return [
+            Finding(
+                "visualization_contract",
+                CATALOG_PATH,
+                f"expected-one-canonical-entry:found-{len(candidates)}",
+            )
+        ]
+    entry = candidates[0]
+    family = entry.get("family")
+    defaults = family_defaults.get(family, {}) if isinstance(family, str) else {}
+    if entry.get("id") != VISUALIZATION_CONTRACT_ID:
+        findings.append(
+            Finding("visualization_contract", VISUALIZATION_CONTRACT_PATH, "invalid-id")
+        )
+    if entry.get("path") != VISUALIZATION_CONTRACT_PATH:
+        findings.append(
+            Finding("visualization_contract", VISUALIZATION_CONTRACT_PATH, "invalid-path")
+        )
+    if entry.get("status") != "canonical":
+        findings.append(
+            Finding("visualization_contract", VISUALIZATION_CONTRACT_PATH, "must-be-canonical")
+        )
+    if inherited_string(entry, defaults, "audience") != "skill":
+        findings.append(
+            Finding("visualization_contract", VISUALIZATION_CONTRACT_PATH, "audience-must-be-skill")
+        )
+    if inherited_string(entry, defaults, "placement") not in {
+        "support_library",
+        "validation_checker",
+    }:
+        findings.append(
+            Finding(
+                "visualization_contract",
+                VISUALIZATION_CONTRACT_PATH,
+                "invalid-placement",
+            )
+        )
+    if VISUALIZATION_CONTRACT_DOC not in string_list(entry.get("docs")):
+        findings.append(
+            Finding(
+                "visualization_contract",
+                VISUALIZATION_CONTRACT_PATH,
+                "missing-canonical-doc",
+            )
+        )
+    return findings
+
+
 def validate_catalog(root: Path) -> CatalogReport:
     """Run catalog validation."""
     root = root.resolve()
@@ -504,6 +576,7 @@ def validate_catalog(root: Path) -> CatalogReport:
     findings.extend(check_default_wiring(root, entries))
     findings.extend(check_catalog_docs(root))
     findings.extend(check_tool_docs_manifest(root, entries))
+    findings.extend(check_visualization_contract_entry(root, entries, family_defaults))
     sorted_findings = sorted(
         findings,
         key=lambda finding: (finding.check, finding.path, finding.detail),

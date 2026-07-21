@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from pathlib import Path
 
 from agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
@@ -22,6 +24,7 @@ from agent_team import (
     TaskCatalog,
     TeamConfig,
     auto_language_specialists,
+    capacity_start_output_lines,
     codex_agent_model_matrix_for_roles,
     codex_runtime_max_depth,
     codex_runtime_max_threads,
@@ -231,7 +234,7 @@ def build_parser(
     parser.add_argument(
         "--skip-agent-canon-preflight",
         action="store_true",
-        help="Skip the automatic make agent-canon-ensure-latest preflight.",
+        help="Skip the automatic read-only AgentCanon update-plan preflight.",
     )
     return parser
 
@@ -341,7 +344,7 @@ def emit_bootstrap_output(
     active_skills = current_stage_skills(selected_skills, args.task)
     deferred_skills = deferred_stage_skills(selected_skills, args.task)
     review_roles = selected_review_roles(runtime.roles)
-    print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest")
+    print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-update-plan")
     print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
     print(f"AGENT_CANON_PREFLIGHT_REASON={preflight.reason}")
     print(f"AGENT_CANON_PREFLIGHT_NEXT={preflight.next_step}")
@@ -351,6 +354,8 @@ def emit_bootstrap_output(
     print(f"REPORT_DIR={context.report_dir}")
     print(f"TASK_AUTHORITY={context.report_dir / 'task_authority.yaml'}")
     print(f"WORKSPACE_ROOT={workspace_root}")
+    for line in capacity_start_output_lines(catalog, workspace_root, context.run_id):
+        print(line)
     print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
     print(f"RUNTIME_MAX_DEPTH={codex_runtime_max_depth()}")
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")

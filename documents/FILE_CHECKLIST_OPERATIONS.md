@@ -28,14 +28,10 @@ upstream design ./github-first-module-and-devcontainer-policy.md environment own
 - `main` が `origin` と同期している
 - 作業 topic が短く切れている
 
-手順:
-
-```bash
-git switch -c work/<topic>-YYYYMMDD
-python3 tools/agent_tools/worktree_scope_lint.py --current
-git status --short --branch
-git worktree list --porcelain
-```
+手順: current checkout を維持して status と worktree list を read-only
+確認します。新しい branch/worktree が必要なら reason を記録して user
+direction を求め、current-task approval と同一 segment の 4 authority/reason
+field が揃うまで作成しません。
 
 確認:
 
@@ -56,7 +52,7 @@ git worktree list --porcelain
 make ci-quick
 python3 -m pyright
 python3 -m pytest tests/ -q --tb=short
-python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501
+bash tools/ci/run_python_quality_checks.sh
 ```
 
 確認:

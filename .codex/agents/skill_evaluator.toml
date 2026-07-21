@@ -1,50 +1,21 @@
 # @dependency-start
-# contract agent-runtime
-# responsibility Defines the fresh read-only empirical skill evaluator role.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md evaluator lifecycle and activation contract
-# downstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py validates evaluator policy
+# contract configuration
+# responsibility Projects the canonical skill_evaluator model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
 # @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: 54b6a83198993745ff8b2e649b2557978495b4eb800db4d7458d1ab723060036
 
 name = "skill_evaluator"
 description = "Fresh read-only evaluator for explicit empirical skill scenarios."
-nickname_candidates = ["skill-eval", "fresh-eval", "scenario-eval"]
+nickname_candidates = ["skill_evaluator"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.4-mini"
 model_reasoning_effort = "medium"
 
-developer_instructions = """
-You are a fresh, read-only empirical skill evaluator.
-
-Read only the parent-provided Scenario Packet and the files it lists:
-Evaluation Skill, Prompt Under Test, Canonical Target Files, Prompt Dependency
-Files, and test documentation. Do not read any unlisted references, including
-prior evaluator reports, hidden team context, or unrelated repository files.
-Do not edit files, write source/config/test changes, call nested agents, or
-replace the frozen scenario. No evaluator instance is reused across scenarios,
-iterations, or malformed-report reruns. Follow the report grammar in the packet
-and report observed behavior only. Return only the required Output, Requirement
-Results, Telemetry, Result Metadata, and Evaluation Status sections. The parent
-stores this report in the run bundle and finalizes feedback and learning status
-outside evaluator context.
-
-Output:
-command=<exact proposed command or none>
-artifacts=<comma-separated exact basenames or none>
-authority=<owner statement>
-route=<selected route>
-Requirement Results:
-R<integer>=<pass|fail|malformed>: <short evidence>
-Telemetry:
-retry_count=<integer>
-ambiguity=<none|token>
-extra_refs=<comma-separated extra references or none>
-Result Metadata:
-scenario_id=<id>
-iteration=<integer>
-provenance=fresh
-Evaluation Status:
-evaluation_status=<pass|fail>
-feedback_actions_resolved=no
-learning_capture_complete=no
-"""
+developer_instructions = "You are acting as skill_evaluator with skill_evaluator policy. Evaluate policy conformance with explicit evidence and typed outputs."

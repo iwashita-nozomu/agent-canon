@@ -208,3 +208,23 @@ required_all = [
   "workflow_improvement_decision:",
   "memory_learning_decision:",
 ]
+
+[[criteria]]
+name = "p5_runtime_profile_projection_attributed"
+max_score = 10
+source = "runtime_profile_projection_gate"
+feedback = "Require generated role/profile attribution, topology-derived 20+6 capacity, loader readback, and separated thread/model queue evidence."
+required_all = [
+  "generated_role_view_v1",
+  "profile-attribution",
+  "topology_derived_v1",
+  "declared_team_peak_plus_nested_reservations_v1",
+  "requested_capacity_loader",
+  "model-capacity",
+  "thread-capacity",
+]
+forbidden_any = [
+  "active_subagents:",
+  "max_write_subagents:",
+  "profile_fallback=",
+]

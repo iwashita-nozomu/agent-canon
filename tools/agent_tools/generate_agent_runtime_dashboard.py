@@ -23,7 +23,9 @@ import time
 from collections import Counter, defaultdict
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from pathlib import Path
 from typing import cast
 
@@ -95,12 +97,10 @@ MARKDOWN_TOOL_IDS = (
     "audit_and_fix_links.py",
     "fix_markdown_docs.py",
     "fix_markdown_headers.py",
-    "run_docs_checks.sh",
 )
 TOOL_SELECTION_ALIASES = {
     "docs check": "agent-canon-cli",
     "docs format": "agent-canon-cli",
-    "run_docs_checks.sh": "agent-canon-cli",
 }
 SELECTION_EVIDENCE_TARGET = "compact report Selection Evidence Drilldown"
 MARKDOWN_EVIDENCE_TARGET = "compact report Markdown And Prompt Drilldown"

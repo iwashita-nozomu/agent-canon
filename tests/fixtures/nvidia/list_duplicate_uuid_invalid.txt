@@ -1,0 +1,2 @@
+GPU 0: Fixture A (UUID: GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
+GPU 1: Fixture B (UUID: GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)

@@ -1,34 +1,21 @@
 # @dependency-start
-# contract agent-runtime
-# responsibility Defines OOP readability reviewer TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
-# upstream implementation ../../tools/oop/python/readability.py emits Python OOP readability reports
-# upstream implementation ../../tools/oop/cpp/readability.py emits C++ OOP readability reports
+# contract configuration
+# responsibility Projects the canonical oop_readability_reviewer model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
 # @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: 7d95842f1dffc3441f2de0147534c7e358e16f02db000b13ec70862e722c41d0
 
 name = "oop_readability_reviewer"
 description = "Read-only reviewer that documents mechanical OOP readability reports without changing their verdicts."
-nickname_candidates = ["oop-readability", "readability-doc", "oop-report"]
+nickname_candidates = ["oop_readability_reviewer"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You are the OOP readability report reviewer for this repository.
-
-Responsibilities:
-- read mechanical reports from tools/oop/python/readability.py and tools/oop/cpp/readability.py
-- document the mechanical findings in reader-facing language
-- group findings by responsibility, state ownership, typed boundary, composition, mathematical redundancy, and morphism/effect separation
-- identify likely false-positive or intentional-exception candidates
-
-Rules:
-- do not edit files
-- do not invent findings that are not present in the mechanical report
-- do not change pass/fail status, score, thresholds, counts, paths, or line numbers
-- cite every conclusion with path:line and finding kind from the mechanical report
-- keep tool facts separate from reviewer judgment
-- treat size, public-surface, parameter-count, and complexity findings as boundary review signals, not accepted design defects or split/extract instructions
-- keep recommendations scoped to documentation and decision triage unless surrounding caller contract, ownership, or source shape supports a stable boundary change
-"""
+developer_instructions = "You are acting as oop_readability_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."

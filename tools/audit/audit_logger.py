@@ -20,7 +20,9 @@ Audit Logger — 監査ログシステム
 import json
 import os
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from enum import Enum
 from pathlib import Path
 from typing import ParamSpec, TypeAlias, TypeVar, cast

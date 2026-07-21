@@ -38,6 +38,24 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 
 - `agents/canonical/CODEX_WORKFLOW.md`
 
+## CompletionCoverage Reader Projection
+
+Closeout reporting consumes the generated `agent-canon.completion-coverage.v1`
+projection from the existing run-bundle logical ledger. This skill is a reader
+and routing projection; `COMMUNICATION_PROTOCOL` owns the schema,
+`CODEX_WORKFLOW` owns applicability/state, and `report_artifact_checks` plus
+`task_close` own checking/consumption. Preserve the five mapping error sets,
+typed owner/state/API/dependency evidence, W1 certificate references, and both
+independent predicates `all_planned_chunks_complete` and
+`overall_delivery_complete`. Do not aggregate a second coverage map or turn a
+chunk/checkpoint into delivery.
+
+Use `tools/bin/agent-canon docs check <changed-markdown-paths>` as the single
+Markdown/math/Mermaid route and consume the single official
+`agent-canon.posttooluse-stop.v1` PostToolUse/Stop dispatcher output. The
+CompletionCoverage route has no scalar OOP score, line/length, test-count,
+coverage, mutation, private-helper, or checker-retest completion gate.
+
 ## Stages
 
 1. intake

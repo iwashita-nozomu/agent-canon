@@ -6,8 +6,27 @@ upstream design ../canonical/CODEX_WORKFLOW.md defines canonical Codex task gate
 upstream design ../../documents/dependency-manifest-design.md defines dependency manifest gates
 downstream design ../templates/closeout_gate.md records closeout evidence required by this workflow
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py verifies design-doc evidence claims
+upstream design ../skills/code-visualization.md sole public visualization owner and canonical projection gate
+upstream implementation ../../tools/agent_tools/visualization_contract.py typed visualization coverage checker
+downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py validates workflow gate dependency edges
 @dependency-end
 -->
+
+## Canonical Visualization Gate
+
+When an implementation slice changes a visualization contract, owner route,
+producer adapter, renderer, or formatter, Gate 5-6 design approval must exist
+before the first contract edit. After the edit, route through the sole public
+`code-visualization` owner and run its canonical ToolCall, projection coverage,
+post-format readback, formatter, route, and producer-checker gates. Reference
+the typed contract owned by `tools/agent_tools/visualization_contract.py`;
+workflow prose must not copy its schema or omission/granularity policy.
+
+Any failed gate returns the existing typed validation failure packet with
+`failing_contract`, `observation_level`, `cause_classification`,
+`intent_preservation`, and `evidence` before repair. A visualization slice
+cannot enter implementation closeout while its canonical final coverage status
+is not `pass`.
 
 # 実装ウォーターフォールワークフロー
 
@@ -723,7 +742,7 @@ exit 条件:
 - `verification.txt` の `status=pass`
 - `closeout_gate.md` の `auditor_status=resolved` と `user_completion_report=unlocked`
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
-- `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes`
+- `closeout_gate.md` の `completion_coverage_consumer=yes`、`coverage_check.ok=true`、および `completion_boundary.topology_errors=[]`
 - `closeout_gate.md` の `post_fix_full_review_complete=yes`
 - `closeout_gate.md` の `mechanical_completion_loop_complete=yes` と構造化 loop evidence
 - `closeout_gate.md` の `diff_check_agent_complete=yes` と run-local diff-check artifact evidence

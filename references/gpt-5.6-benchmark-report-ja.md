@@ -95,14 +95,18 @@ upstream design agent-canon-technology-bibliography.md external source-record an
 
 概算は少なくとも次の形で置く。
 
-```text
-C_total = Σagent [
-    uncached_input × p_in
-  + cache_write × 1.25 × p_in
-  + cache_read × 0.10 × p_in
-  + output × p_out
-] + tool_cost + orchestration_overhead
-```
+$$
+\begin{aligned}
+C_{\mathrm{total}} &= \sum_{\mathrm{agent}}
+\left(
+\mathrm{uncached\_input}\,p_{\mathrm{in}}
++\,1.25\,\mathrm{cache\_write}\,p_{\mathrm{in}}
++\,0.10\,\mathrm{cache\_read}\,p_{\mathrm{in}}
++\,\mathrm{output}\,p_{\mathrm{out}}
+\right) \\
+&\quad+ \mathrm{tool\_cost} + \mathrm{orchestration\_overhead}
+\end{aligned}
+$$
 
 入力が272Kを超える各リクエストには長文倍率を適用する。複数エージェントへ同じ巨大コンテキストを複製すると、**エージェント数に比例して長文料金とコンテキスト希釈が増える**。したがって、MoEでは「全員に1Mトークンを渡す」のではなく、静的接頭辞をキャッシュし、検索・索引・断片化で各専門家の文脈を絞る。
 
@@ -363,18 +367,20 @@ Artificial Analysisは、試験した費用対知能面でSolとLunaがパレー
 
 モデル名だけをexpertとみなさず、次のタプルをexpertとして扱う。
 
-```text
-Expert = (
-  model,
-  reasoning_effort,
-  role_prompt,
-  allowed_tools,
-  context_slice,
-  output_schema,
-  time_budget,
-  token_budget
-)
-```
+$$
+\begin{aligned}
+\mathrm{Expert} &= \left(
+\mathrm{model},
+\mathrm{reasoning\_effort},
+\mathrm{role\_prompt},
+\mathrm{allowed\_tools},
+\mathrm{context\_slice},
+\mathrm{output\_schema},
+\mathrm{time\_budget},
+\mathrm{token\_budget}
+\right)
+\end{aligned}
+$$
 
 例として、`Luna-high-search-scout` と `Luna-high-code-triager` は同じモデルでも異なるexpertである。これにより、モデル切替だけでは得られない **プロンプト・権限・データ分割の多様性**を作れる。
 
@@ -411,10 +417,13 @@ Expert = (
 
 期待損失で書けば、概念的には次を満たすとき昇格する。
 
-```text
-P(failure | observed signals) × business_loss
-    > incremental_model_cost + λ × incremental_latency
-```
+$$
+\operatorname{Pr}(\mathrm{failure}\mid \mathrm{observed\ signals})\,\times\,
+\mathrm{business\_loss}
+>
+\mathrm{incremental\_model\_cost}
++\lambda \,\times\,\mathrm{incremental\_latency}
+$$
 
 `P(failure)` は自社evalで校正し、自己申告confidenceを単独で使わない。
 
@@ -725,15 +734,18 @@ Multi-agentで最も危険なのは、知能不足より **二重実行・古い
 
 ### 12.6 採用判定の例
 
-```text
 Heterogeneous cascadeを採用する条件:
-  quality >= Single Sol high - 許容差
-  high-risk failure <= baseline
-  cost_per_success <= baseline × 0.65
-  P95 latency <= SLO
-  Sol utilization <= 35%
-  unsupported claims <= baseline
-```
+
+$$
+\begin{aligned}
+\mathrm{quality} &\ge \mathrm{Single\ Sol\ high} - \mathrm{tolerance}\\
+\mathrm{high\text{-}risk\ failure} &\le \mathrm{baseline}\\
+\mathrm{cost\_per\_success} &\le 0.65\,\mathrm{baseline}\\
+P_{95}(\mathrm{latency}) &\le \mathrm{SLO}\\
+\mathrm{Sol\ utilization} &\le 35\%\\
+\mathrm{unsupported\ claims} &\le \mathrm{baseline}
+\end{aligned}
+$$
 
 閾値は業務ごとに変える。金融・医療・本番writeでは品質と安全の許容差をほぼゼロにし、低リスクの分類・抽出では費用と速度を重視する。
 

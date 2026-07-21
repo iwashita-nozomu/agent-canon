@@ -6,6 +6,7 @@
 # upstream implementation ../../tools/agent_tools/workflow_monitor.py appends evidence
 # upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py seeds evidence
 # upstream implementation ../../tools/agent_tools/task_start.py seeds evidence
+# upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns update lifecycle evidence identities
 # @dependency-end
 
 from __future__ import annotations
@@ -76,6 +77,54 @@ class WorkflowMonitorTest(unittest.TestCase):
             module.VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES,
             frozenset(response["intent_preservation"]),
         )
+
+    def test_monitor_records_pointer_only_update_lifecycle_evidence(self) -> None:
+        """Monitoring keeps DSV/lifecycle/close refs without duplicating policy."""
+        module = load_monitor_module()
+        evidence_type = getattr(module, "LifecycleMonitoringEvidence")
+        entries_type = getattr(module, "MonitoringEntries")
+        append_monitoring = getattr(module, "append_monitoring")
+        evidence_refs = (
+            "evidence:" + "1" * 64,
+            "evidence:" + "2" * 64,
+        )
+        evidence = evidence_type(
+            decision_sufficiency_packet_ref="evidence:" + "3" * 64,
+            decision_sufficiency_rejection_ref=None,
+            lifecycle_state="closed",
+            evidence_refs=evidence_refs,
+            close_agent_tool_call_ref="close-token:" + "4" * 64,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = append_monitoring(
+                Path(tmp_dir),
+                entries_type(lifecycle_evidence=evidence),
+            )
+            text = path.read_text(encoding="utf-8")
+
+        self.assertIn("## Update Lifecycle Evidence", text)
+        self.assertIn('"schema":"agent-canon.update-lifecycle-monitoring.v1"', text)
+        self.assertIn('"lifecycle_state":"closed"', text)
+        self.assertIn(evidence_refs[0], text)
+        self.assertNotIn("plausible repository state", text)
+
+    def test_monitor_rejects_duplicate_lifecycle_evidence_refs(self) -> None:
+        """One evidence identity may be recorded only once in a monitor event."""
+        module = load_monitor_module()
+        evidence_type = getattr(module, "LifecycleMonitoringEvidence")
+        lifecycle_record = getattr(module, "lifecycle_monitoring_record")
+        repeated = "evidence:" + "5" * 64
+        evidence = evidence_type(
+            decision_sufficiency_packet_ref="evidence:" + "6" * 64,
+            decision_sufficiency_rejection_ref=None,
+            lifecycle_state="prepared",
+            evidence_refs=(repeated, repeated),
+            close_agent_tool_call_ref=None,
+        )
+
+        with self.assertRaisesRegex(ValueError, "evidence_ref_duplicate"):
+            lifecycle_record(evidence)
 
     def test_monitor_appends_signals_interventions_and_decisions(self) -> None:
         """The monitor CLI should update all monitored sections."""
@@ -162,6 +211,68 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("warning_id=W1", text)
             self.assertIn("status=open", text)
             self.assertIn("- tool_warnings_status: open", text)
+
+    def test_monitor_preserves_schema_owned_completion_evidence(self) -> None:
+        """Monitor projection must retain typed gate, failure, resource, and binding fields."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            semantic_event = " ".join(
+                [
+                    "event_id=event-1",
+                    "context_id=context-1",
+                    "semantic_kind=validation",
+                    "owner=writer",
+                    "state_owner=writer",
+                    "api_owner=writer",
+                    "dependency_owner=writer",
+                    "responsibility_unit=completion-coverage",
+                    "intent_id=intent-1",
+                    "outcome=pass",
+                    "evidence_refs=source.md",
+                    "artifact_refs=completion_coverage.json",
+                    'gate_evidence={"gate_id":"oop_readability_guard","outcome":"pass"}',
+                    'failure_response={"status":"none"}',
+                    'resource_certificate={"certificate_id":"none","status":"none"}',
+                    'source_binding={"run_id":"run-1","context_id":"context-1"}',
+                ]
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--semantic-event",
+                    semantic_event,
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            work_log = (report_dir / "work_log.md").read_text(encoding="utf-8")
+            ledger_line = next(
+                line
+                for line in work_log.splitlines()
+                if line.startswith("- ledger_event=")
+            )
+            event = json.loads(ledger_line.removeprefix("- ledger_event="))
+            self.assertEqual(
+                event["gate_evidence"],
+                {"gate_id": "oop_readability_guard", "outcome": "pass"},
+            )
+            self.assertEqual(event["failure_response"], {"status": "none"})
+            self.assertEqual(
+                event["resource_certificate"],
+                {"certificate_id": "none", "status": "none"},
+            )
+            self.assertEqual(
+                event["source_binding"],
+                {"run_id": "run-1", "context_id": "context-1"},
+            )
 
     def test_monitor_sets_no_tool_warning_status(self) -> None:
         """Runs with no observed warning should mark the ledger explicitly none."""
@@ -951,9 +1062,16 @@ class WorkflowMonitorTest(unittest.TestCase):
             text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
             self.assertIn("skill_invocation=$agent-orchestration", text)
             self.assertIn("repo_dependency_review=pass", text)
-            self.assertIn("tool_call=pyright code_checker=pass", text)
-            self.assertIn("tool_call=ruff code_checker=pass", text)
-            self.assertIn("tool_call=oop-readability-check code_checker=pass", text)
+            self.assertIn(
+                "tool_call=canonical-format-check code_checker=pass "
+                "checker=markdown-math-mermaid scope=changed-paths",
+                text,
+            )
+            self.assertIn(
+                "hook_dispatcher=official schema=agent-canon.posttooluse-stop.v1 "
+                "events=PostToolUse,Stop",
+                text,
+            )
             self.assertIn("static_analysis_feedback=recorded", text)
             self.assertIn("hook_tool_feedback=reviewed", text)
             self.assertIn("parent_protocol_update=not_required", text)

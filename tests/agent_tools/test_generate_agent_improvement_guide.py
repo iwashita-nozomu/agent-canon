@@ -89,7 +89,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("Hook Quality Findings", guide)
         self.assertIn("Protocol Feedback Coverage", guide)
         self.assertIn("hook_tool_feedback=reviewed", guide)
-        self.assertIn("failure-a", guide)
+        self.assertNotIn("failure-a", guide)
         self.assertIn("memory/AGENT_PHILOSOPHY.md", guide)
         self.assertIn("Local Codex", guide)
 
@@ -119,7 +119,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(f"evidence_root: `{canon_root.resolve().as_posix()}`", guide)
         self.assertIn("open_issues: `1`", guide)
-        self.assertIn("hook_status_counts: `{'fail': 1, 'pass': 4}`", guide)
+        self.assertIn("hook_status_counts: `{'warn': 1, 'pass': 4}`", guide)
 
     def test_skill_routing_gap_ignores_pre_cutover_skill_logs(self) -> None:
         """Skill source updates should archive older routing signals from gap math."""
@@ -230,10 +230,10 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                     "hook_run_id": "hook-test",
                     "hook_log_namespace": "test-container",
                     "event": "PostToolUse",
-                    "status": "fail",
+                    "status": "warn",
                     "payload_fingerprint": "payload-a",
-                    "failure_fingerprint": "failure-a",
                     "tool_name": "apply_patch",
+                    "review_signal_count": 1,
                     "commands": [
                         {
                             "command": [
@@ -241,12 +241,13 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                                 "tools/oop/python/readability.py",
                                 "--root",
                                 str(root),
-                                "--min-score",
-                                "95",
                                 "tools/agent_tools/task_start.py",
                             ],
-                            "returncode": 1,
-                            "output_snippet": "OOP_READABILITY_FINDING=tools/agent_tools/task_start.py:1",
+                            "returncode": 0,
+                            "output_snippet": (
+                                "OOP_READABILITY_REVIEW_SIGNAL_FINDINGS=1\n"
+                                "OOP_READABILITY_TYPED_BOUNDARY_COUNTS={\\\"api_boundary\\\": 1}"
+                            ),
                         }
                     ],
                 }

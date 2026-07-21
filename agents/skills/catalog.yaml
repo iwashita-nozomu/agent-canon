@@ -2,10 +2,13 @@ version: 1
 # @dependency-start
 # contract registry
 # responsibility Catalogs canonical agent skills and their descriptions.
+# upstream design code-visualization.md sole public visualization owner and typed projection contract
 # downstream design ../canonical/CODEX_WORKFLOW.md consumes the skill catalog during task routing
+# downstream implementation ../../tools/agent_tools/skill_route_catalog.py parses complete rule and capability metadata
 # downstream implementation ../../tools/agent_tools/route.py consumes routing and related-skill metadata
 # downstream implementation ../../tools/agent_tools/skill_tool_commands.py prints skill command packets with related skills
 # downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates public skill catalog consistency
+# downstream implementation ../../tests/agent_tools/test_route.py tests canonical visualization capability routing
 # @dependency-end
 
 skill_families:
@@ -267,6 +270,23 @@ skill_families:
         - ["Dependency inversion"]
         - ["責務", "class"]
         - ["Protocol", "境界"]
+  - id: oop-type-design
+    purpose: Write pre-implementation OOP designs with explicit types, invariants, state transitions, ownership, composition, and API/external boundaries.
+    canonical_doc: agents/skills/oop-type-design.md
+    shim: .agents/skills/oop-type-design/SKILL.md
+    related_skills:
+      - oop-readability-check
+      - python-review
+      - cpp-review
+    routing:
+      stage_policy: active
+      reason: explicit pre-implementation OOP/type design capability owns responsibility and boundary modeling
+      capabilities:
+        - id: oop_type_design
+          owner: pre_implementation_oop_type_design
+          phase: pre_implementation_design
+          activation: explicit_capability
+          exclusive: true
   - id: result-artifact-writeout
     purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
     canonical_doc: agents/skills/result-artifact-writeout.md
@@ -518,6 +538,10 @@ skill_families:
     canonical_doc: agents/skills/agent-update-branch.md
     shim: .agents/skills/agent-update-branch/SKILL.md
   - id: report-writing
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.document_mermaid
+    argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
     purpose: Draft reader-facing reports, experiment summaries, decision briefs, and presentation/PPT storyboards from evidence with explicit source packets, visual asset plans, limitations, actionability, and quality checklist gates.
     canonical_doc: agents/skills/report-writing.md
     shim: .agents/skills/report-writing/SKILL.md
@@ -553,6 +577,10 @@ skill_families:
         - ["presentation", "narrative"]
         - ["ppt", "storyboard"]
   - id: prose-reasoning-graph
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.knowledge_graph
+    argument_schema: agent_canon.visualization.arguments.knowledge_graph.v1
     purpose: Convert prose into a SQLite-backed structure graph, diagnose discourse/argument/evidence/experiment gaps, explain findings, and emit writing-skill handoff packets.
     canonical_doc: agents/skills/prose-reasoning-graph.md
     shim: .agents/skills/prose-reasoning-graph/SKILL.md
@@ -574,6 +602,10 @@ skill_families:
         - ["rewrite", "packet"]
         - ["claim", "evidence", "graph"]
   - id: structure-planning
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.document_mermaid
+    argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
     purpose: Build structure contracts for reports, experiments, presentations/PPT decks, documents, papers, HTML views, and refactors before prose, rendering, interpretation, runs, or edits.
     canonical_doc: agents/skills/structure-planning.md
     shim: .agents/skills/structure-planning/SKILL.md
@@ -591,6 +623,10 @@ skill_families:
         - ["structure", "contract"]
         - ["根本", "設計", "構造"]
   - id: code-visualization
+    visualization_owner: code-visualization
+    visualization_role: owner
+    tool_id: agent_canon.visualization.coverage
+    argument_schema: agent_canon.visualization.arguments.coverage.v1
     purpose: Infer the context question and embedding context, then select the appropriate diagram type, source evidence, owner skill or tool, and renderer for code, repository, or document-embedded visualization.
     canonical_doc: agents/skills/code-visualization.md
     shim: .agents/skills/code-visualization/SKILL.md
@@ -607,7 +643,17 @@ skill_families:
     routing:
       stage_policy: active
       reason: Codex skill metadata selection or an explicit public skill id owns route activation; prose remains context evidence
+      capabilities:
+        - id: dependency_manifest_graph
+          owner: code_visualization
+          phase: repo_changing
+          activation: explicit_capability
+          exclusive: true
   - id: html-output
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.repository_graph
+    argument_schema: agent_canon.visualization.arguments.repository_graph.v1
     purpose: Produce polished browser-readable HTML artifacts only when HTML is explicit, including layout gates, optional ImageGen assets, and local/external browser server publication.
     canonical_doc: agents/skills/html-output.md
     shim: .agents/skills/html-output/SKILL.md
@@ -689,6 +735,10 @@ skill_families:
         - ["repair slice"]
         - ["抽象化", "リファクタ"]
   - id: structure-refactor
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.repository_graph
+    argument_schema: agent_canon.visualization.arguments.repository_graph.v1
     purpose: Refactor repository directory structure from recursive directory README responsibilities, dependency manifests, path mappings, and responsibility-scope validation.
     canonical_doc: agents/skills/structure-refactor.md
     shim: .agents/skills/structure-refactor/SKILL.md
@@ -790,6 +840,10 @@ skill_families:
         - ["ユーザー主導", "デバッグ"]
         - ["ユーザー主導", "リファクタ"]
   - id: long-form-writing
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.document_mermaid
+    argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
     purpose: Project graph/DSL structure into general explanatory repository prose for README, workflow, guide, migration, and specification responsibilities.
     canonical_doc: agents/skills/long-form-writing.md
     shim: .agents/skills/long-form-writing/SKILL.md
@@ -816,6 +870,10 @@ skill_families:
     canonical_doc: agents/skills/paper-writing.md
     shim: .agents/skills/paper-writing/SKILL.md
   - id: md-style-check
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.document_mermaid
+    argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
     purpose: Check Markdown formatting, heading structure, and link hygiene for format-only docs work; pair substantive document edits with prose-reasoning-graph and structure-planning.
     canonical_doc: agents/skills/md-style-check.md
     shim: .agents/skills/md-style-check/SKILL.md
@@ -885,6 +943,10 @@ skill_families:
         - ["旧", "文書"]
         - ["生成", "文書"]
   - id: dependency-analysis
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.dependency_manifest
+    argument_schema: agent_canon.visualization.arguments.dependency_manifest.v1
     purpose: Run dependency manifest and code-dependency tools, then package change impact and repair-planning context for editing, review, or subagent handoff.
     canonical_doc: agents/skills/dependency-analysis.md
     shim: .agents/skills/dependency-analysis/SKILL.md
@@ -1061,6 +1123,10 @@ skill_families:
     canonical_doc: agents/skills/literature-survey.md
     shim: .agents/skills/literature-survey/SKILL.md
   - id: formal-proof-workflow
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.algorithm_flowchart
+    argument_schema: agent_canon.visualization.arguments.algorithm_flowchart.v1
     purpose: Convert natural-language mathematical claims or JIT-canonical implementation claims into formal-proof obligations, existing-proof search packets, proof-assistant scaffolds, and checker-gated evidence.
     canonical_doc: agents/skills/formal-proof-workflow.md
     shim: .agents/skills/formal-proof-workflow/SKILL.md
@@ -1087,6 +1153,10 @@ skill_families:
         - ["アルゴリズム", "証明"]
         - ["アルゴリズム", "テストから"]
   - id: algorithm-flowchart
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.algorithm_flowchart
+    argument_schema: agent_canon.visualization.arguments.algorithm_flowchart.v1
     purpose: Render JIT-canonical IR, generated Lean evidence modules, and theorem graph overlays into Mermaid block charts for algorithm/proof-state review.
     canonical_doc: agents/skills/algorithm-flowchart.md
     shim: .agents/skills/algorithm-flowchart/SKILL.md

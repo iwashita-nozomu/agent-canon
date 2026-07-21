@@ -12,11 +12,15 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
+import agent_team  # noqa: E402
+import task_close  # noqa: E402
 from agent_team import render_template, suggested_public_skills  # noqa: E402
+from tools.agent_tools import implementation_route  # noqa: E402
 
 
 class AgentTeamTemplateTest(unittest.TestCase):
@@ -66,6 +70,93 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertLess(
             skills.index("$literature-survey"),
             skills.index("$research-workflow"),
+        )
+
+    def test_fixed_implementation_dispatch_uses_typed_route_and_registry_prompt(self) -> None:
+        """Eligible implementation dispatch launches one Spark and one owning gate."""
+        result = implementation_route.ImplementationRouteResult(
+            result_version=1,
+            decision_ref="decision:P3",
+            selected_agent_type="spark_worker",
+            selected_profile_id="spark_implementation_low",
+            packet_ref="packet:P3",
+            packet_sha256="a" * 64,
+            capacity_action="reserve_on_successful_spawn",
+            resume_worker_agent_id=None,
+            next_gate="implementation_route_gate",
+            failure=None,
+            status="completed",
+        )
+        original = agent_team.implementation_route.route_implementation
+        calls: list[tuple[str, str]] = []
+        agent_team.implementation_route.route_implementation = lambda request: result
+        try:
+            dispatch = agent_team.dispatch_fixed_implementation(
+                {"fixed_implementation_packet": {"packet_id": "P3"}},
+                "materialize P3",
+                lambda role, prompt: calls.append((role, prompt)) or "spark-1",
+                workspace_root=PROJECT_ROOT,
+            )
+        finally:
+            agent_team.implementation_route.route_implementation = original
+        self.assertEqual(dispatch.status, "spawned")
+        self.assertEqual(dispatch.spawn_count, 1)
+        self.assertEqual(dispatch.owner_gate_count, 1)
+        self.assertEqual(dispatch.worker_agent_id, "spark-1")
+        self.assertEqual(calls[0][0], "spark_worker")
+        self.assertIn("SPARK::", calls[0][1])
+        self.assertEqual(
+            dispatch.close_agent_token.arguments,
+            {"terminal_agent_id": "spark-1"},
+        )
+
+    def test_closeout_projection_uses_provider_child_before_parent_order(self) -> None:
+        """Returned close tokens preserve provider-computed descendant postorder."""
+        lifecycle = agent_team.capacity_handshake
+        ledger = lifecycle.CapacityLedger(
+            topology=lifecycle.DescendantTopologyReadback("run", ())
+        )
+        snapshot = SimpleNamespace(remaining_total_slots=2, remaining_write_slots=0)
+
+        def successful_terminal(work_id: str, parent_work_id: str):
+            reservation = lifecycle.record_successful_spawn(
+                snapshot,
+                ledger,
+                lifecycle.ReadyWorkItem(
+                    work_id=work_id,
+                    packet_sha256=f"packet://{work_id}",
+                    profile_id="spark_implementation_low",
+                ),
+                spawn_succeeded=True,
+                parent_work_id=parent_work_id,
+            )
+            self.assertEqual(reservation.status, "granted")
+            record = ledger.open_records[work_id]
+            record.status = lifecycle.LifecycleStatus.READBACK_VERIFIED
+            record.durable_result_evidence_ref = f"result://{work_id}"
+            record.durable_handback = True
+            record.descendants_closed = True
+            record.close_readback = True
+            return record
+
+        parent = successful_terminal("parent", "run")
+        child = successful_terminal("child", "parent")
+        self.assertEqual(tuple(ledger.open_records), ("parent", "child"))
+        self.assertEqual(tuple(ledger.reservations), ("parent", "child"))
+        projection = agent_team._closeout_projection(
+            SimpleNamespace(ledger=ledger, parent_lineage_id="lineage"),
+            SimpleNamespace(workspace_root=PROJECT_ROOT, run_id="run"),
+        )
+        calls = projection["close_agent_tool_calls"]
+        self.assertIsInstance(calls, list)
+        targets = [
+            call["tool_call_token"]["arguments"]["terminal_agent_id"]
+            for call in calls
+        ]
+        self.assertEqual(targets, ["child", "parent"])
+        self.assertEqual(
+            task_close.validate_capacity_lifecycle_closeout(ledger, calls),
+            (True, ()),
         )
 
 

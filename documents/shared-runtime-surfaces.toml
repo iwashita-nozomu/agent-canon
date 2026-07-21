@@ -2,6 +2,7 @@
 # contract reference
 # responsibility Defines machine-readable AgentCanon root runtime surface ownership.
 # upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface policy
+# upstream design ./gpu-admission-r5-source-packet.md exact whole-directory devcontainer identity ownership
 # downstream implementation ../tools/agent_tools/surface_manifest.py parses this manifest
 # downstream implementation ../tools/sync_agent_canon.sh consumes link and copy specs
 # @dependency-end
@@ -20,6 +21,8 @@ class = "runtime_surface"
 mode = "symlink"
 owner = "agent-canon"
 class = "runtime_surface"
+# .devcontainer remains a whole-directory surface so bootstrap, Compose,
+# finalize, and observational attach identity cannot be overridden separately.
 paths = [
   "agents",
   ".agents",
@@ -65,6 +68,7 @@ paths = [
   "documents/SHARED_RUNTIME_SURFACES.md",
   "documents/shared-runtime-surfaces.toml",
   "documents/log-surface-inventory.json",
+  "documents/agent-canon-update-route.md",
   "documents/agent-canon-parent-repo-latest-checklist.md",
   "documents/agent-canon-update-tasks.toml",
   "documents/runtime-profiles-and-check-matrix.md",
@@ -311,17 +315,36 @@ class = "durable_state"
 local_override_allowed = true
 
 [[surface]]
-path = ".agent-canon/update-state.toml"
+path = ".agent-canon/update-lifecycle/state"
 mode = "repo_state"
-owner = "project"
-class = "durable_state"
-local_override_allowed = true
+owner = "agent-canon-update"
+class = "transaction_state"
+local_override_allowed = false
+
+[[surface]]
+path = ".agent-canon/update-lifecycle/evidence"
+mode = "repo_state"
+owner = "agent-canon-update"
+class = "generated_evidence"
+local_override_allowed = false
+
+[[surface]]
+path = ".agent-canon/update-lifecycle/projection-queue"
+mode = "repo_state"
+owner = "agent-canon-update"
+class = "projection_view"
+local_override_allowed = false
 
 [[group]]
 mode = "removed_legacy"
 owner = "legacy"
 class = "removed_legacy"
 paths = [
+  ".claude",
+  ".github/agents",
+  ".github/copilot-instructions.md",
+  ".github/instructions",
+  "CLAUDE.md",
   "mcp",
   "documents/WORKFLOW_GUIDE.md",
   "documents/academic-writing-workflow.md",
@@ -334,6 +357,7 @@ paths = [
   "documents/main-integration-workflow.md",
   "documents/paper-writing-workflow.md",
   "documents/research-workflow.md",
+  "documents/tools/TOOLS_DIRECTORY.md",
   "documents/workflow-references.md",
   "notes/themes/AGENT_PHILOSOPHY.md",
   "notes/themes/USER_PREFERENCES.md",
@@ -341,4 +365,8 @@ paths = [
   "memory/methods",
   "memory/candidates",
   "memory/subagent_loadouts.yaml",
+  "tests/agent_tools/test_agent_canon_log_management_check.py",
+  "tests/agent_tools/test_check_mcp_inventory.py",
+  "tests/agent_tools/test_repo_mcp_server.py",
+  "tests/tools/test_mirror_skill_shims.py",
 ]

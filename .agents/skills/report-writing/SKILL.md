@@ -14,10 +14,32 @@ upstream design ../../../agents/workflows/slide-production-workflow.md defines P
 downstream design ../../../agents/skills/html-output.md consumes report content for explicit HTML rendering and browser publication
 downstream design ../../../evidence/agent-evals/report_quality_eval.toml defines report quality checklist eval coverage
 downstream implementation ../../../tools/agent_tools/evaluate_report_quality.py evaluates report-writing prompt surfaces
+upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
+downstream implementation ../../../tests/agent_tools/test_check_dependency_headers.py validates this adapter dependency header.
 @dependency-end
 -->
 
 # Report Writing
+
+## Visualization Adapter Boundary
+
+Keep report evidence and claims under `$report-writing`. Every Mermaid,
+storyboard, report, wiki, or browser graph embedding hands its complete selected
+facts to `$code-visualization` and uses that owner's
+`VisualizationSourceUniverse`, canonical `ToolCall`,
+`ProjectionCoverageManifest`, post-format readback, and final coverage status.
+This shim owns prose, placement, and layout only; it does not duplicate the
+owner's omission or granularity policy.
+
+## CompletionCoverage Reader Projection
+
+Completion and closeout reporting reads the generated
+`agent-canon.completion-coverage.v1` artifact from the existing run-bundle
+logical ledger. Preserve source binding, typed owner/state/API/dependency
+evidence, W1 certificate references, the five mapping error sets, and the two
+independent completion predicates. `COMMUNICATION_PROTOCOL` and
+`CODEX_WORKFLOW` remain the schema/applicability owners; this skill only
+projects checked evidence for readers.
 
 ## Tool Commands
 

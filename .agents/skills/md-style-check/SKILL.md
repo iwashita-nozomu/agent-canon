@@ -8,10 +8,21 @@ description: Use when Markdown files changed, docs formatter/fixer output must b
 contract skill
 responsibility Documents Markdown Style Check for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
+upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
+downstream implementation ../../../tests/tools/test_fix_mermaid.py tests formatter and post-format coverage behavior.
 @dependency-end
 -->
 
 # Markdown Style Check
+
+## Visualization Formatter Gate
+
+For Mermaid artifacts, consume `$code-visualization`'s
+`VisualizationSourceUniverse`, canonical `ToolCall`, and
+`ProjectionCoverageManifest`; format the complete artifact and return
+post-format readback identities for the owner's final coverage status. This
+shim owns syntax only and cannot treat rewriting, substitution, aggregation,
+or deletion as an omission repair. A pre-format marker is not readback.
 
 ## Tool Commands
 
@@ -39,6 +50,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Use `tools/bin/agent-canon docs -h` for command options and examples before reading implementation files.
 1. Before formatting files with display math, normalize display math to standalone double-dollar delimiter lines with blank lines around the block. Do not nest Markdown display delimiters inside KaTeX / math fenced blocks.
 1. Inline math in prose must use `$...$` (for example, `$(式)$`). Do not put math in inline code backticks, and do not use double-dollar display delimiters inside a sentence. Reserve double-dollar delimiters for display math on standalone delimiter lines.
+1. Mathematical expressions must not be placed in fenced code blocks labeled `text`, `plaintext`, `txt`, `plain`, `math`, `latex`, or `tex`; these first info tokens are checked case-insensitively. Convert those to `$...$` for inline math or a standalone double-dollar block. The checker reports one finding at a declared math-like fence and payload-line findings for text-like syntax.
 1. For tool-covered Markdown style, link, heading, math, and Mermaid properties, run the Rust docs tool before reading whole documents or spawning reviewers. Trust `DOCS_CHECK=pass`, `DOCS_CHECK_FINDING=...`, and the `DOCS_CHECK_REPORT_BEGIN` structured report; open only the reported path and nearby lines when a repair needs prose context.
 1. After any docs formatter or fixer runs, treat the adjacent check as part of the same operation: run `tools/bin/agent-canon docs check <paths...>` or record why the command was unavailable.
 1. Use `tools/bin/agent-canon docs fix-math <paths...>` and `tools/bin/agent-canon docs fix-mermaid <paths...>` for mechanical math or Mermaid repairs.

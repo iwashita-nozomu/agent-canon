@@ -10,11 +10,23 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/structure-planning.md defines reusable document structure contracts
 upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose graph diagnostics and rewrite handoffs
 upstream design ../../../agents/skills/formal-proof-workflow.md defines mathematical claim proof-obligation routing
+upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
+downstream implementation ../../../tests/agent_tools/test_check_dependency_headers.py validates this adapter dependency header.
 @dependency-end
 -->
 
 
 # Long-Form Writing
+
+## Visualization Adapter Boundary
+
+For any Mermaid, README, workflow, guide, wiki, or browser graph embedding,
+retain the document structure/source map as native writing facts and hand the
+complete selection to `$code-visualization`. Use only its
+`VisualizationSourceUniverse`, canonical `ToolCall`,
+`ProjectionCoverageManifest`, post-format readback, and final coverage status.
+This shim owns prose and placement, not the universal omission/granularity
+contract.
 
 ## Tool Commands
 

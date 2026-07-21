@@ -4,7 +4,10 @@
 // contract implementation
 // responsibility Provides the AgentCanon Rust CLI entrypoint.
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
+// upstream implementation ../../../tools/agent_tools/visualization_contract.py defines typed visualization coverage consumed by docs gates
 // downstream implementation docs.rs routes unified documentation formatting and checks
+// downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
+// downstream implementation ../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates
@@ -12,7 +15,9 @@
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // @dependency-end
 
+mod dependency_manifest;
 mod docs;
+mod graph;
 mod jit_ir_to_lean;
 mod migration_audit;
 mod python_algorithm_contract;
@@ -45,7 +50,13 @@ fn main() {
     }
 
     if args.len() >= 2 && args[1] == "docs" {
+        // Existing docs commands also run docs.rs post-format visualization
+        // identity readback when a projection coverage marker is present.
         std::process::exit(docs::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "graph" {
+        std::process::exit(graph::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "jit-ir-to-lean" {
@@ -90,7 +101,7 @@ fn main() {
 
     eprintln!("agent-canon: unknown or missing command");
     eprintln!(
-        "usage: agent-canon --version | docs <check|format|fix-math|fix-mermaid> [paths...] | test-design <check> [paths...] | jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path> | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|discourse-relations|eval|compare-providers|eval-output> | structured-analysis <build|analyze|graph-contract|document-inventory|import-document-inventory> | python-structure-hash --root <repo-root> [paths...] | python-structure-hash-report --input <path> [--output <path>] | python-structure-hash-impact --before <path> --after <path> [--output <path>] | python-structure-hash-scope-plan --input <path> --dependency-report-dir <dir> [--output <path>] | python-algorithm-contract-check --root <repo-root> [paths...] | python-module-groups-check --root <repo-root> [--contract path]"
+        "usage: agent-canon --version | graph <build|status|query|context> [options] | docs <check|format|fix-math|fix-mermaid> [paths...] | test-design <check> [paths...] | jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path> | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|discourse-relations|eval|compare-providers|eval-output> | structured-analysis <build|analyze|graph-contract|document-inventory|import-document-inventory> | python-structure-hash --root <repo-root> [paths...] | python-structure-hash-report --input <path> [--output <path>] | python-structure-hash-impact --before <path> --after <path> [--output <path>] | python-structure-hash-scope-plan --input <path> --dependency-report-dir <dir> [--output <path>] | python-algorithm-contract-check --root <repo-root> [paths...] | python-module-groups-check --root <repo-root> [--contract path]"
     );
     std::process::exit(2);
 }

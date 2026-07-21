@@ -5,6 +5,9 @@
 # upstream design ../../documents/tool-skill-routing-refactor.md short tool and skill naming policy
 # upstream design ../../agents/skills/task-routing.md task routing skill contract
 # upstream design ../../agents/skills/catalog.yaml public skill catalog and related skill metadata
+# upstream implementation ./skill_route_catalog.py catalog/rule/index owner
+# upstream implementation ./capability_route.py capability preflight/decision owner
+# upstream implementation ./visualization_contract.py exact D2.3 visualization ToolCall schema and validator
 # upstream design ../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
 # upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill routing
 # upstream design ../../agents/skills/pr-processing.md PR and Issue queue processing skill routing
@@ -24,26 +27,67 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
 
-import yaml
+from capability_route import (
+    FORMAT_VALUES,
+    MODE_VALUES,
+    RISK_VALUES,
+    CapabilityRouteDecision,
+    capability_failure_decision,
+    decide_capabilities,
+    preflight_capability_argv,
+)
 from skill_lane_detector import (
     structural_skill_lane_concept_matches,
     validation_failure_repair_concept_matches,
 )
+from skill_route_catalog import (
+    VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
+    VISUALIZATION_OWNER_SKILL,
+    VISUALIZATION_OWNER_TOOL_ID,
+    VISUALIZATION_ROLE_VALUES,
+    CapabilityRootError,
+    SkillRoutingRule,
+    VisualizationOwnerSkill,
+    VisualizationRejection,
+    build_capability_index,
+    build_visualization_owner_tool_call,
+    load_skill_related_map as _load_skill_related_map,
+    load_skill_route_rules,
+    load_skill_route_rules_from_root,
+    ordered_unique,
+    related_skill_candidates,
+    visualization_rejection_from_error,
+)
+from visualization_contract import (
+    TOOL_ARGUMENT_SCHEMAS,
+    TOOL_CALL_SCHEMA,
+    CoverageArguments,
+    ToolCall,
+    serialize_tool_call,
+)
+
+load_skill_related_map = _load_skill_related_map
+
 
 ROUTE_NAME = "task-routing"
 SKILL_NAME = "task-routing"
 TOOL_NAME = "route.py"
-RISK_VALUES = ("routine", "focused", "profile", "shared", "large")
-FORMAT_VALUES = ("text", "json", "markdown")
-MODE_VALUES = ("routing-only", "repo-changing")
 
 AreaData = tuple[str, str, str, str, tuple[str, ...], tuple[str, ...]]
-JsonMapping = Mapping[str, object]
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
-SKILL_CATALOG_PATH = Path("agents/skills/catalog.yaml")
-STAGE_POLICY_VALUES = ("active", "deferred")
-PRIVATE_SKILL_PREFIX = "_"
 SUBAGENT_BOOTSTRAP_SKILL = "subagent-bootstrap"
+VISUALIZATION_PROSE_TERMS = (
+    "visualization",
+    "visualize",
+    "diagram",
+    "flowchart",
+    "dependency graph",
+    "可視化",
+    "図示",
+)
+VISUALIZATION_TOOL_TOKEN_RE = re.compile(
+    r"(?<![A-Za-z0-9_])agent_canon\.visualization(?:\.[a-z0-9_]+)+(?![A-Za-z0-9_])"
+)
 PRIVATE_SUBAGENT_ROUTE_ALIASES = (
     "subagent-beginning",
     "_subagent-beginning",
@@ -418,17 +462,6 @@ class RouteDecision:
 
 
 @dataclass(frozen=True)
-class SkillRoutingRule:
-    """One catalog-backed prompt routing rule for a public skill."""
-
-    skill: str
-    reason: str
-    stage_policy: str
-    triggers: tuple[tuple[str, ...], ...]
-    related_skills: tuple[str, ...]
-
-
-@dataclass(frozen=True)
 class SkillRouteMatch:
     """One prompt-derived public skill route."""
 
@@ -449,6 +482,9 @@ class SkillRouteDecision:
     related_skill_candidates: tuple[str, ...]
     related_skills: dict[str, tuple[str, ...]]
     reasons: tuple[str, ...]
+    visualization_owner_skill: VisualizationOwnerSkill | None
+    visualization_tool_call: ToolCall | None
+    visualization_rejection: VisualizationRejection | None
     evidence: str
 
 
@@ -471,19 +507,34 @@ def build_default_areas() -> tuple[RouteArea, ...]:
 class RouteCatalog:
     """Catalog of short routing areas and long-name aliases."""
 
-    def __init__(self, areas: Sequence[RouteArea], skill_ids: Collection[str] = ()) -> None:
+    def __init__(
+        self,
+        areas: Sequence[RouteArea],
+        skill_ids: Collection[str] = (),
+        skill_rules: Sequence[SkillRoutingRule] = (),
+    ) -> None:
         """Initialize route areas and aliases."""
         self._areas = {area.key: area for area in areas}
         self._aliases = self._build_aliases(areas)
-        self._skill_ids = frozenset(skill_ids)
+        self._skill_rules = tuple(skill_rules)
+        self._skill_ids = frozenset(
+            rule.skill for rule in self._skill_rules
+        ) or frozenset(skill_ids)
 
     @classmethod
     def default(cls) -> RouteCatalog:
         """Build the default catalog."""
+        rules = load_skill_route_rules(DEFAULT_ROOT)
         return cls(
             build_default_areas(),
-            tuple(rule.skill for rule in load_skill_route_rules(DEFAULT_ROOT)),
+            skill_rules=rules,
         )
+
+    @classmethod
+    def from_root(cls, resolved_root: Path) -> RouteCatalog:
+        """Build a catalog from one resolved repository root."""
+        rules = load_skill_route_rules_from_root(resolved_root)
+        return cls(build_default_areas(), skill_rules=rules)
 
     def areas(self) -> tuple[RouteArea, ...]:
         """Return all areas in display order."""
@@ -492,6 +543,10 @@ class RouteCatalog:
     def area(self, key: str) -> RouteArea | None:
         """Return an area by key."""
         return self._areas.get(normalize_name(key))
+
+    def skill_rules(self) -> tuple[SkillRoutingRule, ...]:
+        """Return catalog-ordered skill routing rules."""
+        return self._skill_rules
 
     def resolve_name(self, name: str) -> NameResolution:
         """Resolve one proposed long tool or skill name to a short route."""
@@ -563,6 +618,12 @@ def build_parser(catalog: RouteCatalog) -> argparse.ArgumentParser:
         action="store_true",
         help="read prompt text from stdin",
     )
+    parser.add_argument(
+        "--capability",
+        action="append",
+        default=[],
+        help="explicit capability id to route",
+    )
     parser.add_argument("--mode", choices=MODE_VALUES, default="repo-changing")
     parser.add_argument("--list", action="store_true", help="list short routing areas")
     parser.add_argument("--format", choices=FORMAT_VALUES, default="text")
@@ -607,112 +668,6 @@ def text_matches_group(text: str, group: tuple[str, ...]) -> bool:
     return all(text_matches_term(text, term) for term in group)
 
 
-def object_mapping(value: object, field: str) -> JsonMapping:
-    """Return one string-keyed mapping from parsed catalog data."""
-    if not isinstance(value, Mapping):
-        raise ValueError(f"{field} must be a mapping")
-    return cast(JsonMapping, value)
-
-
-def object_sequence(value: object, field: str) -> Sequence[object]:
-    """Return one sequence from parsed catalog data."""
-    if not isinstance(value, list):
-        raise ValueError(f"{field} must be a list")
-    return cast(Sequence[object], value)
-
-
-def load_skill_catalog(root: Path) -> JsonMapping:
-    """Load the machine-readable public skill catalog."""
-    path = root / SKILL_CATALOG_PATH
-    try:
-        raw: object = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError as exc:
-        raise ValueError(f"{SKILL_CATALOG_PATH} YAML parse failed: {exc}") from exc
-    return object_mapping(raw, str(SKILL_CATALOG_PATH))
-
-
-def string_list(value: object, field: str) -> tuple[str, ...]:
-    """Return a tuple of non-empty strings from one YAML sequence."""
-    result: list[str] = []
-    for item in object_sequence(value, field):
-        if not isinstance(item, str) or not item.strip():
-            raise ValueError(f"{field} entries must be non-empty strings")
-        result.append(item)
-    return tuple(result)
-
-
-def trigger_groups(value: object, field: str) -> tuple[tuple[str, ...], ...]:
-    """Return normalized trigger term groups from YAML."""
-    if value is None:
-        return ()
-    groups: list[tuple[str, ...]] = []
-    for index, group in enumerate(object_sequence(value, field)):
-        groups.append(string_list(group, f"{field}[{index}]"))
-    return tuple(groups)
-
-
-def optional_string_list(value: object, field: str) -> tuple[str, ...]:
-    """Return a tuple of strings from an optional YAML list."""
-    if value is None:
-        return ()
-    return string_list(value, field)
-
-
-def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
-    """Load prompt-routing rules from the public skill catalog."""
-    data = load_skill_catalog(root)
-    families = object_sequence(data.get("skill_families"), "skill_families")
-    rules: list[SkillRoutingRule] = []
-    observed_skill_ids: set[str] = set()
-    for index, entry in enumerate(families):
-        entry_mapping = object_mapping(entry, f"skill_families[{index}]")
-        skill_id = entry_mapping.get("id")
-        if not isinstance(skill_id, str) or not skill_id.strip():
-            raise ValueError(f"skill_families[{index}].id must be a non-empty string")
-        if skill_id.startswith(PRIVATE_SKILL_PREFIX):
-            raise ValueError(f"skill_families[{index}].id must be public: {skill_id}")
-        if skill_id in observed_skill_ids:
-            raise ValueError(f"duplicate skill catalog id: {skill_id}")
-        observed_skill_ids.add(skill_id)
-        routing = entry_mapping.get("routing")
-        if routing is None:
-            routing_mapping: JsonMapping = {}
-        else:
-            routing_mapping = object_mapping(routing, f"{skill_id}.routing")
-        reason = routing_mapping.get("reason", "prompt explicitly names public skill")
-        if not isinstance(reason, str) or not reason.strip():
-            raise ValueError(f"{skill_id}.routing.reason must be a non-empty string")
-        stage_policy = routing_mapping.get("stage_policy", "deferred")
-        if stage_policy not in STAGE_POLICY_VALUES:
-            raise ValueError(f"{skill_id}.routing.stage_policy must be one of {STAGE_POLICY_VALUES}")
-        rules.append(
-            SkillRoutingRule(
-                skill=skill_id,
-                reason=reason,
-                stage_policy=str(stage_policy),
-                triggers=trigger_groups(routing_mapping.get("triggers"), f"{skill_id}.routing.triggers"),
-                related_skills=optional_string_list(
-                    entry_mapping.get("related_skills"),
-                    f"{skill_id}.related_skills",
-                ),
-            )
-        )
-    for rule in rules:
-        for related_skill in rule.related_skills:
-            if related_skill == rule.skill:
-                raise ValueError(f"{rule.skill}.related_skills must not include itself")
-            if related_skill.startswith(PRIVATE_SKILL_PREFIX):
-                raise ValueError(f"{rule.skill}.related_skills must be public: {related_skill}")
-            if related_skill not in observed_skill_ids:
-                raise ValueError(f"{rule.skill}.related_skills unknown skill: {related_skill}")
-    return tuple(rules)
-
-
-def load_skill_related_map(root: Path) -> dict[str, tuple[str, ...]]:
-    """Return catalog-backed related-skill candidates keyed by public skill id."""
-    return {rule.skill: rule.related_skills for rule in load_skill_route_rules(root)}
-
-
 def validation_failure_repair_rules(
     rules_by_skill: Mapping[str, SkillRoutingRule],
     prompt: str,
@@ -731,6 +686,7 @@ def validation_failure_repair_rules(
             reason=matches[0].reason(),
             stage_policy="active",
             triggers=(),
+            capabilities=(),
             related_skills=related_skills,
         ),
     )
@@ -788,6 +744,153 @@ def strip_private_route_aliases(text: str) -> str:
             flags=re.IGNORECASE,
         )
     return scrubbed
+
+
+def _parse_explicit_visualization_tool_call(
+    prompt: str,
+) -> tuple[ToolCall | None, VisualizationRejection | None, bool]:
+    """Parse and validate one explicit JSON visualization ToolCall."""
+    stripped = prompt.strip()
+    looks_like_tool_call = any(
+        marker in prompt
+        for marker in ('"tool_id"', '"argument_schema"', TOOL_CALL_SCHEMA)
+    )
+    if not stripped.startswith(("{", "[")):
+        return None, None, False
+    try:
+        value = json.loads(stripped)
+    except json.JSONDecodeError:
+        if looks_like_tool_call or "agent_canon.visualization" in prompt:
+            return None, "invalid_tool_call", True
+        return None, None, False
+    if not isinstance(value, Mapping):
+        if looks_like_tool_call or "agent_canon.visualization" in prompt:
+            return None, "invalid_tool_call", True
+        return None, None, False
+    tool_call_fields = frozenset(ToolCall.__required_keys__)
+    has_visualization_field = bool(tool_call_fields.intersection(value)) or (
+        "agent_canon.visualization" in prompt
+    )
+    if not has_visualization_field:
+        return None, None, False
+    if set(value) != tool_call_fields:
+        return None, "invalid_tool_call", True
+    if (
+        not isinstance(value.get("schema"), str)
+        or not isinstance(value.get("tool_id"), str)
+        or not isinstance(value.get("argument_schema"), str)
+        or not isinstance(value.get("arguments"), dict)
+    ):
+        return None, "invalid_tool_call", True
+    tool_call = cast(ToolCall, value)
+    try:
+        serialize_tool_call(tool_call)
+    except ValueError as exc:
+        return None, visualization_rejection_from_error(exc), True
+    return tool_call, None, True
+
+
+def _owner_tool_call_from_explicit_call(tool_call: ToolCall) -> ToolCall:
+    """Normalize one valid owner/adapter call to the sole owner ToolCall."""
+    arguments = tool_call["arguments"]
+    owner_arguments = {
+        field: arguments[field]
+        for field in sorted(CoverageArguments.__annotations__)
+        if field in arguments
+    }
+    owner_call: ToolCall = {
+        "schema": "agent_canon.visualization_tool_call.v1",
+        "tool_id": VISUALIZATION_OWNER_TOOL_ID,
+        "argument_schema": VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
+        "arguments": owner_arguments,
+    }
+    serialize_tool_call(owner_call)
+    return owner_call
+
+
+def _visualization_tool_tokens(prompt: str) -> tuple[str, ...]:
+    """Return canonical-looking visualization ToolID tokens in prompt order."""
+    return ordered_unique(VISUALIZATION_TOOL_TOKEN_RE.findall(prompt))
+
+
+def _visualization_prompt_contract(
+    prompt: str,
+    rules_by_skill: Mapping[str, SkillRoutingRule],
+) -> tuple[
+    VisualizationOwnerSkill | None,
+    ToolCall | None,
+    VisualizationRejection | None,
+    str,
+]:
+    """Return the exact owner call or deterministic visualization rejection."""
+    explicit_call, rejection, call_present = _parse_explicit_visualization_tool_call(
+        prompt
+    )
+    if rejection is not None:
+        return None, None, rejection, "explicit visualization ToolCall rejected"
+
+    tokens = _visualization_tool_tokens(prompt)
+    known_tokens = set(TOOL_ARGUMENT_SCHEMAS) | set(TOOL_ARGUMENT_SCHEMAS.values()) | {
+        TOOL_CALL_SCHEMA
+    }
+    if any(token not in known_tokens for token in tokens):
+        return None, None, "invalid_tool_call", "unknown visualization ToolID"
+
+    explicit_owner = public_skill_name_mentioned(prompt, VISUALIZATION_OWNER_SKILL)
+    explicit_adapter = any(
+        rule.visualization_role == "adapter"
+        and public_skill_name_mentioned(prompt, rule.skill)
+        for rule in rules_by_skill.values()
+    )
+    explicit_tool_id = any(token in TOOL_ARGUMENT_SCHEMAS for token in tokens)
+    explicitly_routed = call_present or explicit_owner or explicit_adapter or explicit_tool_id
+    if not explicitly_routed:
+        if any(text_matches_term(prompt.lower(), term) for term in VISUALIZATION_PROSE_TERMS):
+            return None, None, "prose_only", "visualization prose has no explicit owner route"
+        return None, None, None, ""
+
+    owner_rule = rules_by_skill.get(VISUALIZATION_OWNER_SKILL)
+    if (
+        owner_rule is None
+        or owner_rule.visualization_owner_skill != VISUALIZATION_OWNER_SKILL
+        or owner_rule.visualization_role != "owner"
+        or owner_rule.visualization_tool_call is None
+    ):
+        return None, None, "missing_owner", "canonical visualization owner missing"
+
+    if (
+        owner_rule.visualization_tool_call["tool_id"] != VISUALIZATION_OWNER_TOOL_ID
+    ):
+        return None, None, "missing_owner", "canonical visualization owner missing"
+    try:
+        serialize_tool_call(owner_rule.visualization_tool_call)
+    except ValueError as exc:
+        return (
+            None,
+            None,
+            visualization_rejection_from_error(exc),
+            "catalog visualization owner ToolCall rejected",
+        )
+
+    try:
+        owner_call = (
+            _owner_tool_call_from_explicit_call(explicit_call)
+            if explicit_call is not None
+            else build_visualization_owner_tool_call(prompt, "route:prompt")
+        )
+    except ValueError as exc:
+        return (
+            None,
+            None,
+            visualization_rejection_from_error(exc),
+            "canonical visualization owner ToolCall rejected",
+        )
+    return (
+        cast(VisualizationOwnerSkill, VISUALIZATION_OWNER_SKILL),
+        owner_call,
+        None,
+        "explicit visualization owner, capability, adapter, or ToolID route",
+    )
 
 
 def matched_skill_routes(prompt: str, rules: Sequence[SkillRoutingRule]) -> tuple[SkillRouteMatch, ...]:
@@ -879,18 +982,6 @@ def infer_mode(prompt: str, requested_mode: str) -> str:
     return requested_mode
 
 
-def ordered_unique(values: Iterable[str]) -> tuple[str, ...]:
-    """Return values in first-seen order without duplicates."""
-    seen: set[str] = set()
-    result: list[str] = []
-    for value in values:
-        if value in seen:
-            continue
-        seen.add(value)
-        result.append(value)
-    return tuple(result)
-
-
 def implementation_handoff_required(prompt: str, mode: str = "repo-changing") -> bool:
     """Return whether prompt text asks for a write-capable implementation handoff."""
     if mode != "repo-changing":
@@ -922,31 +1013,6 @@ def is_current_stage_skill(
     return rule is not None and rule.stage_policy == "active"
 
 
-def related_skill_candidates(
-    matched_skills: Sequence[str],
-    rules_by_skill: Mapping[str, SkillRoutingRule],
-    selected_skills: Sequence[str],
-) -> tuple[dict[str, tuple[str, ...]], tuple[str, ...]]:
-    """Return related skills for matched skills without activating them."""
-    related_by_source: dict[str, tuple[str, ...]] = {}
-    candidates: list[str] = []
-    selected = set(selected_skills)
-    for skill in matched_skills:
-        rule = rules_by_skill.get(skill)
-        if rule is None or not rule.related_skills:
-            continue
-        pending_related = tuple(
-            related_skill
-            for related_skill in rule.related_skills
-            if related_skill not in selected
-        )
-        if not pending_related:
-            continue
-        related_by_source[skill] = pending_related
-        candidates.extend(pending_related)
-    return related_by_source, ordered_unique(candidates)
-
-
 def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> SkillRouteDecision:
     """Create a prompt-derived public skill route decision."""
     public_prompt = strip_private_route_aliases(prompt)
@@ -957,10 +1023,31 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
         *validation_failure_repair_rules(catalog_rules_by_skill, public_prompt),
     )
     rules_by_skill = {rule.skill: rule for rule in effective_rules}
+    (
+        visualization_owner_skill,
+        visualization_tool_call,
+        visualization_rejection,
+        visualization_reason,
+    ) = _visualization_prompt_contract(public_prompt, rules_by_skill)
+    catalog_matches = matched_skill_routes(public_prompt, effective_rules)
+    if visualization_rejection is not None:
+        visualization_skills = {
+            rule.skill
+            for rule in effective_rules
+            if rule.visualization_role in VISUALIZATION_ROLE_VALUES
+        }
+        catalog_matches = tuple(
+            match for match in catalog_matches if match.skill not in visualization_skills
+        )
     matches = dedupe_skill_route_matches(
         (
+            *(
+                (SkillRouteMatch(VISUALIZATION_OWNER_SKILL, visualization_reason),)
+                if visualization_owner_skill is not None
+                else ()
+            ),
             *broad_refactor_routes(public_prompt),
-            *matched_skill_routes(public_prompt, effective_rules),
+            *catalog_matches,
             *structural_skill_lane_routes(public_prompt),
             *validation_failure_repair_routes(public_prompt),
             *supplemental_skill_routes(public_prompt),
@@ -998,8 +1085,13 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
         f"mode={active_mode};matched={','.join(matched_skills) if matched_skills else 'none'};"
         f"active={','.join(active_skills)};"
         f"deferred={','.join(deferred_skills) if deferred_skills else 'none'};"
-        f"related={','.join(related_candidates) if related_candidates else 'none'}"
+        f"related={','.join(related_candidates) if related_candidates else 'none'};"
+        f"visualization_owner={visualization_owner_skill or 'none'};"
+        f"visualization_rejection={visualization_rejection or 'none'}"
     )
+    reasons = tuple(f"{match.skill}:{match.reason}" for match in matches)
+    if visualization_rejection is not None:
+        reasons = (*reasons, f"visualization:{visualization_rejection}")
     return SkillRouteDecision(
         route="skill-selection",
         mode=active_mode,
@@ -1009,7 +1101,10 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
         matched_skills=matched_skills,
         related_skill_candidates=related_candidates,
         related_skills=related_by_source,
-        reasons=tuple(f"{match.skill}:{match.reason}" for match in matches),
+        reasons=reasons,
+        visualization_owner_skill=visualization_owner_skill,
+        visualization_tool_call=visualization_tool_call,
+        visualization_rejection=visualization_rejection,
         evidence=evidence,
     )
 
@@ -1064,6 +1159,13 @@ class RouteRenderer:
         if self._format == "json":
             payload = {"schema": "agent_canon.route.skill_route.v1", **asdict(decision)}
             return json.dumps(payload, indent=2, sort_keys=True)
+        owner_skill = decision.visualization_owner_skill or "none"
+        tool_call = (
+            serialize_tool_call(decision.visualization_tool_call)
+            if decision.visualization_tool_call is not None
+            else "none"
+        )
+        rejection = decision.visualization_rejection or "none"
         if self._format == "markdown":
             skills = ", ".join(f"`${skill}`" for skill in decision.skills)
             reasons = "<br>".join(f"`{reason}`" for reason in decision.reasons) or "`none`"
@@ -1088,6 +1190,9 @@ class RouteRenderer:
                         else "`none`"
                     ),
                     f"- Reasons: {reasons}",
+                    f"- Visualization owner skill: `{owner_skill}`",
+                    f"- Visualization ToolCall: `{tool_call}`",
+                    f"- Visualization rejection: `{rejection}`",
                     f"- Evidence: `{decision.evidence}`",
                 ]
             )
@@ -1121,7 +1226,74 @@ class RouteRenderer:
                     else "-"
                 ),
                 f"REASONS={';'.join(decision.reasons) or '-'}",
+                f"VISUALIZATION_OWNER_SKILL={owner_skill}",
+                f"VISUALIZATION_TOOL_CALL={tool_call}",
+                f"VISUALIZATION_REJECTION={rejection}",
                 f"EVIDENCE={decision.evidence}",
+            ]
+        )
+
+    def render_capability_decision(self, decision: CapabilityRouteDecision) -> str:
+        """Render one capability decision in the selected stable format."""
+        data = capability_decision_to_json_data(decision)
+        matches = json.dumps(data["matches"], separators=(",", ":"), sort_keys=False)
+        related_skills = json.dumps(
+            data["related_skills"], separators=(",", ":"), sort_keys=False
+        )
+        reasons = json.dumps(data["reasons"], separators=(",", ":"), sort_keys=False)
+        capability_ids = ",".join(decision.capability_ids) or "-"
+        skills = ",".join(decision.skills) or "-"
+        active_skills = ",".join(decision.active_skills) or "-"
+        deferred_skills = ",".join(decision.deferred_skills) or "-"
+        related_candidates = ",".join(decision.related_skill_candidates) or "-"
+        visualization_owner = decision.visualization_owner_skill or "none"
+        visualization_tool_call = (
+            serialize_tool_call(decision.visualization_tool_call)
+            if decision.visualization_tool_call is not None
+            else "none"
+        )
+        visualization_rejection = decision.visualization_rejection or "none"
+        if self._format == "json":
+            return json.dumps(data, indent=2, sort_keys=False)
+        if self._format == "markdown":
+            return "\n".join(
+                [
+                    f"- Schema: `{decision.schema}`",
+                    f"- Route: `{decision.route}`",
+                    f"- Mode: `{decision.mode}`",
+                    f"- Status: `{decision.status}`",
+                    f"- Error code: `{decision.error_code}`",
+                    f"- Capability IDs: `{capability_ids}`",
+                    f"- Matches: `{matches}`",
+                    f"- Skills: `{skills}`",
+                    f"- Active skills: `{active_skills}`",
+                    f"- Deferred skills: `{deferred_skills}`",
+                    f"- Related skill candidates: `{related_candidates}`",
+                    f"- Related skills: `{related_skills}`",
+                    f"- Reasons: `{reasons}`",
+                    f"- Visualization owner skill: `{visualization_owner}`",
+                    f"- Visualization ToolCall: `{visualization_tool_call}`",
+                    f"- Visualization rejection: `{visualization_rejection}`",
+                ]
+            )
+        return "\n".join(
+            [
+                f"CAPABILITY_ROUTE_SCHEMA={decision.schema}",
+                f"CAPABILITY_ROUTE={decision.route}",
+                f"CAPABILITY_MODE={decision.mode}",
+                f"CAPABILITY_ROUTE_STATUS={decision.status}",
+                f"CAPABILITY_ERROR_CODE={decision.error_code}",
+                f"CAPABILITY_IDS={capability_ids}",
+                f"CAPABILITY_MATCHES={matches}",
+                f"SKILLS={skills}",
+                f"ACTIVE_SKILLS={active_skills}",
+                f"DEFERRED_SKILLS={deferred_skills}",
+                f"RELATED_SKILL_CANDIDATES={related_candidates}",
+                f"RELATED_SKILLS={related_skills}",
+                f"REASONS={reasons}",
+                f"VISUALIZATION_OWNER_SKILL={visualization_owner}",
+                f"VISUALIZATION_TOOL_CALL={visualization_tool_call}",
+                f"VISUALIZATION_REJECTION={visualization_rejection}",
             ]
         )
 
@@ -1157,6 +1329,55 @@ class RouteRenderer:
         return "\n".join(rows)
 
 
+def capability_decision_to_json_data(
+    decision: CapabilityRouteDecision,
+) -> dict[str, object]:
+    """Convert an immutable capability decision to a fresh JSON mapping."""
+    return {
+        "schema": decision.schema,
+        "route": decision.route,
+        "mode": decision.mode,
+        "status": decision.status,
+        "error_code": decision.error_code,
+        "capability_ids": list(decision.capability_ids),
+        "matches": [
+            {
+                "skill": match.skill,
+                "capability_id": match.capability_id,
+                "owner": match.owner,
+                "phase": match.phase,
+                "activation": match.activation,
+                "exclusive": match.exclusive,
+            }
+            for match in decision.matches
+        ],
+        "skills": list(decision.skills),
+        "active_skills": list(decision.active_skills),
+        "deferred_skills": list(decision.deferred_skills),
+        "related_skill_candidates": list(decision.related_skill_candidates),
+        "related_skills": {
+            skill: list(related)
+            for skill, related in decision.related_skills.items()
+        },
+        "reasons": list(decision.reasons),
+        "visualization_owner_skill": decision.visualization_owner_skill,
+        "visualization_tool_call": decision.visualization_tool_call,
+        "visualization_rejection": decision.visualization_rejection,
+    }
+
+
+def render_capability_error(
+    error_code: str,
+    capability_ids: Sequence[str],
+    output_format: str,
+    mode: str,
+) -> str:
+    """Render one deterministic capability failure envelope."""
+    safe_format = output_format if output_format in FORMAT_VALUES else "text"
+    decision = capability_failure_decision(error_code, capability_ids, mode)
+    return RouteRenderer(safe_format).render_capability_decision(decision)
+
+
 def render_resolution_line(item: NameResolution) -> str:
     """Render one name resolution as machine-readable text."""
     return "\t".join(
@@ -1175,11 +1396,56 @@ def has_unknown_resolution(resolutions: Iterable[NameResolution]) -> bool:
     return any(item.status == "unknown" for item in resolutions)
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Run the route helper."""
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    preflight = preflight_capability_argv(raw_argv)
+    capability_mode = any(
+        token == "--capability" or token.startswith("--capability=")
+        for token in raw_argv
+    )
+    if capability_mode:
+        if preflight.error_code:
+            print(
+                render_capability_error(
+                    preflight.error_code,
+                    preflight.capability_ids,
+                    preflight.output_format,
+                    preflight.mode,
+                )
+            )
+            return 2
+        try:
+            catalog = (
+                RouteCatalog.default()
+                if preflight.root is None
+                else RouteCatalog.from_root(preflight.root)
+            )
+        except CapabilityRootError as exc:
+            print(
+                render_capability_error(
+                    exc.code,
+                    preflight.capability_ids,
+                    preflight.output_format,
+                    preflight.mode,
+                )
+            )
+            return 2
+        parser = build_parser(catalog)
+        args = parser.parse_args(raw_argv)
+        index = build_capability_index(catalog.skill_rules())
+        decision = decide_capabilities(
+            preflight.capability_ids,
+            preflight.mode,
+            index,
+            preflight,
+        )
+        print(RouteRenderer(preflight.output_format).render_capability_decision(decision))
+        return 0 if decision.status == "pass" else 2
+
     catalog = RouteCatalog.default()
     parser = build_parser(catalog)
-    args = parser.parse_args()
+    args = parser.parse_args(raw_argv)
     renderer = RouteRenderer(args.format)
 
     root = Path(args.root).resolve()

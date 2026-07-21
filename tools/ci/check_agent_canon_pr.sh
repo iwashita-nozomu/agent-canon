@@ -13,6 +13,7 @@
 # upstream implementation ../agent_tools/check_agent_runtime_alignment.py Codex runtime role alignment eval
 # upstream implementation ../agent_tools/check_convention_compliance.py convention gate wiring eval
 # upstream implementation ../agent_tools/skill_tool_commands.py runtime skill command packet gate
+# upstream implementation ../agent_tools/update_lifecycle_contract.py owns G1-G3 receipt identity.
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
 # upstream implementation ./run_all_checks.sh quick CI implementation
 # @dependency-end
@@ -48,6 +49,7 @@ PR_DEPENDENCY_REVIEW_DIR="${AGENT_CANON_PR_TEMP_ROOT}/dependency-review/agent-ca
 PR_AGENT_EVAL_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/agent-canon-pr-gate"
 PR_RUN_ALL_CHECKS_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/run-all-checks"
 PR_QUICK_CI_ARGS=(--quick --skip-docs --skip-github-workflows)
+AGENT_CANON_G1_BUNDLE_ACTIVE=0
 if [[ -d vendor/agent-canon && -f .gitmodules ]]; then
   PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
 else
@@ -137,7 +139,7 @@ agentcanon_pr_branch_pending() {
 
 run_pr_agent_checks() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-    run_direct_agent_checks
+    run_standalone_static_gate_ci
     return
   fi
   if agentcanon_pr_branch_dirty; then
@@ -161,7 +163,7 @@ run_pr_agent_checks() {
 
 run_pr_quick_ci() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-    run_standalone_static_gate_ci
+    echo "AGENT_CANON_PR_QUICK_CI=consumed_standalone_static_gate_receipt"
     return
   fi
   if agentcanon_pr_branch_dirty; then
@@ -177,6 +179,48 @@ run_pr_quick_ci() {
   fi
   echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]}"
   AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}"
+}
+
+consume_source_correctness_receipt() {
+  local bundle="${AGENT_CANON_PR_GATE_BUNDLE:-}"
+  if [[ -z "${bundle}" ]]; then
+    echo "AGENT_CANON_G1_RECEIPT=not_materialized_nontransaction"
+    return
+  fi
+  PYTHONPATH="${PR_AGENT_CANON_SOURCE_ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+    python3 - "${bundle}" <<'PY'
+import json
+import sys
+from pathlib import Path
+from update_lifecycle_contract import validate_gate_chain
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+values = payload.get("gate_verdicts") if isinstance(payload, dict) else None
+if not isinstance(values, list):
+    raise SystemExit("agent_canon_pr_gate_bundle:gate_verdicts_missing")
+validate_gate_chain(values, expected_gate_ids=("G1",), require_pass=True)
+print("AGENT_CANON_G1_RECEIPT=consumed")
+print("AGENT_CANON_PR_GATE_ORDER=G1")
+PY
+  AGENT_CANON_G1_BUNDLE_ACTIVE=1
+}
+
+emit_generated_completeness_receipt() {
+  local bundle="${AGENT_CANON_PR_GATE_BUNDLE:-}"
+  local output="${AGENT_CANON_G2_OUTPUT:-}"
+  local command=(
+    python3 "${PR_AGENT_CANON_SOURCE_ROOT}/tools/ci/check_agent_canon_pr.py"
+    --g1-bundle "${bundle}"
+    --source-root "${PR_AGENT_CANON_SOURCE_ROOT}"
+  )
+  if [[ "${AGENT_CANON_G1_BUNDLE_ACTIVE}" -ne 1 ]]; then
+    echo "AGENT_CANON_G2_RECEIPT=not_materialized_nontransaction"
+    return
+  fi
+  if [[ -n "${output}" ]]; then
+    command+=(--output "${output}")
+  fi
+  "${command[@]}"
 }
 
 run_standalone_static_gate_ci() {
@@ -249,6 +293,7 @@ echo "workspace_root=${WORKSPACE_ROOT}"
 echo "agent_canon_pr_temp_root=${AGENT_CANON_PR_TEMP_ROOT}"
 echo "agent_canon_repository_mode=${AGENT_CANON_REPOSITORY_MODE}"
 echo "agent_canon_remote=${REMOTE_URL}"
+consume_source_correctness_receipt
 if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
   echo "agent_canon_submodule_status=$(git submodule status vendor/agent-canon 2>/dev/null || true)"
   agent_canon_gitmodules_url="$(git config -f .gitmodules --get submodule.vendor/agent-canon.url 2>/dev/null || true)"
@@ -280,7 +325,11 @@ run_shared_surface_check
 echo ""
 
 echo "2b️⃣  GitHub workflow and PR template checks"
-python3 tools/ci/check_github_workflows.py
+if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
+  python3 tools/ci/check_github_workflows.py
+else
+  echo "GITHUB_WORKFLOW_CHECK=owned_by_standalone_static_gate"
+fi
 echo ""
 
 echo "3️⃣  changed shared canon paths"
@@ -314,6 +363,9 @@ echo ""
 
 echo "8b️⃣  generated artifact guard"
 python3 tools/agent_tools/generated_artifact_guard.py --root "${WORKSPACE_ROOT}"
+echo ""
+
+emit_generated_completeness_receipt
 echo ""
 
 echo "AGENT_CANON_PR_CHECK=pass"

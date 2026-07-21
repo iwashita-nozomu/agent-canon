@@ -10,7 +10,7 @@ upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing
 downstream implementation ./hooks.json project-local hook declarations
 downstream implementation ./hooks/hook_dispatcher.py dispatches lifecycle events to guard scripts
 downstream implementation ./hooks/log_archive_mount_warning.py warns when the shared log archive is not mounted
-downstream implementation ./hooks/branch_worktree_guard.py blocks unconfirmed branch and worktree creation
+downstream implementation ./hooks/branch_worktree_guard.py blocks unconfirmed shared-checkout Git mutations
 downstream implementation ./hooks/direct_rg_context_guard.py warns on context-polluting direct rg usage
 downstream implementation ./hooks/skill_usage_logger.py records skill usage hook events
 downstream implementation ./hooks/cause_investigation_guard.py warns on code edits without cause investigation evidence
@@ -45,7 +45,7 @@ downstream implementation ./hooks/notebook_quality_guard.py warns on notebook-as
 - 共通入口は `AGENTS.md`
 - workflow と skill の正本は `agents/`
 - Codex-specific routing は `agents/canonical/CODEX_WORKFLOW.md` と `agents/canonical/CODEX_SUBAGENTS.md`
-- runtime cap は `.codex/config.toml` の `[agents].max_threads = 24` を使い、spawn は depth ではなく bounded concurrency で制御します
+- `.codex/config.toml` の `[agents].max_threads = 26` は direct frontier `20` と nested reservation `6` から生成した requested/configured readback です。platform-effective / current-available capacity は別入力であり、26 を runtime の普遍的な cap とは扱いません
 - `[agents]` は上限と timeout の設定であり、上位 runtime / developer instruction が要求する explicit subagent authorization を上書きしません。明示許可が無い session では fan-out plan と handoff packet を作り、実際の spawn は許可後に行います
 - plan mode や permissions のような mode は session 単位です。official Codex CLI では `/plan`、`/model`、`/permissions` を使います
 - runtime が `/agent` を提供する場合は inventory 確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます
@@ -72,18 +72,23 @@ change a user profile for a fresh session after observed token, latency, or
 tool-output evidence identifies a runtime constraint. Profile changes do not
 waive workflow gates and do not authorize dropping decision-relevant context.
 
-## Runtime Spawn Limits
+## Runtime Capacity And Lifecycle Projection
 
-- `max_threads = 24`
-  - runtime hard ceiling として使います
+- `.codex/config.toml` の `max_threads` は、宣言 topology の生成値を
+  loader/readback した `configured_max_threads` です。現在の生成値は
+  `20 + 6 = 26` であり、普遍的な ceiling ではありません。
+- requested / configured / platform-effective / workflow-demand /
+  write-cap / nested-reserved / available は [capacity handshake owner](../agents/canonical/CODEX_SUBAGENTS.md#capacity-and-lifecycle)
+  の型付き projection に従います。effective は予約後の既知制約の最小値で、
+  saturation は work を queue します。model-capacity event は thread
+  saturation と別です。
 - `job_max_runtime_seconds = 3600`
   - 長めの review / repo scan / validation を含む subagent job を 1 時間まで許容します
 - `max_depth = 2`
   - one bounded child-subagent layer を許可します
-- 同時 spawn の既定 budget は workflow family 側で決めます
-  - repo-changing workflow family: active 4 / write-capable 2
-  - `Skill Evaluation` / T14: evaluator-only active 1 / write-capable cap 1
-  - specialist は decision ごとの wave で入れ替え、全 role を同時起動しない
+- 同時 spawn と write frontier は宣言 topology と pairwise-disjoint write
+  scope から生成されます。固定 active/write 数、task-size/count/time
+  budget、または capacity probe は認可根拠になりません。
 - `team_manifest.yaml` の `run.spawn_budget.active_subagents` が総同時起動 budget、`run.spawn_budget.max_write_subagents` と `run.write_scope_policy.max_write_subagents` が write-capable subagent だけの上限です。write-capable 上限は総同時起動 cap と区別します。
 - same-role instance policy は `agents/task_catalog.yaml` と generated
   `team_manifest.yaml` の `run.delegated_spawn_policy` が正本です。
@@ -95,7 +100,10 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 - 新規 user request では前 task の subagent を使い回さず、run bundle ごとに fresh subagent を起こします
 - active task の途中追加指示は parent が `same_active_task_delta` / `scope_or_contract_change` / `new_task` に分類し、same-task delta は run bundle checkpoint と updated packet path を残してから run-local subagent へ再配送し、scope 変更は fresh follow-up wave にします
 - `team_manifest.yaml` には `run.subagent_lifecycle_policy` を出し、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を handoff prompt に含めます
-- closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
+- closeout は canonical `spawned -> active -> durable result/error -> handed
+  back -> descendants closure verified -> close requested -> closed ->
+  reservation released` を全 descendant で確認し、canonical `close_agent`
+  ToolCall を含む CloseoutPacket を使います。
 
 ## Hook Context
 
@@ -110,6 +118,7 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 - `UserPromptSubmit` と `Stop` は `hooks/skill_usage_logger.py` で `$skill-name`、`skills=...`、`skill_invocation=...` を検出し、さらに入力 prompt から candidate skill / workflow / tool と human feedback label を分類します。`PostToolUse` では同じ logger が `tool_name`、tool input shape、command verb を記録します。既定では mounted runtime log archive `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/skill_usage.jsonl` に `hook_run_id` 付き JSONL として追記します。User prompt は secret-like value を redaction した bounded excerpt と fingerprint を保存し、tool input は key / fingerprint / command verb だけを保存します。`AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` が設定されている run では、明示 skill は `workflow_monitor.py --behavior-event`、人間 feedback は `workflow_monitor.py --runtime-feedback` 経由で run bundle にも記録します。
 - `Stop` は `hooks/codex_runtime_summary_logger.py` で bounded runtime summary を書いた後、`hooks/runtime_log_auto_sync.py` で `runtime_log_archive_git.py sync` を best-effort 実行します。これにより hook JSONL、eval report、Codex runtime summary、`reports/agents/` run bundle は通常 agent の手動 push なしで log archive の `logs/<repo-key>` branch に集約されます。network / SSH / archive 不在の失敗は fail-open で作業を止めません。
 - `PreToolUse` は `hooks/direct_rg_context_guard.py` で、repo root や broad scope への direct `rg -n` を `DIRECT_RG_CONTEXT_RISK=warn` として警告します。この hook は `rg` を canonical search にするものではありません。repo discovery は構造 intake の後に `find`、`git grep`、または owner directory への targeted `grep` で行います。この warning は block ではなく、context 汚染を closeout 前の修復 / 記録対象にするための機械 gate です。
+- `PreToolUse` の critical `hooks/branch_worktree_guard.py` は、同じ checkout を複数 chat/session が共有する前提で `git restore/reset/clean/checkout/switch/stash`、branch/worktree mutation、protected AgentCanon update wrapper を shell 実行前に分類します。unknown dirt は user/other-chat owned とし、proven exact task ownership は approval request の path を限定するだけで destructive approval を迂回しません。destructive intent は同一 command segment の `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` と非空 `AGENT_CANON_DESTRUCTIVE_GIT_REASON` を要求します。branch/worktree creation と protected update wrapper は、さらに同一 segment の route authority と reason を要求する AND gate です。ambient 変数や prior segment は authority になりません。child の launch error、nonzero、timeout、nonempty malformed output は fail-closed、empty stdout は allow です。session 開始時に dispatcher と child registration を load 済みなら、次の tool call は更新後 child script を実行する hot path です。一方、hook table 自体を load していない既存 session には後付けできず、保護を有効にするには session restart が必要です。
 - `PreToolUse` は `hooks/cause_investigation_guard.py` で、`apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を確認します。普通の相談、read-only search、validation command では child guard を起動しません。code edit 前に `reports/agents/<run-id>/cause_investigation.md`、issue、または design note へ `Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を残します。hook log には `code_paths`、`cause_evidence_status`、`cause_evidence_files` を残し、後続の prompt / skill eval に使います。
 - `PostToolUse` は `hooks/oop_readability_guard.py` で、source 編集後の Python / C++ 変更に OOP readability checker を即時実行します。current finding は warning context と hook log に残し、closeout 前の修復対象にします。
 - `PostToolUse` は `hooks/module_boundary_guard.py` で、changed Python module に `import_responsibility.py` を即時実行し、未使用 import、wildcard import、責務外 local import、public surface 変更、大きな module rewrite と boundary evidence の関係を記録します。finding は通常 warning context とし、closeout gate または明示 validation で修復します。
@@ -122,31 +131,34 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 - `Stop` でも `hooks/oop_readability_guard.py`、`hooks/module_boundary_guard.py`、`hooks/library_implementation_guard.py`、`hooks/helper_first_guard.py`、`hooks/style_checker_guard.py`、`hooks/notebook_quality_guard.py` を再実行し、hook を迂回した変更が残っていれば closeout repair context を返します。
 - OOP hook の既定 mode は `full` です。ユーザーが明示的に差分だけを見たい場合だけ `AGENT_CANON_OOP_HOOK_MODE=diff` を設定し、必要に応じて `AGENT_CANON_OOP_HOOK_BASELINE_REF` で比較 ref を指定します。未指定時の diff baseline は `HEAD` です。
 - dispatcher は元の stdin payload を各 child hook に渡し、child hook が finding を出しても後続 hook を実行してログ機会を保ちます。Codex に返す出力は、critical block があればその block、それ以外は公式 hook output の `systemMessage` / `hookSpecificOutput.additionalContext` に正規化した warning context です。`PostToolUse` は runtime の post-tool output schema を壊さないため、非 blocking finding や child failure を stdout に返さず、hook log、明示 validation、closeout evidence の対象にします。
-- `hooks/cause_investigation_guard.py`、`hooks/oop_readability_guard.py`、`hooks/module_boundary_guard.py`、`hooks/library_implementation_guard.py`、`hooks/helper_first_guard.py`、`hooks/style_checker_guard.py`、`hooks/notebook_quality_guard.py` は実行ごとに mounted runtime log archive 配下へ `hook_run_id`、`source_repo_key`、`hook_log_namespace`、`payload_fingerprint`、status fields 付き JSONL を追記します。`<runtime-namespace>` は `AGENT_CANON_HOOK_RUN_NAMESPACE`、`DEVCONTAINER_PROJECT_NAME`、`COMPOSE_PROJECT_NAME`、generated Compose `name:` のいずれかで明示されます。OOP score threshold は analyzer の `tools/oop/shared/readability_core.py` を正本にします。`AGENT_CANON_HOOK_ARCHIVE_DIR` で archive root を、`AGENT_CANON_HOOK_RESULTS_DIR` / `AGENT_CANON_CAUSE_INVESTIGATION_HOOK_LOG_PATH` / `AGENT_CANON_OOP_HOOK_LOG_PATH` / `AGENT_CANON_MODULE_BOUNDARY_HOOK_LOG_PATH` / `AGENT_CANON_LIBRARY_IMPLEMENTATION_HOOK_LOG_PATH` / `AGENT_CANON_HELPER_FIRST_HOOK_LOG_PATH` / `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH` / `AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH` / `AGENT_CANON_SKILL_LOG_PATH` でテスト・debug 用の出力先を差し替えられます。
+- `hooks/cause_investigation_guard.py`、`hooks/oop_readability_guard.py`、`hooks/module_boundary_guard.py`、`hooks/library_implementation_guard.py`、`hooks/helper_first_guard.py`、`hooks/style_checker_guard.py`、`hooks/notebook_quality_guard.py` は実行ごとに mounted runtime log archive 配下へ `hook_run_id`、`source_repo_key`、`hook_log_namespace`、`payload_fingerprint`、status fields 付き JSONL を追記します。`<runtime-namespace>` は `AGENT_CANON_HOOK_RUN_NAMESPACE`、`DEVCONTAINER_PROJECT_NAME`、`COMPOSE_PROJECT_NAME`、generated Compose `name:` のいずれかで明示されます。OOP hook は analyzer の typed boundary evidence を正本にします。`AGENT_CANON_HOOK_ARCHIVE_DIR` で archive root を、`AGENT_CANON_HOOK_RESULTS_DIR` / `AGENT_CANON_CAUSE_INVESTIGATION_HOOK_LOG_PATH` / `AGENT_CANON_OOP_HOOK_LOG_PATH` / `AGENT_CANON_MODULE_BOUNDARY_HOOK_LOG_PATH` / `AGENT_CANON_LIBRARY_IMPLEMENTATION_HOOK_LOG_PATH` / `AGENT_CANON_HELPER_FIRST_HOOK_LOG_PATH` / `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH` / `AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH` / `AGENT_CANON_SKILL_LOG_PATH` で runtime 用の出力先を差し替えられます。
 - hook context は編集手段の毎回説明を要求しません。編集手段の既定は `agents/canonical/CODEX_WORKFLOW.md` の `Edit Execution Surface` に従います。
 - `tools/sync_agent_canon.sh link-root` は root `.codex/hooks.json` と `.codex/hooks/` を shared canon へリンクします。
 
 ## Model Settings
 
-- `.codex/agents/*.toml` is the source of truth for each Codex subagent's
-  `model` and `model_reasoning_effort`.
-- `.codex/config.toml` owns the Sol/high parent default, the Luna `/review`
-  default, project features, runtime limits, skill registration, and the agent
-  registry. Child model settings remain in role TOMLs.
+- `agents/model_profiles.toml` is the canonical typed authority for every
+  parent and child model, reasoning, capability, context, return, checkpoint,
+  and continuation field.
+- `tools/agent_tools/model_profile_registry.py` materializes closed
+  `.codex/agents/*.toml` and `agents/agents_config.json` generated views.
 - `tools/agent_tools/check_agent_runtime_alignment.py` and
   `tools/agent_tools/evaluate_codex_agent_roles.py` validate the materialized
   agent TOML files directly.
-- Ordinary planning, authoring, exploration, experiment execution, and review
-  children use Luna/high. `worker` and `ship_reviewer` use Luna/xhigh; Spark
-  remains explicit mechanical work. `gpt-5.4-mini/medium` is reserved for the
-  fresh, read-only, artifact-only `skill_evaluator` lane in explicit T14
-  `skill_evaluation` and is absent from permanent team roles.
+- `agents/model_profiles.toml` が child model、reasoning、capability、context、
+  return schema、continuation を所有し、canonical materializer が
+  `.codex/agents/*.toml` と `agents/agents_config.json` の role projection を生成します。
+  role view を手動の model authority として編集しません。
+- generated view の更新後は alignment readback を確認し、load 済み session
+  との不一致は手動編集せず restart して canonical projection を再読込します。
 - The parent uses Sol/high and owns integration and final approval. Sol/xhigh is
   an explicit high-risk or final escalation, not a child-role default.
 - mode の扱い
   - plan mode や permissions は session 単位で、per-agent TOML には書きません
   - official Codex CLI では `/plan`、`/model`、`/permissions` を使います
-- `.codex/config.toml` の `[agents.<name>]` が role registry、`.codex/agents/*.toml` が role behavior と model / reasoning 設定の正本です
+- `.codex/config.toml` の `[agents.<name>]` は role registration を所有し、
+  model / reasoning authority は `agents/model_profiles.toml`、role TOML は
+  materialized readback view です
 
 ## Current Agents
 

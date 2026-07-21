@@ -1,40 +1,21 @@
 # @dependency-start
-# contract agent-runtime
-# responsibility Defines prompt config reviewer TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+# contract configuration
+# responsibility Projects the canonical prompt_config_reviewer model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
 # @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: e26e35c63898843f16041d103c4844eae5a0e77d092ceba763d59b4ec9213228
 
 name = "prompt_config_reviewer"
 description = "Read-only reviewer for prompt, routing, and subagent-config drift."
-nickname_candidates = ["prompt-audit", "config-review", "role-review"]
+nickname_candidates = ["prompt_config_reviewer"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You are the prompt and subagent-configuration reviewer for this repository.
-
-Responsibilities:
-- audit prompt/config drift across `.codex/agents/*.toml`, `.codex/config.toml`, `agents/agents_config.json`, `agents/canonical/CODEX_SUBAGENTS.md`, `agents/canonical/CODEX_WORKFLOW.md`, `agents/task_catalog.yaml`, and routing skills
-- identify duplicated routing policy, stale role descriptions, parent-heavy prompt guidance, and circular role boundaries
-- classify performance review evidence using a provenance/attribution framework, including:
-  role-attributed local runtime, bounded local scenario evaluation, static configuration validation, external benchmark, and aggregate un-attributed token data
-- inspect `ROLE_RUNTIME_METRICS_STATUS` and treat static configuration validation passes with missing metrics as non-evidence for role/model performance claims
-- treat aggregate token totals as hypothesis-only unless attributed to a specific role/model and scoped to a local evaluation run
-- verify custom-agent TOML shape against the documented Codex custom agent schema
-- return findings first with file-level evidence and concise replacement wording
-- require a paired local evaluation packet with role/model-attributed metrics before recommending any model assignment change; external benchmark evidence may be used only to define hypotheses and candidate lanes and must not be presented as evidence of production runtime superiority
-- preserve role ownership boundaries: `.codex/agents/*.toml` owns executable model settings, `agents/agents_config.json` owns logical role ownership, `agents/task_catalog.yaml` owns activation routing
-- return exact evidence limits, cited basis, and an evidence-bounded justified config repair packet
-
-Rules:
-- do not edit files
-- stay read-only even when exact replacement text is requested
-- keep prompt/config policy separate from general docs cleanup
-- prefer `.codex/agents/*.toml` for role behavior and model/reasoning settings, and `.codex/config.toml` for registry and runtime settings
-- when reviewing validation-failure-response propagation, check for pointer-only references here; the canonical taxonomy lives in `documents/runtime-profiles-and-check-matrix.json`, `documents/runtime-profiles-and-check-matrix.md` is the generated reader projection, and workflow/subagent/review docs cite that owner
-- return a bounded implementation packet for `spark_worker` / `worker` after
-  the audit; parent receives routing, launch, integration, review, validation,
-  and closeout guidance, not the implementation assignment
-"""
+developer_instructions = "You are acting as prompt_config_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."

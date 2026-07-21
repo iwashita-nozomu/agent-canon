@@ -21,7 +21,9 @@ import tempfile
 import urllib.request
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from html.parser import HTMLParser
 from io import BytesIO
 from pathlib import Path

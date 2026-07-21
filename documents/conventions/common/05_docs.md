@@ -4,6 +4,7 @@ contract policy
 responsibility Documents ドキュメント運用 for this repository.
 upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../../../agents/skills/formal-proof-workflow.md mathematical claim grounding policy
+downstream implementation ../../../rust/agent-canon/src/docs.rs enforces Markdown math notation and fence rules
 downstream implementation ../../../tools/agent_tools/check_convention_compliance.py validates document claim grounding
 downstream implementation ../../../tools/agent_tools/task_close.py validates document split decision closeout evidence
 @dependency-end
@@ -53,6 +54,18 @@ downstream implementation ../../../tools/agent_tools/task_close.py validates doc
 - まとまった Markdown 変更の前後では、少なくとも変更したファイルに対して `markdownlint` を実行して体裁崩れを確認します。
 - 空行は 1 行に保ち、見出しには本文または箇条書きを続けます。
 - 箇条書きは `-` を基本にし、パス・識別子・コマンドはバッククォートで示します。
+
+## 数式の表記
+
+- インライン数式は `$...$` で記述する。
+- 表示数式は double-dollar delimiter をそれぞれ独立行に置き、block の前後に
+  空行を入れる。
+- 数式の記述先は、本文中の inline `$...$` と standalone double-dollar block の
+  2 形式に限定する。
+- fence info の listed aliases は大文字・小文字の双方を同一 alias として正規化し、
+  すべて同じ数式表記規約に従う。`text` / `plaintext` / `txt` / `plain` は literal
+  output 用、`math` / `latex` / `tex` は standalone display math への移行対象として
+  扱う。
 
 ## Document Split Decision
 

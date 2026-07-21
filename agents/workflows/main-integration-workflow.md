@@ -41,13 +41,10 @@ upstream design README.md workflow catalog
    - branch 側で必要な review と check を完了します。
    - `make ci-quick` 以上を通します。
    - branch の action log と branch note を更新します。
-1. current checkout 上で integration branch を切る
-   - `origin/main` から短期の integration branch を作ります。
-   - 例:
-
-```bash
-git switch -c integrate/<topic>-YYYYMMDD origin/main
-```
+1. current checkout の ownership を確認する
+   - 既存 integration branch がこの lane を所有する場合だけ継続します。
+   - 新規 branch が必要なら checkout を変えずに user direction を求め、
+     reason と current-task approval の AND gate を通します。
 
 1. integration branch で source branch を merge する
    - `main` 直系の integration branch 上で、source branch を Git の merge として取り込みます。
@@ -81,11 +78,9 @@ tools/bin/agent-canon docs check
    - root 側の `main` を最新化します。
    - integration branch が妥当なら、`main` はその統合 commit へ fast-forward で進めます。
 
-```bash
-git checkout main
-git pull --ff-only origin main
-git merge --ff-only integrate/<topic>-YYYYMMDD
-```
+Current checkout が authorized target でない場合は切り替えず、user direction
+を求めます。Target が確認できた後にだけ、標準 integration route で
+fast-forward を行います。
 
 ## 禁止事項
 

@@ -3,10 +3,12 @@
 # responsibility Defines the structured AgentCanon tool catalog.
 # upstream design README.md shared tool family ownership
 # upstream design ../documents/repo-local-tool-imports.md legacy import disposition ledger
+# upstream design ../documents/tools/visualization_contract.md canonical visualization coverage and readback tool contract
 # downstream implementation agent_tools/tool_catalog.py validates this catalog
 # downstream implementation agent_tools/tool_drift.py checks catalog drift contracts
 # downstream implementation agent_tools/check_design_doc_claims.py validates design-document evidence claims
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
+# downstream implementation ../tests/agent_tools/test_tool_catalog.py validates canonical visualization tool registration
 # @dependency-end
 
 version: 1
@@ -199,6 +201,26 @@ entries:
       - documents/github-first-module-and-devcontainer-policy.md
     tests:
       - tests/agent_tools/test_parent_repo_readiness.py
+
+  - id: visualization-contract
+    summary: Validates typed visualization source universes, projection manifests, canonical ToolCalls, and post-format readback coverage.
+    path: tools/agent_tools/visualization_contract.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    audience: skill
+    placement: validation_checker
+    command: python3 tools/agent_tools/visualization_contract.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/visualization_contract.md
+    tests:
+      - tests/agent_tools/test_visualization_contract.py
 
   - id: render-dependency-manifest-graph
     summary: Renders dependency manifest graph TSV artifacts into repo-local Graph IR JSON with directory containment, Markdown, DOT, and HTML projection reports under the shared Graph DSL Core projection contract.
@@ -612,12 +634,12 @@ entries:
       - tests/agent_tools/test_run_accumulated_agent_evals.py
 
   - id: runtime-log-archive-git
-    summary: Ensures, imports, syncs, commits, and pushes AgentCanon runtime logs and agent reports to the external log archive.
+    summary: Produces immutable native context certificates, materializes prepared runtime artifacts with confirmed outcome receipts, and checkpoints atomic hook-event spool files through one prepared archive transaction.
     path: tools/agent_tools/runtime_log_archive_git.py
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/agent_tools/runtime_log_archive_git.py sync
+    command: python3 tools/agent_tools/runtime_log_archive_git.py <append-context-discovery|materialize-runtime-event|check-hook-hot-path|sync>
     writes: true
     default_wiring:
       ci: false
@@ -629,7 +651,47 @@ entries:
       - documents/runtime-log-archive-migration.md
       - agents/canonical/ARTIFACT_PLACEMENT.md
     tests:
+      - tests/agent_tools/test_hook_event_log.py
       - tests/agent_tools/test_runtime_log_archive_git.py
+
+  - id: agent-canon-graph
+    summary: Builds and serves the one-build dependency graph with a persisted runtime-evidence snapshot.
+    path: rust/agent-canon/src/graph.rs
+    family: root
+    role: runner
+    status: canonical
+    command: tools/bin/agent-canon graph <build|status|query|context> --root <repo-root> --format json
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/CLI_ENTRYPOINTS.md
+      - documents/dependency-manifest-design.md
+    tests:
+      - tests/agent_tools/test_check_dependency_headers.py
+      - tests/agent_tools/test_check_design_doc_claims.py
+
+  - id: graph-client
+    summary: Provides the typed consume-only Python adapter for graph status, query, and context responses.
+    path: tools/agent_tools/graph_client.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: tools/bin/agent-canon graph <status|query|context> --root <repo-root> --format json
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/CLI_ENTRYPOINTS.md
+    tests:
+      - tests/agent_tools/test_check_dependency_headers.py
+      - tests/agent_tools/test_check_design_doc_claims.py
 
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.
@@ -1011,6 +1073,25 @@ entries:
     tests: []
     test_exempt_reason: Validated by rust/agent-canon cargo tests and devcontainer smoke.
 
+  - id: materialize-agent-canon-pr-g2
+    summary: Materializes the canonical G2 receipt from the ordered passing AgentCanon generated-completeness checks.
+    path: tools/ci/check_agent_canon_pr.py
+    family: ci
+    role: checker
+    status: canonical
+    audience: workflow
+    placement: workflow_helper
+    command: python3 tools/ci/check_agent_canon_pr.py --g1-bundle <path> --source-root .
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/agent-canon-update-route.md
+      - agents/workflows/agent-canon-pr-workflow.md
+    tests:
+      - tests/tools/test_update_agent_canon.py
+
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
     path: tools/ci/check_agent_canon_pr.sh
@@ -1313,25 +1394,6 @@ entries:
       - documents/tools/README.md
     tests:
       - tests/agent_tools/test_evaluate_codex_agent_roles.py
-
-  - id: run-docs-checks
-    summary: Legacy shell forwarder for the unified Rust documentation check.
-    path: tools/ci/run_docs_checks.sh
-    family: ci
-    role: runner
-    status: compatibility_wrapper
-    audience: internal
-    placement: compatibility_wrapper
-    command: tools/bin/agent-canon docs check
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests: []
-    test_exempt_reason: Orchestrates individual Markdown tooling tests.
 
   - id: check-experiment-registry
     summary: Validates the shared experiment registry contract.

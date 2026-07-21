@@ -18,8 +18,21 @@ upstream implementation ../../tools/agent_tools/cpp_template_to_lean.py fully ex
 upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
 upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant references.
 downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex.
+upstream design code-visualization.md sole public visualization owner and typed projection contract
+downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
+
+## Visualization Adapter Boundary
+
+Proof checkers, generated Lean evidence, theorem graphs, and algorithm traces
+retain native proof authority. A proof or algorithm visualization passes the
+complete selected native facts to `code-visualization` and consumes its
+`VisualizationSourceUniverse`, canonical `ToolCall`,
+`ProjectionCoverageManifest`, mandatory post-format readback, and final
+coverage status. Rendering owns layout only and cannot promote a coverage pass
+into proof evidence; this skill does not duplicate universal omission or
+granularity policy.
 
 ## Reader Map
 

@@ -1,0 +1,4 @@
+# NVIDIA parser fixtures intentionally retain invalid whitespace/CRLF bytes as
+# raw evidence; do not run Git's text whitespace diff oracle over these files.
+tests/fixtures/nvidia/*.txt -diff
+tests/fixtures/nvidia/*.xml -diff

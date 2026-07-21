@@ -15,14 +15,15 @@ downstream implementation visualize.ipynb renders topic run artifacts.
 -->
 
 このディレクトリは、新しい experiment topic を構築するための正本雛形です。
-テンプレートはファイルの役割だけをそろえ、実験固有の
-`run_experiment()`、`run_case_worker()`、case、config、notebook 本文、出力
-schema は topic 作成後に実装します。
+テンプレートは `main()`、`run_experiment()`、`run_case_worker()`、case、config、
+notebook 本文、出力 schema の役割だけをそろえます。正式な実行は
+`tools/experiments/run_managed_experiment.py` が選択済み command を一つの
+ExperimentRunner task へ適合し、managed child から `main()` を呼び出します。
 正本 template path は `vendor/agent-canon/experiments/_template/` です。
 
 ## Files
 
-- `run.py`: 実験の正本 entrypoint。オプションなしで run directory を作り、artifact を生成し、`visualize.ipynb` をその run の文脈で実行する。
+- `run.py`: 実験の正本 entrypoint。`main()` は managed runner の child からのみ呼び出し、run artifact を生成する。
 - `visualize.ipynb`: run artifact を読む notebook。本文は実験ごとに置き換える。
 - `config.yaml`: topic 固有設定の置き場。
 - `cases.py`: case 定義の置き場。
@@ -48,17 +49,17 @@ topic 作成後は次の順に編集する。
 
 ## Run Contract
 
-- 標準実行 command は topic `run.py` のオプションなし直実行です。
+- topic `run.py` の直接実行は typed prohibition です。正式な command は managed CLI です。
 
 ```bash
-/usr/bin/python /workspace/experiments/<topic>/run.py
+/usr/bin/python tools/experiments/run_managed_experiment.py --topic <topic> -- /usr/bin/python /workspace/experiments/<topic>/run.py
 ```
 
 - `run.py` は `experiments/<topic>/result/<topic>_<timestamp>/` に run artifact を作ります。
 - `config.yaml` は checked-in 設定正本です。topic 実装は run directory に `config_snapshot.json` などの設定 snapshot を保存します。
-- `run.py` は `visualize.ipynb` を実行し、notebook 実行時は `EXPERIMENT_RUN_DIR` が run directory を指します。
-- template の topic 実装が最初に追加する domain artifact は `summary.json`、`cases.jsonl`、必要な `logs/` artifact、`visualize_executed.ipynb` です。
-- project registry を使う場合も、registered command は topic-local `run.py` を直接呼び、topic 作成 tool や別の実行補助 command を再帰呼びしません。
+- notebook は reader artifact であり、topic `main()` から subprocess 実行しません。必要な notebook 処理は managed runner の別の選択済み task として設計します。
+- template の topic 実装が最初に追加する domain artifact は `summary.json`、`cases.jsonl`、必要な `logs/` artifact です。
+- project registry を使う場合も、registered command は topic-local `run.py` の `main()` へ canonical adapter で到達し、topic 作成 tool や別の実行補助 command を再帰呼びしません。
 
 ## Implementation Markers
 

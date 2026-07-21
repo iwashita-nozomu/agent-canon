@@ -11,10 +11,22 @@ upstream design ../../../documents/prose-reasoning-graph/dsl-spec.md normative g
 upstream implementation ../../../tools/agent_tools/prose_reasoning_graph.py builds graph projections and handoff packets
 upstream implementation ../../../rust/agent-canon/src/structured_analysis.rs reports document responsibility gaps
 upstream design ../../../documents/tools/prose_reasoning_graph.md documents CLI usage
+upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
+downstream implementation ../../../tests/agent_tools/test_check_dependency_headers.py validates this adapter dependency header.
 @dependency-end
 -->
 
 # Prose Reasoning Graph
+
+## Visualization Adapter Boundary
+
+This skill remains authority for the SQLite-backed prose graph and its selected
+nodes, edges, fields, ordering, and diagnostics. A visualization exports that
+complete native selection to `$code-visualization` as a
+`VisualizationSourceUniverse` and consumes only its canonical `ToolCall`,
+`ProjectionCoverageManifest`, post-format readback, and final coverage status.
+Local renderers own layout and reversible view state; the universal omission
+and granularity contract is not duplicated here.
 
 ## Tool Commands
 

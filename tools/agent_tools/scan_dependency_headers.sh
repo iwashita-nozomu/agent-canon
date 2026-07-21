@@ -77,7 +77,7 @@ is_checkable_suffix() {
 
 is_skip_path() {
   case "$1" in
-    .git/*|.pytest_cache/*|.ruff_cache/*|reports/*|LICENSE|LICENSE.*|NOTICE|NOTICE.*|COPYING|COPYING.*|vendor/agent-canon/LICENSE|vendor/agent-canon/LICENSE.*|vendor/agent-canon/NOTICE|vendor/agent-canon/NOTICE.*|vendor/agent-canon/COPYING|vendor/agent-canon/COPYING.*)
+    .git/*|.pytest_cache/*|.ruff_cache/*|reports/*|tests/fixtures/nvidia/*.txt|LICENSE|LICENSE.*|NOTICE|NOTICE.*|COPYING|COPYING.*|vendor/agent-canon/LICENSE|vendor/agent-canon/LICENSE.*|vendor/agent-canon/NOTICE|vendor/agent-canon/NOTICE.*|vendor/agent-canon/COPYING|vendor/agent-canon/COPYING.*)
       return 0
       ;;
     *)

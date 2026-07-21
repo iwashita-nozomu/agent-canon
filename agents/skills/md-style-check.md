@@ -5,8 +5,20 @@
 contract skill
 responsibility Documents md-style-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design code-visualization.md sole public visualization owner and typed projection contract
+downstream implementation ../../tests/tools/test_fix_mermaid.py tests formatter and post-format coverage behavior
 @dependency-end
 -->
+
+## Visualization Formatter Gate
+
+For Mermaid artifacts, `md-style-check` is a formatter/checker adapter to
+`code-visualization`. It receives the owner's `VisualizationSourceUniverse`,
+canonical `ToolCall`, and `ProjectionCoverageManifest`, formats the complete
+artifact, and returns post-format readback identities for the owner's final
+coverage status. Formatting owns syntax only: it cannot repair an omission by
+rewriting, aggregating, substituting, or deleting content, and a pre-format
+marker is not readback evidence.
 
 ## Reader Map
 
@@ -76,6 +88,10 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
   fence と Markdown display delimiter を二重に重ねていない
 - 文中数式 / inline math は `$...$`（例: `$(式)$`）で囲み、backtick の
   code span や文中の double-dollar display delimiter にしていない
+- `text` / `plaintext` / `txt` / `plain` 指定の fenced block には数式を
+  入れず、`math` / `latex` / `tex` 指定の fenced block も使わない。これらの
+  fence info の先頭 token は大文字小文字を区別せずに判定される。数式は本文中
+  `$...$` または standalone double-dollar block のみを使う
 - formatter 後に escaped display delimiter や余分な double-dollar delimiter が残っていない
 - table 内の文中数式や inline code が raw `|` で列分割されていない
 - Mermaid fenced block と math delimiter が repo 標準に揃っている
@@ -87,6 +103,9 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 1. changed Markdown files を固定します。
 1. display math がある file は、double-dollar delimiter を独立行に置き、前後に空行を置きます。KaTeX / math fence の中に Markdown display delimiter を入れません。
 1. 文中数式 / inline math は `$...$`（例: `$(式)$`）で書き、code span や文中の double-dollar display delimiter と混ぜません。
+1. 数式を `text` / `plaintext` / `txt` / `plain` の fenced block に入れず、
+   `math` / `latex` / `tex` の fenced block も使わず、`$...$` か standalone
+   double-dollar block へ正規化します。info token の大文字小文字は問いません。
 1. command option や実行例が必要な場合は、実装 file を読む前に `tools/bin/agent-canon docs -h` を見ます。
 1. 文書全体を読む前に `tools/bin/agent-canon docs check <paths...>` を実行し、lint、link、math、Mermaid、heading を同時に見ます。`DOCS_CHECK=pass`、`DOCS_CHECK_FINDING=...`、`DOCS_CHECK_REPORT_BEGIN` の structured report は tool-covered property の正本判定として扱います。
 1. finding がある場合だけ、修正に必要な path / line / 近傍 slice を読みます。tool が見た property を subagent や reviewer に再読解させません。

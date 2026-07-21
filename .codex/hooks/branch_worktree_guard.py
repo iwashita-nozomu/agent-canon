@@ -1,67 +1,111 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract agent-runtime
-# responsibility Blocks unconfirmed branch and worktree creation before shell execution.
+# responsibility Blocks unconfirmed shared-checkout Git mutations before shell execution.
 # upstream implementation ../hooks.json invokes hook dispatcher for PreToolUse.
 # upstream implementation ./hook_dispatcher.py dispatches this guard as a critical child hook.
-# upstream design ../../agents/canonical/CODEX_WORKFLOW.md owns branch reuse policy.
+# upstream design ../../agents/canonical/CODEX_WORKFLOW.md owns shared-checkout and branch reuse policy.
 # upstream design ../../agents/skills/worktree-health.md owns worktree drift diagnostics.
-# downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates branch and worktree creation blocks.
+# downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates destructive Git and creation blocks.
 # @dependency-end
-"""Guard branch and worktree creation so tasks continue in the active checkout."""
+"""Guard shared-checkout Git mutation such as ``git restore`` and creation."""
 
 from __future__ import annotations
 
 import json
-import os
 import shlex
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from hook_dispatcher import (  # noqa: E402
-    SAFE_GIT_GLOBAL_OPTION_PREFIXES,
-    SAFE_GIT_GLOBAL_OPTIONS_WITH_VALUES,
-    json_payload,
-    tool_command,
-    tool_name,
-)
+from hook_dispatcher import json_payload, tool_command, tool_name  # noqa: E402
 
 SHELL_TOOL_NAMES = {"Bash", "bash"}
-COMMAND_SEPARATORS = {"&&", "||", ";", "|"}
+COMMAND_SEPARATORS = {"&&", "||", ";", "|", "&"}
+GROUPING_TOKENS = {"(", ")", "{", "}"}
 SHELL_WRAPPERS = {"bash", "sh", "zsh"}
-AUTHORITY_ENV = "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY"
-REASON_ENV = "AGENT_CANON_BRANCH_WORKTREE_REASON"
-ALLOWED_AUTHORITIES = {"user_request", "agent_canon_workflow"}
-CREATE_OPTIONS = {
-    "switch": (("-c", "-C"), ("--create", "--force-create")),
-    "checkout": (("-b", "-B"), ("--orphan",)),
+SHELL_OPTIONS_WITH_VALUES = {"-O", "+O", "-o", "--init-file", "--rcfile"}
+BRANCH_AUTHORITY_ENV = "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY"
+BRANCH_REASON_ENV = "AGENT_CANON_BRANCH_WORKTREE_REASON"
+DESTRUCTIVE_AUTHORITY_ENV = "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY"
+DESTRUCTIVE_REASON_ENV = "AGENT_CANON_DESTRUCTIVE_GIT_REASON"
+ALLOWED_BRANCH_AUTHORITIES = {"user_request", "agent_canon_workflow"}
+DESTRUCTIVE_AUTHORITY = "explicit_user_approval"
+READ_ONLY_BRANCH_OPTIONS = {
+    "--all",
+    "--color",
+    "--contains",
+    "--format",
+    "--ignore-case",
+    "--list",
+    "--merged",
+    "--no-color",
+    "--no-contains",
+    "--no-merged",
+    "--points-at",
+    "--remotes",
+    "--show-current",
+    "--sort",
+    "--verbose",
+    "-a",
+    "-r",
+    "-v",
+    "-vv",
 }
-CREATE_EVIDENCE = {
-    "switch": "git switch -c/-C",
-    "checkout": "git checkout -b/-B/--orphan",
+READ_ONLY_BRANCH_VALUE_OPTIONS = {
+    "--color",
+    "--contains",
+    "--format",
+    "--merged",
+    "--no-contains",
+    "--no-merged",
+    "--points-at",
+    "--sort",
 }
-BRANCH_CREATE_OPTIONS = {
-    "--copy",
-    "--copy-force",
+BRANCH_NORMAL_CREATE_SHORTS = {"c"}
+BRANCH_FORCE_SHORTS = {"C", "f"}
+BRANCH_DESTRUCTIVE_SHORTS = {"D", "M", "d", "m"}
+BRANCH_CREATION_MODIFIERS = {
+    "--create-reflog",
     "--no-track",
-    "--recurse-submodules",
     "--track",
-    "--force",
-    "-C",
-    "-c",
-    "-f",
 }
-WORKTREE_OPTIONS = {"-v", "--verbose"}
+PROTECTED_GIT_SUBCOMMANDS = frozenset(
+    {"restore", "reset", "clean", "checkout", "switch", "stash", "branch", "worktree"}
+)
+PROTECTED_UPDATE_MODES = frozenset(
+    {
+        "latest",
+        "apply",
+        "merge-main-into-current",
+        "merge-main-into-current-preserve-dirty",
+    }
+)
+PROTECTED_MAKE_TARGETS = frozenset(
+    {"agent-canon-ensure-latest", "agent-canon-latest", "agent-canon-update"}
+)
+OPAQUE_GIT_OPTIONS_WITH_VALUES = frozenset(
+    {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
+)
 
 
 @dataclass(frozen=True)
-class CreationIntent:
-    """One branch or worktree creation action visible in a shell command."""
+class GitCommand:
+    """One visible Git invocation and its command-segment assignments."""
+
+    tokens: tuple[str, ...]
+    assignments: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class GitIntent:
+    """One protected Git intent and the authority it requires."""
 
     kind: str
     subcommand: str
     evidence: str
+    requires_creation: bool = False
+    requires_destructive: bool = False
 
 
 def load_payload() -> dict[str, object]:
@@ -69,19 +113,13 @@ def load_payload() -> dict[str, object]:
     return json_payload(sys.stdin.buffer.read())
 
 
-def confirmation_ready() -> bool:
-    """Return whether the command carries explicit branch/worktree authority."""
-    authority = os.environ.get(AUTHORITY_ENV, "").strip()
-    return authority in ALLOWED_AUTHORITIES and bool(os.environ.get(REASON_ENV, "").strip())
-
-
 def shell_tokens(command: str) -> tuple[str, ...]:
-    """Return shell tokens while preserving common command separators."""
+    """Return shell tokens while preserving separators and grouping."""
     stripped = command.strip()
     if not stripped:
         return ()
     try:
-        lexer = shlex.shlex(stripped, posix=True, punctuation_chars=True)
+        lexer = shlex.shlex(stripped, posix=True, punctuation_chars=";&|(){}!")
         lexer.whitespace_split = True
         return tuple(lexer)
     except ValueError:
@@ -93,18 +131,24 @@ def command_basename(token: str) -> str:
     return Path(token).name
 
 
-def is_env_assignment(token: str) -> bool:
-    """Return whether a shell token is a simple environment assignment."""
-    name, separator, _value = token.partition("=")
-    return bool(separator and name and not token.startswith("-"))
+def assignment(token: str) -> tuple[str, str] | None:
+    """Return a simple shell assignment pair."""
+    name, separator, value = token.partition("=")
+    if not separator or not name or token.startswith("-"):
+        return None
+    if not (name[0].isalpha() or name[0] == "_"):
+        return None
+    if not all(character.isalnum() or character == "_" for character in name):
+        return None
+    return name, value
 
 
 def command_segments(tokens: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
-    """Split shell tokens around command separators."""
+    """Split tokens at shell command boundaries."""
     segments: list[tuple[str, ...]] = []
     current: list[str] = []
     for token in tokens:
-        if token in COMMAND_SEPARATORS:
+        if token in COMMAND_SEPARATORS or set(token) <= {";", "&", "|"}:
             if current:
                 segments.append(tuple(current))
                 current = []
@@ -115,161 +159,534 @@ def command_segments(tokens: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
     return tuple(segments)
 
 
-def shell_wrapper_script(tokens: tuple[str, ...]) -> str:
-    """Return the script string passed to a shell wrapper."""
-    if not tokens or command_basename(tokens[0]) not in SHELL_WRAPPERS:
+def strip_grouping(tokens: tuple[str, ...]) -> tuple[str, ...]:
+    """Remove shell grouping and negation tokens around one command."""
+    result = list(tokens)
+    while result and (result[0] in GROUPING_TOKENS or set(result[0]) <= set("(){}!")):
+        result.pop(0)
+    while result and (result[-1] in GROUPING_TOKENS or set(result[-1]) <= set("(){}")):
+        result.pop()
+    return tuple(result)
+
+
+def consume_time_prefix(tokens: tuple[str, ...], index: int) -> int:
+    """Skip a POSIX/GNU `time` prefix."""
+    if index >= len(tokens) or command_basename(tokens[index]) != "time":
+        return index
+    index += 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "--":
+            return index + 1
+        if token in {"-f", "--format", "-o", "--output"}:
+            index += 2
+            continue
+        if token.startswith("-"):
+            index += 1
+            continue
+        break
+    return index
+
+
+def consume_command_prefix(tokens: tuple[str, ...], index: int) -> int:
+    """Skip `command` and its options."""
+    if index >= len(tokens) or command_basename(tokens[index]) != "command":
+        return index
+    index += 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "--":
+            return index + 1
+        if token in {"-p", "-v", "-V"}:
+            index += 1
+            continue
+        break
+    return index
+
+
+def consume_exec_prefix(tokens: tuple[str, ...], index: int) -> int:
+    """Skip a shell ``exec`` prefix and its command-shaping options."""
+    if index >= len(tokens) or command_basename(tokens[index]) != "exec":
+        return index
+    index += 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "--":
+            return index + 1
+        if token == "-a":
+            index += 2
+            continue
+        if token in {"-c", "-l"} or (
+            token.startswith("-")
+            and not token.startswith("--")
+            and token[1:]
+            and set(token[1:]) <= {"c", "l"}
+        ):
+            index += 1
+            continue
+        break
+    return index
+
+
+def consume_env_prefix(
+    tokens: tuple[str, ...], index: int, values: dict[str, str]
+) -> int:
+    """Skip `env` options and collect only assignments visible in this segment."""
+    if index >= len(tokens) or command_basename(tokens[index]) != "env":
+        return index
+    index += 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "--":
+            return index + 1
+        if token in {"-u", "--unset"}:
+            if index + 1 < len(tokens):
+                values.pop(tokens[index + 1], None)
+            index += 2
+            continue
+        if token.startswith("--unset="):
+            values.pop(token.partition("=")[2], None)
+            index += 1
+            continue
+        if token in {"-i", "--ignore-environment", "-0", "--null"}:
+            index += 1
+            continue
+        pair = assignment(token)
+        if pair is not None:
+            values[pair[0]] = pair[1]
+            index += 1
+            continue
+        if token.startswith("-"):
+            index += 1
+            continue
+        break
+    return index
+
+
+def git_subcommand_index(tokens: tuple[str, ...], index: int) -> int:
+    """Skip Git global options and return the subcommand index."""
+    index += 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token in {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}:
+            index += 2
+            continue
+        if token in {"-p", "-P", "--paginate", "--no-pager", "--bare", "--no-replace-objects", "--literal-pathspecs", "--glob-pathspecs", "--noglob-pathspecs", "--icase-pathspecs"}:
+            index += 1
+            continue
+        if token == "--exec-path":
+            index += 1
+            continue
+        if token.startswith(("-C", "-c")) and len(token) > 2:
+            index += 1
+            continue
+        if token.startswith(("--git-dir=", "--work-tree=", "--namespace=", "--exec-path=", "--config-env=")):
+            index += 1
+            continue
+        break
+    return index
+
+
+def normalized_git_command(segment: tuple[str, ...]) -> GitCommand | None:
+    """Return one direct Git command from a shell segment."""
+    tokens = strip_grouping(segment)
+    values: dict[str, str] = {}
+    index = 0
+    while index < len(tokens):
+        pair = assignment(tokens[index])
+        if pair is None:
+            break
+        values[pair[0]] = pair[1]
+        index += 1
+    index = consume_time_prefix(tokens, index)
+    index = consume_command_prefix(tokens, index)
+    index = consume_env_prefix(tokens, index, values)
+    while index < len(tokens):
+        pair = assignment(tokens[index])
+        if pair is None:
+            break
+        values[pair[0]] = pair[1]
+        index += 1
+    index = consume_command_prefix(tokens, index)
+    if index >= len(tokens) or command_basename(tokens[index]) != "git":
+        return None
+    subcommand_index = git_subcommand_index(tokens, index)
+    return GitCommand(tuple(tokens[subcommand_index:]), tuple(values.items()))
+
+
+def normalized_shell_command(segment: tuple[str, ...]) -> GitCommand | None:
+    """Return one visible command and same-segment assignments."""
+    tokens = strip_grouping(segment)
+    values: dict[str, str] = {}
+    index = 0
+    while index < len(tokens):
+        pair = assignment(tokens[index])
+        if pair is None:
+            break
+        values[pair[0]] = pair[1]
+        index += 1
+    index = consume_time_prefix(tokens, index)
+    index = consume_command_prefix(tokens, index)
+    index = consume_env_prefix(tokens, index, values)
+    while index < len(tokens):
+        pair = assignment(tokens[index])
+        if pair is None:
+            break
+        values[pair[0]] = pair[1]
+        index += 1
+    index = consume_command_prefix(tokens, index)
+    index = consume_exec_prefix(tokens, index)
+    index = consume_env_prefix(tokens, index, values)
+    while index < len(tokens):
+        pair = assignment(tokens[index])
+        if pair is None:
+            break
+        values[pair[0]] = pair[1]
+        index += 1
+    index = consume_command_prefix(tokens, index)
+    if index >= len(tokens):
+        return None
+    return GitCommand(tuple(tokens[index:]), tuple(values.items()))
+
+
+def protected_update_intent(command: GitCommand) -> GitIntent | None:
+    """Classify update wrappers that can perform protected Git internally."""
+    if not command.tokens:
+        return None
+    executable_token = command.tokens[0].replace("\\", "/")
+    executable = command_basename(executable_token)
+    arguments = command.tokens[1:]
+    script = executable_token
+    script_arguments = arguments
+    if executable in SHELL_WRAPPERS and arguments:
+        script_index = 0
+        while script_index < len(arguments) and arguments[script_index].startswith("-"):
+            if arguments[script_index] == "--":
+                script_index += 1
+                break
+            if arguments[script_index] in SHELL_OPTIONS_WITH_VALUES:
+                script_index += 2
+                continue
+            if arguments[script_index].startswith(("--init-file=", "--rcfile=")):
+                script_index += 1
+                continue
+            script_index += 1
+        if script_index >= len(arguments):
+            return None
+        script = arguments[script_index].replace("\\", "/")
+        script_arguments = arguments[script_index + 1 :]
+    if script.endswith("tools/update_agent_canon.sh") and script_arguments:
+        mode = script_arguments[0]
+        if mode in PROTECTED_UPDATE_MODES:
+            return GitIntent(
+                "protected_agent_canon_update",
+                mode,
+                f"update_agent_canon.sh {mode}",
+                True,
+                True,
+            )
+    if (
+        script.endswith("tools/sync_agent_canon.sh")
+        and script_arguments
+        and script_arguments[0] == "ensure-latest"
+    ):
+        return GitIntent(
+            "protected_agent_canon_update",
+            "ensure-latest",
+            "sync_agent_canon.sh ensure-latest",
+            True,
+            True,
+        )
+    if executable in {"make", "gmake"}:
+        targets = PROTECTED_MAKE_TARGETS.intersection(arguments)
+        if targets:
+            target = sorted(targets)[0]
+            return GitIntent(
+                "protected_agent_canon_update",
+                target,
+                f"make {target}",
+                True,
+                True,
+            )
+    return None
+
+
+def wrapper_script(segment: tuple[str, ...]) -> str:
+    """Return a shell/eval script string visible in one segment."""
+    tokens = strip_grouping(segment)
+    index = consume_time_prefix(tokens, 0)
+    index = consume_command_prefix(tokens, index)
+    if index < len(tokens) and command_basename(tokens[index]) == "eval":
+        return " ".join(tokens[index + 1 :])
+    if index >= len(tokens) or command_basename(tokens[index]) not in SHELL_WRAPPERS:
         return ""
-    for index, token in enumerate(tokens[1:], start=1):
+    for option_index, token in enumerate(tokens[index + 1 :], start=index + 1):
         if token == "--":
             return ""
-        if token == "-c" or (token.startswith("-") and "c" in token[1:]):
-            script_index = index + 1
+        if token == "-c" or (
+            token.startswith("-")
+            and not token.startswith("--")
+            and "c" in token[1:]
+        ):
+            script_index = option_index + 1
             return tokens[script_index] if script_index < len(tokens) else ""
     return ""
 
 
-def normalized_git_tokens(segment: tuple[str, ...]) -> tuple[str, ...]:
-    """Return Git subcommand tokens from one shell segment."""
-    index = 0
-    while index < len(segment) and is_env_assignment(segment[index]):
-        index += 1
-    if index < len(segment) and segment[index] == "command":
-        index += 1
-    if index < len(segment) and segment[index] == "env":
-        index += 1
-        while index < len(segment) and (
-            segment[index].startswith("-") or is_env_assignment(segment[index])
-        ):
-            index += 1
-    while index < len(segment) and is_env_assignment(segment[index]):
-        index += 1
-    if index >= len(segment) or command_basename(segment[index]) != "git":
-        return ()
-    index += 1
-    while index < len(segment):
-        token = segment[index]
-        if token in SAFE_GIT_GLOBAL_OPTIONS_WITH_VALUES:
-            index += 2
-            continue
-        if any(token.startswith(prefix) for prefix in SAFE_GIT_GLOBAL_OPTION_PREFIXES):
-            index += 1
-            continue
-        break
-    return tuple(segment[index:])
+def short_option_letters(arguments: tuple[str, ...]) -> set[str]:
+    """Return letters from combined short options before `--`."""
+    letters: set[str] = set()
+    for argument in arguments:
+        if argument == "--":
+            break
+        if argument.startswith("-") and not argument.startswith("--"):
+            letters.update(argument[1:])
+    return letters
 
 
-def visible_git_token_sequences(command: str) -> tuple[tuple[str, ...], ...]:
-    """Return every Git command segment visible in a shell command."""
-    tokens = shell_tokens(command)
-    if not tokens:
-        return ()
-    script = shell_wrapper_script(tokens)
-    if script:
-        return visible_git_token_sequences(script)
-    sequences: list[tuple[str, ...]] = []
-    for segment in command_segments(tokens):
-        git_tokens = normalized_git_tokens(segment)
-        if git_tokens:
-            sequences.append(git_tokens)
-    return tuple(sequences)
-
-
-def uses_create_option(subcommand: str, arguments: tuple[str, ...]) -> bool:
-    """Return whether arguments contain one of the subcommand's branch creation options."""
-    short_options, long_options = CREATE_OPTIONS[subcommand]
+def has_long_option(arguments: tuple[str, ...], *options: str) -> bool:
+    """Return whether a long option is present in plain or assigned form."""
     return any(
-        argument in short_options
-        or any(argument.startswith(option) and len(argument) > len(option) for option in short_options)
-        or argument in long_options
-        or any(argument.startswith(f"{option}=") for option in long_options)
+        argument in options or any(argument.startswith(f"{option}=") for option in options)
         for argument in arguments
     )
 
 
-def branch_creates_branch(arguments: tuple[str, ...]) -> bool:
-    """Return whether `git branch` arguments create or copy a branch."""
+def branch_is_read_only(arguments: tuple[str, ...]) -> bool:
+    """Return whether branch arguments are an explicit list/show form."""
     if not arguments:
-        return False
-    if arguments[0] == "--":
-        return len(arguments) > 1
-    return (
-        any(argument in BRANCH_CREATE_OPTIONS for argument in arguments)
-        or not arguments[0].startswith("-")
-    )
-
-
-def worktree_subcommand(arguments: tuple[str, ...]) -> str:
-    """Return the first worktree subcommand after minimal top-level options."""
+        return True
+    if arguments == ("--show-current",):
+        return True
     index = 0
+    saw_list = False
     while index < len(arguments):
         argument = arguments[index]
         if argument == "--":
-            return arguments[index + 1] if index + 1 < len(arguments) else ""
-        if not argument.startswith("-"):
-            return argument
-        if argument not in WORKTREE_OPTIONS:
-            return ""
-        index += 1
-    return ""
+            return False
+        if argument == "--list":
+            saw_list = True
+            index += 1
+            continue
+        if argument in READ_ONLY_BRANCH_VALUE_OPTIONS:
+            index += 2
+            continue
+        if any(argument.startswith(f"{option}=") for option in READ_ONLY_BRANCH_VALUE_OPTIONS):
+            index += 1
+            continue
+        if argument in READ_ONLY_BRANCH_OPTIONS:
+            index += 1
+            continue
+        if saw_list and not argument.startswith("-"):
+            index += 1
+            continue
+        return False
+    return True
 
 
-def creation_intent_from_git_tokens(tokens: tuple[str, ...]) -> CreationIntent | None:
-    """Return the guarded creation intent for one Git command."""
-    if not tokens:
+def branch_intent(arguments: tuple[str, ...]) -> GitIntent | None:
+    """Classify branch creation, overwrite, and metadata mutation."""
+    if branch_is_read_only(arguments):
         return None
-    subcommand = tokens[0]
-    arguments = tokens[1:]
-    if subcommand in CREATE_OPTIONS and uses_create_option(subcommand, arguments):
-        return CreationIntent("branch", subcommand, CREATE_EVIDENCE[subcommand])
-    if subcommand == "branch" and branch_creates_branch(arguments):
-        return CreationIntent("branch", "branch", "git branch <name>/-c/-C/-f/--force")
-    if subcommand == "worktree" and worktree_subcommand(arguments) == "add":
-        return CreationIntent("worktree", "worktree", "git worktree add")
+    letters = short_option_letters(arguments)
+    if letters & BRANCH_FORCE_SHORTS or has_long_option(arguments, "--force", "--copy-force"):
+        return GitIntent("destructive_branch_creation", "branch", "git branch force-create/ref-overwrite", True, True)
+    if letters & BRANCH_DESTRUCTIVE_SHORTS or has_long_option(arguments, "--delete", "--move"):
+        return GitIntent("destructive_git", "branch", "git branch delete/rename", False, True)
+    if letters & BRANCH_NORMAL_CREATE_SHORTS or has_long_option(arguments, "--copy"):
+        return GitIntent("branch_creation", "branch", "git branch create/copy", True, False)
+    if (
+        has_long_option(arguments, *BRANCH_CREATION_MODIFIERS)
+        and any(not argument.startswith("-") for argument in arguments)
+    ):
+        return GitIntent("branch_creation", "branch", "git branch create with tracking/reflog", True, False)
+    if arguments and not arguments[0].startswith("-"):
+        return GitIntent("branch_creation", "branch", "git branch <name>", True, False)
+    return GitIntent("destructive_git", "branch", "git branch metadata mutation", False, True)
+
+
+def worktree_intent(arguments: tuple[str, ...]) -> GitIntent | None:
+    """Classify worktree inspection, creation, and mutation."""
+    index = 0
+    while index < len(arguments) and arguments[index] in {"-v", "--verbose"}:
+        index += 1
+    if index >= len(arguments):
+        return GitIntent("destructive_git", "worktree", "git worktree mutation", False, True)
+    subcommand = arguments[index]
+    rest = arguments[index + 1 :]
+    if subcommand == "list":
+        return None
+    if subcommand == "add":
+        force_overwrite = bool(short_option_letters(rest) & {"B", "f"}) or has_long_option(rest, "--force")
+        if force_overwrite:
+            return GitIntent("destructive_worktree_creation", "worktree", "git worktree add -B/-f/--force", True, True)
+        return GitIntent("worktree_creation", "worktree", "git worktree add/create/orphan", True, False)
+    return GitIntent("destructive_git", "worktree", f"git worktree {subcommand}", False, True)
+
+
+def git_intent(command: GitCommand) -> GitIntent | None:
+    """Classify one normalized Git command."""
+    if not command.tokens:
+        return None
+    subcommand = command.tokens[0]
+    arguments = command.tokens[1:]
+    if subcommand in {"restore", "reset"}:
+        return GitIntent("destructive_git", subcommand, f"git {subcommand}", False, True)
+    if subcommand == "clean":
+        letters = short_option_letters(arguments)
+        dry_run = "n" in letters or has_long_option(arguments, "--dry-run")
+        forced = "f" in letters or has_long_option(arguments, "--force")
+        return GitIntent("destructive_git", "clean", "git clean force", False, True) if forced and not dry_run else None
+    if subcommand in {"checkout", "switch"}:
+        if has_long_option(arguments, "--help") or "h" in short_option_letters(arguments):
+            return None
+        letters = short_option_letters(arguments)
+        force_create = (subcommand == "switch" and "C" in letters) or (subcommand == "checkout" and "B" in letters) or has_long_option(arguments, "--force-create")
+        normal_create = (subcommand == "switch" and "c" in letters) or (subcommand == "checkout" and "b" in letters) or has_long_option(arguments, "--create", "--orphan")
+        if force_create:
+            return GitIntent("destructive_branch_creation", subcommand, f"git {subcommand} force-create/ref-overwrite", True, True)
+        if normal_create:
+            return GitIntent("branch_creation", subcommand, f"git {subcommand} create/orphan", True, False)
+        return GitIntent("destructive_git", subcommand, f"git {subcommand} current-checkout mutation", False, True)
+    if subcommand == "stash":
+        if arguments and arguments[0] in {"list", "show"}:
+            return None
+        return GitIntent("destructive_git", "stash", "git stash mutation", False, True)
+    if subcommand == "branch":
+        return branch_intent(arguments)
+    if subcommand == "worktree":
+        return worktree_intent(arguments)
     return None
 
 
-def creation_intent(command: str) -> CreationIntent | None:
-    """Return the first branch or worktree creation action in a shell command."""
-    for git_tokens in visible_git_token_sequences(command):
-        intent = creation_intent_from_git_tokens(git_tokens)
-        if intent is not None:
-            return intent
-    return None
+def assignment_map(command: GitCommand) -> dict[str, str]:
+    """Return command-segment assignments."""
+    return dict(command.assignments)
 
 
-def block_payload(command: str, intent: CreationIntent) -> dict[str, object]:
-    """Return a blocking Codex hook payload."""
-    reason = (
-        "BRANCH_WORKTREE_CREATION_GUARD=block: branch/worktree creation "
-        "requires recorded route authority before shell execution. "
-        f"kind={intent.kind} subcommand={intent.subcommand} evidence={intent.evidence}"
+def creation_authorized(command: GitCommand) -> bool:
+    """Return whether same-segment branch/worktree creation evidence is complete."""
+    values = assignment_map(command)
+    return values.get(BRANCH_AUTHORITY_ENV, "").strip() in ALLOWED_BRANCH_AUTHORITIES and bool(values.get(BRANCH_REASON_ENV, "").strip())
+
+
+def destructive_authorized(command: GitCommand) -> bool:
+    """Return whether same-segment explicit destructive authority is complete."""
+    values = assignment_map(command)
+    return values.get(DESTRUCTIVE_AUTHORITY_ENV, "").strip() == DESTRUCTIVE_AUTHORITY and bool(values.get(DESTRUCTIVE_REASON_ENV, "").strip())
+
+
+def intent_authorized(command: GitCommand, intent: GitIntent) -> bool:
+    """Return whether every authority required by an intent is present."""
+    return (
+        not intent.requires_creation
+        or (creation_authorized(command) and destructive_authorized(command))
+    ) and (
+        not intent.requires_destructive or destructive_authorized(command)
     )
+
+
+def opaque_protected_intent(command: str) -> GitIntent | None:
+    """Fail closed when literal protected Git remains opaque to the parser."""
+    tokens = shell_tokens(command)
+    for git_index, token in enumerate(tokens):
+        if command_basename(token) != "git":
+            continue
+        index = git_index + 1
+        while index < len(tokens):
+            option = tokens[index]
+            if option in OPAQUE_GIT_OPTIONS_WITH_VALUES:
+                index += 2
+                continue
+            if option.startswith("-"):
+                index += 1
+                continue
+            if option in PROTECTED_GIT_SUBCOMMANDS:
+                return GitIntent(
+                    "destructive_git",
+                    "opaque",
+                    "opaque protected Git mutation",
+                    False,
+                    True,
+                )
+            break
+    return None
+
+
+def block_payload(command: str, intent: GitIntent) -> dict[str, object]:
+    """Return a blocking Codex hook payload."""
+    markers = []
+    if intent.requires_destructive:
+        markers.append("DESTRUCTIVE_GIT_GUARD=block")
+    if intent.requires_creation:
+        markers.append("BRANCH_WORKTREE_CREATION_GUARD=block")
+    marker = "; ".join(markers)
+    next_action = (
+        "request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
+        if intent.requires_creation
+        else "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval"
+    )
+    requirements: list[str] = []
+    if intent.requires_creation:
+        requirements.append(f"same-segment {BRANCH_AUTHORITY_ENV}=user_request|agent_canon_workflow and nonempty {BRANCH_REASON_ENV}")
+        requirements.append(f"same-segment {DESTRUCTIVE_AUTHORITY_ENV}=explicit_user_approval and nonempty {DESTRUCTIVE_REASON_ENV}")
+    elif intent.requires_destructive:
+        requirements.append(f"same-segment {DESTRUCTIVE_AUTHORITY_ENV}=explicit_user_approval and nonempty {DESTRUCTIVE_REASON_ENV}")
     return {
         "decision": "block",
-        "reason": reason,
-        "next_action": "reuse_current_checkout_or_record_branch_worktree_reason",
+        "reason": f"{marker}: protected shared-checkout Git intent lacks required authority. kind={intent.kind} subcommand={intent.subcommand} evidence={intent.evidence}; requires={'; '.join(requirements)}",
+        "next_action": next_action,
         "remediation": [
-            "Continue on the current branch and checkout when the task shares the same ownership surface.",
-            (
-                "For an authorized branch/worktree route, record "
-                "`branch_creation_reason=<reason>` or `worktree_creation_reason=<reason>` "
-                f"and rerun with `{AUTHORITY_ENV}=user_request|agent_canon_workflow` "
-                f"and `{REASON_ENV}=<reason>`."
-            ),
-            "Use `git branch --show-current` and `git worktree list --porcelain` for diagnostics.",
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git.",
         ],
         "command": command.strip(),
     }
 
 
+def first_block(command: str) -> GitIntent | None:
+    """Return the first unauthorized protected intent."""
+    tokens = shell_tokens(command)
+    if not tokens:
+        return opaque_protected_intent(command)
+    for segment in command_segments(tokens):
+        script = wrapper_script(segment)
+        if script:
+            if intent := first_block(script):
+                return intent
+            continue
+        git_command = normalized_git_command(segment)
+        if git_command is not None:
+            intent = git_intent(git_command)
+            if intent is not None and not intent_authorized(git_command, intent):
+                return intent
+            if (
+                intent is None
+                and git_command.tokens
+                and git_command.tokens[0].startswith("-")
+                and (opaque := opaque_protected_intent(" ".join(segment)))
+            ):
+                return opaque
+            continue
+        shell_command = normalized_shell_command(segment)
+        if shell_command is not None:
+            intent = protected_update_intent(shell_command)
+            if intent is not None and not intent_authorized(shell_command, intent):
+                return intent
+        if intent := opaque_protected_intent(" ".join(segment)):
+            return intent
+    return None
+
+
 def main() -> int:
-    """Run the branch/worktree creation guard."""
+    """Run the shared-checkout Git mutation guard."""
     payload = load_payload()
     if tool_name(payload) not in SHELL_TOOL_NAMES:
         return 0
     command = tool_command(payload)
-    intent = creation_intent(command)
-    if intent is not None and not confirmation_ready():
+    intent = first_block(command)
+    if intent is not None:
         json.dump(block_payload(command, intent), sys.stdout, sort_keys=True)
         sys.stdout.write("\n")
     return 0

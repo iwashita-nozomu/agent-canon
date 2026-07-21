@@ -6,6 +6,11 @@
 # upstream design ../../agents/task_catalog.yaml workflow topology and isolated skill-evaluation route
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy
 # upstream implementation ./skill_tool_commands.py builds selected skill command packets.
+# upstream implementation ./implementation_route.py owns fixed-packet Spark eligibility
+# upstream implementation ./model_profile_registry.py owns profile prompt/token materialization
+# upstream implementation ./capacity_handshake.py owns capacity reservations and lifecycle state
+# upstream implementation ./update_lifecycle_contract.py preserves owner-produced Decision Sufficiency verdicts and owns the terminal close token.
+# downstream implementation ./workflow_monitor.py records Decision Sufficiency and lifecycle evidence references.
 # @dependency-end
 """Shared runtime helpers for the permanent agent team."""
 
@@ -15,20 +20,42 @@ import hashlib
 import json
 import re
 import subprocess
-import tomllib
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
+from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import cast
+from typing import Callable, Mapping, cast
 
 import yaml
+if __package__:
+    from . import capacity_handshake
+    from . import implementation_route
+    from . import model_profile_registry
+    from .artifact_identity import canonical_json_bytes
+else:
+    import capacity_handshake
+    import implementation_route
+    import model_profile_registry
+    from artifact_identity import canonical_json_bytes
 from route import decide_skills, implementation_handoff_required, load_skill_route_rules
-from skill_tool_commands import (
-    PROMPT_PLACEHOLDER,
-    SkillCommandPacket,
-    packet_for_skill,
-)
+from skill_tool_commands import SkillCommandPacket, packet_for_skill
 from task_authority import AUTHORITY_FILE_NAME, build_default_task_authority
+from update_lifecycle_contract import (
+    import_decision_sufficiency_verdict,
+    materialize_close_agent_tool_call as materialize_lifecycle_close_agent_tool_call,
+    materialize_gate_verdict,
+    validate_cleanup_proof,
+    validate_descendant_close_receipt,
+    validate_durable_handback,
+    validate_gate_chain,
+    validate_reservation_release_receipt,
+    validate_record_binding,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
@@ -143,35 +170,35 @@ PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED = "yes"
 PARENT_DIRECT_WRITE_EXCEPTION = "-"
 REPO_TOOL_ROUTING_POLICY_SOURCE = "agents/skills/task-routing.md#Standard Command"
 REPO_TOOL_ROUTING_OWNER = "tools/agent_tools/skill_tool_commands.py"
-REPO_TOOL_ROUTING_STATUS = "selected_skill_command_packets"
+REPO_TOOL_ROUTING_STATUS = "selected_skill_tool_call_tokens"
 REPO_TOOL_ROUTING_ROUTE_BASIS = "selected_public_skills"
 REPO_TOOL_ROUTING_EXECUTION_MODE = "sequential_by_skill_and_stage"
 REPO_TOOL_ROUTING_SEQUENCE = (
-    "show_skill_packet",
-    "run_required_commands",
-    "run_task_matching_conditional_commands",
-    "run_validation_commands",
-)
-REPO_TOOL_ROUTING_SHOW_COMMAND_TEMPLATE = (
-    "python3 tools/agent_tools/skill_tool_commands.py show "
-    "--skill <skill> --format text"
-)
-REPO_TOOL_ROUTING_CHECK_COMMAND = (
-    "python3 tools/agent_tools/skill_tool_commands.py check"
+    "materialize_tool_call_token",
+    "execute_canonical_tool_id",
+    "record_typed_result",
 )
 REPO_TOOL_ROUTING_STAGE_FIELDS = (
-    "required_commands",
-    "conditional_commands",
-    "validation_commands",
+    "tool_call_token",
+    "intent",
+    "typed_failure_semantics",
 )
 REPO_DYNAMIC_SKILL_ROUTING_STATUS = "related_skill_candidates"
-REPO_DYNAMIC_SKILL_ROUTING_COMMAND = (
-    'python3 tools/agent_tools/route.py --prompt "<user request>" --format json'
-)
-REPO_DYNAMIC_SKILL_AREA_COMMAND = (
-    "python3 tools/agent_tools/route.py --area skills --changed <paths...>"
-)
 REPO_DYNAMIC_SKILL_ROUTING_NEXT = "add_skill_then_regenerate_repo_tool_routes"
+TOOL_CALL_SCHEMA = "agent-canon.tool-call.v1"
+SKILL_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.skill-tool-commands.args.v1"
+ROUTE_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.route.args.v1"
+DECISION_SUFFICIENCY_OWNER = "agents/skills/agent-orchestration.md#Decision Sufficiency Packet"
+DECISION_SUFFICIENCY_VALIDATOR = "validate_decision_sufficiency_packet"
+DECISION_SUFFICIENCY_MACHINE_FIELDS = (
+    "H",
+    "downstream_decision",
+    "possible_branches",
+    "invariant",
+    "value_of_information",
+    "route_verdict",
+    "rejection",
+)
 PRE_HANDOFF_SCOPE_POLICY_SOURCE = (
     "agents/COMMUNICATION_PROTOCOL.md#Pre-Edit Repository Investigation Packet"
 )
@@ -208,7 +235,6 @@ DEFAULT_QUALITY_CHECK_POLICY_SOURCE = (
     "agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default"
 )
 DEFAULT_QUALITY_CHECK_ROLE_IDS = (
-    "test_designer",
     "docs_workflow_steward",
     "python_reviewer",
     "cpp_reviewer",
@@ -219,14 +245,20 @@ DEFAULT_QUALITY_CHECK_STAGES = (
     "post_edit_review",
 )
 DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
+    "tools/bin/agent-canon docs check <changed-markdown-paths>",
     "python3 tools/agent_tools/check_convention_compliance.py",
     "python3 tools/agent_tools/check_dependency_headers.py --changed",
     "bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing",
     "bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header",
-    "python3 tools/agent_tools/helper_function_inventory.py --root . --changed --baseline-ref HEAD",
-    "python3 tools/oop/python/readability.py --root . --min-score 95 <changed-python-paths>",
-    "python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>",
-    "tools/bin/agent-canon docs check <changed-markdown-paths>",
+)
+CANONICAL_FORMAT_CHECK_ROUTE = "tools/bin/agent-canon docs check <changed-markdown-paths>"
+OFFICIAL_HOOK_DISPATCHER = ".codex/hooks/hook_dispatcher.py"
+OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
+OOP_EVIDENCE_DIMENSIONS = (
+    "owner_overlap",
+    "state_ownership",
+    "api_boundary",
+    "dependency_boundary",
 )
 def validation_failure_response_policy() -> dict[str, object]:
     """Return validation-failure response taxonomy from the JSON owner."""
@@ -671,6 +703,68 @@ class RunBundleSpec:
     selected_skills: tuple[str, ...] = ()
     task_catalog: TaskCatalog | None = None
     agent_type_selections: tuple[AgentTypeSelection, ...] = ()
+    parent_lineage_id: str = ""
+    decision_sufficiency_packet: dict[str, object] | None = None
+    decision_sufficiency_packet_ref: str = ""
+
+
+@dataclass(frozen=True)
+class CapacityHandshakeConsumerBinding:
+    """Closed consumer projection for the provider-owned capacity ledger."""
+
+    binding_version: int = 1
+    provider_owner_id: str = "capacity_handshake"
+    consumer_owner_ids: tuple[str, ...] = ("agent_team", "task_close")
+    allowed_api_ids: tuple[str, ...] = (
+        "reserve_capacity",
+        "enqueue_ready_work",
+        "record_lifecycle_transition",
+        "materialize_closeout_packet",
+    )
+    provider_type_ids: tuple[str, ...] = (
+        "LifecycleStatus",
+        "DescendantLifecycleRecord",
+        "CapacityLedger",
+        "LifecycleTransitionRecord",
+        "LedgerWriteResult",
+        "ParentChildEdge",
+        "DescendantTopologyReadback",
+        "CloseoutPacket",
+        "CloseAgentCallRecord",
+        "LifecycleCloseoutFailure",
+    )
+    duplicate_definition_policy: str = "forbidden"
+
+    @property
+    def shape_id(self) -> str:
+        return "capacity_handshake_consumer_binding_v1"
+
+
+@dataclass
+class _CapacityRuntime:
+    """Runtime-owned objects shared by parent and nested lifecycle consumers."""
+
+    binding: CapacityHandshakeConsumerBinding
+    snapshot: capacity_handshake.CapacitySnapshot
+    ledger: capacity_handshake.CapacityLedger
+    parent_lineage_id: str
+    topology_proof_sha256: str
+    requested_capacity: int
+    write_scope_cap: int
+
+
+@dataclass(frozen=True)
+class ImplementationDispatch:
+    """One executable fixed-packet dispatch and its single owning gate."""
+
+    route_result: implementation_route.ImplementationRouteResult
+    prompt_capsule: model_profile_registry.MaterializedPromptCapsule | None
+    close_agent_token: model_profile_registry.ToolCallToken | None
+    worker_agent_id: str | None
+    owner_gate_id: str
+    owner_gate_count: int
+    spawn_count: int
+    status: str
 
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
@@ -825,29 +919,12 @@ def selected_skill_names(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
     )
 
 
-def skill_tool_packet_command(skill: str) -> str:
-    """Return the canonical command that prints one selected skill tool packet."""
-    return (
-        "python3 tools/agent_tools/skill_tool_commands.py show "
-        f"--skill {skill} --format text"
-    )
-
-
 def selected_skill_command_packets(
     selected_skills: tuple[str, ...],
 ) -> tuple[SkillCommandPacket, ...]:
     """Build repo tool command packets for selected public skills."""
     return tuple(
         packet_for_skill(ROOT, skill) for skill in selected_skill_names(selected_skills)
-    )
-
-
-def conditional_commands_for_packet(packet: SkillCommandPacket) -> tuple[str, ...]:
-    """Return task-matching command candidates for one skill packet."""
-    if packet.discovered_commands:
-        return packet.discovered_commands
-    return (
-        f'python3 tools/agent_tools/route.py --prompt "{PROMPT_PLACEHOLDER}" --format json',
     )
 
 
@@ -879,7 +956,7 @@ def repo_tool_routing_policy_output_lines(
     dynamic_candidates = dynamic_skill_candidate_names(selected_skills)
     return (
         "REPO_TOOL_ROUTING_POLICY=run.repo_tool_routing_policy",
-        f"REPO_TOOL_COMMAND_PACKET_COMMAND={REPO_TOOL_ROUTING_SHOW_COMMAND_TEMPLATE}",
+        "REPO_TOOL_CALL_TOKEN_SCHEMA=agent-canon.tool-call.v1",
         f"REPO_TOOL_SELECTED_SKILLS={skill_list}",
         f"REPO_TOOL_DYNAMIC_CANDIDATES={format_public_skill_list(dynamic_candidates)}",
         f"REPO_TOOL_ROUTING_SOURCE={REPO_TOOL_ROUTING_POLICY_SOURCE}",
@@ -888,13 +965,248 @@ def repo_tool_routing_policy_output_lines(
         f"REPO_TOOL_ROUTING_EXECUTION_MODE={REPO_TOOL_ROUTING_EXECUTION_MODE}",
         f"REPO_TOOL_ROUTING_SEQUENCE={','.join(REPO_TOOL_ROUTING_SEQUENCE)}",
         f"REPO_TOOL_ROUTING_STAGE_FIELDS={','.join(REPO_TOOL_ROUTING_STAGE_FIELDS)}",
-        f"REPO_TOOL_ROUTING_CHECK={REPO_TOOL_ROUTING_CHECK_COMMAND}",
+        "REPO_TOOL_ROUTING_CHECK_TOOL_ID=skill-tool-commands",
         f"REPO_DYNAMIC_SKILL_ROUTING_POLICY={REPO_DYNAMIC_SKILL_ROUTING_STATUS}",
-        f"REPO_DYNAMIC_SKILL_ROUTING_COMMAND={REPO_DYNAMIC_SKILL_ROUTING_COMMAND}",
-        f"REPO_DYNAMIC_SKILL_AREA_COMMAND={REPO_DYNAMIC_SKILL_AREA_COMMAND}",
+        "REPO_DYNAMIC_SKILL_ROUTING_TOOL_CALL="
+        + json.dumps(
+            materialize_dynamic_route_tool_call_token(),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
         f"REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES={format_public_skill_list(dynamic_candidates)}",
         f"REPO_DYNAMIC_SKILL_ROUTING_NEXT={REPO_DYNAMIC_SKILL_ROUTING_NEXT}",
     )
+
+
+def materialize_tool_call_token(
+    *,
+    tool_id: str,
+    argument_schema_id: str,
+    argument_properties: Mapping[str, Mapping[str, object]],
+    arguments: Mapping[str, object],
+    intent: str,
+    typed_failure_semantics: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Materialize one canonical, directly executable route-packet ToolCall."""
+    if not tool_id or not argument_schema_id or not intent:
+        raise RuntimeError("tool_call_token requires tool_id, schema, and intent")
+    if set(arguments) != set(argument_properties):
+        raise RuntimeError("tool_call_token arguments do not match argument schema")
+    failures: list[dict[str, object]] = []
+    for index, failure in enumerate(typed_failure_semantics):
+        if set(failure) != {"code", "retryable", "next"}:
+            raise RuntimeError(
+                "tool_call_token typed failure must contain code, retryable, and next: "
+                f"{index}"
+            )
+        if not isinstance(failure["code"], str) or not failure["code"]:
+            raise RuntimeError("tool_call_token failure code must be non-empty")
+        if not isinstance(failure["retryable"], bool):
+            raise RuntimeError("tool_call_token failure retryable must be boolean")
+        if not isinstance(failure["next"], str) or not failure["next"]:
+            raise RuntimeError("tool_call_token failure next must be non-empty")
+        failures.append(dict(failure))
+    record: dict[str, object] = {
+        "schema": TOOL_CALL_SCHEMA,
+        "tool_id": tool_id,
+        "argument_schema": {
+            "$id": argument_schema_id,
+            "type": "object",
+            "required": list(argument_properties),
+            "properties": {
+                key: dict(value) for key, value in argument_properties.items()
+            },
+            "additionalProperties": False,
+        },
+        "arguments": dict(arguments),
+        "intent": intent,
+        "typed_failure_semantics": failures,
+    }
+    token_digest = hashlib.sha256(canonical_json_bytes(record)).hexdigest()
+    record["token_id"] = f"tool-call:{token_digest}"
+    record["token_body_sha256"] = "sha256:" + hashlib.sha256(
+        canonical_json_bytes(record)
+    ).hexdigest()
+    return record
+
+
+def materialize_skill_tool_call_token(skill: str) -> dict[str, object]:
+    """Return the canonical skill-command materializer call without prose argv."""
+    return materialize_tool_call_token(
+        tool_id="skill-tool-commands",
+        argument_schema_id=SKILL_TOOL_CALL_ARGUMENT_SCHEMA,
+        argument_properties={
+            "skill": {"type": "string", "minLength": 1},
+            "format": {"type": "string", "enum": ["json"]},
+        },
+        arguments={"skill": skill, "format": "json"},
+        intent="Materialize the selected skill's canonical repository-tool packet.",
+        typed_failure_semantics=(
+            {
+                "code": "skill_tool_route:unknown_skill",
+                "retryable": False,
+                "next": "reject_route_packet",
+            },
+            {
+                "code": "skill_tool_route:catalog_mismatch",
+                "retryable": False,
+                "next": "return_to_tool_catalog_owner",
+            },
+        ),
+    )
+
+
+def materialize_dynamic_route_tool_call_token() -> dict[str, object]:
+    """Return a canonical route call bound to the run's request artifact."""
+    return materialize_tool_call_token(
+        tool_id="route",
+        argument_schema_id=ROUTE_TOOL_CALL_ARGUMENT_SCHEMA,
+        argument_properties={
+            "prompt_ref": {"type": "string", "minLength": 1},
+            "format": {"type": "string", "enum": ["json"]},
+        },
+        arguments={"prompt_ref": "run.user_request_contract", "format": "json"},
+        intent="Resolve a changed request into the canonical public-skill route.",
+        typed_failure_semantics=(
+            {
+                "code": "route:request_artifact_missing",
+                "retryable": False,
+                "next": "reject_route_packet",
+            },
+            {
+                "code": "route:no_matching_skill",
+                "retryable": False,
+                "next": "return_typed_no_match",
+            },
+        ),
+    )
+
+
+@dataclass(frozen=True)
+class CloseAgentLifecycleEvidence:
+    """Validated-input domain for G6 and terminal close materialization."""
+
+    gate_verdicts: Sequence[Mapping[str, object]]
+    cleanup_proof: Mapping[str, object]
+    durable_handback: Mapping[str, object]
+    descendant_close_receipts: Sequence[Mapping[str, object]]
+    reservation_release_receipts: Sequence[Mapping[str, object]]
+
+
+def materialize_close_agent_tool_call(
+    *,
+    run_id: str,
+    agent_id: str,
+    evidence: CloseAgentLifecycleEvidence,
+) -> dict[str, object]:
+    """Own G6 by validating closure receipts before issuing the terminal token."""
+    handback = validate_durable_handback(evidence.durable_handback)
+    checked_binding = validate_record_binding(handback["binding"])
+    gates = list(
+        validate_gate_chain(
+            list(evidence.gate_verdicts),
+            expected_gate_ids=("G1", "G2", "G3", "G4", "G5"),
+            require_pass=True,
+        )
+    )
+    descendants = [
+        validate_descendant_close_receipt(item)
+        for item in evidence.descendant_close_receipts
+    ]
+    reservations = [
+        validate_reservation_release_receipt(item)
+        for item in evidence.reservation_release_receipts
+    ]
+    declared_descendants = set(cast(Sequence[str], handback["descendant_ids"]))
+    observed_descendants = {cast(str, item["agent_id"]) for item in descendants}
+    if observed_descendants != declared_descendants:
+        raise ValueError("close_agent:unknown_descendant")
+    declared_reservations = set(cast(Sequence[str], handback["reservation_ids"]))
+    observed_reservations = {
+        cast(str, item["reservation_id"]) for item in reservations
+    }
+    if observed_reservations != declared_reservations:
+        raise ValueError("close_agent:reservation_leak")
+    binding_identity_fields = (
+        "transaction_id",
+        "snapshot_id",
+        "candidate_sha",
+        "tree_sha",
+        "input_digest",
+        "tool_id",
+        "tool_version",
+    )
+    expected_identity = tuple(checked_binding[field] for field in binding_identity_fields)
+    handback_binding = cast(Mapping[str, object], handback["binding"])
+    if handback_binding != checked_binding:
+        raise ValueError("close_agent:identity_mismatch")
+    if handback["agent_id"] != agent_id:
+        raise ValueError("close_agent:agent_identity_mismatch")
+    for item in [*descendants, *reservations]:
+        item_binding = cast(Mapping[str, object], item["binding"])
+        if tuple(item_binding[field] for field in binding_identity_fields) != expected_identity:
+            raise ValueError("close_agent:identity_mismatch")
+        if item["durable_handback_evidence_ref"] != handback["evidence_ref"]:
+            raise ValueError("close_agent:durable_handback_mismatch")
+    descendants_closed_evidence_ref = "evidence:" + hashlib.sha256(
+        canonical_json_bytes(descendants)
+    ).hexdigest()
+    reservations_released_evidence_ref = "evidence:" + hashlib.sha256(
+        canonical_json_bytes(reservations)
+    ).hexdigest()
+    cleanup = validate_cleanup_proof(evidence.cleanup_proof)
+    cleanup_binding = cast(Mapping[str, object], cleanup["binding"])
+    if tuple(cleanup_binding[field] for field in binding_identity_fields) != expected_identity:
+        raise ValueError("close_agent:identity_mismatch")
+    gate_refs = [
+        cast(str, cast(Mapping[str, object], gate["binding"])["evidence_ref"])
+        for gate in gates
+    ]
+    if cleanup["remote_readback_evidence_ref"] != gate_refs[4]:
+        raise ValueError("close_agent:cleanup_before_remote_readback")
+    g6 = materialize_gate_verdict(
+        binding=checked_binding,
+        gate_id="G6",
+        ordered_input_evidence_refs=[
+            *gate_refs,
+            cast(str, handback["evidence_ref"]),
+            descendants_closed_evidence_ref,
+            reservations_released_evidence_ref,
+            cast(str, cleanup["evidence_ref"]),
+        ],
+        invariant="nested_lifecycle_cleanup",
+        output_digest="sha256:"
+        + hashlib.sha256(
+            canonical_json_bytes(
+                {
+                    "durable_handback": handback,
+                    "descendants": descendants,
+                    "reservations": reservations,
+                    "cleanup": cleanup,
+                }
+            )
+        ).hexdigest(),
+        owner=f"{Path(__file__).resolve()}#materialize_close_agent_tool_call",
+        verdict="pass",
+    )
+    token = materialize_lifecycle_close_agent_tool_call(
+        binding=checked_binding,
+        run_id=run_id,
+        agent_id=agent_id,
+        gate_verdicts=[*gates, g6],
+        cleanup_proof=cleanup,
+        durable_handback=handback,
+        descendants_closed_evidence_ref=descendants_closed_evidence_ref,
+        reservations_released_evidence_ref=reservations_released_evidence_ref,
+    )
+    return {
+        "schema": "agent-canon.close-agent-materialization.v1",
+        "g6_gate": g6,
+        "descendants_closed_evidence_ref": descendants_closed_evidence_ref,
+        "reservations_released_evidence_ref": reservations_released_evidence_ref,
+        "close_agent_tool_call": token,
+    }
 
 
 def default_quality_check_role_ids(roles: tuple[Role, ...]) -> tuple[str, ...]:
@@ -943,6 +1255,10 @@ def default_quality_check_policy_output_lines(
         "DEFAULT_QUALITY_CHECK_AGENT_TYPES="
         f"{','.join(default_quality_check_agent_types(roles)) or '-'}",
         f"DEFAULT_QUALITY_CHECK_STAGES={','.join(DEFAULT_QUALITY_CHECK_STAGES)}",
+        f"DEFAULT_QUALITY_CHECK_EVIDENCE={','.join(OOP_EVIDENCE_DIMENSIONS)}",
+        f"DEFAULT_FORMAT_CHECK_ROUTE={CANONICAL_FORMAT_CHECK_ROUTE}",
+        f"OFFICIAL_HOOK_DISPATCHER={OFFICIAL_HOOK_DISPATCHER}",
+        f"OFFICIAL_HOOK_SCHEMA={OFFICIAL_HOOK_SCHEMA}",
         "DEFAULT_QUALITY_CHECK_TASK_DEFAULT_SPECIALISTS="
         f"{','.join(task_default_specialists) or '-'}",
         "DEFAULT_QUALITY_CHECK_AUTO_LANGUAGE_REVIEWERS="
@@ -1139,39 +1455,501 @@ def resolve_workflow_family(catalog: TaskCatalog, family_id: str) -> dict[str, o
     raise KeyError(f"unknown workflow family: {family_id}")
 
 
+def _capacity_family_record(
+    family: dict[str, object],
+) -> capacity_handshake.DeclaredFamilyCapacity:
+    """Derive one family capacity record from its declared stage topology."""
+    family_id = _as_required_string(family.get("id"), "workflow_family.id")
+    roles = _as_object_mapping(cast(object, family.get("roles", {})), "workflow_family.roles")
+    declared_roles = set(
+        _as_string_tuple(roles.get("always_on"), "workflow_family.roles.always_on")
+        + _as_string_tuple(roles.get("specialists"), "workflow_family.roles.specialists")
+    )
+    topology = _as_object_mapping(
+        cast(object, family.get("role_topology", {})),
+        "workflow_family.role_topology",
+    )
+    waves = _as_mapping_tuple(topology.get("stage_waves"), "workflow_family.stage_waves")
+
+    def stage_roles(stage_class: str) -> tuple[str, ...]:
+        selected: list[str] = []
+        for wave in waves:
+            if wave.get("stage_class") != stage_class:
+                continue
+            for role_id in _as_string_tuple(wave.get("role_ids"), "stage_wave.role_ids"):
+                if role_id in declared_roles and role_id not in selected:
+                    selected.append(role_id)
+        return tuple(selected)
+
+    direct = list(stage_roles("reviewer"))
+    isolated = {"skill_evaluator"} & declared_roles
+    for role_id in sorted(isolated):
+        if role_id not in direct:
+            direct.append(role_id)
+    nested = stage_roles("producer")
+    final = stage_roles("final")
+    return capacity_handshake.DeclaredFamilyCapacity(
+        workflow_family_id=family_id,
+        direct_frontier_role_ids=tuple(direct),
+        nested_owner_role_ids=tuple(
+            role_id for role_id in nested if role_id not in isolated
+        ),
+        final_frontier_role_ids=tuple(final),
+        direct_frontier_count=len(direct),
+        nested_reservation_count=len(tuple(role_id for role_id in nested if role_id not in isolated)),
+        final_frontier_count=len(final),
+    )
+
+
+def declared_team_capacity_derivation(
+    catalog: TaskCatalog,
+) -> capacity_handshake.DeclaredTeamTopologyDerivation:
+    """Materialize the canonical topology-derived capacity witness input."""
+    return capacity_handshake.DeclaredTeamTopologyDerivation(
+        derivation_version=1,
+        topology_source="agents/task_catalog.yaml::role_topology_defaults",
+        workflow_role_source="agents/task_catalog.yaml::workflow_families[].roles",
+        direct_frontier_stage_class="reviewer",
+        nested_owner_stage_class="producer",
+        final_stage_class="final",
+        excluded_nested_role_ids=("skill_evaluator",),
+        isolated_direct_role_ids=("skill_evaluator",),
+        family_records=tuple(
+            _capacity_family_record(family) for family in catalog.workflow_families
+        ),
+    )
+
+
+def _capacity_write_scope_cap(
+    family: capacity_handshake.DeclaredFamilyCapacity,
+) -> int:
+    """Derive write capacity from the selected nested owner frontier."""
+    return max(1, len(family.nested_owner_role_ids))
+
+
+def _capacity_topology_witness(
+    derivation: capacity_handshake.DeclaredTeamTopologyDerivation,
+    target_state_contract_sha256: str = "",
+) -> capacity_handshake.TopologyCapacityWitness:
+    """Build the serializable topology witness consumed by the handshake owner."""
+    nodes: list[capacity_handshake.TopologyCapacityNode] = []
+    for family in derivation.family_records:
+        family_node = f"workflow:{family.workflow_family_id}"
+        nodes.append(
+            capacity_handshake.TopologyCapacityNode(
+                node_id=family_node,
+                node_kind="workflow_family",
+                predecessor_ids=(),
+                descendant_parent_id=None,
+                total_slot_weight=1,
+                write_slot_weight=0,
+                allowed_write_paths=(),
+                exclusion_ids=(),
+            )
+        )
+        for role_id in family.nested_owner_role_ids:
+            nodes.append(
+                capacity_handshake.TopologyCapacityNode(
+                    node_id=f"{family_node}:{role_id}",
+                    node_kind="descendant",
+                    predecessor_ids=(family_node,),
+                    descendant_parent_id=family_node,
+                    total_slot_weight=1,
+                    write_slot_weight=1,
+                    allowed_write_paths=(f"role:{role_id}",),
+                    exclusion_ids=(),
+                )
+            )
+    peak = derivation.peak_family
+    requested = derivation.requested_max_threads()
+    write_cap = _capacity_write_scope_cap(peak)
+    proof_payload = {
+        "families": [
+            {
+                "id": family.workflow_family_id,
+                "direct": list(family.direct_frontier_role_ids),
+                "nested": list(family.nested_owner_role_ids),
+                "final": list(family.final_frontier_role_ids),
+            }
+            for family in derivation.family_records
+        ],
+        "requested_total_capacity": requested,
+        "write_scope_cap": write_cap,
+    }
+    proof_sha256 = hashlib.sha256(
+        json.dumps(proof_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return capacity_handshake.TopologyCapacityWitness(
+        target_state_contract_sha256=target_state_contract_sha256,
+        declared_team_topology_ref="agents/task_catalog.yaml",
+        declared_team_topology_sha256=proof_sha256,
+        node_records=tuple(nodes),
+        legal_frontier_ids=tuple(node.node_id for node in nodes),
+        peak_frontier_node_ids=tuple(
+            f"workflow:{peak.workflow_family_id}:{role_id}"
+            for role_id in peak.direct_frontier_role_ids
+        ),
+        peak_write_frontier_node_ids=tuple(
+            f"workflow:{peak.workflow_family_id}:{role_id}"
+            for role_id in peak.nested_owner_role_ids
+        ),
+        requested_total_capacity=requested,
+        workflow_dag_peak_demand=peak.direct_frontier_count,
+        nested_reservation_count=peak.nested_reservation_count,
+        workflow_dag_budget=peak.direct_frontier_count,
+        write_scope_cap=write_cap,
+        derivation=derivation,
+    )
+
+
+def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
+    """Create one provider-owned ledger and snapshot for a run bundle."""
+    if spec.task_catalog is None:
+        raise RuntimeError("task catalog is required for capacity handshake")
+    derivation = declared_team_capacity_derivation(spec.task_catalog)
+    witness = _capacity_topology_witness(derivation)
+    config_path = spec.workspace_root / ".codex" / "config.toml"
+    contract = capacity_handshake.load_startup_contract(
+        derivation,
+        witness,
+        config_path=str(config_path),
+        contract_id=f"capacity:{spec.run_id}",
+    )
+    peak = derivation.peak_family
+    write_cap = _capacity_write_scope_cap(peak)
+    snapshot = capacity_handshake.make_session_snapshot(
+        contract=contract,
+        requested_capacity=witness.requested_total_capacity,
+        configured_max_threads=contract.input_evidence.max_threads_loader.configured_max_threads,
+        workflow_dag_demand=peak.direct_frontier_count,
+        nested_capacity_reservation=peak.nested_reservation_count,
+        write_scope_cap=write_cap,
+        requested_write_capacity=write_cap,
+        workflow_dag_write_demand=write_cap,
+    )
+    parent_lineage_id = spec.parent_lineage_id or f"run:{spec.run_id}"
+    ledger = capacity_handshake.CapacityLedger(
+        topology=capacity_handshake.DescendantTopologyReadback(parent_work_id=spec.run_id)
+    )
+    return _CapacityRuntime(
+        binding=CapacityHandshakeConsumerBinding(),
+        snapshot=snapshot,
+        ledger=ledger,
+        parent_lineage_id=parent_lineage_id,
+        topology_proof_sha256=witness.declared_team_topology_sha256,
+        requested_capacity=witness.requested_total_capacity,
+        write_scope_cap=write_cap,
+    )
+
+
+def _json_capacity_record(record: capacity_handshake.DescendantLifecycleRecord) -> dict[str, object]:
+    return {
+        "work_id": record.work_id,
+        "parent_work_id": record.parent_work_id,
+        "profile_id": record.profile_id,
+        "status": record.status.value,
+        "durable_result_evidence_ref": record.durable_result_evidence_ref,
+        "durable_handback": record.durable_handback,
+        "descendants_closed": record.descendants_closed,
+        "close_readback": record.close_readback,
+        "reserved_slots": record.reserved_slots,
+        "reserved_write_slots": record.reserved_write_slots,
+        "transition_generation": record.transition_generation,
+    }
+
+
+def _capacity_projection(runtime: _CapacityRuntime, spec: RunBundleSpec) -> dict[str, object]:
+    """Return the machine-readable manifest projection for shared runtime state."""
+    configured = runtime.snapshot.configured_max_threads
+    return {
+        "schema_id": "team_manifest_capacity_request_v1",
+        "requested_total_capacity": runtime.requested_capacity,
+        "effective_total_capacity": runtime.snapshot.effective_total_capacity,
+        "available_total_capacity": runtime.snapshot.available_total_capacity,
+        "requested_write_capacity": runtime.snapshot.requested_write_capacity,
+        "effective_write_capacity": runtime.snapshot.effective_write_capacity,
+        "available_write_capacity": runtime.snapshot.available_write_capacity,
+        "topology_proof_ref": "agents/task_catalog.yaml",
+        "topology_proof_sha256": runtime.topology_proof_sha256,
+        "capacity_policy_ref": "agents/capacity_policy.toml",
+        "capacity_policy_sha256": runtime.snapshot.contract.capacity_policy.topology_proof_sha256,
+        "loader_evidence_ref": runtime.snapshot.contract.input_evidence.max_threads_loader.evidence_ref,
+        "configured_max_threads_loader_value": configured,
+        "reload_state": "restart_required" if configured != runtime.requested_capacity else "current",
+        "requested_capacity_loader_status": "completed",
+        "input_provenance": [
+            {
+                "input_id": item.input_id,
+                "value": item.value,
+                "source_ref": item.source_ref,
+                "loader_id": item.loader_id,
+                "readback_value": item.readback_value,
+                "status": item.status,
+            }
+            for item in runtime.snapshot.input_provenance
+        ],
+        "parent_lineage_id": runtime.parent_lineage_id,
+        "ledger_ref": f"runtime://ledger/{spec.run_id}",
+        "capacity_handshake_binding": {
+            "shape_id": runtime.binding.shape_id,
+            "binding_version": runtime.binding.binding_version,
+            "provider_owner_id": runtime.binding.provider_owner_id,
+            "consumer_owner_ids": list(runtime.binding.consumer_owner_ids),
+            "allowed_api_ids": list(runtime.binding.allowed_api_ids),
+            "provider_type_ids": list(runtime.binding.provider_type_ids),
+            "duplicate_definition_policy": runtime.binding.duplicate_definition_policy,
+        },
+        "ledger": {
+            "shape_id": runtime.ledger.shape_id,
+            "parent_work_id": runtime.ledger.topology.parent_work_id,
+            "descendants": [_json_capacity_record(record) for record in runtime.ledger.topology.descendants],
+            "reservations": [
+                {"parent_work_id": edge.parent_work_id, "child_work_id": edge.child_work_id}
+                for edge in runtime.ledger.reservations.values()
+            ],
+            "ready_queue": [],
+        },
+        "lineage": {
+            "parent_lineage_id": runtime.parent_lineage_id,
+            "ancestor_agent_ids": [],
+            "run_id": spec.run_id,
+            "work_id": spec.run_id,
+            "role_ids": [role.id for role in spec.roles],
+        },
+    }
+
+
+def _closeout_projection(
+    runtime: _CapacityRuntime,
+    spec: RunBundleSpec,
+) -> dict[str, object]:
+    """Materialize the provider closeout state with canonical close-agent tokens."""
+    tokens: dict[str, dict[str, object]] = {}
+    registry = model_profile_registry.load_model_profile_registry(spec.workspace_root)
+    for record in runtime.ledger.topology.descendants:
+        if record.status not in {
+            capacity_handshake.LifecycleStatus.READBACK_VERIFIED,
+            capacity_handshake.LifecycleStatus.RESERVATION_RELEASED,
+        }:
+            continue
+        if not record.profile_id:
+            raise RuntimeError(f"closeout record lacks profile identity: {record.work_id}")
+        token = model_profile_registry.materialize_tool_call_token(
+            model_profile_registry.ToolCallMaterializationRequest(
+                profile_id=record.profile_id,
+                terminal_agent_id=record.work_id,
+            ),
+            record.profile_id,
+            registry,
+        )
+        token_projection = {
+            "tool_id": token.tool_id,
+            "arguments": dict(token.arguments),
+        }
+        tokens[record.work_id] = token_projection
+    provider_packet = capacity_handshake.materialize_closeout_packet(
+        parent_work_id=spec.run_id,
+        ledger=runtime.ledger,
+        descendants=(runtime.ledger.topology,),
+        close_agent_tokens=tokens,
+    )
+    calls = [
+        {
+            "agent_id": call.work_id,
+            "tool_call_token": dict(call.close_agent_call_token),
+        }
+        for call in provider_packet.close_agent_calls
+    ]
+    failures = [
+        {"work_id": failure.work_id, "detail": failure.detail}
+        for failure in provider_packet.failures
+    ]
+    return {
+        "schema_id": "closeout_tool_call_projection_v1",
+        "parent_work_id": spec.run_id,
+        "parent_lineage_id": runtime.parent_lineage_id,
+        "ledger_ref": f"runtime://ledger/{spec.run_id}",
+        "close_agent_tool_calls": calls,
+        "failures": failures,
+        "status": "completed" if not failures else "failed",
+        "natural_language_intent": "close terminal descendants in postorder and release reservations after readback",
+    }
+
+
+def dispatch_fixed_implementation(
+    request: Mapping[str, object] | implementation_route.ImplementationRouteRequest,
+    objective: str,
+    spawn: Callable[[str, str], str | None],
+    *,
+    workspace_root: Path = ROOT,
+    capacity_runtime: _CapacityRuntime | None = None,
+) -> ImplementationDispatch:
+    """Route, materialize, and launch exactly one fixed Spark implementation worker."""
+    route_result = implementation_route.route_implementation(request)
+    if route_result.status == "blocked":
+        return ImplementationDispatch(route_result, None, None, None, route_result.next_gate, 1, 0, "blocked")
+    if route_result.status == "queued":
+        return ImplementationDispatch(route_result, None, None, None, route_result.next_gate, 1, 0, "queued")
+    if (
+        route_result.selected_agent_type != "spark_worker"
+        or route_result.selected_profile_id != "spark_implementation_low"
+        or route_result.failure is not None
+    ):
+        raise RuntimeError("implementation_dispatch:fixed_route_violation")
+    if isinstance(request, implementation_route.ImplementationRouteRequest):
+        packet_payload: object = request.fixed_implementation_packet
+    else:
+        packet_payload = request.get("fixed_implementation_packet")
+    if is_dataclass(packet_payload):
+        packet_context = asdict(packet_payload)
+    elif isinstance(packet_payload, Mapping):
+        packet_context = dict(packet_payload)
+    else:
+        raise RuntimeError("implementation_dispatch:fixed_packet_missing")
+    registry = model_profile_registry.load_model_profile_registry(workspace_root)
+    prompt = model_profile_registry.materialize_prompt_capsule(
+        model_profile_registry.PromptMaterializationRequest(
+            profile_id=route_result.selected_profile_id,
+            role_id="spark_worker",
+            context=(
+                model_profile_registry.ContextItem("objective", objective),
+                model_profile_registry.ContextItem("context", "fixed_packet_direct_materialization"),
+                model_profile_registry.ContextItem("fixed_implementation_packet", packet_context),
+                model_profile_registry.ContextItem("implementation_route_result", asdict(route_result)),
+                model_profile_registry.ContextItem("owner_gate", route_result.next_gate),
+            ),
+            objective=objective,
+        ),
+        registry,
+    )
+    if route_result.capacity_action == "continue_existing":
+        worker_agent_id = route_result.resume_worker_agent_id
+        spawn_count = 0
+        status = "continued"
+    else:
+        planned_id = f"{route_result.packet_sha256}:spark"
+        item = capacity_handshake.ReadyWorkItem(
+            work_id=planned_id,
+            packet_sha256=route_result.packet_sha256 or "",
+            profile_id=route_result.selected_profile_id,
+            required_slots=1,
+            required_write_slots=1,
+            model=registry.by_profile(route_result.selected_profile_id).model,
+        )
+        if capacity_runtime is not None:
+            readiness = capacity_handshake.request_slot(capacity_runtime.snapshot, capacity_runtime.ledger, item)
+            if readiness.status != "ready":
+                return ImplementationDispatch(route_result, prompt, None, None, route_result.next_gate, 1, 0, "queued")
+        worker_agent_id = spawn("spark_worker", prompt.body)
+        spawn_count = 1
+        if not worker_agent_id:
+            if capacity_runtime is not None:
+                capacity_handshake.record_successful_spawn(
+                    capacity_runtime.snapshot,
+                    capacity_runtime.ledger,
+                    item,
+                    spawn_succeeded=False,
+                )
+            return ImplementationDispatch(route_result, prompt, None, None, route_result.next_gate, 1, spawn_count, "queued")
+        if capacity_runtime is not None:
+            spawned_item = capacity_handshake.ReadyWorkItem(
+                work_id=worker_agent_id,
+                packet_sha256=item.packet_sha256,
+                profile_id=item.profile_id,
+                required_slots=item.required_slots,
+                required_write_slots=item.required_write_slots,
+                model=item.model,
+            )
+            capacity_handshake.record_successful_spawn(
+                capacity_runtime.snapshot,
+                capacity_runtime.ledger,
+                spawned_item,
+                spawn_succeeded=True,
+            )
+        status = "spawned"
+    if not worker_agent_id:
+        raise RuntimeError("implementation_dispatch:worker_identity_missing")
+    token = model_profile_registry.materialize_tool_call_token(
+        model_profile_registry.ToolCallMaterializationRequest(
+            route_result.selected_profile_id,
+            worker_agent_id,
+        ),
+        route_result.selected_profile_id,
+        registry,
+    )
+    return ImplementationDispatch(
+        route_result,
+        prompt,
+        token,
+        worker_agent_id,
+        route_result.next_gate,
+        1,
+        spawn_count,
+        status,
+    )
+
+
+def capacity_manifest_output_lines(
+    spec: RunBundleSpec,
+    runtime: _CapacityRuntime | None = None,
+) -> tuple[str, ...]:
+    """Return task-start/bootstrap fields projected from one typed capacity runtime."""
+    runtime = runtime or capacity_runtime_for_spec(spec)
+    projection = _capacity_projection(runtime, spec)
+    return (
+        "CAPACITY_REQUEST_SCHEMA=team_manifest_capacity_request_v1",
+        f"REQUESTED_TOTAL_CAPACITY={projection['requested_total_capacity']}",
+        f"CAPACITY_TOPOLOGY_PROOF_REF={projection['topology_proof_ref']}",
+        f"CAPACITY_TOPOLOGY_PROOF_SHA256={projection['topology_proof_sha256']}",
+        f"CAPACITY_POLICY_REF={projection['capacity_policy_ref']}",
+        f"CAPACITY_LOADER_EVIDENCE_REF={projection['loader_evidence_ref']}",
+        f"CAPACITY_RELOAD_STATE={projection['reload_state']}",
+        f"PARENT_LINEAGE_ID={runtime.parent_lineage_id}",
+        f"CAPACITY_LEDGER_REF={projection['ledger_ref']}",
+    )
+
+
+def capacity_start_output_lines(
+    catalog: TaskCatalog,
+    workspace_root: Path,
+    run_id: str,
+) -> tuple[str, ...]:
+    """Return startup fields from the same topology-derived capacity owner."""
+    derivation = declared_team_capacity_derivation(catalog)
+    witness = _capacity_topology_witness(derivation)
+    contract = capacity_handshake.load_startup_contract(
+        derivation,
+        witness,
+        config_path=str(workspace_root / ".codex" / "config.toml"),
+        contract_id=f"capacity:{run_id}",
+    )
+    configured = contract.input_evidence.max_threads_loader.configured_max_threads
+    parent_lineage_id = f"run:{run_id}"
+    reload_state = "restart_required" if configured != witness.requested_total_capacity else "current"
+    return (
+        "CAPACITY_REQUEST_SCHEMA=team_manifest_capacity_request_v1",
+        f"REQUESTED_TOTAL_CAPACITY={witness.requested_total_capacity}",
+        "CAPACITY_TOPOLOGY_PROOF_REF=agents/task_catalog.yaml",
+        f"CAPACITY_TOPOLOGY_PROOF_SHA256={witness.declared_team_topology_sha256}",
+        "CAPACITY_POLICY_REF=agents/capacity_policy.toml",
+        "CAPACITY_POLICY_DIGEST="
+        f"{contract.capacity_policy.topology_proof_sha256}",
+        "CAPACITY_LOADER_EVIDENCE_REF="
+        f"{contract.input_evidence.max_threads_loader.evidence_ref}",
+        f"CAPACITY_LOADED_CONFIGURED_VALUE={configured}",
+        f"CAPACITY_RELOAD_STATE={reload_state}",
+        f"PARENT_LINEAGE_ID={parent_lineage_id}",
+        f"CAPACITY_LEDGER_REF=runtime://ledger/{run_id}",
+    )
+
+
 def workflow_spawn_budget(catalog: TaskCatalog, family_id: str) -> tuple[int, int]:
     """Return the active and write-capable spawn budget for one workflow family."""
-    family = resolve_workflow_family(catalog, family_id)
-    raw_budget = family.get("spawn_budget")
-    if not isinstance(raw_budget, dict):
-        raise RuntimeError(
-            f"workflow family spawn_budget must be a mapping for {family_id}"
-        )
-    raw_budget = _as_object_mapping(
-        cast(object, raw_budget), f"workflow_families[{family_id}].spawn_budget"
+    derivation = declared_team_capacity_derivation(catalog)
+    family = next(
+        record for record in derivation.family_records if record.workflow_family_id == family_id
     )
-    active = raw_budget.get("active_subagents")
-    max_write = raw_budget.get("max_write_subagents")
-    if not isinstance(active, int) or active < 1:
-        raise RuntimeError(
-            f"workflow family active_subagents must be >= 1 for {family_id}"
-        )
-    if not isinstance(max_write, int) or max_write < 1:
-        raise RuntimeError(
-            f"workflow family max_write_subagents must be >= 1 for {family_id}"
-        )
-    if max_write > active:
-        raise RuntimeError(
-            "workflow family max_write_subagents exceeds active_subagents "
-            f"for {family_id}: {max_write} > {active}"
-        )
-    runtime_max_threads = codex_runtime_max_threads()
-    if active > runtime_max_threads:
-        raise RuntimeError(
-            "workflow family active_subagents exceeds runtime max_threads "
-            f"for {family_id}: {active} > {runtime_max_threads}"
-        )
-    return active, max_write
+    return family.workflow_thread_request, _capacity_write_scope_cap(family)
 
 
 def workflow_topology_policy_violations(
@@ -1235,22 +2013,20 @@ def workflow_topology_policy_violations(
         if family_id == "skill_evaluation":
             if always_on or specialists != ("skill_evaluator",):
                 violations.append((family_id, "evaluator-only-topology"))
-            expected_budget = (1, 1)
         elif family_id == "owner_bounded_change":
             if always_on != owner_bounded_always_on:
                 violations.append((family_id, "owner-bounded-producer-core"))
             if "change_reviewer" not in specialists:
                 violations.append((family_id, "change-reviewer-not-deferred"))
-            expected_budget = (4, 2)
         else:
             if always_on != delivery_always_on:
                 violations.append((family_id, "delivery-producer-core"))
             missing_reviews = deferred_delivery_reviews - set(specialists)
             if missing_reviews:
                 violations.append((family_id, "reviewers-not-deferred"))
-            expected_budget = (4, 2)
-        if workflow_spawn_budget(catalog, family_id) != expected_budget:
-            violations.append((family_id, "spawn-budget"))
+        active_budget, write_budget = workflow_spawn_budget(catalog, family_id)
+        if active_budget < 1 or write_budget < 1 or write_budget > active_budget:
+            violations.append((family_id, "derived-spawn-budget"))
     return tuple(violations)
 
 
@@ -2010,6 +2786,7 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
         "OWNER": spec.owner,
         "CREATED_AT": spec.created_at_iso,
     }
+    capacity_runtime = capacity_runtime_for_spec(spec)
     spec.report_dir.mkdir(parents=True, exist_ok=True)
     created_files = list(iter_artifacts(spec.config, spec.roles))
     for artifact in created_files:
@@ -2019,9 +2796,22 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
                 encoding="utf-8",
             )
     (spec.report_dir / spec.config.artifacts["team_manifest"]).write_text(
-        build_manifest(spec),
+        build_manifest(spec, capacity_runtime),
         encoding="utf-8",
     )
+    (spec.report_dir / "closeout_packet.json").write_text(
+        json.dumps(
+            {
+                "capacity_request": _capacity_projection(capacity_runtime, spec),
+                "closeout_packet": _closeout_projection(capacity_runtime, spec),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    created_files.append("closeout_packet.json")
     (spec.report_dir / spec.config.artifacts["verification"]).write_text(
         "\n".join(
             [
@@ -2205,7 +2995,10 @@ def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def build_manifest(spec: RunBundleSpec) -> str:
+def build_manifest(
+    spec: RunBundleSpec,
+    capacity_runtime: _CapacityRuntime | None = None,
+) -> str:
     """Build the team manifest yaml."""
     workflow_family = None
     if spec.workflow_family_id:
@@ -2215,7 +3008,7 @@ def build_manifest(spec: RunBundleSpec) -> str:
             spec.task_catalog,
             spec.workflow_family_id,
         )
-    lines = manifest_run_lines(spec, workflow_family)
+    lines = manifest_run_lines(spec, workflow_family, capacity_runtime)
     lines.extend(manifest_role_lines(spec, workflow_family))
     lines.extend(manifest_context_policy_lines(spec.config))
     lines.extend(manifest_quality_gate_lines(spec.config))
@@ -2226,8 +3019,12 @@ def build_manifest(spec: RunBundleSpec) -> str:
 def manifest_run_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
+    capacity_runtime: _CapacityRuntime | None = None,
 ) -> list[str]:
     """Render run-level manifest fields."""
+    capacity_runtime = capacity_runtime or capacity_runtime_for_spec(spec)
+    capacity_projection = _capacity_projection(capacity_runtime, spec)
+    closeout_projection = _closeout_projection(capacity_runtime, spec)
     lines = [
         "run:",
         f"  id: {spec.run_id}",
@@ -2239,6 +3036,38 @@ def manifest_run_lines(
         f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
         f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
         f"  task_catalog: {str(ROOT / str(spec.config.team['task_catalog']))!r}",
+        "  parent_lineage_id: " + repr(capacity_runtime.parent_lineage_id),
+        "  implementation_execution:",
+        "    schema_id: 'implementation_execution_contract_v1'",
+        "    route_owner: 'implementation_route'",
+        "    route_import: 'tools.agent_tools.implementation_route'",
+        "    profile_registry_import: 'tools.agent_tools.model_profile_registry'",
+        "    dispatch: 'immediate_one_pass'",
+        "    same_spark_gap_continuation: 'resume_same_spark_after_gap'",
+        "    deterministic_search_route: 'python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json'",
+        "  capacity_request:",
+    ]
+    capacity_yaml = yaml.safe_dump(
+        capacity_projection,
+        sort_keys=False,
+        default_flow_style=False,
+    ).splitlines()
+    for line in capacity_yaml:
+        lines.append(f"    {line}")
+    lines.extend(
+        [
+            "  closeout_packet:",
+        ]
+    )
+    closeout_yaml = yaml.safe_dump(
+        closeout_projection,
+        sort_keys=False,
+        default_flow_style=False,
+    ).splitlines()
+    for line in closeout_yaml:
+        lines.append(f"    {line}")
+    lines.extend(
+        [
         "  subagent_lifecycle_policy:",
         "    fresh_subagents_required: true",
         "    reuse_for_new_task: forbidden",
@@ -2273,6 +3102,7 @@ def manifest_run_lines(
         *manifest_contract_complete_implementation_policy_lines(spec.task),
         *manifest_pre_handoff_scope_policy_lines(),
         *manifest_pre_handoff_gate_status_lines(),
+        *manifest_decision_sufficiency_lines(spec),
         *manifest_repo_tool_routing_policy_lines(spec),
         *manifest_default_quality_check_policy_lines(spec),
         "  agent_report_collection:",
@@ -2280,7 +3110,8 @@ def manifest_run_lines(
         f"    archive_current_run_command: 'python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {spec.report_dir}'",
         "    sync_command: 'python3 tools/agent_tools/runtime_log_archive_git.py sync'",
         "    archive_index: '.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl'",
-    ]
+        ]
+    )
     insert_index = (
         lines.index("    broad_cross_cutting_packet: available_not_default_read") + 1
     )
@@ -2427,8 +3258,9 @@ def manifest_run_lines(
         lines.append("      - child_role")
         lines.append("      - child_instance_id")
         lines.append("      - input_packet")
+        lines.append("      - decision_sufficiency_packet_ref")
         lines.append("      - tool_route")
-        lines.append("      - tool_command_packet_command")
+        lines.append("      - tool_call_token")
         lines.append("      - tool_evidence")
         lines.append("      - allowed_paths")
         lines.append("      - do_not_read")
@@ -2458,7 +3290,7 @@ def manifest_run_lines(
             "write-capable handoff when design_brief.md exists"
         )
         lines.append(
-            "      - include run.repo_tool_routing_policy selected-skill packet commands, "
+            "      - include run.repo_tool_routing_policy selected-skill ToolCall tokens, "
             "dynamic skill candidates, and tool evidence in every handoff packet"
         )
         lines.append(
@@ -2627,7 +3459,7 @@ def manifest_repo_tool_routing_policy_lines(spec: RunBundleSpec) -> list[str]:
         f"    owner: {REPO_TOOL_ROUTING_OWNER!r}",
         f"    route_basis: {REPO_TOOL_ROUTING_ROUTE_BASIS!r}",
         f"    execution_mode: {REPO_TOOL_ROUTING_EXECUTION_MODE!r}",
-        f"    check_command: {REPO_TOOL_ROUTING_CHECK_COMMAND!r}",
+        f"    tool_call_schema: {TOOL_CALL_SCHEMA!r}",
         "    sequence:",
     ]
     for stage in REPO_TOOL_ROUTING_SEQUENCE:
@@ -2640,8 +3472,10 @@ def manifest_repo_tool_routing_policy_lines(spec: RunBundleSpec) -> list[str]:
         lines.append(f"      - ${skill}")
     lines.append("    dynamic_skill_routing:")
     lines.append(f"      status: {REPO_DYNAMIC_SKILL_ROUTING_STATUS!r}")
-    lines.append(f"      prompt_route_command: {REPO_DYNAMIC_SKILL_ROUTING_COMMAND!r}")
-    lines.append(f"      area_route_command: {REPO_DYNAMIC_SKILL_AREA_COMMAND!r}")
+    lines.append("      tool_call_token:")
+    lines.extend(
+        _yaml_mapping_lines(materialize_dynamic_route_tool_call_token(), indent=8)
+    )
     lines.append(f"      next: {REPO_DYNAMIC_SKILL_ROUTING_NEXT!r}")
     lines.append("      candidates:")
     if dynamic_candidates:
@@ -2661,7 +3495,10 @@ def manifest_one_skill_tool_route_lines(packet: SkillCommandPacket) -> list[str]
         f"      - skill: {packet.skill}",
         f"        runtime_skill: {packet.runtime_skill!r}",
         f"        canonical_doc: {packet.canonical_doc!r}",
-        f"        packet_command: {skill_tool_packet_command(packet.skill)!r}",
+        "        tool_call_token:",
+        *_yaml_mapping_lines(
+            materialize_skill_tool_call_token(packet.skill), indent=10
+        ),
         "        related_skills:",
     ]
     if packet.related_skills:
@@ -2669,6 +3506,53 @@ def manifest_one_skill_tool_route_lines(packet: SkillCommandPacket) -> list[str]
             lines.append(f"          - ${skill}")
     else:
         lines.append("          - none")
+    return lines
+
+
+def _yaml_mapping_lines(value: Mapping[str, object], *, indent: int) -> list[str]:
+    """Render one machine object as indented manifest YAML."""
+    prefix = " " * indent
+    rendered = yaml.safe_dump(
+        dict(value),
+        allow_unicode=True,
+        default_flow_style=False,
+        sort_keys=False,
+    ).rstrip()
+    return [prefix + line if line else line for line in rendered.splitlines()]
+
+
+def manifest_decision_sufficiency_lines(spec: RunBundleSpec) -> list[str]:
+    """Import and render an owner-produced DSV packet without policy validation."""
+    lines = [
+        "  decision_sufficiency:",
+        f"    owner: {DECISION_SUFFICIENCY_OWNER!r}",
+        f"    validator: {DECISION_SUFFICIENCY_VALIDATOR!r}",
+        "    consumer_policy: 'import_owner_verdict_without_revalidation'",
+        "    required_machine_fields:",
+    ]
+    for field in DECISION_SUFFICIENCY_MACHINE_FIELDS:
+        lines.append(f"      - {field}")
+    if spec.decision_sufficiency_packet is None:
+        lines.extend(
+            [
+                "    status: owner_verdict_required",
+                "    packet_ref: null",
+            ]
+        )
+        return lines
+    packet = import_decision_sufficiency_verdict(spec.decision_sufficiency_packet)
+    if not spec.decision_sufficiency_packet_ref:
+        raise RuntimeError(
+            "decision_sufficiency_packet_ref is required with an owner verdict"
+        )
+    lines.extend(
+        [
+            "    status: owner_verdict_imported",
+            f"    packet_ref: {spec.decision_sufficiency_packet_ref!r}",
+            "    packet:",
+            *_yaml_mapping_lines(packet, indent=6),
+        ]
+    )
     return lines
 
 
@@ -2777,14 +3661,24 @@ def manifest_prompt_contract_lines(
 ) -> list[str]:
     """Render prompt contract lines for one role."""
     lines = ["    prompt_contract:"]
-    lines.append(
-        "      assignment_prompt: "
-        f"{compact_role_prompt_contract(role, workflow_family)!r}"
-    )
-    lines.append(
-        "      assignment_prompt_source: "
-        "'tools/agent_tools/agent_team.py#role_prompt_contract'"
-    )
+    if role.id == "implementer":
+        lines.append(
+            "      assignment_prompt: "
+            "'runtime_materialized_fixed_packet_prompt_only'"
+        )
+        lines.append(
+            "      assignment_prompt_source: "
+            "'tools/agent_tools/agent_team.py#dispatch_fixed_implementation->model_profile_registry.materialize_prompt_capsule'"
+        )
+    else:
+        lines.append(
+            "      assignment_prompt: "
+            f"{compact_role_prompt_contract(role, workflow_family)!r}"
+        )
+        lines.append(
+            "      assignment_prompt_source: "
+            "'tools/agent_tools/agent_team.py#role_prompt_contract'"
+        )
     if role.id == "skill_evaluator":
         lines.append("      common_prompt_must_include_ref: 'not_applicable'")
         lines.append(
@@ -2993,17 +3887,19 @@ def render_subagent_prompt_packet(
     lines.append(f"{indent}  subagent_startup_route: {SUBAGENT_STARTUP_ROUTE!r}")
     lines.append(f"{indent}  internal_skill_routes:")
     lines.append(f"{indent}    - {SUBAGENT_STARTUP_ROUTE!r}")
-    lines.append(f"{indent}  tool_route: 'run.repo_tool_routing_policy'")
     lines.append(
-        f"{indent}  tool_command_packet_command: {REPO_TOOL_ROUTING_SHOW_COMMAND_TEMPLATE!r}"
+        f"{indent}  decision_sufficiency_packet_ref: "
+        "'run.decision_sufficiency.packet_ref'"
     )
+    lines.append(f"{indent}  tool_route: 'run.repo_tool_routing_policy'")
+    lines.append(f"{indent}  tool_call_tokens: 'run.repo_tool_routing_policy.sequential_tool_routes[].tool_call_token'")
     lines.append(
         f"{indent}  tool_evidence: 'run.repo_tool_routing_policy.dynamic_skill_routing'"
     )
     lines.append(f"{indent}  tool_catalog_matches: 'tools/catalog.yaml'")
     lines.append(f"{indent}  required_tool_fields:")
     lines.append(f"{indent}    - tool_route")
-    lines.append(f"{indent}    - tool_command_packet_command")
+    lines.append(f"{indent}    - tool_call_tokens")
     lines.append(f"{indent}    - tool_evidence")
     lines.append(f"{indent}    - tool_rejection_prediction")
     for key in ("prompt_preamble", "workflow_focus", "reviewer_prompt"):
@@ -3033,7 +3929,8 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         "When run.subagent_prompt_packet.subagent_startup_route is present, carry that "
         "structural route field into the next handoff or review result without turning it "
         "into prompt keyword skill activation. "
-        "Carry run.repo_tool_routing_policy tool_route, tool_command_packet_command, and tool_evidence into "
+        "Carry the owner-produced DecisionSufficiencyPacket reference and "
+        "run.repo_tool_routing_policy tool_route, machine-readable ToolCall tokens, and tool_evidence into "
         "the next handoff or review result when repo-owned tools are part of the selected route. "
         "Return findings or outputs tied to request_clause_ids, artifact paths, dependency-file "
         "headers for every edited or created text file, remaining planned work, and the next "

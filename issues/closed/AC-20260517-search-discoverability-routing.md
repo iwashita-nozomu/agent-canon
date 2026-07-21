@@ -15,7 +15,6 @@ downstream implementation ../../tools/agent_tools/search_index.py should build l
 downstream implementation ../../tools/catalog.yaml should catalog the search route and related tools.
 downstream implementation ../../tests/agent_tools/test_route.py should verify the route output.
 downstream implementation ../../tests/agent_tools/test_search.py should verify coordinated provider output.
-downstream implementation ../../tests/agent_tools/test_search_index.py should verify search index generation.
 downstream implementation ../../tests/agent_tools/test_vector_search.py should verify search index behavior.
 @dependency-end
 -->

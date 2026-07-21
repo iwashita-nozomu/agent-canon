@@ -111,11 +111,11 @@ goal-driven repo-changing task では、`/goal` がまだ exact でなくても 
 goal-driven task では、write-capable implementation subagent は `goal.md` が parseable で、Codex goal view が mirrored / queued され、Plan-mode evidence mapping が揃うまで起動しません。
 通常の repo-changing task で coding / implementation / patch / doc-edit work が scope に入る場合は、この goal-driven `goal.md` block を適用しません。run bundle と pre-handoff investigation packet が dependency-expanded handoff scope、validation plan、tool-rejection preflight evidence を作ったら、read-only wave の追加より先に選択済み write-capable implementer を起動または schedule します。read-only wave は setup evidence であり、implementation handoff の代替ではありません。
 active runtime が explicit user request なしの `spawn_agent` を禁止する場合、read-only pre-goal wave も即座には起動せず、handoff packet、owner、expected output、`PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を run bundle に残して許可待ちにします。
-command output の `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認します。`worker` が既定で、`spark_worker` は Abstract Design Frame と approved design packet で完全に切れる低リスク implementation slice に対し、parent packet が `--select-agent-type implementer=spark_worker:<evidence>` を明示した場合だけ選択します。選択は `SUBAGENT_AGENT_TYPE_SELECTIONS` と `team_manifest.yaml` に記録します。
+command output の generated model/profile view と `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認します。implementation-executable fixed packet は Decision Sufficiency の `execute_spark` から `spark_worker` 一体を直接 materialize し、同じ packet の post-completion owning gate だけを続けます。
 subagent の model / reasoning は該当 `.codex/agents/*.toml` を先に読みます。
 read-only exploration に切る前に、その質問を所有する checker、router、semantic index、dashboard があるか確認し、ある場合は tool を先に呼びます。subagent は structured tool artifact が曖昧な場合の解釈や、tool-covered ではない judgement の独立 review に使い、同じ文書を読み直して決定論的 check を反復しません。
-repo inventory、tool drift survey、機械 report 要約、experiment/log execution は、implementation の critical path を塞がない独立検証または実験実行として Luna/high の通常 role に切ります。mini/medium は明示 T14 `skill_evaluation` の fresh read-only artifact-only `skill_evaluator` に限り、permanent team role にはありません。static validation triage、diff-local Python / C++ review、bounded review、report traceability、checklist-style review gate は、該当 decision があるときに一つの accountable `gpt-5.6-luna/high` review role へ切ります。user が coding / implementation / patch / doc-edit work を求めている場合、既定の説明は write-capable handoff first にします。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff packet が揃い次第、選択済み write-capable implementer handoff を schedule し、`gpt-5.6-sol/high` parent は handoff packet、統合順序、review gate、最終責任を持ちます。parent-direct は explicit approval、spawn authorization blocker、または tool-gate blocker を run bundle に記録した exception route です。
-Abstract Design Frame から導かれた差し替え可能な責務単位で、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じることは `spark_worker` selection の必要 evidence ですが、それだけで `worker` 既定を切り替えません。
+repo inventory、tool drift survey、機械 report 要約、experiment/log execution は、implementation の critical path を塞がない独立検証または実験実行として Luna/high の通常 role に切ります。mini/medium は明示 T14 `skill_evaluation` の fresh read-only artifact-only `skill_evaluator` に限り、permanent team role にはありません。static validation triage、diff-local Python / C++ review、bounded review、report traceability、checklist-style review gate は、該当 decision があるときに一つの accountable `gpt-5.6-luna/high` review role へ切ります。fixed packet の writer は Spark、owner gate/review は completion 後です。parent-direct は explicit approval、spawn authorization blocker、または tool-gate blocker を run bundle に記録した exception route です。
+- fixed packet の worker substitution、smaller slice、speculative test、repeated preflight、rollback checkpoint、compatibility fallback は禁止します。compile/static failure は `ImplementationFeedback`、exact target contradiction は一度の `StructuralDesignGap` と同じ Spark の resume です。
 選択済み candidate が起動できない場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録します。candidate を変える場合は explicit revised parent packet と wave を必須にします。`skill_evaluator`、実験実行 role、または review role の起動失敗は、同じ role packet と該当 `.codex/agents/*.toml` の `model` / `model_reasoning_effort` で原因を切り分けます。
 command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt は `agents/COMMUNICATION_PROTOCOL.md` の `Context Visibility Contract` と `Fresh Subagent Context Capsule` を満たすように、`team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` から selected fields だけを入れます。full packet、raw stdout、raw logs、broad chat summary は prompt に貼りません。
 command output の `STANDARD_AGENT_WAVE_SEQUENCE=plan,review,edit` を確認し、
@@ -174,8 +174,20 @@ subagent context は chat 要約を蓄積するのではなく、run bundle 内�
 
 ## Subagent Return Investigation
 
-`wait_agent` の timeout、empty status、または wave decision point での final
-response 未着は `subagent_no_return_investigation` として扱います。parent は
+すべての非終端 subagent について、`wait_agent` timeout は polling boundary
+であり lifecycle deadline ではありません。各 blocking poll は
+`timeout_ms <= 60000` とし、全体の completion wait は required user-facing
+progress update と既存の new-state / revised-packet gate を各 poll 間で
+満たす bounded poll の反復として継続できます。timeout、empty update、
+応答遅延だけを理由に interrupt または cancellation を行ってはいけません。
+操作前に active runtime の status、message、interrupt、close capability を
+確認します。この runtime では非割込みの status 確認に `list_agents`、同一
+task の packet 配送に `send_message` を使い、`interrupt_agent` は user の
+明示取消後に限ります。利用不能な `send_input(interrupt=...)` または
+`close_agent` operation を作り出してはいけません。
+
+bounded poll の timeout、empty status、または wave decision point での
+final response 未着は `subagent_no_return_investigation` として扱います。parent は
 agent id、wave id、wait command と timeout、last known status、last
 workflow-monitor event、runtime / tool error、log / dashboard pointer、cause
 hypothesis を `workflow_monitoring.md` と closeout evidence に残し、現在の status
@@ -190,6 +202,10 @@ fresh follow-up wave へ切り替えます。timeout、empty status、final resp
 prior agent が非終端なら `write_scope=reserved` と
 `overlapping_writer=blocked` を保持します。
 
-`close_agent` authority は runtime status `completed|errored|shutdown` または
-user の明示取消です。非終端の no-return instance は
+active runtime に close operation がある場合だけ、runtime status
+`completed|errored|shutdown` または user の明示取消後にその operation を
+使います。active runtime に close operation がない場合は terminal status が
+観測されるまで instance を保持し、closeout_gate.md の Subagent Lifecycle
+Evidence に `runtime_no_close_operation:terminal_status_observed` を記録します。
+非終端の no-return instance は
 `subagents_closed=no`、`lifecycle_gate=pending` とします。

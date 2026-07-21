@@ -304,7 +304,7 @@
           "workflow_monitoring",
           "retrospective"
         ],
-        "notes": "Audit closeout is recorded in the closeout gate, workflow monitoring, agent evaluation, and retrospective artifacts. The auditor may unlock completion only after spec_product_coverage_complete=yes, review_findings_integrated=yes, post_fix_full_review_complete=yes, mechanical_completion_loop_complete=yes with structured loop evidence, diff_check_agent_complete=yes with a run-local independent read-only diff-check artifact, workflow monitoring decisions are resolved, and agent evaluation feedback is resolved."
+        "notes": "Audit closeout is recorded in the closeout gate, CompletionCoverage, workflow monitoring, agent evaluation, and retrospective artifacts. The auditor may unlock completion only after completion_coverage_consumer=yes, coverage_check.ok=true, completion_boundary.topology_errors=[], post_fix_full_review_complete=yes, mechanical_completion_loop_complete=yes with structured loop evidence, diff_check_agent_complete=yes with a run-local independent read-only diff-check artifact, workflow monitoring decisions are resolved, and agent evaluation feedback is resolved."
       }
     }
   ],
@@ -1695,5 +1695,1958 @@
     "artifact_review": "artifact_review.md",
     "fair_data_review": "fair_data_review.md",
     "ml_science_review": "ml_science_review.md"
+  },
+  "agent_views": {
+    "artifact_reviewer": {
+      "name": "artifact_reviewer",
+      "description": "Read-only reviewer for code, scripts, raw results, environment capture, and artifact-readiness.",
+      "nickname_candidates": [
+        "artifact_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as artifact_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "artifact_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/14",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "ecc40306ef40d15ee99e86bd780c996d54d97edd75acdc24469632157f1c14af"
+    },
+    "benchmark_reviewer": {
+      "name": "benchmark_reviewer",
+      "description": "Read-only reviewer for fairness, confounders, and benchmark anti-patterns.",
+      "nickname_candidates": [
+        "benchmark_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as benchmark_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "benchmark_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/13",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "9a146f7073e9d58802fb9fea370658d1653b41bb5deec9408b07db44cdf808eb"
+    },
+    "citation_evidence_reviewer": {
+      "name": "citation_evidence_reviewer",
+      "description": "Read-only reviewer for paper claims, citations, figures, tables, and evidence traceability.",
+      "nickname_candidates": [
+        "citation_evidence_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as citation_evidence_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "citation_evidence_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/6",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "68f23dc8017f0da2c76f62e1fbbe6cd0a1aa123c578fb6ed1b6d1eea569d76b8"
+    },
+    "cpp_reviewer": {
+      "name": "cpp_reviewer",
+      "description": "Read-only reviewer for C and C++ diffs, build/test evidence, ABI-boundary changes, and native-code regressions.",
+      "nickname_candidates": [
+        "cpp_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as cpp_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "change_reviewer+cpp_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/21",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "1245aa61500823d856e19369264f3186fc55b8d8e58dc14775818db276fcbc36"
+    },
+    "detailed_design_reviewer": {
+      "name": "detailed_design_reviewer",
+      "description": "Read-only reviewer for detailed design docs, implementation readiness, side-effect mapping, reuse-first discipline, and style continuity.",
+      "nickname_candidates": [
+        "detailed_design_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as detailed_design_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "design_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/3",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "1e50e4a6cec4b8fa59afd8d84118e816cea24a3bb500e6a78238e9e01097449e"
+    },
+    "detailed_designer": {
+      "name": "detailed_designer",
+      "description": "Detailed-design authoring agent for writing implementation-ready design docs with reuse-first, side-effect mapping, and style-continuity guidance.",
+      "nickname_candidates": [
+        "detailed_designer"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as detailed_designer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "designer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/2",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "04b88bc705194b571d8b10ae90998c81b0bdbcab4659f8296744e488f95b1d2d"
+    },
+    "diff_triage_reviewer": {
+      "name": "diff_triage_reviewer",
+      "description": "Read-only reviewer for bounded diffs before escalation to broad review.",
+      "nickname_candidates": [
+        "diff_triage_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review bounded diffs findings-first; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope.",
+      "logical_role_id": "change_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "a750bbf5f7f2576b4e900120599e88ed22c580385ee16e5ee0959bcd035bd332"
+    },
+    "docs_workflow_steward": {
+      "name": "docs_workflow_steward",
+      "description": "Docs and workflow steward for canonical instructions, notes, and agent workflows.",
+      "nickname_candidates": [
+        "docs_workflow_steward"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as docs_workflow_steward with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "infra_steward+docs_workflow_steward",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/9+agents/agents_config.json#/specialist_roles/18",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "ba53a4d54a94ea83fd73306fa3e06a1510f02c0bf5754f1cf6b7f34dd6a3dd63"
+    },
+    "document_flow_reviewer": {
+      "name": "document_flow_reviewer",
+      "description": "Read-only reviewer for top-down document coherence, section order, term introduction order, and first-reader comprehension.",
+      "nickname_candidates": [
+        "document_flow_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as document_flow_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "document_flow_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/4",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "800da34d508fe3599d06aef4791e2deb5df7a7e3a1e30aa9e99f82eff23ce574"
+    },
+    "execution_planner": {
+      "name": "execution_planner",
+      "description": "Execution-planning agent for stage order, subagent assignment, validation sequence, and rollback-aware task plans.",
+      "nickname_candidates": [
+        "execution_planner"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as execution_planner with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "scheduler",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/4",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "f40955788532d5672936855d5bce0287765aba5f11d5b288cb1b13af988e34dc"
+    },
+    "experiment_runner": {
+      "name": "experiment_runner",
+      "description": "Execution-only agent for running bounded experiments and summarizing logs.",
+      "nickname_candidates": [
+        "experiment_runner"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as experiment_runner with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "experimenter",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/2",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "e16b0021fde54dccd820ef6a155ff994938d8f87433864208c14d3c98b1b3386"
+    },
+    "explorer": {
+      "name": "explorer",
+      "description": "Read-only agent for tracing code paths, docs, and workflow state.",
+      "nickname_candidates": [
+        "explorer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as explorer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "researcher",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/0",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "491e2305089346a2b5d9feadaf7458b35a6d85660613374b0472876994297ee4"
+    },
+    "fair_data_reviewer": {
+      "name": "fair_data_reviewer",
+      "description": "Read-only reviewer for metadata quality, naming, reuse, and FAIR-style data organization.",
+      "nickname_candidates": [
+        "fair_data_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as fair_data_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "fair_data_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/15",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "8d887cf425cdd3ceef59f7aefe1ab5763ed6b00f39a7601700b6bb26ca95070e"
+    },
+    "literature_researcher": {
+      "name": "literature_researcher",
+      "description": "Read-only agent for paper search, prior-art mapping, and contradictory-source hunting.",
+      "nickname_candidates": [
+        "literature_researcher"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as literature_researcher with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "researcher",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/0",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "460ea2610226ca9243f006cd7294f20aac7436b319744497b6b6d89b9a6e51c7"
+    },
+    "logic_gap_reviewer": {
+      "name": "logic_gap_reviewer",
+      "description": "Read-only reviewer for academic-argument continuity, claim-to-evidence links, hidden assumptions, and unsupported inferential jumps.",
+      "nickname_candidates": [
+        "logic_gap_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as logic_gap_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "logic_gap_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/8",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "3a210e08c3417638f783a01434c56189bd5b29afda8f78413b189041e7b948e0"
+    },
+    "long_form_writer": {
+      "name": "long_form_writer",
+      "description": "Long-form document author for README, workflow, guide, migration, and other reader-facing documents that need roadmap-first drafting.",
+      "nickname_candidates": [
+        "long_form_writer"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as long_form_writer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "long_form_writer",
+      "role_contract_ref": "agents/model_profiles.toml#/standalone_role_metadata/long_form_writer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "732a021da775136cec0f7aa322cd4a7307937de8cb71dd923ead6a5ae975cd6e"
+    },
+    "manager_reviewer": {
+      "name": "manager_reviewer",
+      "description": "Read-only requirements reviewer for scope, source buckets, accumulated-context resolution, and escalation discipline.",
+      "nickname_candidates": [
+        "manager_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as manager_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "manager_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/1",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "02deb282af5558b31f6556fd10739ee6e811ea9c1d540784c3d3dd2b48e55cc5"
+    },
+    "ml_science_reviewer": {
+      "name": "ml_science_reviewer",
+      "description": "Read-only reviewer for assumptions, limitations, uncertainty, and reader-facing scientific reporting.",
+      "nickname_candidates": [
+        "ml_science_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as ml_science_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "ml_science_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/16",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "7d47e4a8a9dbddb4c68ae684375009dc4396c11af462224e7de991f23c60487a"
+    },
+    "notation_definition_reviewer": {
+      "name": "notation_definition_reviewer",
+      "description": "Read-only reviewer for symbol, abbreviation, terminology, unit, and definition-before-use discipline in academic documents.",
+      "nickname_candidates": [
+        "notation_definition_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as notation_definition_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "notation_definition_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/7",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "829092681e2bf0913d47ab74003e16c950ede8a539557f8f76b95347f6a2b801"
+    },
+    "oop_readability_reviewer": {
+      "name": "oop_readability_reviewer",
+      "description": "Read-only reviewer that documents mechanical OOP readability reports without changing their verdicts.",
+      "nickname_candidates": [
+        "oop_readability_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as oop_readability_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "oop_readability_reviewer",
+      "role_contract_ref": "agents/model_profiles.toml#/standalone_role_metadata/oop_readability_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "7d95842f1dffc3441f2de0147534c7e358e16f02db000b13ec70862e722c41d0"
+    },
+    "plan_reviewer": {
+      "name": "plan_reviewer",
+      "description": "Read-only reviewer for execution plans, stage order, reviewer separation, validation sequencing, and rollback readiness.",
+      "nickname_candidates": [
+        "plan_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as plan_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "schedule_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/5",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "4718ce49cfb3fdd3ad73a2fefb5042ff07f6a2116ecf9b3e2ed5b1a7b9d344ef"
+    },
+    "project_reviewer": {
+      "name": "project_reviewer",
+      "description": "Read-only reviewer for repo-wide inventory, workflow health, and tooling health.",
+      "nickname_candidates": [
+        "project_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as project_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "final_reviewer+project_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/specialist_roles/17",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "39d39d0f82067761372c5b3aab58b8723418691491fc4b0fd94641109aa8d016"
+    },
+    "prompt_config_reviewer": {
+      "name": "prompt_config_reviewer",
+      "description": "Read-only reviewer for prompt, routing, and subagent-config drift.",
+      "nickname_candidates": [
+        "prompt_config_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as prompt_config_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "prompt_config_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/19",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "e26e35c63898843f16041d103c4844eae5a0e77d092ceba763d59b4ec9213228"
+    },
+    "python_reviewer": {
+      "name": "python_reviewer",
+      "description": "Read-only reviewer for Python diffs, pyright, pytest, ruff, and type-boundary changes.",
+      "nickname_candidates": [
+        "python_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Require a path-covered OOP readability report and check_solid_evidence.py evidence; return revise when SOLID principle signal counts or Single responsibility, Open/closed, Liskov substitution, Interface segregation, and Dependency inversion evidence is missing.",
+      "logical_role_id": "change_reviewer+python_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/20",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "72556cfd35b032e0822754a5790ad8a820e94a0bf950ea1cc67eda2f9cbf5a2e"
+    },
+    "report_reviewer": {
+      "name": "report_reviewer",
+      "description": "Read-only reviewer for experiment reports and evidence traceability.",
+      "nickname_candidates": [
+        "report_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as report_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "report_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/22",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "0237d90b3a51c6fffcc5edaab0153864ba29a223e3ea099d3fdaed56abecef64"
+    },
+    "reproducibility_reviewer": {
+      "name": "reproducibility_reviewer",
+      "description": "Read-only reviewer for provenance, seeds, commands, environments, and rerunability.",
+      "nickname_candidates": [
+        "reproducibility_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as reproducibility_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "reproducibility_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/11",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "c352d794b5666b560ce7ca1393856322bce9a460a4b15f844634966ecfc1eea3"
+    },
+    "requirements_organizer": {
+      "name": "requirements_organizer",
+      "description": "Requirements-organizing agent for turning user intent and local precedent into concrete scope, acceptance criteria, and reuse targets.",
+      "nickname_candidates": [
+        "requirements_organizer"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as requirements_organizer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "manager",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/0",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "47b289b06b0174a392ebd5a114a6ca379ad342a7486d16ad72949b44a132c1fd"
+    },
+    "reviewer": {
+      "name": "reviewer",
+      "description": "Read-only review agent for diffs, regressions, and documentation alignment.",
+      "nickname_candidates": [
+        "reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review exact diffs findings-first against request clauses and owning evidence. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete.",
+      "logical_role_id": "change_reviewer+final_reviewer+research_reviewer+experiment_reviewer+infra_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/specialist_roles/1+agents/agents_config.json#/specialist_roles/3+agents/agents_config.json#/specialist_roles/10",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "04fcb18036e91b6d5fa05df507799411d8c3d915cdc1686f4a4982ed81e505b9"
+    },
+    "scientific_computing_reviewer": {
+      "name": "scientific_computing_reviewer",
+      "description": "Read-only reviewer for incremental change, testing, automation, and prototype discipline in research code.",
+      "nickname_candidates": [
+        "scientific_computing_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as scientific_computing_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "scientific_computing_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/12",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "eac6268e089e91bd95194f611311ce86ed52965003024c06a5a4d7c9faee3059"
+    },
+    "ship_reviewer": {
+      "name": "ship_reviewer",
+      "description": "High-assurance read-only reviewer for final clause coverage and release readiness.",
+      "nickname_candidates": [
+        "ship_reviewer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "xhigh",
+      "developer_instructions": "You are acting as ship_reviewer for ship readiness under luna_ship. Constrain edits to one responsibility unit and one-pass materialization only when selected.",
+      "logical_role_id": "final_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/8",
+      "profile_id": "luna_ship_xhigh",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "final_review",
+        "release_readiness"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "ship_review_result_v1",
+      "checkpoint_policy": "single_owner_gate",
+      "continuation_policy": "terminal_after_gate",
+      "projection_digest": "e43497eb12555e119a32e79cbb9a721f789da8081a4d4ffda441aa15c7973ce1"
+    },
+    "skill_evaluator": {
+      "name": "skill_evaluator",
+      "description": "Fresh read-only evaluator for explicit empirical skill scenarios.",
+      "nickname_candidates": [
+        "skill_evaluator"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.4-mini",
+      "model_reasoning_effort": "medium",
+      "developer_instructions": "You are acting as skill_evaluator with skill_evaluator policy. Evaluate policy conformance with explicit evidence and typed outputs.",
+      "logical_role_id": "skill_evaluator",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/23",
+      "profile_id": "mini_skill_evaluator_medium",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "skill_evaluation"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "scenario_packet",
+        "expected_output_schema"
+      ],
+      "forbidden_context": [
+        "common_run_context",
+        "prior_scenario_context"
+      ],
+      "return_schema_id": "skill_evaluation_result_v1",
+      "checkpoint_policy": "terminal_evaluation",
+      "continuation_policy": "fresh_only_no_continuation",
+      "projection_digest": "54b6a83198993745ff8b2e649b2557978495b4eb800db4d7458d1ab723060036"
+    },
+    "spark_worker": {
+      "name": "spark_worker",
+      "description": "Low-latency implementation agent for bounded code, docs, tests, or mechanical cleanup slices derived from the Abstract Design Frame and design trace.",
+      "nickname_candidates": [
+        "spark_worker"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "model": "gpt-5.3-codex-spark",
+      "model_reasoning_effort": "low",
+      "developer_instructions": "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema.",
+      "logical_role_id": "implementer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/6",
+      "profile_id": "spark_implementation_low",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "implementation",
+        "fixed_packet"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "fixed_implementation_packet",
+        "implementation_route_result",
+        "owner_gate"
+      ],
+      "forbidden_context": [
+        "broad_history",
+        "unrelated_paths",
+        "alternate_architecture"
+      ],
+      "return_schema_id": "spark_implementation_result_v1",
+      "checkpoint_policy": "nonblocking_observation_only",
+      "continuation_policy": "same_spark_after_one_repaired_structural_gap",
+      "projection_digest": "d5a3cb22678268ce586373c889e66cba569891c7507cde55c6112b90f5037037"
+    },
+    "test_designer": {
+      "name": "test_designer",
+      "description": "Read-only agent for post-implementation static analysis when an explicit unresolved oracle, specification, regression, or failure-mode risk remains beyond existing validation.",
+      "nickname_candidates": [
+        "test_designer"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as test_designer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "logical_role_id": "test_designer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/5",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "b1805de39dcbc003fdd7bfb13eb7931872184c8d9a2bf067ee4edda4c909dae3"
+    },
+    "worker": {
+      "name": "worker",
+      "description": "Implementation agent for bounded code, docs, or test changes.",
+      "nickname_candidates": [
+        "worker"
+      ],
+      "sandbox_mode": "workspace-write",
+      "approval_policy": "never",
+      "model": "gpt-5.6-luna",
+      "model_reasoning_effort": "xhigh",
+      "developer_instructions": "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion.",
+      "logical_role_id": "implementer+experimenter+infra_steward",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/6+agents/agents_config.json#/specialist_roles/2+agents/agents_config.json#/specialist_roles/9",
+      "profile_id": "luna_implementation_xhigh",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "implementation",
+        "causal_repair",
+        "cross_owner_integration"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "implementation_feedback_v1",
+      "checkpoint_policy": "nonblocking_observation",
+      "continuation_policy": "same_packet_until_handoff",
+      "projection_digest": "47f3d5cd4dd94af2f4974a7891424c17cf46928b4a899bfdbcebf761dfccb123"
+    }
+  },
+  "roles": [
+    {
+      "id": "artifact_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "ecc40306ef40d15ee99e86bd780c996d54d97edd75acdc24469632157f1c14af"
+    },
+    {
+      "id": "benchmark_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "9a146f7073e9d58802fb9fea370658d1653b41bb5deec9408b07db44cdf808eb"
+    },
+    {
+      "id": "citation_evidence_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "68f23dc8017f0da2c76f62e1fbbe6cd0a1aa123c578fb6ed1b6d1eea569d76b8"
+    },
+    {
+      "id": "cpp_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "1245aa61500823d856e19369264f3186fc55b8d8e58dc14775818db276fcbc36"
+    },
+    {
+      "id": "detailed_design_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "1e50e4a6cec4b8fa59afd8d84118e816cea24a3bb500e6a78238e9e01097449e"
+    },
+    {
+      "id": "detailed_designer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "04b88bc705194b571d8b10ae90998c81b0bdbcab4659f8296744e488f95b1d2d"
+    },
+    {
+      "id": "diff_triage_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "a750bbf5f7f2576b4e900120599e88ed22c580385ee16e5ee0959bcd035bd332"
+    },
+    {
+      "id": "docs_workflow_steward",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "ba53a4d54a94ea83fd73306fa3e06a1510f02c0bf5754f1cf6b7f34dd6a3dd63"
+    },
+    {
+      "id": "document_flow_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "800da34d508fe3599d06aef4791e2deb5df7a7e3a1e30aa9e99f82eff23ce574"
+    },
+    {
+      "id": "execution_planner",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "f40955788532d5672936855d5bce0287765aba5f11d5b288cb1b13af988e34dc"
+    },
+    {
+      "id": "experiment_runner",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "e16b0021fde54dccd820ef6a155ff994938d8f87433864208c14d3c98b1b3386"
+    },
+    {
+      "id": "explorer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "491e2305089346a2b5d9feadaf7458b35a6d85660613374b0472876994297ee4"
+    },
+    {
+      "id": "fair_data_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "8d887cf425cdd3ceef59f7aefe1ab5763ed6b00f39a7601700b6bb26ca95070e"
+    },
+    {
+      "id": "literature_researcher",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "460ea2610226ca9243f006cd7294f20aac7436b319744497b6b6d89b9a6e51c7"
+    },
+    {
+      "id": "logic_gap_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "3a210e08c3417638f783a01434c56189bd5b29afda8f78413b189041e7b948e0"
+    },
+    {
+      "id": "long_form_writer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "732a021da775136cec0f7aa322cd4a7307937de8cb71dd923ead6a5ae975cd6e"
+    },
+    {
+      "id": "manager_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "02deb282af5558b31f6556fd10739ee6e811ea9c1d540784c3d3dd2b48e55cc5"
+    },
+    {
+      "id": "ml_science_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "7d47e4a8a9dbddb4c68ae684375009dc4396c11af462224e7de991f23c60487a"
+    },
+    {
+      "id": "notation_definition_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "829092681e2bf0913d47ab74003e16c950ede8a539557f8f76b95347f6a2b801"
+    },
+    {
+      "id": "oop_readability_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "7d95842f1dffc3441f2de0147534c7e358e16f02db000b13ec70862e722c41d0"
+    },
+    {
+      "id": "plan_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "4718ce49cfb3fdd3ad73a2fefb5042ff07f6a2116ecf9b3e2ed5b1a7b9d344ef"
+    },
+    {
+      "id": "project_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "39d39d0f82067761372c5b3aab58b8723418691491fc4b0fd94641109aa8d016"
+    },
+    {
+      "id": "prompt_config_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "e26e35c63898843f16041d103c4844eae5a0e77d092ceba763d59b4ec9213228"
+    },
+    {
+      "id": "python_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "72556cfd35b032e0822754a5790ad8a820e94a0bf950ea1cc67eda2f9cbf5a2e"
+    },
+    {
+      "id": "report_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "0237d90b3a51c6fffcc5edaab0153864ba29a223e3ea099d3fdaed56abecef64"
+    },
+    {
+      "id": "reproducibility_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "c352d794b5666b560ce7ca1393856322bce9a460a4b15f844634966ecfc1eea3"
+    },
+    {
+      "id": "requirements_organizer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "47b289b06b0174a392ebd5a114a6ca379ad342a7486d16ad72949b44a132c1fd"
+    },
+    {
+      "id": "reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "04fcb18036e91b6d5fa05df507799411d8c3d915cdc1686f4a4982ed81e505b9"
+    },
+    {
+      "id": "scientific_computing_reviewer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "eac6268e089e91bd95194f611311ce86ed52965003024c06a5a4d7c9faee3059"
+    },
+    {
+      "id": "ship_reviewer",
+      "profile_id": "luna_ship_xhigh",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "final_review",
+        "release_readiness"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "ship_review_result_v1",
+      "checkpoint_policy": "single_owner_gate",
+      "continuation_policy": "terminal_after_gate",
+      "projection_digest": "e43497eb12555e119a32e79cbb9a721f789da8081a4d4ffda441aa15c7973ce1"
+    },
+    {
+      "id": "skill_evaluator",
+      "profile_id": "mini_skill_evaluator_medium",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "skill_evaluation"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "scenario_packet",
+        "expected_output_schema"
+      ],
+      "forbidden_context": [
+        "common_run_context",
+        "prior_scenario_context"
+      ],
+      "return_schema_id": "skill_evaluation_result_v1",
+      "checkpoint_policy": "terminal_evaluation",
+      "continuation_policy": "fresh_only_no_continuation",
+      "projection_digest": "54b6a83198993745ff8b2e649b2557978495b4eb800db4d7458d1ab723060036"
+    },
+    {
+      "id": "spark_worker",
+      "profile_id": "spark_implementation_low",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "implementation",
+        "fixed_packet"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "fixed_implementation_packet",
+        "implementation_route_result",
+        "owner_gate"
+      ],
+      "forbidden_context": [
+        "broad_history",
+        "unrelated_paths",
+        "alternate_architecture"
+      ],
+      "return_schema_id": "spark_implementation_result_v1",
+      "checkpoint_policy": "nonblocking_observation_only",
+      "continuation_policy": "same_spark_after_one_repaired_structural_gap",
+      "projection_digest": "d5a3cb22678268ce586373c889e66cba569891c7507cde55c6112b90f5037037"
+    },
+    {
+      "id": "test_designer",
+      "profile_id": "luna_reasoning_high",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "reasoning",
+        "review"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "b1805de39dcbc003fdd7bfb13eb7931872184c8d9a2bf067ee4edda4c909dae3"
+    },
+    {
+      "id": "worker",
+      "profile_id": "luna_implementation_xhigh",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "implementation",
+        "causal_repair",
+        "cross_owner_integration"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths"
+      ],
+      "return_schema_id": "implementation_feedback_v1",
+      "checkpoint_policy": "nonblocking_observation",
+      "continuation_policy": "same_packet_until_handoff",
+      "projection_digest": "47f3d5cd4dd94af2f4974a7891424c17cf46928b4a899bfdbcebf761dfccb123"
+    }
+  ],
+  "generated_profile_projection": {
+    "schema_id": "generated_role_profile_projection_v1",
+    "materializer": "tools/agent_tools/model_profile_registry.py",
+    "registry_ref": "agents/model_profiles.toml",
+    "role_count": 34,
+    "projection_digest": "19f85dafb4acdc58432693f0aa08b3b2a13c607ad80c2338a01e6f55156529ed"
   }
 }

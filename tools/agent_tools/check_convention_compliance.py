@@ -51,7 +51,11 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import tomllib
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -220,7 +224,7 @@ TOOL_GATES = {
         "tools/ci/check_github_workflows.py",
         (
             "tools/ci/run_all_checks.sh",
-            "agents/workflows/agent-canon-pr-workflow.md",
+            "tools/ci/check_agent_canon_pr.sh",
         ),
     ),
     "container_config": (
@@ -246,17 +250,15 @@ TOOL_GATES = {
 
 AGENT_CANON_PR_WORKFLOW_PATH = "agents/workflows/agent-canon-pr-workflow.md"
 AGENT_CANON_PUSH_REMOTE_MARKERS = (
-    "remote_verified=yes",
     "tools/agent_tools/github_publish.py",
-    "gh repo view",
-    "git remote get-url origin",
-    "NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_verified_remote_required",
-    "literal URL push is not a standard route",
-    "hardcoded repository name",
+    "PullRequestLifecycle",
+    "permission_state=unknown|verified_false",
+    "CandidateCasReceipt",
+    "PublicationReadbackReceipt",
+    "QueueReceipt",
 )
 
 SKILL_ROUTING_PROMPTS = (
-    ".agents/skills/agent-orchestration/SKILL.md",
     "agents/skills/agent-orchestration.md",
 )
 
@@ -268,14 +270,6 @@ SKILL_ROUTING_MARKERS = (
     "check_convention_compliance.py",
 )
 EXIT_BLOCKER_POLICY_MARKERS = {
-    ".agents/skills/agent-orchestration/SKILL.md": (
-        "selected_agent_type",
-        "write_capable_handoff_blocker",
-        "evidence",
-        "parent_packet_ref",
-        "status=blocked",
-        "router_unavailable_blocker",
-    ),
     "agents/skills/agent-orchestration.md": (
         "selected_agent_type",
         "write_capable_handoff_blocker",
@@ -357,13 +351,6 @@ EXIT_BLOCKER_FORBIDDEN_RE = re.compile(
     r"worker[^\n.。]{0,80}alternate route)"
 )
 DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
-    ".agents/skills/agent-orchestration/SKILL.md": (
-        "$prose-reasoning-graph",
-        "$structure-planning",
-        "$md-style-check",
-        "format-only",
-        "structure_contract=skipped",
-    ),
     "agents/skills/agent-orchestration.md": (
         "prose-reasoning-graph",
         "structure-planning",
@@ -513,9 +500,9 @@ BRANCH_WORKTREE_CREATION_GUARD_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
 ]
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
+WORKFLOW_GATE_CONSUMERS = ("tools/ci/check_agent_canon_pr.sh",)
 WORKFLOW_GATE_COMMAND_RE = re.compile(
-    r"(?im)^\s*(?:[-*]\s*)?.*\brun\s+`?python3\s+"
-    r"tools/agent_tools/check_convention_compliance\.py`?"
+    r"(?m)^\s*python3\s+tools/agent_tools/check_convention_compliance\.py\s*$"
 )
 WORKFLOW_GATE_FORBIDDEN_RE = re.compile(
     r"(?is)(?:do\s+not|don't|never|skip|omit)\s+(?:\S+\s+){0,6}?"
@@ -803,14 +790,6 @@ PR_ESSENCE_DOCUMENTATION_MARKERS = {
         "behavior or contract delta",
         "evidence route",
     ),
-    "agents/workflows/pr-queue-cleanup-workflow.md": (
-        "PR Essence",
-        "problem / user request",
-        "design intent",
-        "canonical owner",
-        "behavior or contract delta",
-        "evidence route",
-    ),
 }
 SOLID_CODING_CONTRACT_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "solid_coding_contract"
@@ -832,7 +811,8 @@ PROVISIONAL_GROUNDING_RE = re.compile(
 )
 PROMPT_EVAL_MARKERS = (
     "check_convention_compliance",
-    "CONVENTION-WORKFLOW",
+    "WORKFLOW-GENERIC-1",
+    "ORCH-SHIM-TOOLCALL-1",
     "CONVENTION-SKILL",
 )
 SURFACE_MANIFEST_FILES = (
@@ -963,9 +943,9 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                     "check_agent_runtime_alignment.py",
                 ),
                 (
-                    "shared-canon update",
-                    "tools/update_agent_canon.sh",
-                    "AgentCanon PR gate",
+                    "AgentCanon update transaction",
+                    "documents/agent-canon-update-route.md",
+                    "update_lifecycle_contract.py",
                 ),
             ),
         ),
@@ -1235,16 +1215,13 @@ def check_tool_gates(root: Path) -> list[Finding]:
     return findings
 
 
-def workflow_docs(root: Path) -> list[Path]:
-    """Return all workflow prompt documents."""
-    return sorted((root / "agents" / "workflows").glob("*.md"))
-
-
 def check_workflow_hooks(root: Path) -> list[Finding]:
-    """Verify every workflow prompt calls the convention verifier."""
-    findings: list[Finding] = []
-    for path in workflow_docs(root):
-        relative = path.relative_to(root).as_posix()
+    """Verify the canonical source gate owns convention verification."""
+    findings = check_required_files(root, WORKFLOW_GATE_CONSUMERS, "workflow_hook")
+    for relative in WORKFLOW_GATE_CONSUMERS:
+        path = readable_path(root, relative)
+        if path is None:
+            continue
         text = path.read_text(encoding="utf-8")
         if WORKFLOW_GATE_MARKER not in text:
             findings.append(
@@ -1988,7 +1965,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(finding.render())
         print(f"CONVENTION_COMPLIANCE_SOURCES={len(CONVENTION_SOURCES)}")
         print(f"CONVENTION_COMPLIANCE_TOOL_GATES={len(TOOL_GATES)}")
-        print(f"CONVENTION_COMPLIANCE_WORKFLOWS={len(workflow_docs(root))}")
+        print(f"CONVENTION_COMPLIANCE_WORKFLOWS={len(WORKFLOW_GATE_CONSUMERS)}")
         print(f"CONVENTION_COMPLIANCE_FINDINGS={len(findings)}")
         print(f"CONVENTION_COMPLIANCE={'pass' if not findings else 'fail'}")
     return 1 if findings else 0

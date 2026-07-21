@@ -6,7 +6,9 @@ upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 upstream design ../prose-reasoning-graph/dsl-spec.md graph visualization projection contract
+upstream design ../../agents/skills/code-visualization.md sole public visualization owner and closeout boundary
 downstream implementation ../../tools/agent_tools/tool_catalog.py validates catalog/docs consistency
+downstream implementation ../../tools/agent_tools/visualization_contract.py validates typed visualization coverage and readback
 downstream implementation ../../tools/agent_tools/tool_drift.py validates tool/convention trace contracts
 downstream implementation ../../tools/agent_tools/responsibility_scope.py validates responsibility scope ownership
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local issue sync state
@@ -49,7 +51,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 
 ## この文書の読み方
 
-この文書は、AgentCanon tool docs の reader-facing hub です。まず Where To Start で構造化 catalog、tool docs map、docs check、tool drift、dependency tool、graph visualization の入口を選びます。次に Tool Catalog と Tool Detail Notes で tool ごとの責務を確認し、Evidence / Assumption Ledger、置き場所の固定ルール、よく使うもの、結果ログと可視化へ進みます。正確な tool registry は prose ではなく `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を優先します。
+この文書は、AgentCanon tool docs の reader-facing hub です。まず Where To Start で構造化 catalog、tool docs map、docs check、tool drift、dependency tool、graph visualization の入口を選びます。次に Tool Catalog と Tool Detail Notes で tool ごとの責務を確認し、Evidence / Assumption Ledger、置き場所の固定ルール、よく使うものへ進みます。runtime evidence または graph consumer の境界を確認する場合は Source-Bound Runtime and Graph Consumers を読み、その後に結果ログと可視化へ進みます。正確な tool registry は prose ではなく `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を優先します。
 
 ## Where To Start
 
@@ -63,8 +65,10 @@ first and then return here only for reader-facing context.
 | Find one reader-facing document for a tool | `documents/tools/tool-docs.toml` | One-to-one map validated by `tool_catalog.py`; do not mirror it as prose. |
 | Run Markdown, link, math, Mermaid, or runtime-profile docs checks | `tools/bin/agent-canon docs check` | Use `docs format`, `docs fix-math`, or `docs fix-mermaid` only for mechanical repairs. |
 | Check tool catalog or drift after docs / tool edits | `tools/agent_tools/tool_catalog.py`, `tools/agent_tools/tool_drift.py` | These are validation commands, not reader navigation lists. |
+| Validate visualization coverage and post-format readback | [Visualization Contract](visualization_contract.md), then `$code-visualization` | Producers retain native domain validation; the sole public owner has final projection coverage/readback authority, and renderers are adapters. |
 | Understand dependency tool purpose and license evidence | [Dependency Tools And Licenses](dependency-tools-and-licenses.md) | Human-facing summary of external tools and license evidence. |
 | Check design-document claims against code and dependency evidence | [check_design_doc_claims.py](check_design_doc_claims.md) | Use before accepting implementation-backed design prose or structure-refactor handoff claims. |
+| Materialize source-bound runtime evidence or consume its graph snapshot | [Runtime Log Archive](../runtime-log-archive.md), then Source-Bound Runtime and Graph Consumers below | The materializer owns prepared artifact/outcome receipts; graph status/query/context are consume-only. |
 | Understand root `tools/` execution behavior | `tools/README.md` | Execution-facing hub for the symlink view and common commands. |
 | Understand graph visualization outputs | `documents/prose-reasoning-graph/dsl-spec.md`, then the same-named tool doc | Graph HTML, DOT, Mermaid, and dashboard diagrams are DSL projection or adapter artifacts. |
 
@@ -109,11 +113,14 @@ to choose a route:
   `cpp_template_to_lean.py`,
   `agent-canon jit-ir-to-lean`, and `agent-canon test-design check`.
 
-Graph visualization follows the Prose Reasoning Graph DSL projection contract.
+Graph visualization enters through the sole public `code-visualization` owner
+and the typed [Visualization Contract](visualization_contract.md).
 `render_dependency_manifest_graph.py`, `semantic_provider_html_report.py`, and
 runtime dashboard diagrams are adapters or projections; their domain producers
-keep validation authority. Proof and JIT-canonical IR tools provide source facts
-that future graph viewers map through the same DSL contract.
+keep native fact validation authority, while the canonical owner decides final
+projection coverage and post-format readback status. Proof and JIT-canonical IR
+tools provide source facts to that route. Source publication guidance is owned
+by the canonical `code-visualization` closeout and is not copied here.
 
 ## Evidence And Assumption Ledger
 
@@ -360,7 +367,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - `.codex/config.toml` で有効化する session goal view です。repo-owned durable state は `goal.md`、機械 gate は `goal_loop.py status` に置き、使い方は `agents/workflows/codex-goals-workflow.md` を正本にします。`/goal <objective>` を指定した task では、`goal_loop.py plan` の work breakdown と `/plan` の Goal Contract / evidence map を固定してから実装します。
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
   - skill / workflow prompt surface を `evidence/agent-evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細結果を蓄積します。agent が読む場合は `--compact-out <path>.json` を併用し、stdout ではなく compact JSON の統計を読んでから必要な artifact へ drill down します。
-  - hook JSONL、eval report、Codex runtime summary、`reports/agents/` の agent run report は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にし、通常操作は `tools/agent_tools/runtime_log_archive_git.py sync` を使います。個別修復時の subcommand set は `tools/agent_tools/runtime_log_archive_git.py` が所有します。
+  - hook event は PostToolUse で source repo の `.agent-canon/runtime-event-spool/` へ atomic no-replace publish し、archive Git や `ensure` を呼びません。明示 `runtime_log_archive_git.py sync` が nonblocking lock、1 回の ensure、snapshot/ingest/dedup/projection、commit/push/readback、verified finalize を所有します。hot path は `check-hook-hot-path` で archive context 構築前に検査します。eval report、Codex runtime summary、`reports/agents/` の agent run report と checkpoint 済み hook JSONL は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にします。
   - `generate_agent_improvement_guide.py` は `memory/`、mounted `.agent-canon/log-archive/eval-results/skill-workflow-prompt/`、mounted hook archive、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、skill usage、hook event、tool name、checker target、protocol feedback token の不足をまとめ、実修正は local Codex に渡します。
   - `generate_agent_runtime_dashboard.py` は同じ evidence tree を人間が見るための dashboard にします。正本ログの場所、hook namespace、entry 数、skill usage、prompt route 候補、human feedback、eval report family、issue 数を Markdown に出し、GitHub Actions では AgentCanon repo の Step Summary と artifact にだけ出します。agent がログ分析するときは `--compact-out` で token-light summary、generated drilldown、prompt/token rolling trend を生成し、通常分析では raw JSONL を開かずそれを読みます。token 利用は lifetime total だけではなく recent moving average と coverage status で判断します。足りない詳細は raw log 検索ではなく dashboard tool の追加 summary として生成し、raw JSONL は tool 実装、schema debugging、corruption audit の explicit rationale がある場合だけ使います。
   - `run_accumulated_agent_evals.py` は同じ evidence tree の required eval family を機械的に追記する入口です。role、skill/workflow prompt、workflow-selection、report-quality の各 eval を `--accumulate` で実行し、標準出力は log file に捕捉します。
@@ -404,6 +411,43 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - 標準形は `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>` です。remote へ保存する場合だけ `--push` を足します。
 - `tools/push_origin.sh`
   - 旧 shell push 実装の退役入口です。GitHub publish / PR 作業は `tools/agent_tools/github_publish.py` を使います。
+
+## Source-Bound Runtime and Graph Consumers
+
+`runtime_log_archive_git.py` owns the complete runtime-evidence producer and
+consumer boundary. The explicit `append-context-discovery` command reads the
+native rollout `session_meta` and selected `event_msg` / `task_complete`
+records, then publishes exactly one immutable
+`agent_canon.context_discovery_certificate.v1` certificate. The
+`materialize-runtime-event` command consumes exactly one such certificate,
+joins a fixed result-family artifact to its certified rollout record and source
+Git identities, then publishes an immutable prepared
+`agent_canon.runtime_event.v1` artifact. Its
+`publication_intent` contains only the deterministic attempt and
+`prepared_state=prepared`. Post-target evidence is appended to the repo-local
+outcome spool before a separate hash-linked receipt is published. The command
+returns success only after the latest committed receipt is durability-
+confirmed; uncertain, malformed, colliding, or unconfirmed records block.
+
+`tools/bin/agent-canon graph build` captures the dependency-manifest snapshot,
+prepared artifact, and latest committed receipt once in one `BuildMaterial`
+transaction. `graph status`, `graph query`, `graph context`,
+`check_dependency_headers.py`, and `check_design_doc_claims.py` consume the
+persisted v2 snapshot. Each graph command performs at most one bounded
+freshness probe; consumers do not reparse repository-scoped dependency
+guarantees or rerun the runtime producer. Explicit files outside a repository
+and non-Git checker fixtures retain their public local parser behavior without
+becoming graph authority. `graph_client.py` is the typed Python adapter for
+these responses, not a CLI entrypoint.
+
+PostToolUse hook transport is outside the graph producer. `HookLogContext`
+returns `HookAppendResult.status` as `spooled`, `duplicate`, or `failed`; that
+transport status is separate from the hook event's semantic `status` field.
+The append path writes no stdout or stderr, so a spool failure leaves dispatcher
+JSON valid. It writes one canonical no-replace event file per `hook_run_id`.
+Explicit `sync` reuses one prepared archive transaction to create the
+projection/index/cursor and deletes source files only after committed-tree
+readback. Graph status/query/context do not trigger this checkpoint.
 
 ## 結果ログと可視化
 

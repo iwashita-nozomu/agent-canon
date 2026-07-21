@@ -188,6 +188,9 @@ check_post_create_python_install() {
     if [ ! -f "$generate_compose" ]; then
       report_issue ".devcontainer/generate-runtime-compose.sh not found"
     else
+      if grep -F '${HOME}/.codex:/root/.codex' "$generate_compose" >/dev/null 2>&1; then
+        report_issue ".devcontainer/generate-runtime-compose.sh must not mount host ~/.codex"
+      fi
       grep -q 'agent-canon-source-only' "$generate_compose" \
         || report_issue ".devcontainer/generate-runtime-compose.sh must support standalone AgentCanon source-only mode"
       grep -q 'mcr.microsoft.com/devcontainers/base:ubuntu-22.04' "$generate_compose" \

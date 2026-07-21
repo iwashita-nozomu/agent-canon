@@ -4,16 +4,26 @@
 # responsibility Runs shared devcontainer post-create setup after workspace mount.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
 # upstream design ../CONTAINER_OPERATIONS.md container and devcontainer ownership boundary
+# upstream design ../documents/gpu-admission-r5-source-packet.md exact umask and finalize ordering
 # upstream design ../documents/rust-agent-tool-migration.md Rust toolchain and CLI install boundary
 # upstream design ../documents/tools/lean_proof_env.md Lean proof environment toolchain contract
 # upstream environment devcontainer.json postCreateCommand entrypoint
+# upstream implementation finalize-shared-runtime.sh proves the inherited exact runtime identity
 # upstream implementation ../tools/ci/scan_secrets.sh runs dedicated secret scanners
 # downstream implementation ../rust/agent-canon/src/structured_analysis.rs builds structured analysis cache DB
 # @dependency-end
 
 set -euo pipefail
 
+umask 0007
+[ "$(umask)" = "0007" ] || {
+  echo "post-create runtime umask is not exactly 0007" >&2
+  exit 1
+}
+
 workspace="${1:-/workspace}"
+devcontainer_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"${devcontainer_dir}/finalize-shared-runtime.sh"
 node_version="${NODE_VERSION:-22.14.0}"
 rust_toolchain="${RUST_TOOLCHAIN:-stable}"
 lean_toolchain="${AGENT_CANON_LEAN_TOOLCHAIN:-leanprover/lean4:v4.30.0}"
@@ -21,6 +31,8 @@ elan_version="${AGENT_CANON_ELAN_VERSION:-v4.2.3}"
 elan_x86_64_sha256="${AGENT_CANON_ELAN_X86_64_SHA256:-df0b2b3a439961ffcbb3985214365ffe40f49bc871df04dff268c7d8e21ca8b2}"
 elan_aarch64_sha256="${AGENT_CANON_ELAN_AARCH64_SHA256:-cb69af0803b04157bc30201c29c12fca882bb3ad8b43476b8d2d3064810bc3ac}"
 tools_home="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
+runtime_root="${AGENT_CANON_RUNTIME_ROOT:-/var/lib/agent-canon/runtime}"
+source_projection_root="${AGENT_CANON_SOURCE_PROJECTION_ROOT:-${workspace}/reports/agents/devcontainer/runtime}"
 gitleaks_version="${AGENT_CANON_GITLEAKS_VERSION:-8.30.1}"
 trufflehog_version="${AGENT_CANON_TRUFFLEHOG_VERSION:-3.95.3}"
 detect_secrets_version="${AGENT_CANON_DETECT_SECRETS_VERSION:-1.5.0}"
@@ -52,6 +64,8 @@ publish_agent_tools_profile() {
   profile_script="$(mktemp)"
   cat >"$profile_script" <<EOF
 export AGENT_CANON_TOOLS_HOME="${tools_home}"
+export AGENT_CANON_RUNTIME_ROOT="${runtime_root}"
+export AGENT_CANON_SOURCE_PROJECTION_ROOT="${source_projection_root}"
 case ":\${PATH}:" in
   *:"${tools_home}/bin":*) ;;
   *) export PATH="${tools_home}/bin:\${PATH}" ;;
@@ -451,6 +465,29 @@ build_structured_analysis_cache() {
   echo "STRUCTURED_ANALYSIS_BOOTSTRAP=pass"
 }
 
+publish_container_local_runtime() {
+  local tool_status
+
+  install -d -m 755 "$runtime_root" "$runtime_root/runs" "$runtime_root/logs" "$source_projection_root"
+  tool_status="$(for tool in agent-canon codex gh jq tree; do
+    if command -v "$tool" >/dev/null 2>&1; then
+      printf '    "%s": {"available": true, "source": "cataloged"},\n' "$tool"
+    else
+      printf '    "%s": {"available": false, "source": "cataloged"},\n' "$tool"
+    fi
+  done | sed '$ s/,$//')"
+  {
+    printf '{\n'
+    printf '  "schema_version": "container-tool-availability/v1",\n'
+    printf '  "runtime_root": %s,\n' "$(printf '%s' "$runtime_root" | jq -R .)"
+    printf '  "source_projection_root": %s,\n' "$(printf '%s' "$source_projection_root" | jq -R .)"
+    printf '  "tools": {\n%s\n  }\n}\n' "$tool_status"
+  } >"$runtime_root/tool-availability.json"
+  cp "$runtime_root/tool-availability.json" "$source_projection_root/tool-availability.json"
+  echo "ENVIRONMENT_RUNTIME_PROJECTION=$source_projection_root"
+  echo "ENVIRONMENT_TOOL_AVAILABILITY=$runtime_root/tool-availability.json"
+}
+
 publish_agent_tools_profile
 if [ -f "${workspace%/}/docker/register_safe_directories.sh" ]; then
   bash "${workspace%/}/docker/register_safe_directories.sh" "$workspace"
@@ -475,6 +512,7 @@ install_lean_toolchain
 install_secret_scanners
 install_agent_canon_cli
 build_structured_analysis_cache
+publish_container_local_runtime
 jq --version
 tree --version
 latexmk --version | sed -n '1p'

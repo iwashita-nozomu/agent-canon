@@ -48,20 +48,22 @@ AgentCanon は GitHub submodule を正本とし、初期化時に project-local 
 
 ```bash
 bash tools/update_agent_canon.sh plan
-bash tools/update_agent_canon.sh apply
 ```
+
+If the plan requires mutation, request current-task user approval before
+running protected `apply` with all four inline Git authority/reason fields.
 
 派生 repo 側で shared canon を直した場合は、`vendor/agent-canon/` 内で通常の GitHub branch を作って commit し、main を取り込んでから PR を出します。
 
-```bash
-git -C vendor/agent-canon switch -c canon-pr/<short-topic>
-git -C vendor/agent-canon add -A
-git -C vendor/agent-canon commit -m "<message>"
-bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
-git -C vendor/agent-canon push origin HEAD
-```
+Reuse the current AgentCanon branch. If no suitable branch exists, keep the
+checkout unchanged and request user direction; branch creation requires the
+same-segment four-field approval contract. After committing only task-owned
+paths, invoke the protected merge wrapper with those fields and push the
+already-current branch.
 
-AgentCanon PR merge 後に派生 repo 側へ戻り、`bash tools/update_agent_canon.sh apply` と `bash tools/sync_agent_canon.sh link-root` で pin と root view を更新します。
+AgentCanon PR merge 後に派生 repo 側へ戻り、current-task user approval と全
+4 inline Git authority/reason field を得て protected `apply` を実行し、root
+view を修復します。
 
 GitHub 管理では template の canonical remote を
 `https://github.com/iwashita-nozomu/project_template.git` にします。`.gitmodules` の AgentCanon URL は

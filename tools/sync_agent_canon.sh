@@ -24,6 +24,7 @@ FORCE_RELINK="${AGENT_CANON_FORCE_RELINK:-0}"
 PLAN_REMOTE_OVERRIDE_URL="${AGENT_CANON_PLAN_REMOTE_URL:-}"
 CANONICAL_AGENT_CANON_REMOTE_URL="${AGENT_CANON_GITHUB_REMOTE_URL:-https://github.com/iwashita-nozomu/agent-canon.git}"
 SURFACE_MANIFEST="${AGENT_CANON_SURFACE_MANIFEST:-documents/shared-runtime-surfaces.toml}"
+PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
 
 usage() {
   cat <<EOF
@@ -52,6 +53,65 @@ EOF
 die() {
   echo "sync_agent_canon.sh: $*" >&2
   exit 1
+}
+
+require_protected_git_authority() {
+  local mode="$1"
+  local branch_authority="${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-}"
+  local branch_reason="${AGENT_CANON_BRANCH_WORKTREE_REASON:-}"
+  local destructive_authority="${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY:-}"
+  local destructive_reason="${AGENT_CANON_DESTRUCTIVE_GIT_REASON:-}"
+
+  if { [ "$branch_authority" = "user_request" ] || [ "$branch_authority" = "agent_canon_workflow" ]; } \
+    && [ -n "$branch_reason" ] \
+    && [ "$destructive_authority" = "explicit_user_approval" ] \
+    && [ -n "$destructive_reason" ]; then
+    return 0
+  fi
+
+  echo "DESTRUCTIVE_GIT_GUARD=block"
+  echo "BRANCH_WORKTREE_CREATION_GUARD=block"
+  echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
+  echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
+  die "protected AgentCanon update requires inherited branch/worktree and explicit destructive approval authority"
+}
+
+resolve_remote_branch_sha() {
+  local remote="$1"
+  local branch="$2"
+  local expected_ref="refs/heads/$branch"
+  local output=""
+  local candidate_sha=""
+  local candidate_ref=""
+  local resolved_sha=""
+  local match_count=0
+
+  output="$(git ls-remote --exit-code "$remote" "$expected_ref")" \
+    || die "remote branch '$remote#$branch' is missing or unreachable"
+  while read -r candidate_sha candidate_ref; do
+    [ "$candidate_ref" = "$expected_ref" ] || continue
+    resolved_sha="$candidate_sha"
+    match_count=$((match_count + 1))
+  done <<<"$output"
+  [ "$match_count" -eq 1 ] \
+    || die "remote branch '$remote#$branch' resolved ambiguously ($match_count matches)"
+  [[ "$resolved_sha" =~ ^[0-9a-fA-F]{40}([0-9a-fA-F]{24})?$ ]] \
+    || die "remote branch '$remote#$branch' returned invalid object id '$resolved_sha'"
+  printf '%s\n' "$resolved_sha"
+}
+
+ensure_remote_commit_object() {
+  local repo="$1"
+  local remote="$2"
+  local sha="$3"
+  local resolved=""
+
+  if ! git -C "$repo" cat-file -e "$sha^{commit}" 2>/dev/null; then
+    git -C "$repo" fetch --no-write-fetch-head "$remote" "$sha" >/dev/null
+  fi
+  resolved="$(git -C "$repo" rev-parse --verify "$sha^{commit}" 2>/dev/null || true)"
+  [ "$resolved" = "$sha" ] \
+    || die "remote object '$sha' is not an available commit in '$repo'"
 }
 
 require_git_repo() {
@@ -141,6 +201,11 @@ is_submodule_prefix() {
   [ "$(prefix_git_mode)" = "160000" ]
 }
 
+submodule_checkout_initialized() {
+  [ -e "$ROOT_DIR/$PREFIX/.git" ] \
+    && git -C "$ROOT_DIR/$PREFIX" rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
 submodule_commit() {
   git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX"
 }
@@ -203,7 +268,7 @@ submodule_deferred_branch_pr_ref() {
 }
 
 ensure_submodule_checkout() {
-  if git -C "$ROOT_DIR/$PREFIX" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if submodule_checkout_initialized; then
     return
   fi
   git -C "$ROOT_DIR" submodule update --init --recursive "$PREFIX" >/dev/null
@@ -554,17 +619,36 @@ stage_sync_paths() {
 commit_sync_paths_if_needed() {
   local remote_sha="$1"
   local method="$2"
+  local -a owned_paths=("$PREFIX")
+  local spec=""
+
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    owned_paths+=("${spec%%:*}")
+  done < <(
+    {
+      build_link_specs
+      build_copy_specs
+    }
+  )
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    if [ -e "$ROOT_DIR/$spec" ] || [ -L "$ROOT_DIR/$spec" ] || path_is_tracked "$spec"; then
+      owned_paths+=("$spec")
+    fi
+  done < <(build_root_absent_paths)
 
   stage_sync_paths
-  if git -C "$ROOT_DIR" diff --cached --quiet; then
+  if git -C "$ROOT_DIR" diff --cached --quiet -- "${owned_paths[@]}"; then
     return
   fi
 
-  git -C "$ROOT_DIR" commit \
+  git -C "$ROOT_DIR" commit --only \
     -m "chore: sync agent-canon snapshot" \
     -m "agent-canon-remote: $remote_sha" \
     -m "agent-canon-update-method: $method" \
-    -m "agent-canon-prefix: $PREFIX"
+    -m "agent-canon-prefix: $PREFIX" \
+    -- "${owned_paths[@]}"
 }
 
 find_commit_by_tree() {
@@ -825,13 +909,20 @@ cmd_plan() {
   local submodule_worktree_status="not_applicable"
   local submodule_deferred_ref=""
 
-  ensure_prefix_exists
   if is_submodule_prefix; then
     prefix_mode="submodule"
     local_tree="$(submodule_commit)"
     local_split=""
     remote_url="$(submodule_remote_url)"
-    ensure_submodule_checkout
+    if ! submodule_checkout_initialized; then
+      print_plan_summary \
+        "$branch" "$remote_url" "submodule" "" "" "$local_tree" \
+        "" "$subtree_metadata" "submodule_checkout_uninitialized" "$dirty" "yes" "$prefix_mode" "no"
+      print_submodule_plan_details "$local_tree" "" "uninitialized" ""
+      echo "agent_canon_plan_status=approval_required"
+      echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
+      return
+    fi
     submodule_worktree_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD 2>/dev/null || true)"
     if [ -n "$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all)" ]; then
       submodule_worktree_status="dirty"
@@ -842,6 +933,7 @@ cmd_plan() {
       remote_source="submodule"
     fi
   else
+    ensure_prefix_exists
     local_tree="$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX")"
     local_split="$(split_prefix_or_empty)"
     if has_subtree_metadata; then
@@ -881,12 +973,12 @@ cmd_plan() {
   fi
 
   if [ "$prefix_mode" = "submodule" ]; then
-    git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch"
-    remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
+    remote_sha="$(resolve_remote_branch_sha "$remote_url" "$branch")"
+    ensure_remote_commit_object "$ROOT_DIR/$PREFIX" "$remote_url" "$remote_sha"
     remote_tree="$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$remote_sha^{tree}")"
   else
-    git -C "$ROOT_DIR" fetch "$remote_url" "$branch"
-    remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
+    remote_sha="$(resolve_remote_branch_sha "$remote_url" "$branch")"
+    ensure_remote_commit_object "$ROOT_DIR" "$remote_url" "$remote_sha"
     remote_tree="$(git -C "$ROOT_DIR" rev-parse "$remote_sha^{tree}")"
   fi
 
@@ -985,7 +1077,7 @@ pull_or_import_snapshot() {
   fi
 
   pull_log="$(mktemp)"
-  if git -C "$ROOT_DIR" subtree pull --prefix="$PREFIX" "$REMOTE_NAME" "$branch" --squash >"$pull_log" 2>&1; then
+  if git -C "$ROOT_DIR" subtree pull --prefix="$PREFIX" "$REMOTE_NAME" "$remote_sha" --squash >"$pull_log" 2>&1; then
     cat "$pull_log"
     rm -f "$pull_log"
     echo "agent_canon_update_method=subtree_pull"
@@ -1005,7 +1097,7 @@ cmd_add() {
   local branch="${2:-$DEFAULT_BRANCH}"
   require_clean_worktree
   ensure_remote "$remote_url"
-  git -C "$ROOT_DIR" fetch "$REMOTE_NAME" "$branch"
+  git -C "$ROOT_DIR" fetch --no-write-fetch-head "$REMOTE_NAME" "$branch"
   git -C "$ROOT_DIR" subtree add --prefix="$PREFIX" "$REMOTE_NAME" "$branch" --squash
   cmd_link_root 1
 }
@@ -1023,8 +1115,8 @@ cmd_pull() {
 
   require_clean_worktree
   ensure_existing_remote_or_default
-  git -C "$ROOT_DIR" fetch "$REMOTE_NAME" "$branch"
-  remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
+  remote_sha="$(resolve_remote_branch_sha "$REMOTE_NAME" "$branch")"
+  ensure_remote_commit_object "$ROOT_DIR" "$REMOTE_NAME" "$remote_sha"
   local_tree="$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX")"
   local_split="$(split_prefix_or_empty)"
   if [ -n "$local_split" ]; then
@@ -1056,7 +1148,7 @@ cmd_ensure_latest() {
     remote_url="$(submodule_remote_url)"
     [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
     local_commit="$(submodule_commit)"
-    if git -C "$ROOT_DIR/$PREFIX" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    if submodule_checkout_initialized; then
       worktree_commit="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
     else
       git -C "$ROOT_DIR" submodule update --init --recursive "$PREFIX"
@@ -1072,8 +1164,8 @@ cmd_ensure_latest() {
     echo "agent_canon_latest_submodule_local_state_source=$PREFIX"
     echo "agent_canon_latest_submodule_branch=${submodule_branch:-detached}"
     echo "agent_canon_latest_submodule_worktree_status=$submodule_worktree_status"
-    git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch"
-    remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
+    remote_sha="$(resolve_remote_branch_sha "$remote_url" "$branch")"
+    ensure_remote_commit_object "$ROOT_DIR/$PREFIX" "$remote_url" "$remote_sha"
     remote_tree="$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$remote_sha^{tree}")"
     echo "agent_canon_local_submodule=$local_commit"
     echo "agent_canon_worktree_submodule=$worktree_commit"
@@ -1159,8 +1251,8 @@ cmd_ensure_latest() {
   fi
 
   ensure_existing_remote_or_default
-  git -C "$ROOT_DIR" fetch "$REMOTE_NAME" "$branch"
-  remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
+  remote_sha="$(resolve_remote_branch_sha "$REMOTE_NAME" "$branch")"
+  ensure_remote_commit_object "$ROOT_DIR" "$REMOTE_NAME" "$remote_sha"
   remote_tree="$(git -C "$ROOT_DIR" rev-parse "$remote_sha^{tree}")"
   local_tree="$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX")"
   local_split="$(split_prefix_or_empty)"
@@ -1324,6 +1416,9 @@ main() {
   cd "$ROOT_DIR"
 
   local subcommand="${1:-}"
+  if [ "$subcommand" = "ensure-latest" ]; then
+    require_protected_git_authority "$subcommand"
+  fi
   case "$subcommand" in
     link-root)
       cmd_link_root
