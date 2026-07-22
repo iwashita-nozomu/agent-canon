@@ -290,9 +290,6 @@ def resolve_task_start_context(
             workspace_root=workspace_root,
             changed_paths=tuple(args.changed_path),
         )
-        for role_id in auto_specialists:
-            if role_id not in enabled_specialists:
-                enabled_specialists.append(role_id)
     return TaskStartContext(
         created_at_iso=created_at_iso,
         report_root=report_root,

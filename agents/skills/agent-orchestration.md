@@ -145,46 +145,15 @@ requirement.
   "schema": "agent-canon.decision-sufficiency.v1",
   "decision_id": "dsv:<sha256>",
   "request_clause_ids": ["request-clause-id"],
-  "H": [
-    {
-      "state_id": "h-1",
-      "description": "plausible repository state consistent with evidence",
-      "evidence_refs": ["evidence:<64-lowercase-hex>"]
-    }
-  ],
-  "downstream_decision": "owner_edit_validation_route",
-  "possible_branches": [
-    {
+    "owner": "canonical owner responsibility",
+    "replaceable_unit": "replaceable responsibility unit",
+    "implementation_mechanism": "existing mechanism or approved edit mechanism",
+    "validation_route": "targeted validation command or checker",
+    "unresolved_branch": {
       "branch_id": "b-1",
-      "condition": "condition that selects this branch",
-      "owner": "canonical owner",
-      "edit_surface": "absolute path",
-      "validation": "absolute path#symbol",
-      "terminal": false
-    }
-  ],
-  "invariant": {
-    "owner": "agent-orchestration",
-    "owner_path": "absolute path to agents/skills/agent-orchestration.md",
-    "owner_symbol": "validate_decision_sufficiency_packet",
-    "edit": "absolute path#symbol or NEW file#NEW symbol",
-    "validation": "absolute path#symbol",
-    "request_clause_ids": ["request-clause-id"]
-  },
-  "value_of_information": [
-    {
-      "question_id": "q-1",
-      "read_or_check": "exact file/symbol/check",
-      "downstream_decision": "owner_edit_validation_route",
-      "possible_branches": ["b-1"],
-      "decision_value": "changes_route|zero"
-    }
-  ],
-  "route_verdict": {
-    "route": "spark_worker|worker|design_gate|reject",
-    "owner_gate": "G1|G2|G3|G4|G5|G6|S6",
-    "reason_code": "fixed_contract|design_unresolved|zero_value_investigation|typed_rejection"
-  },
+      "condition": "condition that could change owner, unit, mechanism, or route",
+      "changes_next_decision": true
+    },
   "irrelevant_unknowns": [
     {
       "schema": "agent-canon.irrelevant-unknown.v1",
@@ -203,11 +172,13 @@ requirement.
 }
 ```
 
-`H`、`value_of_information`、evidence digest、または threshold は optional
-transport detail です。Decision sufficiency is determined by the semantic
-owner, replaceable unit, implementation mechanism, validation route, and
-unresolved branches that can change them; no hypothesis-space or read-count
-form is required.
+`H`、`possible_branches`、`route_verdict`、`value_of_information`、evidence
+digest、または threshold は generic routing fields ではありません。必要な場合に
+限り、固定 Spark implementation route (`tools/agent_tools/implementation_route.py`)
+の transport detail として scoped されます。Decision sufficiency is determined by
+the semantic owner, replaceable unit, implementation mechanism, validation route, and
+unresolved branches that can change them; no hypothesis-space or read-count form is
+required.
 A durable serializer may include states and evidence references when coordination
 needs them. Additional reads, searches, reviews, and checks are justified only
 when they can change the next owner, unit, mechanism, validation route, or

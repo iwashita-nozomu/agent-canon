@@ -87,8 +87,8 @@ python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format t
 - `COMMANDS`
 - `EVIDENCE`
 - `DECISION_SUFFICIENCY_PACKET_REF`
-- owner-produced `H`, `downstream_decision`, `possible_branches`, `invariant`,
-  `value_of_information`, `route_verdict`, and `rejection`
+- owner-produced semantic sufficiency fields: `owner`, `replaceable_unit`,
+  `implementation_mechanism`, `validation_route`, and `unresolved_branch`
 - machine-readable `TOOL_CALL_TOKEN`
 - prompt routing の場合は `MODE`, `SKILLS`, `ACTIVE_SKILLS`,
   `DEFERRED_SKILLS`, `MATCHED_SKILLS`, `RELATED_SKILL_CANDIDATES`,

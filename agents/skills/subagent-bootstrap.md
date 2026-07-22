@@ -185,8 +185,10 @@ evidence、parent packet evidence、または明示 review-pack activation が�
 materialize します。
 Codex で planning を含む parent session では、plan-mode command を先に使います。official Codex CLI では `/plan` です。
 runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。
-計画レビュー agent、詳細設計レビュー agent、文書通読レビュー agent は、同じ instance を使い回しません。
-学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別 instance を使います。
+計画、詳細設計、文書通読、学術文章の review は candidate です。選択された review
+claims が同じ owner、responsibility、context、write authority、validation route を
+共有する場合は active instance を再利用し、独立 review や distinct unresolved
+claim/risk のために分ける場合だけ fresh instance を使います。
 包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
 各 user input は `same_active_task_delta`、`scope_or_contract_change`、または
 `new_task` として分類しますが、新しい turn や名前を変えた packet だけでは

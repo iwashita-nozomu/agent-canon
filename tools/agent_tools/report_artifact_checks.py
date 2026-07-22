@@ -22,6 +22,7 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import cast
 
@@ -40,6 +41,9 @@ from mid_task_user_input_policy import (
 )
 
 PLACEHOLDER_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
+REVIEW_ADJUDICATION_PLACEHOLDERS = frozenset(
+    {"", "-", "—", "none", "null", "n/a", "na", "missing", "unknown", "todo", "tbd"}
+)
 APPROVE_DECISION_PATTERN = re.compile(
     r"^(?:[-*]\s*)?(?:decision\s*:\s*)?approve\s*$",
     re.IGNORECASE,
@@ -2699,6 +2703,50 @@ def is_placeholder_only_section(text: str) -> bool:
     return not stripped
 
 
+def markdown_without_adjudicated_rejected_hypotheses(text: str) -> str:
+    """Exclude only structurally valid rejected hypothesis table rows."""
+    lines = text.splitlines()
+    table_indexes: tuple[int, int, int] | None = None
+    output: list[str] = []
+    for line in lines:
+        cells = tuple(cell.strip() for cell in line.split("|")[1:-1])
+        normalized = tuple(
+            re.sub(r"[^a-z0-9]+", "_", cell.lower()).strip("_")
+            for cell in cells
+        )
+        if {
+            "adjudication",
+            "reason_code",
+            "evidence_ref",
+        }.issubset(normalized):
+            table_indexes = (
+                normalized.index("adjudication"),
+                normalized.index("reason_code"),
+                normalized.index("evidence_ref"),
+            )
+            output.append(line)
+            continue
+        if not cells or not line.lstrip().startswith("|"):
+            table_indexes = None
+            output.append(line)
+            continue
+        if table_indexes is not None:
+            adjudication_index, reason_index, evidence_index = table_indexes
+            indexes = (adjudication_index, reason_index, evidence_index)
+            if max(indexes) < len(cells):
+                adjudication = cells[adjudication_index].lower()
+                reason_code = cells[reason_index].lower()
+                evidence_ref = cells[evidence_index].lower()
+                if (
+                    adjudication == "rejected"
+                    and reason_code not in REVIEW_ADJUDICATION_PLACEHOLDERS
+                    and evidence_ref not in REVIEW_ADJUDICATION_PLACEHOLDERS
+                ):
+                    continue
+        output.append(line)
+    return "\n".join(output)
+
+
 def section_has_content(text: str, heading: str) -> bool:
     """Return whether a markdown section exists and has non-placeholder content."""
     lines = text.splitlines()
@@ -3220,20 +3268,26 @@ def _actual_wave_mismatch_blockers(
     return blockers
 
 
+class MissingActualWaveClassification(str, Enum):
+    """Exact classifications for planned waves with no actual event."""
+
+    OVERPLANNING = "overplanning"
+    LOGGING_GAP = "logging_gap"
+    UNRESOLVED = "unresolved"
+
+
 def _missing_actual_wave_classification(planned: dict[str, str]) -> str:
-    """Return the explicit cause class for a planned row with no actual event."""
-    source = " ".join(
-        (
-            planned.get("Status", ""),
-            planned.get("Skipped Roles / Rationale", ""),
-        )
-    ).lower()
-    classes = tuple(
-        name
-        for name in ("overplanning", "logging_gap", "unresolved")
-        if name in source
-    )
-    return classes[0] if len(classes) == 1 else ""
+    """Return one exact missing-wave enum value; invalid values are unresolved."""
+    candidates: list[MissingActualWaveClassification] = []
+    for field in ("Status", "Skipped Roles / Rationale"):
+        raw_value = planned.get(field, "").strip().lower()
+        try:
+            candidates.append(MissingActualWaveClassification(raw_value))
+        except ValueError:
+            continue
+    if not candidates or len(set(candidates)) != 1:
+        return MissingActualWaveClassification.UNRESOLVED.value
+    return candidates[0].value
 
 
 def wave_reconciliation_blockers(

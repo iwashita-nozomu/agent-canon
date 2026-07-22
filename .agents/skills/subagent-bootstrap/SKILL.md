@@ -62,8 +62,10 @@ Execute the required and task-matching conditional commands that the packet prin
 1. If the active runtime requires explicit user authorization before `spawn_agent`, do not silently spawn even read-only pre-goal agents. Record the fan-out plan, handoff packets, and `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` in the run bundle, then wait for or request authorization.
 1. Use `--task-id` when the selected route needs catalog evidence; task-default
    specialists and review packs are candidates, not automatic work.
-1. Keep independent requirements, plan, detailed-design, and document-flow
-   reviews separate when the selected validation route activates them.
+1. Keep one owning review gate for one replaceable responsibility. Reuse an active
+   compatible review instance; create a separate instance only for independent
+   review, disjoint authority, incompatible owner/context, or a distinct unresolved
+   claim/risk that the owning gate cannot judge.
 1. Check the command output for `IMPLEMENTATION_CODEX_AGENTS` when an
    implementation wave is selected.
 1. Treat `STANDARD_AGENT_WAVE_SEQUENCE=selected_stages_only` as a candidate

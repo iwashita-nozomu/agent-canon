@@ -254,7 +254,7 @@ python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
 - `goal.md` は durable source of truth、Codex goals は session view、`goal_loop.py status` は機械 gate です。
 - `goal.md` は repo-local state として管理します。
 - user が goal-driven intent を示したが exact `/goal <objective>` を渡していない場合は、parent が target-state-complete Objective を作り、`goal.md` に先に固定します。intake draft は read-only discovery として扱い、edit authorization は target-state-complete Objective の固定後に開始します。
-- repo-changing goal task では `/goal` 確定前に provisional run bundle を作り、active role set と catalog の `intake` stage から read-only WAVE-1 plan を materialize します。標準 catalog では `manager` が `requirements_organizer` として materialize され、`explorer`、`execution_planner`、`plan_reviewer` は parent-packet / stage evidence がある場合だけ dynamic wave に追加します。active runtime が explicit spawn authorization を持つ場合はその wave を起動し、runtime authorization が必要な場合は handoff packet と `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を artifact に残して許可待ちにします。write-capable implementation subagent は `/goal` mirror、parseable `goal.md`、Plan-mode evidence mapping が揃った時点で起動します。
+- repo-changing goal task では、coordination、resumption、または選択された workflow が durable lifecycle evidence を要求する場合だけ run bundle を materialize します。その他は semantic handoff または tool result で owner、replaceable unit、mechanism、validation route、unresolved branch を満たします。goal の role / intake stage と catalog specialist は候補であり、owner-critical decision または distinct unresolved claim/risk が次の判断を変える場合だけ wave を materialize します。write-capable implementation subagent は、goal route が選択された場合に限り `/goal` mirror、parseable `goal.md`、Plan-mode evidence mapping を確認して起動します。
 - user が `/goal <objective>` または goal-driven task を指定した場合は、`/goal` を session view に設定した直後に `/plan <goal-driven task summary>` へ入り、Plan-mode output が `Goal Contract`、`Exit Criteria Mapping`、`Goal Work Breakdown`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を含む状態で実装へ進みます。
 - `Goal Work Breakdown` は `goal_loop.py plan` の `GW*` rows を run bundle `schedule.md` へ移したものです。実装は objective と work breakdown の両方に基づけます。
 - goal-driven task では、Codex goals と対応する `goal.md` Objective / Exit Criteria / Backlog / Loop Log を更新します。
@@ -415,8 +415,8 @@ canonical formatter/dispatcher、validation-response、review integration が
    repo-wide dependency review や broad execution は、最終候補の touched contract
    が要求して次の判断または最終 validation を変える場合だけ一度選択します。
    completion predicate は選択した canonical route で確定します。
-1. read-only の diff-check agent を起動し、run bundle、request contract、schedule、latest diff、validation evidence、dependency evidence を渡します。
-1. diff-check agent の output は hypothesis として parent が adjudicate します。current snapshot、reachable path、contract、witness/static proof があり、behavior、owner boundary、correctness、validation、または publication state を変える accepted finding だけ same-owner repair loop を開きます。rejected hypothesis は `reason_code` と `evidence_ref` を残し、wave / rollback を起こしません。
+1. 選択された owning review gate が diff-check を要求する場合だけ、read-only diff-check reviewer を起動し、選択された handoff、latest diff、validation evidence、dependency evidence を渡します。
+1. 選択された review の output は hypothesis として parent が adjudicate します。current snapshot、reachable path、contract、witness/static proof があり、behavior、owner boundary、correctness、validation、または publication state を変える accepted finding だけ same-owner repair loop を開きます。rejected hypothesis は `reason_code` と `evidence_ref` を残し、wave / rollback を起こしません。
    この修正 loop では、review finding への応答を、同じ意図を保つ修正、
    再設計、または authority 付き escalation / replacement として扱います。
 1. diff-check agent が `approve` し、未完了 work unit、未解決 finding、未実行 validation、未同期 canon、未 commit / push、未判断 follow-up が無い場合だけ loop を止めます。
@@ -521,12 +521,17 @@ checked and cited.
 
 ### 4. Run Bootstrap
 
-repo-changing task では bundle 作成と explicit subagent activation を既定にします。
+repo-changing task では semantic handoff を既定にし、coordination、resumption、または
+selected workflow が durable lifecycle evidence を要求する場合だけ bundle と
+explicit subagent activation を materialize します。
 stage の具体的な責務と実行条件は prose ではなく `.codex/agents/*.toml` を正本にします。
 この文書は executable stage flow の正本です。workflow family 選定は
 `agent-orchestration`、prompt / config drift 監査は `prompt_config_reviewer`
 を先に通し、ここは executable stage flow に保ちます。
-goal-driven task では `/goal` 確定前でも provisional bundle を作り、read-only requirements / repo survey / planning review subagent の handoff plan を先に作ります。active runtime が明示許可を要求する場合は、許可があるときだけ実際に起動します。
+goal-driven task でも provisional bundle は coordination/resumption または owner-critical
+evidence が次の判断を変える場合だけ作り、candidate role の handoff plan を先に
+materialize しません。active runtime が明示許可を要求する場合は、許可があるときだけ
+実際に起動します。
 
 - repo を編集する
 - specialist handoff を明示したい
@@ -695,15 +700,15 @@ cost を無視して review coverage を優先する run では、research-drive
 - すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を local/tool context 参照として扱い、prompt には選択済み `Fresh Subagent Context Capsule` fields を入れる
 - `spark_worker` は design trace と dependency-expanded handoff scope が揃い、typed parent-packet selection が記録された bounded implementation slice にだけ使い、設計判断、scope 判断、review 判断は frontier owner / reviewer に残す
 - chunk、slice、checkpoint、subpass の後は remaining planned work units と next gate を確認してから続行する
-- repo-changing task では current checkout の run bundle `work_log.md` を継続更新する
+- repo-changing task では selected durable coordination/resumption route がある場合だけ current checkout の run bundle `work_log.md` を継続更新し、それ以外は structured handoff/tool-result evidence を使う
 - 新規作業は current checkout で kickoff します。`WORKTREE_SCOPE.md` と `worktree_scope_lint.py` は legacy cleanup / drift diagnosis 専用です
 - stale な `WORKTREE_SCOPE.md`、別 branch、別 path の action log を見つけた場合は、current checkout の `work_log.md` に観測事実と扱いを残す
-- `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` の分離や、implementation 着手条件は `.codex/agents/*.toml` を正本にする
+- selected review の instance reuse / separation と implementation 着手条件は、semantic owner route と `.codex/agents/*.toml` の runtime projection に従う。compatible な同一責務 review は再利用し、distinct unresolved claim/risk の場合だけ分ける
 - 包括的開発では `project_reviewer` を intake と closeout に追加し、repo-wide な integration risk を確認する
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認する
-- README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書で reader-facing 構成を変える場合は `long-form-writing` を DSL-to-prose adapter として読み、docs-impact が高い場合だけ別 reviewer で `docs-completeness-review` も通す
-- 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を読み、`notation_definition_reviewer`、`logic_gap_reviewer`、必要に応じて別 reviewer の `docs-completeness-review` を通す
-- 投稿論文や thesis chapter の draft では `paper-writing` を読み、`citation_evidence_reviewer` も別 instance で通す
+- README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書で reader-facing 構成を変える場合は `long-form-writing` を DSL-to-prose adapter として読み、docs-impact がある distinct unresolved reader-path claim を owning gate が判定できない場合だけ `docs-completeness-review` を追加する
+- 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を読み、notation / logic reviewer は distinct unresolved claim が owning gate の範囲を超える場合だけ選択する
+- 投稿論文や thesis chapter の draft では `paper-writing` を読み、citation evidence reviewer は distinct unresolved citation claim が残る場合だけ追加する
 - contract-only wrapper や checker-owned validation だけの変更では、static contract validation と canonical command evidence を validation route に置く。
   Approved typed contract evidence remains the completion criterion.
 - validation tool の autofix は changed contract、changed lines、または task plan が名指しした checker-owned property に結び付く finding に適用し、広い validation で出た既存 style debt は residual evidence と repair route に分ける
@@ -841,12 +846,11 @@ environment, produce resources, or duplicate tests/gates.
 
 - `AGENTS.md` は Codex のruntime 入口として保つ
 - `.agents/skills/` を正規 skill path とする
-- repo-changing task では、stage ごとの subagent / specialist を明示する
+- repo-changing task では、selected stage の subagent / specialist だけを明示し、候補 stage や未選択 reviewer を work にしない
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は active な
   distinct unresolved claim/risk がそれぞれ必要とした場合だけ選択し、選択した別 gate
   の場合にだけ別 instance にする
-- 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別 instance にする
-- 論文 draft では `citation_evidence_reviewer` も別 instance にする
+- 学術文章の notation / logic reviewer と論文 draft の citation evidence reviewer は候補であり、同じ owner、context、validation route で判定できる場合は active review instance を再利用し、distinct unresolved claim の場合だけ別 instance にする
 - 包括的開発では、parent が dependency order、wave plan、dependency-expanded disjoint write scope、integration order、review gate を handoff packet に載せます
 - 複数 writer を要する場合は、衝突 target を先行 / 後続 wave に分けます。安全に分離できる writer は同一 wave、追加判断が要る writer は current checkout 内の後続 wave へ直列化します
 - writer ごとの path / directory / object は `team_manifest.yaml` の write policy で管理します

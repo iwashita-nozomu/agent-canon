@@ -1072,6 +1072,9 @@ def main() -> int:
         if diff_check_artifact_path and diff_check_artifact_path.is_file()
         else {}
     )
+    diff_check_not_applicable = (
+        closeout.get("diff_check_agent_complete", "").strip() == "not_applicable"
+    )
     active_diff_ref = current_diff_ref(workspace)
     changed_markdown = changed_markdown_paths(workspace)
     (
@@ -1271,35 +1274,33 @@ def main() -> int:
         == "none",
         "close_agent_evidence": subagent_lifecycle.get("close_agent_evidence", "")
         not in {"", "none", "missing"},
-        "diff_check_agent_complete": closeout.get("diff_check_agent_complete")
-        in {"yes", "not_applicable"},
-        "diff_check_agent_role": diff_check.get("diff_check_agent_role", "")
+        "diff_check_agent_complete": diff_check_not_applicable
+        or closeout.get("diff_check_agent_complete") == "yes",
+        "diff_check_agent_role": diff_check_not_applicable
+        or diff_check.get("diff_check_agent_role", "")
         not in {"", "parent", "self", "codex"},
-        "diff_check_agent_decision": diff_check.get("diff_check_agent_decision") == "approve",
-        "diff_check_latest_diff_ref": diff_check.get("diff_check_latest_diff_ref")
-        == active_diff_ref,
-        "diff_check_artifact_path": diff_check_artifact_path is not None,
-        "diff_check_artifact_exists": bool(
-            diff_check_artifact_path and diff_check_artifact_path.is_file()
-        ),
-        "diff_check_artifact_role": diff_check_artifact.get("diff_check_agent_role")
+        "diff_check_agent_decision": diff_check_not_applicable
+        or diff_check.get("diff_check_agent_decision") == "approve",
+        "diff_check_latest_diff_ref": diff_check_not_applicable
+        or diff_check.get("diff_check_latest_diff_ref") == active_diff_ref,
+        "diff_check_artifact_path": diff_check_not_applicable
+        or diff_check_artifact_path is not None,
+        "diff_check_artifact_exists": diff_check_not_applicable
+        or bool(diff_check_artifact_path and diff_check_artifact_path.is_file()),
+        "diff_check_artifact_role": diff_check_not_applicable
+        or diff_check_artifact.get("diff_check_agent_role")
         == diff_check.get("diff_check_agent_role"),
-        "diff_check_artifact_decision": diff_check_artifact.get("diff_check_agent_decision")
-        == "approve",
-        "diff_check_artifact_latest_diff_ref": diff_check_artifact.get(
-            "diff_check_latest_diff_ref"
-        )
+        "diff_check_artifact_decision": diff_check_not_applicable
+        or diff_check_artifact.get("diff_check_agent_decision") == "approve",
+        "diff_check_artifact_latest_diff_ref": diff_check_not_applicable
+        or diff_check_artifact.get("diff_check_latest_diff_ref")
         == diff_check.get("diff_check_latest_diff_ref"),
-        "diff_check_artifact_read_only": diff_check_artifact.get("diff_check_read_only")
-        == "yes",
-        "diff_check_artifact_independent": diff_check_artifact.get(
-            "diff_check_independent_agent"
-        )
-        == "yes",
-        "diff_check_artifact_findings_status": diff_check_artifact.get(
-            "diff_check_findings_status"
-        )
-        in {"none", "resolved"},
+        "diff_check_artifact_read_only": diff_check_not_applicable
+        or diff_check_artifact.get("diff_check_read_only") == "yes",
+        "diff_check_artifact_independent": diff_check_not_applicable
+        or diff_check_artifact.get("diff_check_independent_agent") == "yes",
+        "diff_check_artifact_findings_status": diff_check_not_applicable
+        or diff_check_artifact.get("diff_check_findings_status") in {"none", "resolved"},
         "canonical_tree_head_complete": closeout.get("canonical_tree_head_complete") == "yes",
         "agent_evaluation_complete": closeout.get("agent_evaluation_complete") == "yes",
         "runtime_log_archive_synced": closeout.get("runtime_log_archive_synced") == "yes",

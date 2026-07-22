@@ -3550,10 +3550,21 @@ def manifest_decision_sufficiency_lines(spec: RunBundleSpec) -> list[str]:
         )
         return lines
     packet = import_decision_sufficiency_verdict(spec.decision_sufficiency_packet)
+    fixed_spark_legacy_fields = {
+        "H",
+        "possible_branches",
+        "route_verdict",
+    }
+    transport_scope = (
+        "fixed_spark_route_only"
+        if fixed_spark_legacy_fields.intersection(packet)
+        else "semantic_record_only"
+    )
     lines.extend(
         [
             "    status: semantic_record_with_optional_transport",
             f"    packet_ref: {spec.decision_sufficiency_packet_ref or None!r}",
+            f"    optional_packet_scope: {transport_scope!r}",
             "    optional_packet:",
             *_yaml_mapping_lines(packet, indent=6),
         ]

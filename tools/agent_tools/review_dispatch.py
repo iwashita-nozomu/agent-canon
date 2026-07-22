@@ -41,6 +41,7 @@ from external_artifact_binding import (
 )
 from task_authority import ACTIVE_RUN_POINTER
 from work_log import append_ledger_event, read_ledger_snapshot
+from report_artifact_checks import markdown_without_adjudicated_rejected_hypotheses
 
 REVIEW_CANDIDATE_SCHEMA = "agent-canon.review-candidate-event.v1"
 REVIEW_INTENT_SCHEMA = "agent-canon.terminal-resume-intent.v1"
@@ -742,13 +743,7 @@ def dispatch_current_candidate_review(
 
 def _review_text_without_rejected_hypotheses(text: str) -> str:
     """Exclude adjudicated rejected table rows from approval checks."""
-    lines: list[str] = []
-    for line in text.splitlines():
-        cells = tuple(cell.strip().lower() for cell in line.split("|")[1:-1])
-        if "rejected" in cells:
-            continue
-        lines.append(line)
-    return "\n".join(lines)
+    return markdown_without_adjudicated_rejected_hypotheses(text)
 
 
 def record_current_review_decision(
