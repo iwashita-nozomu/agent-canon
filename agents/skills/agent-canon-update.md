@@ -112,6 +112,7 @@ TODO state up to date.
    publication. Parent-owned
    validation, remote CI, merge, and readback follow there; they do not rerun
    source correctness, generated completeness, or source PR CAS.
+
 ## Final-Topology Adjudication
 
 Apply the full adjudication rule from

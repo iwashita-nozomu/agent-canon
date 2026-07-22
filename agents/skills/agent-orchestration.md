@@ -246,7 +246,7 @@ that route is unreachable for the active task: reject it with
 repair/review wave, and production/source is not changed to satisfy that gate.
 A still-valid issue owned by another trust boundary is recorded with
 `reason_code=outside_active_trust_boundary` and handed to that owner separately;
-do not import it into the active G4 parent-projection task.
+do not import it into the active task.
 
 Validation is static/targeted first. Full suites, full dependency review, and
 remote CI are selected once for the final candidate only when the touched
