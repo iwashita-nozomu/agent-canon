@@ -4,6 +4,7 @@
 contract policy
 responsibility Documents 実験運用規約 for this repository.
 upstream design README.md durable document index
+upstream design ./gpu-admission-r5-source-packet.md exact managed GPU admission and source-freeze contract
 @dependency-end
 -->
 
@@ -37,6 +38,9 @@ upstream design README.md durable document index
 - 新規 topic は、実験名を固定してから AgentCanon template path `vendor/agent-canon/experiments/_template/` を `experiments/<topic>/` へコピーし、`run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
 - 可視化は `experiments/<topic>/visualize.ipynb` の Jupyter notebook に置きます。notebook は結果確認と図表化の入口であり、正式 run の起動、細かな test、設定正本の置き場にしません。
 - topic の正本 entrypoint と smoke / formal command は `experiments/registry.toml` に集約します。
+- managed run は exact `experiments/registry.toml` を必須 source membership として
+  freeze します。registry 欠落を optional 扱いせず、別名 registry や live source
+  command へ fallback しません。
 - 1 回の run の report は `experiments/report/<run_name>.md` に置きます。
 - 複数 run をまたぐ要約や知見は `notes/experiments/` や `notes/themes/` に置きます。
 - server 上の formal run では `result/<run_name>/run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を残します。topic 固有の追加 stdout / stderr、tool log、diagnostic log は `result/<run_name>/logs/` に置きます。
@@ -54,8 +58,17 @@ upstream design README.md durable document index
 - main server host で実行する run は、topic README に exact command と wrapper の使い方を明記します。
 - 実験実行コマンドは project `Makefile` に用意します。長い `python3 ...` command を README や chat だけに残して正式手順にしません。
 - formal / server-side run は `tools/experiments/run_managed_experiment.py` から起動します。標準 runner は `run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、exit status を保存します。
+- managed runner は canonical `experiments/<topic>/run.py` と argv を fd-bound
+  source snapshot に束縛し、その snapshot の `main()` だけを fixed ff97 generic
+  lifecycle で実行します。topic が live callable、task/cases、scheduler、Context、
+  initializer、resource estimator、または別 launch wrapper を注入しません。
+- GPU admission environment は full physical/MIG UUID から runner construction 前に
+  materialize します。CPU fallback、GPU index、UUID prefix、direct launch、
+  compatibility route は禁止します。
 - 可視化 notebook は run 後に `summary.json`、`cases.jsonl`、必要な `logs/` artifact を読むだけにし、notebook の hidden state を正式 evidence にしません。
 - `experiment_runner` を使う実験で、process 管理、GPU 割当、timeout、signal cleanup を実験本体に実装しません。
+- fixed ff97 lifecycle は 1 scheduler、1 `StandardRunner`、1 `run(worker)` call
+  です。`run(worker)` の return は `None`、completion は scheduler-owned です。
 
 ## 3.1 設定 snapshot
 

@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents Shared Runtime Surfaces for this repository.
 downstream design ./shared-runtime-surfaces.toml machine-readable surface manifest
+downstream design ./gpu-admission-r5-source-packet.md exact shared runtime identity contract
 downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 downstream implementation ../tools/agent_tools/surface_manifest.py parses the surface manifest
 downstream implementation ../tools/sync_agent_canon.sh enforces root-view synchronization
@@ -23,6 +24,11 @@ because they are cloned from the template. That coupling is intentional. The
 boundary that must stay clear is ownership: each root path must say who owns it,
 whether a derived repository may override it, and where edits must be made.
 
+Target-State-First, Decision Sufficiency, model/profile, ToolCall, capacity,
+and lifecycle behavior remains an AgentCanon-owned generated projection. Root
+views link to the canonical workflow, subagent, communication, registry,
+handshake, and closeout owners; they are not independent policy sources.
+
 ## Reader Map
 
 Use this document to answer who owns each shared runtime surface exposed from
@@ -40,6 +46,9 @@ workflow for changes to shared surfaces.
 | AgentCanon-owned shared policy | standalone under `vendor/agent-canon/documents/` | AgentCanon source | no |
 | Template-owned active contract | regular root file when the template or derived repo creates one | template or derived repo root | yes |
 | Project-owned durable state / content | regular project-local file or directory | project root | yes |
+| Update transaction state | regular task-owned records under `.agent-canon/update-lifecycle/state/` | AgentCanon update transaction | no |
+| Update generated evidence | regular generated records under `.agent-canon/update-lifecycle/evidence/` | named lifecycle evidence producer | no |
+| Update projection view | regular queue/frontier records under `.agent-canon/update-lifecycle/projection-queue/` | AgentCanon update transaction | no |
 | GitHub path constraint copy surface | regular root copy from AgentCanon source | AgentCanon source, then `link-root` copy | no |
 | AgentCanon standalone-only surface | absent from template root; `link-root` removes stale root views | standalone AgentCanon repo | no |
 
@@ -135,6 +144,14 @@ edited in AgentCanon. The devcontainer consumes repo-local `docker/Dockerfile`,
 `docker/packs/default.toml`, and `docker/install_python_dependencies.sh`; it
 does not make `docker/` AgentCanon-owned.
 
+The whole `.devcontainer/` symlink is also the single shared owner surface for
+GPU admission runtime identity. Its bootstrap, Compose generator, post-create,
+finalize, and post-attach scripts must stay together so parent repositories
+cannot replace one identity stage independently. The exact receipt paths and
+parser/writer ownership are defined by
+`documents/gpu-admission-r5-source-packet.md` and
+`agent-canon-environment.toml`.
+
 `.vscode/` is also a shared AgentCanon runtime ergonomics surface. It owns
 workspace settings, recommended extensions, and VS Code task entrypoints that
 should behave the same in AgentCanon, template, and derived repository roots.
@@ -183,7 +200,9 @@ Project state remains regular root content. AgentCanon must not restore these as
 shared symlinks or shared copies:
 
 - `goal.md`
-- `.agent-canon/update-state.toml`
+- `.agent-canon/update-lifecycle/state/`
+- `.agent-canon/update-lifecycle/evidence/`
+- `.agent-canon/update-lifecycle/projection-queue/`
 - `experiments/README.md`
 - `experiments/registry.toml`
 - `experiments/<topic>/`
@@ -193,6 +212,11 @@ shared symlinks or shared copies:
 
 `goal.md` is always repo-local state. If a legacy root has `goal.md` symlinked
 to AgentCanon, `link-root` converts it to a repo-local placeholder.
+
+The three update-lifecycle children are one owner namespace with distinct
+roles: resumable state, generated evidence, and a projection-only queue view.
+The update transaction may clean its own records after remote readback; it must
+leave every unknown sibling under `.agent-canon/` unchanged.
 
 ## GitHub Path Constraint Copies
 
@@ -218,6 +242,11 @@ AgentCanon documents stay under `vendor/agent-canon/documents/`; root docs may
 link there when readers need shared conventions or workflow policy. Generated or
 experiment artifacts stay under `reports/` or `experiments/` unless they become
 a durable repo-local design or policy surface.
+
+`documents/agent-canon-update-route.md` is the standalone source entry for the
+update transaction. A parent consumes it under `vendor/agent-canon/documents/`;
+it does not copy that contract into root `documents/` or treat projection queue
+records as source canon.
 
 ## Evidence Contract Boundary
 

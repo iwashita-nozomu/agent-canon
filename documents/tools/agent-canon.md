@@ -4,7 +4,6 @@ contract reference
 responsibility Documents the unified Rust docs formatter and checker.
 upstream implementation ../../rust/agent-canon/src/docs.rs implements docs check, format, fix-math, and fix-mermaid.
 downstream design ../../agents/skills/md-style-check.md routes Markdown style work to this tool.
-downstream implementation ../../tools/ci/run_docs_checks.sh forwards legacy docs-check calls.
 @dependency-end
 -->
 
@@ -86,11 +85,6 @@ a blocker.
 
 ## Legacy Entrypoints
 
-These old commands are compatibility forwarders:
-
-- `bash tools/ci/run_docs_checks.sh`
-- `python3 tools/docs/audit_and_fix_links.py --check`
-
-When a forwarder is called, it prints `AGENT_CANON_FORWARDER=deprecated`,
-`AGENT_CANON_FORWARDER_SEVERITY=fix-now`, the caller chain, and the canonical
-`tools/bin/agent-canon docs ...` command before executing the Rust entrypoint.
+`python3 tools/docs/audit_and_fix_links.py --check` remains a legacy link-check
+entrypoint. The canonical Markdown, math, and Mermaid route is
+`tools/bin/agent-canon docs ...`.

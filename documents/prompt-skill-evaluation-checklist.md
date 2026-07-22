@@ -93,12 +93,20 @@ Result Metadata:
 scenario_id=<id>
 iteration=<integer>
 provenance=fresh
+Evaluation Status:
+evaluation_status=<pass|fail>
+feedback_actions_resolved=no
+learning_capture_complete=no
 ```
 
 The four `Output` keys are observed behavior, not an embedded answer. Every
 listed fixed field is mandatory exactly once: `command`, `artifacts`,
 `authority`, `route`, `retry_count`, `ambiguity`, `extra_refs`, `scenario_id`,
-`iteration`, and `provenance`. Missing or duplicated fields, reordered or
+`iteration`, and `provenance`; the three `Evaluation Status` fields are also
+mandatory exactly once. `evaluation_status` is the fresh evaluator's observed
+status for that report. It is not the parent's score, critical-pass decision,
+convergence result, or final completion state. Missing or duplicated fields,
+reordered or
 duplicated headings, missing or duplicated packet-listed requirement IDs,
 unknown requirement IDs, invalid enum/value tokens, a `scenario_id` or
 `iteration` that differs from the packet, provenance other than `fresh`, or
@@ -111,11 +119,13 @@ same frozen packet.
 ## Parent Scoring And Convergence
 
 After each return, the parent scores the observed `Output` and requirement
-observations against this frozen checklist. The evaluator emits no score or
-status. The parent artifact owns the fields
+observations against this frozen checklist. The `Evaluation Status` section is
+the fresh evaluator's observed report status only; it does not score the skill
+and does not finalize the evaluation. The parent artifact owns the fields
 `parent_score_percent=<0..100>` and `parent_critical_pass=<yes|no>`; those
-fields are derived by the parent and cannot be supplied by the evaluator. The
-route requirements are:
+fields are derived by the parent and cannot be supplied as parent decisions by
+the evaluator. The parent also owns iteration convergence and final completion;
+neither is implied by `evaluation_status=pass`. The route requirements are:
 
 - `full` uses exactly `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json`.
 - `changed` uses exactly `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json`, and only when changed scope is explicit.

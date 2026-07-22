@@ -54,7 +54,7 @@ outer loop は agile、inner change pass は waterfall です。
 - iteration 番号は進捗記録であり、loop の終了条件ではありません。`goal_loop.py` の `--max-iterations` は単一実行の安全 cap に限り、repo-level loop の終了は exit criteria と明示 decision で決めます。
 - 1 extension は、1 `Candidate Change:`、1 waterfall run-id、1 `Decision State:` に固定します。
 - 1 iteration で repo に持ち帰る code / docs / environment change は 1 つの waterfall pass として閉じます。
-- 2 つ目の extension に入る前に、直前 extension の `make waterfall-gate-check`、final review、`task-close`、commit / push を終えます。
+- 2 つ目の extension に入る前に、直前 extension の selected `make waterfall-gate-check`、selected review gate（final review は活性化された場合のみ）、`task-close`、commit / push を終えます。
 - baseline と comparison target は loop の途中で勝手に差し替えません。
 - run ごとの result、decision、next action を明示し、なんとなく次へ進みません。
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required` が残る限り loop を閉じません。

@@ -23,9 +23,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_PROVIDER: &str = "deterministic-dense-v1";
 const DEFAULT_MODEL: &str = "hash-token-char-v1";
-const LLAMA_SERVER_EMBEDDING_PROVIDER: &str = "llama-server-embedding";
 const OPENAI_COMPATIBLE_EMBEDDING_PROVIDER: &str = "openai-compatible-embedding";
-const DEFAULT_EMBEDDING_URL: &str = "http://127.0.0.1:8080/v1/embeddings";
 const DEFAULT_REMOTE_EMBEDDING_MAX_CHARS: usize = 3000;
 const DEFAULT_DIM: usize = 128;
 const DEFAULT_TOP_K: usize = 10;
@@ -1012,9 +1010,8 @@ fn parse_embed_provider_args(args: &[String]) -> Result<EmbedProviderArgs, Strin
     let mut parsed = EmbedProviderArgs {
         root: PathBuf::from("."),
         db: default_db_path(Path::new(".")),
-        provider: LLAMA_SERVER_EMBEDDING_PROVIDER.to_string(),
-        model: env::var("AGENT_CANON_LOCAL_LLM_EMBEDDING_MODEL")
-            .unwrap_or_else(|_| "local-embedding-model".to_string()),
+        provider: DEFAULT_PROVIDER.to_string(),
+        model: DEFAULT_MODEL.to_string(),
         dim: 0,
         embedding_url: None,
         embedding_batch: DEFAULT_EMBEDDING_BATCH,
@@ -1411,9 +1408,8 @@ fn parse_compare_providers_args(args: &[String]) -> Result<CompareProvidersArgs,
             embedding_url: None,
         },
         right: ProviderSpec {
-            provider: LLAMA_SERVER_EMBEDDING_PROVIDER.to_string(),
-            model: env::var("AGENT_CANON_LOCAL_LLM_EMBEDDING_MODEL")
-                .unwrap_or_else(|_| "local-embedding-model".to_string()),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
             dim: 0,
             embedding_url: None,
         },
@@ -3952,6 +3948,12 @@ fn embed_texts_for_provider(
         return Ok(texts.iter().map(|text| embed_text(text, dim)).collect());
     }
     let endpoint = embedding_endpoint(embedding_url);
+    if endpoint.is_empty() {
+        return Err(
+            "OpenAI-compatible embedding provider requires an explicit endpoint; local server defaults are disabled"
+                .to_string(),
+        );
+    }
     let expected_dim = remote_expected_dim(dim);
     let batch_size = batch_size.max(1);
     let max_chars = remote_embedding_max_chars();
@@ -3981,10 +3983,7 @@ fn embed_texts_for_provider(
 fn is_remote_embedding_provider(provider: &str) -> bool {
     matches!(
         provider,
-        LLAMA_SERVER_EMBEDDING_PROVIDER
-            | OPENAI_COMPATIBLE_EMBEDDING_PROVIDER
-            | "llama-server"
-            | "openai-compatible"
+        OPENAI_COMPATIBLE_EMBEDDING_PROVIDER | "openai-compatible"
     )
 }
 
@@ -4000,8 +3999,7 @@ fn embedding_endpoint(explicit: Option<&str>) -> String {
     explicit
         .map(str::to_string)
         .or_else(|| env::var("AGENT_CANON_SEMANTIC_INDEX_EMBEDDING_URL").ok())
-        .or_else(|| env::var("AGENT_CANON_LLAMA_EMBEDDING_URL").ok())
-        .unwrap_or_else(|| DEFAULT_EMBEDDING_URL.to_string())
+        .unwrap_or_default()
 }
 
 fn remote_embedding_max_chars() -> usize {

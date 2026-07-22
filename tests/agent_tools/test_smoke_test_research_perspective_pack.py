@@ -106,7 +106,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertIn("user_completion_report=locked", verification_text)
             self.assertIn("closeout_gate_status=pending", verification_text)
             self.assertIn("- user_completion_report: locked", closeout_text)
-            self.assertIn("- spec_product_coverage_complete: no", closeout_text)
+            self.assertIn("- completion_coverage_consumer: no", closeout_text)
             self.assertIn("- repo_wide_dependency_tools_complete: no", closeout_text)
             self.assertIn("- repo_wide_static_analysis_complete: no", closeout_text)
             self.assertIn("- review_findings_integrated: no", closeout_text)
@@ -307,8 +307,10 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertIn("cpp_review.md", result.stdout)
             self.assertTrue((report_dir / "cpp_review.md").is_file())
 
-    def test_bootstrap_auto_enables_cpp_reviewer_from_changed_path_hint(self) -> None:
-        """Changed-path hints should auto-enable the C++ reviewer without explicit --enable."""
+    def test_bootstrap_discovers_language_review_candidate_from_changed_path_hint(
+        self,
+    ) -> None:
+        """Changed-path hints should expose a C++ review candidate without activation."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
@@ -323,11 +325,11 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     sys.executable,
                     str(BOOTSTRAP_SCRIPT_PATH),
                     "--task",
-                    "native auto reviewer smoke",
+                    "native language review candidate smoke",
                     "--owner",
                     "codex",
                     "--run-id",
-                    "test-auto-cpp-reviewer",
+                    "test-language-cpp-candidate",
                     "--report-root",
                     str(report_root),
                     "--workspace-root",
@@ -342,12 +344,12 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            report_dir = report_root / "test-auto-cpp-reviewer"
+            report_dir = report_root / "test-language-cpp-candidate"
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
+            self.assertIn("LANGUAGE_REVIEW_CANDIDATES=cpp_reviewer", result.stdout)
             self.assertIn("cpp_reviewer", result.stdout)
-            self.assertTrue((report_dir / "cpp_review.md").is_file())
+            self.assertFalse((report_dir / "cpp_review.md").exists())
 
 
 if __name__ == "__main__":

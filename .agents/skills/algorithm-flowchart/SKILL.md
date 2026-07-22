@@ -12,10 +12,28 @@ upstream design ../../../agents/skills/algorithm-proof-exploration.md JIT-canoni
 upstream design ../../../agents/skills/formal-proof-workflow.md proof status workflow.
 upstream implementation ../../../tools/agent_tools/jit_canonical_ir.py emits StableHLO-derived operational IR and backend traces.
 upstream implementation ../../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR to Lean evidence modules.
+upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
+upstream implementation ../../../tools/agent_tools/visualization_contract.py owns ToolCall, identity, manifest, readback, and coverage serialization.
+downstream implementation ../../../tests/tools/test_fix_mermaid.py checks syntax-only Mermaid formatting.
 @dependency-end
 -->
 
 # Algorithm Flowchart
+
+## Visualization Adapter Boundary
+
+Build a complete `VisualizationSourceUniverse` containing every selected
+JIT/HLO operation and edge, branch, phase, backend/dtype field, proof/evidence
+item, source locator, helper, and timing item, then hand it to
+`$code-visualization`. Serialize the canonical coverage-owner ToolCall first and
+the algorithm adapter ToolCall second. Use `serialize_projection_identity` for
+every locator and `serialize_projection_coverage_manifest` for the marker; call
+no private owner helper. This skill owns source facts and exactly one Mermaid
+rendering only, with no table fallback. Run
+`tools/bin/agent-canon docs format <artifact.md>`, then
+`readback_projection` and `validate_projection_coverage(..., readback=...)`.
+Only that typed result is final; Rust owns syntax only. `--include-code-facts`
+is reversible view-only state and cannot change the artifact or universe.
 
 ## Tool Commands
 

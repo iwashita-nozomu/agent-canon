@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Checks agent runtime alignment agent workflow state.
+# responsibility Checks public catalog/document/shim/config registration and path parity plus agent workflow state.
 # upstream design ../README.md shared automation index
 # upstream design ../../agents/skills/README.md public skill surface contract
 # upstream design ../../agents/canonical/skills.md official system skill delegation boundary
 # upstream design ../../agents/internal-routines/README.md internal routine surface contract
 # upstream design ../../agents/skills/catalog.yaml public skill routing and related-skill catalog
-# upstream design ../../agents/TASK_WORKFLOWS.md canonical four-entry active design packet reader map
-# upstream design ../../agents/canonical/CLI_ENTRYPOINTS.md canonical packet CLI terminology
+# upstream implementation ./skill_route_catalog.py canonical skill-route rules and capability metadata
 # upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
+# upstream implementation ./model_profile_registry.py owns canonical model/profile projections
+# upstream implementation ./capacity_handshake.py owns typed capacity readback
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""
@@ -20,14 +21,23 @@ import json
 import re
 import subprocess
 import tempfile
-import tomllib
-from collections.abc import Mapping
+import shutil
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
+from collections.abc import Collection
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
 import yaml
+import model_profile_registry
 from agent_team import (
     ROOT,
     Role,
@@ -36,6 +46,7 @@ from agent_team import (
     TeamConfig,
     codex_runtime_max_depth,
     codex_runtime_max_threads,
+    declared_team_capacity_derivation,
     create_run_bundle,
     default_specialists_for_task,
     load_task_catalog,
@@ -43,7 +54,6 @@ from agent_team import (
     recommended_dynamic_expansion_wave_slots,
     recommended_initial_subagent_wave,
     required_output_templates_missing,
-    resolve_active_design_packet,
     resolve_cross_cutting_document_packet,
     resolve_role,
     resolve_role_document_packet,
@@ -52,7 +62,10 @@ from agent_team import (
     workflow_spawn_budget,
     workflow_topology_policy_violations,
 )
+from skill_route_catalog import load_skill_route_rules
 from vendor_skill_adapters import VendorSkillValidator
+
+UTC = timezone.utc
 
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
 PROJECT_SKILL_CONFIG_PATH = ROOT / ".codex" / "project-config.toml"
@@ -62,26 +75,17 @@ SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
 PROJECT_SKILL_LANE = ".codex/project-skills"
 PUBLIC_SKILL_DOC_ROOT = ROOT / "agents" / "skills"
 INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
-FRONTMATTER_OPEN_MARKER = "---\n"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
 EXPECTED_MODEL_CONTEXT_WINDOW = 1_000_000
 EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
-EXPECTED_MAX_THREADS = 24
+EXPECTED_MAX_THREADS = 26
 EXPECTED_MAX_DEPTH = 2
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
 MIN_DYNAMIC_SPAWN_BUDGET = 4
-PARENT_MODEL = "gpt-5.6-sol"
-PARENT_REASONING_EFFORT = "high"
-REVIEW_MODEL = "gpt-5.6-luna"
-LUNA_MODEL = "gpt-5.6-luna"
-SPARK_MODEL = "gpt-5.3-codex-spark"
-SKILL_VALIDATION_MODEL = "gpt-5.4-mini"
-LUNA_XHIGH_AGENT_IDS = {"worker", "ship_reviewer"}
-SPARK_LOW_AGENT_IDS = {"spark_worker"}
 EVALUATOR_AGENT_ID = "skill_evaluator"
 EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
-SKILL_VALIDATION_AGENT_IDS = {EVALUATOR_AGENT_ID}
 FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
+GENERATED_ROLE_VIEW_MATERIALIZER = "generate_role_views"
 SCOPED_MODEL_POLICY_KEYS = {
     "model",
     "model_reasoning_effort",
@@ -95,7 +99,6 @@ ALLOWED_AGENT_RUNTIME_KEYS = {
     "max_depth",
     "job_max_runtime_seconds",
 }
-SKILL_ROUTING_STAGE_POLICIES = {"active", "deferred"}
 PRIVATE_SKILL_PREFIX = "_"
 PUBLIC_SKILL_README_DUPLICATE_ROW = re.compile(
     r"^\|\s*`[^`]+`\s*\|.*`agents/skills/[^`]+\.md`.*`\.agents/skills/[^`]+/SKILL\.md`",
@@ -264,14 +267,17 @@ def load_project_skill_config_toml() -> dict[str, object]:
 def validate_project_config() -> None:
     """Check that the shared project config exposes the review route."""
     config = load_project_config_toml()
-    ensure(config.get("model") == PARENT_MODEL, f"model must be {PARENT_MODEL}")
+    registry = model_profile_registry.load_model_profile_registry(ROOT)
+    parent_profile = registry.by_profile("sol_parent_high")
+    review_profile = registry.by_profile("luna_reasoning_high")
+    ensure(config.get("model") == parent_profile.model, "parent model must project sol_parent_high")
     ensure(
-        config.get("model_reasoning_effort") == PARENT_REASONING_EFFORT,
-        f"model_reasoning_effort must be {PARENT_REASONING_EFFORT}",
+        config.get("model_reasoning_effort") == parent_profile.reasoning_effort,
+        "parent reasoning effort must project sol_parent_high",
     )
     ensure(
-        config.get("review_model") == REVIEW_MODEL,
-        f"review_model must be {REVIEW_MODEL}",
+        config.get("review_model") == review_profile.model,
+        "review_model must project luna_reasoning_high",
     )
     forbidden_project_keys = sorted(
         {"service_tier", "flex", "tier"} & set(config)
@@ -526,61 +532,81 @@ def configured_dispatcher_scripts() -> set[str]:
     return scripts
 
 
-def validate_codex_agent_settings() -> None:
-    """Check that Codex agent TOML files carry the executable model settings."""
+def validate_generated_role_views() -> None:
+    """Validate the closed role-view projection against canonical sources."""
+    config = load_team_config()
+    raw = config.raw
+    agent_views = require_mapping(raw.get("agent_views"), "agents_config.agent_views must be a mapping")
+    bindings_raw = require_list(raw.get("roles"), "agents_config.roles must be a list")
+    bindings: dict[str, dict[str, object]] = {}
+    for raw_binding in bindings_raw:
+        binding = require_mapping(raw_binding, "agents_config.roles entries must be mappings")
+        role_id = require_string(binding.get("id"), "agents_config.roles[].id must be a string")
+        ensure(role_id not in bindings, f"duplicate generated role binding: {role_id}")
+        bindings[role_id] = binding
     configs = parse_codex_agents()
+    expected_fields = {
+        "name", "description", "nickname_candidates", "sandbox_mode",
+        "approval_policy", "model", "model_reasoning_effort", "developer_instructions",
+    }
+    registry = model_profile_registry.load_model_profile_registry(ROOT)
+    registry_ids = {profile.id for profile in registry.model_profiles}
+    generated = {
+        view.role_id: view
+        for view in model_profile_registry.generate_role_views(registry, root=ROOT)
+    }
+    ensure(set(configs) == set(agent_views) == set(bindings), "generated role-view sets must be identical")
+    ensure(len(configs) == 34, "generated role-view projection must contain 34 views")
+    ensure("sol_parent_high" in registry_ids, "registry must retain sol_parent_high")
+    ensure(raw.get("team", {}).get("parent_profile_id", "sol_parent_high") == "sol_parent_high", "team parent profile must be Sol")
+    for role_id, config_view in sorted(configs.items()):
+        source = require_mapping(agent_views.get(role_id), f"agent_views.{role_id} must be a mapping")
+        binding = bindings[role_id]
+        ensure({key for key in config_view if not key.startswith("__")} == expected_fields, f"{role_id} generated view must be closed eight-field projection")
+        view = generated[role_id]
+        for field in expected_fields:
+            projected = {
+                "name": view.name,
+                "description": view.description,
+                "nickname_candidates": list(view.nickname_candidates),
+                "sandbox_mode": view.sandbox_mode,
+                "approval_policy": view.approval_policy,
+                "model": view.model,
+                "model_reasoning_effort": view.reasoning_effort,
+                "developer_instructions": view.rendered_instructions,
+            }[field]
+            ensure(config_view.get(field) == projected, f"{role_id} {field} must project canonical registry materialization")
+            ensure(source.get(field) == projected, f"{role_id} agents_config projection diverges for {field}")
+        profile_id = require_string(source.get("profile_id"), f"agent_views.{role_id}.profile_id must be a string")
+        ensure(profile_id in registry_ids, f"{role_id} profile is not in model profile registry")
+        ensure(binding.get("profile_id") == profile_id, f"{role_id} profile binding diverges from agent view")
+        ensure(binding.get("capsule_schema_id") == view.capsule_schema_id == source.get("capsule_schema_id"), f"{role_id} capsule schema diverges")
+        ensure(require_string(source.get("logical_role_id"), f"agent_views.{role_id}.logical_role_id must be a string"), "logical role id must be non-empty")
+        ensure(require_string(source.get("role_contract_ref"), f"agent_views.{role_id}.role_contract_ref must be a string"), "role contract ref must be non-empty")
+        ensure(tuple(require_string_list(binding.get("capabilities"), f"roles.{role_id}.capabilities")) == view.capabilities, f"{role_id} capabilities diverge")
+        ensure(binding.get("projection_digest") == view.source_canonical_digest == source.get("projection_digest"), f"{role_id} projection digest diverges")
+        ensure(binding.get("return_schema_id") == view.return_schema_id == source.get("return_schema_id"), f"{role_id} return schema diverges")
+        ensure(binding.get("checkpoint_policy") == view.checkpoint_policy == source.get("checkpoint_policy"), f"{role_id} checkpoint policy diverges")
+        ensure(binding.get("continuation_policy") == view.continuation_policy == source.get("continuation_policy"), f"{role_id} continuation policy diverges")
+        ensure("generated_role_view_v1" in (CODEX_AGENT_ROOT / f"{role_id}.toml").read_text(encoding="utf-8"), f"{role_id} missing generated header")
+
+
+def validate_codex_agent_settings() -> None:
+    """Check executable settings and the canonical generated role projection."""
+    configs = parse_codex_agents()
+    registry = model_profile_registry.load_model_profile_registry(ROOT)
+    generated = {view.role_id: view for view in model_profile_registry.generate_role_views(registry, ROOT)}
     valid_efforts = {"low", "medium", "high", "xhigh"}
     for role_id, config in sorted(configs.items()):
         forbidden_keys = sorted(FORBIDDEN_AGENT_PROFILE_KEYS & set(config))
-        ensure(
-            not forbidden_keys,
-            f"{role_id} agent TOML contains unsupported profile keys: {', '.join(forbidden_keys)}",
-        )
+        ensure(not forbidden_keys, f"{role_id} agent TOML contains unsupported profile keys: {', '.join(forbidden_keys)}")
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
-        model = config.get("model")
-        effort = config.get("model_reasoning_effort")
-        ensure(
-            isinstance(model, str) and bool(model),
-            f"{role_id} model must be a non-empty string",
-        )
-        ensure(
-            isinstance(effort, str) and effort in valid_efforts,
-            f"{role_id} model_reasoning_effort must be one of {sorted(valid_efforts)}",
-        )
-        if model == SKILL_VALIDATION_MODEL:
-            ensure(
-                role_id in SKILL_VALIDATION_AGENT_IDS,
-                f"{role_id} may use {SKILL_VALIDATION_MODEL} only for explicit T14 skill_evaluation via skill_evaluator",
-            )
-        if role_id in LUNA_XHIGH_AGENT_IDS:
-            expected_model, expected_effort = LUNA_MODEL, "xhigh"
-        elif role_id in SKILL_VALIDATION_AGENT_IDS:
-            expected_model, expected_effort = SKILL_VALIDATION_MODEL, "medium"
-        elif role_id in SPARK_LOW_AGENT_IDS:
-            expected_model, expected_effort = SPARK_MODEL, "low"
-        else:
-            expected_model, expected_effort = LUNA_MODEL, "high"
-        ensure(
-            model == expected_model,
-            f"{role_id} model must be {expected_model}",
-        )
-        ensure(
-            effort == expected_effort,
-            f"{role_id} model_reasoning_effort must be {expected_effort}",
-        )
-        ensure(model != PARENT_MODEL, f"{role_id} child model must not use Sol")
-        ensure(model != "gpt-5.5", f"{role_id} child model must not use gpt-5.5")
-    evaluator = configs[EVALUATOR_AGENT_ID]
-    ensure(evaluator.get("sandbox_mode") == "read-only", f"{EVALUATOR_AGENT_ID} sandbox_mode must be read-only")
-    ensure(evaluator.get("approval_policy") == "never", f"{EVALUATOR_AGENT_ID} approval_policy must be never")
-    evaluator_instructions = str(evaluator.get("developer_instructions", "")).lower()
-    for phrase in ("scenario packet", "do not edit", "nested agents", "reused", "output:", "requirement results:", "telemetry:", "result metadata:"):
-        ensure(phrase in evaluator_instructions, f"{EVALUATOR_AGENT_ID} instructions missing {phrase}")
-
-    for role_id, marker in INITIAL_INTAKE_MARKERS.items():
-        instructions = str(configs[role_id].get("developer_instructions", ""))
-        ensure(marker in instructions, f"{role_id} missing intake responsibility marker")
-
+        ensure(isinstance(config.get("model"), str) and bool(config.get("model")), f"{role_id} model must be a non-empty string")
+        ensure(isinstance(config.get("model_reasoning_effort"), str) and config.get("model_reasoning_effort") in valid_efforts, f"{role_id} model_reasoning_effort must be valid")
+        view = generated[role_id]
+        ensure(config.get("model") == view.model, f"{role_id} model must project registry profile {view.profile_id}")
+        ensure(config.get("model_reasoning_effort") == view.reasoning_effort, f"{role_id} reasoning must project registry profile {view.profile_id}")
+    validate_generated_role_views()
 
 def validate_team_config_references() -> None:
     """Check role references inside the team config."""
@@ -701,11 +727,6 @@ def validate_team_config_references() -> None:
 
     packet_probe_workspace = resolve_packet_probe_workspace()
     packet_probe_report_dir = ROOT / "reports" / "agents" / "_packet_probe"
-    active_design_packet = resolve_active_design_packet(
-        config,
-        workflow_family=None,
-        explicit=None,
-    )
     for entry in resolve_cross_cutting_document_packet(packet_probe_workspace):
         ensure(entry.path.exists(), f"cross-cutting document packet path missing: {entry.path}")
     for role in config.always_on_roles + config.specialist_roles:
@@ -714,7 +735,6 @@ def validate_team_config_references() -> None:
             role=role,
             report_dir=packet_probe_report_dir,
             workspace_root=packet_probe_workspace,
-            active_design_packet=active_design_packet,
         )
         for entry in packet.read_before_work:
             ensure(
@@ -743,11 +763,33 @@ def validate_task_catalog_references() -> None:
         not (SCOPED_MODEL_POLICY_KEYS & set(catalog.raw)),
         "task_catalog.yaml must not own model, effort, review model, or tier policy",
     )
+    review_policy = require_mapping(
+        catalog.raw.get("review_activation_policy"),
+        "review_activation_policy must be a mapping",
+    )
+    ensure(
+        review_policy.get("mode") == "candidate_only",
+        "review_activation_policy must keep catalog reviews candidate-only",
+    )
+    ensure(
+        review_policy.get("owner_gate_cardinality")
+        == "one_gate_per_replaceable_responsibility",
+        "review_activation_policy must use one owning gate per responsibility",
+    )
+    ensure(
+        review_policy.get("specialist_activation")
+        == "distinct_unresolved_claim_or_risk_only",
+        "review_activation_policy specialist activation must be conditional",
+    )
     runtime_max_threads = codex_runtime_max_threads()
     role_ids = {role.id for role in config.always_on_roles + config.specialist_roles}
     topology = require_mapping(
         catalog.raw.get("role_topology_defaults"),
         "role_topology_defaults must be a mapping",
+    )
+    ensure(
+        topology.get("capacity_derivation") == "declared_team_peak_plus_nested_reservations_v1",
+        "role_topology_defaults must declare the approved capacity derivation",
     )
     topology_role_families = require_mapping(
         topology.get("role_families"),
@@ -984,19 +1026,14 @@ def validate_task_catalog_references() -> None:
                     role_id in role_ids,
                     f"family {family_id} references unknown role {role_id}",
                 )
-        active_budget, max_write_budget = workflow_spawn_budget(catalog, family_id)
-        ensure(
-            active_budget <= runtime_max_threads,
-            f"family {family_id} active_subagents exceeds runtime max_threads",
+        ensure("spawn_budget" not in family, f"family {family_id} must not declare numeric spawn_budget")
+        capacity_request = require_mapping(
+            family.get("capacity_request"), f"family {family_id} capacity_request must be a mapping"
         )
-        ensure(
-            max_write_budget >= 1,
-            f"family {family_id} max_write_subagents must be >= 1",
-        )
-        ensure(
-            max_write_budget <= active_budget,
-            f"family {family_id} max_write_subagents exceeds active_subagents",
-        )
+        ensure(capacity_request.get("schema_id") == "task_catalog_capacity_request_v1", f"family {family_id} capacity_request schema mismatch")
+        ensure(capacity_request.get("policy_id") == "topology_derived_v1", f"family {family_id} capacity policy mismatch")
+        ensure(capacity_request.get("topology_source") == "role_topology", f"family {family_id} capacity topology source mismatch")
+        ensure(capacity_request.get("write_scope_source") == "team_manifest.run.write_scopes", f"family {family_id} write scope source mismatch")
 
     for task_id in task_ids(catalog):
         task = next(task for task in catalog.tasks if task["id"] == task_id)
@@ -1025,8 +1062,14 @@ def validate_task_catalog_references() -> None:
             "docs_workflow_steward",
             "prompt_config_reviewer",
         ),
-        f"T12 default-active specialists must be the five role topology defaults, got {t12_specialists}",
+        f"T12 candidate specialists must remain the five catalog candidates, got {t12_specialists}",
     )
+    derivation = declared_team_capacity_derivation(catalog)
+    ensure(derivation.requested_max_threads() == 26, "declared topology must derive max_threads=26")
+    peak = derivation.peak_family
+    ensure(peak.workflow_family_id == "research_driven_change", "research_driven_change must be the peak family")
+    ensure(peak.direct_frontier_count == 20, "declared direct frontier must be 20")
+    ensure(peak.nested_reservation_count == 6, "declared nested reservations must be 6")
     topology_violations = workflow_topology_policy_violations(catalog)
     ensure(
         not topology_violations,
@@ -1137,52 +1180,40 @@ def validate_public_skill_shims() -> None:
     raw_data: object = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
     data = require_mapping(raw_data, "skill catalog must parse as a mapping")
     families = require_list(data.get("skill_families", []), "skill_families must be a list")
+    try:
+        rules = load_skill_route_rules(ROOT)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"blocked-by=catalog-gate:{exc}") from exc
+    ensure(
+        len(families) == len(rules),
+        "blocked-by=catalog-gate:catalog rule/source order mismatch",
+    )
 
-    observed_skill_ids: set[str] = set()
-    for entry in families:
-        entry = require_mapping(entry, "skill_families entries must be mappings")
-        skill_id = require_string(
-            entry.get("id"), "skill_families id must be a string"
-        )
-        ensure(
-            is_public_skill_id(skill_id),
-            f"public skill catalog id must not start with {PRIVATE_SKILL_PREFIX}: {skill_id}",
-        )
-        ensure(skill_id not in observed_skill_ids, f"duplicate skill catalog id: {skill_id}")
-        observed_skill_ids.add(skill_id)
-        canonical_doc = ROOT / require_string(
+    observed_skill_ids = {rule.skill for rule in rules}
+    registrations: list[tuple[str, str]] = []
+    for rule, raw_entry in zip(rules, families, strict=True):
+        entry = require_mapping(raw_entry, "skill registration entries must be mappings")
+        skill_id = rule.skill
+        canonical_doc_value = require_string(
             entry.get("canonical_doc"),
             f"{skill_id} canonical_doc must be a string",
         )
         shim = ROOT / require_string(entry.get("shim"), f"{skill_id} shim must be a string")
+        canonical_doc = ROOT / canonical_doc_value
         ensure(canonical_doc.is_file(), f"{skill_id} canonical doc missing: {canonical_doc}")
         ensure(shim.is_file(), f"{skill_id} shim missing: {shim}")
         ensure(
             shim.resolve().is_relative_to(SKILL_SHIM_ROOT.resolve()),
             f"{skill_id} shim is outside the Codex skill root: {shim}",
         )
-        text = shim.read_text(encoding="utf-8")
-        ensure(text.startswith(FRONTMATTER_OPEN_MARKER), f"{skill_id} shim must start with YAML frontmatter")
-        ensure(
-            "\n---\n" in text[len(FRONTMATTER_OPEN_MARKER) :],
-            f"{skill_id} shim YAML frontmatter must close",
-        )
-        ensure(f"name: {skill_id}" in text, f"{skill_id} shim frontmatter name mismatch")
-        validate_skill_routing_entry(skill_id, entry.get("routing"))
-    validate_skill_related_entries(families, observed_skill_ids)
+        registrations.append((skill_id, canonical_doc_value))
     observed_shim_ids = {
         path.parent.name
         for path in SKILL_SHIM_ROOT.glob("*/SKILL.md")
     }
     public_shim_ids = {skill_id for skill_id in observed_shim_ids if is_public_skill_id(skill_id)}
-    private_catalog_ids = sorted(skill_id for skill_id in observed_skill_ids if is_private_skill_id(skill_id))
     extra_shims = sorted(public_shim_ids - observed_skill_ids)
     missing_shims = sorted(observed_skill_ids - observed_shim_ids)
-    ensure(
-        not private_catalog_ids,
-        "private skill ids must stay out of public skill catalog: "
-        + ", ".join(private_catalog_ids),
-    )
     ensure(
         not extra_shims,
         "public skill shims missing catalog entries: " + ", ".join(extra_shims),
@@ -1191,14 +1222,14 @@ def validate_public_skill_shims() -> None:
         not missing_shims,
         "skill catalog entries missing public shims: " + ", ".join(missing_shims),
     )
-    validate_public_skill_document_contract(data)
-    validate_official_system_skill_delegation(data)
+    validate_public_skill_document_contract(tuple(registrations))
+    validate_official_system_skill_delegation(observed_skill_ids)
 
 
 def validate_public_skill_document_contract(
-    data: Mapping[str, object], root: Path | None = None
+    registrations: tuple[tuple[str, str], ...], root: Path | None = None
 ) -> None:
-    """Check that agents/skills contains only catalog-backed public skills."""
+    """Check public skill docs against the canonical registration projection."""
     if root is None:
         root = ROOT
     public_doc_root = root / "agents" / "skills"
@@ -1212,26 +1243,14 @@ def validate_public_skill_document_contract(
         (internal_routine_root / "README.md").is_file(),
         "internal routine README missing: agents/internal-routines/README.md",
     )
-    families = require_list(data.get("skill_families", []), "skill_families must be a list")
     catalog_docs: set[str] = set()
-    for entry in families:
-        entry = require_mapping(entry, "skill_families entries must be mappings")
-        canonical_doc = require_string(
-            entry.get("canonical_doc"),
-            "skill_families canonical_doc must be non-empty",
-        ).strip()
-        skill_id = require_string(
-            entry.get("id"), "skill_families id must be a string"
-        ).strip()
-        ensure(
-            is_public_skill_id(skill_id),
-            f"public skill catalog id must not start with {PRIVATE_SKILL_PREFIX}: {skill_id}",
-        )
-        ensure(bool(canonical_doc), "skill_families canonical_doc must be non-empty")
+    for skill_id, canonical_doc in registrations:
+        ensure(bool(skill_id), "skill registration id must be non-empty")
+        ensure(bool(canonical_doc), "skill registration canonical_doc must be non-empty")
         canonical_path = root / canonical_doc
         ensure(
             canonical_path.resolve().is_relative_to(public_doc_root.resolve()),
-            f"{entry.get('id')} canonical doc must live under agents/skills: {canonical_doc}",
+            f"{skill_id} canonical doc must live under agents/skills: {canonical_doc}",
         )
         catalog_docs.add(canonical_path.relative_to(root).as_posix())
     public_docs = {
@@ -1267,20 +1286,12 @@ def validate_public_skill_readme_single_source(root: Path) -> None:
 
 
 def validate_official_system_skill_delegation(
-    data: Mapping[str, object], root: Path | None = None
+    catalog_skill_ids: Collection[str], root: Path | None = None
 ) -> None:
     """Check that host-provided system skills stay in the delegation lane."""
     if root is None:
         root = ROOT
-    families = require_list(data.get("skill_families", []), "skill_families must be a list")
-    catalog_skill_ids: set[str] = set()
-    for entry in families:
-        if not isinstance(entry, dict):
-            continue
-        entry = require_mapping(cast(object, entry), "skill_families entries must be mappings")
-        catalog_skill_ids.add(
-            require_string(entry.get("id"), "skill_families id must be a string").strip()
-        )
+    catalog_skill_ids = set(catalog_skill_ids)
     catalog_official_skills = sorted(set(OFFICIAL_SYSTEM_SKILLS) & catalog_skill_ids)
     ensure(
         not catalog_official_skills,
@@ -1315,73 +1326,71 @@ def validate_official_system_skill_delegation(
             )
 
 
-def validate_skill_routing_entry(skill_id: str, routing: object) -> None:
-    """Check one optional catalog-backed prompt routing block."""
-    if routing is None:
-        return
-    routing = require_mapping(routing, f"{skill_id} routing must be a mapping")
-    stage_policy = routing.get("stage_policy", "deferred")
-    ensure(
-        isinstance(stage_policy, str) and stage_policy in SKILL_ROUTING_STAGE_POLICIES,
-        f"{skill_id} routing.stage_policy must be one of {sorted(SKILL_ROUTING_STAGE_POLICIES)}",
+_STALE_GENERATED_ROLE_AUTHORITY_PATTERNS = (
+    re.compile(
+        r"\.codex/agents/\*\.toml`?\s+is the source of truth for[^\n]*(?:model|reasoning)",
+        re.IGNORECASE,
+    ),
+    re.compile(r"Child model settings remain in role TOMLs", re.IGNORECASE),
+    re.compile(
+        r"(?:model|reasoning).{0,120}\.codex/agents/\*\.toml.{0,80}(?:正本|優先|更新(?:し|します|する))",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:edit|update).{0,80}(?:role TOMLs?|\.codex/agents/\*\.toml).{0,80}(?:model|reasoning)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:agent|role)\s+TOMLs?\s+are\s+authoritative\s+for\s+(?:model|reasoning)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:model|reasoning).{0,80}(?:各\s+)?agent TOML.{0,40}正本",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:edit|update)\b.{0,80}(?:generated\s+)?(?:agent|role)\s+TOMLs?.{0,40}\bmanually\b",
+        re.IGNORECASE,
+    ),
+)
+
+
+def generated_role_authority_contradictions(text: str) -> tuple[str, ...]:
+    """Return stale claims that promote generated role views to policy authority."""
+    normalized = " ".join(text.split())
+    return tuple(
+        pattern.pattern
+        for pattern in _STALE_GENERATED_ROLE_AUTHORITY_PATTERNS
+        if pattern.search(normalized)
     )
-    reason = routing.get("reason")
-    ensure(
-        isinstance(reason, str) and bool(reason.strip()),
-        f"{skill_id} routing.reason must be a non-empty string",
-    )
-    triggers = require_list(
-        routing.get("triggers", []), f"{skill_id} routing.triggers must be a list"
-    )
-    for group_index, group in enumerate(triggers):
-        group = require_string_list(
-            group,
-            f"{skill_id} routing.triggers[{group_index}] must be a non-empty list",
-        )
+
+
+def validate_registry_authority_docs() -> None:
+    """Require canonical registry authority and reject manual generated-view policy."""
+    for relative_path in (
+        ".codex/README.md",
+        "agents/canonical/CODEX_SUBAGENTS.md",
+    ):
+        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        contradictions = generated_role_authority_contradictions(text)
         ensure(
-            bool(group),
-            f"{skill_id} routing.triggers[{group_index}] must be a non-empty list",
+            not contradictions,
+            f"{relative_path} contains stale generated-role authority: "
+            + ", ".join(contradictions),
         )
-        for term_index, term in enumerate(group):
-            ensure(
-                bool(term.strip()),
-                f"{skill_id} routing.triggers[{group_index}][{term_index}] must be a non-empty string",
-            )
-
-
-def validate_skill_related_entries(families: object, observed_skill_ids: set[str]) -> None:
-    """Check related-skill metadata points to public catalog entries."""
-    families = require_list(families, "skill_families must be a list")
-    for entry in families:
-        entry = require_mapping(entry, "skill_families entries must be mappings")
-        skill_id = require_string(
-            entry.get("id"), "skill_families id must be a string"
-        ).strip()
-        related_skills = require_string_list(
-            entry.get("related_skills", []),
-            f"{skill_id} related_skills must be a list",
-        )
-        for related_index, related_skill in enumerate(related_skills):
-            ensure(
-                bool(related_skill.strip()),
-                f"{skill_id} related_skills[{related_index}] must be a non-empty string",
-            )
-            ensure(
-                related_skill != skill_id,
-                f"{skill_id} related_skills[{related_index}] must not self-reference",
-            )
-            ensure(
-                is_public_skill_id(related_skill),
-                f"{skill_id} related_skills[{related_index}] must be public: {related_skill}",
-            )
-            ensure(
-                related_skill in observed_skill_ids,
-                f"{skill_id} related_skills[{related_index}] unknown skill: {related_skill}",
-            )
+        for marker in (
+            "agents/model_profiles.toml",
+            "model_profile_registry.py",
+            "generated",
+            "readback",
+            "restart",
+        ):
+            ensure(marker in text, f"{relative_path} missing registry authority marker: {marker}")
 
 
 def validate_subagent_protocol_docs() -> None:
     """Check subagent routing docs keep machine-enforceable boundaries."""
+    validate_registry_authority_docs()
     for path in SUBAGENT_PROTOCOL_DOCS:
         text = path.read_text(encoding="utf-8")
         if path.name == "TASK_WORKFLOWS.md":
@@ -1394,9 +1403,7 @@ def validate_subagent_protocol_docs() -> None:
                 "bootstrap_agent_run.py",
                 "workflow_monitor.py",
                 "python3 tools/agent_tools/route.py --prompt",
-                "active design packet schema",
-                "Design Artifact Shape",
-                "four-entry active design packet",
+                "Implementation Flow Graph",
             ):
                 ensure(marker in text, f"{path} missing owner-map marker: {marker}")
         else:
@@ -1495,6 +1502,17 @@ def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
     (workspace.workspace_root / "python").mkdir()
     (workspace.workspace_root / "documents").mkdir()
     (workspace.workspace_root / "reports" / "runtime").mkdir(parents=True)
+    (workspace.workspace_root / ".codex").mkdir()
+    (workspace.workspace_root / "agents").mkdir()
+    for relative_path in (
+        ".codex/config.toml",
+        "agents/agents_config.json",
+        "agents/task_catalog.yaml",
+        "agents/model_profiles.toml",
+        "agents/capacity_policy.toml",
+    ):
+        destination = workspace.workspace_root / relative_path
+        shutil.copy2(ROOT / relative_path, destination)
     (workspace.workspace_root / "WORKTREE_SCOPE.md").write_text(
         "\n".join(
             [
@@ -1527,17 +1545,21 @@ def task_by_id(catalog: TaskCatalog, task_id: str) -> dict[str, object]:
 
 
 def roles_for_task(config: TeamConfig, catalog: TaskCatalog, task_id: str) -> tuple[Role, ...]:
-    """Return always-on plus default specialist roles for one task."""
-    enabled = default_specialists_for_task(
-        config=config,
-        catalog=catalog,
-        task_id=task_id,
-        include_default_review_packs=True,
-    )
+    """Return roles materialized by the normal route, not catalog candidates."""
     task = task_by_id(catalog, task_id)
+    enabled_specialists: list[str] = []
+    if str(task["family"]) == "skill_evaluation":
+        enabled_specialists = list(
+            default_specialists_for_task(
+                config=config,
+                catalog=catalog,
+                task_id=task_id,
+                include_default_review_packs=False,
+            )
+        )
     return select_roles(
         config=config,
-        enabled_specialists=list(enabled),
+        enabled_specialists=enabled_specialists,
         full_team=False,
         catalog=catalog,
         workflow_family_id=str(task["family"]),
@@ -1643,12 +1665,13 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         "child_role",
         "child_instance_id",
         "input_packet",
+        "replaceable_unit",
+        "implementation_mechanism",
         "allowed_paths",
         "do_not_read",
         "expected_output",
         "write_scope",
         "validation_route",
-        "review_gate",
         "remaining_spawn_budget",
     }
     ensure(
@@ -1801,9 +1824,27 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     )
     for route in routes:
         route = require_mapping(route, f"task {task_id} tool route must be a mapping")
+        tool_call_token = require_mapping(
+            route.get("tool_call_token"),
+            f"task {task_id} tool route missing tool_call_token",
+        )
+        for field in (
+            "schema",
+            "tool_id",
+            "argument_schema",
+            "arguments",
+            "intent",
+            "typed_failure_semantics",
+            "token_id",
+            "token_body_sha256",
+        ):
+            ensure(
+                field in tool_call_token,
+                f"task {task_id} tool_call_token missing {field}",
+            )
         ensure(
-            "packet_command" in route,
-            f"task {task_id} tool route missing packet_command",
+            "packet_command" not in route,
+            f"task {task_id} tool route must not embed packet_command prose",
         )
         ensure(
             "commands" not in route,
@@ -1818,17 +1859,18 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         f"task {task_id} manifest missing run.subagent_prompt_packet object",
     )
     ensure(
-        "tool_command_packet_command" in prompt_packet,
-        f"task {task_id} subagent_prompt_packet missing tool_command_packet_command",
+        "tool_call_tokens" in prompt_packet,
+        f"task {task_id} subagent_prompt_packet missing tool_call_tokens",
     )
     ensure(
-        "tool_commands" not in prompt_packet,
-        f"task {task_id} subagent_prompt_packet must not keep tool_commands alias",
+        "tool_command_packet_command" not in prompt_packet
+        and "tool_commands" not in prompt_packet,
+        f"task {task_id} subagent_prompt_packet must not keep prose command aliases",
     )
     ensure(
-        "fresh_subagents_required: true" in manifest_text
-        and "reuse_for_new_task: forbidden" in manifest_text,
-        f"task {task_id} manifest missing fresh subagent lifecycle policy",
+        "fresh_subagents_required: conditional" in manifest_text
+        and "reuse_for_new_task: allowed_when_owner_context_compatible" in manifest_text,
+        f"task {task_id} manifest missing conditional subagent lifecycle policy",
     )
     lifecycle_policy = require_mapping(
         run.get("subagent_lifecycle_policy"),
@@ -1836,16 +1878,18 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     )
     ensure(
         lifecycle_policy.get("mid_task_user_input_policy")
-        == "parent_checkpoint_then_route_delta",
-        f"task {task_id} manifest missing mid-task user input checkpoint policy",
+        == "classify_then_reuse_or_route_fresh",
+        f"task {task_id} manifest missing semantic mid-task input policy",
     )
     ensure(
-        lifecycle_policy.get("same_task_delta_reuse") == "allowed_with_updated_packet",
-        f"task {task_id} manifest missing same-task delta reuse policy",
+        lifecycle_policy.get("same_task_delta_reuse")
+        == "allowed_when_owner_context_compatible",
+        f"task {task_id} manifest missing compatible same-task reuse policy",
     )
     ensure(
-        lifecycle_policy.get("scope_change_reuse") == "forbidden_spawn_fresh_wave",
-        f"task {task_id} manifest missing scope-change fresh wave policy",
+        lifecycle_policy.get("scope_change_reuse")
+        == "evaluate_owner_context_compatibility",
+        f"task {task_id} manifest missing scope-change compatibility policy",
     )
     ensure(
         "prompt_contract:" in manifest_text,
@@ -1914,7 +1958,6 @@ def ensure_skill_evaluator_manifest_contract(
             "closeout_gate",
             "agent_evaluation",
             "workflow_monitoring",
-            "final_review",
         )
     }
     ensure(
@@ -2043,7 +2086,6 @@ def validate_task_bundle_output(
             "closeout_gate",
             "agent_evaluation",
             "workflow_monitoring",
-            "final_review",
         )
     }
     missing_closeout_artifacts = sorted(

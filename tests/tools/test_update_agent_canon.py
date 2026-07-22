@@ -9,8 +9,10 @@
 from __future__ import annotations
 
 import os
+import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -24,6 +26,11 @@ def resolve_repo_root() -> Path:
         if (candidate / ".git").exists():
             git_root = candidate
             if (candidate / "vendor" / "agent-canon").exists():
+                return candidate
+            if (
+                (candidate / "ROOT_AGENTS.md").is_file()
+                and (candidate / "tools" / "update_agent_canon.sh").is_file()
+            ):
                 return candidate
     if git_root is not None:
         raise unittest.SkipTest("derived-repo agent-canon wrapper tests require vendor/agent-canon")
@@ -47,13 +54,29 @@ AGENT_CANON_IS_SUBMODULE = bool(
         text=True,
     ).stdout.strip()
 )
+AGENT_CANON_IS_STANDALONE = not (REPO_ROOT / "vendor" / "agent-canon").exists()
+sys.path.insert(0, str(REPO_ROOT / "tools" / "agent_tools"))
+sys.path.insert(0, str(REPO_ROOT / "tools" / "ci"))
+
+from check_agent_canon_pr import (  # noqa: E402
+    GENERATED_COMPLETENESS_CHECK_IDS,
+    materialize_generated_completeness_receipt,
+)
+from github_publish import materialize_pr_identity_gate  # noqa: E402
+from update_lifecycle_contract import (  # noqa: E402
+    materialize_gate_verdict,
+    materialize_publication_readback_receipt,
+    materialize_source_main_rebind_receipt,
+    materialize_source_projection_packet,
+    pull_request_branch_table,
+)
 OVERLAY_EXCLUDED_NAMES = {".git", ".pytest_cache", ".ruff_cache", "reports"}
 SUBMODULE_GITFILE = Path("vendor") / "agent-canon" / ".git"
 
 
 @unittest.skipIf(
-    AGENT_CANON_IS_SUBMODULE,
-    "subtree snapshot wrapper tests do not apply when vendor/agent-canon is a submodule",
+    AGENT_CANON_IS_SUBMODULE or AGENT_CANON_IS_STANDALONE,
+    "subtree snapshot wrapper tests require a derived subtree checkout",
 )
 class UpdateAgentCanonTest(unittest.TestCase):
     """Exercise the wrapper through a cloned repository."""
@@ -2753,6 +2776,326 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(apply.returncode, 0, apply.stderr)
             self.assertIn("agent_canon_latest=updating_submodule", apply.stdout)
             self.assertEqual(pinned_sha, remote_sha)
+
+
+class StandaloneUpdateLifecycleTest(unittest.TestCase):
+    """Exercise the single standalone queue/frontier transaction entry."""
+
+    def make_source_repo(self, root: Path) -> tuple[Path, Path]:
+        """Create a local source clone and local main remote with lifecycle tools."""
+        source = root / "source"
+        remote = root / "origin.git"
+        source.mkdir()
+        subprocess.run(["git", "init", "-b", "main"], cwd=source, check=True)
+        subprocess.run(["git", "config", "user.name", "Lifecycle Test"], cwd=source, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "lifecycle@example.invalid"],
+            cwd=source,
+            check=True,
+        )
+        tool_dir = source / "tools" / "agent_tools"
+        tool_dir.mkdir(parents=True)
+        shutil.copy2(REPO_ROOT / "tools" / "update_agent_canon.sh", source / "tools")
+        for name in ("artifact_identity.py", "update_lifecycle_contract.py"):
+            shutil.copy2(REPO_ROOT / "tools" / "agent_tools" / name, tool_dir / name)
+        (source / "ROOT_AGENTS.md").write_text("# fixture\n", encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=source, check=True)
+        subprocess.run(["git", "commit", "-m", "fixture source"], cwd=source, check=True)
+        subprocess.run(["git", "init", "--bare", str(remote)], check=True)
+        subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=source, check=True)
+        subprocess.run(["git", "push", "-u", "origin", "main"], cwd=source, check=True)
+        subprocess.run(
+            ["git", "--git-dir", str(remote), "symbolic-ref", "HEAD", "refs/heads/main"],
+            check=True,
+        )
+        return source, remote
+
+    def binding_and_rebind(self, source: Path) -> tuple[dict[str, object], dict[str, object]]:
+        """Return one exact binding and immutable pre-freeze rebind receipt."""
+        candidate = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=source,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        tree = subprocess.run(
+            ["git", "rev-parse", "HEAD^{tree}"],
+            cwd=source,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        binding: dict[str, object] = {
+            "transaction_id": "tx:" + "1" * 64,
+            "snapshot_id": "snapshot:" + "2" * 64,
+            "candidate_sha": candidate,
+            "tree_sha": tree,
+            "input_digest": "sha256:" + "3" * 64,
+            "tool_id": "update-agent-canon",
+            "tool_version": "test.v1",
+            "evidence_ref": "evidence:" + "4" * 64,
+            "evidence_digest": "sha256:" + "5" * 64,
+            "timing": {
+                "started_at": "2026-07-18T00:00:00Z",
+                "finished_at": "2026-07-18T00:00:00Z",
+                "last_attempt_at": "2026-07-18T00:00:00Z",
+                "duration_ms": 0,
+                "attempt": 1,
+                "replayed": False,
+            },
+        }
+        base = {
+            "remote": "origin",
+            "ref": "refs/heads/main",
+            "commit_sha": candidate,
+            "tree_sha": tree,
+        }
+        rebind = materialize_source_main_rebind_receipt(
+            binding=binding,
+            old_base_identity=base,
+            new_base_identity=base,
+            origin_main_readback_evidence_ref="evidence:" + "6" * 64,
+        )
+        return binding, rebind
+
+    def source_projection_packet(
+        self,
+        binding: dict[str, object],
+        rebind: dict[str, object],
+        *,
+        publication_sha: str | None = None,
+        publication_tree: str | None = None,
+    ) -> dict[str, object]:
+        """Materialize one exact merged-source packet for the sole `latest` entry."""
+        candidate = str(binding["candidate_sha"])
+        tree = str(binding["tree_sha"])
+        merge_sha = publication_sha or candidate
+        merge_tree = publication_tree or tree
+        rebind_id = str(rebind["rebind_receipt_id"])
+        cas_evidence_ref = "evidence:" + "a" * 64
+        cas_binding = dict(binding)
+        cas_binding["evidence_ref"] = cas_evidence_ref
+        cas_binding["evidence_digest"] = "sha256:" + "a" * 64
+        cas = {
+            "schema": "agent-canon.candidate-cas-receipt.v1",
+            "cas_receipt_id": "cas:" + "b" * 64,
+            "binding": cas_binding,
+            "predecessor_evidence_id": binding["evidence_ref"],
+            "rebind_receipt_evidence_id": rebind_id,
+            "candidate_identity": {
+                "candidate_sha": candidate,
+                "tree_sha": tree,
+            },
+            "cas_base_identity": {"commit_sha": candidate, "tree_sha": tree},
+            "cas_evidence_ref": cas_evidence_ref,
+            "cas_stage": "cas",
+        }
+        lifecycle_binding = dict(binding)
+        lifecycle_binding["evidence_ref"] = "evidence:" + "c" * 64
+        lifecycle_binding["evidence_digest"] = "sha256:" + "c" * 64
+        lifecycle = {
+            "schema": "agent-canon.pull-request-lifecycle.v1",
+            "kind": "user",
+            "binding": lifecycle_binding,
+            "state": "merged",
+            "remote_identity": {
+                "repo_owner": "owner",
+                "repo_name": "agent-canon",
+                "remote_name": "origin",
+                "url_digest": "sha256:" + "d" * 64,
+                "ref": "refs/heads/canon/update-lifecycle",
+                "commit_sha": candidate,
+                "tree_sha": tree,
+            },
+            "base_identity": {
+                "repo_owner": "owner",
+                "repo_name": "agent-canon",
+                "ref": "refs/heads/main",
+                "commit_sha": candidate,
+                "tree_sha": tree,
+            },
+            "head_identity": {
+                "repo_owner": "owner",
+                "repo_name": "agent-canon",
+                "ref": "refs/heads/canon/update-lifecycle",
+                "commit_sha": candidate,
+                "tree_sha": tree,
+            },
+            "branch": pull_request_branch_table(),
+            "permission_identity": {
+                "actor_id": "github-user:7",
+                "permission_state": "verified_true",
+                "permission_evidence_id": "evidence:" + "e" * 64,
+                "authority_source": "fixture GitHub readback",
+                "assumption_forbidden": True,
+            },
+            "pr_essence": {
+                "problem": "project merged source transaction",
+                "intent": "queue exact source publication",
+                "canonical_owner": "tools/update_agent_canon.sh",
+                "contract_delta": "single-entry source projection",
+                "evidence_refs": ["evidence:" + "f" * 64],
+            },
+            "reviews": [],
+            "user_identity": {
+                "actor_id": "github-user:7",
+                "display_name": "Lifecycle Test",
+            },
+        }
+        readback = materialize_publication_readback_receipt(
+            candidate_cas_receipt=cas,
+            pull_request_lifecycle=lifecycle,
+            authoritative_pr_readback={
+                "number": 390,
+                "state": "MERGED",
+                "baseRefName": "main",
+                "baseRefOid": merge_sha,
+                "mergeCasBaseOid": candidate,
+                "mergeCasBaseTreeOid": tree,
+                "headRefName": "canon/update-lifecycle",
+                "headRefOid": candidate,
+                "headRepository": {"nameWithOwner": "owner/agent-canon"},
+                "mergeCommit": {"oid": merge_sha},
+                "mergeTreeOid": merge_tree,
+            },
+        )
+        g1 = materialize_gate_verdict(
+            binding=binding,
+            gate_id="G1",
+            ordered_input_evidence_refs=[str(binding["evidence_ref"])],
+            invariant="source_correctness",
+            output_digest="sha256:" + "2" * 64,
+            owner=str(REPO_ROOT / "tools" / "agent_tools" / "publication_integrator.py")
+            + "#resolve_publication_eligibility",
+            verdict="pass",
+        )
+        g2 = materialize_generated_completeness_receipt(
+            g1_gate=g1,
+            candidate_sha=candidate,
+            tree_sha=tree,
+            check_results=[
+                {"check_id": check_id, "status": "pass"}
+                for check_id in GENERATED_COMPLETENESS_CHECK_IDS
+            ],
+        )
+        g3 = materialize_pr_identity_gate(
+            lifecycle,
+            cas,
+            rebind,
+            [g1, g2],
+        )
+        return materialize_source_projection_packet(
+            binding=binding,
+            source_main_rebind_receipt=rebind,
+            candidate_cas_receipt=cas,
+            pull_request_lifecycle=lifecycle,
+            publication_readback_receipt=readback,
+            source_gate_verdicts=[g1, g2, g3],
+            ordered_predecessor_evidence=[
+                {
+                    "queue_number": 388,
+                    "source_pr": "#388",
+                    "publication_evidence_id": "evidence:" + "5" * 64,
+                },
+                {
+                    "queue_number": 389,
+                    "source_pr": "#389",
+                    "source_pr_sha": "6" * 40,
+                    "publication_evidence_id": "evidence:" + "7" * 64,
+                },
+            ],
+            acceptance_evidence_ref="evidence:" + "8" * 64,
+        )
+
+    def test_latest_materializes_queue_and_frontier_once_from_source_packet(self) -> None:
+        """The sole source entry queues and accepts one exact publication packet."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source, remote = self.make_source_repo(root)
+            binding, rebind = self.binding_and_rebind(source)
+            (source / "publication-marker.txt").write_text(
+                "authoritative merge result\n", encoding="utf-8"
+            )
+            subprocess.run(
+                ["git", "add", "publication-marker.txt"], cwd=source, check=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "authoritative publication merge"],
+                cwd=source,
+                check=True,
+            )
+            subprocess.run(["git", "push", "origin", "main"], cwd=source, check=True)
+            publication_sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=source,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            publication_tree = subprocess.run(
+                ["git", "rev-parse", "HEAD^{tree}"],
+                cwd=source,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            owner_namespace = source / ".agent-canon" / "update-lifecycle"
+            packet_path = owner_namespace / "state" / "source-publication-ready.json"
+            packet_path.parent.mkdir(parents=True)
+            packet_path.write_text(
+                json.dumps(
+                    self.source_projection_packet(
+                        binding,
+                        rebind,
+                        publication_sha=publication_sha,
+                        publication_tree=publication_tree,
+                    )
+                ),
+                encoding="utf-8",
+            )
+            unknown_sibling = source / ".agent-canon" / "shared" / "sentinel"
+            unknown_sibling.parent.mkdir(parents=True)
+            unknown_sibling.write_text("preserve\n", encoding="utf-8")
+            env = {
+                **os.environ,
+                "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "agent_canon_workflow",
+                "AGENT_CANON_BRANCH_WORKTREE_REASON": "frontier test",
+                "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
+                "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "frontier test",
+            }
+            command = ["bash", "tools/update_agent_canon.sh", "latest"]
+            first = subprocess.run(
+                command,
+                cwd=source,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            replay = subprocess.run(
+                command,
+                cwd=source,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr)
+            self.assertIn("AGENT_CANON_QUEUE_REPLAYED=true", replay.stdout)
+            frontier = json.loads(
+                (owner_namespace / "projection-queue" / "frontier.accepted.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(frontier["frontier_state"], "accepted")
+            self.assertEqual(
+                [item["source_pr"] for item in frontier["ordered_predecessor_evidence"]],
+                ["#388", "#389"],
+            )
+            self.assertIn("AGENT_CANON_FRONTIER_REPLAYED=true", replay.stdout)
+            self.assertEqual(unknown_sibling.read_text(encoding="utf-8"), "preserve\n")
 
 
 if __name__ == "__main__":

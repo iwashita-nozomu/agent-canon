@@ -56,12 +56,12 @@ merge, both predecessor record files remain absent.
 1. If AgentCanon source PRs or parent pin PRs are involved, also read
    `agents/workflows/pr-queue-cleanup-workflow.md` and
    `agents/workflows/agent-canon-pr-workflow.md`.
-1. Before creating or updating a PR, identify the active run bundle. If none
-   exists, run `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>"
-   --owner codex --workspace-root "$PWD"` and record `RUN_ID`, `REPORT_DIR`,
-   and `AGENT_CANON_PREFLIGHT_*` lines in `work_log.md` or
-   `workflow_monitoring.md`.
-1. Keep PR publication artifacts inside the run bundle:
+1. Before creating or updating a PR, record source `origin/main`, parent
+   `origin/main` gitlink, target tree, selected merge strategy, and selected
+   remote. Use a run bundle only when coordination, resumption, or the selected
+   PR workflow needs durable evidence; otherwise a structured handoff/tool result
+   is sufficient.
+1. Keep PR publication artifacts inside the run bundle when one is selected:
    - write the reviewed PR body to `reports/agents/<run-id>/pr_body.md`;
    - include a `PR Essence` section in `pr_body.md` with problem / user
      request, design intent, canonical owner, behavior or contract delta, and
@@ -103,7 +103,8 @@ merge, both predecessor record files remain absent.
    missing, stale, unintended, or over-broad diff entries on the PR head branch
    before the merge gate. Record the diff intake decision and repaired paths in
    the PR log or run bundle.
-1. Plan merge order from dependency and conflict evidence:
+1. Plan merge order from dependency and conflict evidence, without rebase or
+   unrelated-history changes:
    - source / library / AgentCanon PRs before parent pin or template PRs;
    - PRs touching shared root/runtime surfaces before dependent docs-only PRs;
    - conflicting PRs after the branch they conflict with has landed, unless the
@@ -129,12 +130,17 @@ merge, both predecessor record files remain absent.
      every slice.
 1. For AgentCanon source PRs, merge source first, then update parent repos with
    `make agent-canon-ensure-latest`, `bash tools/sync_agent_canon.sh link-root`,
-   diff intake / repair, and the parent PR gate.
+   diff intake / repair, and the parent PR gate. Parent projection occurs once
+   after source publication readback; do not rerun source correctness or engineer
+   ancestry to retain internal commit ids.
 1. Process issues with the same evidence rule:
    - close only resolved, duplicate, obsolete, or intentionally not-planned
      issues with a concrete PR, commit, or policy reference;
    - update active issues with residual work and owner;
    - keep stale issues open when evidence is insufficient.
+   - deletion or retirement validates the dependency closure and active
+     references first; it does not invent replacements or import unrelated
+     latest-main changes.
 1. Close out with a table of PR actions, issue actions, merge SHAs, remaining
    blockers, validation commands, final open PR / Issue counts, and the run
    bundle paths that contain the bootstrap log, PR body, publish summary, and

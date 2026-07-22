@@ -4,9 +4,9 @@
 # contract test
 # responsibility Tests structured AgentCanon tool catalog validation.
 # upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog
+# upstream implementation ../../tools/agent_tools/visualization_contract.py owns the canonical visualization contract tool.
 # upstream design ../../tools/catalog.yaml structured tool catalog fixture
-# upstream implementation ../fixtures/tool_catalog/main_manual_dispatch.rs manual main dispatch fixture
-# upstream implementation ../fixtures/tool_catalog/graph_manual_dispatch.rs manual graph dispatch fixture
+# upstream design ../../documents/gpu-admission-r5-source-packet.md canonical managed GPU admission route
 # @dependency-end
 
 from __future__ import annotations
@@ -21,16 +21,6 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "tool_catalog.py"
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-
-import tool_catalog as catalog_tool  # noqa: E402
-
-MAIN_DISPATCH_FIXTURE = (
-    PROJECT_ROOT / "tests/fixtures/tool_catalog/main_manual_dispatch.rs"
-)
-GRAPH_DISPATCH_FIXTURE = (
-    PROJECT_ROOT / "tests/fixtures/tool_catalog/graph_manual_dispatch.rs"
-)
 
 
 class CheckToolCatalogTest(unittest.TestCase):
@@ -45,139 +35,6 @@ class CheckToolCatalogTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-
-    def write_public_surface_fixture(self, root: Path) -> None:
-        """Write only the canonical inputs used by the public-surface extractor."""
-        self.write_file(
-            root,
-            "rust/agent-canon/src/main.rs",
-            MAIN_DISPATCH_FIXTURE.read_text(encoding="utf-8"),
-        )
-        self.write_file(
-            root,
-            "rust/agent-canon/src/graph.rs",
-            GRAPH_DISPATCH_FIXTURE.read_text(encoding="utf-8"),
-        )
-        self.write_file(
-            root,
-            "agents/canonical/CLI_ENTRYPOINTS.md",
-            "\n".join(
-                [
-                    "# CLI",
-                    "",
-                    "graph build",
-                    "graph status",
-                    "graph query",
-                    "graph context",
-                    "",
-                ]
-            ),
-        )
-        self.write_file(root, "tools/catalog.yaml", "version: 1\nentries: []\n")
-        self.write_file(
-            root,
-            "agents/skills/catalog.yaml",
-            "version: 1\nskill_families: []\n",
-        )
-
-    def test_manual_dispatch_fixture_emits_four_sorted_public_rows(self) -> None:
-        """Primary operation spans stay in graph.rs with main/doc secondary spans."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_public_surface_fixture(root)
-
-            report = catalog_tool.extract_public_surface(root)
-
-        self.assertEqual(report.findings, ())
-        self.assertEqual(
-            [row.surface_id for row in report.rows],
-            [
-                "cli:graph build",
-                "cli:graph context",
-                "cli:graph query",
-                "cli:graph status",
-            ],
-        )
-        self.assertTrue(
-            all(row.source_span.path == "rust/agent-canon/src/graph.rs" for row in report.rows)
-        )
-        for row in report.rows:
-            self.assertEqual(
-                {span.path for span in row.secondary_spans},
-                {
-                    "agents/canonical/CLI_ENTRYPOINTS.md",
-                    "rust/agent-canon/src/main.rs",
-                },
-            )
-
-    def test_manual_dispatch_negative_mutations_emit_no_partial_rows(self) -> None:
-        """Invalid or ambiguous dispatch grammar suppresses every public row."""
-        main_source = MAIN_DISPATCH_FIXTURE.read_text(encoding="utf-8")
-        graph_source = GRAPH_DISPATCH_FIXTURE.read_text(encoding="utf-8")
-        cases = {
-            "comment-only": (
-                "// mod graph;\n// args[1] == \"graph\"\nfn main() {}\n",
-                graph_source,
-                "rust_dispatch_invalid",
-            ),
-            "enum-derived": (
-                main_source,
-                "enum Operation { Build, Status, Query, Context }\nfn run(_: &[String]) -> i32 { 2 }\n",
-                "rust_dispatch_invalid",
-            ),
-            "duplicate-main": (
-                main_source + main_source,
-                graph_source,
-                "rust_dispatch_ambiguous",
-            ),
-            "duplicate-operation": (
-                main_source,
-                graph_source.replace(
-                    '"build" => run_build(&args[1..]),',
-                    '"build" => run_build(&args[1..]),\n'
-                    '        "build" => run_build(&args[1..]),',
-                ),
-                "rust_dispatch_ambiguous",
-            ),
-            "missing-module": (
-                main_source.replace("mod graph;\n", ""),
-                graph_source,
-                "rust_dispatch_invalid",
-            ),
-            "wrong-main-index": (
-                main_source.replace("args[1]", "args[0]"),
-                graph_source,
-                "rust_dispatch_invalid",
-            ),
-            "wrong-main-slice": (
-                main_source.replace("&args[2..]", "&args[1..]"),
-                graph_source,
-                "rust_dispatch_invalid",
-            ),
-            "wrong-operation-slice": (
-                main_source,
-                graph_source.replace("&args[1..]", "&args[2..]", 1),
-                "rust_dispatch_invalid",
-            ),
-        }
-        for name, (mutated_main, mutated_graph, expected) in cases.items():
-            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp_dir:
-                root = Path(tmp_dir)
-                self.write_public_surface_fixture(root)
-                (root / "rust/agent-canon/src/main.rs").write_text(
-                    mutated_main, encoding="utf-8"
-                )
-                (root / "rust/agent-canon/src/graph.rs").write_text(
-                    mutated_graph, encoding="utf-8"
-                )
-
-                report = catalog_tool.extract_public_surface(root)
-
-                self.assertEqual(report.rows, ())
-                self.assertTrue(
-                    any(expected in finding.detail for finding in report.findings),
-                    report.findings,
-                )
 
     def test_current_repository_passes(self) -> None:
         """The canonical repository has a valid tool catalog."""
@@ -198,6 +55,69 @@ class CheckToolCatalogTest(unittest.TestCase):
             renderer["command"],
             "python3 tools/agent_tools/render_dependency_manifest_graph.py "
             "--root . --scope full --bundle-dir reports/dependency-graph --format json",
+        )
+        visualization_entries = [
+            entry
+            for entry in catalog["entries"]
+            if entry["id"] == "visualization-contract"
+            or entry["path"] == "tools/agent_tools/visualization_contract.py"
+        ]
+        self.assertEqual(len(visualization_entries), 1)
+        visualization = visualization_entries[0]
+        self.assertEqual(visualization["status"], "canonical")
+        self.assertEqual(visualization["audience"], "skill")
+        self.assertIn(
+            visualization["placement"],
+            {"support_library", "validation_checker"},
+        )
+        self.assertEqual(
+            visualization["docs"],
+            [
+                "tools/README.md",
+                "documents/tools/README.md",
+                "documents/tools/visualization_contract.md",
+            ],
+        )
+        tool_docs = (
+            PROJECT_ROOT / "documents" / "tools" / "tool-docs.toml"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(
+            tool_docs.count('tool = "tools/agent_tools/visualization_contract.py"'),
+            1,
+        )
+        self.assertEqual(
+            tool_docs.count('doc = "documents/tools/visualization_contract.md"'),
+            1,
+        )
+
+    def test_gpu_admission_route(self) -> None:
+        """The catalog exposes only the canonical managed GPU admission entrypoint."""
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
+        )
+        managed = next(
+            entry
+            for entry in catalog["entries"]
+            if entry["id"] == "run-managed-experiment"
+        )
+
+        self.assertEqual(
+            managed["path"],
+            "tools/experiments/run_managed_experiment.py",
+        )
+        self.assertEqual(
+            managed["command"],
+            "python3 tools/experiments/run_managed_experiment.py",
+        )
+        self.assertIn(
+            "tests/tools/test_run_managed_experiment.py",
+            managed["tests"],
+        )
+        self.assertFalse(
+            any(
+                entry["path"] == "tools/experiments/execution_resource_plan.py"
+                for entry in catalog["entries"]
+            )
         )
 
     def test_stale_catalog_entry_fails(self) -> None:
@@ -628,7 +548,6 @@ class CheckToolCatalogTest(unittest.TestCase):
 
     def write_minimal_repo(self, root: Path) -> None:
         """Create a minimal catalog fixture repository."""
-        self.write_public_surface_fixture(root)
         self.write_file(root, "README.md", self.manifest("Fixture root."))
         self.write_file(
             root,

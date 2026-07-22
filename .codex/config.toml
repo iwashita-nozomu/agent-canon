@@ -1,7 +1,8 @@
 # Project-scoped Codex settings.
 # Keep review fan-out explicit, keep project subagent registration centralized here,
 # and use spawned agents in bounded waves instead of starting every available role at once.
-# Role-specific behavior lives in .codex/agents/*.toml; this file owns the registry.
+# This file owns role registration. agents/model_profiles.toml owns child profile authority,
+# and the canonical materializer generates .codex/agents/*.toml plus agents_config projections.
 # @dependency-start
 # contract configuration
 # responsibility Documents Project-scoped Codex settings. for this repository.
@@ -163,6 +164,10 @@ path = "../.agents/skills/oop-readability-check/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/oop-type-design/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/paper-writing/SKILL.md"
 enabled = true
 
@@ -247,7 +252,7 @@ path = "../.agents/skills/worktree-start/SKILL.md"
 enabled = true
 
 [agents]
-max_threads = 24
+max_threads = 26
 max_depth = 2
 job_max_runtime_seconds = 3600
 

@@ -56,6 +56,49 @@ shape, ownership, and traceability, not token minimization.
 | `local_tool_context` | Files, dashboards, raw tool output, generated packets, logs, and search results available by path or tool call. | Keep raw artifacts here unless a packet promotes a selected excerpt or structured summary. |
 | `durable_memory` | Stable repo policy, source packets, issues, reports, and learned feedback stored in owner surfaces. | Do not rely on chat memory or compaction as the only record. |
 
+### Source-Bound Runtime Evidence Certificate
+
+When a run result needs durable runtime provenance, the materializer-owned
+artifact-plus-receipt certificate is the visibility boundary. Consumers may
+use the canonical `agent_canon.runtime_event.v1` prepared artifact for source
+event identity, result-family authority, gate result, and target/base
+identities only together with the latest validated
+`agent_canon.runtime_event.publication_outcome_receipt.v1`. They must not
+reconstruct those guarantees from hook summaries, copied chat text, or another
+producer.
+
+The prepared artifact joins one rollout record to one fixed result artifact and
+one source snapshot. Its `publication_intent` states only
+`prepared_state=prepared`. Post-target evidence is retained in an append-only
+observation and then a distinct immutable receipt; `uncertain` blocks
+consumers, and recovery may advance only by appending a linked `committed`
+receipt. The graph owner persists the exact artifact and latest committed
+receipt bytes in its single `BuildMaterial` transaction. Graph status, query,
+context, and dependency-review consumers reuse that snapshot, perform one
+bounded freshness probe per command, and report stale or unavailable state
+rather than invoking the materializer again.
+
+This certificate contract covers the generic materializer. Hook transport has
+a separate approved boundary: PostToolUse publishes canonical per-event files
+to the repository-owned spool, and an explicit archive checkpoint validates,
+deduplicates, publishes, reads back, and only then finalizes them. Consumers do
+not infer generic certificate guarantees from that hook projection. Skill,
+subagent, task, eval, experiment, and PR-publication adapters remain with their
+existing owners; this boundary does not add adapter-specific regeneration.
+
+Before the generic runtime-event artifact exists, the sole context handoff is
+the immutable `agent_canon.context_discovery_certificate.v1` produced by
+`runtime_log_archive_git.py append-context-discovery`. The producer reads the
+native `session_meta` and selected `event_msg` / `task_complete` records from
+the finite Codex rollout source, binds repository and byte-range identities,
+and publishes one no-replace certificate at
+`reports/agents/<run-id>/context_discovery.<certificate-id>.json`.
+`materialize-runtime-event` enumerates exactly one such certificate, validates
+its repository, rollout, native-record, and hash joins, and uses the certified
+task-completion bytes as its source event. It must not scan for an injected
+`codex.context_discovery.v1` row, use a legacy top-level `task_complete`, or
+re-derive context fields from another source.
+
 ## Post-Compaction Objective Re-Declaration Contract
 
 After context compaction is detected, the first user-facing update from the parent agent before continuing must:
@@ -107,6 +150,23 @@ the structure contract is not a root view, pass
 
 ## Handoff Packet
 
+Implementation handoffs project the canonical TargetStateContract and
+ImplementationExecutionContract: complete owner/type/API/config/schema/path/
+dependency/transition/deletion/validation structure, immutable packet identity,
+Decision Sufficiency record, and empty unresolved decisions. An identical
+owner/edit/validation action transitions directly to one complete materializer
+pass and one post-completion owning gate. `ImplementationFeedback` covers
+compile/static/deterministic failures; only an exact `StructuralDesignGap` is
+repaired once and resumed by the same Spark. Tool calls are registry-issued
+machine-readable `ToolCallToken` values.
+
+Capacity and lifecycle fields use the canonical requested/configured/
+platform-effective/workflow-demand/write-cap/nested-reserved/available terms;
+effective is the minimum of available constraints after reservations. Closeout
+must carry full descendant topology, durable handback, closure verification,
+reservation release, and the canonical `close_agent` ToolCall. Open terminal
+descendants, unknown descendants, missing handback, and reservation leaks fail.
+
 - `from`
 - `to`
 - `stage`
@@ -128,12 +188,13 @@ the structure contract is not a root view, pass
 
 `pre_handoff_gate_status` records gate evidence before a write-capable
 implementation handoff. Design-backed implementation handoffs require the
-current `design_brief.md` path or revision, matching `design_review.md`
-`Design Artifact Under Review`, `design_review.md decision=approve`,
-`waterfall-gate-check --gate design` pass evidence, and selected
-`document_flow_review.md` status when that workflow gate is active. Missing,
-stale, or non-approve design review status returns the task to Gate 5-6 before
-handoff.
+current `design_brief.md` path or revision and the selected owner/design gate.
+`design_review.md` `Design Artifact Under Review`, approve evidence,
+`waterfall-gate-check --gate design` evidence, and selected
+`document_flow_review.md` status are required only when those gates are active.
+Missing candidate review artifacts do not block an otherwise semantically
+sufficient handoff; an active gate with missing, stale, or non-approve evidence
+returns the task to its owning route.
 
 ## Pre-Edit Repository Investigation Packet
 
@@ -150,7 +211,7 @@ before implementation.
 - `implementation_surface_route`: `PRIMARY_SURFACE`, `PRIMARY_PATHS`,
   `FORBIDDEN_PATHS`, `REQUIRED_PRE_EDIT_CHECKS`, or a router-unavailable
   blocker
-- `responsibility_search`: structured semantic-index / local-LLM / tool-catalog
+- `responsibility_search`: structured semantic-index / deterministic search / tool-catalog
   result paths, not broad raw text-search dumps
 - `reuse_survey`: existing tools, skills, workflows, helpers, libraries, and
   why reuse / extension / deletion / new implementation was selected
@@ -281,6 +342,51 @@ before editing. The `responsibility_scope` gate records the owning
 `responsibility-scope.toml` scope, owner, class, and protecting tools for each
 planned path, so the implementation surface stays inside the declared owner
 contract.
+
+## CompletionCoverage v1 Schema Contract
+
+`COMMUNICATION_PROTOCOL.md` owns the human-readable schema and evidence
+semantics for the deterministic completion read model. The canonical chain is
+the existing append-only logical run ledger, the generated
+`agent-canon.completion-coverage.v1` artifact, and its deterministic reader.
+No database, persistence service, second ledger, or closeout aggregation is
+introduced.
+
+The ledger accepts exactly these semantic kinds:
+`request_clause`, `responsibility_unit`, `decision`, `change`,
+`review_finding`, `validation`, `failure`, `publication_state`, and `deferral`.
+Every event is bound to `run_id`, `context_id`, an event identity or sequence,
+an `intent_id`, an owner, `state_owner`, `api_owner`, `dependency_owner`, an
+outcome, and source/artifact evidence references. Responsibility boundaries,
+decisions, failures, deferrals, and publication transitions cannot be grouped.
+
+The generated v1 artifact carries `source_binding`, deterministic projection
+metadata, semantic events, `coverage_map`, typed owner-boundary evidence, gate
+evidence, failure responses, and applicable W1 resource certificates. A
+coverage map has one direct or mechanically valid group mapping per active
+clause. Success requires `uncovered`, `multiply_mapped`, `orphan`, `redundant`,
+and `empty` to all be empty. Group mappings retain explicit member IDs and are
+allowed only for mechanically identical owner/unit/outcome facts.
+
+Typed OOP evidence consists only of owner overlap, state ownership, API
+boundary, and dependency-boundary facts. Line count, length, scalar score,
+`min_score`, and `final_score` are not schema fields or completion gates.
+Test-first, test-count/coverage, mutation, private-helper, and checker-retest
+rules are not evidence gates; each residual trust boundary has one canonical
+evidence owner.
+
+The single Markdown/math/Mermaid format/check route is
+`tools/bin/agent-canon docs check <changed-markdown-paths>`. The single
+PostToolUse/Stop hook contract is the existing dispatcher, with schema
+`agent-canon.posttooluse-stop.v1`; readers consume its evidence and do not add
+a second dispatcher or child-check path.
+
+Validation failures record `failing_contract`, `observation_level`,
+`cause_classification`, `intent_preservation`, `evidence`, the two taxonomy
+references (`documents/runtime-profiles-and-check-matrix.json` and its
+generated Markdown reader), same-intent repair or escalation, its owner and
+result, and result artifact references. The taxonomy text is not copied into
+this schema.
 
 ## Review Packet
 

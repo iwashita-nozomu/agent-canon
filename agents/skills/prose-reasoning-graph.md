@@ -23,7 +23,10 @@ downstream design ../../documents/tools/prose_reasoning_graph.md documents CLI u
 - Use when: section order, reader path, claim support, split/merge/bridge
   decisions, logic holes, or graph-backed rewrite packets need evidence.
 - Boundary: graph artifacts preserve source truth and prepare handoff; they do
-  not replace the receiving writing, research, proof, or review skill.
+  not replace the receiving writing, research, proof, or review skill. Renderer
+  and large-graph projection output remains a view surface only, and
+  code-visualization routes own repository graph rendering through typed tool
+  arguments and coverage checks.
 
 ## Purpose
 
@@ -39,7 +42,7 @@ packets for existing writing, research, review, experiment, and artifact skills.
 | Graph contract | Sentence or EDU anchors and their typed relations are canonical for prose content. Macro-claims, rhetorical moves, reader-state transitions, sections, and paragraphs are projection or form views, not replacement source truth. |
 | Handoff vocabulary | Handoff packets preserve source truth, lower graph, typed relation, projection view, node record, edge record, and `payload_json`. |
 | Presentation candidates | Projection views may recommend prose, lists, tables, figures, or equations. Non-prose forms remain verified `presentation_format_candidate` decisions over source anchors, not provenance-dropping rewrites. |
-| LocalLLM boundary | `ingest` / `ingest-set` call `agent-canon local-llm extract-prose-ir` to split documents and terms, extract `local_llm_prose_ir`, and merge `corpus_hints`, `term_contexts`, and `dsl_seed` into graph metadata. Fixed keyword dictionaries are not the corpus source. |
+| Semantic-prose boundary | `ingest` / `ingest-set` derive `semantic_prose_ir` deterministically from source anchors and prompt context, then merge `corpus_hints` into graph metadata. No model-backed compatibility route is part of this owner. |
 | Receiving skill boundary | Graph artifacts prepare handoff to `$long-form-writing`, `$report-writing`, `$academic-writing`, `$paper-writing`, `$literature-survey`, `$structure-planning`, `$formal-proof-workflow`, `logic-gap-review`, `citation-evidence-review`, `$experiment-lifecycle`, and `$result-artifact-writeout`; they do not replace those skills' authority. |
 | Document responsibility adapter | Rust `structured-analysis` emits `document-canon` diagnostics such as `document_responsibility_gap`; prose graph commands import them into the same diagnostic, integration, verification, and rewrite loop. Diagnostics-only DBs still use `project`, `lint`, `explain`, and `integrate`, while `rewrite-packet` requires a concrete operation id. |
 
@@ -84,9 +87,9 @@ reader path, source map, or canonical route.
    `--prompt-file` when user request context can identify the intended corpus.
    Always use `--stats-out`, then pass the emitted
    `PROSE_REASONING_GRAPH_DB` path to later graph commands. The same stats
-   artifact also carries `PROSE_REASONING_GRAPH_LOCAL_LLM_IR`; keep that JSON
-   as the structure/corpus extraction artifact instead of asking the LLM to
-   return raw word lists in chat.
+   artifact also carries `PROSE_REASONING_GRAPH_SEMANTIC_IR`; keep that JSON
+   as the structure/corpus extraction artifact instead of recomputing corpus
+   terms in chat.
 1. Run `analyze --profile <writing|logic|experiment|report|academic|paper|all>`
    with `--stats-out`. This derives prose, logic, evidence, experiment, and
    presentation layers.
@@ -161,7 +164,7 @@ The skill contract is:
 | Command | Runtime result | How the skill consumes it |
 | ------- | -------------- | ------------------------- |
 | `ingest` / `ingest-set` | Pass marker plus stats JSON containing `PROSE_REASONING_GRAPH_DB`; DB stored under the default cache unless `--db` is explicit. | Save the DB path and pass it to later commands. Do not read raw SQLite tables. |
-| `agent-canon local-llm extract-prose-ir` | LocalLLM prose IR JSON with `parts[]`, `documents[]`, `terms[]`, `corpus_hints`, and `dsl_seed`. | Treat as the corpus-management and existing-document-structure extraction artifact. Read it through graph metadata or stats path, not chat stdout. |
+| `ingest` / `ingest-set` semantic-prose extraction | Deterministic `semantic_prose_ir` with source documents, terms, `analysis_intents`, and `corpus_hints`. | Treat graph metadata as the corpus-management and existing-document-structure evidence. Read it through the stats or projection path, not chat stdout. |
 | `analyze` | Pass marker plus stats JSON; graph layers are added or refreshed inside the DB. | Treat the DB as updated intermediate state. Do not stream graph contents to chat. |
 | `lint --out` | Diagnostics Markdown plus stats JSON. | Read severity, rule, target, message, and `verification_route` summaries; classify active findings before rewrite. |
 | `integrate --out` | Integration Markdown with operation count and verification routes. | Follow recursive verification routes first. Operations count `0` is valid for structured-analysis DBs that contain diagnostics without rewrite operations. |

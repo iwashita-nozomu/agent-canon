@@ -1,0 +1,170 @@
+{
+  "schema": "agent-canon.ordered-integration-interface.v1",
+  "run_id": "convergence-w2-gates-completion-20260716",
+  "design_ref": "user_request_contract:W2-recovery-nine-findings",
+  "source_packet_ref": "preserved_input_diff:sha256:0931a443f817d160f2656372efac7f17c15096eab5bc388e9490c0558a16d162",
+  "base_commit": "87782189882b8d7bad7da85b454f3327206f9e3a",
+  "base_tree": "36637d55b9a41493ce1b96f2bdadf62efbc1bac4",
+  "branch": "codex/convergence-w2-gates-completion-writer-owned",
+  "branch_creation_reason": "convergence_w2_writer_owned_after_git_index_blocker",
+  "owner": "W2 Gates/OOP/CI/Formatting/CompletionCoverage writer-owned",
+  "blocker_transfer": {
+    "authority": "explicit_parent_authority_after_two_recorded_cross_checkout_git_index_lock_read_only_blockers",
+    "source_checkout": "/mnt/l/workspace/agent-canon-convergence-w2-independent",
+    "writer_clone": "/mnt/l/workspace/agent-canon-convergence-w2-writer-owned",
+    "source_checkout_mutation": "preserved",
+    "writer_clone_git_dir": ".git"
+  },
+  "repair_identity": {
+    "preserved_input_diff_sha256": "0931a443f817d160f2656372efac7f17c15096eab5bc388e9490c0558a16d162",
+    "source_diff_identity_verified": true,
+    "repaired_commit": "97c0ea224b0526d0a26bf896b56406d7bcd8825e",
+    "repaired_tree": "e0c1444f4273ca427a8d0364bbfa7c006995b476",
+    "repaired_diff_sha256": "6dc3995d36cbb945167dc7861505bfc5205c6afb5562a95115b6f3679d06311f",
+    "repaired_diff_scope": "all fixed paths excluding this self-binding interface metadata"
+  },
+  "review": {
+    "state": "pending_independent_review",
+    "required_identity": "repaired_commit_and_tree",
+    "review_boundary": "writer-owned clone only",
+    "decision": "deferred_until_independent_review"
+  },
+  "topology": {
+    "run_id": "convergence-w2-gates-completion-20260716",
+    "context_id": "convergence-w2-gates-completion-20260716:writer-owned",
+    "observation_ref": "ordered_integration_interface.json#topology",
+    "global_publication_state": "writer_fixed_pending_independent_review",
+    "routing_gate": "writer_owned_pending_review",
+    "writer_release_order_complete": true,
+    "final_review_approved": false,
+    "closeout_unlocked": false,
+    "branch_creation_reason": "convergence_w2_writer_owned_after_git_index_blocker",
+    "source_freeze_before_review": true,
+    "formatter_static_events": [
+      "static_shell_inspection_recorded",
+      "git_diff_check_passed",
+      "formatter_deferred_by_user"
+    ],
+    "writer_cardinality": 1,
+    "writer_collision_state": "collision_preserved",
+    "descendant_disposition": {
+      "status": "none",
+      "release": "not_applicable",
+      "retained": "two incident checkouts preserved"
+    },
+    "topology_schema": "agent-canon.control-topology.v1",
+    "topology_order": [
+      "design_approved",
+      "writer_released",
+      "source_frozen",
+      "change_review_approved"
+    ]
+  },
+  "changed_paths": [
+    ".codex/hooks/oop_readability_guard.py",
+    ".codex/hooks/skill_usage_logger.py",
+    "documents/log-surface-inventory.json",
+    "documents/REVIEW_PROCESS.md",
+    "notes/knowledge/coding_decision_methods.md",
+    "documents/tools/agent-canon.md",
+    "evidence/agent-evals/workflow_selection_eval.toml",
+    "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+    "agents/workflows/comprehensive-refactoring-workflow.md",
+    "agents/workflows/implementation-waterfall-workflow.md",
+    "agents/agents_config.json",
+    "reports/agents/convergence-w2-gates-completion-20260716/ordered_integration_interface.json",
+    "responsibility-scope.toml",
+    "rust/agent-canon/src/docs.rs",
+    "tests/agent_tools/test_analyze_oop_readability.py",
+    "tests/agent_tools/test_check_solid_evidence.py",
+    "tests/agent_tools/test_codex_hooks.py",
+    "tests/agent_tools/test_generate_agent_improvement_guide.py",
+    "tests/agent_tools/test_generate_agent_runtime_dashboard.py",
+    "tests/agent_tools/test_smoke_test_research_perspective_pack.py",
+    "tests/agent_tools/test_task_start_and_close.py",
+    "tests/agent_tools/test_workflow_monitor.py",
+    "tools/agent_tools/generate_agent_runtime_dashboard.py",
+    "tools/agent_tools/report_artifact_checks.py",
+    "tools/agent_tools/review_backlog_scan.sh",
+    "tools/agent_tools/task_close.py",
+    "tools/agent_tools/tool_rejection_preflight.py",
+    "tools/agent_tools/work_log.py",
+    "tools/agent_tools/workflow_monitor.py",
+    "tools/catalog.yaml"
+  ],
+  "deferred_selectors": [
+    "python_execution",
+    "tests",
+    "ci",
+    "dynamic_graph",
+    "formatter"
+  ],
+  "order": [
+    {
+      "ordinal": 1,
+      "after": "W2 source freeze and review",
+      "before": "W3/parent integration",
+      "action": "apply the exact W2 gates/OOP/CI/formatting/completion-coverage repairs below, then freeze source and review before parent integration"
+    }
+  ],
+  "patches": [
+    {
+      "path": "tools/catalog.yaml",
+      "owner": "W2 writer-owned",
+      "operation": "delete-entry",
+      "selector": "id: run-docs-checks",
+      "desired_result": "remove the compatibility_wrapper catalog record for tools/ci/run_docs_checks.sh; keep tools/bin/agent-canon docs check as the sole docs checker command"
+    },
+    {
+      "path": "responsibility-scope.toml",
+      "owner": "W2 writer-owned",
+      "operation": "delete-reference",
+      "selector": "shared-policy-documents.protecting_tools contains tools/ci/run_docs_checks.sh",
+      "desired_result": "remove the deleted forwarder from protecting_tools without adding a replacement checker"
+    },
+    {
+      "path": "documents/tools/agent-canon.md",
+      "owner": "W2 writer-owned",
+      "operation": "delete-reference",
+      "selector": "dependency header downstream implementation tools/ci/run_docs_checks.sh and Legacy Entrypoints run_docs_checks.sh paragraph",
+      "desired_result": "remove the forwarder reference and compatibility-forwarder instructions; retain the canonical tools/bin/agent-canon docs commands"
+    },
+    {
+      "path": "rust/agent-canon/src/docs.rs",
+      "owner": "W2 writer-owned",
+      "operation": "delete-reference",
+      "selector": "dependency header downstream implementation ../../../tools/ci/run_docs_checks.sh",
+      "desired_result": "remove the reverse dependency pair for the deleted forwarder"
+    },
+    {
+      "path": "documents/log-surface-inventory.json",
+      "owner": "W2 writer-owned",
+      "operation": "regenerate",
+      "selector": "all entries whose path is tools/ci/run_docs_checks.sh",
+      "desired_result": "regenerate the inventory so no deleted forwarder path or forwarder log field remains"
+    },
+    {
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "owner": "W2 writer-owned",
+      "operation": "delete-reference",
+      "selector": "run_docs_checks.sh keyword entries in workflow/tool routing projections",
+      "desired_result": "remove routing recognition for the deleted forwarder; retain agent-canon docs check/format/fix-math/fix-mermaid recognition"
+    },
+    {
+      "path": "evidence/agent-evals/workflow_selection_eval.toml",
+      "owner": "W2 writer-owned",
+      "operation": "delete-reference",
+      "selector": "run_docs_checks.sh prompt variants",
+      "desired_result": "remove stale forwarder prompt variants while retaining canonical docs command coverage"
+    }
+  ],
+  "consumer_closure": {
+    "canonical_owner": "tools/bin/agent-canon docs check",
+    "forbidden": [
+      "reintroduce a shell forwarder",
+      "add a second Markdown/math/Mermaid checker",
+      "retain a catalog record for the deleted forwarder",
+      "turn a generated inventory into a hand-edited source"
+    ]
+  }
+}

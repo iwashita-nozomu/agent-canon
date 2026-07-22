@@ -19,16 +19,15 @@ This template owns the implementation-facing detailed design packet. Fill the
 goal, abstract design frame, evidence ledger, reuse survey, requirement packet,
 implementation source packet, side-effect map, reader path, clause mapping,
 file-by-file design, trace, naming plan, validation, rollback, and risks before
-handoff. After this design is written, send this exact artifact to detailed
-design review before any implementation or worker handoff. The implementation
-worker uses this as an approved source packet only after `design_review.md`
-approves the same artifact; unresolved responsibility, naming, validation, or
-API-shape gaps belong back in design review rather than local implementation
-judgment.
+handoff. Select detailed design review only when an unresolved responsibility,
+naming, validation, or API-shape claim cannot be judged by the owning review
+gate. The implementation worker uses this as the source packet after the
+selected gate adjudicates it; unresolved gaps return to the owning design route
+rather than local implementation judgment.
 
 ## Design Review Handoff
 
-<!-- Record the design artifact path, current revision or section set, required design_review.md path, document_flow_review.md path if applicable, and the fact that implementation/handoff is blocked until the latest review decision is approve. -->
+<!-- Record the design artifact path, current revision or section set, design_review.md path only when that gate is active, document_flow_review.md path if applicable, and the selected gate/adjudication state. Do not block implementation merely because a candidate review artifact is absent. -->
 
 - Design artifact under review:
 - Required review artifact:

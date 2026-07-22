@@ -298,9 +298,9 @@ not be edited as if they were source prose.
 
 A corpus hint object records the academic or domain corpus that should calibrate
 analysis, retrieval, examples, and evaluation. In the MVP, corpus management is
-a LocalLLM IR extraction task: `agent-canon local-llm extract-prose-ir` receives
-the source documents, user prompt, and optional terms, splits them into bounded
-parts, and returns merged `corpus_hints`. User-prompt context is allowed because
+a deterministic semantic-prose extraction task: `ingest` / `ingest-set` reads
+the source documents and user prompt, derives source-anchored terms and intent,
+and returns merged `corpus_hints`. User-prompt context is allowed because
 the user often names the intended field before the draft itself contains
 field-specific vocabulary.
 
@@ -308,8 +308,8 @@ field-specific vocabulary.
 | ----- | -------- | ------- |
 | `corpus_id` | yes | Stable corpus/profile id, such as `academic_writing`, `software_engineering`, `experimental_report`, or `formal_reasoning`. |
 | `label` | yes | Human-readable corpus label. |
-| `score` | yes | LocalLLM IR ranking score or confidence-like ordering value. |
-| `basis` | yes | LocalLLM IR extraction basis, including signal terms, source path, prompt context indicator, or explicit workflow setting. |
+| `score` | yes | Deterministic semantic-IR ranking score or confidence-like ordering value. |
+| `basis` | yes | Semantic-IR extraction basis, including signal terms, source path, prompt context indicator, or explicit workflow setting. |
 | `selected` | yes | Whether this hint is the current default corpus for downstream analysis. |
 
 Corpus hints are calibration metadata, not evidence. A downstream literature
@@ -545,10 +545,10 @@ records `feature_kind`, `source_anchor_id`, `member_anchor_ids`, `basis`, and
 they must not recompute the same decision from word counts, section names, or
 path-specific case lists.
 
-Projection may also carry corpus hints and the LocalLLM prose IR artifact path.
+Projection may also carry corpus hints and the semantic prose IR metadata path.
 Corpus hints select the field-specific norms used to interpret rhetorical moves,
 expected evidence, diagrams, formulas, and evaluation criteria. They should be
-inferred from the LocalLLM IR extraction pass over source text, user prompt, and
+inferred from the deterministic semantic-IR pass over source text, user prompt, and
 optional term inputs, because prompt context may identify the intended academic
 field before the draft does.
 

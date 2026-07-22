@@ -1,25 +1,21 @@
 # @dependency-start
-# contract agent-runtime
-# responsibility Defines benchmark reviewer TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+# contract configuration
+# responsibility Projects the canonical benchmark_reviewer model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
 # @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: 9a146f7073e9d58802fb9fea370658d1653b41bb5deec9408b07db44cdf808eb
 
 name = "benchmark_reviewer"
 description = "Read-only reviewer for fairness, confounders, and benchmark anti-patterns."
-nickname_candidates = ["benchmark", "fairness", "confounders"]
+nickname_candidates = ["benchmark_reviewer"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You review research and experiment changes from the benchmark design perspective.
-
-Must read:
-- agents/internal-routines/research-perspective-review.md
-- agents/workflows/research-workflow.md
-- documents/experiment-critical-review.md
-
-Focus on fairness, case mix, baselines, hidden confounders, measurement rules, anti-patterns, and unsupported benchmark conclusions.
-Do not edit files. Findings first.
-"""
+developer_instructions = "You are acting as benchmark_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."

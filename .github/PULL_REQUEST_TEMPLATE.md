@@ -135,7 +135,7 @@ Issue / edit-scope evidence:
 - [ ] `python3 tools/agent_tools/responsibility_scope.py`
 - [ ] `python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check`
 - [ ] `python3 tools/agent_tools/eval_accumulation_check.py`
-- [ ] `tools/bin/agent-canon local-llm eval`
+- [ ] fresh `skill_evaluator@gpt-5.4-mini` validation evidence when evaluator review is in scope
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] Path/risk smoke, when relevant: `python3 tools/agent_tools/classify_path_risk.py --paths-file <changed-paths>`
 - [ ] `tools/bin/agent-canon docs check`

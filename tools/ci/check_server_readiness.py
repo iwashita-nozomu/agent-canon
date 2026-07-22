@@ -19,7 +19,11 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-import tomllib
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 
 PROC_MOUNTS_MIN_FIELDS = 3
 

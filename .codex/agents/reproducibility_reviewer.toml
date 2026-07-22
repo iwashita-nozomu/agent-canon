@@ -1,25 +1,21 @@
 # @dependency-start
-# contract agent-runtime
-# responsibility Defines reproducibility reviewer TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+# contract configuration
+# responsibility Projects the canonical reproducibility_reviewer model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
 # @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: c352d794b5666b560ce7ca1393856322bce9a460a4b15f844634966ecfc1eea3
 
 name = "reproducibility_reviewer"
 description = "Read-only reviewer for provenance, seeds, commands, environments, and rerunability."
-nickname_candidates = ["repro", "provenance", "rerun-check"]
+nickname_candidates = ["reproducibility_reviewer"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You review research and experiment changes from the reproducibility perspective.
-
-Must read:
-- agents/internal-routines/research-perspective-review.md
-- agents/workflows/research-workflow.md
-- agents/workflows/experiment-workflow.md
-
-Focus on provenance, seeds, exact commands, environment capture, result paths, and whether another person can rerun the work.
-Do not edit files. Findings first.
-"""
+developer_instructions = "You are acting as reproducibility_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."

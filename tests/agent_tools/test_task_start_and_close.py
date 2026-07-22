@@ -24,6 +24,7 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "ci"))
 
 import agent_team  # noqa: E402
 from agent_team import (  # noqa: E402
@@ -31,6 +32,18 @@ from agent_team import (  # noqa: E402
     load_team_config,
     validate_agent_type_selections,
 )
+from report_artifact_checks import write_completion_coverage_artifact  # noqa: E402
+from task_close import update_lifecycle_closeout_consumer  # noqa: E402
+from check_agent_canon_pr import (  # noqa: E402
+    GENERATED_COMPLETENESS_CHECK_IDS,
+    materialize_generated_completeness_receipt,
+)
+from update_lifecycle_contract import (  # noqa: E402
+    materialize_descendant_close_receipt,
+    materialize_gate_verdict,
+    materialize_reservation_release_receipt,
+)
+from work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
 
 RUNTIME_PROFILE_INVENTORY = PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
@@ -45,6 +58,156 @@ GRAPH_ACTIVE_DESIGN_PACKET: dict[str, object] = {
     "document_flow_review_artifact": "graph_document_flow_review.md",
     "document_flow_required": True,
 }
+
+
+def update_lifecycle_closeout_fixture() -> dict[str, object]:
+    """Return one valid six-gate nested-lifecycle closeout artifact."""
+    binding: dict[str, object] = {
+        "transaction_id": "tx:" + "1" * 64,
+        "snapshot_id": "snapshot:" + "2" * 64,
+        "candidate_sha": "3" * 40,
+        "tree_sha": "4" * 40,
+        "input_digest": "sha256:" + "5" * 64,
+        "tool_id": "update-lifecycle-closeout",
+        "tool_version": "test.v1",
+        "evidence_ref": "evidence:" + "6" * 64,
+        "evidence_digest": "sha256:" + "7" * 64,
+        "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": False,
+        },
+    }
+    seed_ref = "evidence:" + "8" * 64
+    gates: list[dict[str, object]] = []
+    gate_contracts = {
+        "G1": (
+            "source_correctness",
+            PROJECT_ROOT / "tools" / "agent_tools" / "publication_integrator.py",
+            "resolve_publication_eligibility",
+        ),
+        "G3": (
+            "pr_identity_cas",
+            PROJECT_ROOT / "tools" / "agent_tools" / "github_publish.py",
+            "materialize_pr_identity_gate",
+        ),
+        "G4": (
+            "parent_projection_integrity",
+            PROJECT_ROOT / "tools" / "update_agent_canon.sh",
+            "accept_dependency_frontier",
+        ),
+        "G5": (
+            "remote_publication_readback",
+            PROJECT_ROOT / "tools" / "agent_tools" / "publication_integrator.py",
+            "integrate_publication",
+        ),
+    }
+    for index, gate_id in enumerate(("G1", "G3", "G4", "G5"), 1):
+        evidence_refs = [
+            cast("dict[str, object]", gate["binding"])["evidence_ref"]
+            for gate in gates
+        ]
+        ordered_inputs = {
+            "G1": [seed_ref],
+            "G3": evidence_refs[:2],
+            "G4": evidence_refs[2:3],
+            "G5": evidence_refs[3:4],
+        }[gate_id]
+        invariant, owner_path, owner_symbol = gate_contracts[gate_id]
+        gate = materialize_gate_verdict(
+            binding=binding,
+            gate_id=gate_id,
+            ordered_input_evidence_refs=cast("list[str]", ordered_inputs),
+            invariant=cast("str", invariant),
+            output_digest="sha256:" + format(index, "x") * 64,
+            owner=f"{owner_path}#{owner_symbol}",
+            verdict="pass",
+        )
+        gates.append(gate)
+        if gate_id == "G1":
+            gates.append(
+                materialize_generated_completeness_receipt(
+                    g1_gate=gate,
+                    candidate_sha=str(binding["candidate_sha"]),
+                    tree_sha=str(binding["tree_sha"]),
+                    check_results=[
+                        {"check_id": check_id, "status": "pass"}
+                        for check_id in GENERATED_COMPLETENESS_CHECK_IDS
+                    ],
+                )
+            )
+    handback: dict[str, object] = {
+        "schema": "agent-canon.durable-handback.v1",
+        "binding": binding,
+        "agent_id": "agent:owner",
+        "descendant_ids": ["agent:reviewer"],
+        "reservation_ids": ["reservation:reviewer"],
+        "evidence_ref": "evidence:" + "b" * 64,
+        "state": "durable_handback",
+    }
+    owned_path = "/tmp/agent-canon-update-owned"
+    gate_five_binding = cast("dict[str, object]", gates[4]["binding"])
+    cleanup: dict[str, object] = {
+        "schema": "agent-canon.cleanup-proof.v1",
+        "binding": binding,
+        "remote_readback_evidence_ref": gate_five_binding["evidence_ref"],
+        "task_owned_paths": [owned_path],
+        "task_owned_state_before": {owned_path: "present"},
+        "task_owned_state_after": {owned_path: "removed"},
+        "cleaned_paths": [owned_path],
+        "unknown_shared_state_before_digest": "sha256:" + "c" * 64,
+        "unknown_shared_state_after_digest": "sha256:" + "c" * 64,
+        "unknown_shared_state_unchanged_evidence_ref": "evidence:" + "d" * 64,
+        "evidence_ref": "evidence:" + "e" * 64,
+        "state": "cleanup_proven",
+    }
+    descendants = [
+        materialize_descendant_close_receipt(
+            binding=binding,
+            durable_handback=handback,
+            agent_id="agent:reviewer",
+            evidence_ref="evidence:" + "f" * 64,
+        )
+    ]
+    reservations = [
+        materialize_reservation_release_receipt(
+            binding=binding,
+            durable_handback=handback,
+            reservation_id="reservation:reviewer",
+            evidence_ref="evidence:" + "0" * 64,
+        )
+    ]
+    closeout = agent_team.materialize_close_agent_tool_call(
+        run_id="run-update-lifecycle",
+        agent_id="agent:owner",
+        evidence=agent_team.CloseAgentLifecycleEvidence(
+            gate_verdicts=gates,
+            cleanup_proof=cleanup,
+            durable_handback=handback,
+            descendant_close_receipts=descendants,
+            reservation_release_receipts=reservations,
+        ),
+    )
+    g6 = cast("dict[str, object]", closeout["g6_gate"])
+    token = cast("dict[str, object]", closeout["close_agent_tool_call"])
+    return {
+        "schema": "agent-canon.update-lifecycle-closeout.v1",
+        "gate_verdicts": [*gates, g6],
+        "durable_handback": handback,
+        "descendants": descendants,
+        "reservations": reservations,
+        "descendants_closed_evidence_ref": closeout[
+            "descendants_closed_evidence_ref"
+        ],
+        "reservations_released_evidence_ref": closeout[
+            "reservations_released_evidence_ref"
+        ],
+        "cleanup_proof": cleanup,
+        "close_agent_tool_call": token,
+    }
 
 
 def current_git_head(workspace: Path = PROJECT_ROOT) -> str:
@@ -132,7 +295,7 @@ def ready_closeout_evidence_lines(
     )
     return [
         "",
-        "## AgentCanon Latest And CI Gate Evidence",
+        "## AgentCanon Latest Evidence",
         "- agent_canon_latest_command: make agent-canon-ensure-latest",
         "- agent_canon_latest_status: pass",
         "- agent_canon_submodule_status: fixture-clean",
@@ -167,9 +330,22 @@ def ready_closeout_evidence_lines(
         "- md_style_check: pass",
         "- format_only_reason: fixture closeout bundle",
         "",
+        "## Canonical Formatter And Static Evidence",
+        "- canonical_format_check_route: tools/bin/agent-canon docs check fixture-format-only.md",
+        "- canonical_format_check_status: pass",
+        "- selected_non_python_static_evidence: fixture-static-evidence",
+        "- typed_owner_boundary_status: pass",
+        "- mapping_error_sets_empty: yes",
+        "- canonical_dispatcher_schema_status: pass",
+        "",
+        "## CompletionCoverage And Failure Response Evidence",
+        "- completion_coverage_artifact: completion_coverage.json",
+        "- completion_coverage_consumer: yes",
+        "- validation_failure_response_status: pass",
+        "",
         "## Subagent Lifecycle Evidence",
-        "- fresh_subagents_required: yes",
-        "- reuse_for_new_task: forbidden",
+        "- fresh_subagents_required: conditional",
+        "- reuse_for_new_task: allowed_when_owner_context_compatible",
         "- previous_task_subagent_reuse: none",
         "- agent_wave_ledger_status: complete",
         "- planned_vs_actual_wave_status: reconciled",
@@ -410,9 +586,6 @@ def write_ready_agent_evaluation(report_dir: Path) -> None:
                 "# Agent Evaluation",
                 "",
                 "- evaluation_status: pass",
-                "- score: 100",
-                "- max_score: 100",
-                "- threshold: 85",
                 "- feedback_actions_resolved: yes",
                 "- learning_capture_complete: yes",
                 "",
@@ -475,6 +648,120 @@ def write_ready_final_review(report_dir: Path) -> None:
     )
 
 
+def write_ready_completion_coverage(report_dir: Path, run_id: str) -> None:
+    """Write the completion-coverage evidence consumed by task_close."""
+    source_binding = {
+        "run_id": run_id,
+        "context_id": "fixture-context",
+        "organizer_context_id": "fixture-organizer",
+        "parent": "codex",
+        "component_manager": "codex",
+        "assigned_unit": "fixture-unit",
+        "source_binding": {"run_id": run_id, "context_id": "fixture-context"},
+        "source_refs": ["tests/agent_tools/test_task_start_and_close.py"],
+    }
+    append_ledger_event(
+        report_dir,
+        {
+            "run_id": run_id,
+            "context_id": "fixture-context",
+            "event_id": "fixture-event-1",
+            "semantic_kind": "request_clause",
+            "owner": "codex",
+            "state_owner": "codex",
+            "api_owner": "codex",
+            "dependency_owner": "codex",
+            "responsibility_unit": "fixture-unit",
+            "intent_id": "fixture-intent",
+            "outcome": "complete",
+            "clause_id": "T1-C1",
+            "evidence_refs": ["fixture-evidence"],
+            "artifact_refs": ["fixture-artifact"],
+            "source_binding": source_binding["source_binding"],
+            "gate_evidence": [
+                {
+                    "gate_id": "oop_readability_guard",
+                    "stage": "review",
+                    "owner": "codex",
+                    "outcome": "pass",
+                    "artifact_refs": ["fixture-oop"],
+                    "source_event_refs": ["fixture-event-1"],
+                    "scanned_paths": ["tools/agent_tools/task_close.py"],
+                    "signal_counts": {"review_signal_findings": 0},
+                    "typed_boundary_counts": {"api_boundary": 0},
+                    "solid_counts": {"single responsibility": 0},
+                    "typed_evidence_owner": "oop-readability-checker",
+                },
+                {
+                    "gate_id": "solid_evidence_gate",
+                    "stage": "review",
+                    "owner": "codex",
+                    "outcome": "pass",
+                    "artifact_refs": ["fixture-solid"],
+                    "source_event_refs": ["fixture-event-1"],
+                    "scanned_paths": ["tools/agent_tools/task_close.py"],
+                    "covered_paths": ["tools/agent_tools/task_close.py"],
+                    "solid_counts": {"single responsibility": 0},
+                },
+                {
+                    "gate_id": "canonical_formatter_static",
+                    "stage": "validation",
+                    "owner": "codex",
+                    "outcome": "pass",
+                    "artifact_refs": ["fixture-format"],
+                    "source_event_refs": ["fixture-event-1"],
+                },
+            ],
+        },
+    )
+    write_completion_coverage_artifact(
+        report_dir,
+        read_ledger_snapshot(report_dir, "fixture-snapshot"),
+        source_binding,
+        ["T1-C1"],
+        {
+            "owner": "codex",
+            "state_owner": "codex",
+            "api_owner": "codex",
+            "dependency_owner": "codex",
+        },
+        {
+            "w2_implementation_complete": True,
+            "w2_review_complete": True,
+            "source_freeze_review_complete": True,
+            "formatter_and_static_checks_pass": True,
+        },
+        {"planned_work_complete": True},
+        {"open_repairs": []},
+        {"open_crossing_edges": []},
+        {
+            "run_id": run_id,
+            "context_id": "fixture-context",
+            "observation_ref": "fixture-topology",
+            "global_publication_state": "publication_ready",
+            "routing_gate": "verified",
+            "writer_release_order_complete": True,
+            "final_review_approved": True,
+            "closeout_unlocked": True,
+            "branch_creation_reason": (
+                "convergence_w2_writer_owned_after_git_index_blocker"
+            ),
+            "source_freeze_before_review": True,
+            "formatter_static_events": ["formatter", "static"],
+            "writer_cardinality": 1,
+            "writer_collision_state": "collision_preserved",
+            "descendant_disposition": {"status": "none"},
+            "topology_schema": "agent-canon.control-topology.v1",
+            "topology_order": [
+                "design_approved",
+                "writer_released",
+                "source_frozen",
+                "change_review_approved",
+            ],
+        },
+    )
+
+
 def write_ready_closeout_bundle(
     report_dir: Path, run_id: str, workspace: Path = PROJECT_ROOT
 ) -> None:
@@ -530,8 +817,6 @@ def write_ready_closeout_bundle(
                 "- repo_wide_dependency_tools_complete: yes",
                 "- repo_wide_static_analysis_complete: yes",
                 "- agent_canon_latest_complete: yes",
-                "- make_ci_status: pass",
-                "- spec_product_coverage_complete: yes",
                 "- review_findings_integrated: yes",
                 "- post_fix_full_review_complete: yes",
                 "- tool_warnings_resolved: yes",
@@ -544,6 +829,9 @@ def write_ready_closeout_bundle(
                 "- commit_created: yes",
                 "- push_completed: yes",
                 "- user_completion_report: unlocked",
+                "- mapping_error_sets_empty: yes",
+                "- typed_owner_boundary_status: pass",
+                "- canonical_dispatcher_schema_status: pass",
                 *ready_closeout_evidence_lines(workspace=workspace),
             ]
         ),
@@ -551,6 +839,7 @@ def write_ready_closeout_bundle(
     )
     write_ready_schedule(report_dir)
     _log_ready_work(report_dir)
+    write_ready_completion_coverage(report_dir, run_id)
     write_ready_workflow_monitoring(report_dir)
     write_ready_agent_evaluation(report_dir)
     write_ready_final_review(report_dir)
@@ -558,6 +847,85 @@ def write_ready_closeout_bundle(
 
 class TaskStartAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
+
+    def consume_update_lifecycle_fixture(
+        self,
+        payload: dict[str, object],
+    ) -> dict[str, object]:
+        """Persist and consume one isolated update-lifecycle closeout record."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir)
+            (report_dir / "update_lifecycle_closeout.json").write_text(
+                json.dumps(payload),
+                encoding="utf-8",
+            )
+            return update_lifecycle_closeout_consumer(report_dir)
+
+    def test_update_lifecycle_terminal_tool_call_passes_after_cleanup(self) -> None:
+        """The positive close route binds all six gates and terminal ToolCall."""
+        payload = update_lifecycle_closeout_fixture()
+
+        decision = self.consume_update_lifecycle_fixture(payload)
+
+        token = cast("dict[str, object]", payload["close_agent_tool_call"])
+        self.assertEqual(decision["ready"], True)
+        self.assertEqual(decision["reason"], "pass")
+        self.assertEqual(token["tool_id"], "close_agent")
+        self.assertEqual(token["state"], "terminal")
+        self.assertEqual(decision["close_agent_token_id"], token["token_id"])
+
+    def test_update_lifecycle_rejects_completed_but_open_descendant(self) -> None:
+        """A completed handback is not a substitute for closing the agent."""
+        payload = update_lifecycle_closeout_fixture()
+        descendants = cast("list[dict[str, object]]", payload["descendants"])
+        descendants[0]["state"] = "completed"
+
+        decision = self.consume_update_lifecycle_fixture(payload)
+
+        self.assertEqual(decision["reason"], "close_agent:completed_but_open")
+
+    def test_update_lifecycle_rejects_unknown_descendant(self) -> None:
+        """Every observed descendant must exist in the durable handback ledger."""
+        payload = update_lifecycle_closeout_fixture()
+        descendants = cast("list[dict[str, object]]", payload["descendants"])
+        unknown = dict(descendants[0])
+        unknown["agent_id"] = "agent:unknown"
+        unknown["evidence_ref"] = "evidence:" + "1" * 64
+        descendants.append(unknown)
+
+        decision = self.consume_update_lifecycle_fixture(payload)
+
+        self.assertEqual(decision["reason"], "close_agent:unknown_descendant")
+
+    def test_update_lifecycle_rejects_reservation_leak(self) -> None:
+        """Closeout remains blocked until every declared reservation is released."""
+        payload = update_lifecycle_closeout_fixture()
+        reservations = cast("list[dict[str, object]]", payload["reservations"])
+        reservations[0]["state"] = "reserved"
+
+        decision = self.consume_update_lifecycle_fixture(payload)
+
+        self.assertEqual(decision["reason"], "close_agent:reservation_leak")
+
+    def test_update_lifecycle_rejects_cleanup_before_remote_readback(self) -> None:
+        """Cleanup proof must point at the exact G5 publication evidence."""
+        payload = update_lifecycle_closeout_fixture()
+        cleanup = cast("dict[str, object]", payload["cleanup_proof"])
+        cleanup["remote_readback_evidence_ref"] = "evidence:" + "2" * 64
+
+        decision = self.consume_update_lifecycle_fixture(payload)
+
+        self.assertEqual(decision["reason"], "close_agent:cleanup_before_remote_readback")
+
+    def test_update_lifecycle_rejects_missing_gate_receipt(self) -> None:
+        """Terminal close requires the ordered complete G1-G6 boundary set."""
+        payload = update_lifecycle_closeout_fixture()
+        gates = cast("list[dict[str, object]]", payload["gate_verdicts"])
+        gates.pop()
+
+        decision = self.consume_update_lifecycle_fixture(payload)
+
+        self.assertEqual(decision["reason"], "close_agent:all_six_gate_evidence_required")
 
     def assert_current_checkout_write_policy(
         self,
@@ -1354,7 +1722,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=pass", resumed.stdout)
             self.assertFalse((workspace_root / "make-sentinel").exists())
 
-    def test_task_start_emits_workflow_skills_and_auto_specialists(self) -> None:
+    def test_task_start_emits_workflow_skills_and_language_review_candidates(self) -> None:
         """task_start should emit machine-friendly workflow and reviewer data."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -1472,7 +1840,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "DEFERRED_SKILLS=$codex-task-workflow",
                 result.stdout,
             )
-            self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
+            self.assertIn("LANGUAGE_REVIEW_CANDIDATES=cpp_reviewer", result.stdout)
             self.assertIn(
                 "IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker", result.stdout
             )
@@ -1485,7 +1853,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "STANDARD_AGENT_WAVE_SEQUENCE=plan,review,edit",
+                "STANDARD_AGENT_WAVE_SEQUENCE=selected_stages_only",
                 result.stdout,
             )
             self.assertIn(
@@ -1552,9 +1920,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "REPO_TOOL_COMMAND_PACKET_COMMAND=python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text",
+                "REPO_TOOL_CALL_TOKEN_SCHEMA=agent-canon.tool-call.v1",
                 result.stdout,
             )
+            self.assertNotIn("REPO_TOOL_COMMAND_PACKET_COMMAND=", result.stdout)
             self.assertIn(
                 "REPO_TOOL_SELECTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
@@ -1571,26 +1940,26 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES=$task-routing",
                 result.stdout,
             )
-            self.assertIn("DEFAULT_QUALITY_CHECKS=enabled", result.stdout)
+            self.assertIn("DEFAULT_QUALITY_CHECKS=candidate_only", result.stdout)
             self.assertIn(
                 "DEFAULT_QUALITY_CHECK_SOURCE=agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default",
                 result.stdout,
             )
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_AGENT_TYPES=docs_workflow_steward,cpp_reviewer",
+                "DEFAULT_QUALITY_CHECK_AGENT_TYPE_CANDIDATES=docs_workflow_steward,cpp_reviewer",
                 result.stdout,
             )
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_STAGES=review_before_edit_handoff,post_edit_review",
+                "DEFAULT_QUALITY_CHECK_STAGES=selected_stages_only",
                 result.stdout,
             )
-            self.assertIn("DEFAULT_QUALITY_CHECK_REVIEW_PACKS=active", result.stdout)
+            self.assertIn("DEFAULT_QUALITY_CHECK_REVIEW_PACKS=candidate_only", result.stdout)
             self.assertIn(
                 "DEFAULT_QUALITY_CHECK_DEFAULT_REVIEW_PACKS=-",
                 result.stdout,
             )
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_AUTO_LANGUAGE_REVIEWERS=cpp_reviewer",
+                "DEFAULT_QUALITY_CHECK_LANGUAGE_REVIEW_CANDIDATES=cpp_reviewer",
                 result.stdout,
             )
             self.assertIn("ROLE_MODEL_MATRIX=", result.stdout)
@@ -1642,11 +2011,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "allowed",
             )
             self.assertEqual(
-                standard_wave_sequence["stages"], ["plan", "review", "edit"]
+                standard_wave_sequence["stages"], ["selected_stages_only"]
             )
             self.assertEqual(
                 standard_wave_sequence["gate_order"],
-                "plan_packet,review_gate,edit_handoff",
+                "selected_stages_only",
             )
             self.assertTrue(pre_handoff_scope_policy["enabled"])
             self.assertEqual(
@@ -1739,10 +2108,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(
                 repo_tool_routing_policy["sequence"],
                 [
-                    "show_skill_packet",
-                    "run_required_commands",
-                    "run_task_matching_conditional_commands",
-                    "run_validation_commands",
+                    "materialize_tool_call_token",
+                    "execute_canonical_tool_id",
+                    "record_typed_result",
                 ],
             )
             self.assertIn(
@@ -1751,40 +2119,41 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             first_tool_route = repo_tool_routing_policy["sequential_tool_routes"][0]
             self.assertEqual(first_tool_route["skill"], "agent-orchestration")
+            tool_call_token = first_tool_route["tool_call_token"]
+            self.assertEqual(tool_call_token["schema"], "agent-canon.tool-call.v1")
+            self.assertEqual(tool_call_token["tool_id"], "skill-tool-commands")
             self.assertEqual(
-                first_tool_route["packet_command"],
-                "python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text",
+                tool_call_token["arguments"],
+                {"skill": "agent-orchestration", "format": "json"},
             )
+            self.assertNotIn("packet_command", first_tool_route)
             self.assertNotIn("commands", first_tool_route)
             self.assertIn("runtime_skill", first_tool_route)
             self.assertIn("canonical_doc", first_tool_route)
             self.assertIn("related_skills", first_tool_route)
-            self.assertEqual(
-                repo_tool_routing_policy["check_command"],
-                "python3 tools/agent_tools/skill_tool_commands.py check",
-            )
-            self.assertTrue(default_quality_check_policy["enabled"])
+            self.assertNotIn("check_command", repo_tool_routing_policy)
+            self.assertFalse(default_quality_check_policy["enabled"])
             self.assertEqual(
                 default_quality_check_policy["source"],
                 "agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default",
             )
             self.assertEqual(
                 default_quality_check_policy["wave_sequence_ref"],
-                "run.standard_wave_sequence",
+                "run.standard_wave_sequence (selected stages only)",
             )
             self.assertEqual(
                 default_quality_check_policy["stages"],
                 ["review_before_edit_handoff", "post_edit_review"],
             )
             self.assertEqual(
-                default_quality_check_policy["roles"],
+                default_quality_check_policy["candidate_roles"],
                 [
                     "docs_workflow_steward",
                     "cpp_reviewer",
                 ],
             )
             self.assertEqual(
-                default_quality_check_policy["codex_agent_types"],
+                default_quality_check_policy["candidate_codex_agent_types"],
                 [
                     "docs_workflow_steward",
                     "cpp_reviewer",
@@ -1792,14 +2161,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertEqual(
                 default_quality_check_policy["provenance"]["default_review_packs"],
-                "active",
+                "candidate_not_activated",
             )
             self.assertEqual(
                 default_quality_check_policy["provenance"]["default_review_pack_ids"],
                 [],
             )
             self.assertEqual(
-                default_quality_check_policy["provenance"]["auto_language_reviewers"],
+                default_quality_check_policy["provenance"]["language_review_candidates"],
                 ["cpp_reviewer"],
             )
             self.assertEqual(
@@ -1901,11 +2270,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_AGENT_TYPES=docs_workflow_steward",
+                "DEFAULT_QUALITY_CHECK_AGENT_TYPE_CANDIDATES=docs_workflow_steward",
                 result.stdout,
             )
             self.assertNotIn(
-                "DEFAULT_QUALITY_CHECK_AGENT_TYPES=docs_workflow_steward,"
+                "DEFAULT_QUALITY_CHECK_AGENT_TYPE_CANDIDATES=docs_workflow_steward,"
                 "python_reviewer",
                 result.stdout,
             )
@@ -2614,9 +2983,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertNotIn("PARENT_REPO_EDITS_ALLOWED=no", result.stdout)
             self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes", result.stdout)
             self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION=-", result.stdout)
-            self.assertIn("DEFAULT_QUALITY_CHECKS=enabled", result.stdout)
+            self.assertIn("DEFAULT_QUALITY_CHECKS=candidate_only", result.stdout)
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_ROLES=docs_workflow_steward,python_reviewer",
+                "DEFAULT_QUALITY_CHECK_ROLE_CANDIDATES=docs_workflow_steward,python_reviewer",
                 result.stdout,
             )
             self.assertNotIn("test_designer", result.stdout)
@@ -2629,9 +2998,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "REPO_TOOL_COMMAND_PACKET_COMMAND=python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text",
+                "REPO_TOOL_CALL_TOKEN_SCHEMA=agent-canon.tool-call.v1",
                 result.stdout,
             )
+            self.assertNotIn("REPO_TOOL_COMMAND_PACKET_COMMAND=", result.stdout)
             self.assertIn("REPO_TOOL_SELECTED_SKILLS=", result.stdout)
             self.assertIn("REPO_TOOL_DYNAMIC_CANDIDATES=", result.stdout)
             self.assertIn(
@@ -2645,6 +3015,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("IMPLEMENTATION_SURFACE_ROUTE_STATUS=pending", result.stdout)
+            self.assertIn(
+                "IMPLEMENTATION_SURFACE_ROUTE_COMMAND=python3 tools/agent_tools/search.py "
+                "--query-file <request-or-design-question.txt> "
+                "--providers text,semantic,vector,tool,header-deps,code-deps "
+                "--format json",
+                result.stdout,
+            )
             self.assertIn(
                 "TOOL_REUSE_LEDGER_STATUS=required_before_custom_implementation",
                 result.stdout,
@@ -2725,7 +3102,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 delegated_spawn_policy["dynamic_mid_task_spawn"], "allowed"
             )
             self.assertEqual(
-                standard_wave_sequence["stages"], ["plan", "review", "edit"]
+                standard_wave_sequence["stages"], ["selected_stages_only"]
             )
             self.assertEqual(
                 pre_handoff_scope_policy["status"],
@@ -2740,14 +3117,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "seed_then_expand_before_handoff",
             )
             self.assertEqual(
-                default_quality_check_policy["roles"],
+                default_quality_check_policy["candidate_roles"],
                 [
                     "docs_workflow_steward",
                     "python_reviewer",
                 ],
             )
             self.assertEqual(
-                default_quality_check_policy["codex_agent_types"],
+                default_quality_check_policy["candidate_codex_agent_types"],
                 [
                     "docs_workflow_steward",
                     "python_reviewer",
@@ -2755,7 +3132,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertEqual(
                 default_quality_check_policy["provenance"]["default_review_packs"],
-                "active",
+                "candidate_not_activated",
             )
             self.assertEqual(
                 default_quality_check_policy["provenance"]["default_review_pack_ids"],
@@ -2845,14 +3222,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 delegated_spawn_policy["required_before_spawn"],
             )
             self.assertIn(
-                "include run.repo_tool_routing_policy selected-skill packet commands, dynamic skill candidates, and tool evidence in every handoff packet",
+                "include run.repo_tool_routing_policy selected-skill ToolCall tokens, dynamic skill candidates, and tool evidence in every handoff packet",
                 delegated_spawn_policy["required_before_spawn"],
             )
             self.assertIn(
                 "tool_route", delegated_spawn_policy["handoff_required_fields"]
             )
             self.assertIn(
-                "tool_command_packet_command",
+                "tool_call_token",
                 delegated_spawn_policy["handoff_required_fields"],
             )
             self.assertNotIn(
@@ -2886,7 +3263,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("runtime_max_depth: 2", manifest_text)
             self.assertIn("standard_wave_sequence:", manifest_text)
             self.assertIn(
-                "STANDARD_AGENT_WAVE_SEQUENCE=plan,review,edit", result.stdout
+                "STANDARD_AGENT_WAVE_SEQUENCE=selected_stages_only", result.stdout
             )
             self.assertIn("spawn_wave_recommendation:", manifest_text)
             self.assertIn("delegated_spawn_policy:", manifest_text)
@@ -2899,25 +3276,31 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("workflow_family:", manifest_text)
             self.assertIn("subagent_prompt_packet:", manifest_text)
             self.assertIn("subagent_lifecycle_policy:", manifest_text)
-            self.assertIn("fresh_subagents_required: true", manifest_text)
-            self.assertIn("reuse_for_new_task: forbidden", manifest_text)
-            self.assertIn("previous_task_subagent_reuse: forbidden", manifest_text)
+            self.assertIn("fresh_subagents_required: conditional", manifest_text)
+            self.assertIn(
+                "reuse_for_new_task: allowed_when_owner_context_compatible",
+                manifest_text,
+            )
+            self.assertIn(
+                "previous_task_subagent_reuse: allowed_when_owner_context_compatible",
+                manifest_text,
+            )
             lifecycle_policy = manifest["run"]["subagent_lifecycle_policy"]
             self.assertEqual(
                 lifecycle_policy["mid_task_user_input_policy"],
-                "parent_checkpoint_then_route_delta",
+                "classify_then_reuse_or_route_fresh",
             )
             self.assertEqual(
                 lifecycle_policy["same_task_delta_reuse"],
-                "allowed_with_updated_packet",
+                "allowed_when_owner_context_compatible",
             )
             self.assertEqual(
                 lifecycle_policy["scope_change_reuse"],
-                "forbidden_spawn_fresh_wave",
+                "evaluate_owner_context_compatibility",
             )
             self.assertEqual(
                 lifecycle_policy["new_task_reuse"],
-                "forbidden_spawn_fresh_run",
+                "evaluate_owner_context_compatibility",
             )
             common_prompt_fields = handoff_context_policy["common_prompt_must_include"]
             self.assertIn("context_artifacts", common_prompt_fields)
@@ -2955,12 +3338,26 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "$task-routing",
                 repo_tool_routing_policy["dynamic_skill_routing"]["candidates"],
             )
+            first_route_token = repo_tool_routing_policy["sequential_tool_routes"][0][
+                "tool_call_token"
+            ]
+            self.assertEqual(first_route_token["tool_id"], "skill-tool-commands")
             self.assertEqual(
-                repo_tool_routing_policy["sequential_tool_routes"][0]["packet_command"],
-                "python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text",
+                first_route_token["arguments"],
+                {"skill": "agent-orchestration", "format": "json"},
+            )
+            self.assertNotIn(
+                "packet_command", repo_tool_routing_policy["sequential_tool_routes"][0]
             )
             self.assertNotIn(
                 "commands", repo_tool_routing_policy["sequential_tool_routes"][0]
+            )
+            self.assertEqual(
+                implementation_gate_defaults["implementation_surface_route_command"],
+                "python3 tools/agent_tools/search.py "
+                "--query-file <request-or-design-question.txt> "
+                "--providers text,semantic,vector,tool,header-deps,code-deps "
+                "--format json",
             )
             self.assertEqual(
                 implementation_gate_defaults["tool_reuse_ledger_status"],
@@ -3090,15 +3487,15 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "-",
             )
             self.assertEqual(
-                default_quality_check_policy["roles"],
-                ["test_designer", "change_reviewer"],
+                default_quality_check_policy["candidate_roles"],
+                ["change_reviewer"],
             )
             self.assertEqual(
                 default_quality_check_policy["provenance"]["task_default_specialists"],
                 [],
             )
             self.assertEqual(
-                default_quality_check_policy["provenance"]["auto_language_reviewers"],
+                default_quality_check_policy["provenance"]["language_review_candidates"],
                 [],
             )
             self.assertEqual(
@@ -3171,8 +3568,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     subagent_prompt_packet["internal_skill_routes"],
                 )
                 self.assertEqual(
-                    subagent_prompt_packet["tool_command_packet_command"],
-                    "python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text",
+                    subagent_prompt_packet["tool_call_tokens"],
+                    "run.repo_tool_routing_policy.sequential_tool_routes[].tool_call_token",
+                )
+                self.assertNotIn(
+                    "tool_command_packet_command", subagent_prompt_packet
                 )
                 self.assertNotIn("tool_commands", subagent_prompt_packet)
                 self.assert_role_prompt_includes(
@@ -3369,8 +3769,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
-                        "- make_ci_status: pass",
-                        "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- tool_warnings_resolved: yes",
@@ -3383,6 +3781,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
+                        "- mapping_error_sets_empty: yes",
+                        "- typed_owner_boundary_status: pass",
+                        "- canonical_dispatcher_schema_status: pass",
                         *ready_closeout_evidence_lines(),
                     ]
                 ),
@@ -3393,7 +3794,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_final_review(report_dir)
+            write_ready_completion_coverage(report_dir, run_id)
             write_ready_diff_check_artifact(report_dir)
+            write_ready_closeout_bundle(report_dir, run_id)
 
             result = subprocess.run(
                 [
@@ -3426,10 +3829,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "- repo_wide_static_analysis_complete: profile_selected",
             )
             closeout_text = closeout_text.replace(
-                "- make_ci_status: pass",
-                "- make_ci_status: targeted",
-            )
-            closeout_text = closeout_text.replace(
                 "- mechanical_loop_static_analysis_status: pass",
                 "- mechanical_loop_static_analysis_status: targeted",
             )
@@ -3451,7 +3850,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
-            self.assertIn("MAKE_CI_STATUS=targeted", result.stdout)
+            self.assertIn(
+                "MECHANICAL_LOOP_STATIC_ANALYSIS_STATUS=targeted",
+                result.stdout,
+            )
 
     def test_task_close_rejects_pending_profile_selected_static_analysis(self) -> None:
         """task_close should not treat targeted routing as a waiver for pending checks."""
@@ -3466,10 +3868,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
             closeout_text = closeout_text.replace(
                 "- repo_wide_static_analysis_complete: yes",
                 "- repo_wide_static_analysis_complete: profile_selected",
-            )
-            closeout_text = closeout_text.replace(
-                "- make_ci_status: pass",
-                "- make_ci_status: targeted",
             )
             closeout_text = closeout_text.replace(
                 "- mechanical_loop_static_analysis_status: pass",
@@ -3644,8 +4042,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
-                        "- make_ci_status: pass",
-                        "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- tool_warnings_resolved: yes",
@@ -3658,6 +4054,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
+                        "- mapping_error_sets_empty: yes",
+                        "- typed_owner_boundary_status: pass",
+                        "- canonical_dispatcher_schema_status: pass",
                         *ready_closeout_evidence_lines(workspace=workspace_root),
                     ]
                 ),
@@ -3668,7 +4067,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_final_review(report_dir)
+            write_ready_completion_coverage(report_dir, run_id)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+            write_ready_closeout_bundle(
+                report_dir,
+                run_id,
+                workspace=workspace_root,
+            )
 
             result = subprocess.run(
                 [
@@ -3687,7 +4092,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
             self.assertIn("ALL_PLANNED_CHUNKS_COMPLETE=yes", result.stdout)
             self.assertIn("OVERALL_DELIVERY_COMPLETE=yes", result.stdout)
-            self.assertIn("SPEC_PRODUCT_COVERAGE_COMPLETE=yes", result.stdout)
+            self.assertIn("COMPLETION_COVERAGE_CONSUMER_READY=True", result.stdout)
             self.assertIn("REVIEW_FINDINGS_INTEGRATED=yes", result.stdout)
             self.assertIn("POST_FIX_FULL_REVIEW_COMPLETE=yes", result.stdout)
             self.assertIn("MECHANICAL_COMPLETION_LOOP_COMPLETE=yes", result.stdout)
@@ -4907,6 +5312,81 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("subagent_wave_reconciliation_clean", result.stdout)
 
+    def test_task_close_does_not_backfill_overplanned_wave(self) -> None:
+        """An explicitly overplanned wave is skipped without synthetic actual evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "init",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            run_id = "test-task-close-overplanned-wave"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            schedule_path = report_dir / "schedule.md"
+            schedule_path.write_text(
+                schedule_path.read_text(encoding="utf-8").replace(
+                    "| none | reports/agents/run |",
+                    "| overplanning | reports/agents/run |",
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "workflow_monitoring.md").write_text(
+                "\n".join(
+                    [
+                        "# Workflow Monitoring",
+                        "",
+                        "## Actual Wave Events",
+                        "",
+                        "## Tool Warnings",
+                        "",
+                        "- tool_warnings_status: none",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=\n", result.stdout)
+            self.assertIn("CAPACITY_LIFECYCLE_BLOCKERS=closeout_packet_missing", result.stdout)
+
     def test_task_close_rejects_comment_only_actual_wave_event(self) -> None:
         """Commented wave rows are documentation, not observed wave evidence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -5393,8 +5873,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
-                        "- make_ci_status: pass",
-                        "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- tool_warnings_resolved: yes",
@@ -5491,8 +5969,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
-                        "- make_ci_status: pass",
-                        "- spec_product_coverage_complete: no",
                         "- review_findings_integrated: no",
                         "- post_fix_full_review_complete: no",
                         "- mechanical_completion_loop_complete: yes",
@@ -5530,7 +6006,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
-            self.assertIn("spec_product_coverage_complete", result.stdout)
+            self.assertIn("completion_coverage_consumer", result.stdout)
             self.assertIn("review_findings_integrated", result.stdout)
 
     def test_task_close_rejects_missing_post_fix_full_review_completion(self) -> None:
@@ -5608,8 +6084,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
-                        "- make_ci_status: pass",
-                        "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: no",
                         "- mechanical_completion_loop_complete: yes",
@@ -5704,8 +6178,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
-                        "- make_ci_status: pass",
-                        "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- tool_warnings_resolved: yes",
@@ -5821,8 +6293,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
-                        "- make_ci_status: pass",
-                        "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- tool_warnings_resolved: yes",

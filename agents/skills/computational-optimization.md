@@ -107,7 +107,7 @@ local loop contract. The packet must contain:
 - `validation_surface`: static checker, smallest deterministic numerical case,
   and any experiment or benchmark path kept separate from correctness evidence.
 
-If `agent-canon local-llm route-implementation-surface` returns
+If deterministic responsibility search routes the task to
 `numerical_iterative_algorithm_contract`, use this skill, the algorithm boundary
 document, and the JAX loop rules as the implementation source packet before
 writing code. The preferred fix is an algorithm or contract correction.

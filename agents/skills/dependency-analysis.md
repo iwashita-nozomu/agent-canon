@@ -24,6 +24,9 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py valid
   edges, design-claim evidence, or repair-planning packets are needed.
 - Boundary: code dependency evidence and dependency-header evidence remain
   separate until summarized in a structured Change Impact Packet.
+  Repository-wide dependency graph projection and rendering is owned by
+  `$code-visualization`, which receives the canonical `tool_call` envelope and
+  `render_dependency_manifest_graph` coverage checks.
 
 ## Purpose
 

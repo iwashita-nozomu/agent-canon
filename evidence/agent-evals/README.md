@@ -6,8 +6,6 @@ upstream design ../../agents/canonical/skills.md skill canon registry
 downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
 downstream implementation ../../tools/agent_tools/evaluate_agent_run.py runs behavior evals
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated result evidence
-downstream implementation ../../rust/agent-canon/src/local_llm.rs routes local LLM eval commands
-downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility evals
 downstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py runs workflow selection evals
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
 downstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py runs Codex subagent role evals
@@ -39,7 +37,6 @@ without storing run outputs here.
 | --- | --- |
 | `skill_workflow_prompt_eval.toml` | all discoverable skill shims, human-facing skill docs, and workflow docs. |
 | `agent_behavior_eval.toml` | observable run-bundle behavior evidence. |
-| `local_llm_responsibility_eval.toml` | single-file advisory responsibility analysis. |
 | `workflow_selection_eval.toml` | prompt-intake routing from user wording to workflow labels. |
 | `report_quality_eval.toml` | report-writing checklist, artifact separation, and reviewer routing. |
 | `evaluate_codex_agent_roles.py` | `.codex/agents/*.toml` role behavior, prohibitions, model / reasoning bucket, routing defaults, runtime metrics, and output-use evidence. |
@@ -58,7 +55,7 @@ order:
    `eval_accumulation_check.py` and dashboards.
 1. Keep the checker branch-free for future eval domains.
 1. Add a registry family for structural analysis, writing-flow analysis,
-   routing analysis, role behavior, local-LLM responsibility, or other non-code
+   routing analysis, role behavior, deterministic responsibility, or other non-code
    evidence, then have the producer emit reports that satisfy the declared
    filename and run-id contract.
 
@@ -161,7 +158,7 @@ python3 tools/agent_tools/run_accumulated_agent_evals.py \
 python3 tools/agent_tools/eval_accumulation_check.py --root .
 ```
 
-The producer runs the registered role, skill/workflow prompt, local LLM,
+The producer runs the registered role, skill/workflow prompt,
 workflow-selection, and report-quality evals with `--accumulate`; stdout/stderr
 go to `reports/agent-eval-runs/<run-id>/`. Agents do not hand-generate these
 reports. The gate validates directory mounted JSONL readability when available,
@@ -175,7 +172,6 @@ and bounded run stdout/stderr may live under `reports/agent-eval-runs/<run-id>/`
 
 | Eval surface | Command | Accumulated evidence and privacy rule |
 | --- | --- | --- |
-| Local LLM responsibility | `agent-canon local-llm eval --manifest evidence/agent-evals/local_llm_responsibility_eval.toml` | `--accumulate` writes `.agent-canon/log-archive/eval-results/local-llm-responsibility/`; `--run-llm` is optional and intentional. |
 | Workflow selection | `python3 tools/agent_tools/evaluate_workflow_selection.py --manifest evidence/agent-evals/workflow_selection_eval.toml` | reports list case IDs, expected workflow labels, and observed workflow labels; they do not store raw prompt text. |
 | Report quality | `python3 tools/agent_tools/evaluate_report_quality.py --manifest evidence/agent-evals/report_quality_eval.toml` | reports list checklist IDs and missing patterns; they do not store raw report drafts or prompts. |
 | Codex subagent roles | `python3 tools/agent_tools/evaluate_codex_agent_roles.py` | accumulated reports use `codex-agent-role-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>-<status>.md` and record `CODEX_AGENT_ROLE_EVAL_RUN_ID=<eval_run_id>`. |

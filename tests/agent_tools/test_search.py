@@ -2,27 +2,21 @@
 
 # @dependency-start
 # contract test
-# responsibility Tests purpose-based search across tool, local LLM card, header dependency, and code dependency providers.
+# responsibility Tests purpose-based search across tool, deterministic semantic card, header dependency, and code dependency providers.
 # upstream implementation ../../tools/agent_tools/search.py coordinates search providers
-# upstream implementation ../../tools/agent_tools/search_index.py supplies local LLM semantic cards
+# upstream implementation ../../tools/agent_tools/search_index.py supplies deterministic semantic cards
 # upstream implementation ../../tools/agent_tools/vector_search.py supplies dependency and code facts
 # upstream design ../../documents/search-coordination.md coordinated search provider contract
 # @dependency-end
 
 from __future__ import annotations
 
-import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
-from unittest import mock
-
-from tools.agent_tools import search as search_tool
-from tools.agent_tools.graph_client import GraphResponse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SEARCH = PROJECT_ROOT / "tools" / "agent_tools" / "search.py"
@@ -120,56 +114,7 @@ def run_search_with_input(
 class CoordinatedSearchTest(unittest.TestCase):
     """Verify purpose-based candidate generation."""
 
-    @staticmethod
-    def graph_response(*, status: str = "fresh", exit_code: int = 0) -> GraphResponse:
-        """Return one provenance-complete dependency query response."""
-        return GraphResponse(
-            schema="agent-canon.graph.query.v1",
-            command="query",
-            status=status,
-            exit_code=exit_code,
-            payload={
-                "reason": None if status == "fresh" else "fingerprint differs",
-                "graph_fingerprint": "fixture",
-                "nodes": [
-                    {
-                        "id": "source",
-                        "path": "documents/workflow.md",
-                    },
-                    {
-                        "id": "target",
-                        "path": "python/workflow.py",
-                    },
-                ],
-                "facts": [
-                    {
-                        "id": "fact:workflow",
-                        "kind": "dependency",
-                        "inferred": False,
-                        "from": "source",
-                        "to": "target",
-                        "producer": "source-snapshot",
-                        "source_path": "documents/workflow.md",
-                        "source_span": {
-                            "path": "documents/workflow.md",
-                            "start_line": 4,
-                            "start_column": 1,
-                            "end_line": 4,
-                            "end_column": 72,
-                        },
-                        "evidence_ref": "documents/workflow.md:4",
-                        "authority": "ManifestParser",
-                        "dependency_detail": {
-                            "direction": "upstream",
-                            "kind": "implementation",
-                            "reason": "alpha dispatch implementation target",
-                        },
-                    }
-                ],
-            },
-        )
-
-    def test_purpose_returns_tool_and_llm_card_candidate(self) -> None:
+    def test_purpose_returns_tool_and_semantic_card_candidate(self) -> None:
         """Tool search and semantic cards should agree on a cataloged tool."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -180,7 +125,7 @@ class CoordinatedSearchTest(unittest.TestCase):
                 "--purpose",
                 "find tool for dependency graph edit scope validation",
                 "--providers",
-                "llm,tool",
+                "semantic,tool",
                 "--surface",
                 ".",
                 "--format",
@@ -192,7 +137,7 @@ class CoordinatedSearchTest(unittest.TestCase):
             candidates = {item["path"]: item for item in payload["candidates"]}
             self.assertIn("tools/dependency_graph.py", candidates)
             self.assertIn("tool", candidates["tools/dependency_graph.py"]["providers"])
-            self.assertIn("llm", candidates["tools/dependency_graph.py"]["providers"])
+            self.assertIn("semantic", candidates["tools/dependency_graph.py"]["providers"])
 
     def test_query_file_returns_tool_candidate(self) -> None:
         """File-backed long queries should use the same search pipeline."""
@@ -349,43 +294,21 @@ class CoordinatedSearchTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             write_search_fixture(root)
-            graph_client = mock.Mock()
-            graph_client.query.return_value = self.graph_response()
-            stdout = io.StringIO()
-            stderr = io.StringIO()
-            with (
-                mock.patch.object(
-                    search_tool, "GraphClient", return_value=graph_client
-                ) as constructor,
-                redirect_stdout(stdout),
-                redirect_stderr(stderr),
-            ):
-                return_code = search_tool.main(
-                    [
-                        "--root",
-                        str(root),
-                        "--purpose",
-                        "alpha dispatch workflow implementation target",
-                        "--providers",
-                        "header-deps,code-deps",
-                        "--surface",
-                        ".",
-                        "--format",
-                        "json",
-                    ]
-                )
 
-            self.assertEqual(return_code, 0, stderr.getvalue())
-            constructor.assert_called_once_with(
-                root.resolve(), search_tool.CANONICAL_GRAPH_EXECUTABLE
+            result = run_search(
+                root,
+                "--purpose",
+                "alpha dispatch workflow implementation target",
+                "--providers",
+                "header-deps,code-deps",
+                "--surface",
+                ".",
+                "--format",
+                "json",
             )
-            graph_client.query.assert_called_once_with(
-                all=True,
-                relation="dependency",
-                direction="both",
-                depth=0,
-            )
-            payload = json.loads(stdout.getvalue())
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
             providers = {
                 evidence["provider"]
                 for item in payload["candidates"]
@@ -395,79 +318,6 @@ class CoordinatedSearchTest(unittest.TestCase):
             self.assertIn("header-deps", providers)
             self.assertIn("code-deps", providers)
             self.assertIn("python/workflow.py", paths)
-            header_evidence = " ".join(
-                evidence["evidence"]
-                for item in payload["candidates"]
-                for evidence in item["evidence"]
-                if evidence["provider"] == "header-deps"
-            )
-            for value in (
-                "producer=source-snapshot",
-                "evidence_ref=documents/workflow.md:4",
-                "authority=ManifestParser",
-            ):
-                self.assertIn(value, header_evidence)
-
-    def test_without_header_provider_makes_zero_graph_calls(self) -> None:
-        """Provider selection closes the graph call boundary."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write_search_fixture(root)
-            request = search_tool.SearchRequest(
-                root=root,
-                query=search_tool.query_profile("alpha dispatch"),
-                providers=("code-deps",),
-                surfaces=(".",),
-                excludes=(),
-                index_dir=root / ".index",
-                top=10,
-                refresh_index=False,
-                run_llm=False,
-                llama_cli="",
-                model="",
-                max_llm_files=0,
-                max_bytes=100_000,
-            )
-            with mock.patch.object(
-                search_tool,
-                "GraphClient",
-                side_effect=AssertionError("unexpected graph call"),
-            ):
-                corpus = search_tool.load_corpus(request)
-
-        self.assertEqual(corpus.dependency_edges, ())
-
-    def test_nonfresh_header_graph_fails_without_fallback(self) -> None:
-        """Nonfresh dependency evidence is not converted to an empty edge set."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write_search_fixture(root)
-            graph_client = mock.Mock()
-            graph_client.query.return_value = self.graph_response(
-                status="stale", exit_code=3
-            )
-            stderr = io.StringIO()
-            with (
-                mock.patch.object(
-                    search_tool, "GraphClient", return_value=graph_client
-                ),
-                redirect_stderr(stderr),
-            ):
-                return_code = search_tool.main(
-                    [
-                        "--root",
-                        str(root),
-                        "--purpose",
-                        "alpha dispatch",
-                        "--providers",
-                        "header-deps",
-                    ]
-                )
-
-        self.assertEqual(return_code, 1)
-        self.assertIn("AGENT_SEARCH=fail", stderr.getvalue())
-        self.assertIn("status=stale", stderr.getvalue())
-        graph_client.query.assert_called_once()
 
 
 if __name__ == "__main__":

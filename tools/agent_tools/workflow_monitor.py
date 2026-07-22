@@ -3,10 +3,10 @@
 # contract tool
 # responsibility Appends workflow monitoring evidence to run bundles.
 # upstream design ../../agents/templates/workflow_monitoring.md defines monitor sections
+# upstream implementation ./work_log.py owns canonical semantic-ledger append/read
 # upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
-# upstream implementation ./runtime_log_paths.py provides the canonical Codex trace join key
-# downstream implementation ./agent_team.py stages initial monitoring artifacts atomically
-# downstream implementation ./generate_agent_runtime_dashboard.py consumes runtime measurement inputs
+# upstream implementation ./work_log.py appends canonical logical-ledger events
+# upstream implementation ./update_lifecycle_contract.py owns update states and evidence identity.
 # downstream implementation ../../tests/agent_tools/test_workflow_monitor.py tests it
 # @dependency-end
 """Append machine-readable workflow monitoring evidence to one run bundle."""
@@ -17,14 +17,14 @@ import argparse
 import fcntl
 import json
 import re
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
-from typing import Literal, TextIO, cast
+from typing import TextIO, cast
 
-from agent_team import resolve_report_root, schedule_wave_row, workflow_wave_event_line
+from agent_team import resolve_report_root, schedule_wave_row
 from mid_task_user_input_policy import (
     MID_TASK_CLASSIFICATION_ACTIONS,
     MID_TASK_CLASSIFICATION_SCOPE_STATUS,
@@ -37,7 +37,8 @@ from mid_task_user_input_policy import (
     has_reuse_marker,
     is_empty_policy_value,
 )
-from runtime_log_paths import codex_trace_key
+from work_log import MONITOR_PASSTHROUGH_FIELDS, append_ledger_event
+from update_lifecycle_contract import TRANSACTION_STATES
 
 DECISION_KEYS = (
     "skill_improvement_decision",
@@ -88,6 +89,31 @@ SUBAGENT_WAVE_EVENT_KINDS = {
     "skipped",
     "authority_blocker",
 }
+COMPLETION_SEMANTIC_KINDS = {
+    "request_clause",
+    "responsibility_unit",
+    "decision",
+    "change",
+    "review_finding",
+    "validation",
+    "failure",
+    "publication_state",
+    "deferral",
+}
+SEMANTIC_EVENT_REQUIRED_KEYS = (
+    "event_id",
+    "context_id",
+    "semantic_kind",
+    "owner",
+    "state_owner",
+    "api_owner",
+    "dependency_owner",
+    "responsibility_unit",
+    "intent_id",
+    "outcome",
+    "evidence_refs",
+    "artifact_refs",
+)
 SUBAGENT_WAVE_EMPTY_OK_STATUSES = {
     "blocked",
     "blocked_authority_required",
@@ -115,8 +141,6 @@ RUNTIME_PROFILE_INVENTORY_PATH = (
     / "documents"
     / "runtime-profiles-and-check-matrix.json"
 )
-RUNTIME_MEASUREMENT_SIGNAL = "runtime_measurement_input="
-SHA256_RE = re.compile(r"[0-9a-f]{64}")
 
 
 def validation_failure_taxonomy_values(field: str) -> frozenset[str]:
@@ -127,9 +151,7 @@ def validation_failure_taxonomy_values(field: str) -> frozenset[str]:
     data = cast(dict[str, object], raw_data)
     raw_response = data.get("validation_failure_response")
     if not isinstance(raw_response, dict):
-        raise ValueError(
-            "runtime profile inventory missing validation_failure_response"
-        )
+        raise ValueError("runtime profile inventory missing validation_failure_response")
     response = cast(dict[str, object], raw_response)
     raw_values = response.get(field)
     if not isinstance(raw_values, list) or not raw_values:
@@ -155,26 +177,26 @@ VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES = validation_failure_taxonomy_val
 )
 STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
     "skill_invocation=$agent-orchestration status=observed",
-    "subagent_lifecycle=closed subagents_closed=yes fresh_subagents_required=true",
+    (
+        "close_agent_tool_call=machine_token_required "
+        "schema=agent-canon.close-agent-tool-call.v1 prose_substitute=forbidden"
+    ),
     (
         "tool_call=run_repo_dependency_review.sh repo_dependency_review=pass "
         "scope=repo-wide"
     ),
-    "tool_call=make ci static_analysis=pass scope=repo-wide",
-    "tool_call=pyright code_checker=pass checker=pyright scope=repo-wide",
-    "tool_call=ruff code_checker=pass checker=ruff scope=repo-wide",
-    (
-        "tool_call=oop-readability-check code_checker=pass "
-        "checker=oop-readability scope=changed-paths"
-    ),
-    "tool_call=check_convention_compliance.py CONVENTION_COMPLIANCE=pass",
+    "tool_call=canonical-format-check code_checker=pass checker=markdown-math-mermaid scope=changed-paths",
+    "hook_dispatcher=official schema=agent-canon.posttooluse-stop.v1 events=PostToolUse,Stop",
     "static_analysis_feedback=recorded target=review-backlog-scan",
     (
         "hook_tool_feedback=reviewed parent_protocol_update=not_required "
         "subagent_protocol_update=not_required "
         "protocol_feedback_reason=standard-closeout-no-new-protocol-change"
     ),
-    ("pre_edit_rejection_prediction=reviewed predicted_tool_rejection_gates=recorded"),
+    (
+        "pre_edit_rejection_prediction=reviewed "
+        "predicted_tool_rejection_gates=recorded"
+    ),
     "validation_failure_not_observed reason=standard-closeout-preset",
     "execution_path_comparison_not_required reason=single-active-route",
     "token_efficiency_not_required reason=no-comparable-session",
@@ -190,6 +212,8 @@ STANDARD_CLOSEOUT_SIGNALS = (
     "validation_status=pass",
     "drift_risk=checked",
 )
+UPDATE_LIFECYCLE_MONITORING_SCHEMA = "agent-canon.update-lifecycle-monitoring.v1"
+EVIDENCE_REF_RE = re.compile(r"^evidence:[0-9a-f]{64}$")
 
 
 def empty_decisions() -> dict[str, str]:
@@ -198,11 +222,23 @@ def empty_decisions() -> dict[str, str]:
 
 
 @dataclass(frozen=True)
+class LifecycleMonitoringEvidence:
+    """Pointer-only update lifecycle evidence consumed by the monitor."""
+
+    decision_sufficiency_packet_ref: str
+    decision_sufficiency_rejection_ref: str | None
+    lifecycle_state: str
+    evidence_refs: tuple[str, ...]
+    close_agent_tool_call_ref: str | None
+
+
+@dataclass(frozen=True)
 class MonitoringEntries:
     """Structured inputs for one workflow monitoring append."""
 
     signals: tuple[str, ...] = ()
     behavior_events: tuple[str, ...] = ()
+    semantic_events: tuple[str, ...] = ()
     runtime_feedback: tuple[str, ...] = ()
     tool_warnings: tuple[str, ...] = ()
     tool_warning_status: str = ""
@@ -211,29 +247,14 @@ class MonitoringEntries:
     interventions: tuple[str, ...] = ()
     decisions: Mapping[str, str] = field(default_factory=empty_decisions)
     timestamp: str = ""
-    responsibility_unit_id: str = ""
-    codex_trace_key: str | None = None
-    generation_parent: str | None = None
-    reuse_mode: str | None = None
-    packet_hash: str | None = None
-    context_bytes_by_source: tuple[tuple[str, int], ...] = ()
-    finding_iteration: int | None = None
-    review_iteration: int | None = None
-    writer_ids: tuple[str, ...] = ()
-    reviewer_ids: tuple[str, ...] = ()
-    launch_epoch: int | None = None
-    finish_epoch: int | None = None
-    retries: int | None = None
-    waits: int | None = None
-    progress_bytes: int | None = None
-    token_footprint_ref: str | None = None
-    artifact_hashes: tuple[str, ...] = ()
+    lifecycle_evidence: LifecycleMonitoringEvidence | None = None
 
 
 EMPTY_MONITORING_ENTRIES = MonitoringEntries()
 MONITORING_LEGACY_KEYS = {
     "signals",
     "behavior_events",
+    "semantic_events",
     "runtime_feedback",
     "tool_warnings",
     "tool_warning_status",
@@ -242,58 +263,7 @@ MONITORING_LEGACY_KEYS = {
     "interventions",
     "decisions",
     "timestamp",
-    "responsibility_unit_id",
-    "codex_trace_key",
-    "generation_parent",
-    "reuse_mode",
-    "packet_hash",
-    "context_bytes_by_source",
-    "finding_iteration",
-    "review_iteration",
-    "writer_ids",
-    "reviewer_ids",
-    "launch_epoch",
-    "finish_epoch",
-    "retries",
-    "waits",
-    "progress_bytes",
-    "token_footprint_ref",
-    "artifact_hashes",
 }
-
-
-def build_run_start_monitoring_entries(
-    *,
-    command: Literal["task_start", "bootstrap_agent_run"],
-    report_dir: Path,
-    created_at_iso: str,
-    start_declaration: str,
-    role_ids: tuple[str, ...],
-    preflight_status: str,
-    writer_ids: tuple[str, ...] = (),
-    reviewer_ids: tuple[str, ...] = (),
-) -> MonitoringEntries:
-    """Build the canonical initial monitoring value for an activating producer."""
-    reason = "task_start_default" if command == "task_start" else "bootstrap_default"
-    return MonitoringEntries(
-        signals=(
-            start_declaration,
-            f"stage owner routing active_roles={','.join(role_ids)}",
-            f"agent_canon_preflight={preflight_status}",
-            f"web_research_not_required: {command} does not decide external research",
-        ),
-        interventions=(
-            f"created run bundle and workflow_monitoring.md at {report_dir}",
-        ),
-        behavior_events=(f"token_efficiency_not_required reason={reason}",),
-        timestamp=created_at_iso,
-        responsibility_unit_id=report_dir.name,
-        codex_trace_key=codex_trace_key() or None,
-        reuse_mode="fresh",
-        writer_ids=tuple(sorted(set(writer_ids or role_ids))),
-        reviewer_ids=tuple(sorted(set(reviewer_ids))),
-        launch_epoch=parse_epoch_millis(created_at_iso),
-    )
 
 
 @contextmanager
@@ -343,7 +313,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Workspace root used with --run-id and relative report roots.",
     )
     add_monitoring_entry_arguments(parser)
-    add_runtime_measurement_arguments(parser)
     add_tool_warning_arguments(parser)
     add_mid_task_user_input_argument(parser)
     add_subagent_wave_argument(parser)
@@ -375,6 +344,16 @@ def add_monitoring_entry_arguments(parser: argparse.ArgumentParser) -> None:
         ),
     )
     parser.add_argument(
+        "--semantic-event",
+        action="append",
+        default=[],
+        help=(
+            "Append one typed logical-ledger event. Required keys: event_id, "
+            "semantic_kind, owner, state_owner, api_owner, dependency_owner, "
+            "intent_id, outcome, evidence_refs, artifact_refs."
+        ),
+    )
+    parser.add_argument(
         "--runtime-feedback",
         action="append",
         default=[],
@@ -383,51 +362,6 @@ def add_monitoring_entry_arguments(parser: argparse.ArgumentParser) -> None:
             "example 'source=user target=.agents/skills/foo/SKILL.md action=prompt_repair'."
         ),
     )
-
-
-def add_runtime_measurement_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add the canonical responsibility-unit measurement input fields."""
-    parser.add_argument("--responsibility-unit-id", default="")
-    parser.add_argument("--codex-trace-key")
-    parser.add_argument("--generation-parent")
-    parser.add_argument("--reuse-mode")
-    parser.add_argument("--packet-hash")
-    parser.add_argument(
-        "--context-bytes",
-        action="append",
-        default=[],
-        metavar="SOURCE=COUNT",
-    )
-    parser.add_argument("--finding-iteration", type=nonnegative_int)
-    parser.add_argument("--review-iteration", type=nonnegative_int)
-    parser.add_argument("--writer-id", action="append", default=[])
-    parser.add_argument("--reviewer-id", action="append", default=[])
-    parser.add_argument("--launch-epoch", type=nonnegative_int)
-    parser.add_argument("--finish-epoch", type=nonnegative_int)
-    parser.add_argument("--retries", type=nonnegative_int)
-    parser.add_argument("--waits", type=nonnegative_int)
-    parser.add_argument("--progress-bytes", type=nonnegative_int)
-    parser.add_argument("--token-footprint-ref")
-    parser.add_argument("--artifact-hash", action="append", default=[])
-
-
-def nonnegative_int(value: str) -> int:
-    """Parse one producer-recorded nonnegative integer."""
-    parsed = int(value)
-    if parsed < 0:
-        raise argparse.ArgumentTypeError("expected a nonnegative integer")
-    return parsed
-
-
-def context_byte_entries(values: list[str]) -> tuple[tuple[str, int], ...]:
-    """Parse and sort canonical source-id byte counts."""
-    result: dict[str, int] = {}
-    for value in values:
-        source, separator, raw_count = value.partition("=")
-        if not separator or not source:
-            raise ValueError("--context-bytes must use SOURCE=COUNT")
-        result[source] = nonnegative_int(raw_count)
-    return tuple(sorted(result.items()))
 
 
 def add_tool_warning_arguments(parser: argparse.ArgumentParser) -> None:
@@ -500,9 +434,10 @@ def add_closeout_decision_arguments(parser: argparse.ArgumentParser) -> None:
         "--closeout-token-preset",
         action="store_true",
         help=(
-            "Append the standard closeout behavior tokens consumed by "
-            "evaluate_agent_run.py. Use only after the corresponding evidence "
-            "has already been verified in the run bundle."
+            "Append standard closeout observations consumed by "
+            "evaluate_agent_run.py. This preset never substitutes for a canonical "
+            "CloseAgentToolCall; use only after lifecycle evidence and the token "
+            "reference have been recorded through append_monitoring."
         ),
     )
     parser.add_argument(
@@ -530,7 +465,8 @@ def default_monitoring_text(report_dir: Path) -> str:
             "<!--",
             "@dependency-start",
             "responsibility Records workflow monitoring for this run bundle.",
-            "upstream design ../../../agents/templates/workflow_monitoring.md template",
+            "upstream design ../../../agents/templates/"
+            "workflow_monitoring.md template",
             "@dependency-end",
             "-->",
             "",
@@ -583,73 +519,6 @@ def normalize_entry(entry: str, timestamp: str) -> str:
     return f"- {timestamp_prefix(timestamp)}{stripped}"
 
 
-def parse_epoch_millis(timestamp: str) -> int | None:
-    """Return epoch milliseconds for an ISO timestamp when present."""
-    if not timestamp:
-        return None
-    try:
-        parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return int(parsed.timestamp() * 1000)
-
-
-def runtime_measurement_input(entries: MonitoringEntries) -> str | None:
-    """Render the sole canonical runtime-measurement producer record."""
-    if not entries.responsibility_unit_id:
-        return None
-    validate_runtime_measurement_input(entries)
-    payload: dict[str, object] = {
-        "responsibility_unit_id": entries.responsibility_unit_id,
-        "codex_trace_key": entries.codex_trace_key,
-        "generation_parent": entries.generation_parent,
-        "reuse_mode": entries.reuse_mode,
-        "packet_hash": entries.packet_hash,
-        "context_bytes_by_source": dict(sorted(entries.context_bytes_by_source)),
-        "finding_iteration": entries.finding_iteration,
-        "review_iteration": entries.review_iteration,
-        "writer_ids": sorted(set(entries.writer_ids)),
-        "reviewer_ids": sorted(set(entries.reviewer_ids)),
-        "launch_epoch": entries.launch_epoch,
-        "finish_epoch": entries.finish_epoch,
-        "retries": entries.retries,
-        "waits": entries.waits,
-        "progress_bytes": entries.progress_bytes,
-        "token_footprint_ref": entries.token_footprint_ref,
-        "artifact_hashes": sorted(entries.artifact_hashes),
-    }
-    return RUNTIME_MEASUREMENT_SIGNAL + json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-
-
-def validate_runtime_measurement_input(entries: MonitoringEntries) -> None:
-    """Reject malformed canonical measurement inputs before publication."""
-    if not entries.responsibility_unit_id.strip():
-        raise ValueError("responsibility_unit_id must not be blank")
-    optional_counts = (
-        entries.finding_iteration,
-        entries.review_iteration,
-        entries.launch_epoch,
-        entries.finish_epoch,
-        entries.retries,
-        entries.waits,
-        entries.progress_bytes,
-    )
-    if any(value is not None and value < 0 for value in optional_counts):
-        raise ValueError("runtime measurement counts must be nonnegative")
-    if any(not source or count < 0 for source, count in entries.context_bytes_by_source):
-        raise ValueError("context_bytes_by_source must contain source/nonnegative pairs")
-    if entries.packet_hash is not None and SHA256_RE.fullmatch(entries.packet_hash) is None:
-        raise ValueError("packet_hash must be a lowercase sha256 value")
-    if any(SHA256_RE.fullmatch(value) is None for value in entries.artifact_hashes):
-        raise ValueError("artifact_hashes must contain lowercase sha256 values")
-
-
 def normalize_runtime_feedback(entry: str) -> str:
     """Render one runtime feedback event with stable machine-readable tokens."""
     stripped = entry.strip()
@@ -658,6 +527,81 @@ def normalize_runtime_feedback(entry: str) -> str:
     if "target=" not in stripped or "action=" not in stripped:
         raise ValueError("runtime feedback must include target=... and action=...")
     return f"runtime_feedback=observed {stripped}"
+
+
+def normalize_semantic_event(entry: str) -> str:
+    """Validate one semantic ledger event before monitoring records it."""
+    fields = parse_token_fields(entry.strip())
+    missing = [key for key in SEMANTIC_EVENT_REQUIRED_KEYS if not fields.get(key)]
+    if missing:
+        raise ValueError(
+            "semantic event must include required keys: " + ",".join(missing)
+        )
+    if fields["semantic_kind"] not in COMPLETION_SEMANTIC_KINDS:
+        raise ValueError(
+            "semantic_kind must be one of: "
+            + ",".join(sorted(COMPLETION_SEMANTIC_KINDS))
+        )
+    for field in MONITOR_PASSTHROUGH_FIELDS:
+        _structured_semantic_field(fields, field)
+    return f"ledger_event=projected {entry.strip()}"
+
+
+def semantic_event_record(entry: str, report_dir: Path) -> dict[str, object]:
+    """Convert one monitor token event into the canonical work-ledger record."""
+    fields = parse_token_fields(entry.strip())
+    missing = [key for key in SEMANTIC_EVENT_REQUIRED_KEYS if not fields.get(key)]
+    if missing:
+        raise ValueError(
+            "semantic event must include required keys: " + ",".join(missing)
+        )
+    def refs(name: str) -> list[str]:
+        values = [item.strip() for item in fields.get(name, "").split(",") if item.strip()]
+        if not values:
+            raise ValueError(f"semantic event requires non-empty {name}")
+        return values
+
+    event: dict[str, object] = {
+        "run_id": report_dir.name,
+        "context_id": fields["context_id"],
+        "event_id": fields["event_id"],
+        "semantic_kind": fields["semantic_kind"],
+        "owner": fields["owner"],
+        "state_owner": fields["state_owner"],
+        "api_owner": fields["api_owner"],
+        "dependency_owner": fields["dependency_owner"],
+        "responsibility_unit": fields["responsibility_unit"],
+        "intent_id": fields["intent_id"],
+        "outcome": fields["outcome"],
+        "evidence_refs": refs("evidence_refs"),
+        "artifact_refs": refs("artifact_refs"),
+    }
+    for optional in ("sequence", "clause_id", "mapping_mode"):
+        if fields.get(optional):
+            event[optional] = fields[optional]
+    if fields.get("member_clause_ids"):
+        event["member_clause_ids"] = refs("member_clause_ids")
+    for field in MONITOR_PASSTHROUGH_FIELDS:
+        value = _structured_semantic_field(fields, field)
+        if value is not None:
+            event[field] = value
+    return event
+
+
+def _structured_semantic_field(
+    fields: Mapping[str, str], field: str
+) -> Mapping[str, object] | list[object] | None:
+    """Decode schema-owned structured evidence without dropping it at the monitor boundary."""
+    raw = fields.get(field, "").strip()
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"semantic event {field} must be compact JSON") from exc
+    if not isinstance(value, (dict, list)):
+        raise ValueError(f"semantic event {field} must be an object or list")
+    return cast(Mapping[str, object] | list[object], value)
 
 
 def parse_token_fields(entry: str) -> dict[str, str]:
@@ -683,14 +627,10 @@ def normalize_subagent_wave(entry: str) -> dict[str, str]:
         if fields.get(key, "").strip().lower() in {"", "missing"}
     ]
     if missing:
-        raise ValueError(
-            "subagent wave must include required keys: " + ",".join(missing)
-        )
+        raise ValueError("subagent wave must include required keys: " + ",".join(missing))
     normalized = dict(fields)
     normalized.setdefault("event_kind", "spawned")
-    normalized.setdefault(
-        "delegated_policy_ref", "team_manifest.yaml#run.delegated_spawn_policy"
-    )
+    normalized.setdefault("delegated_policy_ref", "team_manifest.yaml#run.delegated_spawn_policy")
     event_kind = normalized["event_kind"]
     if event_kind not in SUBAGENT_WAVE_EVENT_KINDS:
         raise ValueError(
@@ -711,7 +651,9 @@ def normalize_subagent_wave(entry: str) -> dict[str, str]:
     if is_delegated and is_empty_policy_value(
         normalized.get("remaining_spawn_budget", "")
     ):
-        raise ValueError("delegated subagent wave must include remaining_spawn_budget")
+        raise ValueError(
+            "delegated subagent wave must include remaining_spawn_budget"
+        )
     validate_validation_failure_wave(normalized)
     return normalized
 
@@ -870,9 +812,8 @@ def validate_mid_task_target_and_evidence(
     classification: str,
 ) -> None:
     """Validate classification-specific target and evidence fields."""
-    if (
-        classification in MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS
-        and is_empty_policy_value(fields.get("target_agents", ""))
+    if classification in MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS and is_empty_policy_value(
+        fields.get("target_agents", "")
     ):
         raise ValueError(
             f"mid-task target_agents for {classification} must identify an agent or role"
@@ -1052,41 +993,35 @@ def upsert_subagent_wave_schedule_rows(
     if not rows:
         return
     schedule_path = report_dir / "schedule.md"
+    desired = {row["wave_id"]: schedule_wave_row(row) for row in rows}
+    replaced: set[str] = set()
     with locked_existing_artifact(schedule_path) as handle:
         lines = handle.read().splitlines()
-        upsert_subagent_wave_schedule_lines(lines, rows)
+        ensure_section(lines, "## Agent Wave Ledger")
+        start, end = section_bounds(lines, "## Agent Wave Ledger")
+        index = start + 1
+        while index < end:
+            wave_id = markdown_wave_id(lines[index])
+            if wave_id not in desired:
+                index += 1
+                continue
+            if wave_id in replaced:
+                del lines[index]
+                end -= 1
+                continue
+            lines[index] = desired[wave_id]
+            replaced.add(wave_id)
+            index += 1
+        missing_rows = [
+            desired[wave_id]
+            for wave_id in desired
+            if wave_id not in replaced
+        ]
+        if missing_rows:
+            insert_entries(lines, "## Agent Wave Ledger", missing_rows)
         handle.seek(0)
         handle.truncate()
         handle.write("\n".join(lines).rstrip() + "\n")
-
-
-def upsert_subagent_wave_schedule_lines(
-    lines: list[str],
-    rows: tuple[dict[str, str], ...],
-) -> None:
-    """Purely insert or replace actual subagent wave rows in schedule lines."""
-    if not rows:
-        return
-    desired = {row["wave_id"]: schedule_wave_row(row) for row in rows}
-    replaced: set[str] = set()
-    ensure_section(lines, "## Agent Wave Ledger")
-    start, end = section_bounds(lines, "## Agent Wave Ledger")
-    index = start + 1
-    while index < end:
-        wave_id = markdown_wave_id(lines[index])
-        if wave_id not in desired:
-            index += 1
-            continue
-        if wave_id in replaced:
-            del lines[index]
-            end -= 1
-            continue
-        lines[index] = desired[wave_id]
-        replaced.add(wave_id)
-        index += 1
-    missing_rows = [desired[wave_id] for wave_id in desired if wave_id not in replaced]
-    if missing_rows:
-        insert_entries(lines, "## Agent Wave Ledger", missing_rows)
 
 
 def normalize_tool_warning(entry: str) -> str:
@@ -1305,51 +1240,6 @@ def decision_entries(value: object) -> Mapping[str, str]:
     raise TypeError(f"expected decision mapping, got {type(value).__name__}")
 
 
-def optional_text(value: object) -> str | None:
-    """Return an optional legacy text field without inventing an empty value."""
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise TypeError(f"expected optional string, got {type(value).__name__}")
-    return value
-
-
-def optional_count(value: object) -> int | None:
-    """Return an optional producer count while preserving explicit zero."""
-    if value is None:
-        return None
-    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-        raise TypeError("expected optional nonnegative integer")
-    return value
-
-
-def context_byte_mapping(value: object) -> tuple[tuple[str, int], ...]:
-    """Return sorted source byte-count pairs from the legacy API."""
-    if value is None:
-        return ()
-    pairs: list[tuple[object, object]] = []
-    if isinstance(value, Mapping):
-        pairs.extend(cast("Mapping[object, object]", value).items())
-    elif isinstance(value, (list, tuple)):
-        for raw_item in cast(Sequence[object], value):
-            if not isinstance(raw_item, (list, tuple)):
-                raise TypeError("expected context byte-count pairs")
-            pair = cast(Sequence[object], raw_item)
-            if len(pair) != 2:
-                raise TypeError("expected context byte-count pairs")
-            pairs.append((pair[0], pair[1]))
-    else:
-        raise TypeError("expected context byte-count mapping or pairs")
-    result: dict[str, int] = {}
-    for key, count in pairs:
-        if not isinstance(key, str) or not isinstance(count, int) or isinstance(count, bool):
-            raise TypeError("expected string/nonnegative integer context byte pair")
-        if count < 0:
-            raise TypeError("expected string/nonnegative integer context byte pair")
-        result[key] = count
-    return tuple(sorted(result.items()))
-
-
 def entries_from_legacy(kwargs: dict[str, object]) -> MonitoringEntries:
     """Build structured monitoring entries from the pre-dataclass keyword API."""
     unknown = set(kwargs) - MONITORING_LEGACY_KEYS
@@ -1359,6 +1249,7 @@ def entries_from_legacy(kwargs: dict[str, object]) -> MonitoringEntries:
         signals=string_entries(kwargs.get("signals")),
         behavior_events=string_entries(kwargs.get("behavior_events")),
         runtime_feedback=string_entries(kwargs.get("runtime_feedback")),
+        semantic_events=string_entries(kwargs.get("semantic_events")),
         tool_warnings=string_entries(kwargs.get("tool_warnings")),
         tool_warning_status=str(kwargs.get("tool_warning_status", "")),
         mid_task_user_inputs=string_entries(kwargs.get("mid_task_user_inputs")),
@@ -1366,25 +1257,6 @@ def entries_from_legacy(kwargs: dict[str, object]) -> MonitoringEntries:
         interventions=string_entries(kwargs.get("interventions")),
         decisions=decision_entries(kwargs.get("decisions")),
         timestamp=str(kwargs.get("timestamp", "")),
-        responsibility_unit_id=str(kwargs.get("responsibility_unit_id", "")),
-        codex_trace_key=optional_text(kwargs.get("codex_trace_key")),
-        generation_parent=optional_text(kwargs.get("generation_parent")),
-        reuse_mode=optional_text(kwargs.get("reuse_mode")),
-        packet_hash=optional_text(kwargs.get("packet_hash")),
-        context_bytes_by_source=context_byte_mapping(
-            kwargs.get("context_bytes_by_source")
-        ),
-        finding_iteration=optional_count(kwargs.get("finding_iteration")),
-        review_iteration=optional_count(kwargs.get("review_iteration")),
-        writer_ids=string_entries(kwargs.get("writer_ids")),
-        reviewer_ids=string_entries(kwargs.get("reviewer_ids")),
-        launch_epoch=optional_count(kwargs.get("launch_epoch")),
-        finish_epoch=optional_count(kwargs.get("finish_epoch")),
-        retries=optional_count(kwargs.get("retries")),
-        waits=optional_count(kwargs.get("waits")),
-        progress_bytes=optional_count(kwargs.get("progress_bytes")),
-        token_footprint_ref=optional_text(kwargs.get("token_footprint_ref")),
-        artifact_hashes=string_entries(kwargs.get("artifact_hashes")),
     )
 
 
@@ -1394,9 +1266,13 @@ def normalized_wave_rows(
     """Return normalized mid-task and subagent wave rows."""
     return (
         tuple(
-            normalize_mid_task_user_input(item) for item in entries.mid_task_user_inputs
+            normalize_mid_task_user_input(item)
+            for item in entries.mid_task_user_inputs
         ),
-        tuple(normalize_subagent_wave(item) for item in entries.subagent_waves),
+        tuple(
+            normalize_subagent_wave(item)
+            for item in entries.subagent_waves
+        ),
     )
 
 
@@ -1410,6 +1286,50 @@ def append_wave_schedule_rows(
     upsert_subagent_wave_schedule_rows(report_dir, subagent_wave_rows)
 
 
+def lifecycle_monitoring_record(
+    evidence: LifecycleMonitoringEvidence,
+) -> dict[str, object]:
+    """Validate and return one pointer-only lifecycle monitor record."""
+    if not evidence.decision_sufficiency_packet_ref:
+        raise ValueError("lifecycle_monitoring:decision_packet_ref_missing")
+    if evidence.lifecycle_state not in TRANSACTION_STATES:
+        raise ValueError("lifecycle_monitoring:state_invalid")
+    if not evidence.evidence_refs:
+        raise ValueError("lifecycle_monitoring:evidence_refs_missing")
+    if any(EVIDENCE_REF_RE.fullmatch(ref) is None for ref in evidence.evidence_refs):
+        raise ValueError("lifecycle_monitoring:evidence_ref_invalid")
+    if len(evidence.evidence_refs) != len(set(evidence.evidence_refs)):
+        raise ValueError("lifecycle_monitoring:evidence_ref_duplicate")
+    if (
+        evidence.lifecycle_state == "closed"
+        and not evidence.close_agent_tool_call_ref
+    ):
+        raise ValueError("lifecycle_monitoring:close_tool_call_ref_missing")
+    return {
+        "schema": UPDATE_LIFECYCLE_MONITORING_SCHEMA,
+        "decision_sufficiency_packet_ref": evidence.decision_sufficiency_packet_ref,
+        "decision_sufficiency_rejection_ref": evidence.decision_sufficiency_rejection_ref,
+        "lifecycle_state": evidence.lifecycle_state,
+        "evidence_refs": list(evidence.evidence_refs),
+        "close_agent_tool_call_ref": evidence.close_agent_tool_call_ref,
+    }
+
+
+def append_lifecycle_monitoring_record(
+    lines: list[str],
+    evidence: LifecycleMonitoringEvidence | None,
+) -> None:
+    """Append one canonical JSON record through the locked monitor path."""
+    if evidence is None:
+        return
+    record = lifecycle_monitoring_record(evidence)
+    insert_entries(
+        lines,
+        "## Update Lifecycle Evidence",
+        [json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":"))],
+    )
+
+
 def append_monitoring_sections(
     lines: list[str],
     entries: MonitoringEntries,
@@ -1418,14 +1338,17 @@ def append_monitoring_sections(
 ) -> None:
     """Apply normalized monitoring rows to workflow_monitoring.md sections."""
     signal_entries = [
-        normalize_entry(item, entries.timestamp) for item in entries.signals
+        normalize_entry(item, entries.timestamp)
+        for item in entries.signals
     ]
-    measurement_input = runtime_measurement_input(entries)
-    if measurement_input is not None:
-        signal_entries.append(normalize_entry(measurement_input, entries.timestamp))
     behavior_entries = [
-        normalize_entry(item, entries.timestamp) for item in entries.behavior_events
+        normalize_entry(item, entries.timestamp)
+        for item in entries.behavior_events
     ]
+    behavior_entries.extend(
+        normalize_entry(normalize_semantic_event(item), entries.timestamp)
+        for item in entries.semantic_events
+    )
     behavior_entries.extend(
         normalize_entry(normalize_runtime_feedback(item), entries.timestamp)
         for item in entries.runtime_feedback
@@ -1451,7 +1374,8 @@ def append_monitoring_sections(
         for item in entries.tool_warnings
     ]
     intervention_entries = [
-        normalize_entry(item, entries.timestamp) for item in entries.interventions
+        normalize_entry(item, entries.timestamp)
+        for item in entries.interventions
     ]
     insert_entries(lines, "## Signals", signal_entries)
     insert_entries(lines, "## Behavior Events", behavior_entries)
@@ -1468,49 +1392,8 @@ def append_monitoring_sections(
         inferred_tool_warning_status,
     )
     insert_entries(lines, "## Interventions", intervention_entries)
+    append_lifecycle_monitoring_record(lines, entries.lifecycle_evidence)
     apply_decisions(lines, dict(entries.decisions))
-
-
-def render_monitoring_artifacts(
-    *,
-    schedule_text: str,
-    workflow_monitoring_text: str,
-    entries: MonitoringEntries,
-    initial_wave_row: Mapping[str, str] | None,
-) -> tuple[str, str]:
-    """Render initial schedule and monitoring bytes without opening run paths."""
-    schedule_lines = schedule_text.splitlines()
-    monitoring_lines = workflow_monitoring_text.splitlines()
-    mid_task_rows, subagent_wave_rows = normalized_wave_rows(entries)
-    if initial_wave_row is not None:
-        row = {key: str(value) for key, value in initial_wave_row.items()}
-        insert_entries(
-            schedule_lines,
-            "## Agent Wave Ledger",
-            [schedule_wave_row(row)],
-        )
-        insert_entries(
-            monitoring_lines,
-            "## Actual Wave Events",
-            [workflow_wave_event_line(row)],
-        )
-    if mid_task_rows:
-        insert_entries(
-            schedule_lines,
-            "## Agent Wave Ledger",
-            [schedule_wave_row(row) for row in mid_task_rows],
-        )
-    upsert_subagent_wave_schedule_lines(schedule_lines, subagent_wave_rows)
-    append_monitoring_sections(
-        monitoring_lines,
-        entries,
-        mid_task_rows,
-        subagent_wave_rows,
-    )
-    return (
-        "\n".join(schedule_lines).rstrip() + "\n",
-        "\n".join(monitoring_lines).rstrip() + "\n",
-    )
 
 
 def append_monitoring(
@@ -1521,42 +1404,28 @@ def append_monitoring(
     """Append monitoring evidence and return the artifact path."""
     active_entries = entries_from_legacy(legacy_entries) if legacy_entries else entries
     report_dir.mkdir(parents=True, exist_ok=True)
-    path = report_dir / "workflow_monitoring.md"
-    schedule_path = report_dir / "schedule.md"
-    mid_task_rows, subagent_wave_rows = normalized_wave_rows(active_entries)
-    mutates_wave_ledger = bool(mid_task_rows or subagent_wave_rows)
-    if mutates_wave_ledger or schedule_path.is_file():
-        with locked_existing_artifact(schedule_path) as schedule_handle:
-            with locked_monitoring_artifact(path) as monitoring_handle:
-                monitoring_text = monitoring_handle.read()
-                if not monitoring_text.strip():
-                    monitoring_text = default_monitoring_text(report_dir)
-                schedule_text, monitoring_text = render_monitoring_artifacts(
-                    schedule_text=schedule_handle.read(),
-                    workflow_monitoring_text=monitoring_text,
-                    entries=active_entries,
-                    initial_wave_row=None,
-                )
-                schedule_handle.seek(0)
-                schedule_handle.truncate()
-                schedule_handle.write(schedule_text)
-                monitoring_handle.seek(0)
-                monitoring_handle.truncate()
-                monitoring_handle.write(monitoring_text)
-        return path
-    with locked_monitoring_artifact(path) as monitoring_handle:
-        monitoring_text = monitoring_handle.read()
-        if not monitoring_text.strip():
-            monitoring_text = default_monitoring_text(report_dir)
-        _schedule_text, monitoring_text = render_monitoring_artifacts(
-            schedule_text="",
-            workflow_monitoring_text=monitoring_text,
-            entries=active_entries,
-            initial_wave_row=None,
+    for semantic_event in active_entries.semantic_events:
+        append_ledger_event(
+            report_dir,
+            semantic_event_record(semantic_event, report_dir),
         )
-        monitoring_handle.seek(0)
-        monitoring_handle.truncate()
-        monitoring_handle.write(monitoring_text)
+    mid_task_rows, subagent_wave_rows = normalized_wave_rows(active_entries)
+    append_wave_schedule_rows(report_dir, mid_task_rows, subagent_wave_rows)
+    path = report_dir / "workflow_monitoring.md"
+    with locked_monitoring_artifact(path) as handle:
+        text = handle.read()
+        if not text.strip():
+            text = default_monitoring_text(report_dir)
+        lines = text.splitlines()
+        append_monitoring_sections(
+            lines,
+            active_entries,
+            mid_task_rows,
+            subagent_wave_rows,
+        )
+        handle.seek(0)
+        handle.truncate()
+        handle.write("\n".join(lines).rstrip() + "\n")
     return path
 
 
@@ -1574,6 +1443,7 @@ def main() -> int:
         MonitoringEntries(
             signals=tuple(signals),
             behavior_events=tuple(behavior_events),
+            semantic_events=tuple(args.semantic_event),
             runtime_feedback=tuple(args.runtime_feedback),
             tool_warnings=tuple(args.tool_warning),
             tool_warning_status=str(args.tool_warning_status),
@@ -1582,23 +1452,6 @@ def main() -> int:
             interventions=tuple(args.intervention),
             decisions=decisions,
             timestamp=str(args.timestamp),
-            responsibility_unit_id=str(args.responsibility_unit_id),
-            codex_trace_key=optional_text(args.codex_trace_key),
-            generation_parent=optional_text(args.generation_parent),
-            reuse_mode=optional_text(args.reuse_mode),
-            packet_hash=optional_text(args.packet_hash),
-            context_bytes_by_source=context_byte_entries(args.context_bytes),
-            finding_iteration=args.finding_iteration,
-            review_iteration=args.review_iteration,
-            writer_ids=tuple(args.writer_id),
-            reviewer_ids=tuple(args.reviewer_id),
-            launch_epoch=args.launch_epoch,
-            finish_epoch=args.finish_epoch,
-            retries=args.retries,
-            waits=args.waits,
-            progress_bytes=args.progress_bytes,
-            token_footprint_ref=optional_text(args.token_footprint_ref),
-            artifact_hashes=tuple(args.artifact_hash),
         ),
     )
     print(f"WORKFLOW_MONITORING={path}")

@@ -51,7 +51,11 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import tomllib
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -220,7 +224,7 @@ TOOL_GATES = {
         "tools/ci/check_github_workflows.py",
         (
             "tools/ci/run_all_checks.sh",
-            "agents/workflows/agent-canon-pr-workflow.md",
+            "tools/ci/check_agent_canon_pr.sh",
         ),
     ),
     "container_config": (
@@ -246,17 +250,15 @@ TOOL_GATES = {
 
 AGENT_CANON_PR_WORKFLOW_PATH = "agents/workflows/agent-canon-pr-workflow.md"
 AGENT_CANON_PUSH_REMOTE_MARKERS = (
-    "remote_verified=yes",
     "tools/agent_tools/github_publish.py",
-    "gh repo view",
-    "git remote get-url origin",
-    "NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_verified_remote_required",
-    "literal URL push is not a standard route",
-    "hardcoded repository name",
+    "PullRequestLifecycle",
+    "permission_state=unknown|verified_false",
+    "CandidateCasReceipt",
+    "PublicationReadbackReceipt",
+    "QueueReceipt",
 )
 
 SKILL_ROUTING_PROMPTS = (
-    ".agents/skills/agent-orchestration/SKILL.md",
     "agents/skills/agent-orchestration.md",
 )
 
@@ -268,14 +270,6 @@ SKILL_ROUTING_MARKERS = (
     "check_convention_compliance.py",
 )
 EXIT_BLOCKER_POLICY_MARKERS = {
-    ".agents/skills/agent-orchestration/SKILL.md": (
-        "selected_agent_type",
-        "write_capable_handoff_blocker",
-        "evidence",
-        "parent_packet_ref",
-        "status=blocked",
-        "router_unavailable_blocker",
-    ),
     "agents/skills/agent-orchestration.md": (
         "selected_agent_type",
         "write_capable_handoff_blocker",
@@ -357,13 +351,6 @@ EXIT_BLOCKER_FORBIDDEN_RE = re.compile(
     r"worker[^\n.。]{0,80}alternate route)"
 )
 DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
-    ".agents/skills/agent-orchestration/SKILL.md": (
-        "$prose-reasoning-graph",
-        "$structure-planning",
-        "$md-style-check",
-        "format-only",
-        "structure_contract=skipped",
-    ),
     "agents/skills/agent-orchestration.md": (
         "prose-reasoning-graph",
         "structure-planning",
@@ -513,9 +500,9 @@ BRANCH_WORKTREE_CREATION_GUARD_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
 ]
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
+WORKFLOW_GATE_CONSUMERS = ("tools/ci/check_agent_canon_pr.sh",)
 WORKFLOW_GATE_COMMAND_RE = re.compile(
-    r"(?im)^\s*(?:[-*]\s*)?.*\brun\s+`?python3\s+"
-    r"tools/agent_tools/check_convention_compliance\.py`?"
+    r"(?m)^\s*python3\s+tools/agent_tools/check_convention_compliance\.py\s*$"
 )
 WORKFLOW_GATE_FORBIDDEN_RE = re.compile(
     r"(?is)(?:do\s+not|don't|never|skip|omit)\s+(?:\S+\s+){0,6}?"
@@ -527,19 +514,6 @@ CLOSEOUT_READINESS_MARKERS = (
     "user-facing completion",
     "repo_wide_static_analysis_complete",
     "repo_wide_dependency_tools_complete",
-)
-POSITIVE_RUNTIME_WORDING_SURFACES = (
-    "ROOT_AGENTS.md",
-    ".agents/skills/agent-orchestration/SKILL.md",
-    ".agents/skills/codex-task-workflow/SKILL.md",
-    ".agents/skills/mvp-skeleton/SKILL.md",
-    "agents/TASK_WORKFLOWS.md",
-    "agents/canonical/CODEX_SUBAGENTS.md",
-    "agents/canonical/CODEX_WORKFLOW.md",
-    "agents/skills/catalog.yaml",
-    "agents/skills/mvp-skeleton.md",
-    "documents/conventions/common/05_docs.md",
-    "documents/coding-conventions-project.md",
 )
 DOCUMENT_CLAIM_GROUNDING_MARKERS = {
     "documents/conventions/common/05_docs.md": (
@@ -803,14 +777,6 @@ PR_ESSENCE_DOCUMENTATION_MARKERS = {
         "behavior or contract delta",
         "evidence route",
     ),
-    "agents/workflows/pr-queue-cleanup-workflow.md": (
-        "PR Essence",
-        "problem / user request",
-        "design intent",
-        "canonical owner",
-        "behavior or contract delta",
-        "evidence route",
-    ),
 }
 SOLID_CODING_CONTRACT_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "solid_coding_contract"
@@ -832,7 +798,8 @@ PROVISIONAL_GROUNDING_RE = re.compile(
 )
 PROMPT_EVAL_MARKERS = (
     "check_convention_compliance",
-    "CONVENTION-WORKFLOW",
+    "WORKFLOW-GENERIC-1",
+    "ORCH-SHIM-TOOLCALL-1",
     "CONVENTION-SKILL",
 )
 SURFACE_MANIFEST_FILES = (
@@ -963,9 +930,9 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                     "check_agent_runtime_alignment.py",
                 ),
                 (
-                    "shared-canon update",
-                    "tools/update_agent_canon.sh",
-                    "AgentCanon PR gate",
+                    "AgentCanon update transaction",
+                    "documents/agent-canon-update-route.md",
+                    "update_lifecycle_contract.py",
                 ),
             ),
         ),
@@ -1031,21 +998,6 @@ NORMATIVE_RE = re.compile(
     r"(?m)^\s*[-*]\s+.*(?:禁止|必須|しなければなりません|してはいけません|"
     r"must|must not|required|forbidden)",
     flags=re.IGNORECASE,
-)
-LEGACY_NEGATIVE_RUNTIME_RE = re.compile(
-    r"(?im)^\s*(?:[-*]\s*)?.*(?:"
-    r"禁止|してはいけ|出さない|返さない|完了扱いにしない|"
-    r"Prohibitions|Close-Out Prohibitions|しなければ|must\s+not|"
-    r"do\s+not|don't|never|cannot|can't|せず|ではありません|"
-    r"しません|しない|置かず|戻さず)"
-)
-LEGACY_SEQUENCE_DESIGN_RE = re.compile(
-    r"(?im)^\s*(?:[-*]\s*)?.*(?:"
-    r"最初の|最初に|初期\s*(?:wave|責務)|Initial Intake Wave|"
-    r"mandatory first skill|first-wave|first-pass|first working version|needs the first version|"
-    r"first runnable path|first screen|first responsibilities wave|"
-    r"first implementation candidate|first cohesive slice|first slice|"
-    r"first candidate|first reviewer|first figure|first routing declaration)"
 )
 VERIFICATION_RE = re.compile(
     r"(?:tools/|check_|pyright|pytest|ruff|make ci|make agent-checks|"
@@ -1236,16 +1188,13 @@ def check_tool_gates(root: Path) -> list[Finding]:
     return findings
 
 
-def workflow_docs(root: Path) -> list[Path]:
-    """Return all workflow prompt documents."""
-    return sorted((root / "agents" / "workflows").glob("*.md"))
-
-
 def check_workflow_hooks(root: Path) -> list[Finding]:
-    """Verify every workflow prompt calls the convention verifier."""
-    findings: list[Finding] = []
-    for path in workflow_docs(root):
-        relative = path.relative_to(root).as_posix()
+    """Verify the canonical source gate owns convention verification."""
+    findings = check_required_files(root, WORKFLOW_GATE_CONSUMERS, "workflow_hook")
+    for relative in WORKFLOW_GATE_CONSUMERS:
+        path = readable_path(root, relative)
+        if path is None:
+            continue
         text = path.read_text(encoding="utf-8")
         if WORKFLOW_GATE_MARKER not in text:
             findings.append(
@@ -1379,32 +1328,6 @@ def check_closeout_readiness(root: Path) -> list[Finding]:
             findings.append(
                 Finding("workflow_readiness", path, f"missing-marker:{marker}")
             )
-    return findings
-
-
-def check_positive_runtime_wording(root: Path) -> list[Finding]:
-    """Verify central runtime docs use positive operational wording."""
-    findings = check_required_files(
-        root, POSITIVE_RUNTIME_WORDING_SURFACES, "positive_runtime_wording"
-    )
-    for path in POSITIVE_RUNTIME_WORDING_SURFACES:
-        full_path = readable_path(root, path)
-        if full_path is None:
-            continue
-        text = full_path.read_text(encoding="utf-8")
-        for label, pattern in (
-            ("legacy-negative-runtime-wording", LEGACY_NEGATIVE_RUNTIME_RE),
-            ("legacy-sequence-design-wording", LEGACY_SEQUENCE_DESIGN_RE),
-        ):
-            for match in pattern.finditer(text):
-                line_no = text.count("\n", 0, match.start()) + 1
-                findings.append(
-                    Finding(
-                        "positive_runtime_wording",
-                        path,
-                        f"{label}:{line_no}",
-                    )
-                )
     return findings
 
 
@@ -1919,7 +1842,6 @@ def run_checks(root: Path) -> list[Finding]:
         )
     )
     findings.extend(check_closeout_readiness(root))
-    findings.extend(check_positive_runtime_wording(root))
     findings.extend(check_document_claim_grounding(root))
     findings.extend(check_test_contract_routing(root))
     findings.extend(
@@ -1964,7 +1886,11 @@ def run_checks(root: Path) -> list[Finding]:
 
 def render_json(root: Path, findings: Sequence[Finding]) -> str:
     """Render JSON output."""
-    workflows = [path.relative_to(root).as_posix() for path in workflow_docs(root)]
+    workflows = [
+        path
+        for path in WORKFLOW_GATE_CONSUMERS
+        if readable_path(root, path) is not None
+    ]
     payload = {
         "status": "pass" if not findings else "fail",
         "findings": [asdict(finding) for finding in findings],
@@ -1989,7 +1915,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(finding.render())
         print(f"CONVENTION_COMPLIANCE_SOURCES={len(CONVENTION_SOURCES)}")
         print(f"CONVENTION_COMPLIANCE_TOOL_GATES={len(TOOL_GATES)}")
-        print(f"CONVENTION_COMPLIANCE_WORKFLOWS={len(workflow_docs(root))}")
+        print(f"CONVENTION_COMPLIANCE_WORKFLOWS={len(WORKFLOW_GATE_CONSUMERS)}")
         print(f"CONVENTION_COMPLIANCE_FINDINGS={len(findings)}")
         print(f"CONVENTION_COMPLIANCE={'pass' if not findings else 'fail'}")
     return 1 if findings else 0

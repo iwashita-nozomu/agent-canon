@@ -12,59 +12,51 @@ schema_version = 1
 
 [[contracts]]
 id = "design_integrity_gate"
-description = "Implementation starts from an owning responsibility model, preserves Abstract Design Frame traceability, and routes unresolved design choices through design_issue_blocker instead of implementation shortcuts."
+description = "Implementation starts from an owning responsibility model and semantic decision sufficiency: owner, replaceable unit, implementation mechanism, validation route, unresolved branch, and design_issue_blocker."
 
 [[contracts.surfaces]]
 path = "ROOT_AGENTS.md"
-markers = ["Design Integrity Gate", "responsibility model", "Abstract Design Frame", "Design-To-Implementation Trace", "design_issue_blocker", "implementation shortcut"]
-
-[[contracts.surfaces]]
-path = ".agents/skills/agent-orchestration/SKILL.md"
-markers = ["Design Integrity Gate", "responsibility model", "Abstract Design Frame", "design_issue_blocker", "implementation shortcut"]
+markers = ["Design Integrity Gate", "owning responsibility model", "owner, replaceable unit", "implementation mechanism", "validation route", "unresolved branch", "design_issue_blocker"]
 
 [[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"
-markers = ["Design Integrity Gate", "responsibility model", "Abstract Design Frame", "design_issue_blocker", "implementation shortcut"]
+markers = ["Design Integrity Gate", "Decision sufficiency is semantic", "owner, replaceable unit", "implementation mechanism", "validation route", "unresolved branch", "design_issue_blocker"]
 
 [[contracts.surfaces]]
 path = ".agents/skills/codex-task-workflow/SKILL.md"
-markers = ["Design Integrity Gate", "responsibility model", "Abstract Design Frame", "design_issue_blocker", "implementation latitude"]
+markers = ["Design Integrity Gate", "responsibility model", "replaceable unit", "implementation paths", "validation route", "unresolved branch", "design_issue_blocker"]
 
 [[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
-markers = ["Design Integrity Gate", "責務 model", "Abstract Design Frame", "design_issue_blocker", "implementation shortcut"]
+markers = ["Design Integrity Gate", "責務 model", "差し替え可能な単位", "実装 scope", "validation route", "unresolved branch", "design_issue_blocker"]
 
 [[contracts.surfaces]]
 path = "agents/canonical/CODEX_WORKFLOW.md"
-markers = ["Design Integrity Gate", "owning responsibility model", "Abstract Design Frame", "Design-To-Implementation Trace", "design_issue_blocker", "implementation shortcut"]
+markers = ["Design Integrity Gate", "owning responsibility model", "replaceable unit", "mechanism", "validation route", "unresolved branch", "design_issue_blocker"]
 
 [[contracts.surfaces]]
 path = "agents/workflows/implementation-waterfall-workflow.md"
-markers = ["Design Integrity Gate", "owning responsibility model", "Abstract Design Frame", "design_issue_blocker", "implementation shortcut"]
+markers = ["Design Integrity Gate", "owning responsibility model", "replaceable unit", "mechanism", "validation route", "unresolved branch", "design_issue_blocker"]
 
 [[contracts]]
 id = "static_read_validation_policy"
-description = "Validation policy treats static analysis and reading evidence as primary, with operation checks and broad execution only as supplemental evidence for runtime or unresolved risk."
-
-[[contracts.surfaces]]
-path = ".agents/skills/agent-orchestration/SKILL.md"
-markers = ["static/read evidence", "unresolved signal", "operation checks", "smoke runs", "Expensive command"]
+description = "Validation keeps static/read evidence primary, adds targeted runtime evidence only for changed behavior or integration risk, and records unresolved runtime or static risk before broader execution."
 
 [[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"
-markers = ["静的解析・読み取り evidence", "未解決 signal", "動作確認", "smoke run", "重いコマンド"]
+markers = ["静的解析・読み取り evidence", "targeted validation", "実行が必要な未解決 signal", "smoke run"]
 
 [[contracts.surfaces]]
 path = ".agents/skills/codex-task-workflow/SKILL.md"
-markers = ["static/read evidence", "primary validation evidence", "supplemental evidence", "operation checks", "unresolved static findings"]
+markers = ["static/read evidence", "primary validation evidence", "targeted validation route", "changed runtime behavior", "unresolved static findings"]
 
 [[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
-markers = ["静的解析・読み取り evidence", "primary validation evidence", "supplemental evidence", "動作確認", "未解決 finding"]
+markers = ["静的解析・読み取り evidence", "primary validation evidence", "supplemental evidence", "runtime behavior", "未解決 finding"]
 
 [[contracts.surfaces]]
 path = "agents/canonical/CODEX_WORKFLOW.md"
-markers = ["静的解析・読み取り", "主証跡", "reading evidence", "動作確認", "broad execution"]
+markers = ["静的解析、読み取り確認、docs / targeted tests / agent checks", "Runtime evidence", "distinct unresolved claim/risk"]
 
 [[contracts.surfaces]]
 path = "documents/runtime-profiles-and-check-matrix.md"
@@ -73,10 +65,6 @@ markers = ["Static analysis and reading evidence", "primary validation evidence"
 [[contracts]]
 id = "literature_backed_skill_call_order"
 description = "Research-backed implementation skill-call sequences place literature-survey before research-workflow, design, implementation, benchmark, and report claims."
-
-[[contracts.surfaces]]
-path = ".agents/skills/agent-orchestration/SKILL.md"
-markers = ["$literature-survey", "$research-workflow", "before `$research-workflow`", "source packet", "adoption/exclusion"]
 
 [[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"
@@ -105,10 +93,6 @@ markers = ["$literature-survey", "$research-workflow", "research_driven_change",
 [[contracts]]
 id = "owner_bounded_tool_route"
 description = "Owner-bounded repository edits run existing tools without a pre-use reading gate and keep owner/tool/validation routing visible."
-
-[[contracts.surfaces]]
-path = ".agents/skills/agent-orchestration/SKILL.md"
-markers = ["existing-tool route", "targeted-validation evidence", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing"]
 
 [[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"

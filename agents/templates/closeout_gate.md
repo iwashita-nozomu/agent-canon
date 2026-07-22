@@ -25,24 +25,28 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 - verifier_status: pending
 - auditor_status: pending
-- required_reviews_complete: no
+- required_reviews_complete: not_applicable
 - validation_complete: no
 - request_contract_complete: no
 - all_planned_chunks_complete: no
 - overall_delivery_complete: no
+- completion_coverage_consumer: no
+- mapping_error_sets_empty: no
+- typed_owner_boundary_status: pending
+- canonical_format_check_status: pending
+- canonical_dispatcher_schema_status: pending
+- validation_failure_response_status: pending
 - unfinished_tasks_absent: no
 - dependency_headers_complete: no
 - repo_wide_dependency_tools_complete: no
 - repo_wide_static_analysis_complete: no
 - agent_canon_latest_complete: no
-- make_ci_status: pending
-- spec_product_coverage_complete: no
 - review_findings_integrated: no
-- post_fix_full_review_complete: no
+- post_fix_full_review_complete: not_applicable
 - tool_warnings_resolved: no
 - mechanical_completion_loop_complete: no
 - subagents_closed: no
-- diff_check_agent_complete: no
+- diff_check_agent_complete: not_applicable
 - canonical_tree_head_complete: no
 - agent_evaluation_complete: no
 - runtime_log_archive_synced: no
@@ -56,7 +60,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 - verifier_status: pass
 - auditor_status: resolved
-- required_reviews_complete: yes
+<!-- Set required_reviews_complete to yes when the selected owning gate is adjudicated; use not_applicable when no review is activated. -->
 - validation_complete: yes
 - request_contract_complete: yes
 - all_planned_chunks_complete: yes
@@ -66,14 +70,18 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - repo_wide_dependency_tools_complete: yes
 - `repo_wide_static_analysis_complete`: `yes` for full static analysis, or `profile_selected` when the runtime profile selected targeted validation
 - agent_canon_latest_complete: yes
-- `make_ci_status`: `pass`, `targeted`, or `not_applicable` according to the active risk profile
-- spec_product_coverage_complete: yes
+- completion_coverage_consumer: yes
+- mapping_error_sets_empty: yes
+- typed_owner_boundary_status: pass
+- canonical_format_check_status: pass
+- canonical_dispatcher_schema_status: pass
+- validation_failure_response_status: pass
 - review_findings_integrated: yes
-- post_fix_full_review_complete: yes
+<!-- Set post_fix_full_review_complete to yes when the selected final-contract rerun is complete; use not_applicable when it is not selected. -->
 - tool_warnings_resolved: yes
 - mechanical_completion_loop_complete: yes
 - subagents_closed: yes
-- diff_check_agent_complete: yes
+<!-- Set diff_check_agent_complete to yes when the diff-check gate is activated and complete; use not_applicable otherwise. -->
 - canonical_tree_head_complete: yes
 - agent_evaluation_complete: yes
 - runtime_log_archive_synced: yes
@@ -84,6 +92,16 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 <!-- Record why this is the whole user-request completion, not just a chunk, slice, checkpoint, or subpass completion. List all planned work units and active clauses as complete, confirm schedule.md remains the TODO source of truth, confirm no unfinished task / follow-up / validation / commit / push / canon-sync item remains in scope, and explain why closeout stays locked if work_log.md or TODO coverage is incomplete. -->
 
+- completion_coverage_artifact: completion_coverage.json
+- completion_coverage_schema: agent-canon.completion-coverage.v1
+- completion_coverage_consumer: no
+- control_topology_observation_ref:
+- all_planned_chunks_complete_source: completion-boundary projection
+- overall_delivery_complete_source: completion-boundary projection
+- open_repairs:
+- open_crossing_edges:
+- canonical_gate_basis: G1_CLAUSE_COVERAGE,G2_OWNER_BOUNDARY,G3_STAGE_EVIDENCE,G4_VALIDATION_RESPONSE,G5_DELIVERY_BOUNDARY
+
 ## Dependency Manifest Evidence
 
 <!-- Confirm that every created or edited human-authored text file has a top-of-file @dependency-start / @dependency-end manifest block, or record the scan-tool classification reason and alternate manifest/design artifact for files that cannot carry such a block. Include output from check_dependency_headers.py, scan_dependency_headers.sh, check_dependency_header_format.sh, and check_dependency_graph.sh when dependency edges changed. During migration, record any pre-existing full-repo graph baseline separately and confirm this change introduced no new old-format header, self reference, reverse-edge gap, kind mismatch, or cycle. -->
@@ -92,13 +110,29 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 <!-- During checkpoint and final review, run `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` against the full repository. Do not unlock closeout if only changed-file dependency checks were run. Record REPO_DEPENDENCY_REVIEW=pass and the checked path count. If any header is missing or invalid, fix it and rerun before unlock. -->
 
-## Repo-Wide Static Analysis Evidence
+## Canonical Formatter And Static Evidence
 
-<!-- Before user-facing completion, select static-analysis evidence from the active runtime profile and risk class. Use `make ci` or equivalent full-repo pyright/ruff evidence when the profile requires a full local confidence gate, such as Large delivery, explicit user-requested comprehensive validation, or an AgentCanon PR gate that defines full CI as equivalent evidence. For Routine docs, prompt/prose-only edits, and Focused code slices, record the targeted commands that match the changed paths, set `repo_wide_static_analysis_complete: profile_selected`, and set `make_ci_status: targeted` or `not_applicable` as appropriate. `make ci-quick` alone is not a substitute when the selected profile requires full CI. -->
+<!-- Record the one canonical Markdown/math/Mermaid formatter/check route and the selected non-Python static evidence. Duplicate CI, formatter, checker, coverage, mutation, private-helper, and checker-retest routes are not additional W2 gates. -->
 
-## AgentCanon Latest And CI Gate Evidence
+- canonical_format_check_route: tools/bin/agent-canon docs check <changed-markdown-paths>
+- canonical_format_check_status:
+- selected_non_python_static_evidence:
+- typed_owner_boundary_status:
+- mapping_error_sets_empty:
 
-<!-- `agent_canon_latest_complete` must be `yes` before user-facing completion. In submodule repos, unrelated parent dirty state is allowed; what must be clean is the AgentCanon update surface: `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned root symlink/copy views. Dirty or stale AgentCanon update-surface state is not an environment blocker and is not a valid reason to skip commit / push. For AgentCanon update-surface changes, commit AgentCanon work on a named branch, run `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` when main must be merged in, open or update the AgentCanon PR, and rerun `make agent-canon-ensure-latest`. Rerun `make ci` only when the active risk profile selects full CI; otherwise record the profile-selected targeted validation and set `make_ci_status: targeted` or `not_applicable`. Documented environment/toolchain issues still require environment repair before user-facing completion when the selected validation cannot run. -->
+## CompletionCoverage And Failure Response Evidence
+
+<!-- Record the generated v1 projection, the five explicit mapping error sets, and pointer-only validation-failure responses. The taxonomy text remains owned by the JSON source and its generated Markdown reader. -->
+
+- completion_coverage_artifact:
+- completion_coverage_consumer:
+- validation_failure_response_status:
+- validation_failure_taxonomy_owner: documents/runtime-profiles-and-check-matrix.json
+- validation_failure_taxonomy_reader: documents/runtime-profiles-and-check-matrix.md
+
+## AgentCanon Latest Evidence
+
+<!-- `agent_canon_latest_complete` remains a repository-update evidence field. It is not a second W2 formatter or completion-coverage gate. -->
 
 - agent_canon_latest_command:
 - agent_canon_latest_status:
@@ -157,7 +191,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Subagent Lifecycle Evidence
 
-<!-- Record run-local subagent lifecycle evidence before user-facing completion. New user requests must use fresh subagents, not send_input to agents created for prior tasks. Mid-task user instructions must be classified as same_active_task_delta, scope_or_contract_change, or new_task; same-task deltas need a run-bundle checkpoint and updated packet path before any run-local send_input, while scope changes need a fresh follow-up wave. Close terminal stage-wave agents as lifecycle cleanup. Timeout, empty status, and absent final response map to termination_action=preserve_running_instance, write_scope=reserved, overlapping_writer=blocked, subagents_closed=no, and lifecycle_gate=pending. `close_agent` authority is runtime status completed, errored, or shutdown, or explicit user cancellation. `reuse_for_new_task` records policy and must be `forbidden`; `previous_task_subagent_reuse` records observed compliance and must be `none`. This section is intentionally about run-local subagents; if a repo-changing task used no subagents, record close_agent_evidence as parent_direct_no_subagents only with PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes and PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker> plus the run-bundle reason. For dynamic fanout, reconcile every schedule.md Agent Wave Ledger row with workflow_monitoring.md Actual Wave Events and terminal run-local agent ids. If `wait_agent` timed out, returned empty status, or a final response was absent at a wave decision point, record the subagent no-return investigation fields and keep the lifecycle gate incomplete until new state evidence or explicit user cancellation resolves the instance. -->
+<!-- Record run-local subagent lifecycle evidence before user-facing completion when a subagent or durable lifecycle route was selected. Classify each user input as same_active_task_delta, scope_or_contract_change, or new_task; reuse an active agent when owner, responsibility, context, write authority, and validation route remain compatible, including revised scope. Fresh agents are for independent review, disjoint write authority, incompatible owner/context, or failed context integrity. Durable checkpoints and updated packet paths are needed only for coordination or resumption. Close terminal stage-wave agents as lifecycle cleanup. Timeout, empty status, and absent final response map to termination_action=preserve_running_instance, write_scope=reserved, overlapping_writer=blocked, subagents_closed=no, and lifecycle_gate=pending. `close_agent` authority is runtime status completed, errored, or shutdown, or explicit user cancellation. `reuse_for_new_task` records the evaluated policy; `previous_task_subagent_reuse` records observed continuity, including `none` when no prior instance was reused. This section is intentionally about selected run-local subagents; a repo-changing task with no subagent may use a structured parent handoff, while parent-direct exception evidence remains required when the selected workflow requires it. For dynamic fanout, reconcile each selected schedule.md Agent Wave Ledger row with workflow_monitoring.md Actual Wave Events and terminal run-local agent ids. If `wait_agent` timed out, returned empty status, or a final response was absent at a wave decision point, record the subagent no-return investigation fields and keep the lifecycle gate incomplete until new state evidence or explicit user cancellation resolves the instance. -->
 
 - fresh_subagents_required:
 - reuse_for_new_task:
@@ -177,7 +211,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Diff-Check Agent Evidence
 
-<!-- Record the read-only diff-check agent instance, input packet paths, latest diff range or commit, decision, findings disposition, and rerun evidence after any fix. Parent self-review is not sufficient for this field. -->
+<!-- Record the selected owning review gate (and a read-only diff-check instance only when activated), input packet paths, latest diff range or commit, decision, findings disposition, and rerun evidence after any accepted same-owner fix. Reviewer output is hypothesis input; parent/integration owner adjudicates it. Each accepted finding must cite current snapshot, reachable path, contract, and witness/static proof. Rejected findings must carry reason_code and evidence_ref and do not open a wave or cause rollback. -->
 
 - diff_check_agent_role:
 - diff_check_agent_decision:

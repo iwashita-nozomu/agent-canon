@@ -10,7 +10,6 @@ upstream design ../../documents/agent-canon-update-route.md AgentCanon source PR
 upstream design result-artifact-writeout.md run-local result artifact writeout contract
 upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py creates run-local report bundles
 upstream implementation ../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
-upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py archives immutable run-bundle snapshots
 downstream implementation ../../.agents/skills/pr-processing/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates PR Essence workflow markers
 @dependency-end
@@ -58,26 +57,38 @@ inventory、authority、conflict、validation、merge、Issue 処理、closeout 
 - AgentCanon source PR と parent pin PR がつながっている場合は、
   `agent-canon-update` と `pr-queue-cleanup-workflow.md` を使い、source merge と
   parent pin 同期を分けます。
+  Before mutation, record source `origin/main`, parent `origin/main` gitlink,
+  target tree, merge strategy, and remote. The reviewed final tree is the
+  identity contract; do not rebase or preserve internal commit ids by ancestry
+  engineering.
 
 ## Processing Graph
 
 ```mermaid
 flowchart TD
-  A["Snapshot open PRs and issues"] --> B["Check mutation authority"]
-  B --> C["Classify PR state"]
-  C --> D["Order by dependency and conflict"]
-  D --> E["Repair branch or conflict"]
-  E --> F["Run surface validation"]
-  F --> G["Merge only when gates pass"]
-  G --> H["Sync dependent parent pin PRs"]
-  H --> I["Triage issues with evidence"]
-  I --> J["Record final counts and blockers"]
+  A["Immutable remote/base/head/permission snapshot"] --> B["PullRequestLifecycle validator"]
+  B --> C["G3 PR identity/CAS receipt"]
+  C --> D["Authorized PR mutation"]
+  D --> E["Exact PR/merge readback"]
+  E --> F["Source QueueReceipt"]
+  F --> G["Ordered DependencyFrontier"]
+  G --> H["Parent projection after acceptance"]
 ```
+
+`PullRequestLifecycle` in
+`tools/agent_tools/update_lifecycle_contract.py` is the only PR state machine.
+This skill consumes its `user|fork|contributor` discriminator and transition
+verdict; it does not define another draft/ready/review/conflict graph. Base/head
+repo, owner, ref, fork and permission identities remain immutable. PR Essence,
+reviews, and contributor diff are retained through draft/ready,
+changes-requested, external-review, closed-head, multiple-remote, merge, and
+conflict-successor handling. Unknown permission never implies push authority.
 
 ## PR Log Report Contract
 
-PR 作成 / 更新は、GitHub 上の PR body だけでなく run-local report も同時に
-更新します。active run bundle が無い場合は、PR 操作前に
+PR 作成 / 更新は、GitHub 上の PR body と、選択された場合の durable run-local
+report を整合させます。coordination、resumption、または selected workflow が
+durable evidence を必要とし、active run bundle が無い場合は、PR 操作前に
 `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --owner codex --workspace-root "$PWD"`
 を実行し、bootstrap output の `RUN_ID`、`REPORT_DIR`、
 `AGENT_CANON_PREFLIGHT_*` を `work_log.md` または `workflow_monitoring.md`
@@ -103,9 +114,11 @@ route を短く書きます。
 
 ## Procedure
 
-1. Run bundle と PR log report を固定します。
+1. PR log report を固定します。run bundle は coordination、resumption、または
+   selected workflow が必要とする場合だけ作成します。
    - 既存の `REPORT_DIR` または `reports/agents/.active_run` を確認する
-   - 無ければ `bootstrap_agent_run.py` で作る
+   - durable evidence が必要で無ければ structured handoff message/tool result
+     を使い、必要な場合だけ `bootstrap_agent_run.py` で作る
    - `work_log.md` に bootstrap output、routing declaration、PR task summary を残す
    - `pr_body.md` と `github_publish.json` の path を決める
    - `pr_body.md` の `PR Essence` に problem / user request、design intent、
@@ -154,11 +167,14 @@ route を短く書きます。
    - AgentCanon source PR は parent pin PR より先に merge する
    - 同じ root/runtime surface に触る PR は一つずつ main に取り込む
    - conflict は、先に入れる PR が確定してから後続 PR の head branch で解く
+   - source publication readback が accepted になるまで parent pin/root projection
+     を開始せず、accepted source tree を一度だけ parent へ投影する
 1. Conflict repair は head branch 上で行います。
    - fetch without changing the current checkout
    - if the current checkout is not `<head-branch>`, keep it unchanged and
      request user direction; do not switch as a collision workaround
-   - `git merge origin/<base>` または repo の標準 update route
+   - 事前に記録した merge strategy に従う。`git merge origin/<base>` は選択された
+     strategy の場合だけ使い、rebase や unrelated history の変更を行わない
    - conflict は `ours` / `theirs` の機械選択ではなく、semantic integration として扱う
    - merge base、head branch の意図、incoming base 側の意図、owning contract、validation surface を確認する
    - 各 side から保持する clause、書き換える clause、意図的に捨てる clause と理由を PR log または run bundle に記録する
@@ -173,23 +189,14 @@ route を短く書きます。
    - PR Essence と validation evidence が PR body、comment、または run bundle にある
    - `documents/BRANCH_SCOPE.md` の範囲分割契約に従い、PR が一つのレビュー単位であること、または複数の差分単位の範囲表と分割判断が PR body、comment、または run bundle にある
    - repo の GitHub automation authority fields が必要なら visible になっている
-1. approved `knowledge_graph` / `active_design_packet_materialization` source units
-   を merge した場合は、merged source OID で post-merge predecessor gate を通します。
-   - `github_publish.py predecessor-integration` を各 unit に一度ずつ実行する
-   - complete run bundle を一つの immutable archive snapshot へ archive / push する
-   - archive の各 record を `verify-predecessor-integration` で検証する
-   - required order `knowledge_graph`, `active_design_packet_materialization` の
-     `verify-predecessor-integration-set` を検証する
-   - verified graph record の後に canonical `graph status` と approved design path の
-     `graph context` を検証する
-   - 二つの record、archive complete-file hashes、common integrated source OID、
-     exact command/exit evidence が揃うまで successor intake と completion を保留する
 1. Issue を処理します。
    - resolved: merge PR / commit / policy reference を書いて close
    - duplicate: canonical issue を示して close
    - obsolete / not planned: なぜ現在の責務に残さないかを書く
    - active: residual work、owner、next validation を追記して open のまま残す
    - local issue ledger は削除せず、`issues/closed/` など正本の lifecycle に従う
+   - deletion / retirement は dependency closure と active-reference validation を
+     先に行い、代替実装や unrelated latest-main changes を発明・取り込まない
 1. Closeout を残します。
    - PR action table
    - Issue action table
@@ -204,19 +211,15 @@ route を短く書きます。
 
 ## AgentCanon Queue
 
-AgentCanon source PR と template / derived PR が連動している場合は、次を固定します。
+Source merge/readback は exact `(source_namespace, candidate_sha, tree_sha,
+input_digest)` の `QueueReceipt` を一度だけ enqueue します。同じ input の retry
+は accepted receipt を再利用し、再 enqueue しません。
 
-1. Source PR を先に green にする。
-1. Source PR を merge する。
-1. 対象 source units が predecessor record owner の場合は、二つの atomic producer、
-   一つの immutable archive、二つの individual verifier、一つの exact set verifier、
-   graph static gate をこの順で完了する。
-1. Parent repo の read-only plan を確認し、mutation が必要なら current-task
-   user approval と全 4 inline Git authority/reason field を得て protected
-   latest route を実行する。
-1. `bash tools/sync_agent_canon.sh link-root` と `check` を通す。
-1. Parent pin / root-view diff を PR Essence と source PR の最終差分に照合し、必要な差分修正を head branch 上で行う。
-1. Parent pin / root-view PR を作るか更新する。
-1. Parent PR gate を通してから ready / merge 判断を行う。
+`DependencyFrontier` は `#388 -> #389 -> current transaction` の機械順序、
+source-main publication readback、accepted QueueReceipt を一つの acceptance
+record に束ねます。pending frontier では parent pin/root projection を開始せず、
+accepted record と current publication readback の後だけ parent PR lane を一度
+進めます。source correctness、generated completeness、source PR CAS は parent
+lane で再検査しません。
 
 この細部は `agents/workflows/pr-queue-cleanup-workflow.md` を正本にします。

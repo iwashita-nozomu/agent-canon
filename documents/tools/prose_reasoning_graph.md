@@ -130,7 +130,7 @@ source file は authoring surface のまま残り、graph DB は削除または�
 flowchart TB
   source["source document"]
   prompt["prompt context"]
-  local_ir["local-llm prose IR"]
+  semantic_ir["deterministic semantic prose IR"]
   ingest["ingest or ingest-set"]
   graph_db["SQLite graph DB"]
   analyze["analyze"]
@@ -142,7 +142,7 @@ flowchart TB
 
   source --> ingest
   prompt --> ingest
-  ingest --> local_ir
+  ingest --> semantic_ir
   ingest --> graph_db
   graph_db --> analyze
   analyze --> diagnostics
@@ -153,24 +153,21 @@ flowchart TB
   integrate --> rewrite
 ```
 
-この図の `local_ir` は `agent-canon local-llm extract-prose-ir` 由来の
-`local_llm_prose_ir` metadata です。corpus hint と既存文書からの DSL seed は
-固定 keyword 辞書ではなく、この LocalLLM task から入ります。LocalLLM output は seed であり、
-graph DB の source-truth record ではありません。
-`extract-prose-ir` は document / term fragment ごとの part prompt を持ち、
-`llama-cli` が使える場合は part を `--local-llm-jobs` 由来の bounded parallelism で実行します。
-graph tool は part order を変更せず、LocalLLM IR の `parts[]` と `llm_execution` を
-metadata として保存します。
+この図の `semantic_ir` は `ingest` / `ingest-set` が source anchor と prompt
+context から決定的に作る `semantic_prose_ir` metadata です。corpus hint と既存
+文書からの DSL seed はこの metadata から入り、graph DB の source-truth
+record にはなりません。
 
-この LocalLLM output と graph DB の境界に加えて、同じ LocalLLM IR の `analysis_intents[]` は、本文が実験計画を述べているのか、
+この semantic prose IR と graph DB の境界に加えて、同じ IR の
+`analysis_intents[]` は、本文が実験計画を述べているのか、
 profile 語彙を説明しているだけなのかを区別します。graph 側はこの intent status を読み、
 `experiment_plan` が `present` の場合に experiment layer と experiment diagnostics を起動します。
-ただし `--profile experiment` は明示的な completeness check 指示なので、LocalLLM IR が active
+ただし `--profile experiment` は明示的な completeness check 指示なので、semantic prose IR が active
 plan を検出しない文でも experiment diagnostics を起動できます。
 
-LocalLLM IR が無い旧 DB や障害時は、graph 側が
-`local_llm_experiment_plan_ir_missing` diagnostic を出し、LocalLLM IR の再生成を
-要求します。語彙検索や非 LLM 判定で experiment-plan applicability を代替しません。
+semantic prose IR が無い旧 DB や障害時は、graph 側が
+`semantic_experiment_plan_ir_missing` diagnostic を出し、deterministic IR の
+再生成を要求します。
 
 ## Command Surface
 
@@ -187,12 +184,8 @@ DB 作成 command は、`--db` が省略された場合に
 python3 tools/agent_tools/prose_reasoning_graph.py check-document vendor/agent-canon/documents/tools/prose_reasoning_graph.md \
   --out-dir reports/agents/<run-id>/prose_tool_doc_check \
   --profile all \
-  --llm-jobs 4 \
   --stats-out reports/agents/<run-id>/prose_tool_doc_check.stats.json
 ```
-
-`check-document` と `ingest` / `ingest-set` は `--local-llm-jobs` と
-Rust LocalLLM と同じ `--llm-jobs` を同じ bounded parallelism option として扱います。
 
 通常の分割実行では、`ingest` 後に stats JSON の
 `.fields.PROSE_REASONING_GRAPH_DB` を後続 command へ渡します。
@@ -200,7 +193,6 @@ Rust LocalLLM と同じ `--llm-jobs` を同じ bounded parallelism option とし
 ```bash
 python3 tools/agent_tools/prose_reasoning_graph.py ingest notes/draft.md \
   --prompt-file reports/agents/<run-id>/user_request_contract.md \
-  --local-llm-jobs 4 \
   --stats-out reports/agents/<run-id>/prose_ingest.stats.json
 GRAPH_DB="<PROSE_REASONING_GRAPH_DB from stats JSON>"
 python3 tools/agent_tools/prose_reasoning_graph.py analyze --db "$GRAPH_DB" --profile all \
@@ -287,10 +279,10 @@ downstream span、rerun command を持ちます。recursive expansion は skill 
   graph layers と handoff routes をまとめて見る profile。
 
 profile は analysis surface の選択です。profile 名や verification-route 語彙を説明する文は、
-active experiment plan そのものではありません。この区別は語彙検索ではなく、
-LocalLLM IR の `analysis_intents[].intent=experiment_plan` と `status` で受け取ります。
+active experiment plan そのものではありません。この区別は
+`semantic_prose_ir.analysis_intents[].intent=experiment_plan` と `status` で受け取ります。
 
-LocalLLM IR が無い場合は `local_llm_experiment_plan_ir_missing` finding として扱い、
+semantic prose IR が無い場合は `semantic_experiment_plan_ir_missing` finding として扱い、
 graph 側だけで applicability を確定しません。
 
 ## Verification Route

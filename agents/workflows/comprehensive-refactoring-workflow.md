@@ -114,25 +114,27 @@ Python の OOP readability baseline では次を使います。
 
 ```bash
 python3 tools/oop/python/readability.py \
+  --format markdown \
+  --include-snippets \
   --exclude vendor \
   --exclude reports \
-  python tools tests \
-  --min-score 95
+  python tools tests
 ```
 
-Python tool は `object-oriented-design.md` に合わせ、責務不明 class / helper 名、巨大 class / function、public method 過多、instance state 過多、static method namespace、引数過多、`None` runtime routing、純粋変換と副作用の混在、control-flow の読みづらさを検出します。`OOP_READABILITY` は score threshold ではなく signal class で判定します。size / surface / parameter / complexity finding は boundary review signal であり、caller contract や ownership から安定した境界が読めない限り分割指示にしません。
+Python tool は `object-oriented-design.md` に合わせ、責務不明 class / helper 名、巨大 class / function、public method 過多、instance state 過多、static method namespace、引数過多、`None` runtime routing、純粋変換と副作用の混在、control-flow の読みづらさを検出します。`OOP_READABILITY` は scalar threshold ではなく signal class で判定します。size / surface / parameter / complexity finding は boundary review signal であり、caller contract や ownership から安定した境界が読めない限り分割指示にしません。JSON / Markdown report の `typed_boundary_evidence`、`scanned_paths`、`signal_counts` を review artifact に保持します。
 C / C++ surface がある場合は別 entrypoint を使います。
 
 ```bash
 python3 tools/oop/cpp/readability.py \
+  --format markdown \
+  --include-snippets \
   --exclude vendor \
   --exclude reports \
-  include src tests/cpp \
-  --min-score 95
+  include src tests/cpp
 ```
 
-C++ tool は責務不明 type 名、巨大 class / function、public field / method 過多、base class / parameter 過多、`nullptr` runtime routing、純粋変換と副作用の混在、redundant wrapper を検出します。`OOP_READABILITY` は score threshold ではなく signal class で判定します。size / surface / parameter / complexity finding は boundary review signal であり、caller contract や ownership から安定した境界が読めない限り分割指示にしません。
-score は設計判断の補助であり、behavior correctness の代替ではありません。
+C++ tool は責務不明 type 名、巨大 class / function、public field / method 過多、base class / parameter 過多、`nullptr` runtime routing、純粋変換と副作用の混在、redundant wrapper を検出します。`OOP_READABILITY` は scalar threshold ではなく signal class で判定します。size / surface / parameter / complexity finding は boundary review signal であり、caller contract や ownership から安定した境界が読めない限り分割指示にしません。JSON / Markdown report の `typed_boundary_evidence`、`scanned_paths`、`signal_counts` を review artifact に保持します。
+signal counts は設計判断の補助であり、behavior correctness の代替ではありません。
 tool が足りない場合は、refactor 対象に合わせて targeted 解析 tool を同じ pass で追加し、signal class outcome、限界、false positive の扱いを design artifact に書きます。
 
 外部 repo、bare repo、または派生 template snapshot を調べる場合は、元 repo を編集せず `git archive` などで読み取り専用 snapshot を作り、run bundle に `OOP Analysis Scope:` として次を残します。
@@ -142,9 +144,9 @@ tool が足りない場合は、refactor 対象に合わせて targeted 解析 t
 - `Paths:` 実際に analyzer へ渡した path。
 - `Excludes:` `vendor`、`reports`、生成物、別 canon snapshot など対象 repo の product surface ではない path。
 - `Reports:` Markdown report、JSON report、`oop_readability_reviewer` prompt。
-- `Interpretation:` 最上位 dimensions、finding kinds、hotspot files。score / counts / path / line は機械 report から変更しません。
+- `Interpretation:` 最上位 dimensions、finding kinds、hotspot files。signal counts / path / line は機械 report から変更しません。
 
-調査目的で score floor を評価条件にしたくない場合は、survey report だけ `--min-score 0` で完走させます。
+survey report は signal class outcome と typed evidence を記録し、終了コードや scalar floor を closeout 条件にしません。
 closeout gate に使う report は、signal class outcome、accepted-warning ledger、
 human review gate を残します。strict score floor は task が根拠を明示した場合
 だけ closeout 条件に含めます。

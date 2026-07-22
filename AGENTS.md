@@ -15,6 +15,14 @@ repositories consume it through `vendor/agent-canon/` and root runtime views.
 
 ## Reader Map
 
+Target-State-First, Decision Sufficiency, model/profile, ToolCall, capacity,
+and lifecycle behavior is projected from the canonical owners:
+[workflow](agents/canonical/CODEX_WORKFLOW.md),
+[subagents](agents/canonical/CODEX_SUBAGENTS.md),
+[communication](agents/COMMUNICATION_PROTOCOL.md), and the approved
+[implementation contract](documents/design/codex-spark-implementation-routing.md).
+This entrypoint does not create a second policy source.
+
 This repository entrypoint maps agents working inside the standalone
 AgentCanon source tree to the canonical owner surfaces. Use `Read First` for
 the initial document path, `Scope` to identify the source area, `Runtime Owner
@@ -101,13 +109,19 @@ branch/worktree and requests user direction.
 | shared-checkout Git mutation and branch/worktree creation route | `agents/canonical/CODEX_WORKFLOW.md`; `.codex/hooks/branch_worktree_guard.py`; `agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation routing | `documents/runtime-profiles-and-check-matrix.md` | profile-specific checks |
 | closeout evidence | `tools/agent_tools/task_close.py`; `tools/agent_tools/report_artifact_checks.py` | closeout artifact gate |
-| shared-canon update | `tools/update_agent_canon.sh`; `tools/sync_agent_canon.sh`; `agents/workflows/agent-canon-pr-workflow.md` | AgentCanon PR gate |
+| AgentCanon update transaction | `documents/agent-canon-update-route.md`; `tools/agent_tools/update_lifecycle_contract.py` | boundary-owned G1-G6 receipts; `tools/agent_tools/task_close.py` |
 
 Update the owner surface first, then adjust this entrypoint when reader routing
 changes. `AGENTS.md` is a repository-local map; it is not the policy source for
 workflow stages, skill routing, role behavior, or closeout gates.
 
 ## Task Entry
+
+AgentCanon source updates enter only through
+`documents/agent-canon-update-route.md`. Its machine-readable transaction and
+ToolCall records are owned by `tools/agent_tools/update_lifecycle_contract.py`;
+the Decision Sufficiency policy remains owned by
+`agents/skills/agent-orchestration.md#Decision Sufficiency Packet`.
 
 For repo-changing work, create or reuse the run bundle and follow the
 machine-readable packet emitted by:

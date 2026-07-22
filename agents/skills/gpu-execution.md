@@ -5,6 +5,7 @@ contract skill
 responsibility Documents GPU execution routing, ExperimentRunner delegation, and GPU validation evidence.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/experiment_runner.md ExperimentRunner responsibility boundary
+upstream design ../../documents/gpu-admission-r5-source-packet.md exact R5 admission owner and fallback boundary
 upstream design ../../documents/conventions/python/15_jax_rules.md JAX GPU preallocation and CPU fallback policy
 upstream design ../workflows/experiment-workflow.md managed experiment workflow
 upstream design experiment-lifecycle.md experiment protocol and result artifact boundary
@@ -79,35 +80,55 @@ GPU / CPU 数値実行、benchmark、formal experiment を予定する前に、�
 ## Python Execution Contract
 
 Python の GPU 実行は、正式な validation / smoke / formal / server-side run では
-ExperimentRunner または managed experiment wrapper を通します。
+`tools/experiments/run_managed_experiment.py` を通します。topic が実装する
+public entrypoint は canonical `experiments/<topic>/run.py::main()` だけです。
+managed adapter は exact registry closure と fd-bound source snapshot からその
+entrypoint と argv を 1 つの immutable case に束縛します。live source callable、
+topic-owned scheduler、injected task/cases/context builder、direct subprocess、または
+別 lifecycle wrapper は admission route ではありません。
 
-実験側が実装するものは次だけです。
+GPU admission は独立 owner の collaboration です。
 
-- `task(case, context)`: 1 case の研究ロジックと case record 出力。
-- `cases`: scheduler へ渡す展開済み case 列。
-- `context_builder(case)`: case ごとの `TaskContext` 作成。
-- `initializer(context)`: child process 先頭での環境反映。
-- `resource_estimate(case)`: worker / GPU / memory estimate。
-- `SkipController`: 起動前 skip が必要な場合だけ。
+- `NvidiaInventoryProbe`: exact NVIDIA list/XML/driver と physical/MIG topology。
+- `GpuProcessOccupancyProbe`: physical/MIG parent-child occupancy exclusion。
+- `GpuReservationTransaction`: candidate-local flock、fd readback、busy continuation、
+  tamper/infrastructure fail-closed、total rollback。
+- `SourceFreezeOwner`: exact registry を含む source membership と fd-bound snapshot。
+- `RuntimeIdentityReader`: namespace、UID/GID/groups、umask、Compose/bootstrap/finalize
+  receipt join。
+- `build_admitted_environment`: frozen full UUID set から run 前 environment を作成。
+- `RunGpuAdmissionContext`: composition order と reverse release だけ。
 
 `experiment_runner` 側へ委譲するものは次です。
 
 - fresh child process lifecycle
 - timeout、terminate、kill、cleanup
 - parent / child diagnostics
-- `ExecutionResult` completion
-- worker slot、host memory、GPU、GPU slot allocation
+- scheduler-owned `ExecutionResult` completion
+- generic worker slot と host memory lifecycle
 - `TaskContext["environment_variables"]` の child 反映
 - worker start / finish / timeout / signal の観測
 
-実験 script 側で mini-runner、scheduler、GPU slot 管理、`Popen` loop、timeout /
-signal cleanup、独自 completion 契約を実装しません。
+fixed ff97 route は 1 つの `StandardFullResourceScheduler`、1 つの
+`StandardRunner`、1 回の `run(worker)` だけです。`run(worker)` は `None` を返し、
+completion は scheduler から読みます。実験 script、Context、Adapter、Store、Owner
+は launch lifecycle、completion、cleanup policy を吸収しません。
 
 ## Environment Contract
 
-GPU device と allocator の環境変数は、runner / scheduler / project-local helper が作り、
+GPU device と allocator の環境変数は、admission 済み frozen plan から
+`build_admitted_environment` が runner construction 前に作り、
 `TaskContext["environment_variables"]` と child initializer で反映します。task body や
 case loop の中で `CUDA_VISIBLE_DEVICES`、`NVIDIA_VISIBLE_DEVICES`、`XLA_*` を直接組み立てません。
+GPU ID は full physical UUID または full MIG UUID だけです。CPU fallback、integer
+index、UUID prefix、direct launch、compatibility route はありません。
+
+managed container identity は次の exact artifact からだけ読みます。
+
+```text
+/var/lib/agent-canon/runtime/shared-runtime-provision.json
+/var/lib/agent-canon/runtime/shared-runtime-readback.json
+```
 
 JAX / XLA GPU 実行では、JAX import より前に次を反映します。
 
@@ -150,4 +171,3 @@ GPU execution closeout には次を含めます。
 - GPU id / GPU slot / worker slot / backend / dtype / allocator metadata
 - stdout、stderr、runner diagnostics、`ExecutionResult` summary
 - correctness evidence と performance evidence の分離
-

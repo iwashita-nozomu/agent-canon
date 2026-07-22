@@ -49,6 +49,9 @@ GIT_CHANGED_PATHS_TIMEOUT_SECONDS = 10
 ANALYZER_TIMEOUT_SECONDS = 30
 MAX_BLOCKED_ANALYZER_SNIPPETS = 3
 MAX_ANALYZER_OUTPUT_LINES = 12
+REVIEW_SIGNAL_PATTERN = re.compile(
+    r"^OOP_READABILITY_REVIEW_SIGNAL_FINDINGS=(\d+)$", re.MULTILINE
+)
 
 
 @dataclass(frozen=True)
@@ -58,7 +61,6 @@ class AnalyzerResult:
     command: tuple[str, ...]
     returncode: int
     output: str
-    min_score: int | None
 
 
 FindingKey = tuple[str, str, str, str, str, str, str]
@@ -191,25 +193,6 @@ def source_paths(root: Path, suffixes: set[str]) -> list[Path]:
     return [path for path in changed_paths(root) if is_source_path(path, suffixes)]
 
 
-def default_oop_min_score(root: Path) -> int | None:
-    """Return the analyzer-owned default min score."""
-    candidate_roots = (Path(__file__).resolve().parents[2], root)
-    for candidate in candidate_roots:
-        sys.path.insert(0, str(candidate))
-        try:
-            from tools.oop.shared.readability_core import DEFAULT_MIN_SCORE
-
-            return int(DEFAULT_MIN_SCORE)
-        except (ImportError, ValueError, TypeError):
-            continue
-        finally:
-            try:
-                sys.path.remove(str(candidate))
-            except ValueError:
-                pass
-    return None
-
-
 def check_mode_from_environment() -> CheckMode:
     """Return the OOP hook mode, defaulting to changed-finding checks."""
     mode = os.environ.get(MODE_ENV, MODE_DIFF).strip().casefold() or MODE_DIFF
@@ -231,15 +214,12 @@ def run_analyzer(
     if not analyzer.is_file() or not paths:
         return None
     relative_paths = [path.relative_to(root).as_posix() for path in paths]
-    min_score = default_oop_min_score(root)
     command_parts = [
         "python3",
         str(analyzer),
         "--root",
         str(root),
     ]
-    if min_score is not None:
-        command_parts.extend(("--min-score", str(min_score)))
     if check_mode.mode == MODE_DIFF and check_mode.baseline_ref is not None:
         command_parts.extend(("--baseline-ref", check_mode.baseline_ref))
     command_parts.extend(relative_paths)
@@ -256,7 +236,6 @@ def run_analyzer(
         command=command,
         returncode=result.returncode,
         output=(result.stdout + result.stderr).strip(),
-        min_score=min_score,
     )
     if result_record.returncode == 0:
         return result_record
@@ -279,8 +258,8 @@ def build_finding_key(finding: dict[str, object]) -> FindingKey:
         str(finding.get("severity", "")),
         str(finding.get("kind", "")),
         str(finding.get("symbol", "")),
-        str(finding.get("actual", "")),
-        str(finding.get("limit", "")),
+        str(finding.get("evidence", "")),
+        str(finding.get("contract", "")),
     )
 
 
@@ -320,8 +299,6 @@ def run_analyzer_finding_keys(
             str(root),
             "--format",
             "json",
-            "--min-score",
-            "0",
             *relative_paths,
         ],
         cwd=root,
@@ -402,7 +379,6 @@ def run_preexisting_finding_filter(
         command=result.command,
         returncode=0,
         output=f"{result.output}\nOOP_READABILITY_BASELINE=preexisting-only",
-        min_score=result.min_score,
     )
 
 
@@ -451,9 +427,13 @@ def should_check(payload: dict[str, object]) -> bool:
 
 def emit_warning(results: list[AnalyzerResult]) -> None:
     """Emit a non-blocking hook result with OOP remediation details."""
-    failed = [result for result in results if result.returncode != 0]
+    notable = [
+        result
+        for result in results
+        if result.returncode != 0 or review_signal_count(result) > 0
+    ]
     snippets = []
-    for result in failed[:MAX_BLOCKED_ANALYZER_SNIPPETS]:
+    for result in notable[:MAX_BLOCKED_ANALYZER_SNIPPETS]:
         first_lines = "\n".join(result.output.splitlines()[:MAX_ANALYZER_OUTPUT_LINES])
         snippets.append(f"$ {' '.join(result.command)}\n{first_lines}")
     json.dump(
@@ -462,7 +442,7 @@ def emit_warning(results: list[AnalyzerResult]) -> None:
             "reason": (
                 "OOP readability hook found new or changed-source review findings. "
                 "This warning is a non-blocking boundary review signal; do not split code only "
-                "to satisfy the score. Run the listed checker(s) before closeout and "
+                "to satisfy a mechanical finding. Run the listed checker(s) before closeout and "
                 "either fix a true design risk or record why the current boundary is intended.\n\n"
                 + "\n\n".join(snippets)
             ),
@@ -529,7 +509,17 @@ def hook_log_status(
     """Return the status value for one OOP hook log entry."""
     if not logged_checked(checked, results):
         return "skipped"
-    return "warn" if failed else "pass"
+    return (
+        "warn"
+        if failed or any(review_signal_count(result) > 0 for result in results)
+        else "pass"
+    )
+
+
+def review_signal_count(result: AnalyzerResult) -> int:
+    """Return the non-blocking STATUS_REVIEW signal count from analyzer output."""
+    match = REVIEW_SIGNAL_PATTERN.search(result.output)
+    return int(match.group(1)) if match else 0
 
 
 def analyzer_log_payload(
@@ -542,7 +532,6 @@ def analyzer_log_payload(
 ) -> dict[str, object]:
     """Build one OOP hook invocation log payload."""
     failed = [result for result in results if result.returncode != 0]
-    min_score = next((result.min_score for result in results if result.min_score is not None), None)
     timestamp = utc_now()
     payload_fingerprint = fingerprint_json(payload)
     failure_fingerprint = fingerprint_json(
@@ -571,9 +560,9 @@ def analyzer_log_payload(
         "skip_reason": _log_skip_reason(payload, checked, results),
         "mode": check_mode.mode,
         "baseline_ref": check_mode.baseline_ref or "",
-        "min_score": min_score,
         "result_count": len(results),
         "failed_count": len(failed),
+        "review_signal_count": sum(review_signal_count(result) for result in results),
         "failure_fingerprint": failure_fingerprint if failed else "",
         "status": hook_log_status(checked, results, failed),
         "root": str(root),
@@ -631,7 +620,9 @@ def main() -> int:
             check_mode=check_mode,
         ),
     )
-    if any(result.returncode != 0 for result in results):
+    if any(
+        result.returncode != 0 or review_signal_count(result) > 0 for result in results
+    ):
         emit_warning(results)
     return 0
 

@@ -37,22 +37,79 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-export PYTHONPATH="${WORKSPACE_ROOT}/python:${PYTHONPATH:-}"
+PYTHON_IMPORT_PATHS=()
+for candidate_path in python tools/agent_tools tools .codex/hooks; do
+  if [ -d "${candidate_path}" ]; then
+    PYTHON_IMPORT_PATHS+=("${WORKSPACE_ROOT}/${candidate_path}")
+  fi
+done
+if [ ${#PYTHON_IMPORT_PATHS[@]} -gt 0 ]; then
+  PYTHONPATH_VALUE="${PYTHON_IMPORT_PATHS[0]}"
+  for ((path_index = 1; path_index < ${#PYTHON_IMPORT_PATHS[@]}; path_index++)); do
+    PYTHONPATH_VALUE+=":${PYTHON_IMPORT_PATHS[path_index]}"
+  done
+  if [ -n "${PYTHONPATH:-}" ]; then
+    PYTHONPATH_VALUE+=":${PYTHONPATH}"
+  fi
+  export PYTHONPATH="${PYTHONPATH_VALUE}"
+fi
 export JAX_PLATFORMS="${JAX_PLATFORMS:-}"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-}"
 export NVIDIA_VISIBLE_DEVICES="${NVIDIA_VISIBLE_DEVICES:-}"
 
 PYTHON_SOURCE_PATHS=()
-for candidate_path in python tests; do
-  if [ -e "${candidate_path}" ]; then
-    PYTHON_SOURCE_PATHS+=("${candidate_path}")
+PYTHON_TEST_PATHS=()
+if [ -d python ]; then
+  PYTHON_SOURCE_PATHS+=(python)
+  if [ -d tests ]; then
+    while IFS= read -r candidate_path; do
+      PYTHON_SOURCE_PATHS+=("$candidate_path")
+      PYTHON_TEST_PATHS+=("$candidate_path")
+    done < <(
+      find tests \
+        -type f \( -name 'test_*.py' -o -name '*_test.py' \) -print | sort
+    )
   fi
-done
+else
+  AGENT_CANON_W2_OWNER_PATHS=(
+    .codex/hooks/completion_review_guard.py \
+    tools/agent_tools/artifact_identity.py \
+    tools/agent_tools/external_artifact_binding.py \
+    tools/agent_tools/publication_integrator.py \
+    tools/agent_tools/report_artifact_checks.py \
+    tools/agent_tools/review_dispatch.py \
+    tools/agent_tools/work_log.py \
+    tests/agent_tools/test_artifact_identity.py \
+    tests/agent_tools/test_codex_hooks.py \
+    tests/agent_tools/test_external_artifact_binding.py \
+    tests/agent_tools/test_publication_integrator.py \
+    tests/agent_tools/test_review_dispatch.py \
+    tests/agent_tools/test_work_log.py
+  )
+  for candidate_path in "${AGENT_CANON_W2_OWNER_PATHS[@]}"; do
+    if [ -f "${candidate_path}" ]; then
+      PYTHON_SOURCE_PATHS+=("${candidate_path}")
+    else
+      echo "Missing canonical AgentCanon W2 owner path: ${candidate_path}" >&2
+      exit 1
+    fi
+  done
+  PYTHON_TEST_PATHS=(
+    tests/agent_tools/test_artifact_identity.py
+    tests/agent_tools/test_codex_hooks.py
+    tests/agent_tools/test_external_artifact_binding.py
+    tests/agent_tools/test_publication_integrator.py
+    tests/agent_tools/test_review_dispatch.py
+    tests/agent_tools/test_work_log.py
+  )
+fi
 
 EXIT_CODE=0
 
 echo "3️⃣  pytest を実行中..."
-if "$PYTHON_BIN" -m pytest tests/ -q --tb=short 2>&1; then
+if [ ${#PYTHON_TEST_PATHS[@]} -eq 0 ]; then
+  echo "PYTEST=skip reason=no_parent_owned_tests"
+elif "$PYTHON_BIN" -m pytest "${PYTHON_TEST_PATHS[@]}" -q --tb=short 2>&1; then
   echo "✅ pytest 成功"
 else
   echo "❌ pytest 失敗"
@@ -61,7 +118,7 @@ fi
 echo ""
 
 echo "4️⃣  pyright を実行中..."
-if "$PYTHON_BIN" -m pyright 2>&1; then
+if "$PYTHON_BIN" -m pyright "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
   echo "✅ pyright 成功"
 else
   echo "❌ pyright 失敗"
@@ -72,7 +129,7 @@ echo ""
 echo "5️⃣  pydocstyle を実行中... (Docstring チェック)"
 if [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
   echo "PYDOCSTYLE=skip"
-  echo "python/tests source roots are absent in this checkout; skipping pydocstyle"
+  echo "AgentCanon Python source roots are absent in this checkout; skipping pydocstyle"
 elif "$PYTHON_BIN" -m pydocstyle "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
   echo "✅ pydocstyle 成功"
 else
@@ -85,7 +142,7 @@ if [ "$QUICK_MODE" -eq 1 ]; then
   echo "RUFF=skip reason=quick_mode"
 elif [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
   echo "RUFF=skip"
-  echo "python/tests source roots are absent in this checkout; skipping ruff"
+  echo "AgentCanon Python source roots are absent in this checkout; skipping ruff"
 else
   echo "6️⃣  ruff を実行中..."
   echo "   - E,F: コード品質（エラー・警告）"

@@ -5,59 +5,57 @@
 # upstream design ../README.md shared automation index
 # upstream design ../../agents/task_catalog.yaml workflow topology and isolated skill-evaluation route
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy
-# upstream implementation ./graph_client.py provides canonical dependency facts for packet references
-# upstream implementation ./workflow_monitor.py renders initial monitoring artifacts for atomic publication
 # upstream implementation ./skill_tool_commands.py builds selected skill command packets.
-# downstream implementation ./task_start.py creates task-start run bundles
-# downstream implementation ./bootstrap_agent_run.py creates bootstrap run bundles
-# downstream implementation ./waterfall_gate_check.py consumes materialized active packets
+# upstream implementation ./implementation_route.py owns fixed-packet Spark eligibility
+# upstream implementation ./model_profile_registry.py owns profile prompt/token materialization
+# upstream implementation ./capacity_handshake.py owns capacity reservations and lifecycle state
+# upstream implementation ./update_lifecycle_contract.py preserves owner-produced Decision Sufficiency verdicts and owns the terminal close token.
+# downstream implementation ./workflow_monitor.py records Decision Sufficiency and lifecycle evidence references.
 # @dependency-end
 """Shared runtime helpers for the permanent agent team."""
 
 from __future__ import annotations
 
-import ast
-import ctypes
-import errno
-import fcntl
 import hashlib
 import json
-import os
 import re
-import secrets
-import shutil
-import stat
 import subprocess
-import tomllib
-from collections.abc import Mapping
-from dataclasses import dataclass, replace
-from datetime import UTC, datetime
-from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Any, Literal, cast
-from urllib.parse import quote
+from collections.abc import Mapping, Sequence
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
+from dataclasses import asdict, dataclass, is_dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Callable, Mapping, cast
 
 import yaml
-from graph_client import CANONICAL_GRAPH_EXECUTABLE, GraphClient, GraphClientError
-from report_artifact_checks import (
-    is_placeholder_only_section,
-    parse_review_identity,
-    section_has_content,
-)
+if __package__:
+    from . import capacity_handshake
+    from . import implementation_route
+    from . import model_profile_registry
+    from .artifact_identity import canonical_json_bytes
+else:
+    import capacity_handshake
+    import implementation_route
+    import model_profile_registry
+    from artifact_identity import canonical_json_bytes
 from route import decide_skills, implementation_handoff_required, load_skill_route_rules
-from skill_tool_commands import (
-    PROMPT_PLACEHOLDER,
-    SkillCommandPacket,
-    packet_for_skill,
+from skill_tool_commands import SkillCommandPacket, packet_for_skill
+from task_authority import AUTHORITY_FILE_NAME, build_default_task_authority
+from update_lifecycle_contract import (
+    import_decision_sufficiency_verdict,
+    materialize_close_agent_tool_call as materialize_lifecycle_close_agent_tool_call,
+    materialize_gate_verdict,
+    validate_cleanup_proof,
+    validate_descendant_close_receipt,
+    validate_durable_handback,
+    validate_gate_chain,
+    validate_reservation_release_receipt,
+    validate_record_binding,
 )
-from task_authority import (
-    AUTHORITY_FILE_NAME,
-    authority_baseline_path,
-    build_default_task_authority,
-    hash_baseline_bytes,
-)
-
-if TYPE_CHECKING:
-    from workflow_monitor import MonitoringEntries
 
 ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
@@ -115,11 +113,11 @@ DEFERRED_SPAWN_ROLE_IDS = {
     "verifier",
     "auditor",
 }
-STANDARD_AGENT_WAVE_SEQUENCE = ("plan", "review", "edit")
+STANDARD_AGENT_WAVE_SEQUENCE = ("selected_stages_only",)
 STANDARD_AGENT_WAVE_SEQUENCE_SOURCE = (
     "agents/canonical/CODEX_SUBAGENTS.md#Wave Plan Contract"
 )
-STANDARD_AGENT_WAVE_SEQUENCE_GATE = "plan_packet,review_gate,edit_handoff"
+STANDARD_AGENT_WAVE_SEQUENCE_GATE = "selected_stage_evidence"
 USER_FACING_LANGUAGE_POLICY_SOURCE = "AGENTS.md#Template Context"
 USER_FACING_LANGUAGE = "ja"
 USER_FACING_LANGUAGE_SCOPE = (
@@ -172,35 +170,33 @@ PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED = "yes"
 PARENT_DIRECT_WRITE_EXCEPTION = "-"
 REPO_TOOL_ROUTING_POLICY_SOURCE = "agents/skills/task-routing.md#Standard Command"
 REPO_TOOL_ROUTING_OWNER = "tools/agent_tools/skill_tool_commands.py"
-REPO_TOOL_ROUTING_STATUS = "selected_skill_command_packets"
+REPO_TOOL_ROUTING_STATUS = "selected_skill_tool_call_tokens"
 REPO_TOOL_ROUTING_ROUTE_BASIS = "selected_public_skills"
 REPO_TOOL_ROUTING_EXECUTION_MODE = "sequential_by_skill_and_stage"
 REPO_TOOL_ROUTING_SEQUENCE = (
-    "show_skill_packet",
-    "run_required_commands",
-    "run_task_matching_conditional_commands",
-    "run_validation_commands",
-)
-REPO_TOOL_ROUTING_SHOW_COMMAND_TEMPLATE = (
-    "python3 tools/agent_tools/skill_tool_commands.py show "
-    "--skill <skill> --format text"
-)
-REPO_TOOL_ROUTING_CHECK_COMMAND = (
-    "python3 tools/agent_tools/skill_tool_commands.py check"
+    "materialize_tool_call_token",
+    "execute_canonical_tool_id",
+    "record_typed_result",
 )
 REPO_TOOL_ROUTING_STAGE_FIELDS = (
-    "required_commands",
-    "conditional_commands",
-    "validation_commands",
+    "tool_call_token",
+    "intent",
+    "typed_failure_semantics",
 )
 REPO_DYNAMIC_SKILL_ROUTING_STATUS = "related_skill_candidates"
-REPO_DYNAMIC_SKILL_ROUTING_COMMAND = (
-    'python3 tools/agent_tools/route.py --prompt "<user request>" --format json'
-)
-REPO_DYNAMIC_SKILL_AREA_COMMAND = (
-    "python3 tools/agent_tools/route.py --area skills --changed <paths...>"
-)
 REPO_DYNAMIC_SKILL_ROUTING_NEXT = "add_skill_then_regenerate_repo_tool_routes"
+TOOL_CALL_SCHEMA = "agent-canon.tool-call.v1"
+SKILL_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.skill-tool-commands.args.v1"
+ROUTE_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.route.args.v1"
+DECISION_SUFFICIENCY_OWNER = "agents/skills/agent-orchestration.md#Decision Sufficiency Packet"
+DECISION_SUFFICIENCY_VALIDATOR = "semantic_decision_sufficiency"
+DECISION_SUFFICIENCY_MACHINE_FIELDS = (
+    "owner",
+    "replaceable_unit",
+    "implementation_mechanism",
+    "validation_route",
+    "unresolved_branch",
+)
 PRE_HANDOFF_SCOPE_POLICY_SOURCE = (
     "agents/COMMUNICATION_PROTOCOL.md#Pre-Edit Repository Investigation Packet"
 )
@@ -237,28 +233,28 @@ DEFAULT_QUALITY_CHECK_POLICY_SOURCE = (
     "agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default"
 )
 DEFAULT_QUALITY_CHECK_ROLE_IDS = (
-    "test_designer",
     "docs_workflow_steward",
     "python_reviewer",
     "cpp_reviewer",
     "change_reviewer",
 )
-DEFAULT_QUALITY_CHECK_STAGES = (
-    "review_before_edit_handoff",
-    "post_edit_review",
-)
+DEFAULT_QUALITY_CHECK_STAGES = ("selected_stages_only",)
 DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
+    "tools/bin/agent-canon docs check <changed-markdown-paths>",
     "python3 tools/agent_tools/check_convention_compliance.py",
     "python3 tools/agent_tools/check_dependency_headers.py --changed",
     "bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing",
     "bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header",
-    "python3 tools/agent_tools/helper_function_inventory.py --root . --changed --baseline-ref HEAD",
-    "python3 tools/oop/python/readability.py --root . --min-score 95 <changed-python-paths>",
-    "python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>",
-    "tools/bin/agent-canon docs check <changed-markdown-paths>",
 )
-
-
+CANONICAL_FORMAT_CHECK_ROUTE = "tools/bin/agent-canon docs check <changed-markdown-paths>"
+OFFICIAL_HOOK_DISPATCHER = ".codex/hooks/hook_dispatcher.py"
+OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
+OOP_EVIDENCE_DIMENSIONS = (
+    "owner_overlap",
+    "state_ownership",
+    "api_boundary",
+    "dependency_boundary",
+)
 def validation_failure_response_policy() -> dict[str, object]:
     """Return validation-failure response taxonomy from the JSON owner."""
     global _validation_failure_response_policy_cache
@@ -276,16 +272,11 @@ def validation_failure_response_policy() -> dict[str, object]:
         if not isinstance(required_fields, list) or not all(
             isinstance(field, str) for field in cast("list[object]", required_fields)
         ):
-            raise ValueError(
-                "validation_failure_response.required_fields must be strings"
-            )
+            raise ValueError("validation_failure_response.required_fields must be strings")
         if not isinstance(intent_preservation, list) or not all(
-            isinstance(value, str)
-            for value in cast("list[object]", intent_preservation)
+            isinstance(value, str) for value in cast("list[object]", intent_preservation)
         ):
-            raise ValueError(
-                "validation_failure_response.intent_preservation must be strings"
-            )
+            raise ValueError("validation_failure_response.intent_preservation must be strings")
         _validation_failure_response_policy_cache = {
             "taxonomy_source": VALIDATION_FAILURE_TAXONOMY_SOURCE,
             "required_fields": tuple(cast("list[str]", required_fields)),
@@ -371,7 +362,6 @@ STANDARD_RUN_ARTIFACT_KEYS = (
     "closeout_gate",
     "agent_evaluation",
     "workflow_monitoring",
-    "final_review",
 )
 CURRENT_STAGE_SKILLS = {
     "$agent-orchestration",
@@ -441,11 +431,13 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "schedule",
             "design_brief",
             "design_review",
-            "test_plan",
             "change_review",
         ],
         "workspace_paths": ["documents/REVIEW_PROCESS.md"],
-        "notes": "Checkpoint review verifies that implementation cited the approved packet.",
+        "notes": (
+            "Checkpoint review is the selected owning gate; test_plan is read only when "
+            "post-implementation test design was activated."
+        ),
     },
     "final_reviewer": {
         "artifact_keys": [
@@ -453,11 +445,13 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "schedule",
             "design_brief",
             "design_review",
-            "test_plan",
             "final_review",
         ],
         "workspace_paths": ["documents/REVIEW_PROCESS.md"],
-        "notes": "Final review verifies whole-request traceability back to the approved packet.",
+        "notes": (
+            "Final review is a selected escalation gate; test_plan is read only when "
+            "post-implementation test design was activated."
+        ),
     },
     "scheduler": {
         "artifact_keys": ["user_request_contract", "schedule"],
@@ -484,7 +478,7 @@ ROLE_DOCUMENT_PACKET_SECTION_SPECS: dict[str, dict[str, tuple[str, ...]]] = {
             "Gate 7. 文書通読レビュー",
             "Gate 8. 実装",
             "Gate 8.5. 実装後の条件付きテストケース設計",
-            "Gate 9. 最終受け入れ review",
+            "Gate 9. 条件付き受け入れ review",
         ),
         "agents/canonical/CODEX_WORKFLOW.md": (
             "4. Run Bootstrap",
@@ -535,61 +529,6 @@ def resolve_report_root(
     if candidate.is_absolute():
         return candidate.resolve()
     return (base_root / candidate).resolve()
-
-
-class ReportBundleArtifactPathError(RuntimeError):
-    """Report one rejected run-artifact path and its containment reason."""
-
-    def __init__(self, declared_path: str, reason: str) -> None:
-        """Record the rejected declaration and stable reason code."""
-        self.declared_path = declared_path
-        self.reason = reason
-        super().__init__(
-            f"report_bundle_artifact_path_invalid:{reason}:{declared_path}"
-        )
-
-
-def resolve_report_bundle_artifact_path(
-    report_dir: Path,
-    declared_path: str,
-    *,
-    require_existing_regular_file: bool = False,
-) -> Path:
-    """Resolve one lexical bundle path without following symlink components."""
-    relative_path = Path(declared_path)
-    if not declared_path or relative_path.is_absolute():
-        raise ReportBundleArtifactPathError(declared_path, "not_relative")
-    parts = tuple(part for part in relative_path.parts if part not in {"", "."})
-    if not parts:
-        raise ReportBundleArtifactPathError(declared_path, "not_relative")
-
-    report_root = report_dir.resolve()
-    lexical_path = report_root
-    for index, component in enumerate(parts):
-        if component == "..":
-            raise ReportBundleArtifactPathError(declared_path, "outside_bundle")
-        lexical_path = lexical_path / component
-        if lexical_path.is_symlink():
-            raise ReportBundleArtifactPathError(declared_path, "symlink_component")
-        if not lexical_path.exists():
-            continue
-        is_final_component = index == len(parts) - 1
-        if is_final_component and not lexical_path.is_file():
-            raise ReportBundleArtifactPathError(declared_path, "nonregular_target")
-        if not is_final_component and not lexical_path.is_dir():
-            raise ReportBundleArtifactPathError(declared_path, "non_directory_parent")
-
-    candidate = lexical_path.resolve()
-    try:
-        candidate.relative_to(report_root)
-    except ValueError as exc:
-        raise ReportBundleArtifactPathError(
-            declared_path,
-            "outside_bundle",
-        ) from exc
-    if require_existing_regular_file and not candidate.is_file():
-        raise ReportBundleArtifactPathError(declared_path, "missing_regular_file")
-    return candidate
 
 
 @dataclass(frozen=True)
@@ -694,72 +633,6 @@ class RoleDocumentPacket:
     notes: str
 
 
-ActiveDesignSection = Literal[
-    "abstract_design_frame",
-    "implementation_source_packet",
-    "design_side_effect_map",
-    "design_to_implementation_trace",
-]
-ACTIVE_DESIGN_SECTIONS: tuple[ActiveDesignSection, ...] = (
-    "abstract_design_frame",
-    "implementation_source_packet",
-    "design_side_effect_map",
-    "design_to_implementation_trace",
-)
-ACTIVE_DESIGN_REFERENCE_FIELDS = (
-    "clause_refs",
-    "owner_refs",
-    "source_refs",
-    "dependency_refs",
-    "output_refs",
-    "reviewer_refs",
-)
-
-
-@dataclass(frozen=True)
-class ActiveDesignClause:
-    """One packet clause and its canonical source reference."""
-
-    clause_id: str
-    source_ref: str
-
-
-@dataclass(frozen=True)
-class ActiveDesignPacketEntry:
-    """Neutral reference record shared by all four design sections."""
-
-    entry_id: str
-    responsibility_id: str
-    clause_refs: tuple[str, ...]
-    owner_refs: tuple[str, ...]
-    source_refs: tuple[str, ...]
-    dependency_refs: tuple[str, ...]
-    output_refs: tuple[str, ...]
-    reviewer_refs: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class ActiveDesignPacketValue:
-    """Complete four-section active design packet value."""
-
-    schema: str
-    design_artifact: str
-    design_review_artifact: str
-    document_flow_review_artifact: str
-    document_flow_required: bool
-    clause_registry: tuple[ActiveDesignClause, ...]
-    abstract_design_frame: ActiveDesignPacketEntry
-    implementation_source_packet: ActiveDesignPacketEntry
-    design_side_effect_map: ActiveDesignPacketEntry
-    design_to_implementation_trace: ActiveDesignPacketEntry
-
-    def section_entries(
-        self,
-    ) -> tuple[tuple[ActiveDesignSection, ActiveDesignPacketEntry], ...]:
-        """Return section/value pairs in canonical order."""
-        return tuple((name, getattr(self, name)) for name in ACTIVE_DESIGN_SECTIONS)
-
-
 def resolve_cross_cutting_document_packet(
     workspace_root: Path,
 ) -> tuple[DocumentPacketEntry, ...]:
@@ -794,7 +667,6 @@ class TeamConfig:
     context_policies: tuple[dict[str, object], ...]
     activation_rules: tuple[dict[str, object], ...]
     quality_gates: tuple[str, ...]
-    artifact_registry: dict[str, object]
     artifacts: dict[str, str]
 
 
@@ -806,371 +678,6 @@ class TaskCatalog:
     workflow_families: tuple[dict[str, object], ...]
     tasks: tuple[dict[str, object], ...]
     review_packs: tuple[dict[str, object], ...]
-
-
-RUN_BUNDLE_FILE_MODE = 0o644
-RUN_BUNDLE_DIRECTORY_MODE = 0o755
-PRIVATE_STAGE_MODE = 0o700
-PRIVATE_TEMP_MODE = 0o600
-MATERIALIZATION_LOCK_MODE = 0o600
-MATERIALIZATION_LOCK_SCHEMA = "agent_canon.run_bundle_materialization_lock.v2"
-MATERIALIZATION_LOCK_NAME = ".run_bundle_materialization.lock"
-RENAME_NOREPLACE = 1
-RENAME_EXCHANGE = 2
-AT_FDCWD = -100
-GENERATED_NAME_ATTEMPTS = 8
-CleanupStatus = Literal["not_required", "pass", "fail"]
-MaterializationPhase = Literal[
-    "decode",
-    "reference_validation",
-    "render",
-    "stage",
-    "publish",
-    "activate",
-    "rollback",
-]
-MaterializationErrorCode = Literal[
-    "packet_invalid",
-    "reference_invalid",
-    "render_invalid",
-    "artifact_set_invalid",
-    "report_root_invalid",
-    "materialization_lock_failed",
-    "materialization_lock_busy",
-    "materialization_lock_foreign",
-    "materialization_lock_release_failed",
-    "atomic_noreplace_unavailable",
-    "atomic_exchange_unavailable",
-    "staging_name_exhausted",
-    "staging_write_failed",
-    "staging_verify_failed",
-    "run_bundle_target_exists",
-    "run_bundle_cross_device",
-    "run_bundle_publish_failed",
-    "active_bookkeeping_nonregular",
-    "bookkeeping_name_exhausted",
-    "active_baseline_publish_failed",
-    "active_pointer_publish_failed",
-    "bookkeeping_restore_conflict",
-    "run_bundle_rollback_failed",
-]
-LockReuseClass = Literal[
-    "first_acquisition",
-    "released_file_reuse",
-    "crash_stale_reuse",
-]
-
-
-@dataclass(frozen=True)
-class RenderedArtifact:
-    """One fully rendered run-bundle artifact awaiting publication."""
-
-    relative_path: PurePosixPath
-    content: bytes
-    mode: int
-
-
-@dataclass(frozen=True)
-class ArtifactDigest:
-    """Stable digest for one rendered artifact."""
-
-    relative_path: PurePosixPath
-    sha256: str
-
-
-@dataclass(frozen=True)
-class SubagentPromptPacket:
-    """Projected prompt inputs for one selected role."""
-
-    role_id: str
-    active_design_packet: ActiveDesignPacketValue
-    document_packet: RoleDocumentPacket
-    required_outputs: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class SourceReferenceResult:
-    """Resolved source-reference evidence for the active design packet."""
-
-    declared_ref: str
-    root_key: Literal["workspace", "agent_canon", "artifact"]
-    resolved_path: Path
-    relative_path: PurePosixPath
-    fragment_kind: Literal["none", "symbol", "section"]
-    fragment_value: str | None
-    sha256: str
-    parser_match_count: int
-
-
-@dataclass(frozen=True)
-class DependencyReferenceResult:
-    """Canonical dependency-edge evidence for one declared reference."""
-
-    declared_ref: str
-    dependency_root_key: Literal["workspace", "agent_canon"]
-    normalized_key: str
-    source_path: PurePosixPath
-    target_path: PurePosixPath
-    source_sha256: str
-    target_sha256: str
-    graph_match_count: int
-
-
-@dataclass(frozen=True)
-class RoleOutputProjection:
-    """Exact selected output paths owned by one active role."""
-
-    role_ref: str
-    output_refs: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class ReviewerArtifactProjection:
-    """Exact one-to-one join from a reviewer role to its review artifact."""
-
-    reviewer_ref: str
-    review_artifact_ref: str
-
-
-@dataclass(frozen=True)
-class ClauseReferenceResult:
-    """Resolved clause identifier and its authoritative source reference."""
-
-    clause_id: str
-    source_ref: str
-
-
-@dataclass(frozen=True)
-class OutputReferenceResult:
-    """Planned artifact-path evidence for one output reference."""
-
-    output_ref: str
-    relative_path: PurePosixPath
-    planned_count: int
-
-
-@dataclass(frozen=True)
-class ActiveDesignReferenceContext:
-    """Complete authoritative projection used by packet validation."""
-
-    workspace_root: Path
-    report_dir: Path
-    source_results: tuple[SourceReferenceResult, ...]
-    dependency_results: tuple[DependencyReferenceResult, ...]
-    role_output_projections: tuple[RoleOutputProjection, ...]
-    reviewer_artifact_projections: tuple[ReviewerArtifactProjection, ...]
-    clause_results: tuple[ClauseReferenceResult, ...]
-    output_results: tuple[OutputReferenceResult, ...]
-    planned_output_paths: frozenset[PurePosixPath]
-
-
-@dataclass(frozen=True)
-class ManifestPacketViolation:
-    """One typed manifest-shape violation."""
-
-    kind: str
-    field: str | None
-    observed_schema: str | None
-    order_key: tuple[int, int, int, int]
-
-
-@dataclass(frozen=True)
-class ReferencePacketViolation:
-    """One typed active-packet reference violation."""
-
-    section: ActiveDesignSection
-    field: str
-    input_index: int
-    reason: str
-    order_key: tuple[int, int, int, int]
-
-
-@dataclass(frozen=True)
-class DesignArtifactViolation:
-    """One typed design-artifact validation violation."""
-
-    artifact_path: PurePosixPath
-    reason: str
-    section_slug: str | None
-    order_key: tuple[int, int, int, int]
-
-
-@dataclass(frozen=True)
-class ReviewArtifactViolation:
-    """One typed design-review validation violation."""
-
-    artifact_path: PurePosixPath
-    reason: str
-    order_key: tuple[int, int, int, int]
-
-
-ActiveDesignPacketViolation = (
-    ManifestPacketViolation
-    | ReferencePacketViolation
-    | DesignArtifactViolation
-    | ReviewArtifactViolation
-)
-
-
-@dataclass(frozen=True)
-class MaterializedActiveDesignPacketResult:
-    """Loaded packet, persisted projection, and complete violation set."""
-
-    value: ActiveDesignPacketValue | None
-    context: ActiveDesignReferenceContext | None
-    violations: tuple[ActiveDesignPacketViolation, ...]
-
-
-@dataclass(frozen=True)
-class RollbackResult:
-    """Independent cleanup outcomes for a failed materialization."""
-
-    staging_cleanup: CleanupStatus = "not_required"
-    target_cleanup: CleanupStatus = "not_required"
-    pointer_restore: CleanupStatus = "not_required"
-    baseline_restore: CleanupStatus = "not_required"
-    temp_cleanup: CleanupStatus = "not_required"
-    failed_paths: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class FileIdentity:
-    """Stable filesystem object identity used for compare-before-mutate checks."""
-
-    st_dev: int
-    st_ino: int
-
-
-@dataclass(frozen=True)
-class FileState:
-    """Mutable metadata validated independently from stable object identity."""
-
-    identity: FileIdentity
-    file_type: int
-    permission_mode: int
-    owner_uid: int
-    owner_gid: int
-    link_count: int
-
-
-@dataclass(frozen=True)
-class BookkeepingFileState:
-    """Exact prior or published state of one activation bookkeeping file."""
-
-    name: Literal[".active_run", ".active_run.sha256"]
-    existed: bool
-    identity: FileIdentity | None
-    permission_mode: int | None
-    size: int | None
-    sha256: str | None
-    content: bytes | None
-
-
-@dataclass(frozen=True)
-class BookkeepingTempState:
-    """Verified temporary bookkeeping artifact and its bytes."""
-
-    path: Path
-    identity: FileIdentity
-    permission_mode: int
-    size: int
-    sha256: str
-    content: bytes
-
-
-@dataclass(frozen=True)
-class MaterializationLockIdentity:
-    """Canonical persistent lock payload and process identity."""
-
-    schema_version: str
-    state: Literal["held"]
-    report_root_identity: FileIdentity
-    lock_file_identity: FileIdentity
-    effective_uid: int
-    pid: int
-    process_start_ticks: int
-    boot_id: str
-    nonce: str
-    acquired_at: str
-    run_id: str
-    reuse_class: LockReuseClass
-    payload_sha256: str
-
-
-@dataclass(frozen=True)
-class MaterializationLock:
-    """Held persistent materialization lock and open descriptor."""
-
-    path: Path
-    descriptor: int
-    identity: MaterializationLockIdentity
-
-
-@dataclass(frozen=True)
-class PriorBookkeepingState:
-    """Snapshot and transaction state for pointer-last activation."""
-
-    report_root_identity: FileIdentity
-    lock_file_identity: FileIdentity
-    lock_nonce: str
-    pointer_prior: BookkeepingFileState
-    baseline_prior: BookkeepingFileState
-    pointer_temp: BookkeepingTempState | None = None
-    baseline_temp: BookkeepingTempState | None = None
-    pointer_quarantine: BookkeepingTempState | None = None
-    baseline_quarantine: BookkeepingTempState | None = None
-    pointer_published: BookkeepingFileState | None = None
-    baseline_published: BookkeepingFileState | None = None
-
-
-@dataclass(frozen=True)
-class StagedArtifactSet:
-    """Verified private staging directory awaiting publication."""
-
-    path: Path
-    identity: FileIdentity
-
-
-@dataclass(frozen=True)
-class PublishedTarget:
-    """Published run-bundle identity and content-tree digest."""
-
-    path: Path
-    identity: FileIdentity
-    tree_sha256: str
-
-
-class RunBundleMaterializationError(RuntimeError):
-    """Closed typed failure for bundle render, publication, and rollback."""
-
-    def __init__(
-        self,
-        *,
-        phase: MaterializationPhase,
-        code: MaterializationErrorCode,
-        cause_code: MaterializationErrorCode,
-        target_path: Path,
-        staging_path: Path | None = None,
-        violations: tuple[ActiveDesignPacketViolation, ...] = (),
-        rollback: RollbackResult | None = None,
-    ) -> None:
-        """Initialize one closed materialization failure."""
-        self.phase = phase
-        self.code = code
-        self.cause_code = cause_code
-        self.target_path = target_path
-        self.staging_path = staging_path
-        self.violations = violations
-        self.rollback = rollback if rollback is not None else RollbackResult()
-        super().__init__(f"run_bundle_materialization:{phase}:{code}")
-
-
-@dataclass(frozen=True)
-class RunActivationSpec:
-    """Parent-owned activation inputs rendered in the atomic transaction."""
-
-    report_root: Path
-    monitoring_entries: MonitoringEntries
 
 
 @dataclass(frozen=True)
@@ -1185,41 +692,82 @@ class RunBundleSpec:
     created_at_iso: str
     roles: tuple[Role, ...]
     workspace_root: Path
-    active_design_packet: ActiveDesignPacketValue | None = None
-    activation: RunActivationSpec | None = None
     workflow_family_id: str = ""
     manual_specialists: tuple[str, ...] = ()
     task_default_specialists: tuple[str, ...] = ()
-    auto_specialists: tuple[str, ...] = ()
+    language_review_candidates: tuple[str, ...] = ()
     default_review_packs_enabled: bool = False
     default_review_pack_ids: tuple[str, ...] = ()
     selected_skills: tuple[str, ...] = ()
     task_catalog: TaskCatalog | None = None
     agent_type_selections: tuple[AgentTypeSelection, ...] = ()
+    parent_lineage_id: str = ""
+    decision_sufficiency_packet: dict[str, object] | None = None
+    decision_sufficiency_packet_ref: str = ""
 
 
 @dataclass(frozen=True)
-class RunBundleMaterialization:
-    """Published run-bundle result returned to every producer."""
+class CapacityHandshakeConsumerBinding:
+    """Closed consumer projection for the provider-owned capacity ledger."""
 
-    report_dir: Path
-    created_files: tuple[str, ...]
-    active_design_packet: ActiveDesignPacketValue
-    role_document_packets: tuple[RoleDocumentPacket, ...]
-    subagent_prompt_packets: tuple[SubagentPromptPacket, ...]
-    artifact_digests: tuple[ArtifactDigest, ...]
-    active_pointer: Path | None
+    binding_version: int = 1
+    provider_owner_id: str = "capacity_handshake"
+    consumer_owner_ids: tuple[str, ...] = ("agent_team", "task_close")
+    allowed_api_ids: tuple[str, ...] = (
+        "reserve_capacity",
+        "enqueue_ready_work",
+        "record_lifecycle_transition",
+        "materialize_closeout_packet",
+    )
+    provider_type_ids: tuple[str, ...] = (
+        "LifecycleStatus",
+        "DescendantLifecycleRecord",
+        "CapacityLedger",
+        "LifecycleTransitionRecord",
+        "LedgerWriteResult",
+        "ParentChildEdge",
+        "DescendantTopologyReadback",
+        "CloseoutPacket",
+        "CloseAgentCallRecord",
+        "LifecycleCloseoutFailure",
+    )
+    duplicate_definition_policy: str = "forbidden"
+
+    @property
+    def shape_id(self) -> str:
+        return "capacity_handshake_consumer_binding_v1"
+
+
+@dataclass
+class _CapacityRuntime:
+    """Runtime-owned objects shared by parent and nested lifecycle consumers."""
+
+    binding: CapacityHandshakeConsumerBinding
+    snapshot: capacity_handshake.CapacitySnapshot
+    ledger: capacity_handshake.CapacityLedger
+    parent_lineage_id: str
+    topology_proof_sha256: str
+    requested_capacity: int
+    write_scope_cap: int
+
+
+@dataclass(frozen=True)
+class ImplementationDispatch:
+    """One executable fixed-packet dispatch and its single owning gate."""
+
+    route_result: implementation_route.ImplementationRouteResult
+    prompt_capsule: model_profile_registry.MaterializedPromptCapsule | None
+    close_agent_token: model_profile_registry.ToolCallToken | None
+    worker_agent_id: str | None
+    owner_gate_id: str
+    owner_gate_count: int
+    spawn_count: int
+    status: str
 
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
     """Load the canonical team config."""
-    try:
-        parsed: object = json.loads(
-            path.read_text(encoding="utf-8"),
-            object_pairs_hook=_reject_duplicate_json_keys,
-        )
-    except _DuplicateJsonKey as exc:
-        raise RuntimeError(f"team_config:duplicate_key:{exc.key}") from exc
+    parsed: object = json.loads(path.read_text(encoding="utf-8"))
     raw = _as_object_mapping(parsed, "team config")
     team = _as_object_mapping(raw.get("team"), "team")
     always_on_roles = tuple(
@@ -1238,11 +786,9 @@ def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
         raw.get("activation_rules"), "activation_rules"
     )
     quality_gates = _as_string_tuple(raw.get("quality_gates"), "quality_gates")
-    artifact_registry = _as_object_mapping(raw.get("artifacts"), "artifacts")
     artifacts = {
         key: _as_required_string(value, f"artifacts.{key}")
-        for key, value in artifact_registry.items()
-        if key != "active_design_packet"
+        for key, value in _as_object_mapping(raw.get("artifacts"), "artifacts").items()
     }
     return TeamConfig(
         raw=raw,
@@ -1253,1731 +799,8 @@ def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
         context_policies=context_policies,
         activation_rules=activation_rules,
         quality_gates=quality_gates,
-        artifact_registry=artifact_registry,
         artifacts=artifacts,
     )
-
-
-ActiveDesignPacketInputErrorCode = Literal[
-    "json_invalid",
-    "missing_field",
-    "unknown_field",
-    "wrong_type",
-    "unknown_schema",
-    "duplicate_id",
-    "empty_reference_set",
-    "malformed_reference",
-]
-ACTIVE_PACKET_VALUE_KEYS = (
-    "schema",
-    "design_artifact",
-    "design_review_artifact",
-    "document_flow_review_artifact",
-    "document_flow_required",
-    "clause_registry",
-    *ACTIVE_DESIGN_SECTIONS,
-)
-ACTIVE_PACKET_ENTRY_KEYS = (
-    "entry_id",
-    "responsibility_id",
-    *ACTIVE_DESIGN_REFERENCE_FIELDS,
-)
-ACTIVE_PACKET_ENTRY_IDS = {
-    "abstract_design_frame": "abstract-design-frame",
-    "implementation_source_packet": "implementation-source-packet",
-    "design_side_effect_map": "design-side-effect-map",
-    "design_to_implementation_trace": "design-to-implementation-trace",
-}
-SOURCE_REFERENCE_PATTERN = re.compile(
-    r"^(?:repo|artifact):[^#]+(?:#(?:symbol|section):[^#]+)?$"
-)
-HEADER_REFERENCE_PATTERN = re.compile(
-    r"^header:(?:upstream|downstream):(?:design|implementation|environment):"
-    r"repo:[^#\x00]+->repo:[^#\x00]+$"
-)
-ROLE_REFERENCE_PATTERN = re.compile(r"^role:[A-Za-z0-9][A-Za-z0-9_-]*$")
-CLAUSE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
-
-
-class ActiveDesignPacketInputError(ValueError):
-    """One stable active-design-packet decoder failure."""
-
-    def __init__(
-        self,
-        *,
-        code: ActiveDesignPacketInputErrorCode,
-        field: str,
-    ) -> None:
-        """Initialize one stable decoder failure."""
-        self.code = code
-        self.field = field
-        super().__init__(f"active_design_packet:{code}:{field}")
-
-
-class _DuplicateJsonKey(ValueError):
-    def __init__(self, key: str) -> None:
-        self.key = key
-        super().__init__(key)
-
-
-def _reject_duplicate_json_keys(
-    pairs: list[tuple[str, object]],
-) -> dict[str, object]:
-    result: dict[str, object] = {}
-    for key, value in pairs:
-        if key in result:
-            raise _DuplicateJsonKey(key)
-        result[key] = value
-    return result
-
-
-def _input_mapping(value: object, field: str) -> dict[str, object]:
-    if not isinstance(value, dict):
-        raise ActiveDesignPacketInputError(code="wrong_type", field=field)
-    mapping = cast(dict[object, object], value)
-    if not all(isinstance(key, str) for key in mapping):
-        raise ActiveDesignPacketInputError(code="wrong_type", field=field)
-    return cast(dict[str, object], mapping)
-
-
-def _input_required_fields(
-    mapping: Mapping[str, object],
-    expected: tuple[str, ...],
-    field: str,
-) -> None:
-    missing = [key for key in expected if key not in mapping]
-    if missing:
-        raise ActiveDesignPacketInputError(
-            code="missing_field",
-            field=f"{field}.{missing[0]}",
-        )
-    unknown = [key for key in mapping if key not in expected]
-    if unknown:
-        raise ActiveDesignPacketInputError(
-            code="unknown_field",
-            field=f"{field}.{unknown[0]}",
-        )
-
-
-def _input_string(value: object, field: str) -> str:
-    if not isinstance(value, str) or not value:
-        raise ActiveDesignPacketInputError(code="wrong_type", field=field)
-    return value
-
-
-def _validate_relative_posix_path(value: str, field: str) -> str:
-    path = PurePosixPath(value)
-    if (
-        "\\" in value
-        or "\x00" in value
-        or path.is_absolute()
-        or not path.parts
-        or any(part in {"", ".", ".."} for part in path.parts)
-    ):
-        raise ActiveDesignPacketInputError(code="malformed_reference", field=field)
-    return value
-
-
-def _input_reference_tuple(
-    value: object,
-    field: str,
-) -> tuple[str, ...]:
-    if not isinstance(value, list):
-        raise ActiveDesignPacketInputError(code="wrong_type", field=field)
-    if not value:
-        raise ActiveDesignPacketInputError(code="empty_reference_set", field=field)
-    refs = tuple(
-        _input_string(item, f"{field}[{index}]")
-        for index, item in enumerate(cast(list[object], value))
-    )
-    if len(set(refs)) != len(refs):
-        raise ActiveDesignPacketInputError(code="duplicate_id", field=field)
-    return refs
-
-
-def _validate_source_reference(reference: str, field: str) -> None:
-    if SOURCE_REFERENCE_PATTERN.fullmatch(reference) is None:
-        raise ActiveDesignPacketInputError(code="malformed_reference", field=field)
-    root, _, fragment = reference.partition("#")
-    _prefix, path = root.split(":", 1)
-    _validate_relative_posix_path(path, field)
-    if fragment and fragment.split(":", 1)[1] == "":
-        raise ActiveDesignPacketInputError(code="malformed_reference", field=field)
-
-
-def _validate_entry_reference(reference: str, field: str) -> None:
-    if not reference.startswith("entry:") or not reference.removeprefix("entry:"):
-        raise ActiveDesignPacketInputError(code="malformed_reference", field=field)
-
-
-def _validate_reference_field(
-    field_name: str, refs: tuple[str, ...], field: str
-) -> None:
-    for index, reference in enumerate(refs):
-        item_field = f"{field}[{index}]"
-        if field_name == "clause_refs":
-            valid = CLAUSE_ID_PATTERN.fullmatch(reference) is not None
-        elif field_name in {"owner_refs", "reviewer_refs"}:
-            valid = ROLE_REFERENCE_PATTERN.fullmatch(reference) is not None
-        elif field_name == "source_refs":
-            _validate_source_reference(reference, item_field)
-            valid = True
-        elif field_name == "dependency_refs":
-            if reference.startswith("entry:"):
-                _validate_entry_reference(reference, item_field)
-                valid = True
-            else:
-                valid = HEADER_REFERENCE_PATTERN.fullmatch(reference) is not None
-                remainder = reference.split(":", 3)[3] if valid else ""
-                valid = valid and remainder.count("->repo:") == 1
-                if valid:
-                    source, target = remainder.split("->", 1)
-                    _validate_source_reference(source, item_field)
-                    _validate_source_reference(target, item_field)
-        else:
-            valid = reference.startswith("artifact:") and "#" not in reference
-            if valid:
-                _validate_relative_posix_path(
-                    reference.removeprefix("artifact:"),
-                    item_field,
-                )
-        if not valid:
-            raise ActiveDesignPacketInputError(
-                code="malformed_reference",
-                field=item_field,
-            )
-
-
-def _decode_packet_entry(
-    raw: object,
-    *,
-    section: ActiveDesignSection,
-    field_prefix: str,
-) -> ActiveDesignPacketEntry:
-    field = f"{field_prefix}.{section}"
-    mapping = _input_mapping(raw, field)
-    _input_required_fields(mapping, ACTIVE_PACKET_ENTRY_KEYS, field)
-    entry_id = _input_string(mapping["entry_id"], f"{field}.entry_id")
-    if entry_id != ACTIVE_PACKET_ENTRY_IDS[section]:
-        raise ActiveDesignPacketInputError(
-            code="malformed_reference",
-            field=f"{field}.entry_id",
-        )
-    responsibility_id = _input_string(
-        mapping["responsibility_id"],
-        f"{field}.responsibility_id",
-    )
-    references = {
-        name: _input_reference_tuple(mapping[name], f"{field}.{name}")
-        for name in ACTIVE_DESIGN_REFERENCE_FIELDS
-    }
-    for name, refs in references.items():
-        _validate_reference_field(name, refs, f"{field}.{name}")
-    return ActiveDesignPacketEntry(
-        entry_id=entry_id,
-        responsibility_id=responsibility_id,
-        clause_refs=references["clause_refs"],
-        owner_refs=references["owner_refs"],
-        source_refs=references["source_refs"],
-        dependency_refs=references["dependency_refs"],
-        output_refs=references["output_refs"],
-        reviewer_refs=references["reviewer_refs"],
-    )
-
-
-def _decode_active_design_packet(
-    raw: object,
-    *,
-    field_prefix: str,
-) -> ActiveDesignPacketValue:
-    """Decode the one complete active-design-packet input shape."""
-    packet = _input_mapping(raw, field_prefix)
-    _input_required_fields(packet, ACTIVE_PACKET_VALUE_KEYS, field_prefix)
-    schema = _input_string(packet["schema"], f"{field_prefix}.schema")
-    if schema != "waterfall.design_packet.v1":
-        raise ActiveDesignPacketInputError(
-            code="unknown_schema",
-            field=f"{field_prefix}.schema",
-        )
-    artifact_values = {
-        name: _validate_relative_posix_path(
-            _input_string(packet[name], f"{field_prefix}.{name}"),
-            f"{field_prefix}.{name}",
-        )
-        for name in (
-            "design_artifact",
-            "design_review_artifact",
-            "document_flow_review_artifact",
-        )
-    }
-    document_flow_required = packet["document_flow_required"]
-    if not isinstance(document_flow_required, bool):
-        raise ActiveDesignPacketInputError(
-            code="wrong_type",
-            field=f"{field_prefix}.document_flow_required",
-        )
-    raw_clauses = packet["clause_registry"]
-    if not isinstance(raw_clauses, list):
-        raise ActiveDesignPacketInputError(
-            code="wrong_type",
-            field=f"{field_prefix}.clause_registry",
-        )
-    if not raw_clauses:
-        raise ActiveDesignPacketInputError(
-            code="empty_reference_set",
-            field=f"{field_prefix}.clause_registry",
-        )
-    clauses: list[ActiveDesignClause] = []
-    for index, raw_clause in enumerate(cast(list[object], raw_clauses)):
-        clause_field = f"{field_prefix}.clause_registry[{index}]"
-        clause = _input_mapping(raw_clause, clause_field)
-        _input_required_fields(clause, ("clause_id", "source_ref"), clause_field)
-        clause_id = _input_string(clause["clause_id"], f"{clause_field}.clause_id")
-        source_ref = _input_string(clause["source_ref"], f"{clause_field}.source_ref")
-        if CLAUSE_ID_PATTERN.fullmatch(clause_id) is None:
-            raise ActiveDesignPacketInputError(
-                code="malformed_reference",
-                field=f"{clause_field}.clause_id",
-            )
-        _validate_source_reference(source_ref, f"{clause_field}.source_ref")
-        clauses.append(ActiveDesignClause(clause_id=clause_id, source_ref=source_ref))
-    clause_ids = tuple(clause.clause_id for clause in clauses)
-    if len(set(clause_ids)) != len(clause_ids):
-        raise ActiveDesignPacketInputError(
-            code="duplicate_id",
-            field=f"{field_prefix}.clause_registry",
-        )
-    entries: dict[ActiveDesignSection, ActiveDesignPacketEntry] = {
-        section: _decode_packet_entry(
-            packet[section],
-            section=section,
-            field_prefix=field_prefix,
-        )
-        for section in ACTIVE_DESIGN_SECTIONS
-    }
-    responsibility_ids = {entry.responsibility_id for entry in entries.values()}
-    if len(responsibility_ids) != 1:
-        raise ActiveDesignPacketInputError(
-            code="duplicate_id",
-            field=f"{field_prefix}.responsibility_id",
-        )
-    known_entry_ids = {entry.entry_id for entry in entries.values()}
-    expected_dependencies: dict[ActiveDesignSection, set[str]] = {
-        "abstract_design_frame": set(),
-        "implementation_source_packet": {"abstract-design-frame"},
-        "design_side_effect_map": {"abstract-design-frame"},
-        "design_to_implementation_trace": {
-            "abstract-design-frame",
-            "implementation-source-packet",
-            "design-side-effect-map",
-        },
-    }
-    referenced_clauses: set[str] = set()
-    for section, entry in entries.items():
-        referenced_clauses.update(entry.clause_refs)
-        if not set(entry.clause_refs).issubset(set(clause_ids)):
-            raise ActiveDesignPacketInputError(
-                code="malformed_reference",
-                field=f"{field_prefix}.{section}.clause_refs",
-            )
-        joined = {
-            value.removeprefix("entry:")
-            for value in entry.dependency_refs
-            if value.startswith("entry:")
-        }
-        if entry.entry_id in joined or not joined.issubset(known_entry_ids):
-            raise ActiveDesignPacketInputError(
-                code="malformed_reference",
-                field=f"{field_prefix}.{section}.dependency_refs",
-            )
-        if joined != expected_dependencies[section]:
-            raise ActiveDesignPacketInputError(
-                code="malformed_reference",
-                field=f"{field_prefix}.{section}.dependency_refs",
-            )
-    if referenced_clauses != set(clause_ids):
-        raise ActiveDesignPacketInputError(
-            code="malformed_reference",
-            field=f"{field_prefix}.clause_registry",
-        )
-    return ActiveDesignPacketValue(
-        schema=schema,
-        design_artifact=artifact_values["design_artifact"],
-        design_review_artifact=artifact_values["design_review_artifact"],
-        document_flow_review_artifact=artifact_values["document_flow_review_artifact"],
-        document_flow_required=document_flow_required,
-        clause_registry=tuple(clauses),
-        abstract_design_frame=entries["abstract_design_frame"],
-        implementation_source_packet=entries["implementation_source_packet"],
-        design_side_effect_map=entries["design_side_effect_map"],
-        design_to_implementation_trace=entries["design_to_implementation_trace"],
-    )
-
-
-def parse_active_design_packet_input(
-    value: str | None,
-) -> ActiveDesignPacketValue | None:
-    """Parse one atomic JSON packet supplied by a run entrypoint."""
-    if value is None:
-        return None
-    try:
-        parsed: object = json.loads(
-            value, object_pairs_hook=_reject_duplicate_json_keys
-        )
-    except _DuplicateJsonKey as exc:
-        raise ActiveDesignPacketInputError(
-            code="duplicate_id",
-            field=f"active_design_packet.{exc.key}",
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise ActiveDesignPacketInputError(
-            code="json_invalid",
-            field="active_design_packet",
-        ) from exc
-    return _decode_active_design_packet(parsed, field_prefix="active_design_packet")
-
-
-def resolve_active_design_packet(
-    config: TeamConfig,
-    *,
-    workflow_family: Mapping[str, object] | None,
-    explicit: ActiveDesignPacketValue | None,
-) -> ActiveDesignPacketValue:
-    """Resolve exactly explicit, workflow, then standard packet precedence."""
-    if explicit is not None:
-        return explicit
-    if workflow_family is not None and "active_design_packet" in workflow_family:
-        raw_packet = workflow_family["active_design_packet"]
-        field_prefix = "workflow_family.active_design_packet"
-    else:
-        raw_packet = config.artifact_registry.get("active_design_packet")
-        field_prefix = "artifacts.active_design_packet"
-    if raw_packet is None:
-        raise ActiveDesignPacketInputError(
-            code="missing_field",
-            field="artifacts.active_design_packet",
-        )
-    return _decode_active_design_packet(raw_packet, field_prefix=field_prefix)
-
-
-FORBIDDEN_ACTIVE_PACKET_AUTHORITY_NAMES = {
-    "schedule.md",
-    "workflow_monitoring.md",
-    "work_log.md",
-    "decision_log.md",
-}
-
-
-def _packet_references(
-    packet: ActiveDesignPacketValue,
-    field: str,
-) -> tuple[tuple[ActiveDesignSection, int, str], ...]:
-    return tuple(
-        (section, index, reference)
-        for section, entry in packet.section_entries()
-        for index, reference in enumerate(cast(tuple[str, ...], getattr(entry, field)))
-    )
-
-
-def _source_reference_parts(
-    reference: str,
-) -> tuple[str, PurePosixPath, str, str | None]:
-    root, separator, fragment = reference.partition("#")
-    prefix, path_value = root.split(":", 1)
-    fragment_kind = "none"
-    fragment_value: str | None = None
-    if separator:
-        fragment_kind, fragment_value = fragment.split(":", 1)
-    return prefix, PurePosixPath(path_value), fragment_kind, fragment_value
-
-
-def _resolved_source_binding(
-    workspace_root: Path,
-    report_dir: Path,
-    reference: str,
-) -> tuple[Literal["workspace", "agent_canon", "artifact"], Path, PurePosixPath]:
-    prefix, relative_path, _fragment_kind, _fragment_value = _source_reference_parts(
-        reference
-    )
-    if relative_path.name in FORBIDDEN_ACTIVE_PACKET_AUTHORITY_NAMES:
-        raise ValueError(f"forbidden packet authority source: {reference}")
-    if prefix == "artifact":
-        return (
-            "artifact",
-            resolve_report_bundle_artifact_path(
-                report_dir,
-                relative_path.as_posix(),
-            ),
-            relative_path,
-        )
-    resolved = resolve_workspace_document_path(
-        workspace_root,
-        relative_path.as_posix(),
-    ).resolve()
-    workspace = workspace_root.resolve()
-    canon = ROOT.resolve()
-    if resolved.is_relative_to(workspace) and not resolved.is_relative_to(canon):
-        return (
-            "workspace",
-            resolved,
-            PurePosixPath(resolved.relative_to(workspace).as_posix()),
-        )
-    if resolved.is_relative_to(canon):
-        return (
-            "agent_canon",
-            resolved,
-            PurePosixPath(resolved.relative_to(canon).as_posix()),
-        )
-    raise ValueError(f"source reference escaped canonical roots: {reference}")
-
-
-def _resolved_source_path(
-    spec: RunBundleSpec,
-    reference: str,
-) -> tuple[Literal["workspace", "agent_canon", "artifact"], Path, PurePosixPath]:
-    """Resolve a source binding from one run specification."""
-    return _resolved_source_binding(spec.workspace_root, spec.report_dir, reference)
-
-
-def _ast_symbol_match_count(path: Path, dotted_qualname: str) -> int:
-    tree = ast.parse(path.read_bytes(), filename=path.as_posix())
-    components = dotted_qualname.split(".")
-    nodes: list[ast.AST] = [tree]
-    for component in components:
-        matched: list[ast.AST] = []
-        for node in nodes:
-            body = getattr(node, "body", ())
-            matched.extend(
-                child
-                for child in body
-                if isinstance(
-                    child, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
-                )
-                and child.name == component
-            )
-        nodes = matched
-    return len(nodes)
-
-
-def _source_parser_match_count(
-    path: Path,
-    fragment_kind: str,
-    fragment_value: str | None,
-) -> int:
-    if not path.is_file() or path.is_symlink():
-        return 0
-    if fragment_kind == "none":
-        return 1
-    if fragment_value is None:
-        return 0
-    if fragment_kind == "symbol":
-        return _ast_symbol_match_count(path, fragment_value)
-    if fragment_kind == "section":
-        return sum(
-            markdown_heading_anchor(heading) == fragment_value
-            for heading in markdown_document_headings(path)
-        )
-    return 0
-
-
-def _source_reference_result(
-    spec: RunBundleSpec,
-    reference: str,
-) -> SourceReferenceResult:
-    root_key, resolved_path, relative_path = _resolved_source_path(spec, reference)
-    _prefix, _path, fragment_kind, fragment_value = _source_reference_parts(reference)
-    match_count = _source_parser_match_count(
-        resolved_path,
-        fragment_kind,
-        fragment_value,
-    )
-    digest = (
-        hashlib.sha256(resolved_path.read_bytes()).hexdigest()
-        if resolved_path.is_file()
-        else ""
-    )
-    return SourceReferenceResult(
-        declared_ref=reference,
-        root_key=root_key,
-        resolved_path=resolved_path,
-        relative_path=relative_path,
-        fragment_kind=cast(Literal["none", "symbol", "section"], fragment_kind),
-        fragment_value=fragment_value,
-        sha256=digest,
-        parser_match_count=match_count,
-    )
-
-
-def _dependency_root_for_paths(
-    workspace_root: Path,
-    source: Path,
-    target: Path,
-) -> tuple[Literal["workspace", "agent_canon"], Path]:
-    canon = ROOT.resolve()
-    workspace = workspace_root.resolve()
-    if source.is_relative_to(canon) and target.is_relative_to(canon):
-        return "agent_canon", canon
-    if source.is_relative_to(workspace) and target.is_relative_to(workspace):
-        return "workspace", workspace
-    raise ValueError("dependency endpoints resolve to different canonical roots")
-
-
-def _canonical_dependency_binding(
-    workspace_root: Path,
-    reference: str,
-) -> tuple[
-    Literal["workspace", "agent_canon"],
-    Path,
-    str,
-    PurePosixPath,
-    PurePosixPath,
-    str,
-    str,
-]:
-    """Bind one declared dependency reference to its canonical tuple."""
-    prefix, remainder = reference.split(":repo:", 1)
-    direction, kind = prefix.removeprefix("header:").split(":", 1)
-    source_value, target_value = remainder.split("->repo:", 1)
-    source_ref = f"repo:{source_value}"
-    target_ref = f"repo:{target_value}"
-    _source_key, source, _source_relative = _resolved_source_binding(
-        workspace_root,
-        workspace_root,
-        source_ref,
-    )
-    _target_key, target, _target_relative = _resolved_source_binding(
-        workspace_root,
-        workspace_root,
-        target_ref,
-    )
-    root_key, dependency_root = _dependency_root_for_paths(
-        workspace_root,
-        source,
-        target,
-    )
-    source_path = PurePosixPath(source.relative_to(dependency_root).as_posix())
-    target_path = PurePosixPath(target.relative_to(dependency_root).as_posix())
-    normalized_key = (
-        f"header:{direction}:{kind}:repo:{source_path.as_posix()}"
-        f"->repo:{target_path.as_posix()}"
-    )
-    return (
-        root_key,
-        dependency_root,
-        normalized_key,
-        source_path,
-        target_path,
-        direction,
-        kind,
-    )
-
-
-def _canonical_dependency_rows(root: Path) -> tuple[tuple[str, str, str, str], ...]:
-    client = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE)
-    try:
-        status = client.status()
-        integration = status.payload.get("integration_record")
-        if status.status != "fresh" or not isinstance(integration, Mapping):
-            raise RuntimeError(
-                "canonical dependency graph is not verified and fresh: "
-                f"status={status.status} reason={status.payload.get('reason')}"
-            )
-        integration_fields = cast(Mapping[str, object], integration)
-        if (
-            integration_fields.get("verified") is not True
-            or integration_fields.get("profile") != "default"
-            or integration_fields.get("source_snapshot_profile") != "parent"
-        ):
-            raise RuntimeError("canonical dependency graph integration is invalid")
-        response = client.query(
-            all=True,
-            relation="dependency",
-            direction="both",
-            depth=0,
-        )
-        if response.status != "fresh":
-            raise RuntimeError(
-                "canonical dependency query is not fresh: "
-                f"status={response.status} reason={response.payload.get('reason')}"
-            )
-        return tuple(
-            (fact.direction, fact.kind, fact.source, fact.target)
-            for fact in response.dependency_facts
-        )
-    except GraphClientError as error:
-        raise RuntimeError(f"canonical dependency graph failed: {error}") from error
-
-
-def _dependency_reference_result(
-    spec: RunBundleSpec,
-    reference: str,
-    rows_by_root: dict[Path, tuple[tuple[str, str, str, str], ...]],
-) -> DependencyReferenceResult:
-    (
-        root_key,
-        dependency_root,
-        normalized_key,
-        source_path,
-        target_path,
-        direction,
-        kind,
-    ) = _canonical_dependency_binding(spec.workspace_root, reference)
-    source = dependency_root / source_path.as_posix()
-    target = dependency_root / target_path.as_posix()
-    rows = rows_by_root.get(dependency_root)
-    if rows is None:
-        rows = _canonical_dependency_rows(dependency_root)
-        rows_by_root[dependency_root] = rows
-    match_count = sum(
-        row == (direction, kind, source_path.as_posix(), target_path.as_posix())
-        for row in rows
-    )
-    return DependencyReferenceResult(
-        declared_ref=reference,
-        dependency_root_key=root_key,
-        normalized_key=normalized_key,
-        source_path=source_path,
-        target_path=target_path,
-        source_sha256=hashlib.sha256(source.read_bytes()).hexdigest()
-        if source.is_file()
-        else "",
-        target_sha256=hashlib.sha256(target.read_bytes()).hexdigest()
-        if target.is_file()
-        else "",
-        graph_match_count=match_count,
-    )
-
-
-def _distinct_packet_references(
-    packet: ActiveDesignPacketValue,
-    field: str,
-) -> tuple[str, ...]:
-    return tuple(
-        dict.fromkeys(
-            reference
-            for _section, _index, reference in _packet_references(packet, field)
-        )
-    )
-
-
-def _active_packet_source_references(
-    packet: ActiveDesignPacketValue,
-) -> tuple[str, ...]:
-    """Return the canonical ordered domain of persisted source projections."""
-    references = list(_distinct_packet_references(packet, "source_refs"))
-    references.extend(
-        clause.source_ref
-        for clause in packet.clause_registry
-        if clause.source_ref not in references
-    )
-    return tuple(references)
-
-
-def _active_packet_dependency_references(
-    packet: ActiveDesignPacketValue,
-) -> tuple[str, ...]:
-    """Return the canonical ordered domain of persisted dependency projections."""
-    return tuple(
-        reference
-        for reference in _distinct_packet_references(packet, "dependency_refs")
-        if reference.startswith("header:")
-    )
-
-
-def build_active_design_reference_context(
-    spec: RunBundleSpec,
-    packet: ActiveDesignPacketValue,
-    workflow_family: Mapping[str, object] | None,
-    *,
-    artifact_names: tuple[str, ...],
-) -> ActiveDesignReferenceContext:
-    """Construct the sole authoritative active-design reference projection."""
-    del workflow_family
-    role_output_projections = tuple(
-        RoleOutputProjection(
-            role_ref=f"role:{role.id}",
-            output_refs=tuple(
-                f"artifact:{output}"
-                for output in selected_role_outputs(spec.config, role, packet)
-            ),
-        )
-        for role in spec.roles
-    )
-    role_outputs = {
-        projection.role_ref: projection.output_refs
-        for projection in role_output_projections
-    }
-    reviewer_refs = tuple(
-        dict.fromkeys(
-            reference
-            for _section, _index, reference in _packet_references(
-                packet,
-                "reviewer_refs",
-            )
-        )
-    )
-    review_outputs = {
-        f"artifact:{packet.design_review_artifact}",
-        f"artifact:{packet.document_flow_review_artifact}",
-    }
-    reviewer_projections: list[ReviewerArtifactProjection] = []
-    for reviewer_ref in reviewer_refs:
-        matches = tuple(
-            output
-            for output in role_outputs.get(reviewer_ref, ())
-            if output in review_outputs
-        )
-        if len(matches) == 1:
-            reviewer_projections.append(
-                ReviewerArtifactProjection(reviewer_ref, matches[0])
-            )
-    source_results = tuple(
-        _source_reference_result(spec, reference)
-        for reference in _active_packet_source_references(packet)
-    )
-    dependency_refs = _active_packet_dependency_references(packet)
-    rows_by_root: dict[Path, tuple[tuple[str, str, str, str], ...]] = {}
-    dependency_results = tuple(
-        _dependency_reference_result(spec, reference, rows_by_root)
-        for reference in dependency_refs
-    )
-    planned_paths = tuple(
-        PurePosixPath(path)
-        for path in (
-            *artifact_names,
-            AUTHORITY_FILE_NAME,
-            authority_baseline_path(Path(AUTHORITY_FILE_NAME)).name,
-        )
-    )
-    output_results = tuple(
-        OutputReferenceResult(
-            output_ref=reference,
-            relative_path=PurePosixPath(reference.removeprefix("artifact:")),
-            planned_count=planned_paths.count(
-                PurePosixPath(reference.removeprefix("artifact:"))
-            ),
-        )
-        for reference in _distinct_packet_references(packet, "output_refs")
-    )
-    return ActiveDesignReferenceContext(
-        workspace_root=spec.workspace_root.resolve(),
-        report_dir=spec.report_dir.resolve(),
-        source_results=source_results,
-        dependency_results=dependency_results,
-        role_output_projections=role_output_projections,
-        reviewer_artifact_projections=tuple(reviewer_projections),
-        clause_results=tuple(
-            ClauseReferenceResult(clause.clause_id, clause.source_ref)
-            for clause in packet.clause_registry
-        ),
-        output_results=output_results,
-        planned_output_paths=frozenset(planned_paths),
-    )
-
-
-def _packet_entry_mapping(entry: ActiveDesignPacketEntry) -> dict[str, object]:
-    return {
-        "entry_id": entry.entry_id,
-        "responsibility_id": entry.responsibility_id,
-        "clause_refs": list(entry.clause_refs),
-        "owner_refs": list(entry.owner_refs),
-        "source_refs": list(entry.source_refs),
-        "dependency_refs": list(entry.dependency_refs),
-        "output_refs": list(entry.output_refs),
-        "reviewer_refs": list(entry.reviewer_refs),
-    }
-
-
-def active_design_packet_mapping(packet: ActiveDesignPacketValue) -> dict[str, object]:
-    """Return the exact manifest/config packet mapping."""
-    return {
-        "schema": packet.schema,
-        "design_artifact": packet.design_artifact,
-        "design_review_artifact": packet.design_review_artifact,
-        "document_flow_review_artifact": packet.document_flow_review_artifact,
-        "document_flow_required": packet.document_flow_required,
-        "clause_registry": [
-            {"clause_id": clause.clause_id, "source_ref": clause.source_ref}
-            for clause in packet.clause_registry
-        ],
-        **{
-            section: _packet_entry_mapping(entry)
-            for section, entry in packet.section_entries()
-        },
-    }
-
-
-def active_design_reference_projection_mapping(
-    context: ActiveDesignReferenceContext,
-) -> dict[str, object]:
-    """Return the exact persisted reference projection without absolute paths."""
-    return {
-        "source_results": [
-            {
-                "declared_ref": result.declared_ref,
-                "root_key": result.root_key,
-                "relative_path": result.relative_path.as_posix(),
-                "fragment_kind": result.fragment_kind,
-                "fragment_value": result.fragment_value,
-                "sha256": result.sha256,
-                "parser_match_count": result.parser_match_count,
-            }
-            for result in context.source_results
-        ],
-        "dependency_results": [
-            {
-                "declared_ref": result.declared_ref,
-                "dependency_root_key": result.dependency_root_key,
-                "normalized_key": result.normalized_key,
-                "source_path": result.source_path.as_posix(),
-                "target_path": result.target_path.as_posix(),
-                "source_sha256": result.source_sha256,
-                "target_sha256": result.target_sha256,
-                "graph_match_count": result.graph_match_count,
-            }
-            for result in context.dependency_results
-        ],
-        "role_output_projections": [
-            {
-                "role_ref": result.role_ref,
-                "output_refs": list(result.output_refs),
-            }
-            for result in context.role_output_projections
-        ],
-        "reviewer_artifact_projections": [
-            {
-                "reviewer_ref": result.reviewer_ref,
-                "review_artifact_ref": result.review_artifact_ref,
-            }
-            for result in context.reviewer_artifact_projections
-        ],
-        "clause_results": [
-            {"clause_id": result.clause_id, "source_ref": result.source_ref}
-            for result in context.clause_results
-        ],
-        "output_results": [
-            {
-                "output_ref": result.output_ref,
-                "relative_path": result.relative_path.as_posix(),
-                "planned_count": result.planned_count,
-            }
-            for result in context.output_results
-        ],
-        "planned_output_paths": sorted(
-            path.as_posix() for path in context.planned_output_paths
-        ),
-    }
-
-
-def _encoded_violation_component(value: str) -> str:
-    return quote(
-        value, safe="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._/-"
-    )
-
-
-def render_active_design_packet_violation(
-    violation: ActiveDesignPacketViolation,
-) -> str:
-    """Render the sole closed public active-packet blocker grammar."""
-    if isinstance(violation, ManifestPacketViolation):
-        if violation.kind == "manifest_missing":
-            return "team_manifest.yaml:missing"
-        if violation.kind == "manifest_invalid":
-            return "team_manifest.yaml:active_design_packet_field_invalid:manifest"
-        if violation.kind == "packet_missing":
-            return "team_manifest.yaml:active_design_packet_missing"
-        if violation.field is None:
-            raise ValueError("manifest packet violation requires a field")
-        field = _encoded_violation_component(violation.field)
-        if violation.kind == "field_missing":
-            return f"team_manifest.yaml:active_design_packet_field_missing:{field}"
-        if violation.kind == "field_invalid":
-            return f"team_manifest.yaml:active_design_packet_field_invalid:{field}"
-        if violation.kind == "schema_unknown":
-            if violation.observed_schema is None:
-                raise ValueError("schema violation requires observed_schema")
-            return (
-                "team_manifest.yaml:active_design_packet_schema_unknown:"
-                + _encoded_violation_component(violation.observed_schema)
-            )
-        if violation.kind == "path_outside_bundle":
-            return (
-                f"team_manifest.yaml:active_design_packet_path_outside_bundle:{field}"
-            )
-        raise ValueError(f"unknown manifest packet violation: {violation.kind}")
-    if isinstance(violation, ReferencePacketViolation):
-        return (
-            "team_manifest.yaml:active_design_packet_reference_invalid:"
-            f"{violation.section}:{violation.field}:{violation.input_index}:"
-            f"{violation.reason}"
-        )
-    if isinstance(violation, DesignArtifactViolation):
-        path = _encoded_violation_component(violation.artifact_path.as_posix())
-        if violation.reason == "section_empty_or_missing":
-            if violation.section_slug is None:
-                raise ValueError("section violation requires section_slug")
-            return f"{path}:section_empty_or_missing:{_encoded_violation_component(violation.section_slug)}"
-        if violation.section_slug is not None:
-            raise ValueError("non-section violation cannot carry section_slug")
-        return f"{path}:{violation.reason}"
-    return (
-        f"{_encoded_violation_component(violation.artifact_path.as_posix())}:"
-        f"{violation.reason}"
-    )
-
-
-def _reference_semantic_violations(
-    packet: ActiveDesignPacketValue,
-    context: ActiveDesignReferenceContext,
-) -> list[ActiveDesignPacketViolation]:
-    violations: list[ActiveDesignPacketViolation] = []
-    clause_ids = {result.clause_id for result in context.clause_results}
-    role_refs = {result.role_ref for result in context.role_output_projections}
-    reviewer_map = {
-        result.reviewer_ref: result.review_artifact_ref
-        for result in context.reviewer_artifact_projections
-    }
-    distinct_reviewer_refs = _distinct_packet_references(packet, "reviewer_refs")
-    role_output_map = {
-        result.role_ref: result.output_refs
-        for result in context.role_output_projections
-    }
-    review_artifacts = {
-        f"artifact:{packet.design_review_artifact}",
-        f"artifact:{packet.document_flow_review_artifact}",
-    }
-    invalid_reviewer_refs = {
-        reviewer
-        for reviewer in distinct_reviewer_refs
-        if len(
-            tuple(
-                output
-                for output in role_output_map.get(reviewer, ())
-                if output in review_artifacts
-            )
-        )
-        != 1
-    }
-    required_review_artifacts = [f"artifact:{packet.design_review_artifact}"]
-    if packet.document_flow_required:
-        required_review_artifacts.append(
-            f"artifact:{packet.document_flow_review_artifact}"
-        )
-    for artifact in required_review_artifacts:
-        matching_reviewers = tuple(
-            reviewer
-            for reviewer, projected_artifact in reviewer_map.items()
-            if projected_artifact == artifact
-        )
-        if len(matching_reviewers) != 1:
-            invalid_reviewer_refs.update(matching_reviewers or distinct_reviewer_refs)
-    source_map = {result.declared_ref: result for result in context.source_results}
-    dependency_map = {
-        result.declared_ref: result for result in context.dependency_results
-    }
-    output_map = {result.output_ref: result for result in context.output_results}
-    for section, entry in packet.section_entries():
-        for index, clause in enumerate(entry.clause_refs):
-            if clause not in clause_ids:
-                violations.append(
-                    ReferencePacketViolation(
-                        section,
-                        "clause_refs",
-                        index,
-                        "clause_unknown",
-                        (1, ACTIVE_DESIGN_SECTIONS.index(section), 0, index),
-                    )
-                )
-        for index, owner in enumerate(entry.owner_refs):
-            if owner not in role_refs:
-                violations.append(
-                    ReferencePacketViolation(
-                        section,
-                        "owner_refs",
-                        index,
-                        "owner_unknown",
-                        (1, ACTIVE_DESIGN_SECTIONS.index(section), 1, index),
-                    )
-                )
-        for index, source in enumerate(entry.source_refs):
-            result = source_map.get(source)
-            reason = None
-            if result is None or not result.sha256:
-                reason = "source_missing"
-            elif result.parser_match_count != 1:
-                reason = "source_fragment_mismatch"
-            if reason is not None:
-                violations.append(
-                    ReferencePacketViolation(
-                        section,
-                        "source_refs",
-                        index,
-                        reason,
-                        (1, ACTIVE_DESIGN_SECTIONS.index(section), 2, index),
-                    )
-                )
-        for index, dependency in enumerate(entry.dependency_refs):
-            if dependency.startswith("entry:"):
-                continue
-            result = dependency_map.get(dependency)
-            if result is None or result.graph_match_count != 1:
-                violations.append(
-                    ReferencePacketViolation(
-                        section,
-                        "dependency_refs",
-                        index,
-                        "dependency_edge_missing",
-                        (1, ACTIVE_DESIGN_SECTIONS.index(section), 3, index),
-                    )
-                )
-        for index, output in enumerate(entry.output_refs):
-            result = output_map.get(output)
-            if result is None or result.planned_count != 1:
-                violations.append(
-                    ReferencePacketViolation(
-                        section,
-                        "output_refs",
-                        index,
-                        "output_missing",
-                        (1, ACTIVE_DESIGN_SECTIONS.index(section), 4, index),
-                    )
-                )
-        for index, reviewer in enumerate(entry.reviewer_refs):
-            if (
-                reviewer in invalid_reviewer_refs
-                or reviewer_map.get(reviewer) not in review_artifacts
-            ):
-                violations.append(
-                    ReferencePacketViolation(
-                        section,
-                        "reviewer_refs",
-                        index,
-                        "reviewer_output_mismatch",
-                        (1, ACTIVE_DESIGN_SECTIONS.index(section), 5, index),
-                    )
-                )
-    return violations
-
-
-def _design_artifact_violations(
-    packet: ActiveDesignPacketValue,
-    report_dir: Path,
-) -> list[ActiveDesignPacketViolation]:
-    relative = PurePosixPath(packet.design_artifact)
-    try:
-        path = resolve_report_bundle_artifact_path(
-            report_dir,
-            packet.design_artifact,
-            require_existing_regular_file=True,
-        )
-    except ReportBundleArtifactPathError:
-        return [DesignArtifactViolation(relative, "missing", None, (2, 0, 0, 0))]
-    text = path.read_text(encoding="utf-8")
-    violations: list[ActiveDesignPacketViolation] = []
-    if is_placeholder_only_section(text):
-        violations.append(
-            DesignArtifactViolation(
-                relative, "template_or_placeholder_remaining", None, (2, 0, 0, 0)
-            )
-        )
-    for index, (heading, slug) in enumerate(
-        (
-            ("## Abstract Design Frame", "abstract_design_frame"),
-            ("## Implementation Source Packet", "implementation_source_packet"),
-            ("## Design Side-Effect Map", "design_side_effect_map"),
-            ("## Design-To-Implementation Trace", "design-to-implementation_trace"),
-        ),
-        start=1,
-    ):
-        if not section_has_content(text, heading):
-            violations.append(
-                DesignArtifactViolation(
-                    relative, "section_empty_or_missing", slug, (2, 0, index, 0)
-                )
-            )
-    return violations
-
-
-def _review_artifact_violations(
-    report_dir: Path,
-    packet: ActiveDesignPacketValue,
-    review_artifact: str,
-    order: int,
-) -> list[ActiveDesignPacketViolation]:
-    relative = PurePosixPath(review_artifact)
-    try:
-        review_path = resolve_report_bundle_artifact_path(
-            report_dir,
-            review_artifact,
-            require_existing_regular_file=True,
-        )
-    except ReportBundleArtifactPathError:
-        return [
-            ReviewArtifactViolation(
-                relative, "design_artifact_path_missing", (order, 0, 0, 0)
-            )
-        ]
-    try:
-        design_path = resolve_report_bundle_artifact_path(
-            report_dir,
-            packet.design_artifact,
-            require_existing_regular_file=True,
-        )
-    except ReportBundleArtifactPathError:
-        design_path = None
-    expected_sha = (
-        hashlib.sha256(design_path.read_bytes()).hexdigest()
-        if design_path is not None
-        else ""
-    )
-    identity = parse_review_identity(review_path.read_text(encoding="utf-8"))
-    violations: list[ActiveDesignPacketViolation] = []
-    if identity.design_artifact_path is None:
-        violations.append(
-            ReviewArtifactViolation(
-                relative, "design_artifact_path_missing", (order, 0, 0, 0)
-            )
-        )
-    elif identity.design_artifact_path != packet.design_artifact:
-        violations.append(
-            ReviewArtifactViolation(
-                relative, "design_artifact_path_mismatch", (order, 0, 1, 0)
-            )
-        )
-    if identity.review_target_sha256 is None:
-        violations.append(
-            ReviewArtifactViolation(
-                relative, "review_target_sha256_missing", (order, 1, 0, 0)
-            )
-        )
-    elif identity.review_target_sha256 != expected_sha:
-        violations.append(
-            ReviewArtifactViolation(
-                relative, "review_target_sha256_mismatch", (order, 1, 1, 0)
-            )
-        )
-    if not identity.decision_approved:
-        violations.append(
-            ReviewArtifactViolation(relative, "decision_not_approve", (order, 2, 0, 0))
-        )
-    return violations
-
-
-def validate_materialized_active_design_packet(
-    value: ActiveDesignPacketValue,
-    context: ActiveDesignReferenceContext,
-    *,
-    gate: Literal["materialization", "design", "document_flow", "implementation"],
-) -> tuple[ActiveDesignPacketViolation, ...]:
-    """Validate shared packet semantics without decoding or reparsing its projection."""
-    violations = _reference_semantic_violations(value, context)
-    if gate in {"design", "implementation"}:
-        violations.extend(_design_artifact_violations(value, context.report_dir))
-        if not any(
-            isinstance(item, DesignArtifactViolation) and item.reason == "missing"
-            for item in violations
-        ):
-            violations.extend(
-                _review_artifact_violations(
-                    context.report_dir,
-                    value,
-                    value.design_review_artifact,
-                    3,
-                )
-            )
-            if value.document_flow_required:
-                violations.extend(
-                    _review_artifact_violations(
-                        context.report_dir,
-                        value,
-                        value.document_flow_review_artifact,
-                        4,
-                    )
-                )
-    elif gate == "document_flow" and value.document_flow_required:
-        violations.extend(
-            _review_artifact_violations(
-                context.report_dir,
-                value,
-                value.document_flow_review_artifact,
-                4,
-            )
-        )
-    return tuple(sorted(violations, key=lambda item: item.order_key))
-
-
-def _manifest_violation(
-    kind: str,
-    field: str | None = None,
-    observed_schema: str | None = None,
-    order: int = 0,
-) -> ManifestPacketViolation:
-    return ManifestPacketViolation(kind, field, observed_schema, (0, order, 0, 0))
-
-
-def _projection_mapping(value: object, field: str) -> dict[str, object]:
-    if not isinstance(value, dict):
-        raise ValueError(field)
-    mapping = cast(dict[object, object], value)
-    if not all(isinstance(key, str) for key in mapping):
-        raise ValueError(field)
-    return cast(dict[str, object], mapping)
-
-
-def _projection_row(
-    value: object,
-    field: str,
-    expected_fields: frozenset[str],
-) -> dict[str, object]:
-    """Require one projection row to have exactly its canonical field domain."""
-    row = _projection_mapping(value, field)
-    if set(row) != expected_fields:
-        raise ValueError(field)
-    return row
-
-
-def _projection_list(value: object, field: str) -> list[object]:
-    if not isinstance(value, list):
-        raise ValueError(field)
-    return cast(list[object], value)
-
-
-def _projection_string(mapping: Mapping[str, object], field: str) -> str:
-    value = mapping.get(field)
-    if not isinstance(value, str):
-        raise ValueError(field)
-    return value
-
-
-def _projection_int(mapping: Mapping[str, object], field: str) -> int:
-    value = mapping.get(field)
-    if not isinstance(value, int) or isinstance(value, bool):
-        raise ValueError(field)
-    return value
-
-
-def _projection_optional_string(
-    mapping: Mapping[str, object],
-    field: str,
-) -> str | None:
-    value = mapping.get(field)
-    if value is not None and not isinstance(value, str):
-        raise ValueError(field)
-    return value
-
-
-def _loader_reference_violation(
-    packet: ActiveDesignPacketValue,
-    declared_ref: str,
-    reason: str,
-) -> ReferencePacketViolation:
-    for field in ("source_refs", "dependency_refs", "output_refs"):
-        for section, index, reference in _packet_references(packet, field):
-            if reference == declared_ref:
-                return ReferencePacketViolation(
-                    section,
-                    field,
-                    index,
-                    reason,
-                    (
-                        1,
-                        ACTIVE_DESIGN_SECTIONS.index(section),
-                        ACTIVE_DESIGN_REFERENCE_FIELDS.index(field),
-                        index,
-                    ),
-                )
-    clause = next(
-        (item for item in packet.clause_registry if item.source_ref == declared_ref),
-        None,
-    )
-    if clause is not None:
-        for section, entry in packet.section_entries():
-            if clause.clause_id in entry.clause_refs:
-                index = entry.clause_refs.index(clause.clause_id)
-                return ReferencePacketViolation(
-                    section,
-                    "clause_refs",
-                    index,
-                    reason,
-                    (1, ACTIVE_DESIGN_SECTIONS.index(section), 0, index),
-                )
-    return ReferencePacketViolation(
-        "abstract_design_frame",
-        "source_refs",
-        0,
-        "projection_mismatch",
-        (1, 0, 2, 0),
-    )
-
-
-def _load_source_results(
-    packet: ActiveDesignPacketValue,
-    rows: object,
-    workspace_root: Path,
-    report_dir: Path,
-) -> tuple[tuple[SourceReferenceResult, ...], list[ActiveDesignPacketViolation]]:
-    results: list[SourceReferenceResult] = []
-    violations: list[ActiveDesignPacketViolation] = []
-    raw_rows = _projection_list(rows, "source_results")
-    expected_references = _active_packet_source_references(packet)
-    if len(raw_rows) != len(expected_references):
-        raise ValueError("source_results")
-    expected_fields = frozenset(
-        {
-            "declared_ref",
-            "root_key",
-            "relative_path",
-            "fragment_kind",
-            "fragment_value",
-            "sha256",
-            "parser_match_count",
-        }
-    )
-    for expected_reference, raw in zip(expected_references, raw_rows, strict=True):
-        row = _projection_row(raw, "source_results[]", expected_fields)
-        declared_ref = _projection_string(row, "declared_ref")
-        root_key, resolved, relative = _resolved_source_binding(
-            workspace_root,
-            report_dir,
-            expected_reference,
-        )
-        _prefix, _path, fragment_kind, fragment_value = _source_reference_parts(
-            expected_reference
-        )
-        observed_binding = (
-            declared_ref,
-            _projection_string(row, "root_key"),
-            _projection_string(row, "relative_path"),
-            _projection_string(row, "fragment_kind"),
-            _projection_optional_string(row, "fragment_value"),
-        )
-        canonical_binding = (
-            expected_reference,
-            root_key,
-            relative.as_posix(),
-            fragment_kind,
-            fragment_value,
-        )
-        if observed_binding != canonical_binding:
-            raise ValueError("source_results[].canonical_binding")
-        if resolved.is_symlink():
-            violations.append(
-                _loader_reference_violation(packet, declared_ref, "source_missing")
-            )
-        persisted_sha = _projection_string(row, "sha256")
-        current_sha = (
-            hashlib.sha256(resolved.read_bytes()).hexdigest()
-            if resolved.is_file()
-            else ""
-        )
-        if current_sha != persisted_sha:
-            violations.append(
-                _loader_reference_violation(
-                    packet,
-                    declared_ref,
-                    "source_digest_mismatch" if current_sha else "source_missing",
-                )
-            )
-        if fragment_kind not in {"none", "symbol", "section"}:
-            raise ValueError("source_results[].fragment_kind")
-        persisted_match_count = _projection_int(row, "parser_match_count")
-        current_match_count = _source_parser_match_count(
-            resolved,
-            fragment_kind,
-            fragment_value,
-        )
-        if current_match_count != persisted_match_count:
-            violations.append(
-                _loader_reference_violation(
-                    packet,
-                    declared_ref,
-                    "source_fragment_mismatch",
-                )
-            )
-        results.append(
-            SourceReferenceResult(
-                declared_ref=declared_ref,
-                root_key=root_key,
-                resolved_path=resolved,
-                relative_path=relative,
-                fragment_kind=cast(Literal["none", "symbol", "section"], fragment_kind),
-                fragment_value=fragment_value,
-                sha256=persisted_sha,
-                parser_match_count=persisted_match_count,
-            )
-        )
-    return tuple(results), violations
-
-
-def _load_dependency_results(
-    packet: ActiveDesignPacketValue,
-    rows: object,
-    workspace_root: Path,
-) -> tuple[tuple[DependencyReferenceResult, ...], list[ActiveDesignPacketViolation]]:
-    results: list[DependencyReferenceResult] = []
-    violations: list[ActiveDesignPacketViolation] = []
-    raw_rows = _projection_list(rows, "dependency_results")
-    expected_references = _active_packet_dependency_references(packet)
-    if len(raw_rows) != len(expected_references):
-        raise ValueError("dependency_results")
-    expected_fields = frozenset(
-        {
-            "declared_ref",
-            "dependency_root_key",
-            "normalized_key",
-            "source_path",
-            "target_path",
-            "source_sha256",
-            "target_sha256",
-            "graph_match_count",
-        }
-    )
-    for expected_reference, raw in zip(expected_references, raw_rows, strict=True):
-        row = _projection_row(raw, "dependency_results[]", expected_fields)
-        declared_ref = _projection_string(row, "declared_ref")
-        (
-            root_key,
-            dependency_root,
-            normalized_key,
-            source_path,
-            target_path,
-            _direction,
-            _kind,
-        ) = _canonical_dependency_binding(workspace_root, expected_reference)
-        observed_binding = (
-            declared_ref,
-            _projection_string(row, "dependency_root_key"),
-            _projection_string(row, "normalized_key"),
-            _projection_string(row, "source_path"),
-            _projection_string(row, "target_path"),
-        )
-        canonical_binding = (
-            expected_reference,
-            root_key,
-            normalized_key,
-            source_path.as_posix(),
-            target_path.as_posix(),
-        )
-        if observed_binding != canonical_binding:
-            raise ValueError("dependency_results[].canonical_binding")
-        source = dependency_root / source_path.as_posix()
-        target = dependency_root / target_path.as_posix()
-        source_sha = _projection_string(row, "source_sha256")
-        target_sha = _projection_string(row, "target_sha256")
-        current_source = (
-            hashlib.sha256(source.read_bytes()).hexdigest() if source.is_file() else ""
-        )
-        current_target = (
-            hashlib.sha256(target.read_bytes()).hexdigest() if target.is_file() else ""
-        )
-        if current_source != source_sha or current_target != target_sha:
-            violations.append(
-                _loader_reference_violation(
-                    packet, declared_ref, "source_digest_mismatch"
-                )
-            )
-        results.append(
-            DependencyReferenceResult(
-                declared_ref=declared_ref,
-                dependency_root_key=root_key,
-                normalized_key=normalized_key,
-                source_path=source_path,
-                target_path=target_path,
-                source_sha256=source_sha,
-                target_sha256=target_sha,
-                graph_match_count=_projection_int(row, "graph_match_count"),
-            )
-        )
-    return tuple(results), violations
-
-
-def _load_role_projections(rows: object) -> tuple[RoleOutputProjection, ...]:
-    results: list[RoleOutputProjection] = []
-    for raw in _projection_list(rows, "role_output_projections"):
-        row = _projection_mapping(raw, "role_output_projections[]")
-        outputs = tuple(
-            _projection_string({"value": value}, "value")
-            for value in _projection_list(row.get("output_refs"), "output_refs")
-        )
-        results.append(
-            RoleOutputProjection(_projection_string(row, "role_ref"), outputs)
-        )
-    return tuple(results)
-
-
-def _load_reviewer_projections(rows: object) -> tuple[ReviewerArtifactProjection, ...]:
-    return tuple(
-        ReviewerArtifactProjection(
-            _projection_string(row, "reviewer_ref"),
-            _projection_string(row, "review_artifact_ref"),
-        )
-        for raw in _projection_list(rows, "reviewer_artifact_projections")
-        if (row := _projection_mapping(raw, "reviewer_artifact_projections[]"))
-    )
-
-
-def _load_clause_results(rows: object) -> tuple[ClauseReferenceResult, ...]:
-    return tuple(
-        ClauseReferenceResult(
-            _projection_string(row, "clause_id"),
-            _projection_string(row, "source_ref"),
-        )
-        for raw in _projection_list(rows, "clause_results")
-        if (row := _projection_mapping(raw, "clause_results[]"))
-    )
-
-
-def _load_output_results(rows: object) -> tuple[OutputReferenceResult, ...]:
-    return tuple(
-        OutputReferenceResult(
-            _projection_string(row, "output_ref"),
-            PurePosixPath(_projection_string(row, "relative_path")),
-            _projection_int(row, "planned_count"),
-        )
-        for raw in _projection_list(rows, "output_results")
-        if (row := _projection_mapping(raw, "output_results[]"))
-    )
-
-
-def load_materialized_active_design_packet(
-    report_dir: Path,
-) -> MaterializedActiveDesignPacketResult:
-    """Load one persisted packet and projection without consulting live config."""
-    manifest_path = report_dir / "team_manifest.yaml"
-    if not manifest_path.is_file() or manifest_path.is_symlink():
-        return MaterializedActiveDesignPacketResult(
-            None,
-            None,
-            (_manifest_violation("manifest_missing"),),
-        )
-    try:
-        parsed: object = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    except yaml.YAMLError:
-        return MaterializedActiveDesignPacketResult(
-            None,
-            None,
-            (_manifest_violation("manifest_invalid"),),
-        )
-    if not isinstance(parsed, dict):
-        return MaterializedActiveDesignPacketResult(
-            None,
-            None,
-            (_manifest_violation("manifest_invalid"),),
-        )
-    parsed_mapping = cast(dict[object, object], parsed)
-    raw_run = parsed_mapping.get("run")
-    if not isinstance(raw_run, dict):
-        return MaterializedActiveDesignPacketResult(
-            None,
-            None,
-            (_manifest_violation("manifest_invalid"),),
-        )
-    run_mapping = cast(dict[object, object], raw_run)
-    if not all(isinstance(key, str) for key in run_mapping):
-        return MaterializedActiveDesignPacketResult(
-            None,
-            None,
-            (_manifest_violation("manifest_invalid"),),
-        )
-    run = cast(dict[str, object], run_mapping)
-    if "active_design_packet" not in run:
-        return MaterializedActiveDesignPacketResult(
-            None,
-            None,
-            (_manifest_violation("packet_missing"),),
-        )
-    try:
-        packet = _decode_active_design_packet(
-            run["active_design_packet"],
-            field_prefix="run.active_design_packet",
-        )
-    except ActiveDesignPacketInputError as error:
-        field = error.field.removeprefix("run.active_design_packet.")
-        kind = {
-            "missing_field": "field_missing",
-            "unknown_schema": "schema_unknown",
-        }.get(error.code, "field_invalid")
-        observed_schema = None
-        if error.code == "unknown_schema" and isinstance(
-            run["active_design_packet"], dict
-        ):
-            schema = cast(dict[str, object], run["active_design_packet"]).get("schema")
-            observed_schema = schema if isinstance(schema, str) else ""
-        return MaterializedActiveDesignPacketResult(
-            None,
-            None,
-            (_manifest_violation(kind, field, observed_schema),),
-        )
-    try:
-        workspace_root = Path(_projection_string(run, "workspace_root")).resolve()
-        persisted_report_dir = Path(_projection_string(run, "report_dir")).resolve()
-        if persisted_report_dir != report_dir.resolve():
-            raise ValueError("run.report_dir")
-        projection = _projection_mapping(
-            run.get("active_design_packet_reference_projection"),
-            "active_design_packet_reference_projection",
-        )
-        expected_keys = {
-            "source_results",
-            "dependency_results",
-            "role_output_projections",
-            "reviewer_artifact_projections",
-            "clause_results",
-            "output_results",
-            "planned_output_paths",
-        }
-        if set(projection) != expected_keys:
-            raise ValueError("active_design_packet_reference_projection")
-        source_results, source_violations = _load_source_results(
-            packet,
-            projection["source_results"],
-            workspace_root,
-            persisted_report_dir,
-        )
-        dependency_results, dependency_violations = _load_dependency_results(
-            packet,
-            projection["dependency_results"],
-            workspace_root,
-        )
-        context = ActiveDesignReferenceContext(
-            workspace_root=workspace_root,
-            report_dir=persisted_report_dir,
-            source_results=source_results,
-            dependency_results=dependency_results,
-            role_output_projections=_load_role_projections(
-                projection["role_output_projections"]
-            ),
-            reviewer_artifact_projections=_load_reviewer_projections(
-                projection["reviewer_artifact_projections"]
-            ),
-            clause_results=_load_clause_results(projection["clause_results"]),
-            output_results=_load_output_results(projection["output_results"]),
-            planned_output_paths=frozenset(
-                PurePosixPath(_projection_string({"path": value}, "path"))
-                for value in _projection_list(
-                    projection["planned_output_paths"],
-                    "planned_output_paths",
-                )
-            ),
-        )
-    except (OSError, UnicodeError, ValueError, TypeError):
-        return MaterializedActiveDesignPacketResult(
-            packet,
-            None,
-            (
-                _manifest_violation(
-                    "field_invalid",
-                    "active_design_packet_reference_projection",
-                ),
-            ),
-        )
-    violations = tuple(
-        sorted(
-            [*source_violations, *dependency_violations],
-            key=lambda item: item.order_key,
-        )
-    )
-    return MaterializedActiveDesignPacketResult(packet, context, violations)
 
 
 def load_task_catalog(config: TeamConfig, root: Path = ROOT) -> TaskCatalog:
@@ -3094,29 +917,12 @@ def selected_skill_names(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
     )
 
 
-def skill_tool_packet_command(skill: str) -> str:
-    """Return the canonical command that prints one selected skill tool packet."""
-    return (
-        "python3 tools/agent_tools/skill_tool_commands.py show "
-        f"--skill {skill} --format text"
-    )
-
-
 def selected_skill_command_packets(
     selected_skills: tuple[str, ...],
 ) -> tuple[SkillCommandPacket, ...]:
     """Build repo tool command packets for selected public skills."""
     return tuple(
         packet_for_skill(ROOT, skill) for skill in selected_skill_names(selected_skills)
-    )
-
-
-def conditional_commands_for_packet(packet: SkillCommandPacket) -> tuple[str, ...]:
-    """Return task-matching command candidates for one skill packet."""
-    if packet.discovered_commands:
-        return packet.discovered_commands
-    return (
-        f'python3 tools/agent_tools/route.py --prompt "{PROMPT_PLACEHOLDER}" --format json',
     )
 
 
@@ -3148,7 +954,7 @@ def repo_tool_routing_policy_output_lines(
     dynamic_candidates = dynamic_skill_candidate_names(selected_skills)
     return (
         "REPO_TOOL_ROUTING_POLICY=run.repo_tool_routing_policy",
-        f"REPO_TOOL_COMMAND_PACKET_COMMAND={REPO_TOOL_ROUTING_SHOW_COMMAND_TEMPLATE}",
+        "REPO_TOOL_CALL_TOKEN_SCHEMA=agent-canon.tool-call.v1",
         f"REPO_TOOL_SELECTED_SKILLS={skill_list}",
         f"REPO_TOOL_DYNAMIC_CANDIDATES={format_public_skill_list(dynamic_candidates)}",
         f"REPO_TOOL_ROUTING_SOURCE={REPO_TOOL_ROUTING_POLICY_SOURCE}",
@@ -3157,13 +963,248 @@ def repo_tool_routing_policy_output_lines(
         f"REPO_TOOL_ROUTING_EXECUTION_MODE={REPO_TOOL_ROUTING_EXECUTION_MODE}",
         f"REPO_TOOL_ROUTING_SEQUENCE={','.join(REPO_TOOL_ROUTING_SEQUENCE)}",
         f"REPO_TOOL_ROUTING_STAGE_FIELDS={','.join(REPO_TOOL_ROUTING_STAGE_FIELDS)}",
-        f"REPO_TOOL_ROUTING_CHECK={REPO_TOOL_ROUTING_CHECK_COMMAND}",
+        "REPO_TOOL_ROUTING_CHECK_TOOL_ID=skill-tool-commands",
         f"REPO_DYNAMIC_SKILL_ROUTING_POLICY={REPO_DYNAMIC_SKILL_ROUTING_STATUS}",
-        f"REPO_DYNAMIC_SKILL_ROUTING_COMMAND={REPO_DYNAMIC_SKILL_ROUTING_COMMAND}",
-        f"REPO_DYNAMIC_SKILL_AREA_COMMAND={REPO_DYNAMIC_SKILL_AREA_COMMAND}",
+        "REPO_DYNAMIC_SKILL_ROUTING_TOOL_CALL="
+        + json.dumps(
+            materialize_dynamic_route_tool_call_token(),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
         f"REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES={format_public_skill_list(dynamic_candidates)}",
         f"REPO_DYNAMIC_SKILL_ROUTING_NEXT={REPO_DYNAMIC_SKILL_ROUTING_NEXT}",
     )
+
+
+def materialize_tool_call_token(
+    *,
+    tool_id: str,
+    argument_schema_id: str,
+    argument_properties: Mapping[str, Mapping[str, object]],
+    arguments: Mapping[str, object],
+    intent: str,
+    typed_failure_semantics: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Materialize one canonical, directly executable route-packet ToolCall."""
+    if not tool_id or not argument_schema_id or not intent:
+        raise RuntimeError("tool_call_token requires tool_id, schema, and intent")
+    if set(arguments) != set(argument_properties):
+        raise RuntimeError("tool_call_token arguments do not match argument schema")
+    failures: list[dict[str, object]] = []
+    for index, failure in enumerate(typed_failure_semantics):
+        if set(failure) != {"code", "retryable", "next"}:
+            raise RuntimeError(
+                "tool_call_token typed failure must contain code, retryable, and next: "
+                f"{index}"
+            )
+        if not isinstance(failure["code"], str) or not failure["code"]:
+            raise RuntimeError("tool_call_token failure code must be non-empty")
+        if not isinstance(failure["retryable"], bool):
+            raise RuntimeError("tool_call_token failure retryable must be boolean")
+        if not isinstance(failure["next"], str) or not failure["next"]:
+            raise RuntimeError("tool_call_token failure next must be non-empty")
+        failures.append(dict(failure))
+    record: dict[str, object] = {
+        "schema": TOOL_CALL_SCHEMA,
+        "tool_id": tool_id,
+        "argument_schema": {
+            "$id": argument_schema_id,
+            "type": "object",
+            "required": list(argument_properties),
+            "properties": {
+                key: dict(value) for key, value in argument_properties.items()
+            },
+            "additionalProperties": False,
+        },
+        "arguments": dict(arguments),
+        "intent": intent,
+        "typed_failure_semantics": failures,
+    }
+    token_digest = hashlib.sha256(canonical_json_bytes(record)).hexdigest()
+    record["token_id"] = f"tool-call:{token_digest}"
+    record["token_body_sha256"] = "sha256:" + hashlib.sha256(
+        canonical_json_bytes(record)
+    ).hexdigest()
+    return record
+
+
+def materialize_skill_tool_call_token(skill: str) -> dict[str, object]:
+    """Return the canonical skill-command materializer call without prose argv."""
+    return materialize_tool_call_token(
+        tool_id="skill-tool-commands",
+        argument_schema_id=SKILL_TOOL_CALL_ARGUMENT_SCHEMA,
+        argument_properties={
+            "skill": {"type": "string", "minLength": 1},
+            "format": {"type": "string", "enum": ["json"]},
+        },
+        arguments={"skill": skill, "format": "json"},
+        intent="Materialize the selected skill's canonical repository-tool packet.",
+        typed_failure_semantics=(
+            {
+                "code": "skill_tool_route:unknown_skill",
+                "retryable": False,
+                "next": "reject_route_packet",
+            },
+            {
+                "code": "skill_tool_route:catalog_mismatch",
+                "retryable": False,
+                "next": "return_to_tool_catalog_owner",
+            },
+        ),
+    )
+
+
+def materialize_dynamic_route_tool_call_token() -> dict[str, object]:
+    """Return a canonical route call bound to the run's request artifact."""
+    return materialize_tool_call_token(
+        tool_id="route",
+        argument_schema_id=ROUTE_TOOL_CALL_ARGUMENT_SCHEMA,
+        argument_properties={
+            "prompt_ref": {"type": "string", "minLength": 1},
+            "format": {"type": "string", "enum": ["json"]},
+        },
+        arguments={"prompt_ref": "run.user_request_contract", "format": "json"},
+        intent="Resolve a changed request into the canonical public-skill route.",
+        typed_failure_semantics=(
+            {
+                "code": "route:request_artifact_missing",
+                "retryable": False,
+                "next": "reject_route_packet",
+            },
+            {
+                "code": "route:no_matching_skill",
+                "retryable": False,
+                "next": "return_typed_no_match",
+            },
+        ),
+    )
+
+
+@dataclass(frozen=True)
+class CloseAgentLifecycleEvidence:
+    """Validated-input domain for G6 and terminal close materialization."""
+
+    gate_verdicts: Sequence[Mapping[str, object]]
+    cleanup_proof: Mapping[str, object]
+    durable_handback: Mapping[str, object]
+    descendant_close_receipts: Sequence[Mapping[str, object]]
+    reservation_release_receipts: Sequence[Mapping[str, object]]
+
+
+def materialize_close_agent_tool_call(
+    *,
+    run_id: str,
+    agent_id: str,
+    evidence: CloseAgentLifecycleEvidence,
+) -> dict[str, object]:
+    """Own G6 by validating closure receipts before issuing the terminal token."""
+    handback = validate_durable_handback(evidence.durable_handback)
+    checked_binding = validate_record_binding(handback["binding"])
+    gates = list(
+        validate_gate_chain(
+            list(evidence.gate_verdicts),
+            expected_gate_ids=("G1", "G2", "G3", "G4", "G5"),
+            require_pass=True,
+        )
+    )
+    descendants = [
+        validate_descendant_close_receipt(item)
+        for item in evidence.descendant_close_receipts
+    ]
+    reservations = [
+        validate_reservation_release_receipt(item)
+        for item in evidence.reservation_release_receipts
+    ]
+    declared_descendants = set(cast(Sequence[str], handback["descendant_ids"]))
+    observed_descendants = {cast(str, item["agent_id"]) for item in descendants}
+    if observed_descendants != declared_descendants:
+        raise ValueError("close_agent:unknown_descendant")
+    declared_reservations = set(cast(Sequence[str], handback["reservation_ids"]))
+    observed_reservations = {
+        cast(str, item["reservation_id"]) for item in reservations
+    }
+    if observed_reservations != declared_reservations:
+        raise ValueError("close_agent:reservation_leak")
+    binding_identity_fields = (
+        "transaction_id",
+        "snapshot_id",
+        "candidate_sha",
+        "tree_sha",
+        "input_digest",
+        "tool_id",
+        "tool_version",
+    )
+    expected_identity = tuple(checked_binding[field] for field in binding_identity_fields)
+    handback_binding = cast(Mapping[str, object], handback["binding"])
+    if handback_binding != checked_binding:
+        raise ValueError("close_agent:identity_mismatch")
+    if handback["agent_id"] != agent_id:
+        raise ValueError("close_agent:agent_identity_mismatch")
+    for item in [*descendants, *reservations]:
+        item_binding = cast(Mapping[str, object], item["binding"])
+        if tuple(item_binding[field] for field in binding_identity_fields) != expected_identity:
+            raise ValueError("close_agent:identity_mismatch")
+        if item["durable_handback_evidence_ref"] != handback["evidence_ref"]:
+            raise ValueError("close_agent:durable_handback_mismatch")
+    descendants_closed_evidence_ref = "evidence:" + hashlib.sha256(
+        canonical_json_bytes(descendants)
+    ).hexdigest()
+    reservations_released_evidence_ref = "evidence:" + hashlib.sha256(
+        canonical_json_bytes(reservations)
+    ).hexdigest()
+    cleanup = validate_cleanup_proof(evidence.cleanup_proof)
+    cleanup_binding = cast(Mapping[str, object], cleanup["binding"])
+    if tuple(cleanup_binding[field] for field in binding_identity_fields) != expected_identity:
+        raise ValueError("close_agent:identity_mismatch")
+    gate_refs = [
+        cast(str, cast(Mapping[str, object], gate["binding"])["evidence_ref"])
+        for gate in gates
+    ]
+    if cleanup["remote_readback_evidence_ref"] != gate_refs[4]:
+        raise ValueError("close_agent:cleanup_before_remote_readback")
+    g6 = materialize_gate_verdict(
+        binding=checked_binding,
+        gate_id="G6",
+        ordered_input_evidence_refs=[
+            *gate_refs,
+            cast(str, handback["evidence_ref"]),
+            descendants_closed_evidence_ref,
+            reservations_released_evidence_ref,
+            cast(str, cleanup["evidence_ref"]),
+        ],
+        invariant="nested_lifecycle_cleanup",
+        output_digest="sha256:"
+        + hashlib.sha256(
+            canonical_json_bytes(
+                {
+                    "durable_handback": handback,
+                    "descendants": descendants,
+                    "reservations": reservations,
+                    "cleanup": cleanup,
+                }
+            )
+        ).hexdigest(),
+        owner=f"{Path(__file__).resolve()}#materialize_close_agent_tool_call",
+        verdict="pass",
+    )
+    token = materialize_lifecycle_close_agent_tool_call(
+        binding=checked_binding,
+        run_id=run_id,
+        agent_id=agent_id,
+        gate_verdicts=[*gates, g6],
+        cleanup_proof=cleanup,
+        durable_handback=handback,
+        descendants_closed_evidence_ref=descendants_closed_evidence_ref,
+        reservations_released_evidence_ref=reservations_released_evidence_ref,
+    )
+    return {
+        "schema": "agent-canon.close-agent-materialization.v1",
+        "g6_gate": g6,
+        "descendants_closed_evidence_ref": descendants_closed_evidence_ref,
+        "reservations_released_evidence_ref": reservations_released_evidence_ref,
+        "close_agent_tool_call": token,
+    }
 
 
 def default_quality_check_role_ids(roles: tuple[Role, ...]) -> tuple[str, ...]:
@@ -3196,26 +1237,30 @@ def default_quality_check_policy_output_lines(
     *,
     manual_specialists: tuple[str, ...] = (),
     task_default_specialists: tuple[str, ...] = (),
-    auto_specialists: tuple[str, ...] = (),
+    language_review_candidates: tuple[str, ...] = (),
     default_review_packs_enabled: bool = False,
     default_review_pack_ids: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
     """Return machine-readable stdout lines for default quality-check routing."""
     review_pack_state = (
-        "active" if default_review_packs_enabled else "route_without_default_packs"
+        "active" if default_review_packs_enabled else "candidate_only"
     )
     return (
-        "DEFAULT_QUALITY_CHECKS=enabled",
+        "DEFAULT_QUALITY_CHECKS=candidate_only",
         f"DEFAULT_QUALITY_CHECK_SOURCE={DEFAULT_QUALITY_CHECK_POLICY_SOURCE}",
-        "DEFAULT_QUALITY_CHECK_ROLES="
+        "DEFAULT_QUALITY_CHECK_ROLE_CANDIDATES="
         f"{','.join(default_quality_check_role_ids(roles)) or '-'}",
-        "DEFAULT_QUALITY_CHECK_AGENT_TYPES="
+        "DEFAULT_QUALITY_CHECK_AGENT_TYPE_CANDIDATES="
         f"{','.join(default_quality_check_agent_types(roles)) or '-'}",
         f"DEFAULT_QUALITY_CHECK_STAGES={','.join(DEFAULT_QUALITY_CHECK_STAGES)}",
+        f"DEFAULT_QUALITY_CHECK_EVIDENCE={','.join(OOP_EVIDENCE_DIMENSIONS)}",
+        f"DEFAULT_FORMAT_CHECK_ROUTE={CANONICAL_FORMAT_CHECK_ROUTE}",
+        f"OFFICIAL_HOOK_DISPATCHER={OFFICIAL_HOOK_DISPATCHER}",
+        f"OFFICIAL_HOOK_SCHEMA={OFFICIAL_HOOK_SCHEMA}",
         "DEFAULT_QUALITY_CHECK_TASK_DEFAULT_SPECIALISTS="
         f"{','.join(task_default_specialists) or '-'}",
-        "DEFAULT_QUALITY_CHECK_AUTO_LANGUAGE_REVIEWERS="
-        f"{','.join(auto_specialists) or '-'}",
+        "DEFAULT_QUALITY_CHECK_LANGUAGE_REVIEW_CANDIDATES="
+        f"{','.join(language_review_candidates) or '-'}",
         "DEFAULT_QUALITY_CHECK_MANUAL_SPECIALISTS="
         f"{','.join(manual_specialists) or '-'}",
         f"DEFAULT_QUALITY_CHECK_REVIEW_PACKS={review_pack_state}",
@@ -3350,11 +1395,11 @@ def discover_changed_paths(workspace_root: Path) -> tuple[str, ...]:
     return tuple(changed)
 
 
-def auto_language_specialists(
+def language_review_candidates(
     workspace_root: Path,
     changed_paths: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
-    """Infer language-specific reviewers from changed paths."""
+    """Return explicit language-review candidates from changed paths."""
     candidate_paths = changed_paths or discover_changed_paths(workspace_root)
     normalized_paths = tuple(
         raw_path.replace("\\", "/").lstrip("./") for raw_path in candidate_paths
@@ -3408,39 +1453,501 @@ def resolve_workflow_family(catalog: TaskCatalog, family_id: str) -> dict[str, o
     raise KeyError(f"unknown workflow family: {family_id}")
 
 
+def _capacity_family_record(
+    family: dict[str, object],
+) -> capacity_handshake.DeclaredFamilyCapacity:
+    """Derive one family capacity record from its declared stage topology."""
+    family_id = _as_required_string(family.get("id"), "workflow_family.id")
+    roles = _as_object_mapping(cast(object, family.get("roles", {})), "workflow_family.roles")
+    declared_roles = set(
+        _as_string_tuple(roles.get("always_on"), "workflow_family.roles.always_on")
+        + _as_string_tuple(roles.get("specialists"), "workflow_family.roles.specialists")
+    )
+    topology = _as_object_mapping(
+        cast(object, family.get("role_topology", {})),
+        "workflow_family.role_topology",
+    )
+    waves = _as_mapping_tuple(topology.get("stage_waves"), "workflow_family.stage_waves")
+
+    def stage_roles(stage_class: str) -> tuple[str, ...]:
+        selected: list[str] = []
+        for wave in waves:
+            if wave.get("stage_class") != stage_class:
+                continue
+            for role_id in _as_string_tuple(wave.get("role_ids"), "stage_wave.role_ids"):
+                if role_id in declared_roles and role_id not in selected:
+                    selected.append(role_id)
+        return tuple(selected)
+
+    direct = list(stage_roles("reviewer"))
+    isolated = {"skill_evaluator"} & declared_roles
+    for role_id in sorted(isolated):
+        if role_id not in direct:
+            direct.append(role_id)
+    nested = stage_roles("producer")
+    final = stage_roles("final")
+    return capacity_handshake.DeclaredFamilyCapacity(
+        workflow_family_id=family_id,
+        direct_frontier_role_ids=tuple(direct),
+        nested_owner_role_ids=tuple(
+            role_id for role_id in nested if role_id not in isolated
+        ),
+        final_frontier_role_ids=tuple(final),
+        direct_frontier_count=len(direct),
+        nested_reservation_count=len(tuple(role_id for role_id in nested if role_id not in isolated)),
+        final_frontier_count=len(final),
+    )
+
+
+def declared_team_capacity_derivation(
+    catalog: TaskCatalog,
+) -> capacity_handshake.DeclaredTeamTopologyDerivation:
+    """Materialize the canonical topology-derived capacity witness input."""
+    return capacity_handshake.DeclaredTeamTopologyDerivation(
+        derivation_version=1,
+        topology_source="agents/task_catalog.yaml::role_topology_defaults",
+        workflow_role_source="agents/task_catalog.yaml::workflow_families[].roles",
+        direct_frontier_stage_class="reviewer",
+        nested_owner_stage_class="producer",
+        final_stage_class="final",
+        excluded_nested_role_ids=("skill_evaluator",),
+        isolated_direct_role_ids=("skill_evaluator",),
+        family_records=tuple(
+            _capacity_family_record(family) for family in catalog.workflow_families
+        ),
+    )
+
+
+def _capacity_write_scope_cap(
+    family: capacity_handshake.DeclaredFamilyCapacity,
+) -> int:
+    """Derive write capacity from the selected nested owner frontier."""
+    return max(1, len(family.nested_owner_role_ids))
+
+
+def _capacity_topology_witness(
+    derivation: capacity_handshake.DeclaredTeamTopologyDerivation,
+    target_state_contract_sha256: str = "",
+) -> capacity_handshake.TopologyCapacityWitness:
+    """Build the serializable topology witness consumed by the handshake owner."""
+    nodes: list[capacity_handshake.TopologyCapacityNode] = []
+    for family in derivation.family_records:
+        family_node = f"workflow:{family.workflow_family_id}"
+        nodes.append(
+            capacity_handshake.TopologyCapacityNode(
+                node_id=family_node,
+                node_kind="workflow_family",
+                predecessor_ids=(),
+                descendant_parent_id=None,
+                total_slot_weight=1,
+                write_slot_weight=0,
+                allowed_write_paths=(),
+                exclusion_ids=(),
+            )
+        )
+        for role_id in family.nested_owner_role_ids:
+            nodes.append(
+                capacity_handshake.TopologyCapacityNode(
+                    node_id=f"{family_node}:{role_id}",
+                    node_kind="descendant",
+                    predecessor_ids=(family_node,),
+                    descendant_parent_id=family_node,
+                    total_slot_weight=1,
+                    write_slot_weight=1,
+                    allowed_write_paths=(f"role:{role_id}",),
+                    exclusion_ids=(),
+                )
+            )
+    peak = derivation.peak_family
+    requested = derivation.requested_max_threads()
+    write_cap = _capacity_write_scope_cap(peak)
+    proof_payload = {
+        "families": [
+            {
+                "id": family.workflow_family_id,
+                "direct": list(family.direct_frontier_role_ids),
+                "nested": list(family.nested_owner_role_ids),
+                "final": list(family.final_frontier_role_ids),
+            }
+            for family in derivation.family_records
+        ],
+        "requested_total_capacity": requested,
+        "write_scope_cap": write_cap,
+    }
+    proof_sha256 = hashlib.sha256(
+        json.dumps(proof_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return capacity_handshake.TopologyCapacityWitness(
+        target_state_contract_sha256=target_state_contract_sha256,
+        declared_team_topology_ref="agents/task_catalog.yaml",
+        declared_team_topology_sha256=proof_sha256,
+        node_records=tuple(nodes),
+        legal_frontier_ids=tuple(node.node_id for node in nodes),
+        peak_frontier_node_ids=tuple(
+            f"workflow:{peak.workflow_family_id}:{role_id}"
+            for role_id in peak.direct_frontier_role_ids
+        ),
+        peak_write_frontier_node_ids=tuple(
+            f"workflow:{peak.workflow_family_id}:{role_id}"
+            for role_id in peak.nested_owner_role_ids
+        ),
+        requested_total_capacity=requested,
+        workflow_dag_peak_demand=peak.direct_frontier_count,
+        nested_reservation_count=peak.nested_reservation_count,
+        workflow_dag_budget=peak.direct_frontier_count,
+        write_scope_cap=write_cap,
+        derivation=derivation,
+    )
+
+
+def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
+    """Create one provider-owned ledger and snapshot for a run bundle."""
+    if spec.task_catalog is None:
+        raise RuntimeError("task catalog is required for capacity handshake")
+    derivation = declared_team_capacity_derivation(spec.task_catalog)
+    witness = _capacity_topology_witness(derivation)
+    config_path = spec.workspace_root / ".codex" / "config.toml"
+    contract = capacity_handshake.load_startup_contract(
+        derivation,
+        witness,
+        config_path=str(config_path),
+        contract_id=f"capacity:{spec.run_id}",
+    )
+    peak = derivation.peak_family
+    write_cap = _capacity_write_scope_cap(peak)
+    snapshot = capacity_handshake.make_session_snapshot(
+        contract=contract,
+        requested_capacity=witness.requested_total_capacity,
+        configured_max_threads=contract.input_evidence.max_threads_loader.configured_max_threads,
+        workflow_dag_demand=peak.direct_frontier_count,
+        nested_capacity_reservation=peak.nested_reservation_count,
+        write_scope_cap=write_cap,
+        requested_write_capacity=write_cap,
+        workflow_dag_write_demand=write_cap,
+    )
+    parent_lineage_id = spec.parent_lineage_id or f"run:{spec.run_id}"
+    ledger = capacity_handshake.CapacityLedger(
+        topology=capacity_handshake.DescendantTopologyReadback(parent_work_id=spec.run_id)
+    )
+    return _CapacityRuntime(
+        binding=CapacityHandshakeConsumerBinding(),
+        snapshot=snapshot,
+        ledger=ledger,
+        parent_lineage_id=parent_lineage_id,
+        topology_proof_sha256=witness.declared_team_topology_sha256,
+        requested_capacity=witness.requested_total_capacity,
+        write_scope_cap=write_cap,
+    )
+
+
+def _json_capacity_record(record: capacity_handshake.DescendantLifecycleRecord) -> dict[str, object]:
+    return {
+        "work_id": record.work_id,
+        "parent_work_id": record.parent_work_id,
+        "profile_id": record.profile_id,
+        "status": record.status.value,
+        "durable_result_evidence_ref": record.durable_result_evidence_ref,
+        "durable_handback": record.durable_handback,
+        "descendants_closed": record.descendants_closed,
+        "close_readback": record.close_readback,
+        "reserved_slots": record.reserved_slots,
+        "reserved_write_slots": record.reserved_write_slots,
+        "transition_generation": record.transition_generation,
+    }
+
+
+def _capacity_projection(runtime: _CapacityRuntime, spec: RunBundleSpec) -> dict[str, object]:
+    """Return the machine-readable manifest projection for shared runtime state."""
+    configured = runtime.snapshot.configured_max_threads
+    return {
+        "schema_id": "team_manifest_capacity_request_v1",
+        "requested_total_capacity": runtime.requested_capacity,
+        "effective_total_capacity": runtime.snapshot.effective_total_capacity,
+        "available_total_capacity": runtime.snapshot.available_total_capacity,
+        "requested_write_capacity": runtime.snapshot.requested_write_capacity,
+        "effective_write_capacity": runtime.snapshot.effective_write_capacity,
+        "available_write_capacity": runtime.snapshot.available_write_capacity,
+        "topology_proof_ref": "agents/task_catalog.yaml",
+        "topology_proof_sha256": runtime.topology_proof_sha256,
+        "capacity_policy_ref": "agents/capacity_policy.toml",
+        "capacity_policy_sha256": runtime.snapshot.contract.capacity_policy.topology_proof_sha256,
+        "loader_evidence_ref": runtime.snapshot.contract.input_evidence.max_threads_loader.evidence_ref,
+        "configured_max_threads_loader_value": configured,
+        "reload_state": "restart_required" if configured != runtime.requested_capacity else "current",
+        "requested_capacity_loader_status": "completed",
+        "input_provenance": [
+            {
+                "input_id": item.input_id,
+                "value": item.value,
+                "source_ref": item.source_ref,
+                "loader_id": item.loader_id,
+                "readback_value": item.readback_value,
+                "status": item.status,
+            }
+            for item in runtime.snapshot.input_provenance
+        ],
+        "parent_lineage_id": runtime.parent_lineage_id,
+        "ledger_ref": f"runtime://ledger/{spec.run_id}",
+        "capacity_handshake_binding": {
+            "shape_id": runtime.binding.shape_id,
+            "binding_version": runtime.binding.binding_version,
+            "provider_owner_id": runtime.binding.provider_owner_id,
+            "consumer_owner_ids": list(runtime.binding.consumer_owner_ids),
+            "allowed_api_ids": list(runtime.binding.allowed_api_ids),
+            "provider_type_ids": list(runtime.binding.provider_type_ids),
+            "duplicate_definition_policy": runtime.binding.duplicate_definition_policy,
+        },
+        "ledger": {
+            "shape_id": runtime.ledger.shape_id,
+            "parent_work_id": runtime.ledger.topology.parent_work_id,
+            "descendants": [_json_capacity_record(record) for record in runtime.ledger.topology.descendants],
+            "reservations": [
+                {"parent_work_id": edge.parent_work_id, "child_work_id": edge.child_work_id}
+                for edge in runtime.ledger.reservations.values()
+            ],
+            "ready_queue": [],
+        },
+        "lineage": {
+            "parent_lineage_id": runtime.parent_lineage_id,
+            "ancestor_agent_ids": [],
+            "run_id": spec.run_id,
+            "work_id": spec.run_id,
+            "role_ids": [role.id for role in spec.roles],
+        },
+    }
+
+
+def _closeout_projection(
+    runtime: _CapacityRuntime,
+    spec: RunBundleSpec,
+) -> dict[str, object]:
+    """Materialize the provider closeout state with canonical close-agent tokens."""
+    tokens: dict[str, dict[str, object]] = {}
+    registry = model_profile_registry.load_model_profile_registry(spec.workspace_root)
+    for record in runtime.ledger.topology.descendants:
+        if record.status not in {
+            capacity_handshake.LifecycleStatus.READBACK_VERIFIED,
+            capacity_handshake.LifecycleStatus.RESERVATION_RELEASED,
+        }:
+            continue
+        if not record.profile_id:
+            raise RuntimeError(f"closeout record lacks profile identity: {record.work_id}")
+        token = model_profile_registry.materialize_tool_call_token(
+            model_profile_registry.ToolCallMaterializationRequest(
+                profile_id=record.profile_id,
+                terminal_agent_id=record.work_id,
+            ),
+            record.profile_id,
+            registry,
+        )
+        token_projection = {
+            "tool_id": token.tool_id,
+            "arguments": dict(token.arguments),
+        }
+        tokens[record.work_id] = token_projection
+    provider_packet = capacity_handshake.materialize_closeout_packet(
+        parent_work_id=spec.run_id,
+        ledger=runtime.ledger,
+        descendants=(runtime.ledger.topology,),
+        close_agent_tokens=tokens,
+    )
+    calls = [
+        {
+            "agent_id": call.work_id,
+            "tool_call_token": dict(call.close_agent_call_token),
+        }
+        for call in provider_packet.close_agent_calls
+    ]
+    failures = [
+        {"work_id": failure.work_id, "detail": failure.detail}
+        for failure in provider_packet.failures
+    ]
+    return {
+        "schema_id": "closeout_tool_call_projection_v1",
+        "parent_work_id": spec.run_id,
+        "parent_lineage_id": runtime.parent_lineage_id,
+        "ledger_ref": f"runtime://ledger/{spec.run_id}",
+        "close_agent_tool_calls": calls,
+        "failures": failures,
+        "status": "completed" if not failures else "failed",
+        "natural_language_intent": "close terminal descendants in postorder and release reservations after readback",
+    }
+
+
+def dispatch_fixed_implementation(
+    request: Mapping[str, object] | implementation_route.ImplementationRouteRequest,
+    objective: str,
+    spawn: Callable[[str, str], str | None],
+    *,
+    workspace_root: Path = ROOT,
+    capacity_runtime: _CapacityRuntime | None = None,
+) -> ImplementationDispatch:
+    """Route, materialize, and launch exactly one fixed Spark implementation worker."""
+    route_result = implementation_route.route_implementation(request)
+    if route_result.status == "blocked":
+        return ImplementationDispatch(route_result, None, None, None, route_result.next_gate, 1, 0, "blocked")
+    if route_result.status == "queued":
+        return ImplementationDispatch(route_result, None, None, None, route_result.next_gate, 1, 0, "queued")
+    if (
+        route_result.selected_agent_type != "spark_worker"
+        or route_result.selected_profile_id != "spark_implementation_low"
+        or route_result.failure is not None
+    ):
+        raise RuntimeError("implementation_dispatch:fixed_route_violation")
+    if isinstance(request, implementation_route.ImplementationRouteRequest):
+        packet_payload: object = request.fixed_implementation_packet
+    else:
+        packet_payload = request.get("fixed_implementation_packet")
+    if is_dataclass(packet_payload):
+        packet_context = asdict(packet_payload)
+    elif isinstance(packet_payload, Mapping):
+        packet_context = dict(packet_payload)
+    else:
+        raise RuntimeError("implementation_dispatch:fixed_packet_missing")
+    registry = model_profile_registry.load_model_profile_registry(workspace_root)
+    prompt = model_profile_registry.materialize_prompt_capsule(
+        model_profile_registry.PromptMaterializationRequest(
+            profile_id=route_result.selected_profile_id,
+            role_id="spark_worker",
+            context=(
+                model_profile_registry.ContextItem("objective", objective),
+                model_profile_registry.ContextItem("context", "fixed_packet_direct_materialization"),
+                model_profile_registry.ContextItem("fixed_implementation_packet", packet_context),
+                model_profile_registry.ContextItem("implementation_route_result", asdict(route_result)),
+                model_profile_registry.ContextItem("owner_gate", route_result.next_gate),
+            ),
+            objective=objective,
+        ),
+        registry,
+    )
+    if route_result.capacity_action == "continue_existing":
+        worker_agent_id = route_result.resume_worker_agent_id
+        spawn_count = 0
+        status = "continued"
+    else:
+        planned_id = f"{route_result.packet_sha256}:spark"
+        item = capacity_handshake.ReadyWorkItem(
+            work_id=planned_id,
+            packet_sha256=route_result.packet_sha256 or "",
+            profile_id=route_result.selected_profile_id,
+            required_slots=1,
+            required_write_slots=1,
+            model=registry.by_profile(route_result.selected_profile_id).model,
+        )
+        if capacity_runtime is not None:
+            readiness = capacity_handshake.request_slot(capacity_runtime.snapshot, capacity_runtime.ledger, item)
+            if readiness.status != "ready":
+                return ImplementationDispatch(route_result, prompt, None, None, route_result.next_gate, 1, 0, "queued")
+        worker_agent_id = spawn("spark_worker", prompt.body)
+        spawn_count = 1
+        if not worker_agent_id:
+            if capacity_runtime is not None:
+                capacity_handshake.record_successful_spawn(
+                    capacity_runtime.snapshot,
+                    capacity_runtime.ledger,
+                    item,
+                    spawn_succeeded=False,
+                )
+            return ImplementationDispatch(route_result, prompt, None, None, route_result.next_gate, 1, spawn_count, "queued")
+        if capacity_runtime is not None:
+            spawned_item = capacity_handshake.ReadyWorkItem(
+                work_id=worker_agent_id,
+                packet_sha256=item.packet_sha256,
+                profile_id=item.profile_id,
+                required_slots=item.required_slots,
+                required_write_slots=item.required_write_slots,
+                model=item.model,
+            )
+            capacity_handshake.record_successful_spawn(
+                capacity_runtime.snapshot,
+                capacity_runtime.ledger,
+                spawned_item,
+                spawn_succeeded=True,
+            )
+        status = "spawned"
+    if not worker_agent_id:
+        raise RuntimeError("implementation_dispatch:worker_identity_missing")
+    token = model_profile_registry.materialize_tool_call_token(
+        model_profile_registry.ToolCallMaterializationRequest(
+            route_result.selected_profile_id,
+            worker_agent_id,
+        ),
+        route_result.selected_profile_id,
+        registry,
+    )
+    return ImplementationDispatch(
+        route_result,
+        prompt,
+        token,
+        worker_agent_id,
+        route_result.next_gate,
+        1,
+        spawn_count,
+        status,
+    )
+
+
+def capacity_manifest_output_lines(
+    spec: RunBundleSpec,
+    runtime: _CapacityRuntime | None = None,
+) -> tuple[str, ...]:
+    """Return task-start/bootstrap fields projected from one typed capacity runtime."""
+    runtime = runtime or capacity_runtime_for_spec(spec)
+    projection = _capacity_projection(runtime, spec)
+    return (
+        "CAPACITY_REQUEST_SCHEMA=team_manifest_capacity_request_v1",
+        f"REQUESTED_TOTAL_CAPACITY={projection['requested_total_capacity']}",
+        f"CAPACITY_TOPOLOGY_PROOF_REF={projection['topology_proof_ref']}",
+        f"CAPACITY_TOPOLOGY_PROOF_SHA256={projection['topology_proof_sha256']}",
+        f"CAPACITY_POLICY_REF={projection['capacity_policy_ref']}",
+        f"CAPACITY_LOADER_EVIDENCE_REF={projection['loader_evidence_ref']}",
+        f"CAPACITY_RELOAD_STATE={projection['reload_state']}",
+        f"PARENT_LINEAGE_ID={runtime.parent_lineage_id}",
+        f"CAPACITY_LEDGER_REF={projection['ledger_ref']}",
+    )
+
+
+def capacity_start_output_lines(
+    catalog: TaskCatalog,
+    workspace_root: Path,
+    run_id: str,
+) -> tuple[str, ...]:
+    """Return startup fields from the same topology-derived capacity owner."""
+    derivation = declared_team_capacity_derivation(catalog)
+    witness = _capacity_topology_witness(derivation)
+    contract = capacity_handshake.load_startup_contract(
+        derivation,
+        witness,
+        config_path=str(workspace_root / ".codex" / "config.toml"),
+        contract_id=f"capacity:{run_id}",
+    )
+    configured = contract.input_evidence.max_threads_loader.configured_max_threads
+    parent_lineage_id = f"run:{run_id}"
+    reload_state = "restart_required" if configured != witness.requested_total_capacity else "current"
+    return (
+        "CAPACITY_REQUEST_SCHEMA=team_manifest_capacity_request_v1",
+        f"REQUESTED_TOTAL_CAPACITY={witness.requested_total_capacity}",
+        "CAPACITY_TOPOLOGY_PROOF_REF=agents/task_catalog.yaml",
+        f"CAPACITY_TOPOLOGY_PROOF_SHA256={witness.declared_team_topology_sha256}",
+        "CAPACITY_POLICY_REF=agents/capacity_policy.toml",
+        "CAPACITY_POLICY_DIGEST="
+        f"{contract.capacity_policy.topology_proof_sha256}",
+        "CAPACITY_LOADER_EVIDENCE_REF="
+        f"{contract.input_evidence.max_threads_loader.evidence_ref}",
+        f"CAPACITY_LOADED_CONFIGURED_VALUE={configured}",
+        f"CAPACITY_RELOAD_STATE={reload_state}",
+        f"PARENT_LINEAGE_ID={parent_lineage_id}",
+        f"CAPACITY_LEDGER_REF=runtime://ledger/{run_id}",
+    )
+
+
 def workflow_spawn_budget(catalog: TaskCatalog, family_id: str) -> tuple[int, int]:
     """Return the active and write-capable spawn budget for one workflow family."""
-    family = resolve_workflow_family(catalog, family_id)
-    raw_budget = family.get("spawn_budget")
-    if not isinstance(raw_budget, dict):
-        raise RuntimeError(
-            f"workflow family spawn_budget must be a mapping for {family_id}"
-        )
-    raw_budget = _as_object_mapping(
-        cast(object, raw_budget), f"workflow_families[{family_id}].spawn_budget"
+    derivation = declared_team_capacity_derivation(catalog)
+    family = next(
+        record for record in derivation.family_records if record.workflow_family_id == family_id
     )
-    active = raw_budget.get("active_subagents")
-    max_write = raw_budget.get("max_write_subagents")
-    if not isinstance(active, int) or active < 1:
-        raise RuntimeError(
-            f"workflow family active_subagents must be >= 1 for {family_id}"
-        )
-    if not isinstance(max_write, int) or max_write < 1:
-        raise RuntimeError(
-            f"workflow family max_write_subagents must be >= 1 for {family_id}"
-        )
-    if max_write > active:
-        raise RuntimeError(
-            "workflow family max_write_subagents exceeds active_subagents "
-            f"for {family_id}: {max_write} > {active}"
-        )
-    runtime_max_threads = codex_runtime_max_threads()
-    if active > runtime_max_threads:
-        raise RuntimeError(
-            "workflow family active_subagents exceeds runtime max_threads "
-            f"for {family_id}: {active} > {runtime_max_threads}"
-        )
-    return active, max_write
+    return family.workflow_thread_request, _capacity_write_scope_cap(family)
 
 
 def workflow_topology_policy_violations(
@@ -3476,12 +1983,14 @@ def workflow_topology_policy_violations(
         always_on_raw = roles.get("always_on")
         specialists_raw = roles.get("specialists")
         if not isinstance(always_on_raw, list) or not all(
-            isinstance(role_id, str) for role_id in cast(list[object], always_on_raw)
+            isinstance(role_id, str)
+            for role_id in cast(list[object], always_on_raw)
         ):
             violations.append((family_id, "malformed-always-on"))
             continue
         if not isinstance(specialists_raw, list) or not all(
-            isinstance(role_id, str) for role_id in cast(list[object], specialists_raw)
+            isinstance(role_id, str)
+            for role_id in cast(list[object], specialists_raw)
         ):
             violations.append((family_id, "malformed-specialists"))
             continue
@@ -3502,22 +2011,20 @@ def workflow_topology_policy_violations(
         if family_id == "skill_evaluation":
             if always_on or specialists != ("skill_evaluator",):
                 violations.append((family_id, "evaluator-only-topology"))
-            expected_budget = (1, 1)
         elif family_id == "owner_bounded_change":
             if always_on != owner_bounded_always_on:
                 violations.append((family_id, "owner-bounded-producer-core"))
             if "change_reviewer" not in specialists:
                 violations.append((family_id, "change-reviewer-not-deferred"))
-            expected_budget = (4, 2)
         else:
             if always_on != delivery_always_on:
                 violations.append((family_id, "delivery-producer-core"))
             missing_reviews = deferred_delivery_reviews - set(specialists)
             if missing_reviews:
                 violations.append((family_id, "reviewers-not-deferred"))
-            expected_budget = (4, 2)
-        if workflow_spawn_budget(catalog, family_id) != expected_budget:
-            violations.append((family_id, "spawn-budget"))
+        active_budget, write_budget = workflow_spawn_budget(catalog, family_id)
+        if active_budget < 1 or write_budget < 1 or write_budget > active_budget:
+            violations.append((family_id, "derived-spawn-budget"))
     return tuple(violations)
 
 
@@ -3563,9 +2070,7 @@ def registered_codex_agent_types(agent_root: Path = CODEX_AGENT_ROOT) -> set[str
     return {path.stem for path in agent_root.glob("*.toml") if path.is_file()}
 
 
-def parse_agent_type_selections(
-    raw_values: tuple[str, ...],
-) -> tuple[AgentTypeSelection, ...]:
+def parse_agent_type_selections(raw_values: tuple[str, ...]) -> tuple[AgentTypeSelection, ...]:
     """Parse explicit role-to-agent selections from parent-packet CLI values."""
     selections: list[AgentTypeSelection] = []
     for raw_value in raw_values:
@@ -3660,9 +2165,7 @@ def catalog_stage_waves(catalog: TaskCatalog) -> tuple[StageWave, ...]:
         catalog.raw.get("role_topology_defaults"),
         "role_topology_defaults",
     )
-    waves = _as_mapping_tuple(
-        topology.get("stage_waves"), "role_topology_defaults.stage_waves"
-    )
+    waves = _as_mapping_tuple(topology.get("stage_waves"), "role_topology_defaults.stage_waves")
     return tuple(
         StageWave(
             id=_as_required_string(wave.get("id"), "stage_waves[].id"),
@@ -3766,9 +2269,11 @@ def _initial_stage_wave_slots(
         set(),
         selections,
     )
-    return tuple(slot for slot in slots if slot.role_id not in {"verifier", "auditor"})[
-        :active_subagents
-    ]
+    return tuple(
+        slot
+        for slot in slots
+        if slot.role_id not in {"verifier", "auditor"}
+    )[:active_subagents]
 
 
 def _chunk_wave_slots(
@@ -3925,7 +2430,10 @@ def format_subagent_role_instance_wave_chunks(
 ) -> str:
     """Render follow-up role-instance waves in a machine-readable summary form."""
     return ";".join(
-        f"WAVE-{index + 2}=" + ",".join(slot.executable_identity for slot in wave)
+        f"WAVE-{index + 2}="
+        + ",".join(
+            slot.executable_identity for slot in wave
+        )
         for index, wave in enumerate(waves)
     )
 
@@ -4005,13 +2513,10 @@ def select_roles(
             selected_roles.append(role)
             selected_ids.add(role.id)
     enabled_set = {role.id for role in enabled_roles}
-    enabled_activations = {
-        role.activation for role in enabled_roles if role in config.specialist_roles
-    }
     selected_specialists = tuple(
         role
         for role in config.specialist_roles
-        if role.id in enabled_set or role.activation in enabled_activations
+        if role.id in enabled_set
         if role.id not in selected_ids
     )
     return tuple(selected_roles) + selected_specialists
@@ -4068,59 +2573,13 @@ def codex_agent_model_matrix_for_roles(
     return tuple(dict.fromkeys(rows))
 
 
-def selected_packet_artifact_paths(
-    config: TeamConfig,
-    packet: ActiveDesignPacketValue,
-) -> dict[str, str]:
-    """Map standard design artifact names to the selected packet outputs."""
-    return {
-        config.artifacts["design_brief"]: packet.design_artifact,
-        config.artifacts["design_review"]: packet.design_review_artifact,
-        config.artifacts["document_flow_review"]: packet.document_flow_review_artifact,
-    }
-
-
-def selected_role_outputs(
-    config: TeamConfig,
-    role: Role,
-    packet: ActiveDesignPacketValue,
-) -> tuple[str, ...]:
-    """Return role outputs aligned with the selected design packet."""
-    artifact_map = selected_packet_artifact_paths(config, packet)
-    return tuple(artifact_map.get(output, output) for output in role.required_outputs)
-
-
-def selected_artifact_name(
-    config: TeamConfig,
-    artifact_key: str,
-    packet: ActiveDesignPacketValue,
-) -> str:
-    """Resolve one logical artifact key through the selected design packet."""
-    artifact_name = config.artifacts[artifact_key]
-    return selected_packet_artifact_paths(config, packet).get(
-        artifact_name,
-        artifact_name,
-    )
-
-
-def iter_artifacts(
-    config: TeamConfig,
-    roles: tuple[Role, ...],
-    packet: ActiveDesignPacketValue,
-) -> tuple[str, ...]:
+def iter_artifacts(config: TeamConfig, roles: tuple[Role, ...]) -> tuple[str, ...]:
     """Return unique artifact filenames in deterministic order."""
     return tuple(
         dict.fromkeys(
             (
                 *(config.artifacts[key] for key in STANDARD_RUN_ARTIFACT_KEYS),
-                packet.design_artifact,
-                packet.design_review_artifact,
-                packet.document_flow_review_artifact,
-                *(
-                    output
-                    for role in roles
-                    for output in selected_role_outputs(config, role, packet)
-                ),
+                *(output for role in roles for output in role.required_outputs),
             )
         )
     )
@@ -4131,7 +2590,6 @@ def resolve_role_document_packet(
     role: Role,
     report_dir: Path,
     workspace_root: Path,
-    active_design_packet: ActiveDesignPacketValue,
 ) -> RoleDocumentPacket:
     """Resolve explicit read-before-work packet for one role."""
     spec = ROLE_DOCUMENT_PACKET_SPECS.get(role.id, {})
@@ -4145,12 +2603,6 @@ def resolve_role_document_packet(
     )
     entries: list[DocumentPacketEntry] = []
     seen_paths: set[Path] = set()
-    active_packet = active_design_packet
-    active_packet_paths = {
-        "design_brief": active_packet.design_artifact,
-        "design_review": active_packet.design_review_artifact,
-        "document_flow_review": active_packet.document_flow_review_artifact,
-    }
 
     def add_entry(entry: DocumentPacketEntry) -> None:
         resolved_path = entry.path.resolve()
@@ -4166,29 +2618,13 @@ def resolve_role_document_packet(
         )
 
     for artifact_key in artifact_keys:
-        if artifact_key in active_packet_paths:
-            add_entry(
-                DocumentPacketEntry(
-                    path=resolve_report_bundle_artifact_path(
-                        report_dir,
-                        active_packet_paths[artifact_key],
-                    ),
-                    rationale=(
-                        f"run artifact:{artifact_key}; source=run.active_design_packet"
-                    ),
-                )
-            )
-            continue
         if artifact_key not in config.artifacts:
             raise RuntimeError(
                 f"document packet artifact key missing for role {role.id}: {artifact_key}"
             )
         add_entry(
             DocumentPacketEntry(
-                path=resolve_report_bundle_artifact_path(
-                    report_dir,
-                    config.artifacts[artifact_key],
-                ),
+                path=(report_dir / config.artifacts[artifact_key]).resolve(),
                 rationale=f"run artifact:{artifact_key}",
             )
         )
@@ -4337,106 +2773,43 @@ def required_output_templates_missing(
     )
 
 
-def run_workflow_family(spec: RunBundleSpec) -> dict[str, object] | None:
-    """Return the workflow-family record selected for one run."""
-    if not spec.workflow_family_id:
-        return None
-    if spec.task_catalog is None:
-        raise RuntimeError("task catalog is required for workflow manifest rendering")
-    return resolve_workflow_family(spec.task_catalog, spec.workflow_family_id)
-
-
-def rendered_text_artifact(relative_path: str, text: str) -> RenderedArtifact:
-    """Create one canonical UTF-8 run-bundle text artifact."""
-    return RenderedArtifact(
-        relative_path=PurePosixPath(relative_path),
-        content=text.encode("utf-8"),
-        mode=RUN_BUNDLE_FILE_MODE,
-    )
-
-
-def project_role_document_packets(
-    spec: RunBundleSpec,
-    packet: ActiveDesignPacketValue,
-) -> tuple[RoleDocumentPacket, ...]:
-    """Project every selected role's immutable document packet."""
-    return tuple(
-        resolve_role_document_packet(
-            spec.config,
-            role,
-            spec.report_dir,
-            spec.workspace_root,
-            packet,
-        )
-        for role in spec.roles
-    )
-
-
-def project_subagent_prompt_packets(
-    spec: RunBundleSpec,
-    packet: ActiveDesignPacketValue,
-    role_packets: tuple[RoleDocumentPacket, ...],
-) -> tuple[SubagentPromptPacket, ...]:
-    """Project one packet-bearing prompt value for every selected role."""
-    documents_by_role = {value.role_id: value for value in role_packets}
-    if tuple(documents_by_role) != tuple(role.id for role in spec.roles):
-        raise RuntimeError(
-            "role document packet projection disagrees with selected roles"
-        )
-    return tuple(
-        SubagentPromptPacket(
-            role_id=role.id,
-            active_design_packet=packet,
-            document_packet=documents_by_role[role.id],
-            required_outputs=selected_role_outputs(spec.config, role, packet),
-        )
-        for role in spec.roles
-    )
-
-
-def project_template_artifacts(
-    spec: RunBundleSpec,
-    packet: ActiveDesignPacketValue,
-    *,
-    artifact_names: tuple[str, ...],
-    role_packets: tuple[RoleDocumentPacket, ...],
-    prompt_packets: tuple[SubagentPromptPacket, ...],
-) -> tuple[RenderedArtifact, ...]:
-    """Render every template-owned run artifact entirely in memory."""
-    role_ids = tuple(role.id for role in spec.roles)
-    if tuple(value.role_id for value in role_packets) != role_ids:
-        raise RuntimeError("role document packet order disagrees with selected roles")
-    if tuple(value.role_id for value in prompt_packets) != role_ids:
-        raise RuntimeError("subagent prompt packet order disagrees with selected roles")
+def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
+    """Create the standard files for a run."""
     replacements = {
         "RUN_ID": spec.run_id,
         "TASK": spec.task,
         "OWNER": spec.owner,
         "CREATED_AT": spec.created_at_iso,
     }
-    selected_templates = {
-        packet.design_artifact: spec.config.artifacts["design_brief"],
-        packet.design_review_artifact: spec.config.artifacts["design_review"],
-        packet.document_flow_review_artifact: spec.config.artifacts[
-            "document_flow_review"
-        ],
-    }
-    return tuple(
-        rendered_text_artifact(
-            artifact,
-            render_template(selected_templates.get(artifact, artifact), replacements),
-        )
-        for artifact in artifact_names
-        if has_template(selected_templates.get(artifact, artifact))
+    capacity_runtime = capacity_runtime_for_spec(spec)
+    spec.report_dir.mkdir(parents=True, exist_ok=True)
+    created_files = list(iter_artifacts(spec.config, spec.roles))
+    for artifact in created_files:
+        if has_template(artifact):
+            (spec.report_dir / artifact).write_text(
+                render_template(artifact, replacements),
+                encoding="utf-8",
+            )
+    (spec.report_dir / spec.config.artifacts["team_manifest"]).write_text(
+        build_manifest(spec, capacity_runtime),
+        encoding="utf-8",
     )
-
-
-def project_verification_artifact(spec: RunBundleSpec) -> RenderedArtifact:
-    """Project the canonical pending verification record."""
-    return rendered_text_artifact(
-        spec.config.artifacts["verification"],
+    (spec.report_dir / "closeout_packet.json").write_text(
+        json.dumps(
+            {
+                "capacity_request": _capacity_projection(capacity_runtime, spec),
+                "closeout_packet": _closeout_projection(capacity_runtime, spec),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    created_files.append("closeout_packet.json")
+    (spec.report_dir / spec.config.artifacts["verification"]).write_text(
         "\n".join(
-            (
+            [
                 f"run_id={spec.run_id}",
                 f"task={spec.task}",
                 f"owner={spec.owner}",
@@ -4445,44 +2818,35 @@ def project_verification_artifact(spec: RunBundleSpec) -> RenderedArtifact:
                 "user_completion_report=locked",
                 "closeout_gate_status=pending",
                 "",
-            )
+            ]
         ),
+        encoding="utf-8",
     )
-
-
-def project_authority_artifacts(
-    spec: RunBundleSpec,
-) -> tuple[RenderedArtifact, RenderedArtifact]:
-    """Project task authority and its hash baseline from the same bytes."""
     authority_roles = {
         role.id: role.write_policy.mode not in {"read_only", "artifacts_only"}
         for role in spec.roles
     }
-    authority_bytes = build_default_task_authority(
-        run_id=spec.run_id,
-        task=spec.task,
-        roles=authority_roles,
-    ).encode("utf-8")
-    authority = RenderedArtifact(
-        PurePosixPath(AUTHORITY_FILE_NAME),
-        authority_bytes,
-        RUN_BUNDLE_FILE_MODE,
+    (spec.report_dir / AUTHORITY_FILE_NAME).write_text(
+        build_default_task_authority(
+            run_id=spec.run_id,
+            task=spec.task,
+            roles=authority_roles,
+        ),
+        encoding="utf-8",
     )
-    baseline_name = authority_baseline_path(Path(AUTHORITY_FILE_NAME)).name
-    baseline = RenderedArtifact(
-        PurePosixPath(baseline_name),
-        hash_baseline_bytes(authority_bytes),
-        RUN_BUNDLE_FILE_MODE,
-    )
-    return authority, baseline
+    created_files.append(AUTHORITY_FILE_NAME)
+    write_initial_wave_execution_gate(spec)
+    unique_created_files: list[str] = []
+    for artifact in created_files:
+        if artifact not in unique_created_files:
+            unique_created_files.append(artifact)
+    return tuple(unique_created_files)
 
 
-def project_initial_wave_row(
-    spec: RunBundleSpec,
-) -> Mapping[str, str] | None:
-    """Project the sole initial wave row without mutating run artifacts."""
+def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
+    """Record the parent runtime gate for the first recommended subagent wave."""
     if not spec.workflow_family_id:
-        return None
+        return
     if spec.task_catalog is None:
         raise RuntimeError("task catalog is required for initial wave materialization")
     active_subagents, _max_write_subagents = workflow_spawn_budget(
@@ -4496,104 +2860,21 @@ def project_initial_wave_row(
         spec.agent_type_selections,
     )
     if not initial_wave:
-        return None
-    return initial_wave_gate_fields(
+        return
+    row = initial_wave_gate_fields(
         initial_wave=initial_wave,
         active_subagents=active_subagents,
     )
-
-
-def project_wave_ledger_artifacts(
-    spec: RunBundleSpec,
-    template_artifacts: tuple[RenderedArtifact, ...],
-    *,
-    monitoring_entries: MonitoringEntries,
-    initial_wave_row: Mapping[str, str] | None,
-) -> tuple[RenderedArtifact, ...]:
-    """Project schedule and monitoring replacements through the shared renderer."""
-    from workflow_monitor import render_monitoring_artifacts
-
-    schedule_name = spec.config.artifacts["schedule"]
-    monitoring_name = spec.config.artifacts["workflow_monitoring"]
-    by_path = {value.relative_path.as_posix(): value for value in template_artifacts}
-    try:
-        schedule_text = by_path[schedule_name].content.decode("utf-8")
-        monitoring_text = by_path[monitoring_name].content.decode("utf-8")
-    except KeyError as exc:
-        raise RuntimeError(
-            f"missing monitoring template artifact: {exc.args[0]}"
-        ) from exc
-    schedule_text, monitoring_text = render_monitoring_artifacts(
-        schedule_text=schedule_text,
-        workflow_monitoring_text=monitoring_text,
-        entries=monitoring_entries,
-        initial_wave_row=initial_wave_row,
+    append_markdown_section_line(
+        spec.report_dir / "schedule.md",
+        "## Agent Wave Ledger",
+        schedule_wave_row(row),
     )
-    return (
-        rendered_text_artifact(schedule_name, schedule_text),
-        rendered_text_artifact(monitoring_name, monitoring_text),
+    append_markdown_section_line(
+        spec.report_dir / "workflow_monitoring.md",
+        "## Actual Wave Events",
+        workflow_wave_event_line(row),
     )
-
-
-def enrich_runtime_measurement_input(
-    spec: RunBundleSpec,
-    packet: ActiveDesignPacketValue,
-    context: ActiveDesignReferenceContext,
-    entries: MonitoringEntries,
-) -> MonitoringEntries:
-    """Attach immutable packet/source identity to the monitor-owned record."""
-    packet_bytes = json.dumps(
-        active_design_packet_mapping(packet),
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    source_bytes = {
-        result.declared_ref: len(result.resolved_path.read_bytes())
-        for result in context.source_results
-    }
-    reviewer_ids = tuple(
-        sorted(
-            role.id
-            for role in spec.roles
-            if role.id.endswith("_reviewer")
-            or role.id
-            in {"reviewer", "verifier", "auditor", "docs_workflow_steward"}
-        )
-    )
-    writer_ids = tuple(
-        sorted(
-            role.id
-            for role in spec.roles
-            if role.write_policy.mode not in {"read_only", "artifacts_only"}
-        )
-    )
-    return replace(
-        entries,
-        responsibility_unit_id=entries.responsibility_unit_id or spec.run_id,
-        packet_hash=hashlib.sha256(packet_bytes).hexdigest(),
-        context_bytes_by_source=tuple(sorted(source_bytes.items())),
-        writer_ids=entries.writer_ids or writer_ids,
-        reviewer_ids=entries.reviewer_ids or reviewer_ids,
-    )
-
-
-def format_start_declaration(
-    workflow_family_name: str,
-    active_skills: tuple[str, ...],
-    review_roles: tuple[str, ...],
-) -> str:
-    """Format the one start declaration shared by publication and CLI output."""
-    return (
-        f"workflow={workflow_family_name or 'Unspecified'}, "
-        f"skills={','.join(active_skills) or '-'}, "
-        f"review={','.join(review_roles) or '-'}"
-    )
-
-
-def create_run_bundle(spec: RunBundleSpec) -> RunBundleMaterialization:
-    """Materialize one complete run bundle through the sole public delegator."""
-    return _materialize_run_bundle(spec)
 
 
 def initial_wave_gate_fields(
@@ -4682,1780 +2963,63 @@ def workflow_wave_event_line(row: dict[str, str]) -> str:
     return "- " + " ".join(f"{key}={value}" for key, value in fields)
 
 
-def _file_identity(value: os.stat_result) -> FileIdentity:
-    return FileIdentity(
-        st_dev=value.st_dev,
-        st_ino=value.st_ino,
-    )
-
-
-def _file_state(value: os.stat_result) -> FileState:
-    """Capture permission and ownership state without folding it into identity."""
-    return FileState(
-        identity=_file_identity(value),
-        file_type=stat.S_IFMT(value.st_mode),
-        permission_mode=stat.S_IMODE(value.st_mode),
-        owner_uid=value.st_uid,
-        owner_gid=value.st_gid,
-        link_count=value.st_nlink,
-    )
-
-
-def _same_report_root_identity(left: FileIdentity, right: FileIdentity) -> bool:
-    """Compare stable root authority while allowing child-directory state changes."""
-    return left == right
-
-
-def _identity_mapping(value: FileIdentity) -> dict[str, int]:
-    return {
-        "st_dev": value.st_dev,
-        "st_ino": value.st_ino,
-    }
-
-
-def _identity_from_mapping(value: object) -> FileIdentity:
-    if not isinstance(value, dict):
-        raise ValueError("identity must be a mapping")
-    mapping = cast(dict[object, object], value)
-    expected = ("st_dev", "st_ino")
-    if set(mapping) != set(expected):
-        raise ValueError("identity fields disagree")
-    fields: list[int] = []
-    for key in expected:
-        field = mapping[key]
-        if not isinstance(field, int) or isinstance(field, bool):
-            raise ValueError(f"identity field is not an integer: {key}")
-        fields.append(field)
-    return FileIdentity(*fields)
-
-
-def _write_all(descriptor: int, payload: bytes) -> None:
-    offset = 0
-    while offset < len(payload):
-        written = os.write(descriptor, payload[offset:])
-        if written <= 0:
-            raise OSError(errno.EIO, "short write")
-        offset += written
-
-
-def _read_descriptor_bytes(descriptor: int, expected_size: int | None = None) -> bytes:
-    os.lseek(descriptor, 0, os.SEEK_SET)
-    chunks: list[bytes] = []
-    remaining = expected_size
-    while True:
-        request_size = SHA256_READ_CHUNK_BYTES
-        if remaining is not None:
-            request_size = min(request_size, remaining + 1)
-            if request_size == 0:
-                break
-        chunk = os.read(descriptor, request_size)
-        if not chunk:
+def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
+    """Append one line to a level-2 Markdown section if it is not already present."""
+    if not path.is_file():
+        return
+    text = path.read_text(encoding="utf-8")
+    if line in text:
+        return
+    lines = text.splitlines()
+    in_section = False
+    insert_at = len(lines)
+    for index, existing_line in enumerate(lines):
+        stripped = existing_line.strip()
+        if not stripped.startswith("## "):
+            continue
+        if in_section:
+            insert_at = index
             break
-        chunks.append(chunk)
-        if remaining is not None:
-            remaining -= len(chunk)
-            if remaining < 0:
-                break
-    return b"".join(chunks)
-
-
-def _canonical_lock_payload(identity: MaterializationLockIdentity) -> bytes:
-    value = {
-        "schema_version": identity.schema_version,
-        "state": identity.state,
-        "report_root_identity": _identity_mapping(identity.report_root_identity),
-        "lock_file_identity": _identity_mapping(identity.lock_file_identity),
-        "effective_uid": identity.effective_uid,
-        "pid": identity.pid,
-        "process_start_ticks": identity.process_start_ticks,
-        "boot_id": identity.boot_id,
-        "nonce": identity.nonce,
-        "acquired_at": identity.acquired_at,
-        "run_id": identity.run_id,
-        "reuse_class": identity.reuse_class,
-    }
-    return (
-        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        + "\n"
-    ).encode("utf-8")
-
-
-def _process_start_ticks(pid: int) -> int | None:
-    try:
-        line = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
-    except (FileNotFoundError, ProcessLookupError):
-        return None
-    close = line.rfind(")")
-    if close < 0:
-        raise RuntimeError("process stat is malformed")
-    fields = line[close + 2 :].split()
-    if len(fields) <= 19:
-        raise RuntimeError("process stat lacks start ticks")
-    return int(fields[19])
-
-
-def _boot_id() -> str:
-    value = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="ascii").strip()
-    if not value:
-        raise RuntimeError("kernel boot id is empty")
-    return value
-
-
-def _validate_lock_inode(
-    value: os.stat_result,
-    *,
-    report_root_identity: FileIdentity,
-) -> None:
-    state = _file_state(value)
-    if (
-        state.file_type != stat.S_IFREG
-        or state.link_count != 1
-        or state.owner_uid != os.geteuid()
-        or state.permission_mode != MATERIALIZATION_LOCK_MODE
-        or state.identity.st_dev != report_root_identity.st_dev
-    ):
-        raise ValueError("foreign lock inode")
-
-
-def _open_stable_report_root(report_root: Path) -> tuple[int, FileIdentity]:
-    before = os.lstat(report_root)
-    if not stat.S_ISDIR(before.st_mode) or stat.S_ISLNK(before.st_mode):
-        raise ValueError("report root is not a direct directory")
-    descriptor = os.open(
-        report_root,
-        os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
-    )
-    try:
-        opened = os.fstat(descriptor)
-        after = os.lstat(report_root)
-        if (
-            _file_state(before) != _file_state(opened)
-            or _file_state(opened) != _file_state(after)
-            or not stat.S_ISDIR(opened.st_mode)
-            or not stat.S_ISDIR(after.st_mode)
-        ):
-            raise ValueError("report root identity changed")
-        return descriptor, _file_identity(opened)
-    except BaseException:
-        os.close(descriptor)
-        raise
-
-
-def _materialization_failure(
-    *,
-    phase: MaterializationPhase,
-    code: MaterializationErrorCode,
-    target: Path,
-    staging: Path | None = None,
-    cause_code: MaterializationErrorCode | None = None,
-    violations: tuple[ActiveDesignPacketViolation, ...] = (),
-    rollback: RollbackResult | None = None,
-) -> RunBundleMaterializationError:
-    return RunBundleMaterializationError(
-        phase=phase,
-        code=code,
-        cause_code=cause_code or code,
-        target_path=target,
-        staging_path=staging,
-        violations=violations,
-        rollback=rollback,
-    )
-
-
-def _lock_payload_reuse_class(
-    payload: bytes,
-    *,
-    report_root_identity: FileIdentity,
-    lock_identity: FileIdentity,
-) -> LockReuseClass:
-    try:
-        decoded: object = json.loads(
-            payload.decode("utf-8"),
-            object_pairs_hook=_reject_duplicate_json_keys,
-        )
-        if not isinstance(decoded, dict):
-            raise ValueError("lock payload is not a mapping")
-        mapping = cast(dict[str, object], decoded)
-        expected = {
-            "schema_version",
-            "state",
-            "report_root_identity",
-            "lock_file_identity",
-            "effective_uid",
-            "pid",
-            "process_start_ticks",
-            "boot_id",
-            "nonce",
-            "acquired_at",
-            "run_id",
-            "reuse_class",
-        }
-        if set(mapping) != expected:
-            raise ValueError("lock payload fields disagree")
-        root_value = _identity_from_mapping(mapping["report_root_identity"])
-        lock_value = _identity_from_mapping(mapping["lock_file_identity"])
-        if (
-            not _same_report_root_identity(root_value, report_root_identity)
-            or lock_value != lock_identity
-        ):
-            raise ValueError("lock payload identities disagree")
-        if mapping["schema_version"] != MATERIALIZATION_LOCK_SCHEMA:
-            raise ValueError("lock payload schema disagrees")
-        if mapping["state"] != "held" or mapping["effective_uid"] != os.geteuid():
-            raise ValueError("lock payload owner state disagrees")
-        pid = mapping["pid"]
-        start_ticks = mapping["process_start_ticks"]
-        if (
-            not isinstance(pid, int)
-            or isinstance(pid, bool)
-            or pid <= 0
-            or not isinstance(start_ticks, int)
-            or isinstance(start_ticks, bool)
-            or start_ticks <= 0
-        ):
-            raise ValueError("lock process identity is invalid")
-        nonce = mapping["nonce"]
-        if not isinstance(nonce, str) or re.fullmatch(r"[0-9a-f]{32}", nonce) is None:
-            raise ValueError("lock nonce is invalid")
-        reuse_class = mapping["reuse_class"]
-        if not isinstance(reuse_class, str) or reuse_class not in {
-            "first_acquisition",
-            "released_file_reuse",
-            "crash_stale_reuse",
-        }:
-            raise ValueError("lock reuse class is invalid")
-        run_id = mapping["run_id"]
-        if not isinstance(run_id, str) or not run_id:
-            raise ValueError("lock run id is invalid")
-        acquired_at = mapping["acquired_at"]
-        if not isinstance(acquired_at, str):
-            raise ValueError("lock acquisition time is invalid")
-        datetime.fromisoformat(acquired_at.replace("Z", "+00:00"))
-        stored_boot_id = mapping["boot_id"]
-        if not isinstance(stored_boot_id, str) or not stored_boot_id:
-            raise ValueError("lock boot id is invalid")
-        reconstructed = MaterializationLockIdentity(
-            schema_version=MATERIALIZATION_LOCK_SCHEMA,
-            state="held",
-            report_root_identity=root_value,
-            lock_file_identity=lock_value,
-            effective_uid=os.geteuid(),
-            pid=pid,
-            process_start_ticks=start_ticks,
-            boot_id=stored_boot_id,
-            nonce=nonce,
-            acquired_at=acquired_at,
-            run_id=run_id,
-            reuse_class=cast(LockReuseClass, reuse_class),
-            payload_sha256=hashlib.sha256(payload).hexdigest(),
-        )
-        if _canonical_lock_payload(reconstructed) != payload:
-            raise ValueError("lock payload is not canonical")
-        current_boot_id = _boot_id()
-        live_ticks = (
-            _process_start_ticks(pid) if stored_boot_id == current_boot_id else None
-        )
-        if (
-            stored_boot_id != current_boot_id
-            or live_ticks is None
-            or live_ticks != start_ticks
-        ):
-            return "crash_stale_reuse"
-        raise ValueError("held lock payload still names a live process")
-    except (OSError, UnicodeError, ValueError, _DuplicateJsonKey, RuntimeError) as exc:
-        raise ValueError("foreign lock payload") from exc
-
-
-def _acquire_materialization_lock(
-    *,
-    report_root: Path,
-    run_id: str,
-) -> MaterializationLock:
-    """Acquire and identify the persistent canonical materialization lock."""
-    target = report_root / run_id
-    root_descriptor: int | None = None
-    descriptor: int | None = None
-    try:
-        root_descriptor, root_identity = _open_stable_report_root(report_root)
-        reuse_class: LockReuseClass
-        try:
-            descriptor = os.open(
-                MATERIALIZATION_LOCK_NAME,
-                os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW,
-                MATERIALIZATION_LOCK_MODE,
-                dir_fd=root_descriptor,
-            )
-            reuse_class = "first_acquisition"
-        except FileExistsError:
-            before = os.stat(
-                MATERIALIZATION_LOCK_NAME,
-                dir_fd=root_descriptor,
-                follow_symlinks=False,
-            )
-            descriptor = os.open(
-                MATERIALIZATION_LOCK_NAME,
-                os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW,
-                dir_fd=root_descriptor,
-            )
-            opened = os.fstat(descriptor)
-            after = os.stat(
-                MATERIALIZATION_LOCK_NAME,
-                dir_fd=root_descriptor,
-                follow_symlinks=False,
-            )
-            before_identity = _file_identity(before)
-            opened_identity = _file_identity(opened)
-            if (
-                before_identity != opened_identity
-                or opened_identity != _file_identity(after)
-                or _file_state(before) != _file_state(opened)
-                or _file_state(opened) != _file_state(after)
-            ):
-                raise ValueError("lock identity changed during open")
-            _validate_lock_inode(opened, report_root_identity=root_identity)
-            reuse_class = "released_file_reuse"
-        lock_status = os.fstat(descriptor)
-        lock_identity = _file_identity(lock_status)
-        _validate_lock_inode(lock_status, report_root_identity=root_identity)
-        try:
-            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError as exc:
-            code: MaterializationErrorCode = (
-                "materialization_lock_busy"
-                if exc.errno in {errno.EACCES, errno.EAGAIN}
-                else "materialization_lock_failed"
-            )
-            raise _materialization_failure(
-                phase="stage", code=code, target=target
-            ) from exc
-        path_status = os.stat(
-            MATERIALIZATION_LOCK_NAME,
-            dir_fd=root_descriptor,
-            follow_symlinks=False,
-        )
-        descriptor_status = os.fstat(descriptor)
-        path_identity = _file_identity(path_status)
-        descriptor_identity = _file_identity(descriptor_status)
-        if path_identity != lock_identity or descriptor_identity != lock_identity:
-            raise ValueError("lock identity changed after flock")
-        _validate_lock_inode(path_status, report_root_identity=root_identity)
-        _validate_lock_inode(descriptor_status, report_root_identity=root_identity)
-        payload = _read_descriptor_bytes(descriptor)
-        if payload:
-            reuse_class = _lock_payload_reuse_class(
-                payload,
-                report_root_identity=root_identity,
-                lock_identity=lock_identity,
-            )
-        start_ticks = _process_start_ticks(os.getpid())
-        if start_ticks is None:
-            raise RuntimeError("current process start ticks are unavailable")
-        acquired_at = (
-            datetime.now(UTC)
-            .replace(microsecond=0)
-            .isoformat()
-            .replace(
-                "+00:00",
-                "Z",
-            )
-        )
-        provisional = MaterializationLockIdentity(
-            schema_version=MATERIALIZATION_LOCK_SCHEMA,
-            state="held",
-            report_root_identity=root_identity,
-            lock_file_identity=lock_identity,
-            effective_uid=os.geteuid(),
-            pid=os.getpid(),
-            process_start_ticks=start_ticks,
-            boot_id=_boot_id(),
-            nonce=secrets.token_hex(16),
-            acquired_at=acquired_at,
-            run_id=run_id,
-            reuse_class=reuse_class,
-            payload_sha256="",
-        )
-        held_payload = _canonical_lock_payload(provisional)
-        identity = replace(
-            provisional,
-            payload_sha256=hashlib.sha256(held_payload).hexdigest(),
-        )
-        os.ftruncate(descriptor, 0)
-        os.lseek(descriptor, 0, os.SEEK_SET)
-        _write_all(descriptor, held_payload)
-        os.fsync(descriptor)
-        if _read_descriptor_bytes(descriptor, len(held_payload)) != held_payload:
-            raise RuntimeError("held lock payload verification failed")
-        return MaterializationLock(
-            path=report_root / MATERIALIZATION_LOCK_NAME,
-            descriptor=descriptor,
-            identity=identity,
-        )
-    except RunBundleMaterializationError:
-        if descriptor is not None:
-            os.close(descriptor)
-        raise
-    except ValueError as exc:
-        if descriptor is not None:
-            os.close(descriptor)
-        raise _materialization_failure(
-            phase="stage",
-            code="materialization_lock_foreign",
-            target=target,
-        ) from exc
-    except (OSError, RuntimeError) as exc:
-        if descriptor is not None:
-            os.close(descriptor)
-        raise _materialization_failure(
-            phase="stage",
-            code="materialization_lock_failed",
-            target=target,
-        ) from exc
-    finally:
-        if root_descriptor is not None:
-            os.close(root_descriptor)
-
-
-def _release_materialization_lock(lock: MaterializationLock) -> None:
-    """Release an exact held lock while retaining its empty persistent inode."""
-    descriptor = lock.descriptor
-    try:
-        root_descriptor, root_identity = _open_stable_report_root(lock.path.parent)
-        try:
-            path_status = os.stat(
-                lock.path.name,
-                dir_fd=root_descriptor,
-                follow_symlinks=False,
-            )
-            descriptor_status = os.fstat(descriptor)
-            path_identity = _file_identity(path_status)
-            descriptor_identity = _file_identity(descriptor_status)
-            if (
-                not _same_report_root_identity(
-                    root_identity, lock.identity.report_root_identity
-                )
-                or path_identity != lock.identity.lock_file_identity
-                or descriptor_identity != lock.identity.lock_file_identity
-            ):
-                raise ValueError("lock release identity changed")
-            _validate_lock_inode(path_status, report_root_identity=root_identity)
-            _validate_lock_inode(descriptor_status, report_root_identity=root_identity)
-            payload = _read_descriptor_bytes(descriptor)
-            if (
-                hashlib.sha256(payload).hexdigest() != lock.identity.payload_sha256
-                or payload != _canonical_lock_payload(lock.identity)
-            ):
-                raise ValueError("lock release payload changed")
-            os.ftruncate(descriptor, 0)
-            os.fsync(descriptor)
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
-        finally:
-            os.close(root_descriptor)
-    except BaseException as exc:
-        os.close(descriptor)
-        raise RuntimeError("materialization lock release failed") from exc
-    os.close(descriptor)
-
-
-def _normalized_artifact_path(value: str | PurePosixPath) -> PurePosixPath:
-    path = PurePosixPath(value)
-    if (
-        path.is_absolute()
-        or not path.parts
-        or "\\" in path.as_posix()
-        or any(part in {"", ".", ".."} for part in path.parts)
-    ):
-        raise ValueError(f"invalid run artifact path: {value}")
-    return path
-
-
-def _build_in_memory_artifact_set(
-    *,
-    planned_paths: tuple[str, ...],
-    projected_artifacts: tuple[RenderedArtifact, ...],
-) -> tuple[RenderedArtifact, ...]:
-    """Validate and sort the complete in-memory artifact set."""
-    normalized_planned = tuple(
-        _normalized_artifact_path(path) for path in planned_paths
-    )
-    if len(set(normalized_planned)) != len(normalized_planned):
-        raise ValueError("planned run artifact paths are not unique")
-    by_path: dict[PurePosixPath, RenderedArtifact] = {}
-    for artifact in projected_artifacts:
-        path = _normalized_artifact_path(artifact.relative_path)
-        if path in by_path:
-            raise ValueError(f"duplicate projected artifact: {path.as_posix()}")
-        if artifact.mode != RUN_BUNDLE_FILE_MODE:
-            raise ValueError(f"invalid projected artifact mode: {path.as_posix()}")
-        try:
-            artifact.content.decode("utf-8")
-        except UnicodeDecodeError as exc:
-            raise ValueError(
-                f"projected artifact is not UTF-8 text: {path.as_posix()}"
-            ) from exc
-        by_path[path] = replace(artifact, relative_path=path)
-    planned_set = set(normalized_planned)
-    if set(by_path) != planned_set:
-        missing = sorted(path.as_posix() for path in planned_set - set(by_path))
-        unexpected = sorted(path.as_posix() for path in set(by_path) - planned_set)
-        raise ValueError(
-            f"projected artifact set disagrees: missing={missing} unexpected={unexpected}"
-        )
-    return tuple(by_path[path] for path in sorted(by_path, key=PurePosixPath.as_posix))
-
-
-def _artifact_digests(
-    artifacts: tuple[RenderedArtifact, ...],
-) -> tuple[ArtifactDigest, ...]:
-    return tuple(
-        ArtifactDigest(
-            relative_path=artifact.relative_path,
-            sha256=hashlib.sha256(artifact.content).hexdigest(),
-        )
-        for artifact in artifacts
-    )
-
-
-def _fsync_directory(path: Path) -> None:
-    descriptor = os.open(
-        path, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
-    )
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-
-
-def _tree_records(path: Path) -> tuple[tuple[str, int, int, str], ...]:
-    records: list[tuple[str, int, int, str]] = []
-    for candidate in sorted(
-        path.rglob("*"), key=lambda item: item.relative_to(path).as_posix()
-    ):
-        relative = candidate.relative_to(path).as_posix()
-        status = os.lstat(candidate)
-        if stat.S_ISDIR(status.st_mode):
-            continue
-        if not stat.S_ISREG(status.st_mode) or status.st_nlink != 1:
-            raise ValueError(f"nonregular staged artifact: {relative}")
-        payload = candidate.read_bytes()
-        records.append(
-            (
-                relative,
-                stat.S_IMODE(status.st_mode),
-                len(payload),
-                hashlib.sha256(payload).hexdigest(),
-            )
-        )
-    return tuple(records)
-
-
-def _tree_sha256(path: Path) -> str:
-    lines = "".join(
-        f"{relative}\t{mode:o}\t{size}\t{digest}\n"
-        for relative, mode, size, digest in _tree_records(path)
-    )
-    return hashlib.sha256(lines.encode("utf-8")).hexdigest()
-
-
-def _verify_staged_artifacts(
-    stage: Path,
-    artifacts: tuple[RenderedArtifact, ...],
-) -> str:
-    expected = tuple(
-        (
-            artifact.relative_path.as_posix(),
-            artifact.mode,
-            len(artifact.content),
-            hashlib.sha256(artifact.content).hexdigest(),
-        )
-        for artifact in artifacts
-    )
-    observed = _tree_records(stage)
-    if observed != expected:
-        raise ValueError("staged artifact path/mode/size/digest verification failed")
-    return _tree_sha256(stage)
-
-
-class _StageArtifactSetError(RuntimeError):
-    def __init__(
-        self,
-        *,
-        code: Literal["staging_write_failed", "staging_verify_failed"],
-        path: Path,
-        cleanup: CleanupStatus,
-    ) -> None:
-        self.code: Literal["staging_write_failed", "staging_verify_failed"] = code
-        self.path = path
-        self.cleanup: CleanupStatus = cleanup
-        super().__init__(code)
-
-
-def _stage_artifact_set(
-    *,
-    report_root: Path,
-    target: Path,
-    run_id: str,
-    artifacts: tuple[RenderedArtifact, ...],
-) -> StagedArtifactSet:
-    """Write and verify one complete private sibling staging tree."""
-    del target
-    stage: Path | None = None
-    for _attempt in range(GENERATED_NAME_ATTEMPTS):
-        candidate = report_root / (
-            f".{run_id}.stage.{os.getpid()}.{secrets.token_hex(16)}"
-        )
-        try:
-            candidate.mkdir(mode=PRIVATE_STAGE_MODE)
-        except FileExistsError:
-            continue
-        stage = candidate
-        break
-    if stage is None:
-        raise FileExistsError(errno.EEXIST, "staging name exhausted")
-    phase: Literal["write", "verify"] = "write"
-    initial_identity = _file_identity(os.lstat(stage))
-    try:
-        created_directories = {stage}
-        for artifact in artifacts:
-            output = stage.joinpath(*artifact.relative_path.parts)
-            parent = output.parent
-            missing: list[Path] = []
-            while parent != stage and not parent.exists():
-                missing.append(parent)
-                parent = parent.parent
-            for directory in reversed(missing):
-                directory.mkdir(mode=PRIVATE_STAGE_MODE)
-                created_directories.add(directory)
-            with output.open("xb") as handle:
-                handle.write(artifact.content)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.chmod(output, artifact.mode, follow_symlinks=False)
-        for directory in sorted(
-            created_directories,
-            key=lambda item: len(item.relative_to(stage).parts),
-            reverse=True,
-        ):
-            os.chmod(directory, RUN_BUNDLE_DIRECTORY_MODE, follow_symlinks=False)
-            _fsync_directory(directory)
-        phase = "verify"
-        _verify_staged_artifacts(stage, artifacts)
-        return StagedArtifactSet(path=stage, identity=_file_identity(os.lstat(stage)))
-    except BaseException as exc:
-        cleanup: CleanupStatus = "pass"
-        try:
-            current = _file_identity(os.lstat(stage))
-            if (
-                current.st_dev != initial_identity.st_dev
-                or current.st_ino != initial_identity.st_ino
-            ):
-                cleanup = "fail"
-            else:
-                shutil.rmtree(stage)
-        except FileNotFoundError:
-            cleanup = "pass"
-        except OSError:
-            cleanup = "fail"
-        raise _StageArtifactSetError(
-            code="staging_verify_failed"
-            if phase == "verify"
-            else "staging_write_failed",
-            path=stage,
-            cleanup=cleanup,
-        ) from exc
-
-
-def _renameat2_function() -> Any:
-    libc = ctypes.CDLL(None, use_errno=True)
-    try:
-        function = libc.renameat2
-    except AttributeError as exc:
-        raise OSError(errno.ENOSYS, os.strerror(errno.ENOSYS)) from exc
-    function.argtypes = (
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_uint,
-    )
-    function.restype = ctypes.c_int
-    return function
-
-
-def _renameat2(source: Path, target: Path, flag: int) -> None:
-    function = _renameat2_function()
-    result = function(
-        AT_FDCWD,
-        os.fsencode(source),
-        AT_FDCWD,
-        os.fsencode(target),
-        flag,
-    )
-    if result != 0:
-        error = ctypes.get_errno()
-        raise OSError(error, os.strerror(error), str(source), str(target))
-
-
-def _require_renameat2_capability(report_root: Path, flag: int) -> None:
-    nonce = secrets.token_hex(16)
-    source = report_root / f".renameat2.probe.source.{nonce}"
-    target = report_root / f".renameat2.probe.target.{nonce}"
-    try:
-        _renameat2(source, target, flag)
-    except OSError as exc:
-        if exc.errno == errno.ENOENT:
-            return
-        raise
-    raise RuntimeError("renameat2 capability probe unexpectedly mutated a path")
-
-
-def _rename_directory_noreplace(
-    staging: StagedArtifactSet,
-    target: Path,
-) -> PublishedTarget:
-    """Publish one staged directory through the sole kernel no-replace path."""
-    staged_tree_sha = _tree_sha256(staging.path)
-    _renameat2(staging.path, target, RENAME_NOREPLACE)
-    identity = _file_identity(os.lstat(target))
-    if identity != staging.identity:
-        raise OSError(errno.EIO, "published target identity disagrees")
-    target_tree_sha = _tree_sha256(target)
-    if target_tree_sha != staged_tree_sha:
-        raise OSError(errno.EIO, "published target tree digest disagrees")
-    return PublishedTarget(path=target, identity=identity, tree_sha256=target_tree_sha)
-
-
-def _remove_staging_tree(staging: StagedArtifactSet) -> bool:
-    try:
-        current = _file_identity(os.lstat(staging.path))
-    except FileNotFoundError:
-        return True
-    if current != staging.identity:
-        return False
-    shutil.rmtree(staging.path)
-    return not staging.path.exists()
-
-
-def _remove_published_target(published: PublishedTarget) -> bool:
-    try:
-        current = _file_identity(os.lstat(published.path))
-    except FileNotFoundError:
-        return True
-    if (
-        current != published.identity
-        or _tree_sha256(published.path) != published.tree_sha256
-    ):
-        return False
-    shutil.rmtree(published.path)
-    _fsync_directory(published.path.parent)
-    return not published.path.exists()
-
-
-def _assert_materialization_lock_owned(
-    report_root: Path,
-    lock: MaterializationLock,
-) -> None:
-    root_descriptor, root_identity = _open_stable_report_root(report_root)
-    try:
-        path_status = os.stat(
-            MATERIALIZATION_LOCK_NAME,
-            dir_fd=root_descriptor,
-            follow_symlinks=False,
-        )
-        descriptor_status = os.fstat(lock.descriptor)
-        path_identity = _file_identity(path_status)
-        descriptor_identity = _file_identity(descriptor_status)
-        if (
-            not _same_report_root_identity(
-                root_identity, lock.identity.report_root_identity
-            )
-            or path_identity != lock.identity.lock_file_identity
-            or descriptor_identity != lock.identity.lock_file_identity
-        ):
-            raise ValueError("materialization lock identity drift")
-        _validate_lock_inode(path_status, report_root_identity=root_identity)
-        _validate_lock_inode(descriptor_status, report_root_identity=root_identity)
-        payload = _read_descriptor_bytes(lock.descriptor)
-        if (
-            hashlib.sha256(payload).hexdigest() != lock.identity.payload_sha256
-            or payload != _canonical_lock_payload(lock.identity)
-        ):
-            raise ValueError("materialization lock payload drift")
-    finally:
-        os.close(root_descriptor)
-
-
-def _capture_bookkeeping_file(
-    *,
-    report_root: Path,
-    lock: MaterializationLock,
-    name: Literal[".active_run", ".active_run.sha256"],
-) -> BookkeepingFileState:
-    _assert_materialization_lock_owned(report_root, lock)
-    root_descriptor, root_identity = _open_stable_report_root(report_root)
-    try:
-        try:
-            before = os.stat(name, dir_fd=root_descriptor, follow_symlinks=False)
-        except FileNotFoundError:
-            return BookkeepingFileState(name, False, None, None, None, None, None)
-        before_identity = _file_identity(before)
-        before_state = _file_state(before)
-        mode = before_state.permission_mode
-        if (
-            before_state.file_type != stat.S_IFREG
-            or before_state.link_count != 1
-            or before_state.owner_uid != os.geteuid()
-            or before.st_dev != root_identity.st_dev
-            or mode not in {PRIVATE_TEMP_MODE, RUN_BUNDLE_FILE_MODE}
-        ):
-            raise ValueError(f"nonregular active bookkeeping: {name}")
-        descriptor = os.open(
-            name,
-            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
-            dir_fd=root_descriptor,
-        )
-        try:
-            opened = os.fstat(descriptor)
-            payload = _read_descriptor_bytes(descriptor, opened.st_size)
-        finally:
-            os.close(descriptor)
-        after = os.stat(name, dir_fd=root_descriptor, follow_symlinks=False)
-        if (
-            _file_identity(opened) != before_identity
-            or _file_identity(after) != before_identity
-            or _file_state(opened) != before_state
-            or _file_state(after) != before_state
-            or len(payload) != opened.st_size
-        ):
-            raise ValueError(f"active bookkeeping identity changed: {name}")
-        return BookkeepingFileState(
-            name=name,
-            existed=True,
-            identity=before_identity,
-            permission_mode=mode,
-            size=len(payload),
-            sha256=hashlib.sha256(payload).hexdigest(),
-            content=payload,
-        )
-    finally:
-        os.close(root_descriptor)
-
-
-def _capture_regular_path(
-    path: Path,
-) -> tuple[FileIdentity, int, bytes, str]:
-    before = os.lstat(path)
-    identity = _file_identity(before)
-    before_state = _file_state(before)
-    if (
-        before_state.file_type != stat.S_IFREG
-        or before_state.link_count != 1
-        or before_state.owner_uid != os.geteuid()
-    ):
-        raise ValueError(f"nonregular private bookkeeping path: {path}")
-    descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
-    try:
-        opened = os.fstat(descriptor)
-        payload = _read_descriptor_bytes(descriptor, opened.st_size)
-    finally:
-        os.close(descriptor)
-    after = os.lstat(path)
-    if (
-        _file_identity(opened) != identity
-        or _file_identity(after) != identity
-        or _file_state(opened) != before_state
-        or _file_state(after) != before_state
-        or len(payload) != opened.st_size
-    ):
-        raise ValueError(f"private bookkeeping identity changed: {path}")
-    return (
-        identity,
-        before_state.permission_mode,
-        payload,
-        hashlib.sha256(payload).hexdigest(),
-    )
-
-
-def _create_bookkeeping_temp(
-    *,
-    report_root: Path,
-    lock: MaterializationLock,
-    name: Literal[".active_run", ".active_run.sha256"],
-    content: bytes,
-    final_mode: int = PRIVATE_TEMP_MODE,
-) -> BookkeepingTempState:
-    _assert_materialization_lock_owned(report_root, lock)
-    root_descriptor, _root_identity = _open_stable_report_root(report_root)
-    try:
-        for _attempt in range(GENERATED_NAME_ATTEMPTS):
-            path = report_root / f"{name}.tmp.{os.getpid()}.{secrets.token_hex(16)}"
-            try:
-                descriptor = os.open(
-                    path.name,
-                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW,
-                    PRIVATE_TEMP_MODE,
-                    dir_fd=root_descriptor,
-                )
-            except FileExistsError:
-                continue
-            try:
-                _write_all(descriptor, content)
-                os.fsync(descriptor)
-                if final_mode != PRIVATE_TEMP_MODE:
-                    os.fchmod(descriptor, final_mode)
-                    os.fsync(descriptor)
-            finally:
-                os.close(descriptor)
-            identity, mode, observed, digest = _capture_regular_path(path)
-            if observed != content or mode != final_mode:
-                raise ValueError(f"bookkeeping temp verification failed: {path}")
-            return BookkeepingTempState(
-                path=path,
-                identity=identity,
-                permission_mode=mode,
-                size=len(content),
-                sha256=digest,
-                content=content,
-            )
-    finally:
-        os.close(root_descriptor)
-    raise FileExistsError(errno.EEXIST, "bookkeeping name exhausted")
-
-
-def _bookkeeping_matches(
-    observed: BookkeepingFileState,
-    expected: BookkeepingFileState,
-    *,
-    require_identity: bool = True,
-) -> bool:
-    if observed.existed != expected.existed:
-        return False
-    if not observed.existed:
-        return True
-    return (
-        (not require_identity or observed.identity == expected.identity)
-        and observed.permission_mode == expected.permission_mode
-        and observed.size == expected.size
-        and observed.sha256 == expected.sha256
-        and observed.content == expected.content
-    )
-
-
-def _temp_matches(path: Path, expected: BookkeepingTempState) -> bool:
-    try:
-        identity, mode, payload, digest = _capture_regular_path(path)
-    except (FileNotFoundError, OSError, ValueError):
-        return False
-    return (
-        identity == expected.identity
-        and mode == expected.permission_mode
-        and len(payload) == expected.size
-        and digest == expected.sha256
-        and payload == expected.content
-    )
-
-
-def _publish_temp_over_bookkeeping(
-    *,
-    report_root: Path,
-    lock: MaterializationLock,
-    temp: BookkeepingTempState,
-    prior: BookkeepingFileState,
-) -> BookkeepingFileState:
-    current = _capture_bookkeeping_file(
-        report_root=report_root,
-        lock=lock,
-        name=prior.name,
-    )
-    if not _bookkeeping_matches(current, prior):
-        raise ValueError(f"bookkeeping compare-before-publish failed: {prior.name}")
-    if temp.permission_mode != RUN_BUNDLE_FILE_MODE or not _temp_matches(
-        temp.path, temp
-    ):
-        raise ValueError(f"bookkeeping temp is not publication-ready: {temp.path}")
-    root_descriptor, _root_identity = _open_stable_report_root(report_root)
-    try:
-        os.replace(
-            temp.path.name,
-            prior.name,
-            src_dir_fd=root_descriptor,
-            dst_dir_fd=root_descriptor,
-        )
-    finally:
-        os.close(root_descriptor)
-    published = _capture_bookkeeping_file(
-        report_root=report_root,
-        lock=lock,
-        name=prior.name,
-    )
-    if (
-        not published.existed
-        or published.permission_mode != RUN_BUNDLE_FILE_MODE
-        or published.content != temp.content
-        or published.sha256 != temp.sha256
-    ):
-        raise ValueError(f"bookkeeping publish verification failed: {prior.name}")
-    return published
-
-
-def _promote_bookkeeping_temp(
-    *,
-    report_root: Path,
-    lock: MaterializationLock,
-    temp: BookkeepingTempState,
-) -> BookkeepingTempState:
-    _assert_materialization_lock_owned(report_root, lock)
-    if not _temp_matches(temp.path, temp):
-        raise ValueError(f"bookkeeping temp changed before promotion: {temp.path}")
-    root_descriptor, _root_identity = _open_stable_report_root(report_root)
-    try:
-        os.chmod(
-            temp.path.name,
-            RUN_BUNDLE_FILE_MODE,
-            dir_fd=root_descriptor,
-            follow_symlinks=False,
-        )
-        _fsync_directory(report_root)
-    finally:
-        os.close(root_descriptor)
-    identity, mode, payload, digest = _capture_regular_path(temp.path)
-    if (
-        identity != temp.identity
-        or payload != temp.content
-        or mode != RUN_BUNDLE_FILE_MODE
-    ):
-        raise ValueError(f"bookkeeping temp promotion failed: {temp.path}")
-    return replace(
-        temp,
-        permission_mode=mode,
-        size=len(payload),
-        sha256=digest,
-    )
-
-
-def _publish_active_bookkeeping(
-    *,
-    report_root: Path,
-    lock: MaterializationLock,
-    published_target: PublishedTarget,
-) -> tuple[Path, PriorBookkeepingState]:
-    """Publish active baseline then pointer and rollback any activation failure."""
-    pointer_bytes = (str(published_target.path.resolve()) + "\n").encode("utf-8")
-    baseline_bytes = hash_baseline_bytes(pointer_bytes)
-    prior: PriorBookkeepingState | None = None
-    failure_code: MaterializationErrorCode = "active_bookkeeping_nonregular"
-    try:
-        pointer_prior = _capture_bookkeeping_file(
-            report_root=report_root,
-            lock=lock,
-            name=".active_run",
-        )
-        baseline_prior = _capture_bookkeeping_file(
-            report_root=report_root,
-            lock=lock,
-            name=".active_run.sha256",
-        )
-        prior = PriorBookkeepingState(
-            report_root_identity=lock.identity.report_root_identity,
-            lock_file_identity=lock.identity.lock_file_identity,
-            lock_nonce=lock.identity.nonce,
-            pointer_prior=pointer_prior,
-            baseline_prior=baseline_prior,
-        )
-        failure_code = "bookkeeping_name_exhausted"
-        baseline_temp = _create_bookkeeping_temp(
-            report_root=report_root,
-            lock=lock,
-            name=".active_run.sha256",
-            content=baseline_bytes,
-        )
-        prior = replace(prior, baseline_temp=baseline_temp)
-        pointer_temp = _create_bookkeeping_temp(
-            report_root=report_root,
-            lock=lock,
-            name=".active_run",
-            content=pointer_bytes,
-        )
-        prior = replace(prior, pointer_temp=pointer_temp)
-        failure_code = "active_baseline_publish_failed"
-        baseline_temp = _promote_bookkeeping_temp(
-            report_root=report_root,
-            lock=lock,
-            temp=baseline_temp,
-        )
-        prior = replace(prior, baseline_temp=baseline_temp)
-        baseline_published = _publish_temp_over_bookkeeping(
-            report_root=report_root,
-            lock=lock,
-            temp=baseline_temp,
-            prior=baseline_prior,
-        )
-        prior = replace(
-            prior,
-            baseline_temp=None,
-            baseline_published=baseline_published,
-        )
-        failure_code = "active_pointer_publish_failed"
-        pointer_temp = _promote_bookkeeping_temp(
-            report_root=report_root,
-            lock=lock,
-            temp=pointer_temp,
-        )
-        prior = replace(prior, pointer_temp=pointer_temp)
-        pointer_published = _publish_temp_over_bookkeeping(
-            report_root=report_root,
-            lock=lock,
-            temp=pointer_temp,
-            prior=pointer_prior,
-        )
-        prior = replace(prior, pointer_temp=None, pointer_published=pointer_published)
-        _fsync_directory(report_root)
-        return report_root / ".active_run", prior
-    except BaseException as exc:
-        rollback = _rollback_publication(
-            report_root=report_root,
-            lock=lock,
-            published_target=published_target,
-            staging=None,
-            prior=prior,
-        )
-        failed = bool(rollback.failed_paths)
-        raise _materialization_failure(
-            phase="rollback" if failed else "activate",
-            code="run_bundle_rollback_failed" if failed else failure_code,
-            cause_code=failure_code,
-            target=published_target.path,
-            rollback=rollback,
-        ) from exc
-
-
-def _bookkeeping_state_from_regular_path(
-    *,
-    path: Path,
-    name: Literal[".active_run", ".active_run.sha256"],
-) -> BookkeepingFileState:
-    identity, mode, payload, digest = _capture_regular_path(path)
-    return BookkeepingFileState(
-        name=name,
-        existed=True,
-        identity=identity,
-        permission_mode=mode,
-        size=len(payload),
-        sha256=digest,
-        content=payload,
-    )
-
-
-def _unlink_exact_bookkeeping_temp(
-    path: Path,
-    expected: BookkeepingFileState | BookkeepingTempState,
-) -> bool:
-    try:
-        identity, mode, payload, digest = _capture_regular_path(path)
-    except FileNotFoundError:
-        return True
-    except (OSError, ValueError):
-        return False
-    expected_identity = expected.identity
-    return_value = (
-        expected_identity is not None
-        and identity == expected_identity
-        and mode == expected.permission_mode
-        and len(payload) == expected.size
-        and digest == expected.sha256
-        and payload == expected.content
-    )
-    if not return_value:
-        return False
-    path.unlink()
-    return not path.exists()
-
-
-def _unique_bookkeeping_quarantine(
-    report_root: Path,
-    name: Literal[".active_run", ".active_run.sha256"],
-) -> Path:
-    for _attempt in range(GENERATED_NAME_ATTEMPTS):
-        candidate = report_root / (
-            f"{name}.quarantine.{os.getpid()}.{secrets.token_hex(16)}"
-        )
-        if not candidate.exists() and not candidate.is_symlink():
-            return candidate
-    raise FileExistsError(errno.EEXIST, "bookkeeping quarantine name exhausted")
-
-
-def _restore_one_bookkeeping_file(
-    *,
-    report_root: Path,
-    lock: MaterializationLock,
-    prior: BookkeepingFileState,
-    published: BookkeepingFileState,
-) -> None:
-    current = _capture_bookkeeping_file(
-        report_root=report_root,
-        lock=lock,
-        name=prior.name,
-    )
-    if not _bookkeeping_matches(current, published):
-        raise ValueError(f"bookkeeping_restore_conflict:{prior.name}")
-    destination = report_root / prior.name
-    if prior.existed:
-        if prior.content is None or prior.permission_mode is None:
-            raise ValueError(f"bookkeeping_restore_conflict:{prior.name}")
-        restore_temp = _create_bookkeeping_temp(
-            report_root=report_root,
-            lock=lock,
-            name=prior.name,
-            content=prior.content,
-            final_mode=prior.permission_mode,
-        )
-        _renameat2(destination, restore_temp.path, RENAME_EXCHANGE)
-        try:
-            restored = _capture_bookkeeping_file(
-                report_root=report_root,
-                lock=lock,
-                name=prior.name,
-            )
-            exchanged = _bookkeeping_state_from_regular_path(
-                path=restore_temp.path,
-                name=prior.name,
-            )
-            if not _bookkeeping_matches(restored, prior, require_identity=False):
-                raise ValueError(f"bookkeeping_restore_conflict:{prior.name}")
-            if not _bookkeeping_matches(exchanged, published):
-                raise ValueError(f"bookkeeping_restore_conflict:{prior.name}")
-            if not _unlink_exact_bookkeeping_temp(restore_temp.path, exchanged):
-                raise ValueError(
-                    f"bookkeeping_restore_conflict:{restore_temp.path.name}"
-                )
-        except BaseException:
-            try:
-                destination_identity = _file_identity(os.lstat(destination))
-                temp_identity = _file_identity(os.lstat(restore_temp.path))
-                if (
-                    destination_identity == restore_temp.identity
-                    and temp_identity == published.identity
-                ):
-                    _renameat2(destination, restore_temp.path, RENAME_EXCHANGE)
-            except (FileNotFoundError, OSError, ValueError):
-                pass
-            raise
+        in_section = stripped == heading
+    if not in_section:
+        lines.extend(("", heading, "", line))
     else:
-        quarantine = _unique_bookkeeping_quarantine(report_root, prior.name)
-        _renameat2(destination, quarantine, RENAME_NOREPLACE)
-        try:
-            quarantined = _bookkeeping_state_from_regular_path(
-                path=quarantine,
-                name=prior.name,
-            )
-            if not _bookkeeping_matches(quarantined, published):
-                raise ValueError(f"bookkeeping_restore_conflict:{prior.name}")
-            if not _unlink_exact_bookkeeping_temp(quarantine, quarantined):
-                raise ValueError(f"bookkeeping_restore_conflict:{quarantine.name}")
-        except BaseException:
-            try:
-                if not destination.exists() and quarantine.exists():
-                    _renameat2(quarantine, destination, RENAME_NOREPLACE)
-            except OSError:
-                pass
-            raise
-        absent = _capture_bookkeeping_file(
-            report_root=report_root,
-            lock=lock,
-            name=prior.name,
-        )
-        if absent.existed:
-            raise ValueError(f"bookkeeping_restore_conflict:{prior.name}")
-    _fsync_directory(report_root)
-
-
-def _cleanup_prior_temps(
-    prior: PriorBookkeepingState | None,
-) -> tuple[CleanupStatus, list[str]]:
-    if prior is None:
-        return "not_required", []
-    states = tuple(
-        state
-        for state in (
-            prior.pointer_temp,
-            prior.baseline_temp,
-            prior.pointer_quarantine,
-            prior.baseline_quarantine,
-        )
-        if state is not None
-    )
-    if not states:
-        return "not_required", []
-    failed: list[str] = []
-    for state in states:
-        if not _unlink_exact_bookkeeping_temp(state.path, state):
-            failed.append(str(state.path))
-    return ("fail" if failed else "pass"), failed
-
-
-def _rollback_publication(
-    *,
-    report_root: Path,
-    lock: MaterializationLock,
-    published_target: PublishedTarget | None,
-    staging: StagedArtifactSet | None,
-    prior: PriorBookkeepingState | None,
-) -> RollbackResult:
-    """Rollback only identity- and digest-bound state owned by this call."""
-    pointer_restore: CleanupStatus = "not_required"
-    baseline_restore: CleanupStatus = "not_required"
-    target_cleanup: CleanupStatus = "not_required"
-    staging_cleanup: CleanupStatus = "not_required"
-    failed_paths: list[str] = []
-    try:
-        _assert_materialization_lock_owned(report_root, lock)
-    except (OSError, RuntimeError, ValueError):
-        return RollbackResult(
-            pointer_restore="fail"
-            if prior and prior.pointer_published
-            else "not_required",
-            baseline_restore="not_required",
-            target_cleanup="not_required",
-            staging_cleanup="not_required",
-            temp_cleanup="not_required",
-            failed_paths=("materialization_lock_identity",),
-        )
-    if prior is not None and prior.pointer_published is not None:
-        try:
-            _restore_one_bookkeeping_file(
-                report_root=report_root,
-                lock=lock,
-                prior=prior.pointer_prior,
-                published=prior.pointer_published,
-            )
-            pointer_restore = "pass"
-        except (OSError, RuntimeError, ValueError):
-            pointer_restore = "fail"
-            failed_paths.append(
-                f"bookkeeping_restore_conflict:{prior.pointer_prior.name}"
-            )
-    if (
-        pointer_restore != "fail"
-        and prior is not None
-        and prior.baseline_published is not None
-    ):
-        try:
-            _restore_one_bookkeeping_file(
-                report_root=report_root,
-                lock=lock,
-                prior=prior.baseline_prior,
-                published=prior.baseline_published,
-            )
-            baseline_restore = "pass"
-        except (OSError, RuntimeError, ValueError):
-            baseline_restore = "fail"
-            failed_paths.append(
-                f"bookkeeping_restore_conflict:{prior.baseline_prior.name}"
-            )
-    if pointer_restore != "fail" and baseline_restore != "fail":
-        if published_target is not None:
-            try:
-                target_cleanup = (
-                    "pass" if _remove_published_target(published_target) else "fail"
-                )
-            except (OSError, ValueError):
-                target_cleanup = "fail"
-            if target_cleanup == "fail":
-                failed_paths.append(str(published_target.path))
-        elif staging is not None:
-            try:
-                staging_cleanup = "pass" if _remove_staging_tree(staging) else "fail"
-            except OSError:
-                staging_cleanup = "fail"
-            if staging_cleanup == "fail":
-                failed_paths.append(str(staging.path))
-    temp_cleanup, temp_failures = _cleanup_prior_temps(prior)
-    failed_paths.extend(temp_failures)
-    return RollbackResult(
-        staging_cleanup=staging_cleanup,
-        target_cleanup=target_cleanup,
-        pointer_restore=pointer_restore,
-        baseline_restore=baseline_restore,
-        temp_cleanup=temp_cleanup,
-        failed_paths=tuple(sorted(set(failed_paths))),
-    )
-
-
-def _validated_publication_paths(spec: RunBundleSpec) -> tuple[Path, Path]:
-    root_input = (
-        spec.activation.report_root
-        if spec.activation is not None
-        else spec.report_dir.parent
-    )
-    report_root = root_input.absolute()
-    target = spec.report_dir.absolute()
-    try:
-        root_descriptor, _identity = _open_stable_report_root(report_root)
-    except (FileNotFoundError, OSError, ValueError) as exc:
-        raise ValueError("report root is invalid") from exc
-    else:
-        os.close(root_descriptor)
-    if target.parent != report_root or target.name != spec.run_id:
-        raise ValueError("report target parent or run id disagrees")
-    return report_root, target
-
-
-def _publish_error_code(error: OSError) -> MaterializationErrorCode:
-    if error.errno in {errno.EEXIST, errno.ENOTEMPTY}:
-        return "run_bundle_target_exists"
-    if error.errno in {errno.ENOSYS, errno.EINVAL, errno.EOPNOTSUPP}:
-        return "atomic_noreplace_unavailable"
-    if error.errno == errno.EXDEV:
-        return "run_bundle_cross_device"
-    return "run_bundle_publish_failed"
-
-
-def _error_after_rollback(
-    *,
-    phase: MaterializationPhase,
-    cause_code: MaterializationErrorCode,
-    target: Path,
-    rollback: RollbackResult,
-    staging: Path | None = None,
-) -> RunBundleMaterializationError:
-    failed = bool(rollback.failed_paths)
-    return _materialization_failure(
-        phase="rollback" if failed else phase,
-        code="run_bundle_rollback_failed" if failed else cause_code,
-        cause_code=cause_code,
-        target=target,
-        staging=staging,
-        rollback=rollback,
-    )
-
-
-def _materialize_run_bundle(spec: RunBundleSpec) -> RunBundleMaterialization:
-    """Validate, render, stage, publish, and optionally activate one run bundle."""
-    target_for_error = spec.report_dir.absolute()
-    try:
-        workflow_family = run_workflow_family(spec)
-        packet = resolve_active_design_packet(
-            spec.config,
-            workflow_family=workflow_family,
-            explicit=spec.active_design_packet,
-        )
-    except ActiveDesignPacketInputError as exc:
-        raise _materialization_failure(
-            phase="decode",
-            code="packet_invalid",
-            target=target_for_error,
-        ) from exc
-    artifact_names = iter_artifacts(spec.config, spec.roles, packet)
-    try:
-        context = build_active_design_reference_context(
-            spec,
-            packet,
-            workflow_family,
-            artifact_names=artifact_names,
-        )
-        violations = validate_materialized_active_design_packet(
-            packet,
-            context,
-            gate="materialization",
-        )
-    except (OSError, RuntimeError, ValueError) as exc:
-        raise _materialization_failure(
-            phase="reference_validation",
-            code="reference_invalid",
-            target=target_for_error,
-        ) from exc
-    if violations:
-        raise _materialization_failure(
-            phase="reference_validation",
-            code="reference_invalid",
-            target=target_for_error,
-            violations=violations,
-        )
-    try:
-        role_packets = project_role_document_packets(spec, packet)
-        prompt_packets = project_subagent_prompt_packets(spec, packet, role_packets)
-        template_artifacts = project_template_artifacts(
-            spec,
-            packet,
-            artifact_names=artifact_names,
-            role_packets=role_packets,
-            prompt_packets=prompt_packets,
-        )
-        verification = project_verification_artifact(spec)
-        authority_artifacts = project_authority_artifacts(spec)
-        initial_wave_row = project_initial_wave_row(spec)
-        if spec.activation is None:
-            from workflow_monitor import EMPTY_MONITORING_ENTRIES
-
-            monitoring_entries = EMPTY_MONITORING_ENTRIES
-        else:
-            monitoring_entries = enrich_runtime_measurement_input(
-                spec,
-                packet,
-                context,
-                spec.activation.monitoring_entries,
-            )
-        wave_artifacts = project_wave_ledger_artifacts(
-            spec,
-            template_artifacts,
-            monitoring_entries=monitoring_entries,
-            initial_wave_row=initial_wave_row,
-        )
-        manifest = rendered_text_artifact(
-            spec.config.artifacts["team_manifest"],
-            build_manifest(
-                spec,
-                packet,
-                context,
-                artifact_names=artifact_names,
-                role_packets=role_packets,
-                prompt_packets=prompt_packets,
-            ),
-        )
-    except (OSError, RuntimeError, UnicodeError, ValueError) as exc:
-        raise _materialization_failure(
-            phase="render",
-            code="render_invalid",
-            target=target_for_error,
-        ) from exc
-    wave_paths = {artifact.relative_path for artifact in wave_artifacts}
-    projected = (
-        *(
-            artifact
-            for artifact in template_artifacts
-            if artifact.relative_path not in wave_paths
-        ),
-        *wave_artifacts,
-        verification,
-        *authority_artifacts,
-        manifest,
-    )
-    authority_paths = tuple(
-        artifact.relative_path.as_posix() for artifact in authority_artifacts
-    )
-    planned_paths = (*artifact_names, *authority_paths)
-    try:
-        artifacts = _build_in_memory_artifact_set(
-            planned_paths=planned_paths,
-            projected_artifacts=projected,
-        )
-    except ValueError as exc:
-        raise _materialization_failure(
-            phase="render",
-            code="artifact_set_invalid",
-            target=target_for_error,
-        ) from exc
-    digests = _artifact_digests(artifacts)
-    try:
-        report_root, target = _validated_publication_paths(spec)
-    except ValueError as exc:
-        raise _materialization_failure(
-            phase="reference_validation",
-            code="report_root_invalid",
-            target=target_for_error,
-        ) from exc
-
-    lock = _acquire_materialization_lock(report_root=report_root, run_id=spec.run_id)
-    lock_released = False
-    staged: StagedArtifactSet | None = None
-    published: PublishedTarget | None = None
-    active_pointer: Path | None = None
-    try:
-        try:
-            _require_renameat2_capability(report_root, RENAME_NOREPLACE)
-        except OSError as exc:
-            code: MaterializationErrorCode = "atomic_noreplace_unavailable"
-            raise _materialization_failure(
-                phase="publish", code=code, target=target
-            ) from exc
-        if spec.activation is not None:
-            try:
-                _require_renameat2_capability(report_root, RENAME_EXCHANGE)
-            except OSError as exc:
-                raise _materialization_failure(
-                    phase="activate",
-                    code="atomic_exchange_unavailable",
-                    target=target,
-                ) from exc
-        if os.path.lexists(target):
-            raise _materialization_failure(
-                phase="publish",
-                code="run_bundle_target_exists",
-                target=target,
-            )
-        try:
-            staged = _stage_artifact_set(
-                report_root=report_root,
-                target=target,
-                run_id=spec.run_id,
-                artifacts=artifacts,
-            )
-        except FileExistsError as exc:
-            raise _materialization_failure(
-                phase="stage",
-                code="staging_name_exhausted",
-                target=target,
-            ) from exc
-        except _StageArtifactSetError as exc:
-            rollback = RollbackResult(
-                staging_cleanup=exc.cleanup,
-                failed_paths=(str(exc.path),) if exc.cleanup == "fail" else (),
-            )
-            raise _error_after_rollback(
-                phase="stage",
-                cause_code=exc.code,
-                target=target,
-                staging=exc.path,
-                rollback=rollback,
-            ) from exc
-        if os.path.lexists(target):
-            rollback = _rollback_publication(
-                report_root=report_root,
-                lock=lock,
-                published_target=None,
-                staging=staged,
-                prior=None,
-            )
-            raise _error_after_rollback(
-                phase="publish",
-                cause_code="run_bundle_target_exists",
-                target=target,
-                staging=staged.path,
-                rollback=rollback,
-            )
-        try:
-            published = _rename_directory_noreplace(staged, target)
-            staged = None
-            _fsync_directory(report_root)
-        except OSError as exc:
-            cause_code = _publish_error_code(exc)
-            if published is None and staged is not None and os.path.lexists(target):
-                try:
-                    target_identity = _file_identity(os.lstat(target))
-                    if target_identity == staged.identity:
-                        published = PublishedTarget(
-                            path=target,
-                            identity=target_identity,
-                            tree_sha256=_tree_sha256(target),
-                        )
-                        staged = None
-                except (OSError, ValueError):
-                    published = None
-            rollback = _rollback_publication(
-                report_root=report_root,
-                lock=lock,
-                published_target=cast(PublishedTarget, published),
-                staging=staged,
-                prior=None,
-            )
-            raise _error_after_rollback(
-                phase="publish",
-                cause_code=cause_code,
-                target=target,
-                staging=staged.path if staged is not None else None,
-                rollback=rollback,
-            ) from exc
-        if spec.activation is not None:
-            active_pointer, _prior = _publish_active_bookkeeping(
-                report_root=report_root,
-                lock=lock,
-                published_target=published,
-            )
-        try:
-            _release_materialization_lock(lock)
-            lock_released = True
-        except RuntimeError as release_error:
-            lock_released = True
-            raise _materialization_failure(
-                phase="rollback",
-                code="materialization_lock_release_failed",
-                target=target,
-            ) from release_error
-    except RunBundleMaterializationError as exc:
-        if not lock_released:
-            try:
-                _release_materialization_lock(lock)
-                lock_released = True
-            except RuntimeError as release_error:
-                raise _materialization_failure(
-                    phase="rollback",
-                    code="materialization_lock_release_failed",
-                    target=target,
-                    cause_code="materialization_lock_release_failed",
-                    rollback=exc.rollback,
-                ) from release_error
-        raise
-    except RuntimeError as exc:
-        if not lock_released:
-            try:
-                _release_materialization_lock(lock)
-                lock_released = True
-            except RuntimeError as release_error:
-                raise _materialization_failure(
-                    phase="rollback",
-                    code="materialization_lock_release_failed",
-                    target=target,
-                ) from release_error
-        raise _materialization_failure(
-            phase="rollback",
-            code="materialization_lock_release_failed",
-            target=target,
-        ) from exc
-    return RunBundleMaterialization(
-        report_dir=target,
-        created_files=tuple(
-            artifact.relative_path.as_posix() for artifact in artifacts
-        ),
-        active_design_packet=packet,
-        role_document_packets=role_packets,
-        subagent_prompt_packets=prompt_packets,
-        artifact_digests=digests,
-        active_pointer=active_pointer,
-    )
-
-
-def _indented_yaml_mapping_lines(key: str, value: object) -> list[str]:
-    rendered = yaml.safe_dump(
-        {key: value},
-        allow_unicode=True,
-        sort_keys=False,
-    ).rstrip()
-    return [f"  {line}" for line in rendered.splitlines()]
+        while insert_at > 0 and not lines[insert_at - 1].strip():
+            insert_at -= 1
+        lines.insert(insert_at, line)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def build_manifest(
     spec: RunBundleSpec,
-    packet: ActiveDesignPacketValue,
-    context: ActiveDesignReferenceContext,
-    *,
-    artifact_names: tuple[str, ...],
-    role_packets: tuple[RoleDocumentPacket, ...],
-    prompt_packets: tuple[SubagentPromptPacket, ...],
+    capacity_runtime: _CapacityRuntime | None = None,
 ) -> str:
     """Build the team manifest yaml."""
-    workflow_family = run_workflow_family(spec)
-    lines = manifest_run_lines(spec, workflow_family, packet, context)
-    lines.extend(
-        manifest_role_lines(
-            spec,
-            workflow_family,
-            packet,
-            role_packets,
-            prompt_packets,
+    workflow_family = None
+    if spec.workflow_family_id:
+        if spec.task_catalog is None:
+            raise RuntimeError("task catalog is required for workflow manifest rendering")
+        workflow_family = resolve_workflow_family(
+            spec.task_catalog,
+            spec.workflow_family_id,
         )
-    )
-    lines.extend(manifest_context_policy_lines(spec.config, packet))
+    lines = manifest_run_lines(spec, workflow_family, capacity_runtime)
+    lines.extend(manifest_role_lines(spec, workflow_family))
+    lines.extend(manifest_context_policy_lines(spec.config))
     lines.extend(manifest_quality_gate_lines(spec.config))
-    lines.extend(manifest_artifact_lines(artifact_names))
+    lines.extend(manifest_artifact_lines(spec.config, spec.roles))
     return "\n".join(lines) + "\n"
 
 
 def manifest_run_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
-    active_design_packet: ActiveDesignPacketValue,
-    context: ActiveDesignReferenceContext,
+    capacity_runtime: _CapacityRuntime | None = None,
 ) -> list[str]:
     """Render run-level manifest fields."""
+    capacity_runtime = capacity_runtime or capacity_runtime_for_spec(spec)
+    capacity_projection = _capacity_projection(capacity_runtime, spec)
+    closeout_projection = _closeout_projection(capacity_runtime, spec)
     lines = [
         "run:",
         f"  id: {spec.run_id}",
@@ -6467,48 +3031,75 @@ def manifest_run_lines(
         f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
         f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
         f"  task_catalog: {str(ROOT / str(spec.config.team['task_catalog']))!r}",
-        *_indented_yaml_mapping_lines(
-            "active_design_packet",
-            active_design_packet_mapping(active_design_packet),
-        ),
-        *_indented_yaml_mapping_lines(
-            "active_design_packet_reference_projection",
-            active_design_reference_projection_mapping(context),
-        ),
+        "  parent_lineage_id: " + repr(capacity_runtime.parent_lineage_id),
+        "  implementation_execution:",
+        "    schema_id: 'implementation_execution_contract_v1'",
+        "    route_owner: 'implementation_route'",
+        "    route_import: 'tools.agent_tools.implementation_route'",
+        "    profile_registry_import: 'tools.agent_tools.model_profile_registry'",
+        "    dispatch: 'immediate_one_pass'",
+        "    same_spark_gap_continuation: 'resume_same_spark_after_gap'",
+        "    deterministic_search_route: 'python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json'",
+        "  capacity_request:",
+    ]
+    capacity_yaml = yaml.safe_dump(
+        capacity_projection,
+        sort_keys=False,
+        default_flow_style=False,
+    ).splitlines()
+    for line in capacity_yaml:
+        lines.append(f"    {line}")
+    lines.extend(
+        [
+            "  closeout_packet:",
+        ]
+    )
+    closeout_yaml = yaml.safe_dump(
+        closeout_projection,
+        sort_keys=False,
+        default_flow_style=False,
+    ).splitlines()
+    for line in closeout_yaml:
+        lines.append(f"    {line}")
+    lines.extend(
+        [
         "  subagent_lifecycle_policy:",
-        "    fresh_subagents_required: true",
-        "    reuse_for_new_task: forbidden",
-        "    previous_task_subagent_reuse: forbidden",
-        "    mid_task_user_input_policy: parent_checkpoint_then_route_delta",
-        "    same_task_delta_reuse: allowed_with_updated_packet",
-        "    scope_change_reuse: forbidden_spawn_fresh_wave",
-        "    new_task_reuse: forbidden_spawn_fresh_run",
+        "    fresh_subagents_required: conditional",
+        "    reuse_for_new_task: allowed_when_owner_context_compatible",
+        "    previous_task_subagent_reuse: allowed_when_owner_context_compatible",
+        "    mid_task_user_input_policy: classify_then_reuse_or_route_fresh",
+        "    same_task_delta_reuse: allowed_when_owner_context_compatible",
+        "    scope_change_reuse: evaluate_owner_context_compatibility",
+        "    new_task_reuse: evaluate_owner_context_compatibility",
         "    close_before_user_completion: true",
         "    closeout_gate_key: subagents_closed",
         "    closeout_evidence_section: 'Subagent Lifecycle Evidence'",
-        "    handoff_rule: 'Do not send_input to agents from another user request; spawn a "
-        "fresh run-local agent for each new task. Same-task user deltas require a parent "
-        "checkpoint, updated packet path, wave-ledger entry, and unchanged role scope before "
-        "send_input; scope changes spawn a fresh wave.'",
+        "    handoff_rule: 'Reuse an active agent when owner, responsibility, context, write "
+        "authority, and validation route remain compatible, including revised scope. Use a "
+        "fresh agent only for independent review, disjoint write authority, incompatible "
+        "owner/context, or failed context integrity. Durable checkpoints and packet paths "
+        "are conditional on coordination or resumption.'",
         "  handoff_context_policy:",
         "    inactive_profile_docs: not_applicable",
         "    broad_cross_cutting_packet: available_not_default_read",
         "  implementation_gate_defaults:",
         "    implementation_surface_route_status: pending",
-        "    implementation_surface_route_command: 'tools/bin/agent-canon local-llm route-implementation-surface --request-file <request-or-design-question.txt> --format text'",
+        "    implementation_surface_route_command: 'python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json'",
         "    tool_reuse_ledger_status: required_before_custom_implementation",
         "    pre_edit_rejection_prediction_status: pending",
         "    pre_edit_rejection_command: 'python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>'",
         "  standard_wave_sequence:",
+        "    activation: candidate_sequence_selected_per_wave",
         f"    source: {STANDARD_AGENT_WAVE_SEQUENCE_SOURCE!r}",
         "    stages:",
         *(f"      - {stage}" for stage in STANDARD_AGENT_WAVE_SEQUENCE),
-        f"    gate_order: {STANDARD_AGENT_WAVE_SEQUENCE_GATE!r}",
-        "    edit_handoff_rule: 'write-capable handoff は review gate 後の bounded write scope から開始し、read-only wave は read scope と次の review gate を記録する'",
+        "    gate_order: 'selected_stages_only'",
+        "    edit_handoff_rule: 'selected owner-critical edit stage only; no fixed plan-review-edit sequence'",
         *manifest_user_facing_language_policy_lines(),
         *manifest_contract_complete_implementation_policy_lines(spec.task),
         *manifest_pre_handoff_scope_policy_lines(),
-        *manifest_pre_handoff_gate_status_lines(active_design_packet),
+        *manifest_pre_handoff_gate_status_lines(),
+        *manifest_decision_sufficiency_lines(spec),
         *manifest_repo_tool_routing_policy_lines(spec),
         *manifest_default_quality_check_policy_lines(spec),
         "  agent_report_collection:",
@@ -6516,7 +3107,8 @@ def manifest_run_lines(
         f"    archive_current_run_command: 'python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {spec.report_dir}'",
         "    sync_command: 'python3 tools/agent_tools/runtime_log_archive_git.py sync'",
         "    archive_index: '.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl'",
-    ]
+        ]
+    )
     insert_index = (
         lines.index("    broad_cross_cutting_packet: available_not_default_read") + 1
     )
@@ -6663,39 +3255,43 @@ def manifest_run_lines(
         lines.append("      - child_role")
         lines.append("      - child_instance_id")
         lines.append("      - input_packet")
+        lines.append("      - replaceable_unit")
+        lines.append("      - implementation_mechanism")
+        lines.append("      - validation_route")
         lines.append("      - tool_route")
-        lines.append("      - tool_command_packet_command")
+        lines.append("      - tool_call_token")
         lines.append("      - tool_evidence")
         lines.append("      - allowed_paths")
         lines.append("      - do_not_read")
         lines.append("      - expected_output")
         lines.append("      - write_scope")
-        lines.append("      - validation_route")
+        lines.append("      - remaining_spawn_budget")
+        lines.append("    handoff_optional_fields:")
+        lines.append("      - decision_sufficiency_packet_ref")
+        lines.append("      - unresolved_branch")
         lines.append("      - review_gate")
         lines.append("      - plan_artifact")
         lines.append("      - edit_handoff")
         lines.append("      - pre_handoff_gate_status")
-        lines.append("      - remaining_spawn_budget")
         lines.append("    required_before_spawn:")
         lines.append(
-            "      - plan artifact, review gate decision, and edit handoff evidence "
-            "following run.standard_wave_sequence"
+            "      - owner, replaceable unit, implementation mechanism, validation "
+            "route, and any unresolved branch that can change them"
         )
         lines.append(
-            "      - include run.default_quality_check_policy in review and edit "
-            "handoff packets"
+            "      - include run.default_quality_check_policy only when a selected "
+            "review or edit route consumes it"
         )
         lines.append(
             "      - include run.pre_handoff_scope_policy and dependency-expanded "
             "handoff scope evidence"
         )
         lines.append(
-            "      - include run.pre_handoff_gate_status before implementation or "
-            "write-capable handoff when run.active_design_packet.design_artifact "
-            f"({active_design_packet.design_artifact}) exists"
+            "      - include run.pre_handoff_gate_status only before the selected "
+            "implementation or write-capable handoff when design_brief.md exists"
         )
         lines.append(
-            "      - include run.repo_tool_routing_policy selected-skill packet commands, "
+            "      - include run.repo_tool_routing_policy selected-skill ToolCall tokens, "
             "dynamic skill candidates, and tool evidence in every handoff packet"
         )
         lines.append(
@@ -6710,7 +3306,7 @@ def manifest_run_lines(
             "include remaining_spawn_budget"
         )
         lines.append(
-            "      - schedule.md Agent Wave Ledger row with spawn_authority, "
+            "      - selected schedule.md Agent Wave Ledger row with spawn_authority, "
             "budget, runtime ceilings, paths, validation_route, review_gate, "
             "handoff_artifacts, and delegated policy ref"
         )
@@ -6718,16 +3314,16 @@ def manifest_run_lines(
             "      - workflow_monitoring.md intervention or behavior-event for spawned/skipped roles"
         )
         lines.append(
-            "      - bounded handoff packet with allowed_paths, do_not_read, expected_output, and write_policy"
+            "      - structured handoff with allowed_paths, do_not_read, expected_output, "
+            "and write_policy; durable packet transport is conditional"
         )
         lines.append("    closeout_required_evidence:")
         lines.append(
             "      - closeout_gate.md Subagent Lifecycle Evidence planned-vs-actual wave status"
         )
         lines.append(
-            "      - closed run-local agent ids or parent_direct_no_subagents with "
-            "PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes and "
-            "PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>"
+            "      - closed selected run-local agent ids, or the applicable structured "
+            "parent handoff / recorded parent-direct exception evidence"
         )
         lines.append("  write_scope_policy:")
         lines.append("    parent_managed: true")
@@ -6763,7 +3359,8 @@ def manifest_contract_complete_implementation_policy_lines(
     ]
     if implementation_handoff_required(task_text):
         lines[
-            CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX:CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX
+            CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX:
+            CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX
         ] = [
             f"    implementation_handoff_required: {IMPLEMENTATION_HANDOFF_REQUIRED!r}",
             f"    parent_repo_edits_allowed: {PARENT_REPO_EDITS_ALLOWED!r}",
@@ -6827,15 +3424,8 @@ def manifest_pre_handoff_scope_policy_lines() -> list[str]:
     return lines
 
 
-def manifest_pre_handoff_gate_status_lines(
-    active_design_packet: ActiveDesignPacketValue,
-) -> list[str]:
+def manifest_pre_handoff_gate_status_lines() -> list[str]:
     """Render the pre-handoff gate status contract."""
-    applies_when = (
-        "run.active_design_packet.design_artifact="
-        f"{active_design_packet.design_artifact};"
-        "condition=exists_before_implementation_or_handoff"
-    )
     lines = [
         "  pre_handoff_gate_status:",
         "    enabled: true",
@@ -6848,7 +3438,7 @@ def manifest_pre_handoff_gate_status_lines(
     lines.extend(
         [
             "    design_gate_command: 'python3 tools/agent_tools/waterfall_gate_check.py --report-dir <report-dir> --gate design'",
-            f"    applies_when: {applies_when!r}",
+            "    applies_when: design_brief.md_exists_before_implementation_or_handoff",
             "    document_flow_review: conditional_when_workflow_gate_active",
         ]
     )
@@ -6870,7 +3460,7 @@ def manifest_repo_tool_routing_policy_lines(spec: RunBundleSpec) -> list[str]:
         f"    owner: {REPO_TOOL_ROUTING_OWNER!r}",
         f"    route_basis: {REPO_TOOL_ROUTING_ROUTE_BASIS!r}",
         f"    execution_mode: {REPO_TOOL_ROUTING_EXECUTION_MODE!r}",
-        f"    check_command: {REPO_TOOL_ROUTING_CHECK_COMMAND!r}",
+        f"    tool_call_schema: {TOOL_CALL_SCHEMA!r}",
         "    sequence:",
     ]
     for stage in REPO_TOOL_ROUTING_SEQUENCE:
@@ -6883,8 +3473,10 @@ def manifest_repo_tool_routing_policy_lines(spec: RunBundleSpec) -> list[str]:
         lines.append(f"      - ${skill}")
     lines.append("    dynamic_skill_routing:")
     lines.append(f"      status: {REPO_DYNAMIC_SKILL_ROUTING_STATUS!r}")
-    lines.append(f"      prompt_route_command: {REPO_DYNAMIC_SKILL_ROUTING_COMMAND!r}")
-    lines.append(f"      area_route_command: {REPO_DYNAMIC_SKILL_AREA_COMMAND!r}")
+    lines.append("      tool_call_token:")
+    lines.extend(
+        _yaml_mapping_lines(materialize_dynamic_route_tool_call_token(), indent=8)
+    )
     lines.append(f"      next: {REPO_DYNAMIC_SKILL_ROUTING_NEXT!r}")
     lines.append("      candidates:")
     if dynamic_candidates:
@@ -6904,7 +3496,10 @@ def manifest_one_skill_tool_route_lines(packet: SkillCommandPacket) -> list[str]
         f"      - skill: {packet.skill}",
         f"        runtime_skill: {packet.runtime_skill!r}",
         f"        canonical_doc: {packet.canonical_doc!r}",
-        f"        packet_command: {skill_tool_packet_command(packet.skill)!r}",
+        "        tool_call_token:",
+        *_yaml_mapping_lines(
+            materialize_skill_tool_call_token(packet.skill), indent=10
+        ),
         "        related_skills:",
     ]
     if packet.related_skills:
@@ -6915,35 +3510,98 @@ def manifest_one_skill_tool_route_lines(packet: SkillCommandPacket) -> list[str]
     return lines
 
 
+def _yaml_mapping_lines(value: Mapping[str, object], *, indent: int) -> list[str]:
+    """Render one machine object as indented manifest YAML."""
+    prefix = " " * indent
+    rendered = yaml.safe_dump(
+        dict(value),
+        allow_unicode=True,
+        default_flow_style=False,
+        sort_keys=False,
+    ).rstrip()
+    return [prefix + line if line else line for line in rendered.splitlines()]
+
+
+def manifest_decision_sufficiency_lines(spec: RunBundleSpec) -> list[str]:
+    """Render semantic decision sufficiency and optional durable transport."""
+    lines = [
+        "  decision_sufficiency:",
+        f"    owner: {DECISION_SUFFICIENCY_OWNER!r}",
+        f"    validator: {DECISION_SUFFICIENCY_VALIDATOR!r}",
+        "    consumer_policy: 'consume_semantic_record_without_second_form'",
+        "    semantic_fields:",
+    ]
+    for field in DECISION_SUFFICIENCY_MACHINE_FIELDS:
+        lines.append(f"      - {field}")
+    lines.extend(
+        [
+            "    transport_fields_optional:",
+            "      - packet_ref",
+            "      - packet",
+            "      - digest",
+        ]
+    )
+    if spec.decision_sufficiency_packet is None:
+        lines.extend(
+            [
+                "    status: semantic_record_required",
+                "    packet_ref: null",
+            ]
+        )
+        return lines
+    packet = import_decision_sufficiency_verdict(spec.decision_sufficiency_packet)
+    fixed_spark_legacy_fields = {
+        "H",
+        "possible_branches",
+        "route_verdict",
+    }
+    transport_scope = (
+        "fixed_spark_route_only"
+        if fixed_spark_legacy_fields.intersection(packet)
+        else "semantic_record_only"
+    )
+    lines.extend(
+        [
+            "    status: semantic_record_with_optional_transport",
+            f"    packet_ref: {spec.decision_sufficiency_packet_ref or None!r}",
+            f"    optional_packet_scope: {transport_scope!r}",
+            "    optional_packet:",
+            *_yaml_mapping_lines(packet, indent=6),
+        ]
+    )
+    return lines
+
+
 def manifest_default_quality_check_policy_lines(spec: RunBundleSpec) -> list[str]:
     """Render default quality-check routing policy lines."""
     role_ids = default_quality_check_role_ids(spec.roles)
     agent_types = default_quality_check_agent_types(spec.roles)
     review_pack_state = (
-        "active" if spec.default_review_packs_enabled else "route_without_default_packs"
+        "active" if spec.default_review_packs_enabled else "candidate_not_activated"
     )
     lines = [
         "  default_quality_check_policy:",
-        "    enabled: true",
+        "    enabled: false",
         f"    source: {DEFAULT_QUALITY_CHECK_POLICY_SOURCE!r}",
-        "    wave_sequence_ref: run.standard_wave_sequence",
+        "    activation: owner_critical_or_distinct_unresolved_claim_or_risk",
+        "    wave_sequence_ref: run.standard_wave_sequence (selected stages only)",
         "    role_topology_ref: 'agents/task_catalog.yaml#role_topology_defaults.role_families.review'",
         "    stages:",
     ]
     for stage in DEFAULT_QUALITY_CHECK_STAGES:
         lines.append(f"      - {stage}")
     if role_ids:
-        lines.append("    roles:")
+        lines.append("    candidate_roles:")
         for role_id in role_ids:
             lines.append(f"      - {role_id}")
     else:
-        lines.append("    roles: []")
+        lines.append("    candidate_roles: []")
     if agent_types:
-        lines.append("    codex_agent_types:")
+        lines.append("    candidate_codex_agent_types:")
         for agent_type in agent_types:
             lines.append(f"      - {agent_type}")
     else:
-        lines.append("    codex_agent_types: []")
+        lines.append("    candidate_codex_agent_types: []")
     lines.append("    provenance:")
     if spec.task_default_specialists:
         lines.append("      task_default_specialists:")
@@ -6951,12 +3609,12 @@ def manifest_default_quality_check_policy_lines(spec: RunBundleSpec) -> list[str
             lines.append(f"        - {role_id}")
     else:
         lines.append("      task_default_specialists: []")
-    if spec.auto_specialists:
-        lines.append("      auto_language_reviewers:")
-        for role_id in spec.auto_specialists:
+    if spec.language_review_candidates:
+        lines.append("      language_review_candidates:")
+        for role_id in spec.language_review_candidates:
             lines.append(f"        - {role_id}")
     else:
-        lines.append("      auto_language_reviewers: []")
+        lines.append("      language_review_candidates: []")
     if spec.manual_specialists:
         lines.append("      manual_specialists:")
         for role_id in spec.manual_specialists:
@@ -6979,35 +3637,18 @@ def manifest_default_quality_check_policy_lines(spec: RunBundleSpec) -> list[str
 def manifest_role_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
-    active_design_packet: ActiveDesignPacketValue,
-    role_packets: tuple[RoleDocumentPacket, ...],
-    prompt_packets: tuple[SubagentPromptPacket, ...],
 ) -> list[str]:
     """Render role entries for the team manifest."""
-    documents_by_role = {packet.role_id: packet for packet in role_packets}
-    prompts_by_role = {packet.role_id: packet for packet in prompt_packets}
     lines = ["roles:"]
     for role in spec.roles:
-        lines.extend(
-            manifest_one_role_lines(
-                spec,
-                workflow_family,
-                active_design_packet,
-                role,
-                documents_by_role[role.id],
-                prompts_by_role[role.id],
-            )
-        )
+        lines.extend(manifest_one_role_lines(spec, workflow_family, role))
     return lines
 
 
 def manifest_one_role_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
-    active_design_packet: ActiveDesignPacketValue,
     role: Role,
-    document_packet: RoleDocumentPacket,
-    prompt_packet: SubagentPromptPacket,
 ) -> list[str]:
     """Render one role entry for the team manifest."""
     lines = [
@@ -7024,10 +3665,10 @@ def manifest_one_role_lines(
     for responsibility in role.owns:
         lines.append(f"      - {responsibility}")
     lines.append("    required_outputs:")
-    for output in prompt_packet.required_outputs:
+    for output in role.required_outputs:
         lines.append(f"      - {output}")
-    lines.extend(manifest_write_policy_lines(spec, role, active_design_packet))
-    lines.extend(manifest_document_packet_lines(document_packet))
+    lines.extend(manifest_write_policy_lines(spec, role))
+    lines.extend(manifest_document_packet_lines(spec, role))
     return lines
 
 
@@ -7037,14 +3678,24 @@ def manifest_prompt_contract_lines(
 ) -> list[str]:
     """Render prompt contract lines for one role."""
     lines = ["    prompt_contract:"]
-    lines.append(
-        "      assignment_prompt: "
-        f"{compact_role_prompt_contract(role, workflow_family)!r}"
-    )
-    lines.append(
-        "      assignment_prompt_source: "
-        "'tools/agent_tools/agent_team.py#role_prompt_contract'"
-    )
+    if role.id == "implementer":
+        lines.append(
+            "      assignment_prompt: "
+            "'runtime_materialized_fixed_packet_prompt_only'"
+        )
+        lines.append(
+            "      assignment_prompt_source: "
+            "'tools/agent_tools/agent_team.py#dispatch_fixed_implementation->model_profile_registry.materialize_prompt_capsule'"
+        )
+    else:
+        lines.append(
+            "      assignment_prompt: "
+            f"{compact_role_prompt_contract(role, workflow_family)!r}"
+        )
+        lines.append(
+            "      assignment_prompt_source: "
+            "'tools/agent_tools/agent_team.py#role_prompt_contract'"
+        )
     if role.id == "skill_evaluator":
         lines.append("      common_prompt_must_include_ref: 'not_applicable'")
         lines.append(
@@ -7062,18 +3713,13 @@ def manifest_prompt_contract_lines(
     return lines
 
 
-def manifest_write_policy_lines(
-    spec: RunBundleSpec,
-    role: Role,
-    active_design_packet: ActiveDesignPacketValue,
-) -> list[str]:
+def manifest_write_policy_lines(spec: RunBundleSpec, role: Role) -> list[str]:
     """Render resolved write policy lines for one role."""
     scope = resolve_role_write_scope(
         config=spec.config,
         role=role,
         report_dir=spec.report_dir,
         workspace_root=spec.workspace_root,
-        active_design_packet=active_design_packet,
     )
     lines = ["    write_policy:"]
     lines.append(f"      mode: {scope.mode}")
@@ -7095,10 +3741,14 @@ def manifest_write_policy_lines(
     return lines
 
 
-def manifest_document_packet_lines(
-    document_packet: RoleDocumentPacket,
-) -> list[str]:
+def manifest_document_packet_lines(spec: RunBundleSpec, role: Role) -> list[str]:
     """Render explicit document packet lines for one role."""
+    document_packet = resolve_role_document_packet(
+        spec.config,
+        role,
+        spec.report_dir,
+        spec.workspace_root,
+    )
     lines = ["    document_packet:"]
     lines.append(
         f"      must_cite_before_edit: {str(document_packet.must_cite_before_edit).lower()}"
@@ -7118,7 +3768,9 @@ def manifest_document_packet_lines(
             for section in entry.sections:
                 lines.append(f"            - heading: {section.heading!r}")
                 lines.append(f"              anchor: {section.anchor!r}")
-                lines.append(f"              required: {str(section.required).lower()}")
+                lines.append(
+                    f"              required: {str(section.required).lower()}"
+                )
     return lines
 
 
@@ -7133,21 +3785,12 @@ def role_specific_document_entries(
     )
 
 
-def manifest_context_policy_lines(
-    config: TeamConfig,
-    active_design_packet: ActiveDesignPacketValue,
-) -> list[str]:
+def manifest_context_policy_lines(config: TeamConfig) -> list[str]:
     """Render context-sharing policy lines."""
-    packet_artifacts = selected_packet_artifact_paths(
-        config,
-        active_design_packet,
-    )
     lines = ["context_policies:"]
     for policy in config.context_policies:
         lines.append("  - roles:")
-        for role_name in _as_string_tuple(
-            policy.get("roles"), "context_policies.roles"
-        ):
+        for role_name in _as_string_tuple(policy.get("roles"), "context_policies.roles"):
             lines.append(f"      - {role_name}")
         mode = _as_required_string(policy.get("mode"), "context_policies.mode")
         lines.append(f"    mode: {mode}")
@@ -7155,7 +3798,7 @@ def manifest_context_policy_lines(
         for artifact in _as_string_tuple(
             policy.get("share_only"), "context_policies.share_only"
         ):
-            lines.append(f"      - {packet_artifacts.get(artifact, artifact)}")
+            lines.append(f"      - {artifact}")
         lines.append("    do_not_share:")
         for artifact in _as_string_tuple(
             policy.get("do_not_share"), "context_policies.do_not_share"
@@ -7172,10 +3815,10 @@ def manifest_quality_gate_lines(config: TeamConfig) -> list[str]:
     return lines
 
 
-def manifest_artifact_lines(artifact_names: tuple[str, ...]) -> list[str]:
+def manifest_artifact_lines(config: TeamConfig, roles: tuple[Role, ...]) -> list[str]:
     """Render artifact lines."""
     lines = ["artifacts:"]
-    for artifact in artifact_names:
+    for artifact in iter_artifacts(config, roles):
         lines.append(f"  - {artifact}")
     return lines
 
@@ -7234,17 +3877,13 @@ def render_role_topology(
             cast(object, stage_waves),
             "role_topology.stage_waves",
         ):
-            lines.append(
-                f"{indent}    - id: {_as_required_string(wave.get('id'), 'stage_waves[].id')}"
-            )
+            lines.append(f"{indent}    - id: {_as_required_string(wave.get('id'), 'stage_waves[].id')}")
             lines.append(
                 f"{indent}      stage_class: "
                 f"{_as_required_string(wave.get('stage_class'), 'stage_waves[].stage_class')}"
             )
             lines.append(f"{indent}      role_ids:")
-            for role_id in _as_string_tuple(
-                wave.get("role_ids"), "stage_waves[].role_ids"
-            ):
+            for role_id in _as_string_tuple(wave.get("role_ids"), "stage_waves[].role_ids"):
                 lines.append(f"{indent}        - {role_id}")
     return lines
 
@@ -7265,17 +3904,19 @@ def render_subagent_prompt_packet(
     lines.append(f"{indent}  subagent_startup_route: {SUBAGENT_STARTUP_ROUTE!r}")
     lines.append(f"{indent}  internal_skill_routes:")
     lines.append(f"{indent}    - {SUBAGENT_STARTUP_ROUTE!r}")
-    lines.append(f"{indent}  tool_route: 'run.repo_tool_routing_policy'")
     lines.append(
-        f"{indent}  tool_command_packet_command: {REPO_TOOL_ROUTING_SHOW_COMMAND_TEMPLATE!r}"
+        f"{indent}  decision_sufficiency_packet_ref: "
+        "'run.decision_sufficiency.packet_ref'"
     )
+    lines.append(f"{indent}  tool_route: 'run.repo_tool_routing_policy'")
+    lines.append(f"{indent}  tool_call_tokens: 'run.repo_tool_routing_policy.sequential_tool_routes[].tool_call_token'")
     lines.append(
         f"{indent}  tool_evidence: 'run.repo_tool_routing_policy.dynamic_skill_routing'"
     )
     lines.append(f"{indent}  tool_catalog_matches: 'tools/catalog.yaml'")
     lines.append(f"{indent}  required_tool_fields:")
     lines.append(f"{indent}    - tool_route")
-    lines.append(f"{indent}    - tool_command_packet_command")
+    lines.append(f"{indent}    - tool_call_tokens")
     lines.append(f"{indent}    - tool_evidence")
     lines.append(f"{indent}    - tool_rejection_prediction")
     for key in ("prompt_preamble", "workflow_focus", "reviewer_prompt"):
@@ -7305,7 +3946,8 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         "When run.subagent_prompt_packet.subagent_startup_route is present, carry that "
         "structural route field into the next handoff or review result without turning it "
         "into prompt keyword skill activation. "
-        "Carry run.repo_tool_routing_policy tool_route, tool_command_packet_command, and tool_evidence into "
+        "Carry the owner-produced DecisionSufficiencyPacket reference and "
+        "run.repo_tool_routing_policy tool_route, machine-readable ToolCall tokens, and tool_evidence into "
         "the next handoff or review result when repo-owned tools are part of the selected route. "
         "Return findings or outputs tied to request_clause_ids, artifact paths, dependency-file "
         "headers for every edited or created text file, remaining planned work, and the next "
@@ -7380,7 +4022,6 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
                 "abstract_design_frame",
                 "implementation_source_packet",
                 "design_to_implementation_trace",
-                "test_plan_item",
                 "remaining_planned_work_units",
             )
         )
@@ -7414,15 +4055,9 @@ def resolve_role_write_scope(
     role: Role,
     report_dir: Path,
     workspace_root: Path,
-    active_design_packet: ActiveDesignPacketValue,
 ) -> RoleWriteScope:
     """Resolve concrete write paths for one role."""
-    allowed_files = role_allowed_artifact_files(
-        config,
-        role,
-        report_dir,
-        active_design_packet,
-    )
+    allowed_files = role_allowed_artifact_files(config, role, report_dir)
     allowed_directories = role_allowed_directories(role, workspace_root)
     unresolved_reason = role_write_scope_unresolved_reason(role, allowed_directories)
     return RoleWriteScope(
@@ -7441,16 +4076,12 @@ def role_allowed_artifact_files(
     config: TeamConfig,
     role: Role,
     report_dir: Path,
-    active_design_packet: ActiveDesignPacketValue,
 ) -> tuple[Path, ...]:
     """Resolve generated artifact files one role may write."""
     return tuple(
         sorted(
             {
-                resolve_report_bundle_artifact_path(
-                    report_dir,
-                    selected_artifact_name(config, artifact_key, active_design_packet),
-                )
+                (report_dir / config.artifacts[artifact_key]).resolve()
                 for artifact_key in role.write_policy.allowed_artifacts
             },
             key=str,
@@ -7537,19 +4168,8 @@ def validate_role_write_scope(
     role = resolve_role(config, role_name)
     resolved_report_dir = report_dir.resolve()
     resolved_workspace_root = workspace_root.resolve()
-    loaded_packet = load_materialized_active_design_packet(resolved_report_dir)
-    if loaded_packet.value is None or loaded_packet.violations:
-        blockers = ",".join(
-            render_active_design_packet_violation(violation)
-            for violation in loaded_packet.violations
-        )
-        raise RuntimeError(f"active design packet is invalid: {blockers or 'missing'}")
     scope = resolve_role_write_scope(
-        config,
-        role,
-        resolved_report_dir,
-        resolved_workspace_root,
-        loaded_packet.value,
+        config, role, resolved_report_dir, resolved_workspace_root
     )
     resolved_ignored_paths = tuple(path.resolve() for path in ignored_paths)
     if workspace_snapshot is None:

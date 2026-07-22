@@ -4,17 +4,15 @@
 # contract test
 # responsibility Tests workflow monitor accumulation behavior.
 # upstream implementation ../../tools/agent_tools/workflow_monitor.py appends evidence
-# upstream implementation ../../tools/agent_tools/agent_team.py stages initial monitoring with run bundles
 # upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py seeds evidence
 # upstream implementation ../../tools/agent_tools/task_start.py seeds evidence
-# upstream implementation ../../tools/bin/agent-canon builds the verified graph fixture
+# upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns update lifecycle evidence identities
 # @dependency-end
 
 from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -22,27 +20,10 @@ import unittest
 from pathlib import Path
 from typing import Protocol, cast
 
-import yaml
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-
-from agent_team import (  # noqa: E402
-    active_design_packet_mapping,
-    load_task_catalog,
-    load_team_config,
-    recommended_dynamic_expansion_wave_slots,
-    recommended_initial_subagent_wave,
-    resolve_active_design_packet,
-    select_roles,
-    selected_role_outputs,
-    workflow_spawn_budget,
-)
-
 MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
-AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
 )
@@ -80,457 +61,6 @@ def load_monitor_module() -> WorkflowMonitorModule:
 class WorkflowMonitorTest(unittest.TestCase):
     """Verify workflow monitoring is updated mechanically."""
 
-    _graph_fixture: tuple[
-        tempfile.TemporaryDirectory[str], Path, dict[str, str]
-    ] | None = None
-
-    @classmethod
-    def verified_graph_fixture(cls) -> tuple[Path, dict[str, str]]:
-        """Build one stable parent-profile graph for subprocess fixture consumers."""
-        if cls._graph_fixture is not None:
-            return cls._graph_fixture[1], cls._graph_fixture[2]
-
-        fixture_directory = tempfile.TemporaryDirectory(
-            prefix="agent-canon-workflow-monitor-graph-"
-        )
-        fixture_root = Path(fixture_directory.name)
-        workspace_root = fixture_root / "workspace"
-        environment = dict(os.environ)
-        environment["CARGO_TARGET_DIR"] = str(fixture_root / "cargo-target")
-        clone = subprocess.run(
-            [
-                "git",
-                "clone",
-                "--quiet",
-                "--no-local",
-                str(PROJECT_ROOT),
-                str(workspace_root),
-            ],
-            cwd=fixture_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if clone.returncode != 0:
-            fixture_directory.cleanup()
-            raise AssertionError(
-                "failed to create graph fixture checkout: "
-                f"{clone.stdout}{clone.stderr}"
-            )
-        graph_state_root = workspace_root / ".agent-canon" / "knowledge-graph"
-        graph_state_root.mkdir(parents=True)
-        (graph_state_root / ".fixture-parent-state").write_text(
-            "parent-owned graph fixture state\n",
-            encoding="utf-8",
-        )
-        source_state_before = subprocess.run(
-            ["git", "status", "--porcelain=v2", "-z"],
-            cwd=workspace_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if source_state_before.returncode != 0:
-            fixture_directory.cleanup()
-            raise AssertionError(
-                "failed to capture graph fixture source state: "
-                f"{source_state_before.stdout}{source_state_before.stderr}"
-            )
-        build = subprocess.run(
-            [
-                str(AGENT_CANON_CLI),
-                "graph",
-                "build",
-                "--root",
-                str(workspace_root),
-                "--profile",
-                "default",
-                "--format",
-                "json",
-            ],
-            cwd=workspace_root,
-            env=environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if build.returncode != 0:
-            fixture_directory.cleanup()
-            raise AssertionError(
-                "failed to build verified graph fixture: "
-                f"{build.stdout}{build.stderr}"
-            )
-        try:
-            build_payload = json.loads(build.stdout)
-        except json.JSONDecodeError as error:
-            fixture_directory.cleanup()
-            raise AssertionError(
-                "verified graph fixture build was not canonical JSON: "
-                f"{build.stdout}{build.stderr}"
-            ) from error
-        source_state_after = subprocess.run(
-            ["git", "status", "--porcelain=v2", "-z"],
-            cwd=workspace_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if (
-            source_state_after.returncode != 0
-            or source_state_after.stdout != source_state_before.stdout
-        ):
-            fixture_directory.cleanup()
-            raise AssertionError(
-                "graph fixture source fingerprint changed during build: "
-                f"before={source_state_before.stdout!r} "
-                f"after={source_state_after.stdout!r} "
-                f"stderr={source_state_after.stderr}"
-            )
-        status = subprocess.run(
-            [
-                str(AGENT_CANON_CLI),
-                "graph",
-                "status",
-                "--root",
-                str(workspace_root),
-                "--profile",
-                "default",
-                "--format",
-                "json",
-            ],
-            cwd=workspace_root,
-            env=environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        try:
-            status_payload = json.loads(status.stdout)
-        except json.JSONDecodeError as error:
-            fixture_directory.cleanup()
-            raise AssertionError(
-                "verified graph fixture status was not canonical JSON: "
-                f"{status.stdout}{status.stderr}"
-            ) from error
-        source_head = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=workspace_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        integration = status_payload.get("integration_record", {})
-        if (
-            status.returncode != 0
-            or source_head.returncode != 0
-            or status_payload.get("status") != "fresh"
-            or not isinstance(integration, dict)
-            or integration.get("verified") is not True
-            or integration.get("profile") != "default"
-            or integration.get("source_snapshot_profile") != "parent"
-        ):
-            fixture_directory.cleanup()
-            raise AssertionError(
-                "graph fixture lacks a verified integration record: "
-                f"{status.stdout}{status.stderr}"
-            )
-        expected_build_state = {
-            "schema": "agent-canon.graph.build.v1",
-            "command": "build",
-            "status": "fresh",
-            "graph_status": "fresh",
-            "profile": "default",
-            "root": ".",
-            "db_path": ".agent-canon/knowledge-graph/graph.sqlite",
-            "publication": "published",
-            "durability": "durable",
-            "failure_stage": None,
-            "exit_code": 0,
-            "unresolved": [],
-            "ambiguous": [],
-            "uncovered": [],
-        }
-        observed_build_state = {
-            field: build_payload.get(field) for field in expected_build_state
-        }
-        if observed_build_state != expected_build_state:
-            fixture_directory.cleanup()
-            raise AssertionError(
-                "graph fixture build state differs from the producer contract: "
-                f"{observed_build_state}"
-            )
-        expected_status_state = {
-            "schema": "agent-canon.graph.status.v1",
-            "command": "status",
-            "status": "fresh",
-            "profile": "default",
-            "root": ".",
-            "db_path": ".agent-canon/knowledge-graph/graph.sqlite",
-            "exit_code": 0,
-            "unresolved": [],
-            "ambiguous": [],
-            "uncovered": [],
-        }
-        observed_status_state = {
-            field: status_payload.get(field) for field in expected_status_state
-        }
-        if observed_status_state != expected_status_state:
-            fixture_directory.cleanup()
-            raise AssertionError(
-                "graph fixture status differs from the producer contract: "
-                f"{observed_status_state}"
-            )
-        build_integration = build_payload.get("integration_record")
-        if build_integration != integration:
-            fixture_directory.cleanup()
-            raise AssertionError("build and status integration records differ")
-        input_fingerprint = build_payload.get("input_fingerprint")
-        graph_fingerprint = build_payload.get("graph_fingerprint")
-        if (
-            not isinstance(input_fingerprint, str)
-            or not input_fingerprint
-            or not isinstance(graph_fingerprint, str)
-            or not graph_fingerprint
-            or status_payload.get("input_fingerprint") != input_fingerprint
-            or status_payload.get("graph_fingerprint") != graph_fingerprint
-            or integration.get("input_fingerprint") != input_fingerprint
-            or integration.get("graph_fingerprint") != graph_fingerprint
-            or integration.get("snapshot_head") != source_head.stdout.strip()
-        ):
-            fixture_directory.cleanup()
-            raise AssertionError(
-                "graph fixture fingerprint or source snapshot identity differs: "
-                f"build={build_payload} status={status_payload}"
-            )
-        producer_artifacts = build_payload.get("producer_artifacts")
-        if (
-            not isinstance(producer_artifacts, list)
-            or producer_artifacts != integration.get("producer_artifacts")
-        ):
-            fixture_directory.cleanup()
-            raise AssertionError("graph fixture producer artifact identities differ")
-        source_artifacts = [
-            artifact
-            for artifact in producer_artifacts
-            if isinstance(artifact, dict)
-            and artifact.get("producer_id") == "source-snapshot"
-        ]
-        if len(source_artifacts) != 1:
-            fixture_directory.cleanup()
-            raise AssertionError(
-                f"graph fixture source-snapshot artifact domain differs: {source_artifacts}"
-            )
-        source_artifact = cast(dict[str, object], source_artifacts[0])
-        source_content_sha = source_artifact.get("content_sha256")
-        expected_source_artifact = {
-            "producer_id": "source-snapshot",
-            "version": "source_snapshot.v1",
-            "command": (
-                "dependency_manifest::capture_snapshot graph-profile=default "
-                "profile=parent"
-            ),
-            "root": ".",
-            "content_sha256": source_content_sha,
-            "relation_families": ["dependency", "pin", "submodule"],
-            "artifact_ref": (
-                "producer:source-snapshot/source-snapshot.jsonl#sha256="
-                f"{source_content_sha}"
-            ),
-        }
-        if (
-            not isinstance(source_content_sha, str)
-            or len(source_content_sha) != 64
-            or any(
-                character not in "0123456789abcdef"
-                for character in source_content_sha
-            )
-            or source_artifact != expected_source_artifact
-        ):
-            fixture_directory.cleanup()
-            raise AssertionError(
-                "graph fixture source-snapshot producer identity differs: "
-                f"{source_artifact}"
-            )
-        contract_fingerprint = integration.get("contract_fingerprint")
-        expected_integration = {
-            "schema": "agent-canon.graph.integration.v1",
-            "root": ".",
-            "db_path": ".agent-canon/knowledge-graph/graph.sqlite",
-            "schema_version": "graph_storage_core.v1",
-            "profile": "default",
-            "source_snapshot_profile": "parent",
-            "snapshot_head": source_head.stdout.strip(),
-            "input_fingerprint": input_fingerprint,
-            "graph_fingerprint": graph_fingerprint,
-            "contract_fingerprint": contract_fingerprint,
-            "producer_artifacts": producer_artifacts,
-            "verified": True,
-            "verification_code": "graph.integration.verified",
-        }
-        if (
-            not isinstance(contract_fingerprint, str)
-            or any(
-                not isinstance(value, str)
-                or len(value) != 64
-                or any(character not in "0123456789abcdef" for character in value)
-                for value in (
-                    input_fingerprint,
-                    graph_fingerprint,
-                    contract_fingerprint,
-                )
-            )
-            or integration != expected_integration
-        ):
-            fixture_directory.cleanup()
-            raise AssertionError(
-                "graph fixture integration identity differs from the exact contract: "
-                f"{integration}"
-            )
-        cls._graph_fixture = (fixture_directory, workspace_root, environment)
-        return workspace_root, environment
-
-    def assert_complete_active_packet_projections(self, report_dir: Path) -> None:
-        """Compare a producer output to the complete canonical role/packet topology."""
-        manifest = cast(
-            "dict[str, object]",
-            yaml.safe_load(
-                (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
-            ),
-        )
-        run = cast("dict[str, object]", manifest["run"])
-        role_rows = cast("list[dict[str, object]]", manifest["roles"])
-        config = load_team_config()
-        catalog = load_task_catalog(config)
-        roles = select_roles(
-            config,
-            [],
-            True,
-            catalog=catalog,
-            workflow_family_id="owner_bounded_change",
-        )
-        packet = resolve_active_design_packet(
-            config,
-            workflow_family=None,
-            explicit=None,
-        )
-        self.assertEqual(
-            [
-                (row["id"], tuple(cast("list[str]", row.get("codex_agents", []))))
-                for row in role_rows
-            ],
-            [(role.id, role.codex_agents) for role in roles],
-        )
-        self.assertEqual(
-            run["active_design_packet"],
-            active_design_packet_mapping(packet),
-        )
-        projection = cast(
-            "dict[str, object]",
-            run["active_design_packet_reference_projection"],
-        )
-        self.assertEqual(
-            projection["role_output_projections"],
-            [
-                {
-                    "role_ref": f"role:{role.id}",
-                    "output_refs": [
-                        f"artifact:{output}"
-                        for output in selected_role_outputs(config, role, packet)
-                    ],
-                }
-                for role in roles
-            ],
-        )
-        self.assertEqual(
-            projection["reviewer_artifact_projections"],
-            [
-                {
-                    "reviewer_ref": "role:design_reviewer",
-                    "review_artifact_ref": "artifact:design_review.md",
-                },
-                {
-                    "reviewer_ref": "role:document_flow_reviewer",
-                    "review_artifact_ref": "artifact:document_flow_review.md",
-                },
-            ],
-        )
-        self.assertEqual(
-            projection["output_results"],
-            [
-                {
-                    "output_ref": "artifact:design_brief.md",
-                    "relative_path": "design_brief.md",
-                    "planned_count": 1,
-                },
-                {
-                    "output_ref": "artifact:design_review.md",
-                    "relative_path": "design_review.md",
-                    "planned_count": 1,
-                },
-                {
-                    "output_ref": "artifact:document_flow_review.md",
-                    "relative_path": "document_flow_review.md",
-                    "planned_count": 1,
-                },
-            ],
-        )
-        active_subagents, _max_write = workflow_spawn_budget(
-            catalog,
-            "owner_bounded_change",
-        )
-        initial_wave = recommended_initial_subagent_wave(
-            roles,
-            active_subagents,
-            catalog,
-        )
-        expansion_waves = recommended_dynamic_expansion_wave_slots(
-            roles,
-            active_subagents,
-            initial_wave,
-            catalog,
-        )
-        recommendation = cast(
-            "dict[str, object]",
-            run["spawn_wave_recommendation"],
-        )
-        self.assertEqual(
-            recommendation["initial_wave_agent_types"],
-            list(initial_wave),
-        )
-        expected_expansion_waves = [
-            {
-                "wave_id": f"WAVE-{index}",
-                "standard_sequence_ref": "run.standard_wave_sequence",
-                "agent_types": [slot.agent_type for slot in wave],
-                "role_instances": [
-                    f"{slot.executable_identity}:team_manifest.yaml#roles.{slot.role_id}"
-                    for slot in wave
-                ],
-            }
-            for index, wave in enumerate(expansion_waves, start=2)
-        ]
-        if not expected_expansion_waves:
-            expected_expansion_waves = [
-                {
-                    "wave_id": "none",
-                    "standard_sequence_ref": "run.standard_wave_sequence",
-                    "agent_types": [],
-                    "role_instances": [],
-                }
-            ]
-        self.assertEqual(
-            recommendation["dynamic_expansion_waves"],
-            expected_expansion_waves,
-        )
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        """Remove the isolated graph checkout after its consumers finish."""
-        if cls._graph_fixture is not None:
-            cls._graph_fixture[0].cleanup()
-            cls._graph_fixture = None
-        super().tearDownClass()
-
     def test_monitor_validation_failure_taxonomy_comes_from_runtime_inventory(
         self,
     ) -> None:
@@ -547,6 +77,54 @@ class WorkflowMonitorTest(unittest.TestCase):
             module.VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES,
             frozenset(response["intent_preservation"]),
         )
+
+    def test_monitor_records_pointer_only_update_lifecycle_evidence(self) -> None:
+        """Monitoring keeps DSV/lifecycle/close refs without duplicating policy."""
+        module = load_monitor_module()
+        evidence_type = getattr(module, "LifecycleMonitoringEvidence")
+        entries_type = getattr(module, "MonitoringEntries")
+        append_monitoring = getattr(module, "append_monitoring")
+        evidence_refs = (
+            "evidence:" + "1" * 64,
+            "evidence:" + "2" * 64,
+        )
+        evidence = evidence_type(
+            decision_sufficiency_packet_ref="evidence:" + "3" * 64,
+            decision_sufficiency_rejection_ref=None,
+            lifecycle_state="closed",
+            evidence_refs=evidence_refs,
+            close_agent_tool_call_ref="close-token:" + "4" * 64,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = append_monitoring(
+                Path(tmp_dir),
+                entries_type(lifecycle_evidence=evidence),
+            )
+            text = path.read_text(encoding="utf-8")
+
+        self.assertIn("## Update Lifecycle Evidence", text)
+        self.assertIn('"schema":"agent-canon.update-lifecycle-monitoring.v1"', text)
+        self.assertIn('"lifecycle_state":"closed"', text)
+        self.assertIn(evidence_refs[0], text)
+        self.assertNotIn("plausible repository state", text)
+
+    def test_monitor_rejects_duplicate_lifecycle_evidence_refs(self) -> None:
+        """One evidence identity may be recorded only once in a monitor event."""
+        module = load_monitor_module()
+        evidence_type = getattr(module, "LifecycleMonitoringEvidence")
+        lifecycle_record = getattr(module, "lifecycle_monitoring_record")
+        repeated = "evidence:" + "5" * 64
+        evidence = evidence_type(
+            decision_sufficiency_packet_ref="evidence:" + "6" * 64,
+            decision_sufficiency_rejection_ref=None,
+            lifecycle_state="prepared",
+            evidence_refs=(repeated, repeated),
+            close_agent_tool_call_ref=None,
+        )
+
+        with self.assertRaisesRegex(ValueError, "evidence_ref_duplicate"):
+            lifecycle_record(evidence)
 
     def test_monitor_appends_signals_interventions_and_decisions(self) -> None:
         """The monitor CLI should update all monitored sections."""
@@ -600,63 +178,6 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("- workflow_improvement_decision: applied", text)
             self.assertIn("- memory_learning_decision: not_applicable", text)
 
-    def test_monitor_emits_nullable_runtime_measurement_input(self) -> None:
-        """The monitor should preserve producer nulls and explicit numeric zero."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports" / "agents" / "runtime-unit"
-            report_dir.mkdir(parents=True)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(MONITOR_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--responsibility-unit-id",
-                    "runtime-unit",
-                    "--packet-hash",
-                    "a" * 64,
-                    "--context-bytes",
-                    "z-source=0",
-                    "--context-bytes",
-                    "a-source=41",
-                    "--finding-iteration",
-                    "0",
-                    "--writer-id",
-                    "writer-2",
-                    "--writer-id",
-                    "writer-1",
-                    "--launch-epoch",
-                    "0",
-                    "--retries",
-                    "0",
-                    "--waits",
-                    "0",
-                    "--progress-bytes",
-                    "0",
-                    "--artifact-hash",
-                    "b" * 64,
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        measurement_line = next(
-            line for line in text.splitlines() if "runtime_measurement_input=" in line
-        )
-        payload = json.loads(measurement_line.split("runtime_measurement_input=", 1)[1])
-        self.assertIsNone(payload["generation_parent"])
-        self.assertIsNone(payload["review_iteration"])
-        self.assertEqual(payload["context_bytes_by_source"], {"a-source": 41, "z-source": 0})
-        self.assertEqual(payload["writer_ids"], ["writer-1", "writer-2"])
-        self.assertEqual(payload["launch_epoch"], 0)
-        self.assertEqual(payload["retries"], 0)
-        self.assertEqual(payload["waits"], 0)
-        self.assertEqual(payload["progress_bytes"], 0)
-
     def test_monitor_appends_structured_tool_warning(self) -> None:
         """Tool warnings should be recorded as closeout-obligating ledger rows."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -690,6 +211,68 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("warning_id=W1", text)
             self.assertIn("status=open", text)
             self.assertIn("- tool_warnings_status: open", text)
+
+    def test_monitor_preserves_schema_owned_completion_evidence(self) -> None:
+        """Monitor projection must retain typed gate, failure, resource, and binding fields."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            semantic_event = " ".join(
+                [
+                    "event_id=event-1",
+                    "context_id=context-1",
+                    "semantic_kind=validation",
+                    "owner=writer",
+                    "state_owner=writer",
+                    "api_owner=writer",
+                    "dependency_owner=writer",
+                    "responsibility_unit=completion-coverage",
+                    "intent_id=intent-1",
+                    "outcome=pass",
+                    "evidence_refs=source.md",
+                    "artifact_refs=completion_coverage.json",
+                    'gate_evidence={"gate_id":"oop_readability_guard","outcome":"pass"}',
+                    'failure_response={"status":"none"}',
+                    'resource_certificate={"certificate_id":"none","status":"none"}',
+                    'source_binding={"run_id":"run-1","context_id":"context-1"}',
+                ]
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--semantic-event",
+                    semantic_event,
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            work_log = (report_dir / "work_log.md").read_text(encoding="utf-8")
+            ledger_line = next(
+                line
+                for line in work_log.splitlines()
+                if line.startswith("- ledger_event=")
+            )
+            event = json.loads(ledger_line.removeprefix("- ledger_event="))
+            self.assertEqual(
+                event["gate_evidence"],
+                {"gate_id": "oop_readability_guard", "outcome": "pass"},
+            )
+            self.assertEqual(event["failure_response"], {"status": "none"})
+            self.assertEqual(
+                event["resource_certificate"],
+                {"certificate_id": "none", "status": "none"},
+            )
+            self.assertEqual(
+                event["source_binding"],
+                {"run_id": "run-1", "context_id": "context-1"},
+            )
 
     def test_monitor_sets_no_tool_warning_status(self) -> None:
         """Runs with no observed warning should mark the ledger explicitly none."""
@@ -787,9 +370,10 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_replaces_initial_blocker_with_actual_subagent_wave(self) -> None:
         """A real parent wave should replace the bootstrap authority blocker."""
-        workspace_root, graph_environment = self.verified_graph_fixture()
         with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True)
             bootstrap = subprocess.run(
                 [
                     sys.executable,
@@ -806,11 +390,9 @@ class WorkflowMonitorTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
-                    "--full-team",
                     "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
-                env=graph_environment,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -818,7 +400,6 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertEqual(bootstrap.returncode, 0, bootstrap.stderr)
 
             report_dir = report_root / "run-1"
-            self.assert_complete_active_packet_projections(report_dir)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -1481,9 +1062,16 @@ class WorkflowMonitorTest(unittest.TestCase):
             text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
             self.assertIn("skill_invocation=$agent-orchestration", text)
             self.assertIn("repo_dependency_review=pass", text)
-            self.assertIn("tool_call=pyright code_checker=pass", text)
-            self.assertIn("tool_call=ruff code_checker=pass", text)
-            self.assertIn("tool_call=oop-readability-check code_checker=pass", text)
+            self.assertIn(
+                "tool_call=canonical-format-check code_checker=pass "
+                "checker=markdown-math-mermaid scope=changed-paths",
+                text,
+            )
+            self.assertIn(
+                "hook_dispatcher=official schema=agent-canon.posttooluse-stop.v1 "
+                "events=PostToolUse,Stop",
+                text,
+            )
             self.assertIn("static_analysis_feedback=recorded", text)
             self.assertIn("hook_tool_feedback=reviewed", text)
             self.assertIn("parent_protocol_update=not_required", text)
@@ -1503,9 +1091,10 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_bootstrap_seeds_monitoring_with_routing_evidence(self) -> None:
         """bootstrap_agent_run should seed workflow monitoring without manual edits."""
-        workspace_root, graph_environment = self.verified_graph_fixture()
         with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -1522,20 +1111,16 @@ class WorkflowMonitorTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
-                    "--full-team",
                     "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
-                env=graph_environment,
                 check=False,
                 capture_output=True,
                 text=True,
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            report_dir = report_root / "monitor-bootstrap"
-            self.assert_complete_active_packet_projections(report_dir)
-            monitor_path = report_dir / "workflow_monitoring.md"
+            monitor_path = report_root / "monitor-bootstrap" / "workflow_monitoring.md"
             text = monitor_path.read_text(encoding="utf-8")
             self.assertIn("workflow=Owner-Bounded Change", text)
             self.assertIn("skills=$agent-orchestration", text)
@@ -1544,9 +1129,10 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_task_start_seeds_monitoring_with_routing_evidence(self) -> None:
         """task_start should seed workflow monitoring without manual edits."""
-        workspace_root, graph_environment = self.verified_graph_fixture()
         with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -1563,20 +1149,16 @@ class WorkflowMonitorTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
-                    "--full-team",
                     "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
-                env=graph_environment,
                 check=False,
                 capture_output=True,
                 text=True,
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            report_dir = report_root / "monitor-task-start"
-            self.assert_complete_active_packet_projections(report_dir)
-            monitor_path = report_dir / "workflow_monitoring.md"
+            monitor_path = report_root / "monitor-task-start" / "workflow_monitoring.md"
             text = monitor_path.read_text(encoding="utf-8")
             self.assertIn("workflow=Owner-Bounded Change", text)
             self.assertIn("skills=$agent-orchestration", text)

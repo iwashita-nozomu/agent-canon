@@ -5,6 +5,7 @@
 # upstream design ../../ROOT_AGENTS.md defines PR mutation authority and non-blocking publish policy.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines the AgentCanon PR workflow.
 # upstream design ../../documents/agent-canon-github-remote.md defines canonical GitHub remote policy.
+# upstream implementation ./update_lifecycle_contract.py owns immutable PR topology and gate identity.
 # downstream design ../../documents/tools/github_publish.md documents the public tool contract.
 # downstream implementation ../../tests/agent_tools/test_github_publish.py validates command construction.
 # @dependency-end
@@ -13,64 +14,38 @@
 from __future__ import annotations
 
 import argparse
-import ctypes
-import errno
 import hashlib
 import json
 import os
 import re
-import secrets
-import stat
 import subprocess
-import sys
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from pathlib import Path, PurePosixPath
-from typing import Literal, cast
+from pathlib import Path
+from typing import cast
 from urllib.parse import urlparse
 
-from report_artifact_checks import parse_review_identity
+from artifact_identity import canonical_json_bytes
+from update_lifecycle_contract import (
+    binding_identity,
+    materialize_gate_verdict,
+    materialize_publication_readback_receipt,
+    pull_request_branch_table,
+    validate_candidate_cas_pr_transition,
+    validate_candidate_cas_receipt,
+    validate_candidate_cas_rebind_transition,
+    validate_gate_chain,
+    validate_gate_verdict,
+    validate_pull_request_lifecycle,
+    validate_pull_request_transition,
+    validate_record_binding,
+    validate_source_main_rebind_receipt,
+)
 
 MAX_ERROR_CHARS = 4000
 REMOTE_SCP_RE = re.compile(r"^[^@]+@[^:]+:(?P<slug>[^/]+/[^/]+?)(?:\.git)?/?$")
-PREDECESSOR_INTEGRATION_SCHEMA_VERSION = "agent_canon.predecessor_integration.v1"
-PREDECESSOR_INTEGRATION_PRODUCER = (
-    "tools/agent_tools/github_publish.py:predecessor-integration"
-)
-PREDECESSOR_INTEGRATION_UNIT_ID_PATTERN = r"[a-z][a-z0-9_]{0,63}"
-PREDECESSOR_TARGET_REMOTE = "origin"
-PREDECESSOR_TARGET_BRANCH = "main"
-PREDECESSOR_TARGET_MAIN_REF = "refs/remotes/origin/main"
-PREDECESSOR_CLI_RESULT_SCHEMA = "agent_canon.predecessor_integration.cli_result.v1"
-PREDECESSOR_CLI_SET_RESULT_SCHEMA = (
-    "agent_canon.predecessor_integration.cli_set_result.v1"
-)
-PREDECESSOR_CLI_ERROR_SCHEMA = "agent_canon.predecessor_integration.cli_error.v1"
-PREDECESSOR_RECORD_FIELDS = (
-    "schema_version",
-    "unit_id",
-    "design_path",
-    "design_sha256",
-    "approve_review_path",
-    "approve_review_sha256",
-    "source_pr_url",
-    "source_pr_number",
-    "integrated_source_oid",
-    "observed_target_main_oid",
-    "produced_at",
-    "producer",
-    "artifact_sha256",
-)
-PREDECESSOR_DIGEST_FIELDS = PREDECESSOR_RECORD_FIELDS[:-1]
-PREDECESSOR_OID_PATTERN = re.compile(r"[0-9a-f]{40}")
-PREDECESSOR_SHA_PATTERN = re.compile(r"[0-9a-f]{64}")
-PREDECESSOR_TEMP_MODE = 0o600
-PREDECESSOR_FILE_MODE = 0o644
-PREDECESSOR_RENAME_NOREPLACE = 1
-PREDECESSOR_AT_FDCWD = -100
-PREDECESSOR_GENERATED_NAME_ATTEMPTS = 8
-PREDECESSOR_ERROR_VALUE_MAX_CHARS = 512
+GITHUB_PUBLICATION_PACKET_SCHEMA = "agent-canon.github-publication-packet.v1"
 
 
 @dataclass(frozen=True)
@@ -81,6 +56,117 @@ class CommandResult:
     returncode: int
     stdout: str
     stderr: str
+
+
+@dataclass(frozen=True, init=False)
+class GithubPublicationAuthority:
+    """Opaque sealed publication packet consumed by GitHub mutations."""
+
+    _packet_bytes: bytes
+    _seal: str
+
+    @classmethod
+    def from_packet(
+        cls, packet: Mapping[str, object]
+    ) -> "GithubPublicationAuthority":
+        """Seal one fully validated publication packet."""
+        checked = validate_github_publication_packet(packet)
+        payload = canonical_json_bytes(checked)
+        instance = object.__new__(cls)
+        object.__setattr__(instance, "_packet_bytes", payload)
+        object.__setattr__(instance, "_seal", hashlib.sha256(payload).hexdigest())
+        return instance
+
+    def consume(self) -> dict[str, object]:
+        """Verify the opaque seal before exposing owner-validated evidence."""
+        try:
+            payload = self._packet_bytes
+            seal = self._seal
+        except AttributeError as exc:
+            raise UserVisibleFailure(
+                message="GitHub publication authority was not owner-materialized",
+                next_action="materialize_the_canonical_github_publication_packet",
+            ) from exc
+        if hashlib.sha256(payload).hexdigest() != seal:
+            raise UserVisibleFailure(
+                message="GitHub publication authority seal is invalid",
+                next_action="materialize_a_successor_publication_packet",
+            )
+        decoded = json.loads(payload)
+        if not isinstance(decoded, dict):
+            raise UserVisibleFailure(
+                message="GitHub publication authority payload is invalid",
+                next_action="materialize_the_canonical_github_publication_packet",
+            )
+        return cast(dict[str, object], decoded)
+
+
+@dataclass(frozen=True, init=False)
+class GithubPostPublicationChecksAuthority:
+    """Opaque publication packet plus passing same-binding G5 evidence."""
+
+    _payload_bytes: bytes
+    _seal: str
+
+    @classmethod
+    def from_publication(
+        cls,
+        publication_authority: GithubPublicationAuthority,
+        g5_gate: Mapping[str, object],
+    ) -> "GithubPostPublicationChecksAuthority":
+        """Seal a post-publication checks variant after validating G5."""
+        packet = publication_authority.consume()
+        lifecycle = cast(Mapping[str, object], packet["pull_request_lifecycle"])
+        checked_g5 = validate_gate_verdict(g5_gate)
+        if checked_g5["gate_id"] != "G5" or checked_g5["verdict"] != "pass":
+            raise UserVisibleFailure(
+                message="publication readback evidence is not a passing G5 verdict",
+                next_action="read_back_the_exact_remote_publication_identity",
+            )
+        if binding_identity(lifecycle["binding"]) != binding_identity(
+            checked_g5["binding"]
+        ):
+            raise UserVisibleFailure(
+                message="G5 evidence does not bind the selected PR lifecycle",
+                next_action="create_a_successor_lifecycle_for_the_changed_identity",
+            )
+        payload = canonical_json_bytes(
+            {"publication_packet": packet, "g5_gate": checked_g5}
+        )
+        instance = object.__new__(cls)
+        object.__setattr__(instance, "_payload_bytes", payload)
+        object.__setattr__(instance, "_seal", hashlib.sha256(payload).hexdigest())
+        return instance
+
+    def consume(self) -> tuple[dict[str, object], dict[str, object]]:
+        """Verify and return the sealed publication packet and G5 receipt."""
+        try:
+            payload = self._payload_bytes
+            seal = self._seal
+        except AttributeError as exc:
+            raise UserVisibleFailure(
+                message="post-publication checks authority was not owner-materialized",
+                next_action="materialize_passing_same_binding_G5_evidence",
+            ) from exc
+        if hashlib.sha256(payload).hexdigest() != seal:
+            raise UserVisibleFailure(
+                message="post-publication checks authority seal is invalid",
+                next_action="materialize_passing_same_binding_G5_evidence",
+            )
+        decoded = json.loads(payload)
+        if not isinstance(decoded, dict):
+            raise UserVisibleFailure(
+                message="post-publication checks authority payload is invalid",
+                next_action="materialize_passing_same_binding_G5_evidence",
+            )
+        packet = decoded.get("publication_packet")
+        gate = decoded.get("g5_gate")
+        if not isinstance(packet, dict) or not isinstance(gate, dict):
+            raise UserVisibleFailure(
+                message="post-publication checks authority fields are invalid",
+                next_action="materialize_passing_same_binding_G5_evidence",
+            )
+        return packet, gate
 
 
 @dataclass(frozen=True)
@@ -107,187 +193,16 @@ class RemoteVerification:
     remote: str
     remote_url: str
     remote_slug: str
+    topology_kind: str = "user"
+    head_repo: str = ""
+    fork_parent_repo: str = ""
+    permission_state: str = "unknown"
+    permission_evidence_id: str = ""
+    actor_id: str = "viewer:unknown"
+    actor_display_name: str = "GitHub authenticated viewer"
 
 
 Runner = Callable[[Sequence[str]], CommandResult]
-
-PredecessorIntegrationErrorCode = Literal[
-    "usage_error",
-    "invalid_unit_id",
-    "duplicate_unit_id",
-    "unit_id_mismatch",
-    "integrated_source_oid_mismatch",
-    "non_ancestor",
-    "malformed_json",
-    "truncated_json",
-    "stale_record",
-    "missing_record",
-    "schema_version_mismatch",
-    "record_shape_mismatch",
-    "path_mismatch",
-    "filename_mismatch",
-    "record_collision",
-    "record_hash_mismatch",
-    "design_hash_mismatch",
-    "review_hash_mismatch",
-    "same_sha_approve_mismatch",
-    "archive_hash_mismatch",
-    "source_pr_mismatch",
-    "git_object_missing",
-    "process_failure",
-    "serialization_failure",
-    "publication_failure",
-    "cleanup_failure",
-    "set_inconsistency",
-]
-PredecessorIntegrationPhase = Literal[
-    "arguments",
-    "load",
-    "decode",
-    "schema",
-    "path",
-    "review",
-    "remote",
-    "pr",
-    "git",
-    "serialize",
-    "publish",
-    "cleanup",
-    "archive",
-    "set",
-]
-
-
-@dataclass(frozen=True)
-class PredecessorIntegrationRecord:
-    """One immutable, canonical post-merge integration record."""
-
-    schema_version: str
-    unit_id: str
-    design_path: str
-    design_sha256: str
-    approve_review_path: str
-    approve_review_sha256: str
-    source_pr_url: str
-    source_pr_number: int
-    integrated_source_oid: str
-    observed_target_main_oid: str
-    produced_at: str
-    producer: str
-    artifact_sha256: str
-
-
-@dataclass(frozen=True)
-class PredecessorIntegrationError(Exception):
-    """One closed typed predecessor-integration failure."""
-
-    code: PredecessorIntegrationErrorCode
-    phase: PredecessorIntegrationPhase
-    unit_id: str | None
-    path: str | None
-    field: str | None
-    expected: str | None
-    observed: str | None
-    command: tuple[str, ...] | None
-    returncode: int | None
-    retryable: bool
-
-
-@dataclass(frozen=True)
-class PredecessorIntegrationVerification:
-    """Complete verification result for one predecessor record."""
-
-    record: PredecessorIntegrationRecord
-    record_path: Path
-    archive_manifest_path: Path
-    complete_file_sha256: str
-    design_sha256_verified: bool
-    approve_review_sha256_verified: bool
-    same_sha_approve_verified: bool
-    source_pr_identity_verified: bool
-    integrated_is_ancestor_of_observed_main: bool
-    observed_main_is_ancestor_of_current_main: bool
-
-
-@dataclass(frozen=True)
-class PredecessorIntegrationInput:
-    """Explicit paths and expected ID for one set member."""
-
-    expected_unit_id: str
-    record_path: Path
-    archive_manifest_path: Path
-
-
-@dataclass(frozen=True)
-class PredecessorIntegrationSetVerification:
-    """Verified ordered predecessor set and its common source commit."""
-
-    verified_records: tuple[PredecessorIntegrationVerification, ...]
-    common_integrated_source_oid: str
-
-
-class _DuplicatePredecessorKey(ValueError):
-    def __init__(self, key: str) -> None:
-        self.key = key
-        super().__init__(key)
-
-
-def _predecessor_error(
-    code: PredecessorIntegrationErrorCode,
-    phase: PredecessorIntegrationPhase,
-    *,
-    unit_id: str | None = None,
-    path: str | None = None,
-    field: str | None = None,
-    expected: str | None = None,
-    observed: str | None = None,
-    command: Sequence[str] | None = None,
-    returncode: int | None = None,
-    retryable: bool = False,
-) -> PredecessorIntegrationError:
-    def bounded(value: str | None) -> str | None:
-        return value[:PREDECESSOR_ERROR_VALUE_MAX_CHARS] if value is not None else None
-
-    return PredecessorIntegrationError(
-        code=code,
-        phase=phase,
-        unit_id=unit_id,
-        path=path,
-        field=field,
-        expected=bounded(expected),
-        observed=bounded(observed),
-        command=tuple(command) if command is not None else None,
-        returncode=returncode,
-        retryable=retryable,
-    )
-
-
-def predecessor_integration_filename(unit_id: str) -> str:
-    """Return the sole filename derived from one exact predecessor unit ID."""
-    if re.fullmatch(PREDECESSOR_INTEGRATION_UNIT_ID_PATTERN, unit_id) is None:
-        raise _predecessor_error(
-            "invalid_unit_id",
-            "arguments",
-            unit_id=unit_id,
-            field="unit_id",
-            expected=PREDECESSOR_INTEGRATION_UNIT_ID_PATTERN,
-            observed=unit_id,
-        )
-    return f"predecessor_integration.{unit_id}.json"
-
-
-def _canonical_json_line_bytes(mapping: Mapping[str, object]) -> bytes:
-    """Serialize one strict canonical JSON object with exactly one terminal LF."""
-    return (
-        json.dumps(
-            mapping,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-            allow_nan=False,
-        )
-        + "\n"
-    ).encode("utf-8")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -314,67 +229,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_publish_arguments(publish_pr)
     add_pr_arguments(publish_pr)
-    publish_pr.add_argument(
-        "--allow-main", action="store_true", help="Allow pushing main."
-    )
+    publish_pr.add_argument("--allow-main", action="store_true", help="Allow pushing main.")
 
     checks = subparsers.add_parser("checks", help="Show GitHub PR checks.")
     add_publish_arguments(checks)
-    checks.add_argument(
-        "--pr", help="PR number, URL, or branch. Defaults to current branch."
-    )
-    checks.add_argument(
-        "--watch", action="store_true", help="Watch checks until completion."
-    )
-
-    predecessor = subparsers.add_parser(
-        "predecessor-integration",
-        help="Publish one immutable post-merge predecessor integration record.",
-        exit_on_error=False,
-    )
-    add_predecessor_integration_arguments(predecessor)
-
-    verify_predecessor = subparsers.add_parser(
-        "verify-predecessor-integration",
-        help="Verify one explicit archived predecessor integration record.",
-        exit_on_error=False,
-    )
-    add_predecessor_verification_arguments(verify_predecessor)
-
-    verify_predecessor_set = subparsers.add_parser(
-        "verify-predecessor-integration-set",
-        help="Verify an exact ordered set of predecessor integration records.",
-        exit_on_error=False,
-    )
-    add_predecessor_set_verification_arguments(verify_predecessor_set)
+    checks.add_argument("--pr", help="PR number, URL, or branch. Defaults to current branch.")
+    checks.add_argument("--watch", action="store_true", help="Watch checks until completion.")
     return parser
-
-
-def add_predecessor_integration_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add the frozen single-unit predecessor producer grammar."""
-    parser.add_argument("--user-task", required=True)
-    parser.add_argument("--repo", required=True)
-    parser.add_argument("--pr", required=True)
-    parser.add_argument("--report-dir", required=True)
-    parser.add_argument("--unit-id", required=True)
-    parser.add_argument("--design-path", required=True)
-    parser.add_argument("--approve-review-path", required=True)
-
-
-def add_predecessor_verification_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add the frozen individual predecessor verification grammar."""
-    parser.add_argument("--record", required=True)
-    parser.add_argument("--archive-manifest", required=True)
-    parser.add_argument("--expected-unit-id", required=True)
-
-
-def add_predecessor_set_verification_arguments(
-    parser: argparse.ArgumentParser,
-) -> None:
-    """Add the frozen ordered predecessor-set verification grammar."""
-    parser.add_argument("--required-unit-id", action="append", required=True)
-    parser.add_argument("--record", action="append", required=True)
-    parser.add_argument("--archive-manifest", action="append", required=True)
 
 
 def add_publish_arguments(parser: argparse.ArgumentParser) -> None:
@@ -385,12 +246,8 @@ def add_publish_arguments(parser: argparse.ArgumentParser) -> None:
         help="The current user task that authorizes this publish operation.",
     )
     parser.add_argument("--repo", help="GitHub repository in owner/name form.")
-    parser.add_argument(
-        "--remote", default="origin", help="Git remote to verify. Defaults to origin."
-    )
-    parser.add_argument(
-        "--branch", help="Branch to publish. Defaults to the current branch."
-    )
+    parser.add_argument("--remote", default="origin", help="Git remote to verify. Defaults to origin.")
+    parser.add_argument("--branch", help="Branch to publish. Defaults to the current branch.")
     parser.add_argument(
         "--summary-out",
         help="Optional JSON summary path. Stdout remains a compact key/value report.",
@@ -401,12 +258,8 @@ def add_pr_arguments(parser: argparse.ArgumentParser) -> None:
     """Add pull-request creation/update arguments."""
     parser.add_argument("--base", default="main", help="Base branch. Defaults to main.")
     parser.add_argument("--title", required=True, help="Pull request title.")
-    parser.add_argument(
-        "--body-file", required=True, help="Path to a Markdown PR body file."
-    )
-    parser.add_argument(
-        "--draft", action="store_true", help="Create the PR as a draft."
-    )
+    parser.add_argument("--body-file", required=True, help="Path to a Markdown PR body file.")
+    parser.add_argument("--draft", action="store_true", help="Create the PR as a draft.")
     parser.add_argument(
         "--update-existing",
         action="store_true",
@@ -475,7 +328,7 @@ def json_list(text: str, *, command: str) -> list[Mapping[str, object]]:
             next_action="rerun_gh_command_and_fix_auth_or_cli_output",
         )
     result: list[Mapping[str, object]] = []
-    for item in cast(list[object], loaded):
+    for item in loaded:
         if isinstance(item, Mapping):
             result.append(cast(Mapping[str, object], item))
     return result
@@ -513,13 +366,52 @@ def gh_repo_metadata(runner: Runner, repo: str | None) -> Mapping[str, object]:
     command = ["gh", "repo", "view"]
     if repo:
         command.append(repo)
-    command.extend(["--json", "nameWithOwner,url,sshUrl"])
+    command.extend(["--json", "nameWithOwner,url,sshUrl,viewerPermission"])
     result = run_command(
         runner,
         command,
         next_action="authenticate_gh_and_verify_the_target_repository",
     )
     return json_object(result.stdout, command="gh repo view")
+
+
+def gh_authenticated_actor(runner: Runner) -> tuple[str, str]:
+    """Return the authenticated GitHub actor from an identity-owning endpoint."""
+    command = ["gh", "api", "user", "--jq", "{id: .id, login: .login, name: .name}"]
+    result = run_command(
+        runner,
+        command,
+        next_action="authenticate_gh_and_read_the_verified_actor_identity",
+    )
+    actor = json_object(result.stdout, command="gh api user")
+    actor_number = actor.get("id")
+    login = actor.get("login")
+    display_name = actor.get("name")
+    if not isinstance(actor_number, int) or not isinstance(login, str) or not login:
+        raise UserVisibleFailure(
+            message="gh api user did not expose immutable actor identity",
+            next_action="authenticate_gh_and_read_the_verified_actor_identity",
+        )
+    display = display_name if isinstance(display_name, str) and display_name else login
+    return f"github-user:{actor_number}", display
+
+
+def gh_head_repo_metadata(runner: Runner, repo: str) -> Mapping[str, object]:
+    """Read fork-parent and permission identity for a non-base head repository."""
+    command = [
+        "gh",
+        "repo",
+        "view",
+        repo,
+        "--json",
+        "nameWithOwner,url,sshUrl,viewerPermission,parent",
+    ]
+    result = run_command(
+        runner,
+        command,
+        next_action="verify_the_fork_head_repository_and_parent_identity",
+    )
+    return json_object(result.stdout, command="gh repo view head")
 
 
 def verify_remote(
@@ -543,1422 +435,64 @@ def verify_remote(
     )
     remote_url = remote_result.stdout.strip()
     remote_slug = normalized_repo_slug(remote_url)
-    if remote_slug is None or remote_slug != name_with_owner:
+    if remote_slug is None:
         raise UserVisibleFailure(
-            message=(
-                f"remote {remote!r} points at {remote_slug or '<unrecognized>'}, "
-                f"but gh resolved {name_with_owner}"
-            ),
+            message=f"remote {remote!r} has an unrecognized GitHub identity",
             next_action="fix_origin_remote_or_pass_the_correct_--repo_verified_remote_required",
         )
+    topology_kind = "user"
+    fork_parent_repo = ""
+    permission_metadata = metadata
+    if remote_slug != name_with_owner:
+        head_metadata = gh_head_repo_metadata(runner, remote_slug)
+        parent = head_metadata.get("parent")
+        parent_name = parent.get("nameWithOwner") if isinstance(parent, Mapping) else None
+        if head_metadata.get("nameWithOwner") != remote_slug or parent_name != name_with_owner:
+            raise UserVisibleFailure(
+                message=(
+                    f"remote {remote!r} points at {remote_slug}, which is not a "
+                    f"verified fork of {name_with_owner}"
+                ),
+                next_action="materialize_the_typed_multiple_remotes_or_contributor_lifecycle",
+            )
+        topology_kind = "fork"
+        fork_parent_repo = name_with_owner
+        permission_metadata = head_metadata
+    viewer_permission = permission_metadata.get("viewerPermission")
+    if viewer_permission in {"ADMIN", "MAINTAIN", "WRITE"}:
+        permission_state = "verified_true"
+    elif isinstance(viewer_permission, str):
+        permission_state = "verified_false"
+    else:
+        permission_state = "unknown"
+    permission_evidence = {
+        "repo": name_with_owner,
+        "head_repo": remote_slug,
+        "topology_kind": topology_kind,
+        "remote": remote,
+        "remote_url_sha256": "sha256:"
+        + hashlib.sha256(remote_url.encode()).hexdigest(),
+        "viewer_permission": viewer_permission,
+        "permission_state": permission_state,
+        "authority_source": "gh repo view viewerPermission",
+    }
+    permission_evidence_id = "evidence:" + hashlib.sha256(
+        canonical_json_bytes(permission_evidence)
+    ).hexdigest()
+    actor_id, actor_display_name = gh_authenticated_actor(runner)
     return RemoteVerification(
         repo=name_with_owner,
         remote=remote,
         remote_url=remote_url,
         remote_slug=remote_slug,
+        topology_kind=topology_kind,
+        head_repo=remote_slug,
+        fork_parent_repo=fork_parent_repo,
+        permission_state=permission_state,
+        permission_evidence_id=permission_evidence_id,
+        actor_id=actor_id,
+        actor_display_name=actor_display_name,
     )
-
-
-def _normalized_predecessor_path(value: str, *, field: str) -> PurePosixPath:
-    path = PurePosixPath(value)
-    if (
-        not value
-        or "\\" in value
-        or "\x00" in value
-        or path.is_absolute()
-        or any(part in {"", ".", ".."} for part in path.parts)
-    ):
-        raise _predecessor_error(
-            "path_mismatch",
-            "path",
-            path=value,
-            field=field,
-            expected="normalized repository-relative POSIX path",
-            observed=value,
-        )
-    return path
-
-
-def _resolve_predecessor_path(
-    root: Path,
-    value: str | PurePosixPath,
-    *,
-    field: str,
-    require_file: bool,
-) -> Path:
-    relative = _normalized_predecessor_path(str(value), field=field)
-    root = root.resolve()
-    lexical = root
-    for component in relative.parts:
-        lexical /= component
-        if lexical.is_symlink():
-            raise _predecessor_error(
-                "path_mismatch",
-                "path",
-                path=relative.as_posix(),
-                field=field,
-                expected="no-symlink path beneath repository root",
-                observed=component,
-            )
-    try:
-        resolved = lexical.resolve(strict=True)
-        resolved.relative_to(root)
-    except (FileNotFoundError, ValueError) as exc:
-        raise _predecessor_error(
-            "path_mismatch",
-            "path",
-            path=relative.as_posix(),
-            field=field,
-            expected="existing contained repository path",
-            observed="missing_or_outside",
-        ) from exc
-    if require_file and (not resolved.is_file() or resolved.is_symlink()):
-        raise _predecessor_error(
-            "path_mismatch",
-            "path",
-            path=relative.as_posix(),
-            field=field,
-            expected="regular file",
-            observed="nonregular",
-        )
-    return resolved
-
-
-def _record_payload_mapping(record: PredecessorIntegrationRecord) -> dict[str, object]:
-    value = asdict(record)
-    return {field: value[field] for field in PREDECESSOR_DIGEST_FIELDS}
-
-
-def _record_mapping(record: PredecessorIntegrationRecord) -> dict[str, object]:
-    value = asdict(record)
-    return {field: value[field] for field in PREDECESSOR_RECORD_FIELDS}
-
-
-def _record_artifact_sha(record: PredecessorIntegrationRecord) -> str:
-    return hashlib.sha256(
-        _canonical_json_line_bytes(_record_payload_mapping(record))
-    ).hexdigest()
-
-
-def _reject_predecessor_duplicate_keys(
-    pairs: list[tuple[str, object]],
-) -> dict[str, object]:
-    result: dict[str, object] = {}
-    for key, value in pairs:
-        if key in result:
-            raise _DuplicatePredecessorKey(key)
-        result[key] = value
-    return result
-
-
-def load_predecessor_integration_record(
-    record_path: Path,
-) -> PredecessorIntegrationRecord:
-    """Load the one strict canonical predecessor record representation."""
-    path_text = record_path.as_posix()
-    if not record_path.exists():
-        raise _predecessor_error(
-            "missing_record",
-            "load",
-            path=path_text,
-            field="record_path",
-            expected="existing immutable record",
-            observed="missing",
-            retryable=True,
-        )
-    if record_path.is_symlink() or not record_path.is_file():
-        raise _predecessor_error(
-            "path_mismatch",
-            "path",
-            path=path_text,
-            field="record_path",
-            expected="regular no-symlink record",
-            observed="nonregular",
-        )
-    payload = record_path.read_bytes()
-    trailing_lf = len(payload) - len(payload.rstrip(b"\n"))
-    if not payload or trailing_lf != 1:
-        raise _predecessor_error(
-            "truncated_json",
-            "decode",
-            path=path_text,
-            field="record",
-            expected="one complete canonical JSON object plus one LF",
-            observed=f"bytes={len(payload)} trailing_lf={trailing_lf}",
-        )
-    try:
-        text = payload.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        code: PredecessorIntegrationErrorCode = (
-            "truncated_json"
-            if exc.reason == "unexpected end of data"
-            else "malformed_json"
-        )
-        raise _predecessor_error(
-            code,
-            "decode",
-            path=path_text,
-            field="record",
-            expected="canonical UTF-8 JSON",
-            observed=f"{exc.reason}@{exc.start}",
-        ) from exc
-    try:
-        decoded: object = json.loads(
-            text,
-            object_pairs_hook=_reject_predecessor_duplicate_keys,
-        )
-    except _DuplicatePredecessorKey as exc:
-        raise _predecessor_error(
-            "malformed_json",
-            "decode",
-            path=path_text,
-            field="record",
-            expected="unique JSON keys",
-            observed=f"duplicate:{exc.key}",
-        ) from exc
-    except json.JSONDecodeError as exc:
-        code = (
-            "truncated_json"
-            if exc.pos >= len(text) - 1 or exc.msg.startswith("Unterminated string")
-            else "malformed_json"
-        )
-        raise _predecessor_error(
-            cast(PredecessorIntegrationErrorCode, code),
-            "decode",
-            path=path_text,
-            field="record",
-            expected="canonical JSON",
-            observed=f"{exc.msg}@{exc.pos}",
-        ) from exc
-    if not isinstance(decoded, dict):
-        raise _predecessor_error(
-            "record_shape_mismatch",
-            "schema",
-            path=path_text,
-            field="record",
-            expected=",".join(PREDECESSOR_RECORD_FIELDS),
-            observed=type(decoded).__name__,
-        )
-    mapping = cast(dict[object, object], decoded)
-    schema = mapping.get("schema_version")
-    if schema != PREDECESSOR_INTEGRATION_SCHEMA_VERSION:
-        raise _predecessor_error(
-            "schema_version_mismatch",
-            "schema",
-            path=path_text,
-            field="schema_version",
-            expected=PREDECESSOR_INTEGRATION_SCHEMA_VERSION,
-            observed=str(schema),
-        )
-    if tuple(mapping) != tuple(sorted(PREDECESSOR_RECORD_FIELDS)) or set(
-        mapping
-    ) != set(PREDECESSOR_RECORD_FIELDS):
-        raise _predecessor_error(
-            "record_shape_mismatch",
-            "schema",
-            path=path_text,
-            field="record",
-            expected=",".join(sorted(PREDECESSOR_RECORD_FIELDS)),
-            observed=",".join(str(key) for key in mapping),
-        )
-    string_fields = tuple(
-        field for field in PREDECESSOR_RECORD_FIELDS if field != "source_pr_number"
-    )
-    invalid_field = next(
-        (field for field in string_fields if not isinstance(mapping.get(field), str)),
-        None,
-    )
-    number = mapping.get("source_pr_number")
-    if (
-        invalid_field is not None
-        or not isinstance(number, int)
-        or isinstance(number, bool)
-    ):
-        field = invalid_field or "source_pr_number"
-        raise _predecessor_error(
-            "record_shape_mismatch",
-            "schema",
-            path=path_text,
-            field=field,
-            expected="string" if invalid_field else "positive integer",
-            observed=type(mapping.get(field)).__name__,
-        )
-    record = PredecessorIntegrationRecord(
-        schema_version=cast(str, mapping["schema_version"]),
-        unit_id=cast(str, mapping["unit_id"]),
-        design_path=cast(str, mapping["design_path"]),
-        design_sha256=cast(str, mapping["design_sha256"]),
-        approve_review_path=cast(str, mapping["approve_review_path"]),
-        approve_review_sha256=cast(str, mapping["approve_review_sha256"]),
-        source_pr_url=cast(str, mapping["source_pr_url"]),
-        source_pr_number=cast(int, mapping["source_pr_number"]),
-        integrated_source_oid=cast(str, mapping["integrated_source_oid"]),
-        observed_target_main_oid=cast(str, mapping["observed_target_main_oid"]),
-        produced_at=cast(str, mapping["produced_at"]),
-        producer=cast(str, mapping["producer"]),
-        artifact_sha256=cast(str, mapping["artifact_sha256"]),
-    )
-    predecessor_integration_filename(record.unit_id)
-    if record.source_pr_number <= 0:
-        raise _predecessor_error(
-            "record_shape_mismatch",
-            "schema",
-            unit_id=record.unit_id,
-            path=path_text,
-            field="source_pr_number",
-            expected="positive integer",
-            observed=str(record.source_pr_number),
-        )
-    for field in ("design_path", "approve_review_path"):
-        _normalized_predecessor_path(getattr(record, field), field=field)
-    for field in ("design_sha256", "approve_review_sha256", "artifact_sha256"):
-        if PREDECESSOR_SHA_PATTERN.fullmatch(getattr(record, field)) is None:
-            raise _predecessor_error(
-                "record_shape_mismatch",
-                "schema",
-                unit_id=record.unit_id,
-                path=path_text,
-                field=field,
-                expected="lowercase SHA-256",
-                observed=getattr(record, field),
-            )
-    for field in ("integrated_source_oid", "observed_target_main_oid"):
-        if PREDECESSOR_OID_PATTERN.fullmatch(getattr(record, field)) is None:
-            raise _predecessor_error(
-                "record_shape_mismatch",
-                "schema",
-                unit_id=record.unit_id,
-                path=path_text,
-                field=field,
-                expected="full lowercase commit OID",
-                observed=getattr(record, field),
-            )
-    if record.producer != PREDECESSOR_INTEGRATION_PRODUCER:
-        raise _predecessor_error(
-            "record_shape_mismatch",
-            "schema",
-            unit_id=record.unit_id,
-            path=path_text,
-            field="producer",
-            expected=PREDECESSOR_INTEGRATION_PRODUCER,
-            observed=record.producer,
-        )
-    try:
-        if (
-            re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", record.produced_at)
-            is None
-        ):
-            raise ValueError("timestamp is not canonical UTC seconds with Z")
-        datetime.strptime(record.produced_at, "%Y-%m-%dT%H:%M:%SZ")
-    except ValueError as exc:
-        raise _predecessor_error(
-            "record_shape_mismatch",
-            "schema",
-            unit_id=record.unit_id,
-            path=path_text,
-            field="produced_at",
-            expected="UTC RFC 3339 timestamp with Z",
-            observed=record.produced_at,
-        ) from exc
-    canonical = _canonical_json_line_bytes(_record_mapping(record))
-    if canonical != payload:
-        raise _predecessor_error(
-            "record_shape_mismatch",
-            "schema",
-            unit_id=record.unit_id,
-            path=path_text,
-            field="record",
-            expected="canonical JSON bytes",
-            observed="noncanonical",
-        )
-    computed_artifact_sha = _record_artifact_sha(record)
-    if record.artifact_sha256 != computed_artifact_sha:
-        raise _predecessor_error(
-            "record_hash_mismatch",
-            "schema",
-            unit_id=record.unit_id,
-            path=path_text,
-            field="artifact_sha256",
-            expected=computed_artifact_sha,
-            observed=record.artifact_sha256,
-        )
-    return record
-
-
-def _run_predecessor_command(
-    runner: Runner,
-    command: Sequence[str],
-    *,
-    unit_id: str,
-    phase: PredecessorIntegrationPhase,
-    field: str,
-    allowed_returncodes: frozenset[int] = frozenset({0}),
-) -> CommandResult:
-    try:
-        result = runner(command)
-    except OSError as exc:
-        raise _predecessor_error(
-            "process_failure",
-            phase,
-            unit_id=unit_id,
-            field=field,
-            expected="external command launch",
-            observed=type(exc).__name__,
-            command=command,
-            retryable=True,
-        ) from exc
-    if result.returncode not in allowed_returncodes:
-        raise _predecessor_error(
-            "process_failure",
-            phase,
-            unit_id=unit_id,
-            field=field,
-            expected=f"returncode in {sorted(allowed_returncodes)}",
-            observed=str(result.returncode),
-            command=result.args,
-            returncode=result.returncode,
-            retryable=True,
-        )
-    return result
-
-
-def _canonical_pr_selector(pr: str, repo: str, unit_id: str) -> str:
-    if pr.isdecimal() and int(pr) > 0:
-        return pr
-    expected_prefix = f"https://github.com/{repo}/pull/"
-    parsed = urlparse(pr)
-    if (
-        not pr.startswith(expected_prefix)
-        or parsed.scheme != "https"
-        or parsed.netloc != "github.com"
-        or parsed.query
-        or parsed.fragment
-        or not parsed.path.removeprefix(f"/{repo}/pull/").isdecimal()
-        or int(parsed.path.rsplit("/", 1)[-1]) <= 0
-    ):
-        raise _predecessor_error(
-            "usage_error",
-            "arguments",
-            unit_id=unit_id,
-            field="pr",
-            expected="positive decimal or canonical verified-repository PR URL",
-            observed=pr,
-        )
-    return pr
-
-
-def _predecessor_pr_metadata(
-    *,
-    runner: Runner,
-    repo: str,
-    pr: str,
-    unit_id: str,
-) -> tuple[str, int, str]:
-    selector = _canonical_pr_selector(pr, repo, unit_id)
-    command = (
-        "gh",
-        "pr",
-        "view",
-        selector,
-        "--repo",
-        repo,
-        "--json",
-        "number,url,state,mergedAt,mergeCommit,baseRefName",
-    )
-    result = _run_predecessor_command(
-        runner,
-        command,
-        unit_id=unit_id,
-        phase="pr",
-        field="source_pr",
-    )
-    try:
-        value: object = json.loads(result.stdout)
-    except json.JSONDecodeError as exc:
-        raise _predecessor_error(
-            "source_pr_mismatch",
-            "pr",
-            unit_id=unit_id,
-            field="source_pr",
-            expected="gh merged PR JSON",
-            observed=f"invalid_json@{exc.pos}",
-            command=result.args,
-            returncode=result.returncode,
-        ) from exc
-    if not isinstance(value, dict):
-        raise _predecessor_error(
-            "source_pr_mismatch",
-            "pr",
-            unit_id=unit_id,
-            field="source_pr",
-            expected="gh merged PR object",
-            observed=type(value).__name__,
-            command=result.args,
-            returncode=result.returncode,
-        )
-    metadata = cast(dict[str, object], value)
-    number = metadata.get("number")
-    url = metadata.get("url")
-    merge_commit = metadata.get("mergeCommit")
-    merge_mapping = (
-        cast(dict[str, object], merge_commit) if isinstance(merge_commit, dict) else {}
-    )
-    merge_oid = merge_mapping.get("oid")
-    expected_url = f"https://github.com/{repo}/pull/{number}"
-    checks = (
-        isinstance(number, int) and not isinstance(number, bool) and number > 0,
-        isinstance(url, str) and url == expected_url,
-        metadata.get("state") == "MERGED",
-        isinstance(metadata.get("mergedAt"), str) and bool(metadata.get("mergedAt")),
-        metadata.get("baseRefName") == PREDECESSOR_TARGET_BRANCH,
-        isinstance(merge_oid, str)
-        and PREDECESSOR_OID_PATTERN.fullmatch(merge_oid) is not None,
-    )
-    if not all(checks):
-        raise _predecessor_error(
-            "source_pr_mismatch",
-            "pr",
-            unit_id=unit_id,
-            field="source_pr",
-            expected=f"merged {repo} PR to main with full merge OID",
-            observed=json.dumps(metadata, sort_keys=True)[
-                :PREDECESSOR_ERROR_VALUE_MAX_CHARS
-            ],
-            command=result.args,
-            returncode=result.returncode,
-        )
-    if selector.isdecimal() and int(selector) != number:
-        raise _predecessor_error(
-            "source_pr_mismatch",
-            "pr",
-            unit_id=unit_id,
-            field="source_pr_number",
-            expected=selector,
-            observed=str(number),
-            command=result.args,
-            returncode=result.returncode,
-        )
-    if selector.startswith("https://") and selector != url:
-        raise _predecessor_error(
-            "source_pr_mismatch",
-            "pr",
-            unit_id=unit_id,
-            field="source_pr_url",
-            expected=selector,
-            observed=cast(str, url),
-            command=result.args,
-            returncode=result.returncode,
-        )
-    return cast(str, url), cast(int, number), cast(str, merge_oid)
-
-
-def _same_sha_approve(
-    *,
-    root: Path,
-    report_dir: Path,
-    design_path: PurePosixPath,
-    review_path: PurePosixPath,
-    design_sha256: str,
-    unit_id: str,
-) -> tuple[Path, Path, str]:
-    design = _resolve_predecessor_path(
-        root,
-        design_path,
-        field="design_path",
-        require_file=True,
-    )
-    review = _resolve_predecessor_path(
-        root,
-        review_path,
-        field="approve_review_path",
-        require_file=True,
-    )
-    report_dir = report_dir.resolve()
-    try:
-        design.relative_to(report_dir)
-        review.relative_to(report_dir)
-    except ValueError as exc:
-        raise _predecessor_error(
-            "path_mismatch",
-            "path",
-            unit_id=unit_id,
-            path=review_path.as_posix(),
-            field="approve_review_path",
-            expected=f"same report directory as {design_path.as_posix()}",
-            observed=review_path.as_posix(),
-        ) from exc
-    observed_design_sha = hashlib.sha256(design.read_bytes()).hexdigest()
-    if observed_design_sha != design_sha256:
-        raise _predecessor_error(
-            "design_hash_mismatch",
-            "review",
-            unit_id=unit_id,
-            path=design_path.as_posix(),
-            field="design_sha256",
-            expected=design_sha256,
-            observed=observed_design_sha,
-        )
-    review_bytes = review.read_bytes()
-    review_sha = hashlib.sha256(review_bytes).hexdigest()
-    identity = parse_review_identity(review_bytes.decode("utf-8"))
-    declared_design = identity.design_artifact_path
-    if declared_design is not None:
-        declared_path = _normalized_predecessor_path(
-            declared_design,
-            field="review.design_artifact_path",
-        )
-        if len(declared_path.parts) == 1:
-            declared_path = PurePosixPath(review_path.parent, declared_path)
-    else:
-        declared_path = None
-    if (
-        declared_path != design_path
-        or identity.review_target_sha256 != design_sha256
-        or not identity.decision_approved
-    ):
-        raise _predecessor_error(
-            "same_sha_approve_mismatch",
-            "review",
-            unit_id=unit_id,
-            path=review_path.as_posix(),
-            field="review_identity",
-            expected=f"path={design_path.as_posix()} sha={design_sha256} decision=APPROVE",
-            observed=(
-                f"path={declared_path.as_posix() if declared_path else None} "
-                f"sha={identity.review_target_sha256} approved={identity.decision_approved}"
-            ),
-        )
-    return design, review, review_sha
-
-
-def _rename_predecessor_noreplace(source: Path, target: Path) -> None:
-    libc = ctypes.CDLL(None, use_errno=True)
-    try:
-        function = libc.renameat2
-    except AttributeError as exc:
-        raise OSError(errno.ENOSYS, os.strerror(errno.ENOSYS)) from exc
-    function.argtypes = (
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_uint,
-    )
-    function.restype = ctypes.c_int
-    result = function(
-        PREDECESSOR_AT_FDCWD,
-        os.fsencode(source),
-        PREDECESSOR_AT_FDCWD,
-        os.fsencode(target),
-        PREDECESSOR_RENAME_NOREPLACE,
-    )
-    if result != 0:
-        error = ctypes.get_errno()
-        raise OSError(error, os.strerror(error))
-
-
-def _publish_predecessor_record(
-    *,
-    target: Path,
-    payload: bytes,
-    unit_id: str,
-) -> None:
-    temp: Path | None = None
-    temp_identity: tuple[int, int] | None = None
-    try:
-        for _attempt in range(PREDECESSOR_GENERATED_NAME_ATTEMPTS):
-            candidate = target.parent / (
-                f".{target.name}.tmp.{os.getpid()}.{secrets.token_hex(16)}"
-            )
-            try:
-                descriptor = os.open(
-                    candidate,
-                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW,
-                    PREDECESSOR_TEMP_MODE,
-                )
-            except FileExistsError:
-                continue
-            temp = candidate
-            status = os.fstat(descriptor)
-            temp_identity = (status.st_dev, status.st_ino)
-            try:
-                with os.fdopen(descriptor, "wb", closefd=True) as handle:
-                    handle.write(payload)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-            except BaseException:
-                raise
-            break
-        if temp is None:
-            raise OSError(errno.EEXIST, "predecessor temp name exhausted")
-        before = os.lstat(temp)
-        if (
-            not stat.S_ISREG(before.st_mode)
-            or before.st_uid != os.geteuid()
-            or before.st_nlink != 1
-            or stat.S_IMODE(before.st_mode) != PREDECESSOR_TEMP_MODE
-            or (before.st_dev, before.st_ino) != temp_identity
-            or temp.read_bytes() != payload
-        ):
-            raise OSError(errno.EIO, "predecessor temp verification failed")
-        _rename_predecessor_noreplace(temp, target)
-        temp = None
-        os.chmod(target, PREDECESSOR_FILE_MODE, follow_symlinks=False)
-        descriptor = os.open(
-            target.parent,
-            os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
-        )
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-    except OSError as exc:
-        if temp is not None and temp_identity is not None:
-            try:
-                observed = os.lstat(temp)
-                if (observed.st_dev, observed.st_ino) == temp_identity:
-                    temp.unlink()
-            except FileNotFoundError:
-                pass
-            except OSError as cleanup_error:
-                raise _predecessor_error(
-                    "cleanup_failure",
-                    "cleanup",
-                    unit_id=unit_id,
-                    path=str(temp),
-                    field="producer_temp",
-                    expected=str(temp_identity),
-                    observed=type(cleanup_error).__name__,
-                ) from cleanup_error
-        code: PredecessorIntegrationErrorCode = (
-            "record_collision" if exc.errno == errno.EEXIST else "publication_failure"
-        )
-        raise _predecessor_error(
-            code,
-            "publish",
-            unit_id=unit_id,
-            path=str(target),
-            field="record_path",
-            expected="durable no-replace publication",
-            observed=f"errno={exc.errno}",
-        ) from exc
-
-
-def produce_predecessor_integration_record(
-    *,
-    root: Path,
-    report_dir: Path,
-    unit_id: str,
-    design_path: PurePosixPath,
-    approve_review_path: PurePosixPath,
-    pr: str,
-    remote: RemoteVerification,
-    runner: Runner,
-) -> Path:
-    """Produce one immutable post-merge predecessor integration record."""
-    filename = predecessor_integration_filename(unit_id)
-    root = root.resolve()
-    if remote.remote != PREDECESSOR_TARGET_REMOTE:
-        raise _predecessor_error(
-            "source_pr_mismatch",
-            "remote",
-            unit_id=unit_id,
-            field="remote",
-            expected=PREDECESSOR_TARGET_REMOTE,
-            observed=remote.remote,
-        )
-    report_relative = PurePosixPath(report_dir)
-    report = _resolve_predecessor_path(
-        root,
-        report_relative,
-        field="report_dir",
-        require_file=False,
-    )
-    if not report.is_dir():
-        raise _predecessor_error(
-            "path_mismatch",
-            "path",
-            unit_id=unit_id,
-            path=report_relative.as_posix(),
-            field="report_dir",
-            expected="existing report directory",
-            observed="non-directory",
-        )
-    source_pr_url, source_pr_number, integrated_oid = _predecessor_pr_metadata(
-        runner=runner,
-        repo=remote.repo,
-        pr=pr,
-        unit_id=unit_id,
-    )
-    _run_predecessor_command(
-        runner,
-        ("git", "fetch", PREDECESSOR_TARGET_REMOTE, PREDECESSOR_TARGET_BRANCH),
-        unit_id=unit_id,
-        phase="git",
-        field="origin_main_fetch",
-    )
-    observed_result = _run_predecessor_command(
-        runner,
-        ("git", "rev-parse", f"{PREDECESSOR_TARGET_MAIN_REF}^{{commit}}"),
-        unit_id=unit_id,
-        phase="git",
-        field="observed_target_main_oid",
-    )
-    observed_oid = observed_result.stdout.strip()
-    if PREDECESSOR_OID_PATTERN.fullmatch(observed_oid) is None:
-        raise _predecessor_error(
-            "git_object_missing",
-            "git",
-            unit_id=unit_id,
-            field="observed_target_main_oid",
-            expected="full origin/main commit OID",
-            observed=observed_oid,
-            command=observed_result.args,
-            returncode=observed_result.returncode,
-        )
-    ancestor = _run_predecessor_command(
-        runner,
-        ("git", "merge-base", "--is-ancestor", integrated_oid, observed_oid),
-        unit_id=unit_id,
-        phase="git",
-        field="integrated_source_oid",
-        allowed_returncodes=frozenset({0, 1}),
-    )
-    if ancestor.returncode == 1:
-        raise _predecessor_error(
-            "non_ancestor",
-            "git",
-            unit_id=unit_id,
-            field="integrated_source_oid",
-            expected=f"ancestor of {observed_oid}",
-            observed=integrated_oid,
-            command=ancestor.args,
-            returncode=1,
-        )
-    design = _resolve_predecessor_path(
-        root,
-        design_path,
-        field="design_path",
-        require_file=True,
-    )
-    design_sha = hashlib.sha256(design.read_bytes()).hexdigest()
-    _design, _review, review_sha = _same_sha_approve(
-        root=root,
-        report_dir=report,
-        design_path=design_path,
-        review_path=approve_review_path,
-        design_sha256=design_sha,
-        unit_id=unit_id,
-    )
-    provisional = PredecessorIntegrationRecord(
-        schema_version=PREDECESSOR_INTEGRATION_SCHEMA_VERSION,
-        unit_id=unit_id,
-        design_path=design_path.as_posix(),
-        design_sha256=design_sha,
-        approve_review_path=approve_review_path.as_posix(),
-        approve_review_sha256=review_sha,
-        source_pr_url=source_pr_url,
-        source_pr_number=source_pr_number,
-        integrated_source_oid=integrated_oid,
-        observed_target_main_oid=observed_oid,
-        produced_at=datetime.now(UTC)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z"),
-        producer=PREDECESSOR_INTEGRATION_PRODUCER,
-        artifact_sha256="",
-    )
-    record = replace(
-        provisional,
-        artifact_sha256=_record_artifact_sha(provisional),
-    )
-    try:
-        payload = _canonical_json_line_bytes(_record_mapping(record))
-    except (TypeError, ValueError) as exc:
-        raise _predecessor_error(
-            "serialization_failure",
-            "serialize",
-            unit_id=unit_id,
-            field="record",
-            expected=PREDECESSOR_INTEGRATION_SCHEMA_VERSION,
-            observed=type(exc).__name__,
-        ) from exc
-    target = report / filename
-    if os.path.lexists(target):
-        try:
-            existing = load_predecessor_integration_record(target)
-        except PredecessorIntegrationError as exc:
-            raise _predecessor_error(
-                "record_collision",
-                "publish",
-                unit_id=unit_id,
-                path=str(target),
-                field="record_path",
-                expected=hashlib.sha256(payload).hexdigest(),
-                observed=exc.code,
-            ) from exc
-        stable_fields = tuple(
-            field for field in PREDECESSOR_DIGEST_FIELDS if field != "produced_at"
-        )
-        if all(
-            getattr(existing, field) == getattr(record, field)
-            for field in stable_fields
-        ):
-            return target
-        raise _predecessor_error(
-            "record_collision",
-            "publish",
-            unit_id=unit_id,
-            path=str(target),
-            field="record_path",
-            expected=hashlib.sha256(payload).hexdigest(),
-            observed=hashlib.sha256(target.read_bytes()).hexdigest(),
-        )
-    _publish_predecessor_record(target=target, payload=payload, unit_id=unit_id)
-    loaded = load_predecessor_integration_record(target)
-    if loaded != record:
-        raise _predecessor_error(
-            "publication_failure",
-            "publish",
-            unit_id=unit_id,
-            path=str(target),
-            field="record_path",
-            expected=record.artifact_sha256,
-            observed=loaded.artifact_sha256,
-        )
-    return target
-
-
-def _archive_manifest_complete_sha(
-    *,
-    manifest_path: Path,
-    record_path: Path,
-    unit_id: str,
-) -> str:
-    if (
-        manifest_path.parent != record_path.parent
-        or manifest_path.name != "archive_manifest.json"
-    ):
-        raise _predecessor_error(
-            "path_mismatch",
-            "archive",
-            unit_id=unit_id,
-            path=str(manifest_path),
-            field="archive_manifest_path",
-            expected="sibling archive_manifest.json",
-            observed=str(manifest_path),
-        )
-    try:
-        value: object = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise _predecessor_error(
-            "archive_hash_mismatch",
-            "archive",
-            unit_id=unit_id,
-            path=str(manifest_path),
-            field="archive_manifest",
-            expected="valid sibling archive manifest",
-            observed=type(exc).__name__,
-        ) from exc
-    if not isinstance(value, dict):
-        raise _predecessor_error(
-            "archive_hash_mismatch",
-            "archive",
-            unit_id=unit_id,
-            path=str(manifest_path),
-            field="files",
-            expected=record_path.name,
-            observed="missing",
-        )
-    manifest = cast(dict[str, object], value)
-    raw_files = manifest.get("files")
-    if not isinstance(raw_files, list):
-        raise _predecessor_error(
-            "archive_hash_mismatch",
-            "archive",
-            unit_id=unit_id,
-            path=str(manifest_path),
-            field="files",
-            expected=record_path.name,
-            observed="missing",
-        )
-    matches: list[dict[str, object]] = []
-    for item in cast(list[object], raw_files):
-        if not isinstance(item, dict):
-            continue
-        entry = cast(dict[str, object], item)
-        if entry.get("path") == record_path.name:
-            matches.append(entry)
-    if len(matches) != 1 or not isinstance(matches[0].get("sha256"), str):
-        raise _predecessor_error(
-            "archive_hash_mismatch",
-            "archive",
-            unit_id=unit_id,
-            path=str(manifest_path),
-            field="files.sha256",
-            expected=f"one entry for {record_path.name}",
-            observed=str(len(matches)),
-        )
-    return cast(str, matches[0]["sha256"])
-
-
-def _verification_report_files(
-    *,
-    root: Path,
-    record_path: Path,
-    record: PredecessorIntegrationRecord,
-) -> tuple[Path, Path]:
-    design_original = PurePosixPath(record.design_path)
-    review_original = PurePosixPath(record.approve_review_path)
-    if design_original.parent != review_original.parent:
-        raise _predecessor_error(
-            "path_mismatch",
-            "path",
-            unit_id=record.unit_id,
-            path=record.approve_review_path,
-            field="approve_review_path",
-            expected=design_original.parent.as_posix(),
-            observed=review_original.parent.as_posix(),
-        )
-    snapshot_relative = record_path.parent.resolve().relative_to(root.resolve())
-    design_snapshot = PurePosixPath(snapshot_relative.as_posix(), design_original.name)
-    review_snapshot = PurePosixPath(snapshot_relative.as_posix(), review_original.name)
-    return (
-        _resolve_predecessor_path(
-            root,
-            design_snapshot,
-            field="design_path",
-            require_file=True,
-        ),
-        _resolve_predecessor_path(
-            root,
-            review_snapshot,
-            field="approve_review_path",
-            require_file=True,
-        ),
-    )
-
-
-def _verify_record_review_bytes(
-    *,
-    root: Path,
-    record_path: Path,
-    record: PredecessorIntegrationRecord,
-) -> tuple[bool, bool, bool]:
-    design, review = _verification_report_files(
-        root=root,
-        record_path=record_path,
-        record=record,
-    )
-    design_sha = hashlib.sha256(design.read_bytes()).hexdigest()
-    if design_sha != record.design_sha256:
-        raise _predecessor_error(
-            "design_hash_mismatch",
-            "review",
-            unit_id=record.unit_id,
-            path=record.design_path,
-            field="design_sha256",
-            expected=record.design_sha256,
-            observed=design_sha,
-        )
-    review_bytes = review.read_bytes()
-    review_sha = hashlib.sha256(review_bytes).hexdigest()
-    if review_sha != record.approve_review_sha256:
-        raise _predecessor_error(
-            "review_hash_mismatch",
-            "review",
-            unit_id=record.unit_id,
-            path=record.approve_review_path,
-            field="approve_review_sha256",
-            expected=record.approve_review_sha256,
-            observed=review_sha,
-        )
-    identity = parse_review_identity(review_bytes.decode("utf-8"))
-    declared = identity.design_artifact_path
-    if declared is not None:
-        declared_path = _normalized_predecessor_path(
-            declared,
-            field="review.design_artifact_path",
-        )
-        if len(declared_path.parts) == 1:
-            declared_path = PurePosixPath(
-                PurePosixPath(record.approve_review_path).parent, declared_path
-            )
-    else:
-        declared_path = None
-    if (
-        declared_path != PurePosixPath(record.design_path)
-        or identity.review_target_sha256 != record.design_sha256
-        or not identity.decision_approved
-    ):
-        raise _predecessor_error(
-            "same_sha_approve_mismatch",
-            "review",
-            unit_id=record.unit_id,
-            path=record.approve_review_path,
-            field="review_identity",
-            expected=f"path={record.design_path} sha={record.design_sha256} decision=APPROVE",
-            observed=(
-                f"path={declared_path.as_posix() if declared_path else None} "
-                f"sha={identity.review_target_sha256} approved={identity.decision_approved}"
-            ),
-        )
-    return True, True, True
-
-
-def _verify_predecessor_remote(
-    runner: Runner,
-    *,
-    unit_id: str,
-) -> RemoteVerification:
-    try:
-        return verify_remote(
-            runner,
-            repo=None,
-            remote=PREDECESSOR_TARGET_REMOTE,
-        )
-    except CommandFailure as exc:
-        raise _predecessor_error(
-            "process_failure",
-            "remote",
-            unit_id=unit_id,
-            field="remote",
-            expected="verified origin repository",
-            observed=str(exc.result.returncode),
-            command=exc.result.args,
-            returncode=exc.result.returncode,
-            retryable=True,
-        ) from exc
-    except UserVisibleFailure as exc:
-        raise _predecessor_error(
-            "source_pr_mismatch",
-            "remote",
-            unit_id=unit_id,
-            field="remote",
-            expected="verified origin repository",
-            observed=exc.message,
-        ) from exc
-
-
-def _require_git_commit(
-    runner: Runner,
-    *,
-    unit_id: str,
-    oid: str,
-    field: str,
-) -> None:
-    command = ("git", "cat-file", "-e", f"{oid}^{{commit}}")
-    result = _run_predecessor_command(
-        runner,
-        command,
-        unit_id=unit_id,
-        phase="git",
-        field=field,
-        allowed_returncodes=frozenset({0, 1, 128}),
-    )
-    if result.returncode != 0:
-        raise _predecessor_error(
-            "git_object_missing",
-            "git",
-            unit_id=unit_id,
-            field=field,
-            expected=oid,
-            observed="missing",
-            command=result.args,
-            returncode=result.returncode,
-        )
-
-
-def verify_predecessor_integration_record(
-    *,
-    root: Path,
-    record_path: Path,
-    archive_manifest_path: Path,
-    expected_unit_id: str,
-    runner: Runner,
-) -> PredecessorIntegrationVerification:
-    """Verify one immutable predecessor record without fetching or writing."""
-    predecessor_integration_filename(expected_unit_id)
-    root = root.resolve()
-    record_relative = _normalized_predecessor_path(
-        record_path.as_posix(),
-        field="record_path",
-    )
-    manifest_relative = _normalized_predecessor_path(
-        archive_manifest_path.as_posix(),
-        field="archive_manifest_path",
-    )
-    record_candidate = root.joinpath(*record_relative.parts)
-    if not os.path.lexists(record_candidate):
-        raise _predecessor_error(
-            "missing_record",
-            "load",
-            unit_id=expected_unit_id,
-            path=record_relative.as_posix(),
-            field="record_path",
-            expected="existing immutable record",
-            observed="missing",
-            retryable=True,
-        )
-    record_file = _resolve_predecessor_path(
-        root,
-        record_relative,
-        field="record_path",
-        require_file=True,
-    )
-    manifest_file = _resolve_predecessor_path(
-        root,
-        manifest_relative,
-        field="archive_manifest_path",
-        require_file=True,
-    )
-    record = load_predecessor_integration_record(record_file)
-    if record.unit_id != expected_unit_id:
-        raise _predecessor_error(
-            "unit_id_mismatch",
-            "schema",
-            unit_id=record.unit_id,
-            path=record_relative.as_posix(),
-            field="unit_id",
-            expected=expected_unit_id,
-            observed=record.unit_id,
-        )
-    expected_filename = predecessor_integration_filename(record.unit_id)
-    if record_file.name != expected_filename:
-        raise _predecessor_error(
-            "filename_mismatch",
-            "path",
-            unit_id=record.unit_id,
-            path=record_relative.as_posix(),
-            field="record_path",
-            expected=expected_filename,
-            observed=record_file.name,
-        )
-    complete_sha = hashlib.sha256(record_file.read_bytes()).hexdigest()
-    archived_sha = _archive_manifest_complete_sha(
-        manifest_path=manifest_file,
-        record_path=record_file,
-        unit_id=record.unit_id,
-    )
-    if archived_sha != complete_sha:
-        raise _predecessor_error(
-            "archive_hash_mismatch",
-            "archive",
-            unit_id=record.unit_id,
-            path=manifest_relative.as_posix(),
-            field="files.sha256",
-            expected=complete_sha,
-            observed=archived_sha,
-        )
-    design_ok, review_ok, same_sha_ok = _verify_record_review_bytes(
-        root=root,
-        record_path=record_file,
-        record=record,
-    )
-    remote = _verify_predecessor_remote(runner, unit_id=record.unit_id)
-    pr_url, pr_number, merge_oid = _predecessor_pr_metadata(
-        runner=runner,
-        repo=remote.repo,
-        pr=record.source_pr_url,
-        unit_id=record.unit_id,
-    )
-    if (
-        pr_url != record.source_pr_url
-        or pr_number != record.source_pr_number
-        or merge_oid != record.integrated_source_oid
-    ):
-        raise _predecessor_error(
-            "source_pr_mismatch",
-            "pr",
-            unit_id=record.unit_id,
-            path=record_relative.as_posix(),
-            field="source_pr",
-            expected=f"{record.source_pr_url}:{record.source_pr_number}:{record.integrated_source_oid}",
-            observed=f"{pr_url}:{pr_number}:{merge_oid}",
-        )
-    current_result = _run_predecessor_command(
-        runner,
-        ("git", "rev-parse", f"{PREDECESSOR_TARGET_MAIN_REF}^{{commit}}"),
-        unit_id=record.unit_id,
-        phase="git",
-        field="current_target_main_oid",
-    )
-    current_oid = current_result.stdout.strip()
-    if PREDECESSOR_OID_PATTERN.fullmatch(current_oid) is None:
-        raise _predecessor_error(
-            "git_object_missing",
-            "git",
-            unit_id=record.unit_id,
-            field="current_target_main_oid",
-            expected="full origin/main commit OID",
-            observed=current_oid,
-            command=current_result.args,
-            returncode=current_result.returncode,
-        )
-    for field, oid in (
-        ("integrated_source_oid", record.integrated_source_oid),
-        ("observed_target_main_oid", record.observed_target_main_oid),
-        ("current_target_main_oid", current_oid),
-    ):
-        _require_git_commit(
-            runner,
-            unit_id=record.unit_id,
-            oid=oid,
-            field=field,
-        )
-    integrated_ancestor = _run_predecessor_command(
-        runner,
-        (
-            "git",
-            "merge-base",
-            "--is-ancestor",
-            record.integrated_source_oid,
-            record.observed_target_main_oid,
-        ),
-        unit_id=record.unit_id,
-        phase="git",
-        field="integrated_source_oid",
-        allowed_returncodes=frozenset({0, 1}),
-    )
-    if integrated_ancestor.returncode == 1:
-        raise _predecessor_error(
-            "non_ancestor",
-            "git",
-            unit_id=record.unit_id,
-            field="integrated_source_oid",
-            expected=record.observed_target_main_oid,
-            observed=record.integrated_source_oid,
-            command=integrated_ancestor.args,
-            returncode=1,
-        )
-    observed_ancestor = _run_predecessor_command(
-        runner,
-        (
-            "git",
-            "merge-base",
-            "--is-ancestor",
-            record.observed_target_main_oid,
-            PREDECESSOR_TARGET_MAIN_REF,
-        ),
-        unit_id=record.unit_id,
-        phase="git",
-        field="observed_target_main_oid",
-        allowed_returncodes=frozenset({0, 1}),
-    )
-    if observed_ancestor.returncode == 1:
-        raise _predecessor_error(
-            "stale_record",
-            "git",
-            unit_id=record.unit_id,
-            path=record_relative.as_posix(),
-            field="observed_target_main_oid",
-            expected=current_oid,
-            observed=record.observed_target_main_oid,
-            command=observed_ancestor.args,
-            returncode=1,
-        )
-    return PredecessorIntegrationVerification(
-        record=record,
-        record_path=record_file,
-        archive_manifest_path=manifest_file,
-        complete_file_sha256=complete_sha,
-        design_sha256_verified=design_ok,
-        approve_review_sha256_verified=review_ok,
-        same_sha_approve_verified=same_sha_ok,
-        source_pr_identity_verified=True,
-        integrated_is_ancestor_of_observed_main=True,
-        observed_main_is_ancestor_of_current_main=True,
-    )
-
-
-def verify_predecessor_integration_set(
-    *,
-    root: Path,
-    inputs: tuple[PredecessorIntegrationInput, ...],
-    required_unit_ids: tuple[str, ...],
-    runner: Runner,
-) -> PredecessorIntegrationSetVerification:
-    """Verify one exact ordered predecessor set in memory."""
-    if not required_unit_ids:
-        raise _predecessor_error(
-            "set_inconsistency",
-            "set",
-            field="required_unit_ids",
-            expected="one or more exact unit IDs",
-            observed="empty",
-        )
-    seen: dict[str, int] = {}
-    for index, unit_id in enumerate(required_unit_ids):
-        predecessor_integration_filename(unit_id)
-        if unit_id in seen:
-            raise _predecessor_error(
-                "duplicate_unit_id",
-                "set",
-                unit_id=unit_id,
-                field="required_unit_ids",
-                expected=str(seen[unit_id]),
-                observed=str(index),
-            )
-        seen[unit_id] = index
-    input_ids = tuple(value.expected_unit_id for value in inputs)
-    if input_ids != required_unit_ids:
-        raise _predecessor_error(
-            "set_inconsistency",
-            "set",
-            field="inputs",
-            expected=",".join(required_unit_ids),
-            observed=",".join(input_ids),
-        )
-    if len(set(input_ids)) != len(input_ids):
-        repeated = next(value for value in input_ids if input_ids.count(value) > 1)
-        raise _predecessor_error(
-            "duplicate_unit_id",
-            "set",
-            unit_id=repeated,
-            field="inputs",
-            expected="unique IDs",
-            observed=repeated,
-        )
-    archive_parents = {value.archive_manifest_path.parent for value in inputs}
-    if len(archive_parents) != 1:
-        raise _predecessor_error(
-            "set_inconsistency",
-            "set",
-            field="archive_manifest_path",
-            expected="one shared archive snapshot directory",
-            observed=",".join(sorted(path.as_posix() for path in archive_parents)),
-        )
-    verified = tuple(
-        verify_predecessor_integration_record(
-            root=root,
-            record_path=value.record_path,
-            archive_manifest_path=value.archive_manifest_path,
-            expected_unit_id=value.expected_unit_id,
-            runner=runner,
-        )
-        for value in inputs
-    )
-    verified_ids = tuple(value.record.unit_id for value in verified)
-    if verified_ids != required_unit_ids or len(set(verified_ids)) != len(verified_ids):
-        raise _predecessor_error(
-            "set_inconsistency",
-            "set",
-            field="verified_unit_ids",
-            expected=",".join(required_unit_ids),
-            observed=",".join(verified_ids),
-        )
-    common_oid = verified[0].record.integrated_source_oid
-    for value in verified[1:]:
-        if value.record.integrated_source_oid != common_oid:
-            raise _predecessor_error(
-                "integrated_source_oid_mismatch",
-                "set",
-                unit_id=value.record.unit_id,
-                field="integrated_source_oid",
-                expected=common_oid,
-                observed=value.record.integrated_source_oid,
-            )
-    return PredecessorIntegrationSetVerification(verified, common_oid)
 
 
 def current_branch(runner: Runner) -> str:
@@ -2032,6 +566,242 @@ def existing_open_pr(
     return rows[0] if rows else None
 
 
+def pull_request_readback(
+    runner: Runner,
+    *,
+    repo: str,
+    selector: str,
+) -> Mapping[str, object]:
+    """Read one PR identity and retained review history after mutation."""
+    command = [
+        "gh",
+        "pr",
+        "view",
+        selector,
+        "--repo",
+        repo,
+        "--json",
+        "number,url,state,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
+    ]
+    result = run_command(
+        runner,
+        command,
+        next_action="read_back_the_exact_pull_request_identity",
+    )
+    readback = dict(json_object(result.stdout, command="gh pr view"))
+    merge_commit = readback.get("mergeCommit")
+    if isinstance(merge_commit, Mapping) and isinstance(merge_commit.get("oid"), str):
+        merge_oid = cast(str, merge_commit["oid"])
+        tree_command = [
+            "gh",
+            "api",
+            f"repos/{repo}/git/commits/{merge_oid}",
+            "--jq",
+            "{commit_sha: .sha, tree_sha: .tree.sha, parents: [.parents[].sha]}",
+        ]
+        tree_result = run_command(
+            runner,
+            tree_command,
+            next_action="read_back_the_exact_publication_merge_tree",
+        )
+        merge_identity = json_object(tree_result.stdout, command="gh api merge commit")
+        if merge_identity.get("commit_sha") != merge_oid:
+            raise UserVisibleFailure(
+                message="merge commit API identity differs from PR readback",
+                next_action="reject_publication_readback_and_retry_exact_PR_identity",
+            )
+        merge_tree = merge_identity.get("tree_sha")
+        if not isinstance(merge_tree, str) or re.fullmatch(r"[0-9a-f]{40}", merge_tree) is None:
+            raise UserVisibleFailure(
+                message="merge commit tree identity is incomplete",
+                next_action="read_back_the_exact_publication_merge_tree",
+            )
+        parents = merge_identity.get("parents")
+        if (
+            not isinstance(parents, list)
+            or not parents
+            or re.fullmatch(r"[0-9a-f]{40}", str(parents[0])) is None
+        ):
+            raise UserVisibleFailure(
+                message="merge commit lacks an authoritative pre-merge CAS parent",
+                next_action="read_back_the_exact_publication_merge_base",
+            )
+        merge_cas_base_oid = str(parents[0])
+        base_command = [
+            "gh",
+            "api",
+            f"repos/{repo}/git/commits/{merge_cas_base_oid}",
+            "--jq",
+            "{commit_sha: .sha, tree_sha: .tree.sha}",
+        ]
+        base_result = run_command(
+            runner,
+            base_command,
+            next_action="read_back_the_exact_publication_merge_base_tree",
+        )
+        merge_base_identity = json_object(
+            base_result.stdout, command="gh api merge CAS base commit"
+        )
+        merge_cas_base_tree = merge_base_identity.get("tree_sha")
+        if (
+            merge_base_identity.get("commit_sha") != merge_cas_base_oid
+            or not isinstance(merge_cas_base_tree, str)
+            or re.fullmatch(r"[0-9a-f]{40}", merge_cas_base_tree) is None
+        ):
+            raise UserVisibleFailure(
+                message="merge CAS base commit/tree identity is incomplete",
+                next_action="read_back_the_exact_publication_merge_base_tree",
+            )
+        readback["mergeTreeOid"] = merge_tree
+        readback["mergeCasBaseOid"] = merge_cas_base_oid
+        readback["mergeCasBaseTreeOid"] = merge_cas_base_tree
+    else:
+        readback["mergeTreeOid"] = None
+        readback["mergeCasBaseOid"] = None
+        readback["mergeCasBaseTreeOid"] = None
+    return readback
+
+
+def lifecycle_with_pr_readback(
+    lifecycle: Mapping[str, object],
+    readback: Mapping[str, object],
+) -> dict[str, object]:
+    """Preserve Essence/reviews while classifying one typed PR state."""
+    checked = validate_pull_request_lifecycle(lifecycle)
+    base = cast(Mapping[str, object], checked["base_identity"])
+    head = cast(Mapping[str, object], checked["head_identity"])
+    remote_state = str(readback.get("state", "")).upper()
+    if readback.get("baseRefName") != str(base["ref"]).removeprefix("refs/heads/"):
+        raise UserVisibleFailure(
+            message="pull request base identity changed after publication",
+            next_action="materialize_a_conflict_successor_lifecycle",
+        )
+    if (
+        remote_state != "MERGED"
+        and readback.get("baseRefOid") != base["commit_sha"]
+    ):
+        raise UserVisibleFailure(
+            message="pull request base commit changed after publication",
+            next_action="materialize_a_conflict_successor_lifecycle",
+        )
+    if readback.get("headRefName") != str(head["ref"]).removeprefix("refs/heads/"):
+        raise UserVisibleFailure(
+            message="pull request head ref changed after publication",
+            next_action="materialize_a_conflict_successor_lifecycle",
+        )
+    if readback.get("headRefOid") != head["commit_sha"]:
+        raise UserVisibleFailure(
+            message="pull request head commit differs from the frozen candidate",
+            next_action="materialize_a_conflict_successor_lifecycle",
+        )
+    head_repository = readback.get("headRepository")
+    expected_head_repo = f"{head['repo_owner']}/{head['repo_name']}"
+    if (
+        not isinstance(head_repository, Mapping)
+        or head_repository.get("nameWithOwner") != expected_head_repo
+    ):
+        raise UserVisibleFailure(
+            message="pull request head repository changed after publication",
+            next_action="materialize_a_conflict_successor_lifecycle",
+        )
+    review_decision = str(readback.get("reviewDecision", "")).upper()
+    if remote_state == "MERGED":
+        merge_commit = readback.get("mergeCommit")
+        merge_tree = readback.get("mergeTreeOid")
+        merge_cas_base = readback.get("mergeCasBaseOid")
+        merge_cas_base_tree = readback.get("mergeCasBaseTreeOid")
+        if (
+            not isinstance(merge_commit, Mapping)
+            or re.fullmatch(r"[0-9a-f]{40}", str(merge_commit.get("oid", ""))) is None
+            or re.fullmatch(r"[0-9a-f]{40}", str(merge_tree or "")) is None
+            or merge_cas_base != base["commit_sha"]
+            or merge_cas_base_tree != base["tree_sha"]
+        ):
+            raise UserVisibleFailure(
+                message="merged PR readback lacks matching merge/CAS identity",
+                next_action="reject_publication_readback_and_materialize_a_successor",
+            )
+        state = "merged"
+    elif remote_state == "CLOSED":
+        state = "closed_head"
+    elif readback.get("isDraft") is True:
+        state = "draft"
+    elif review_decision == "CHANGES_REQUESTED":
+        state = "changes_requested"
+    elif review_decision == "REVIEW_REQUIRED":
+        state = "external_review"
+    else:
+        state = "ready"
+    retained_reviews = list(cast(Sequence[object], checked["reviews"]))
+    remote_reviews = readback.get("reviews")
+    if isinstance(remote_reviews, list):
+        for index, item in enumerate(remote_reviews):
+            if not isinstance(item, Mapping):
+                continue
+            author = item.get("author")
+            reviewer = "unknown"
+            if isinstance(author, Mapping) and isinstance(author.get("login"), str):
+                reviewer = cast(str, author["login"])
+            raw_state = str(item.get("state", "COMMENTED")).lower()
+            if raw_state not in {
+                "approved",
+                "changes_requested",
+                "commented",
+                "dismissed",
+            }:
+                raw_state = "commented"
+            body = str(item.get("body", ""))
+            review = {
+                "review_id": str(item.get("id") or f"readback:{index}:{reviewer}"),
+                "reviewer_id": reviewer,
+                "state": raw_state,
+                "body_digest": _sha256(body),
+            }
+            if review not in retained_reviews:
+                retained_reviews.append(review)
+    updated = dict(checked)
+    updated["state"] = state
+    updated["reviews"] = retained_reviews
+    updated_binding = dict(cast(Mapping[str, object], checked["binding"]))
+    readback_ref = _evidence_ref(
+        {
+            "predecessor_evidence_ref": updated_binding["evidence_ref"],
+            "readback": readback,
+            "state": state,
+            "reviews": retained_reviews,
+        }
+    )
+    updated_binding["evidence_ref"] = readback_ref
+    updated_binding["evidence_digest"] = "sha256:" + readback_ref.removeprefix(
+        "evidence:"
+    )
+    updated["binding"] = updated_binding
+    return validate_pull_request_transition(checked, updated)
+
+
+def authoritative_publication_readback(
+    runner: Runner,
+    *,
+    repo: str,
+    selector: str,
+    candidate_cas_receipt: Mapping[str, object],
+    pull_request_lifecycle: Mapping[str, object],
+) -> dict[str, object]:
+    """Read and materialize one authoritative merged PR publication receipt."""
+    readback = pull_request_readback(runner, repo=repo, selector=selector)
+    merged_lifecycle = lifecycle_with_pr_readback(pull_request_lifecycle, readback)
+    receipt = materialize_publication_readback_receipt(
+        candidate_cas_receipt=candidate_cas_receipt,
+        pull_request_lifecycle=merged_lifecycle,
+        authoritative_pr_readback=readback,
+    )
+    return {
+        "pull_request_lifecycle": merged_lifecycle,
+        "authoritative_pr_readback": dict(readback),
+        "publication_readback_receipt": receipt,
+    }
+
+
 def string_field(mapping: Mapping[str, object], key: str) -> str:
     """Return a mapping field as a string."""
     value = mapping.get(key)
@@ -2044,9 +814,509 @@ def int_field(mapping: Mapping[str, object], key: str) -> int | None:
     return value if isinstance(value, int) else None
 
 
-def base_summary(
-    args: argparse.Namespace, verification: RemoteVerification, branch: str
+def _sha256(value: object) -> str:
+    """Return one canonical prefixed digest."""
+    return "sha256:" + hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+
+
+def _evidence_ref(value: object) -> str:
+    """Return one canonical evidence identity."""
+    return "evidence:" + hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+
+
+def _git_object_id(runner: Runner, revision: str, *, next_action: str) -> str:
+    """Read one exact Git object identity."""
+    result = run_command(
+        runner,
+        ["git", "rev-parse", revision],
+        next_action=next_action,
+    )
+    value = result.stdout.strip()
+    if re.fullmatch(r"[0-9a-f]{40}", value) is None:
+        raise UserVisibleFailure(
+            message=f"git revision did not resolve to a commit/tree identity: {revision}",
+            next_action=next_action,
+        )
+    return value
+
+
+def _permission_identity(verification: RemoteVerification) -> dict[str, object]:
+    """Return verified or explicitly unknown push authority evidence."""
+    evidence_id = verification.permission_evidence_id
+    if not re.fullmatch(r"evidence:[0-9a-f]{64}", evidence_id):
+        evidence_id = _evidence_ref(
+            {
+                "repo": verification.repo,
+                "remote": verification.remote,
+                "permission_state": "unknown",
+            }
+        )
+    return {
+        "actor_id": verification.actor_id,
+        "permission_state": verification.permission_state,
+        "permission_evidence_id": evidence_id,
+        "authority_source": "verified gh repository metadata",
+        "assumption_forbidden": True,
+    }
+
+
+def _github_base_identity(
+    runner: Runner,
+    *,
+    repo: str,
+    ref: str,
+) -> tuple[str, str]:
+    """Read an exact base commit/tree when the head remote is a fork."""
+    command = [
+        "gh",
+        "api",
+        f"repos/{repo}/commits/{ref}",
+        "--jq",
+        "{commit_sha: .sha, tree_sha: .commit.tree.sha}",
+    ]
+    result = run_command(
+        runner,
+        command,
+        next_action="read_the_exact_pull_request_base_commit_and_tree",
+    )
+    identity = json_object(result.stdout, command="gh api base commit")
+    commit_sha = string_field(identity, "commit_sha")
+    tree_sha = string_field(identity, "tree_sha")
+    if (
+        re.fullmatch(r"[0-9a-f]{40}", commit_sha) is None
+        or re.fullmatch(r"[0-9a-f]{40}", tree_sha) is None
+    ):
+        raise UserVisibleFailure(
+            message="GitHub base identity is incomplete",
+            next_action="read_the_exact_pull_request_base_commit_and_tree",
+        )
+    return commit_sha, tree_sha
+
+
+def build_pull_request_lifecycle(
+    args: argparse.Namespace,
+    runner: Runner,
+    verification: RemoteVerification,
+    branch: str,
+    *,
+    state: str | None = None,
+    topology_kind: str | None = None,
+    contributor_identity: Mapping[str, object] | None = None,
+    contributor_diff: Mapping[str, object] | None = None,
+    lifecycle_binding: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
+    """Materialize one immutable user/fork/contributor PR topology."""
+    base_ref = str(getattr(args, "base", "main") or "main")
+    kind = topology_kind or verification.topology_kind
+    if kind not in {"user", "fork", "contributor"}:
+        raise UserVisibleFailure(
+            message=f"unsupported pull-request topology: {kind}",
+            next_action="materialize_a_typed_user_fork_or_contributor_lifecycle",
+        )
+    candidate_sha = _git_object_id(
+        runner,
+        branch,
+        next_action="freeze_the_local_candidate_before_github_publication",
+    )
+    tree_sha = _git_object_id(
+        runner,
+        f"{candidate_sha}^{{tree}}",
+        next_action="freeze_the_local_candidate_tree_before_github_publication",
+    )
+    external_binding = (
+        None
+        if lifecycle_binding is None
+        else validate_record_binding(lifecycle_binding)
+    )
+    if external_binding is not None and (
+        external_binding["candidate_sha"] != candidate_sha
+        or external_binding["tree_sha"] != tree_sha
+    ):
+        raise UserVisibleFailure(
+            message="transaction binding differs from the selected candidate",
+            next_action="materialize_a_successor_for_the_changed_candidate",
+        )
+    if kind == "user" and verification.remote_slug == verification.repo:
+        base_sha = _git_object_id(
+            runner,
+            f"{verification.remote}/{base_ref}",
+            next_action="fetch_and_rebind_the_exact_pull_request_base",
+        )
+        base_tree = _git_object_id(
+            runner,
+            f"{base_sha}^{{tree}}",
+            next_action="read_the_exact_pull_request_base_tree",
+        )
+    else:
+        base_sha, base_tree = _github_base_identity(
+            runner,
+            repo=verification.repo,
+            ref=base_ref,
+        )
+    body_text = ""
+    body_path = getattr(args, "body_file", None)
+    if isinstance(body_path, str) and body_path:
+        body = require_body_file(body_path)
+        body_text = body.read_text(encoding="utf-8")
+    input_record = {
+        "user_task": str(args.user_task),
+        "title": str(getattr(args, "title", "") or ""),
+        "body_sha256": _sha256(body_text),
+        "repo": verification.repo,
+        "head_repo": verification.head_repo or verification.remote_slug,
+        "remote": verification.remote,
+        "branch": branch,
+        "base": base_ref,
+        "kind": kind,
+    }
+    input_digest = (
+        _sha256(input_record)
+        if external_binding is None
+        else cast(str, external_binding["input_digest"])
+    )
+    transaction_id = (
+        "tx:"
+        + hashlib.sha256(
+            canonical_json_bytes(
+                {
+                    "input_digest": input_digest,
+                    "candidate_sha": candidate_sha,
+                    "tree_sha": tree_sha,
+                }
+            )
+        ).hexdigest()
+        if external_binding is None
+        else cast(str, external_binding["transaction_id"])
+    )
+    snapshot_id = (
+        "snapshot:"
+        + hashlib.sha256(
+            canonical_json_bytes(
+                {
+                    "remote": verification.remote,
+                    "base_ref": base_ref,
+                    "base_sha": base_sha,
+                    "base_tree": base_tree,
+                }
+            )
+        ).hexdigest()
+        if external_binding is None
+        else cast(str, external_binding["snapshot_id"])
+    )
+    observed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    evidence_seed = {
+        "transaction_id": transaction_id,
+        "snapshot_id": snapshot_id,
+        "candidate_sha": candidate_sha,
+        "tree_sha": tree_sha,
+        "input_digest": input_digest,
+        "permission": _permission_identity(verification),
+    }
+    evidence_ref = _evidence_ref(evidence_seed)
+    binding = {
+        "transaction_id": transaction_id,
+        "snapshot_id": snapshot_id,
+        "candidate_sha": candidate_sha,
+        "tree_sha": tree_sha,
+        "input_digest": input_digest,
+        "tool_id": "github-publish",
+        "tool_version": "agent-canon.pull-request-lifecycle.v1",
+        "evidence_ref": evidence_ref,
+        "evidence_digest": _sha256(evidence_seed),
+        "timing": {
+            "started_at": observed_at,
+            "finished_at": observed_at,
+            "last_attempt_at": observed_at,
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": False,
+        },
+    }
+    if external_binding is not None:
+        binding = dict(external_binding)
+        binding["evidence_ref"] = evidence_ref
+        binding["evidence_digest"] = _sha256(evidence_seed)
+        binding["timing"] = {
+            "started_at": observed_at,
+            "finished_at": observed_at,
+            "last_attempt_at": observed_at,
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": False,
+        }
+    repo_owner, repo_name = verification.repo.split("/", 1)
+    head_repo = verification.head_repo or verification.remote_slug
+    head_owner, head_name = head_repo.split("/", 1)
+    permission = _permission_identity(verification)
+    lifecycle_state = state
+    if lifecycle_state is None:
+        if permission["permission_state"] == "unknown":
+            lifecycle_state = "permission_unknown"
+        elif permission["permission_state"] == "verified_false":
+            lifecycle_state = "permission_denied"
+        elif bool(getattr(args, "draft", False)):
+            lifecycle_state = "draft"
+        else:
+            lifecycle_state = "ready"
+    essence_evidence = _evidence_ref(
+        {
+            "problem": args.user_task,
+            "title": getattr(args, "title", ""),
+            "body_sha256": _sha256(body_text),
+        }
+    )
+    lifecycle = {
+        "schema": "agent-canon.pull-request-lifecycle.v1",
+        "kind": kind,
+        "binding": binding,
+        "state": lifecycle_state,
+        "remote_identity": {
+            "repo_owner": head_owner,
+            "repo_name": head_name,
+            "remote_name": verification.remote,
+            "url_digest": _sha256(verification.remote_url),
+            "ref": f"refs/heads/{branch}",
+            "commit_sha": candidate_sha,
+            "tree_sha": tree_sha,
+        },
+        "base_identity": {
+            "repo_owner": repo_owner,
+            "repo_name": repo_name,
+            "ref": f"refs/heads/{base_ref}",
+            "commit_sha": base_sha,
+            "tree_sha": base_tree,
+        },
+        "head_identity": {
+            "repo_owner": head_owner,
+            "repo_name": head_name,
+            "ref": f"refs/heads/{branch}",
+            "commit_sha": candidate_sha,
+            "tree_sha": tree_sha,
+        },
+        "branch": pull_request_branch_table(),
+        "permission_identity": permission,
+        "pr_essence": {
+            "problem": str(args.user_task),
+            "intent": str(getattr(args, "title", "") or args.user_task),
+            "canonical_owner": "agents/workflows/agent-canon-pr-workflow.md",
+            "contract_delta": str(getattr(args, "title", "") or args.user_task),
+            "evidence_refs": [essence_evidence],
+        },
+        "reviews": [],
+    }
+    if kind == "user":
+        lifecycle["user_identity"] = {
+            "actor_id": verification.actor_id,
+            "display_name": verification.actor_display_name,
+        }
+    elif kind == "fork":
+        parent_repo = verification.fork_parent_repo or verification.repo
+        parent_owner, parent_name = parent_repo.split("/", 1)
+        lifecycle["fork_identity"] = {
+            "repo_owner": head_owner,
+            "repo_name": head_name,
+            "parent_repo_owner": parent_owner,
+            "parent_repo_name": parent_name,
+            "ref": f"refs/heads/{branch}",
+        }
+    else:
+        if contributor_identity is None or contributor_diff is None:
+            raise UserVisibleFailure(
+                message="contributor lifecycle requires immutable actor and diff identity",
+                next_action="read_the_contributor_pr_head_and_diff_before_processing",
+            )
+        lifecycle["contributor_identity"] = dict(contributor_identity)
+        lifecycle["contributor_diff"] = dict(contributor_diff)
+    return validate_pull_request_lifecycle(lifecycle)
+
+
+def materialize_pr_identity_gate(
+    lifecycle: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
+    upstream_gate_verdicts: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Materialize G3 from G1/G2, exact CAS, topology, and permission."""
+    checked = validate_pull_request_lifecycle(lifecycle)
+    cas = validate_candidate_cas_receipt(candidate_cas_receipt)
+    rebind = validate_source_main_rebind_receipt(source_main_rebind_receipt)
+    validate_candidate_cas_rebind_transition(rebind, cas)
+    validate_candidate_cas_pr_transition(cas, checked)
+    upstream = validate_gate_chain(
+        list(upstream_gate_verdicts),
+        expected_gate_ids=("G1", "G2"),
+        require_pass=True,
+    )
+    if any(
+        binding_identity(item["binding"]) != binding_identity(checked["binding"])
+        for item in (*upstream, cas)
+    ):
+        raise UserVisibleFailure(
+            message="G1/G2/CAS evidence does not bind the selected PR topology",
+            next_action="materialize_a_successor_for_the_changed_candidate_or_base",
+        )
+    permission = cast(Mapping[str, object], checked["permission_identity"])
+    if permission["permission_state"] != "verified_true":
+        raise UserVisibleFailure(
+            message="push permission is not verified true for this immutable PR topology",
+            next_action="read_verified_remote_permission_and_create_a_successor_lifecycle",
+        )
+    binding = cast(Mapping[str, object], checked["binding"])
+    upstream_refs = [
+        cast(str, cast(Mapping[str, object], item["binding"])["evidence_ref"])
+        for item in upstream
+    ]
+    cas_binding = cast(Mapping[str, object], cas["binding"])
+    return materialize_gate_verdict(
+        binding=binding,
+        gate_id="G3",
+        ordered_input_evidence_refs=[
+            *upstream_refs,
+            cast(str, cas_binding["evidence_ref"]),
+            cast(str, binding["evidence_ref"]),
+        ],
+        invariant="pr_identity_cas",
+        output_digest=_sha256(
+            {"lifecycle": checked, "cas": cas, "source_main_rebind": rebind}
+        ),
+        owner=f"{Path(__file__).resolve()}#materialize_pr_identity_gate",
+        verdict="pass",
+        retry_reason=None,
+        next_checkpoint=None,
+    )
+
+
+def require_pr_identity_gate(
+    lifecycle: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
+    upstream_gate_verdicts: Sequence[Mapping[str, object]],
+    gate_verdict: Mapping[str, object],
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Consume, without recomputing, one exact G3 publication authority."""
+    checked = validate_pull_request_lifecycle(lifecycle)
+    cas = validate_candidate_cas_receipt(candidate_cas_receipt)
+    rebind = validate_source_main_rebind_receipt(source_main_rebind_receipt)
+    validate_candidate_cas_rebind_transition(rebind, cas)
+    validate_candidate_cas_pr_transition(cas, checked)
+    gate = validate_gate_verdict(gate_verdict)
+    if gate["gate_id"] != "G3" or gate["verdict"] != "pass":
+        raise UserVisibleFailure(
+            message="GitHub mutation requires a passing G3 PR identity/CAS verdict",
+            next_action="materialize_the_exact_candidate_permission_and_cas_evidence",
+        )
+    try:
+        validate_gate_chain(
+            [*upstream_gate_verdicts, gate],
+            expected_gate_ids=("G1", "G2", "G3"),
+            require_pass=True,
+        )
+    except ValueError as exc:
+        raise UserVisibleFailure(
+            message=f"G3 predecessor chain is invalid: {exc}",
+            next_action="materialize_G1_G2_and_CAS_for_the_exact_candidate",
+        ) from exc
+    cas_binding = cast(Mapping[str, object], cas["binding"])
+    gate_inputs = cast(Sequence[object], gate["ordered_input_evidence_refs"])
+    if (
+        binding_identity(checked["binding"]) != binding_identity(gate["binding"])
+        or binding_identity(cas_binding) != binding_identity(gate["binding"])
+        or cast(str, cas_binding["evidence_ref"]) not in gate_inputs
+    ):
+        raise UserVisibleFailure(
+            message="G3 evidence does not bind the selected PR lifecycle",
+            next_action="create_a_successor_lifecycle_for_the_changed_identity",
+        )
+    return checked, gate
+
+
+def materialize_github_publication_packet(
+    *,
+    lifecycle: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
+    upstream_gate_verdicts: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Materialize the sole machine packet consumed by GitHub mutations."""
+    checked_lifecycle = validate_pull_request_lifecycle(lifecycle)
+    checked_cas = validate_candidate_cas_receipt(candidate_cas_receipt)
+    checked_rebind = validate_source_main_rebind_receipt(
+        source_main_rebind_receipt
+    )
+    validate_candidate_cas_rebind_transition(checked_rebind, checked_cas)
+    upstream = validate_gate_chain(
+        list(upstream_gate_verdicts),
+        expected_gate_ids=("G1", "G2"),
+        require_pass=True,
+    )
+    gate = materialize_pr_identity_gate(
+        checked_lifecycle, checked_cas, checked_rebind, upstream
+    )
+    return {
+        "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
+        "pull_request_lifecycle": checked_lifecycle,
+        "candidate_cas_receipt": checked_cas,
+        "source_main_rebind_receipt": checked_rebind,
+        "upstream_gate_verdicts": list(upstream),
+        "g3_gate": gate,
+    }
+
+
+def validate_github_publication_packet(value: object) -> dict[str, object]:
+    """Validate one immutable publication packet without rebuilding evidence."""
+    if not isinstance(value, Mapping) or set(value) != {
+        "schema",
+        "pull_request_lifecycle",
+        "candidate_cas_receipt",
+        "source_main_rebind_receipt",
+        "upstream_gate_verdicts",
+        "g3_gate",
+    }:
+        raise UserVisibleFailure(
+            message="GitHub publication packet fields are invalid",
+            next_action="materialize_the_canonical_github_publication_packet",
+        )
+    if value.get("schema") != GITHUB_PUBLICATION_PACKET_SCHEMA:
+        raise UserVisibleFailure(
+            message="GitHub publication packet schema is invalid",
+            next_action="materialize_the_canonical_github_publication_packet",
+        )
+    upstream_value = value["upstream_gate_verdicts"]
+    if not isinstance(upstream_value, Sequence) or isinstance(
+        upstream_value, (str, bytes)
+    ):
+        raise UserVisibleFailure(
+            message="GitHub publication predecessor gates are invalid",
+            next_action="materialize_G1_and_G2_for_the_exact_candidate",
+        )
+    lifecycle, gate = require_pr_identity_gate(
+        cast(Mapping[str, object], value["pull_request_lifecycle"]),
+        cast(Mapping[str, object], value["candidate_cas_receipt"]),
+        cast(Mapping[str, object], value["source_main_rebind_receipt"]),
+        cast(Sequence[Mapping[str, object]], upstream_value),
+        cast(Mapping[str, object], value["g3_gate"]),
+    )
+    return {
+        "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
+        "pull_request_lifecycle": lifecycle,
+        "candidate_cas_receipt": validate_candidate_cas_receipt(
+            value["candidate_cas_receipt"]
+        ),
+        "source_main_rebind_receipt": validate_source_main_rebind_receipt(
+            value["source_main_rebind_receipt"]
+        ),
+        "upstream_gate_verdicts": list(
+            validate_gate_chain(
+                list(upstream_value),
+                expected_gate_ids=("G1", "G2"),
+                require_pass=True,
+            )
+        ),
+        "g3_gate": gate,
+    }
+
+
+def base_summary(args: argparse.Namespace, verification: RemoteVerification, branch: str) -> dict[str, object]:
     """Return common summary fields."""
     return {
         "user_task": args.user_task,
@@ -2055,8 +1325,30 @@ def base_summary(
         "remote": verification.remote,
         "remote_url": verification.remote_url,
         "branch": branch,
+        "permission_state": verification.permission_state,
+        "permission_evidence_id": verification.permission_evidence_id,
         "verified_remote_policy": "gh_verified_remote_required",
     }
+
+
+def consume_publication_authority(
+    authority: GithubPublicationAuthority,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Consume one opaque owner-materialized mutation authority."""
+    if type(authority) is not GithubPublicationAuthority:
+        raise UserVisibleFailure(
+            message="GitHub mutation requires an opaque publication authority",
+            next_action="materialize_the_canonical_github_publication_packet",
+        )
+    packet = authority.consume()
+    lifecycle = packet.get("pull_request_lifecycle")
+    gate = packet.get("g3_gate")
+    if not isinstance(lifecycle, dict) or not isinstance(gate, dict):
+        raise UserVisibleFailure(
+            message="GitHub publication authority fields are invalid",
+            next_action="materialize_the_canonical_github_publication_packet",
+        )
+    return lifecycle, gate
 
 
 def perform_push(
@@ -2064,12 +1356,25 @@ def perform_push(
     runner: Runner,
     verification: RemoteVerification,
     branch: str,
+    *,
+    authority: GithubPublicationAuthority,
 ) -> dict[str, object]:
     """Push the verified branch to origin."""
     if branch == "main" and not getattr(args, "allow_main", False):
         raise UserVisibleFailure(
             message="refusing to push main without --allow-main",
             next_action="publish_a_topic_branch_or_pass_--allow-main_with_explicit_authority",
+        )
+    lifecycle, gate = consume_publication_authority(authority)
+    if lifecycle["state"] not in {
+        "draft",
+        "ready",
+        "changes_requested",
+        "external_review",
+    }:
+        raise UserVisibleFailure(
+            message=f"PR lifecycle state does not permit push: {lifecycle['state']}",
+            next_action="resolve_permission_remote_or_successor_state_before_push",
         )
     dirty = worktree_dirty(runner)
     push_ref = "main" if branch == "main" else branch
@@ -2089,6 +1394,8 @@ def perform_push(
             "command": command,
             "git_push_stdout": result.stdout.strip(),
             "git_push_stderr": result.stderr.strip(),
+            "pull_request_lifecycle": lifecycle,
+            "g3_gate": gate,
             "status": "ok",
         }
     )
@@ -2100,9 +1407,22 @@ def perform_pr(
     runner: Runner,
     verification: RemoteVerification,
     branch: str,
+    *,
+    authority: GithubPublicationAuthority,
 ) -> dict[str, object]:
     """Create or update a pull request for the verified branch."""
     body_file = require_body_file(args.body_file)
+    lifecycle, gate = consume_publication_authority(authority)
+    if lifecycle["state"] not in {
+        "draft",
+        "ready",
+        "changes_requested",
+        "external_review",
+    }:
+        raise UserVisibleFailure(
+            message=f"PR lifecycle state does not permit PR mutation: {lifecycle['state']}",
+            next_action="resolve_permission_remote_or_successor_state_before_pr_mutation",
+        )
     existing = existing_open_pr(runner, repo=verification.repo, branch=branch)
     summary = base_summary(args, verification, branch)
     if existing is not None:
@@ -2125,6 +1445,10 @@ def perform_pr(
                 command,
                 next_action="fix_gh_pr_edit_auth_or_update_the_pr_body_manually",
             )
+            readback = pull_request_readback(
+                runner, repo=verification.repo, selector=str(number)
+            )
+            lifecycle = lifecycle_with_pr_readback(lifecycle, readback)
             summary.update(
                 {
                     "action": "pr-update",
@@ -2133,9 +1457,17 @@ def perform_pr(
                     "pr_url": string_field(existing, "url"),
                     "command": command,
                     "gh_stdout": result.stdout.strip(),
+                    "pull_request_lifecycle": lifecycle,
+                    "g3_gate": gate,
                 }
             )
             return summary
+        readback = pull_request_readback(
+            runner,
+            repo=verification.repo,
+            selector=str(number) if number is not None else branch,
+        )
+        lifecycle = lifecycle_with_pr_readback(lifecycle, readback)
         summary.update(
             {
                 "action": "pr-existing",
@@ -2143,6 +1475,8 @@ def perform_pr(
                 "pr_number": number,
                 "pr_url": string_field(existing, "url"),
                 "next_action": "use_existing_pr_or_pass_--update-existing",
+                "pull_request_lifecycle": lifecycle,
+                "g3_gate": gate,
             }
         )
         return summary
@@ -2169,12 +1503,21 @@ def perform_pr(
         command,
         next_action="fix_gh_pr_create_auth_or_repository_permissions_before_retrying_verified_pr_create",
     )
+    readback = pull_request_readback(
+        runner,
+        repo=verification.repo,
+        selector=branch,
+    )
+    lifecycle = lifecycle_with_pr_readback(lifecycle, readback)
     summary.update(
         {
             "action": "pr-create",
             "status": "ok",
             "pr_url": result.stdout.strip(),
             "command": command,
+            "pr_number": int_field(readback, "number"),
+            "pull_request_lifecycle": lifecycle,
+            "g3_gate": gate,
         }
     )
     return summary
@@ -2185,8 +1528,20 @@ def perform_checks(
     runner: Runner,
     verification: RemoteVerification,
     branch: str,
+    *,
+    authority: GithubPublicationAuthority | GithubPostPublicationChecksAuthority,
 ) -> dict[str, object]:
     """Show pull-request checks through gh."""
+    checked_g5: dict[str, object] | None
+    if type(authority) is GithubPostPublicationChecksAuthority:
+        packet, checked_g5 = authority.consume()
+        lifecycle = cast(dict[str, object], packet["pull_request_lifecycle"])
+        gate = cast(dict[str, object], packet["g3_gate"])
+    else:
+        lifecycle, gate = consume_publication_authority(
+            cast(GithubPublicationAuthority, authority)
+        )
+        checked_g5 = None
     pr_selector = args.pr or branch
     command = ["gh", "pr", "checks", pr_selector, "--repo", verification.repo]
     if args.watch:
@@ -2207,6 +1562,9 @@ def perform_checks(
             "pr_selector": pr_selector,
             "command": command,
             "checks_stdout": result.stdout.strip(),
+            "pull_request_lifecycle": lifecycle,
+            "g3_gate": gate,
+            "g5_gate": checked_g5,
         }
     )
     if result.returncode == 8:
@@ -2224,6 +1582,8 @@ def summary_lines(summary: Mapping[str, object]) -> list[str]:
         "repo",
         "remote",
         "branch",
+        "permission_state",
+        "permission_evidence_id",
         "worktree_dirty",
         "pr_number",
         "pr_url",
@@ -2231,7 +1591,7 @@ def summary_lines(summary: Mapping[str, object]) -> list[str]:
         "next_action",
         "verified_remote_policy",
     ]
-    lines: list[str] = []
+    lines = []
     for key in keys:
         if key in summary:
             value = summary[key]
@@ -2243,282 +1603,13 @@ def summary_lines(summary: Mapping[str, object]) -> list[str]:
     return lines
 
 
-class _CommandEvidenceRunner:
-    def __init__(self, runner: Runner) -> None:
-        self.runner = runner
-        self.evidence: list[dict[str, object]] = []
-
-    def __call__(self, command: Sequence[str]) -> CommandResult:
-        result = self.runner(command)
-        self.evidence.append(
-            {"argv": list(result.args), "returncode": result.returncode}
-        )
-        return result
-
-
-def _producer_remote(
-    runner: Runner,
-    *,
-    repo: str,
-    unit_id: str,
-) -> RemoteVerification:
-    try:
-        return verify_remote(
-            runner,
-            repo=repo,
-            remote=PREDECESSOR_TARGET_REMOTE,
-        )
-    except CommandFailure as exc:
-        raise _predecessor_error(
-            "process_failure",
-            "remote",
-            unit_id=unit_id,
-            field="remote",
-            expected="verified origin repository",
-            observed=str(exc.result.returncode),
-            command=exc.result.args,
-            returncode=exc.result.returncode,
-            retryable=True,
-        ) from exc
-    except UserVisibleFailure as exc:
-        raise _predecessor_error(
-            "source_pr_mismatch",
-            "remote",
-            unit_id=unit_id,
-            field="remote",
-            expected=repo,
-            observed=exc.message,
-        ) from exc
-
-
-def _parse_unit_bindings(
-    values: Sequence[str],
-    *,
-    field: str,
-) -> dict[str, Path]:
-    result: dict[str, Path] = {}
-    for index, value in enumerate(values):
-        unit_id, separator, path = value.partition("=")
-        if not separator or not path:
-            raise _predecessor_error(
-                "usage_error",
-                "arguments",
-                field=field,
-                expected="LOWERCASE_SNAKE_UNIT_ID=REPO_RELATIVE_PATH",
-                observed=value,
-            )
-        predecessor_integration_filename(unit_id)
-        if unit_id in result:
-            raise _predecessor_error(
-                "duplicate_unit_id",
-                "set",
-                unit_id=unit_id,
-                field=field,
-                expected="first binding",
-                observed=f"repeat_index={index}",
-            )
-        _normalized_predecessor_path(path, field=field)
-        result[unit_id] = Path(path)
-    return result
-
-
-def _verification_summary(
-    value: PredecessorIntegrationVerification,
-    evidence: list[dict[str, object]],
-    *,
-    root: Path,
-) -> dict[str, object]:
-    return {
-        "action": "verify-predecessor-integration",
-        "archive_manifest_path": value.archive_manifest_path.relative_to(
-            root
-        ).as_posix(),
-        "artifact_sha256": value.record.artifact_sha256,
-        "command_evidence": evidence,
-        "complete_file_sha256": value.complete_file_sha256,
-        "integrated_source_oid": value.record.integrated_source_oid,
-        "observed_target_main_oid": value.record.observed_target_main_oid,
-        "record_path": value.record_path.relative_to(root).as_posix(),
-        "schema": PREDECESSOR_CLI_RESULT_SCHEMA,
-        "status": "ok",
-        "unit_id": value.record.unit_id,
-    }
-
-
-def run_predecessor_action(
-    args: argparse.Namespace,
-    runner: Runner,
-) -> dict[str, object]:
-    """Run one frozen predecessor action and buffer its complete result."""
-    root = Path(args.root).resolve()
-    recording = _CommandEvidenceRunner(runner)
-    if args.action == "predecessor-integration":
-        unit_id = str(args.unit_id)
-        predecessor_integration_filename(unit_id)
-        if not str(args.user_task).strip():
-            raise _predecessor_error(
-                "usage_error",
-                "arguments",
-                unit_id=unit_id,
-                field="user_task",
-                expected="nonempty text",
-                observed=str(args.user_task),
-            )
-        report_path = _normalized_predecessor_path(args.report_dir, field="report_dir")
-        design_path = _normalized_predecessor_path(
-            args.design_path, field="design_path"
-        )
-        review_path = _normalized_predecessor_path(
-            args.approve_review_path,
-            field="approve_review_path",
-        )
-        target = root.joinpath(*report_path.parts) / predecessor_integration_filename(
-            unit_id
-        )
-        existed = os.path.lexists(target)
-        remote = _producer_remote(recording, repo=args.repo, unit_id=unit_id)
-        path = produce_predecessor_integration_record(
-            root=root,
-            report_dir=Path(report_path.as_posix()),
-            unit_id=unit_id,
-            design_path=design_path,
-            approve_review_path=review_path,
-            pr=args.pr,
-            remote=remote,
-            runner=recording,
-        )
-        record = load_predecessor_integration_record(path)
-        complete_sha = hashlib.sha256(path.read_bytes()).hexdigest()
-        return {
-            "action": "predecessor-integration",
-            "artifact_sha256": record.artifact_sha256,
-            "command_evidence": recording.evidence,
-            "complete_file_sha256": complete_sha,
-            "idempotent": existed,
-            "path": path.relative_to(root).as_posix(),
-            "schema": PREDECESSOR_CLI_RESULT_SCHEMA,
-            "status": "ok",
-            "unit_id": unit_id,
-        }
-    if args.action == "verify-predecessor-integration":
-        value = verify_predecessor_integration_record(
-            root=root,
-            record_path=Path(args.record),
-            archive_manifest_path=Path(args.archive_manifest),
-            expected_unit_id=args.expected_unit_id,
-            runner=recording,
-        )
-        return _verification_summary(
-            value,
-            recording.evidence,
-            root=root,
-        )
-    if args.action == "verify-predecessor-integration-set":
-        required_ids = tuple(str(value) for value in args.required_unit_id)
-        records = _parse_unit_bindings(args.record, field="record")
-        manifests = _parse_unit_bindings(
-            args.archive_manifest,
-            field="archive_manifest",
-        )
-        if set(records) != set(required_ids) or set(manifests) != set(required_ids):
-            raise _predecessor_error(
-                "set_inconsistency",
-                "set",
-                field="unit_bindings",
-                expected=",".join(required_ids),
-                observed=(
-                    f"records={','.join(records)} manifests={','.join(manifests)}"
-                ),
-            )
-        inputs = tuple(
-            PredecessorIntegrationInput(
-                expected_unit_id=unit_id,
-                record_path=records[unit_id],
-                archive_manifest_path=manifests[unit_id],
-            )
-            for unit_id in required_ids
-        )
-        individual_evidence: list[list[dict[str, object]]] = []
-
-        def per_record_runner(command: Sequence[str]) -> CommandResult:
-            if tuple(command[:3]) == ("gh", "repo", "view"):
-                individual_evidence.append([])
-            if not individual_evidence:
-                raise AssertionError("individual verification command order is invalid")
-            result = runner(command)
-            individual_evidence[-1].append(
-                {"argv": list(result.args), "returncode": result.returncode}
-            )
-            return result
-
-        set_value = verify_predecessor_integration_set(
-            root=root,
-            inputs=inputs,
-            required_unit_ids=required_ids,
-            runner=per_record_runner,
-        )
-        if len(individual_evidence) != len(set_value.verified_records):
-            raise _predecessor_error(
-                "set_inconsistency",
-                "set",
-                field="command_evidence",
-                expected="one consumed verification per required ID",
-                observed=str(len(individual_evidence)),
-            )
-        records_result: list[dict[str, object]] = []
-        for index, value in enumerate(set_value.verified_records):
-            summary = _verification_summary(
-                value,
-                individual_evidence[index],
-                root=root,
-            )
-            records_result.append(
-                {
-                    key: summary[key]
-                    for key in (
-                        "artifact_sha256",
-                        "command_evidence",
-                        "complete_file_sha256",
-                        "integrated_source_oid",
-                        "observed_target_main_oid",
-                        "record_path",
-                        "unit_id",
-                    )
-                }
-            )
-        return {
-            "action": "verify-predecessor-integration-set",
-            "common_integrated_source_oid": set_value.common_integrated_source_oid,
-            "records": records_result,
-            "required_unit_ids": list(required_ids),
-            "schema": PREDECESSOR_CLI_SET_RESULT_SCHEMA,
-            "status": "ok",
-        }
-    raise _predecessor_error(
-        "usage_error",
-        "arguments",
-        field="action",
-        expected="recognized predecessor action",
-        observed=str(args.action),
-    )
-
-
 def emit_summary(args: argparse.Namespace, summary: Mapping[str, object]) -> None:
     """Write optional JSON summary and compact stdout."""
-    if getattr(args, "action", "") in {
-        "predecessor-integration",
-        "verify-predecessor-integration",
-        "verify-predecessor-integration-set",
-    }:
-        sys.stdout.buffer.write(_canonical_json_line_bytes(summary))
-        return
     summary_out = getattr(args, "summary_out", None)
     if summary_out:
         path = Path(summary_out)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     for line in summary_lines(summary):
         print(line)
 
@@ -2545,7 +1636,9 @@ def command_failure_message(exc: CommandFailure) -> str:
     """Return a bounded command failure message."""
     command = " ".join(exc.result.args)
     detail = "\n".join(
-        part.strip() for part in (exc.result.stderr, exc.result.stdout) if part.strip()
+        part.strip()
+        for part in (exc.result.stderr, exc.result.stdout)
+        if part.strip()
     )
     if detail:
         detail = detail[:MAX_ERROR_CHARS]
@@ -2554,86 +1647,95 @@ def command_failure_message(exc: CommandFailure) -> str:
 
 
 def run(
-    args: argparse.Namespace, runner: Runner = subprocess_runner
+    args: argparse.Namespace,
+    runner: Runner = subprocess_runner,
+    *,
+    publication_packet: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Run the selected publish action."""
     os.chdir(args.root)
-    if args.action in {
-        "predecessor-integration",
-        "verify-predecessor-integration",
-        "verify-predecessor-integration-set",
-    }:
-        return run_predecessor_action(args, runner)
     branch = selected_branch(runner, args.branch)
     verification = verify_remote(runner, repo=args.repo, remote=args.remote)
+    if publication_packet is None:
+        packet_path = Path(
+            ".agent-canon/update-lifecycle/state/github-publication.json"
+        )
+        if not packet_path.is_file():
+            raise UserVisibleFailure(
+                message="canonical GitHub publication packet is missing",
+                next_action="materialize_reviewed_CAS_and_G1_G2_G3_before_mutation",
+            )
+        loaded = json.loads(packet_path.read_text(encoding="utf-8"))
+        publication_packet = cast(Mapping[str, object], loaded)
+    authority = GithubPublicationAuthority.from_packet(publication_packet)
+    packet = authority.consume()
+    lifecycle = cast(Mapping[str, object], packet["pull_request_lifecycle"])
+    remote_identity = cast(Mapping[str, object], lifecycle["remote_identity"])
+    base_identity = cast(Mapping[str, object], lifecycle["base_identity"])
+    permission = cast(Mapping[str, object], lifecycle["permission_identity"])
+    expected_head_repo = verification.head_repo or verification.remote_slug
+    if (
+        f"{remote_identity['repo_owner']}/{remote_identity['repo_name']}"
+        != expected_head_repo
+        or remote_identity["remote_name"] != verification.remote
+        or remote_identity["ref"] != f"refs/heads/{branch}"
+        or f"{base_identity['repo_owner']}/{base_identity['repo_name']}"
+        != verification.repo
+        or permission["actor_id"] != verification.actor_id
+        or permission["permission_evidence_id"]
+        != verification.permission_evidence_id
+    ):
+        raise UserVisibleFailure(
+            message="publication packet differs from verified immutable GitHub topology",
+            next_action="materialize_a_successor_publication_packet",
+        )
     if args.action == "push":
-        return perform_push(args, runner, verification, branch)
+        return perform_push(
+            args,
+            runner,
+            verification,
+            branch,
+            authority=authority,
+        )
     if args.action == "pr":
-        return perform_pr(args, runner, verification, branch)
+        return perform_pr(
+            args,
+            runner,
+            verification,
+            branch,
+            authority=authority,
+        )
     if args.action == "publish-pr":
-        push_summary = perform_push(args, runner, verification, branch)
-        pr_summary = perform_pr(args, runner, verification, branch)
+        push_summary = perform_push(
+            args,
+            runner,
+            verification,
+            branch,
+            authority=authority,
+        )
+        pr_summary = perform_pr(
+            args,
+            runner,
+            verification,
+            branch,
+            authority=authority,
+        )
         summary = dict(pr_summary)
         summary["action"] = "publish-pr"
         summary["push"] = push_summary
         return summary
     if args.action == "checks":
-        return perform_checks(args, runner, verification, branch)
+        return perform_checks(
+            args,
+            runner,
+            verification,
+            branch,
+            authority=authority,
+        )
     raise UserVisibleFailure(
         message=f"unknown action: {args.action}",
         next_action="choose_push_pr_publish-pr_or_checks",
     )
-
-
-def _predecessor_exit_code(error: PredecessorIntegrationError) -> int:
-    if error.phase == "arguments" or error.code == "invalid_unit_id":
-        return 2
-    if error.phase == "set" or error.code in {
-        "duplicate_unit_id",
-        "integrated_source_oid_mismatch",
-        "set_inconsistency",
-    }:
-        return 6
-    if error.code in {
-        "source_pr_mismatch",
-        "git_object_missing",
-        "non_ancestor",
-        "process_failure",
-    }:
-        return 4
-    if error.code in {
-        "serialization_failure",
-        "publication_failure",
-        "record_collision",
-        "cleanup_failure",
-    }:
-        return 5
-    return 3
-
-
-def _emit_predecessor_error(
-    action: str,
-    error: PredecessorIntegrationError,
-) -> int:
-    exit_code = _predecessor_exit_code(error)
-    payload: dict[str, object] = {
-        "action": action,
-        "code": error.code,
-        "command": list(error.command) if error.command is not None else None,
-        "exit_code": exit_code,
-        "expected": error.expected,
-        "field": error.field,
-        "observed": error.observed,
-        "path": error.path,
-        "phase": error.phase,
-        "retryable": error.retryable,
-        "returncode": error.returncode,
-        "schema": PREDECESSOR_CLI_ERROR_SCHEMA,
-        "status": "error",
-        "unit_id": error.unit_id,
-    }
-    sys.stderr.buffer.write(_canonical_json_line_bytes(payload))
-    return exit_code
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -2645,34 +1747,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         summary = run(args)
         emit_summary(args, summary)
         return 0
-    except (argparse.ArgumentError, SystemExit) as exc:
-        tokens = tuple(argv) if argv is not None else tuple(sys.argv[1:])
-        action = next(
-            (
-                value
-                for value in tokens
-                if value
-                in {
-                    "predecessor-integration",
-                    "verify-predecessor-integration",
-                    "verify-predecessor-integration-set",
-                }
-            ),
-            "",
-        )
-        if action:
-            error = _predecessor_error(
-                "usage_error",
-                "arguments",
-                field="arguments",
-                expected="frozen predecessor CLI grammar",
-                observed=str(exc),
-            )
-            return _emit_predecessor_error(action, error)
-        raise
-    except PredecessorIntegrationError as exc:
-        action = getattr(args, "action", "predecessor-integration")
-        return _emit_predecessor_error(action, exc)
     except CommandFailure as exc:
         summary = failure_summary(
             args,
@@ -2685,9 +1759,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(summary, sort_keys=True))
         return 1
     except UserVisibleFailure as exc:
-        summary = failure_summary(
-            args, message=exc.message, next_action=exc.next_action
-        )
+        summary = failure_summary(args, message=exc.message, next_action=exc.next_action)
         if args is not None:
             emit_summary(args, summary)
         else:

@@ -18,8 +18,9 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py verif
 
 ## Reader Map
 
-This template owns review of the detailed design artifact itself before
-implementation. Record the exact design artifact under review, then work
+This template is materialized only when a distinct unresolved design claim is
+not judgeable by the owning gate. When selected, it owns review of the detailed
+design artifact itself before implementation. Record the exact design artifact under review, then work
 through document completeness, reuse/style, cross-doc coverage, upstream
 requirements, abstract design frame, evidence, assumptions, parent-doc
 alignment, source packet, side effects, canonical tree head, naming,
@@ -31,7 +32,7 @@ only to the current artifact recorded below.
 
 ## Design Artifact Under Review
 
-<!-- Name the exact design_brief.md path, revision or section set, source packet, and reviewer separation evidence. Return revise if the review target is a chat summary, implementation diff, worker summary, or stale design artifact. -->
+<!-- When this gate is selected, name the exact design_brief.md path, revision or section set, source packet, and reviewer separation evidence. Return revise if the review target is a chat summary, implementation diff, worker summary, or stale design artifact. -->
 
 - Design artifact path:
 - Design revision or section set:
@@ -57,7 +58,7 @@ only to the current artifact recorded below.
 
 ## Abstract Design Frame Review
 
-<!-- Review the exact active-packet abstract-design-frame entry and whether the design fixes the abstract responsibility model, concept graph or layer model, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces. Return revise if entry references do not join or file-by-file design is not derived from this frame. -->
+<!-- Check whether the design fixes the abstract responsibility model, concept graph or layer model, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces before selecting implementation files, helpers, or current findings. Return revise if file-by-file design or validation is not derived from this frame. -->
 
 ## Evidence Coverage Review
 
@@ -77,11 +78,11 @@ only to the current artifact recorded below.
 
 ## Implementation Source Packet Review
 
-<!-- Review the exact implementation-source-packet entry, its dependency on abstract-design-frame, and every required read-before-edit artifact. Return revise if references do not join or the worker would need chat context or unstated assumptions. -->
+<!-- Check whether the design names every selected read-before-edit artifact: request contract, schedule, design, design review when active, document flow review when active, test plan only when post-implementation test design is active, repo docs, code paths, tests, and external references. Return revise if the worker would need chat context or unstated assumptions. -->
 
 ## Design Side-Effect Map Review
 
-<!-- Review the exact design-side-effect-map entry and whether each decision maps to affected implementation, document, workflow, prompt/config, validation, dependency-manifest, and user-facing surfaces. Return revise if references do not join or implementation would need to discover secondary surfaces after approval. -->
+<!-- Check whether the design maps each major design decision to affected implementation, document, workflow, prompt/config, validation, dependency-manifest, and user-facing surfaces. Confirm every side-effect item is tied to the Abstract Design Frame, request clause ID, reuse precedent, owner stage, review gate, and validation or test-plan item. Return revise if implementation would need to discover secondary surfaces after design approval. -->
 
 ## Canonical Tree-Head Review
 
@@ -93,7 +94,7 @@ only to the current artifact recorded below.
 
 ## Design-To-Implementation Trace Review
 
-<!-- Review the exact design-to-implementation-trace entry and its dependencies on all other packet entries. Check that every planned source, generated, and deletion record maps to a design section, request clause, source or reuse path, validation evidence, and the one responsibility unit. -->
+<!-- Check whether each planned edit maps to a design section, user-request clause ID, reuse precedent or source document, test-plan item, and validation evidence. Return revise if any implementation slice cannot cite this trace. -->
 
 ## Implementation Readiness Review
 

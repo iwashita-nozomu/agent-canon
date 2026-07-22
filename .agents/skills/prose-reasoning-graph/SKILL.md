@@ -11,10 +11,22 @@ upstream design ../../../documents/prose-reasoning-graph/dsl-spec.md normative g
 upstream implementation ../../../tools/agent_tools/prose_reasoning_graph.py builds graph projections and handoff packets
 upstream implementation ../../../rust/agent-canon/src/structured_analysis.rs reports document responsibility gaps
 upstream design ../../../documents/tools/prose_reasoning_graph.md documents CLI usage
+upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
+downstream implementation ../../../tests/agent_tools/test_check_dependency_headers.py validates this adapter dependency header.
 @dependency-end
 -->
 
 # Prose Reasoning Graph
+
+## Visualization Adapter Boundary
+
+This skill remains authority for the SQLite-backed prose graph and its selected
+nodes, edges, fields, ordering, and diagnostics. A visualization exports that
+complete native selection to `$code-visualization` as a
+`VisualizationSourceUniverse` and consumes only its canonical `ToolCall`,
+`ProjectionCoverageManifest`, post-format readback, and final coverage status.
+Local renderers own layout and reversible view state; the universal omission
+and granularity contract is not duplicated here.
 
 ## Tool Commands
 
@@ -37,7 +49,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Use this when prose structure, paragraph connection, claim support, evidence traceability, experiment-plan completeness, or split/merge/bridge/reorder rewrite planning should be derived from a graph rather than inferred repeatedly from raw prose.
 1. Use this as the structure-first writing gate for nontrivial or substantive document creation or revision: encode the draft or source packet into the graph/DSL, analyze it, expand/delete/reorganize graph-backed structure while it is still DSL/projection state, rerun diagnostics, and only then project to reader-facing prose.
 1. Skip this gate only for typo, link, Markdown formatting, or other format-only edits that do not change section order, responsibility coverage, claim/support, reader path, source map, or canonical route; record that reason and use `$md-style-check` for those edits.
-1. Treat corpus management and existing-document-to-DSL seed extraction as LocalLLM tasks. `ingest` / `ingest-set` call `agent-canon local-llm extract-prose-ir`, which partitions multiple documents and terms into bounded parts, writes `local_llm_prose_ir`, and merges `corpus_hints`, `term_contexts`, and `dsl_seed` into graph metadata. Do not revive fixed keyword dictionaries or ask the LLM to return raw word lists in chat.
+1. Treat corpus management and existing-document-to-DSL seed extraction as deterministic semantic-prose work. `ingest` / `ingest-set` derive `semantic_prose_ir` from source anchors and prompt context, then merge `corpus_hints` into graph metadata. Do not add a model-backed compatibility route or ask a model to return raw word lists in chat.
 1. Let `ingest` / `ingest-set` create the SQLite DB under `${AGENT_CANON_PROSE_GRAPH_HOME:-$HOME/.cache/agent-canon/prose-reasoning-graph}` unless the workflow explicitly passes `--db <graph.sqlite>`; generated outputs and stats still belong under the active run bundle or task-local artifact directory.
 1. Run `python3 tools/agent_tools/prose_reasoning_graph.py ingest <source.md> --stats-out <ingest.stats.json>` and read `PROSE_REASONING_GRAPH_DB` from stdout or the stats JSON.
 1. Run `python3 tools/agent_tools/prose_reasoning_graph.py analyze --db <graph.sqlite> --profile <writing|logic|experiment|report|academic|paper|all> --stats-out <analyze.stats.json>`.
@@ -45,7 +57,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. For broader or already-materialized structured-analysis DBs, materialize Rust `structured-analysis` `document-canon` diagnostics in the graph DB and route them through the same diagnostic, integration, verification, and rewrite loop as prose findings.
 1. Treat `edit_operations` as optional for structured-analysis DBs. `project`, `lint`, `explain`, and `integrate` must still read document-canon diagnostics when operations count is `0`; use `rewrite-packet --op <operation-id>` only when the DB contains a concrete edit operation.
 1. Keep stdout token-light: never print full projection, diagnostics, explanation, integration, handoff, or rewrite structures to chat or CLI stdout. Write them with `--out`, add `--stats-out`, read the stats JSON first, and open larger artifacts only as needed.
-1. Treat tool results as bounded contracts: `ingest` / `ingest-set` returns `PROSE_REASONING_GRAPH_DB` and `PROSE_REASONING_GRAPH_LOCAL_LLM_IR`, `analyze` mutates the DB and returns stats, `check-document --out-dir` returns a combined document-check report plus `PROSE_REASONING_GRAPH_DOCUMENT_CANON_FINDINGS`, `lint --out` returns active diagnostics with severity/rule/target/verification route, `integrate --out` returns operation count plus recursive verification routes, `skill-handoff --out` returns receiving-skill packets, and `project --out` is reserved for full graph inspection.
+1. Treat tool results as bounded contracts: `ingest` / `ingest-set` returns `PROSE_REASONING_GRAPH_DB` and stores `semantic_prose_ir` in graph metadata, `analyze` mutates the DB and returns stats, `check-document --out-dir` returns a combined document-check report plus `PROSE_REASONING_GRAPH_DOCUMENT_CANON_FINDINGS`, `lint --out` returns active diagnostics with severity/rule/target/verification route, `integrate --out` returns operation count plus recursive verification routes, `skill-handoff --out` returns receiving-skill packets, and `project --out` is reserved for full graph inspection.
 1. If `integrate` reports `operations: 0`, continue with diagnostic verification and rerun checks; do not call `rewrite-packet` until a concrete operation id exists.
 1. Do not treat `PROSE_REASONING_GRAPH_EDIT_OPERATIONS=0` as `no findings`. Always inspect diagnostic rules and counts. If any `presentation_format_candidate` remains, record each target, recommended format, feature-subgraph reason, verification route, and decision status before closeout.
 1. A `presentation_format_candidate` is unresolved until `$structure-planning` / `$report-writing` has adopted it, rejected it with renderer or reader-state evidence, combined it with prose, or preserved it as an explicit unresolved warning with owner and next command. Do not summarize it as a harmless residual warning without that decision record.

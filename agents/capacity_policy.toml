@@ -1,0 +1,60 @@
+# @dependency-start
+# contract configuration
+# responsibility Declares topology-derived capacity, queue, reservation, and lifecycle policy.
+# upstream design ./task_catalog.yaml declares the direct and nested workflow topology
+# downstream implementation ../tools/agent_tools/capacity_handshake.py loads and projects this policy
+# downstream implementation ../tools/agent_tools/agent_team.py supplies workflow and write-scope inputs
+# downstream implementation ../tools/agent_tools/task_close.py validates lifecycle closeout
+# @dependency-end
+
+policy_version = 2
+policy_id = "topology_derived_v1"
+
+[topology_derivation]
+total_slot_derivation = "max_legal_concurrent_open_frontier"
+workflow_budget_derivation = "direct_frontier_plus_nested_reservations_once"
+write_slot_derivation = "max_pairwise_disjoint_write_frontier"
+parent_slot_weight = 1
+descendant_slot_weight = 1
+direct_frontier_count = 20
+nested_reservation_count = 6
+nested_reservation_accounting = "count_once"
+unknown_platform_behavior = "min_known_then_queue_on_runtime_rejection"
+
+[reservation_policy]
+idempotency_fields = ["work_id", "packet_sha256"]
+creation_event = "actual_successful_spawn"
+preregister_declared_roles = false
+terminal_open_consumes_slot = true
+release_requires = ["durable_result_evidence", "durable_handback", "descendants_closure_verified", "closed", "readback_verified"]
+open_record_retention = "retain_reservation_released_record"
+unknown_descendant_action = "fail_closeout"
+
+[lifecycle_policy]
+transition_mode = "compare_and_swap"
+states = ["spawned", "active", "durable_result_evidence", "handed_back", "descendants_closure_verified", "closed", "readback_verified", "reservation_released"]
+skipped_transition_action = "reject"
+unknown_transition_action = "reject"
+
+[queue_policy]
+preserve_packet_and_profile = true
+promotion_order = ["dependency_then_priority_then_work_id"]
+thread_rejection_action = "queue_ready_work"
+model_rejection_action = "queue_same_model_packet"
+compatibility_fallback = false
+
+[runtime_config_change_policy]
+config_key = "agents.max_threads"
+target_value_derivation = "declared_team_peak_plus_nested_reservations_v1"
+target_value = 26
+required_predicates = ["approved_target_state", "valid_declared_team_topology", "generated_value_matches_topology_witness"]
+missing_predicate_action = "fail_generation"
+unavailable_reload_action = "emit_restart_required"
+disposable_spawn_probe = false
+
+[generated_manifest_policy]
+output_key = "run.capacity_request.requested_total_capacity"
+topology_proof_key = "run.capacity_request.topology_proof_ref"
+capacity_policy_key = "run.capacity_request.capacity_policy_ref"
+loader_evidence_key = "run.capacity_request.input_provenance"
+numeric_family_default = false

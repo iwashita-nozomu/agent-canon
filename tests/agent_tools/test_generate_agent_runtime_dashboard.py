@@ -2,8 +2,6 @@
 # contract test
 # responsibility Tests AgentCanon runtime dashboard generation.
 # upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py generates dashboard reports
-# upstream implementation ../../tools/agent_tools/workflow_monitor.py emits canonical runtime measurement inputs
-# upstream implementation ../../tools/agent_tools/compare_codex_token_footprints.py owns token usage parsing
 # upstream design ../../documents/runtime-log-archive.md documents result families shown by dashboard
 # @dependency-end
 
@@ -18,15 +16,15 @@ import tempfile
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_runtime_dashboard.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import generate_agent_runtime_dashboard as dashboard  # noqa: E402
-from generate_agent_runtime_dashboard import HookWorkflowBreakdownReader  # noqa: E402
+from generate_agent_runtime_dashboard import (  # noqa: E402
+    HookWorkflowBreakdownReader,
+    tool_source_path_candidates,
+)
 from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
-from workflow_monitor import RUNTIME_MEASUREMENT_SIGNAL  # noqa: E402
 
 DASHBOARD_PROMPT_CHAR_COUNT = 27
 
@@ -42,69 +40,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             entries = HookWorkflowBreakdownReader.iter_entries(missing_log)
 
         self.assertEqual(entries, ())
-
-    def test_runtime_candidate_paths_are_typed_before_git(self) -> None:
-        """Malformed event paths should be rejected before reset history lookup."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            base = Path(temp_dir)
-            root = base / "root"
-            outside = base / "outside"
-            root.mkdir()
-            outside.mkdir()
-            (root / "source.py").write_text("pass\n", encoding="utf-8")
-            (outside / "escaped.py").write_text("pass\n", encoding="utf-8")
-            (root / "escape").symlink_to(outside, target_is_directory=True)
-            candidates: tuple[object, ...] = (
-                b"\xff",
-                "",
-                "/absolute.py",
-                "C:/drive.py",
-                "../parent.py",
-                "nul\x00.py",
-                "wrong\\separator.py",
-                "escape/escaped.py",
-                "missing.py",
-                "./source.py",
-            )
-            reset = dashboard.SelectionReset("fixture", 1, "fixture")
-            with (
-                mock.patch.object(
-                    dashboard,
-                    "selection_source_path_candidates",
-                    return_value=candidates,
-                ),
-                mock.patch.object(
-                    dashboard,
-                    "read_selection_path_reset",
-                    return_value=reset,
-                ) as read_reset,
-            ):
-                resolution = dashboard.read_candidate_selection_resets(
-                    root,
-                    "tool",
-                    "event-derived",
-                )
-
-        self.assertEqual(resolution.accepted, (Path("source.py"),))
-        self.assertEqual(resolution.resets, (reset,))
-        self.assertEqual(read_reset.call_count, 1)
-        self.assertEqual(
-            {item.code for item in resolution.rejections},
-            {
-                "runtime.path.type",
-                "runtime.path.empty",
-                "runtime.path.absolute",
-                "runtime.path.drive_prefix",
-                "runtime.path.parent_escape",
-                "runtime.path.nul",
-                "runtime.path.separator",
-                "runtime.path.root_escape",
-                "runtime.path.non_regular",
-            },
-        )
-        self.assertTrue(
-            all(item.set_name == "Unresolved" for item in resolution.rejections)
-        )
 
     def test_generates_log_location_dashboard(self) -> None:
         """The dashboard should show canonical paths and accumulated counts."""
@@ -255,8 +190,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """Verify routing selection, prompt, and Markdown evidence sections."""
         required = (
             "## Selection Accuracy By Responsibility",
-            "AGENT_RUNTIME_DASHBOARD_SELECTION_ITEMS=8",
-            "AGENT_RUNTIME_DASHBOARD_SELECTION_SELECTED=7",
+            "AGENT_RUNTIME_DASHBOARD_SELECTION_ITEMS=7",
+            "AGENT_RUNTIME_DASHBOARD_SELECTION_SELECTED=6",
             "AGENT_RUNTIME_DASHBOARD_SELECTION_CANDIDATES=4",
             "AGENT_RUNTIME_DASHBOARD_SELECTION_MISSES=2",
             "AGENT_RUNTIME_DASHBOARD_SKILL_SELECTION_MISS_RATE=50.0%",
@@ -287,8 +222,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "`0.0%` | `untracked-or-unknown` |",
             "| `workflow` | `environment-maintenance` | `0` | `1` | `1` | "
             "`100.0%` | `untracked-or-unknown` |",
-            "| `workflow` | `platform-and-environment` | `1` | `0` | `0` | "
-            "`unknown` | `untracked-or-unknown` |",
             "| `tool` | `agent-canon-cli` | `1` | `1` | `0` | "
             "`0.0%` | `untracked-or-unknown` |",
         )
@@ -311,7 +244,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "AGENT_RUNTIME_DASHBOARD_HOOK_FILES=3",
             "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=6",
             "skill-workflow-prompt",
-            "local-llm-responsibility",
             "workflow-selection",
             "test-container",
             "environment-maintenance",
@@ -536,184 +468,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertIn("| `namespace_debt_by_hook_family` | `skill_usage=1` |", compact_dashboard)
         self.assertIn("oop_applicability", compact_dashboard)
 
-    def test_api_preserves_complete_runtime_measurements(self) -> None:
-        """The API should preserve complete measurements with stable unit ordering."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            self.write_fixture(root)
-            token_path = root / "reports" / "agents" / "test" / "session.jsonl"
-            token_path.write_text(
-                json.dumps(
-                    {
-                        "type": "event_msg",
-                        "payload": {
-                            "type": "token_count",
-                            "info": {
-                                "total_token_usage": {
-                                    "input_tokens": 1000,
-                                    "cached_input_tokens": 250,
-                                    "output_tokens": 120,
-                                    "reasoning_output_tokens": 30,
-                                    "total_tokens": 1150,
-                                }
-                            },
-                        },
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            measurement_input: dict[str, object] = {
-                "responsibility_unit_id": "a-unit",
-                "codex_trace_key": None,
-                "generation_parent": "parent-unit",
-                "reuse_mode": "fresh",
-                "packet_hash": "sha256:packet-a",
-                "context_bytes_by_source": {"z-source": 0, "a-source": 41},
-                "finding_iteration": 0,
-                "review_iteration": 2,
-                "writer_ids": ["writer-1"],
-                "reviewer_ids": ["reviewer-2", "reviewer-1"],
-                "launch_epoch": 100,
-                "finish_epoch": 125,
-                "retries": 0,
-                "waits": 1,
-                "progress_bytes": 4096,
-                "token_footprint_ref": "reports/agents/test/session.jsonl",
-                "artifact_hashes": ["sha256:artifact", "sha256:artifact"],
-            }
-            second = dict(measurement_input)
-            second["responsibility_unit_id"] = "z-unit"
-            second.update(
-                {
-                    "generation_parent": None,
-                    "reuse_mode": None,
-                    "packet_hash": None,
-                    "context_bytes_by_source": {},
-                    "finding_iteration": None,
-                    "review_iteration": None,
-                    "writer_ids": [],
-                    "reviewer_ids": [],
-                    "launch_epoch": None,
-                    "finish_epoch": None,
-                    "retries": None,
-                    "waits": None,
-                    "progress_bytes": None,
-                    "token_footprint_ref": None,
-                    "artifact_hashes": [],
-                }
-            )
-            workflow_report = (
-                root / "reports" / "agents" / "test" / "workflow_monitoring.md"
-            )
-            with workflow_report.open("a", encoding="utf-8") as handle:
-                for runtime_measurement in (second, measurement_input):
-                    handle.write(
-                        RUNTIME_MEASUREMENT_SIGNAL
-                        + json.dumps(runtime_measurement)
-                        + "\n"
-                    )
-            api_output = root / "reports" / "dashboard-api.json"
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--root",
-                    str(root),
-                    "--out",
-                    str(root / "reports" / "dashboard.md"),
-                    "--api-out",
-                    str(api_output),
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            payload = json.loads(api_output.read_text(encoding="utf-8"))
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        rows = payload["runtime_measurements"]
-        self.assertEqual([row["responsibility_unit_id"] for row in rows], ["a-unit", "z-unit"])
-        self.assertEqual(
-            rows[0],
-            {
-                "responsibility_unit_id": "a-unit",
-                "generation_parent": "parent-unit",
-                "reuse_mode": "fresh",
-                "packet_hash": "sha256:packet-a",
-                "context_bytes_by_source": {"a-source": 41, "z-source": 0},
-                "finding_iteration": 0,
-                "review_iteration": 2,
-                "writer_ids": ["writer-1"],
-                "reviewer_ids": ["reviewer-1", "reviewer-2"],
-                "launch_epoch": 100,
-                "finish_epoch": 125,
-                "input_tokens": 1000,
-                "cached_input_tokens": 250,
-                "output_tokens": 120,
-                "reasoning_tokens": 30,
-                "retries": 0,
-                "waits": 1,
-                "progress_bytes": 4096,
-                "repeated_artifact_hashes": ["sha256:artifact"],
-            },
-        )
-        self.assertEqual(
-            list(rows[0]["context_bytes_by_source"]), ["a-source", "z-source"]
-        )
-        self.assertEqual(rows[0]["finding_iteration"], 0)
-        self.assertEqual(rows[0]["retries"], 0)
-        self.assertIsNone(rows[1]["generation_parent"])
-        self.assertIsNone(rows[1]["finding_iteration"])
-        self.assertIsNone(rows[1]["input_tokens"])
-        self.assertIsNone(rows[1]["retries"])
-        self.assertNotIn(
-            "runtime.measurement_missing",
-            {diagnostic["code"] for diagnostic in payload["diagnostics"]},
-        )
-
-    def test_api_reports_missing_token_comparison_without_inference(self) -> None:
-        """Zero comparison evidence should remain zero and emit a typed diagnostic."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            self.write_fixture(root)
-            workflow_report = (
-                root / "reports" / "agents" / "test" / "workflow_monitoring.md"
-            )
-            workflow_report.write_text(
-                "\n".join(
-                    line
-                    for line in workflow_report.read_text(encoding="utf-8").splitlines()
-                    if "token_efficiency_protocol=" not in line
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            api_output = root / "reports" / "dashboard-api.json"
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--root",
-                    str(root),
-                    "--out",
-                    str(root / "reports" / "dashboard.md"),
-                    "--api-out",
-                    str(api_output),
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            payload = json.loads(api_output.read_text(encoding="utf-8"))
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(payload["token_observability"]["comparison_count"], 0)
-        self.assertIn(
-            "runtime.token_comparison_missing",
-            {diagnostic["code"] for diagnostic in payload["diagnostics"]},
-        )
-
     def test_selection_metrics_normalize_workflows_and_known_skills(self) -> None:
         """Selection metrics should compare canonical workflow names only."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -739,7 +493,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(
-            "| `workflow` | `platform-and-environment` | `2` | `1` | `0` | `0.0%` |",
+            "| `workflow` | `platform-and-environment` | `1` | `1` | `0` | `0.0%` |",
             dashboard,
         )
         self.assertNotIn("| `skill` | `pid` |", dashboard)
@@ -770,7 +524,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(
-            "| `workflow` | `platform-and-environment` | `2` | `1` | `0` | `0.0%` |",
+            "| `workflow` | `platform-and-environment` | `1` | `1` | `0` | `0.0%` |",
             dashboard,
         )
         self.assertNotIn("| `workflow` | `agent-canon-update-route` |", dashboard)
@@ -805,7 +559,57 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         )
         self.assertNotIn("| `tool` | `docs check` |", dashboard)
         self.assertNotIn("| `tool` | `docs format` |", dashboard)
-        self.assertNotIn("| `tool` | `run_docs_checks.sh` |", dashboard)
+
+    def test_invalid_tool_selection_label_does_not_abort_dashboard(self) -> None:
+        """Regex-like tool labels stay aggregate evidence without a reset path."""
+        invalid_tool = "pattern='AGENT_CANON_LLAMA_CPP|...'"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            hook_dir = (
+                mounted_log_archive_root(root)
+                / "hook-runs"
+                / repo_log_key(root)
+                / "test-container"
+            )
+            with (hook_dir / "skill_usage.jsonl").open("a", encoding="utf-8") as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "hook_run_id": "hook-invalid-tool-label",
+                            "hook_log_namespace": "test-container",
+                            "event": "UserPromptSubmit",
+                            "status": "pass",
+                            "payload_fingerprint": "payload-invalid-tool-label",
+                            "timestamp": "2026-05-17T01:02:07Z",
+                            "candidate_tools": [invalid_tool],
+                        }
+                    )
+                    + "\n"
+                )
+            output = root / "reports" / "dashboard.md"
+
+            self.assertEqual(tool_source_path_candidates(invalid_tool), ())
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            dashboard = output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "| `tool` | `pattern='AGENT_CANON_LLAMA_CPP|...'` | `0` | `1` | `1` |",
+            dashboard,
+        )
 
     def test_selection_metrics_ignore_related_only_skill_candidates(self) -> None:
         """Related skill hints should not inflate missed skill selections."""
@@ -906,14 +710,13 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         archive = mounted_log_archive_root(root)
         hook_dir = archive / "hook-runs" / repo_log_key(source) / "test-container"
         skill_dir = archive / "eval-results" / "skill-workflow-prompt"
-        local_llm_dir = archive / "eval-results" / "local-llm-responsibility"
         workflow_dir = archive / "eval-results" / "workflow-selection"
         evals_dir = root / "agents" / "evals"
         evals_dir.mkdir(parents=True)
         (evals_dir / "README.md").write_text("# Eval Fixture\n", encoding="utf-8")
-        self.create_fixture_dirs(root, hook_dir, skill_dir, local_llm_dir, workflow_dir)
+        self.create_fixture_dirs(root, hook_dir, skill_dir, workflow_dir)
         self.write_issue_memory_fixture(root)
-        self.write_eval_report_fixture(skill_dir, local_llm_dir, workflow_dir)
+        self.write_eval_report_fixture(skill_dir, workflow_dir)
         self.write_hook_fixture(hook_dir)
         self.write_workflow_monitor_fixture(root)
 
@@ -922,11 +725,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         root: Path,
         hook_dir: Path,
         skill_dir: Path,
-        local_llm_dir: Path,
         workflow_dir: Path,
     ) -> None:
         """Create fixture directories."""
-        for directory in (hook_dir, skill_dir, local_llm_dir, workflow_dir):
+        for directory in (hook_dir, skill_dir, workflow_dir):
             directory.mkdir(parents=True)
         (root / "issues" / "open").mkdir(parents=True)
         (root / "issues" / "closed").mkdir(parents=True)
@@ -957,7 +759,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
     def write_eval_report_fixture(
         self,
         skill_dir: Path,
-        local_llm_dir: Path,
         workflow_dir: Path,
     ) -> None:
         """Write eval report fixture files."""
@@ -967,10 +768,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         )
         (skill_dir / "skill-eval-test-fail-md-style-check.md").write_text(
             "- used_skills: `md-style-check`\nEVAL_STATUS=fail\n",
-            encoding="utf-8",
-        )
-        (local_llm_dir / "local-llm-eval-20260517T010203040506Z-1234567890-pass.md").write_text(
-            "LOCAL_LLM_EVAL_STATUS=pass\n",
             encoding="utf-8",
         )
         (workflow_dir / "workflow-selection-eval-20260517T010203040506Z-1234567890-pass.md").write_text(
@@ -1013,8 +810,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "payload_fingerprint": "payload-b",
                     "skills": ["agent-orchestration"],
                     "candidate_workflows": ["environment-maintenance"],
-                    "workflow_family": "platform-and-environment",
-                    "workflow_attribution_kind": "owner",
                     "candidate_skills": ["md-style-check", "oop-readability-check"],
                     "candidate_tools": ["agent-canon-cli"],
                     "feedback_labels": ["quality_gap"],
@@ -1189,7 +984,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                         "status": "pass",
                         "payload_fingerprint": "payload-tool-alias-candidate",
                         "timestamp": "2026-05-17T01:02:04Z",
-                        "candidate_tools": ["run_docs_checks.sh", "docs check", "docs format"],
+                        "candidate_tools": ["docs check", "docs format"],
                     }
                 )
                 + "\n"

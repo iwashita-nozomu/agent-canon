@@ -188,7 +188,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 - README、guide、workflow、規約文書が最新実装を説明していること
 - `verification.txt` が `status=pass` であること
 - `closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` であること
-- `closeout_gate.md` が `spec_product_coverage_complete=yes` かつ `review_findings_integrated=yes` であること
+- `closeout_gate.md` が `completion_coverage_consumer=yes`、`coverage_check.ok=true`、および `completion_boundary.topology_errors=[]` を記録していること
 - `closeout_gate.md` が `post_fix_full_review_complete=yes` であること
 - `closeout_gate.md` が `mechanical_completion_loop_complete=yes` かつ `diff_check_agent_complete=yes` であること
 - `user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` であること

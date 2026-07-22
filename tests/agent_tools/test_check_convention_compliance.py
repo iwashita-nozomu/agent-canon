@@ -30,7 +30,6 @@ from tools.agent_tools.check_convention_compliance import (
     MATHEMATICAL_NECESSITY_MARKERS,
     OWNER_BOUNDED_TOOL_ROUTE_MARKERS,
     OWNER_MAP_ENTRYPOINT_MARKERS,
-    POSITIVE_RUNTIME_WORDING_SURFACES,
     PR_ESSENCE_DOCUMENTATION_MARKERS,
     REFACTOR_SEQUENCE_MARKERS,
     RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
@@ -164,7 +163,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/agent-canon-parent-repo-latest-checklist.md": "checklist\n",
     "documents/runtime-profiles-and-check-matrix.md": (
         "Static analysis and reading evidence primary validation evidence "
-        "operation checks supplemental evidence unresolved static/read findings\n"
+        "operation checks supplemental evidence unresolved static/read findings "
+        "runtime behavior\n"
     ),
     "documents/TROUBLESHOOTING.md": (
         "validation test/check failure failing_contract cause_classification "
@@ -208,6 +208,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "Completion Readiness\n"
         "Design Integrity Gate owning responsibility model "
         "Abstract Design Frame Design-To-Implementation Trace "
+        "owner, replaceable unit replaceable unit mechanism validation route unresolved branch "
         "design_issue_blocker implementation shortcut\n"
         "user-facing completion\n"
         "repo_wide_static_analysis_complete\n"
@@ -216,7 +217,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "bounded route existing tool targeted validation follow-up context\n"
         "contract-only wrapper static contract validation canonical command evidence "
         "validation tool\n"
-        "静的解析・読み取り 主証跡 reading evidence 動作確認 broad execution\n"
+        "静的解析・読み取り 主証跡 reading evidence 動作確認 broad execution "
+        "静的解析、読み取り確認、docs / targeted tests / agent checks "
+        "Runtime evidence distinct unresolved claim/risk\n"
         "compatibility-preservation drift duplicate implementation canonical owner "
         "caller migration contract-complete implementation acceptance contract "
         "design_issue_blocker implementation shortcut\n"
@@ -273,7 +276,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "$md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted-validation evidence Owner-Bounded Change "
         "static/read evidence primary validation evidence supplemental evidence "
-        "operation checks unresolved static findings "
+        "operation checks unresolved static findings replaceable unit "
+        "implementation paths validation route unresolved branch "
+        "targeted validation route "
+        "changed runtime behavior "
         "Design Integrity Gate responsibility model Abstract Design Frame "
         "design_issue_blocker implementation latitude "
         "parent-direct $owner-bounded-routing SKILL.md "
@@ -384,9 +390,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "literature-survey research-workflow 先に source packet adoption/exclusion "
-        "静的解析・読み取り evidence 未解決 signal 動作確認 smoke run "
+        "静的解析・読み取り evidence 未解決 signal 実行が必要な未解決 signal 動作確認 smoke run "
         "重いコマンド "
-        "Design Integrity Gate responsibility model Abstract Design Frame "
+        "Design Integrity Gate responsibility model Decision sufficiency is semantic "
+        "owner, replaceable unit implementation mechanism validation route "
+        "unresolved branch Abstract Design Frame "
         "design_issue_blocker implementation shortcut "
         "$owner-bounded-routing "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
@@ -404,8 +412,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "literature-survey research-workflow 設計 Implementation Source Packet "
         "adoption/exclusion "
         "静的解析・読み取り evidence primary validation evidence "
-        "supplemental evidence 動作確認 未解決 finding "
-        "Design Integrity Gate 責務 model Abstract Design Frame "
+        "supplemental evidence 動作確認 runtime behavior 未解決 finding "
+        "Design Integrity Gate 責務 model responsibility model 差し替え可能な単位 "
+        "実装 scope validation route unresolved branch Abstract Design Frame "
         "design_issue_blocker implementation shortcut "
         "md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted validation Owner-Bounded Change "
@@ -504,6 +513,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/workflows/implementation-waterfall-workflow.md": (
         "Design Integrity Gate owning responsibility model Abstract Design Frame "
+        "replaceable unit mechanism validation route unresolved branch "
         "design_issue_blocker implementation shortcut\n"
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
@@ -594,7 +604,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/templates/test_plan.md": "validation route behavior-owned cases\n",
     "evidence/agent-evals/skill_workflow_prompt_eval.toml": (
         "check_convention_compliance.py CONVENTION-WORKFLOW CONVENTION-SKILL "
-        "write-capable handoff\n"
+        "write-capable handoff ORCH-SHIM-TOOLCALL-1 WORKFLOW-GENERIC-1\n"
         "evaluate_skill_workflow_prompts.py\n"
     ),
     "evidence/agent-evals/agent_behavior_eval.toml": "behavior evaluate_agent_run.py\n",
@@ -663,6 +673,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "tool_catalog.py tool_drift.py notebook_quality.py "
         "check_github_workflows.py container_config.py check_runtime_profile_inventory.py\n"
     ),
+    "tools/ci/check_agent_canon_pr.sh": (
+        "python3 tools/agent_tools/check_convention_compliance.py\n"
+        "python3 tools/ci/check_github_workflows.py\n"
+    ),
     "rust/agent-canon/src/docs.rs": "runtime profile inventory\n",
     "documents/tools/agent-canon.md": "docs\n",
     "tools/sync_agent_canon.sh": "surface_manifest.py build_regular_specs regular_path\n",
@@ -702,7 +716,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "Multiple chats or sessions unknown dirty Proven exact task ownership "
         "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
         "AGENT_CANON_DESTRUCTIVE_GIT_REASON "
-        "Design Integrity Gate responsibility model Abstract Design Frame "
+        "Design Integrity Gate responsibility model owning responsibility model "
+        "owner, replaceable unit implementation mechanism validation route "
+        "unresolved branch Abstract Design Frame "
         "Design-To-Implementation Trace design_issue_blocker "
         "implementation shortcut\n"
         "## Runtime Owner Map\n\n"
@@ -738,8 +754,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "`agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |\n"
         "| public skill registry | `agents/skills/catalog.yaml` | "
         "`check_agent_runtime_alignment.py` |\n"
-        "| shared-canon update | `tools/update_agent_canon.sh` | "
-        "AgentCanon PR gate |\n"
+        "| AgentCanon update transaction | "
+        "`documents/agent-canon-update-route.md` | "
+        "`update_lifecycle_contract.py` |\n"
     ),
 }
 
@@ -803,18 +820,18 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("missing-tool-commands-section", result.stdout)
 
     def test_missing_workflow_hook_fails(self) -> None:
-        """A workflow prompt without the verifier marker is rejected."""
+        """The canonical source gate cannot omit convention verification."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "workflows" / "example-workflow.md"
-            workflow.write_text("# Example\nNo verifier here.\n", encoding="utf-8")
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
 
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "workflow_hook:agents/workflows/example-workflow.md",
+                "workflow_hook:tools/ci/check_agent_canon_pr.sh",
                 result.stdout,
             )
             self.assertIn("missing-convention-compliance-gate", result.stdout)
@@ -824,9 +841,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "workflows" / "example-workflow.md"
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             workflow.write_text(
-                "# Example\nMention check_convention_compliance.py in prose only.\n",
+                "#!/usr/bin/env bash\n# Mention check_convention_compliance.py only.\n",
                 encoding="utf-8",
             )
 
@@ -843,12 +860,11 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "workflows" / "example-workflow.md"
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             workflow.write_text(
-                "# Example\n"
-                "Before closeout, run "
-                "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
-                "Do not run check_convention_compliance.py for quick tasks.\n",
+                "#!/usr/bin/env bash\n"
+                "python3 tools/agent_tools/check_convention_compliance.py\n"
+                "# Do not run check_convention_compliance.py for quick tasks.\n",
                 encoding="utf-8",
             )
 
@@ -981,63 +997,22 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("normative-lines-without-verification-route", result.stdout)
 
-    def test_runtime_wording_rejects_legacy_completion_blocker(self) -> None:
-        """Runtime docs keep completion wording in readiness form."""
+    def test_runtime_boundary_wording_is_not_a_blanket_checker_gate(self) -> None:
+        """Reachability boundaries may use negative wording without a style gate."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
-            workflow.write_text(
-                workflow.read_text(encoding="utf-8")
-                + "\n- completion report を出さない\n",
+            root_agents = root / "ROOT_AGENTS.md"
+            root_agents.write_text(
+                root_agents.read_text(encoding="utf-8")
+                + "\n- do not activate a reviewer when no unresolved risk changes the route.\n",
                 encoding="utf-8",
             )
 
             result = self.run_checker(root)
 
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("positive_runtime_wording", result.stdout)
-            self.assertIn("legacy-negative-runtime-wording", result.stdout)
-
-    def test_runtime_wording_rejects_sequence_design_labels(self) -> None:
-        """Runtime docs keep MVP and design routing free of sequence labels."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            cases = {
-                ".agents/skills/mvp-skeleton/SKILL.md": (
-                    "# MVP\nStop after the first runnable path.\n"
-                ),
-                "ROOT_AGENTS.md": "- first-wave target\n",
-                "agents/TASK_WORKFLOWS.md": "- 最初の作業 update\n",
-                "agents/skills/mvp-skeleton.md": (
-                    "# MVP\nThis is a first-pass MVP scope.\n"
-                ),
-            }
-            for rel_path, content in cases.items():
-                with self.subTest(rel_path=rel_path):
-                    self.copy_minimal_repo(root)
-                    (root / rel_path).write_text(content, encoding="utf-8")
-
-                    result = self.run_checker(root)
-
-                    self.assertEqual(
-                        result.returncode,
-                        1,
-                        result.stdout + result.stderr,
-                    )
-                    self.assertIn("positive_runtime_wording", result.stdout)
-                    self.assertIn("legacy-sequence-design-wording", result.stdout)
-
-    def test_minimal_fixture_covers_positive_runtime_wording_surfaces(self) -> None:
-        """The minimal test fixture includes every positive wording surface."""
-        missing = sorted(
-            path
-            for path in POSITIVE_RUNTIME_WORDING_SURFACES
-            if path not in MINIMAL_REPO_FILES
-        )
-
-        self.assertEqual(missing, [])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CONVENTION_COMPLIANCE=pass", result.stdout)
 
     def test_legacy_forwarder_requires_caller_action_warning(self) -> None:
         """Legacy forwarders must identify callers and migration action."""
@@ -1062,10 +1037,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            skill = root / ".agents" / "skills" / "agent-orchestration" / "SKILL.md"
+            skill = root / "agents" / "skills" / "agent-orchestration.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8").replace(
-                    " $codex-task-workflow",
+                    "$codex-task-workflow ",
                     "",
                 ),
                 encoding="utf-8",
@@ -1082,10 +1057,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            skill = root / ".agents" / "skills" / "agent-orchestration" / "SKILL.md"
+            skill = root / "agents" / "skills" / "agent-orchestration.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8").replace(
-                    " $subagent-bootstrap",
+                    "$subagent-bootstrap ",
                     "",
                     1,
                 ),
@@ -1354,6 +1329,18 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "agents/workflows/implementation-waterfall-workflow.md",
             DESIGN_INTEGRITY_GATE_MARKERS,
         )
+        self.assertIn(
+            "owner, replaceable unit",
+            DESIGN_INTEGRITY_GATE_MARKERS["ROOT_AGENTS.md"],
+        )
+        self.assertNotIn(
+            "Abstract Design Frame",
+            DESIGN_INTEGRITY_GATE_MARKERS["ROOT_AGENTS.md"],
+        )
+        self.assertNotIn(
+            "Design-To-Implementation Trace",
+            DESIGN_INTEGRITY_GATE_MARKERS["ROOT_AGENTS.md"],
+        )
 
     def test_minimal_fixture_covers_design_integrity_gate_surfaces(self) -> None:
         """The fixture includes every design-integrity gate surface."""
@@ -1367,8 +1354,12 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
     def test_literature_backed_skill_call_order_contract_is_manifest_backed(self) -> None:
         """Literature-backed skill-call order surfaces are manifest-backed."""
-        self.assertIn(
+        self.assertNotIn(
             ".agents/skills/agent-orchestration/SKILL.md",
+            LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
+        )
+        self.assertIn(
+            "agents/skills/agent-orchestration.md",
             LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
         )
         self.assertIn(
@@ -1394,7 +1385,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             workflow = root / "agents" / "skills" / "codex-task-workflow.md"
             workflow.write_text(
                 workflow.read_text(encoding="utf-8").replace(
-                    "静的解析・読み取り evidence",
+                    "primary validation evidence",
                     "runtime confirmation",
                 ),
                 encoding="utf-8",
@@ -1404,7 +1395,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("static_read_validation_policy", result.stdout)
-            self.assertIn("missing-marker:静的解析・読み取り evidence", result.stdout)
+            self.assertIn("missing-marker:primary validation evidence", result.stdout)
 
     def test_static_read_validation_policy_contract_is_manifest_backed(self) -> None:
         """Static/read validation policy surfaces are manifest-backed."""
@@ -1415,6 +1406,18 @@ class CheckConventionComplianceTest(unittest.TestCase):
         self.assertIn(
             ".agents/skills/codex-task-workflow/SKILL.md",
             STATIC_READ_VALIDATION_POLICY_MARKERS,
+        )
+        self.assertIn(
+            "primary validation evidence",
+            STATIC_READ_VALIDATION_POLICY_MARKERS[
+                ".agents/skills/codex-task-workflow/SKILL.md"
+            ],
+        )
+        self.assertNotIn(
+            "動作確認",
+            STATIC_READ_VALIDATION_POLICY_MARKERS[
+                "agents/skills/codex-task-workflow.md"
+            ],
         )
 
     def test_minimal_fixture_covers_static_read_validation_policy_surfaces(self) -> None:

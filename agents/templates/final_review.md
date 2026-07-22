@@ -1,4 +1,4 @@
-# Final Review
+# Final Review (Selected Escalation)
 <!--
 @dependency-start
 contract template
@@ -20,11 +20,11 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Design Trace Acceptance
 
-<!-- Confirm that the final integrated responsibility unit remains traceable through all four exact active-packet entries and every active request clause. Return revise for a partial skeleton, duplicate owner/parser/writer, inferred authority, or a changed slice justified only by nearby code or chat. -->
+<!-- This artifact is materialized only when final escalation or a distinct unresolved claim/risk is selected. Confirm that the final diff remains traceable to the Abstract Design Frame, approved design sections, user-request clause IDs, Implementation Source Packet entries, and test-plan items only when test design was activated. -->
 
 ## Design Side-Effect Trace Acceptance
 
-<!-- Confirm that implemented side effects match the exact Design Side-Effect Map, including atomic run-bundle publication, parent-owned graph DB, consumers, docs/skills/templates, runtime dashboard/token evidence, dependency manifests, and user-facing surfaces. Partial publication or pointer advance is a blocker. -->
+<!-- Confirm that implemented side effects match the approved Design Side-Effect Map, including documents, workflows, prompt/config, validation output, dependency manifests, and user-facing surfaces. Record any side-effect item that moved to a later stage, was escalated, or received explicit reviewer acceptance. -->
 
 ## Planned Work Completion Review
 
@@ -40,7 +40,7 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Review Finding Incorporation Review
 
-<!-- Confirm that change review, language-specific review, docs review, final review, and required specialist findings were reflected in implementation or explicitly escalated. Return revise if fix-now findings were ignored or only recorded in review artifacts. -->
+<!-- Confirm that the selected owning review gate and any explicitly activated specialist findings were reflected in implementation or explicitly escalated. Reviewer output is hypothesis input; accepted findings require current snapshot, reachable path, contract, and witness/static proof. Rejected findings require reason_code/evidence_ref and do not create a repair wave. -->
 
 ## Review Rejection Response Review
 
@@ -52,15 +52,11 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Post-Fix Full Review Rerun Review
 
-<!-- Confirm that if any review-driven fix landed after an earlier review artifact, the active required review set for the risk class and changed surface was rerun against the latest diff. Record the refreshed review artifacts, or explicitly state that no post-review fixes occurred after the last applicable review pass. Return revise if any tiny fix skipped the rerun. -->
+<!-- Confirm that if an accepted review-driven fix changed behavior, owner/design boundary, correctness, validation, or publication state, the selected owning gate was rerun against the latest diff. Full review reruns are selected only for a final candidate when the touched contract requires them. -->
 
 ## Repo-Wide Dependency Review
 
-<!-- Confirm a fresh canonical graph build/status/query/context and `bash tools/agent_tools/run_repo_dependency_review.sh` were run after the latest fix. Confirm obsolete parser/transport/binder routes are absent and runtime evidence remains metadata/context, not a relation kind. -->
-
-## Predecessor Integration Acceptance
-
-<!-- For post-merge acceptance only, verify the immutable knowledge_graph and active_design_packet_materialization records individually and as the exact two-unit set at one integrated source OID. Before source merge, confirm both derived record files are absent and no manual substitute was created. -->
+<!-- Confirm the selected static/targeted validation route after the latest accepted fix. Run the full repository dependency review only when the final candidate contract requires it. -->
 
 ## Canonical Tree-Head Acceptance
 

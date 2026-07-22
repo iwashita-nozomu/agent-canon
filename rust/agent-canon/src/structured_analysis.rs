@@ -9,7 +9,6 @@
 // downstream implementation ../../../rust/agent-canon/src/main.rs routes structured-analysis commands
 // @dependency-end
 
-use crate::dependency_manifest::{DependencyKind, ManifestAst, ManifestDirection, ManifestParser};
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -21,6 +20,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const DOC_SUFFIXES: &[&str] = &["md", "rst", "txt"];
+const HEADER_SCAN_LINES: usize = 120;
+const HEADER_SCAN_BYTES: usize = 64 * 1024;
 const MAX_MARKDOWN_FINDINGS: usize = 200;
 const DOCUMENT_RESPONSIBILITY_GAP: &str = "document_responsibility_gap";
 const DIRECTORY_RESPONSIBILITY_LOW_CHILD_COVERAGE: &str =
@@ -62,9 +63,9 @@ struct DocumentRecord {
     path: String,
     title: String,
     responsibility: String,
-    design_dependencies: Vec<String>,
+    upstream_design_targets: Vec<String>,
     coverage_rules: Vec<CoverageRule>,
-    manifest_present: bool,
+    has_dependency_manifest: bool,
     text: String,
 }
 
@@ -100,6 +101,7 @@ struct FileRecord {
     content_sha256: String,
     title: String,
     responsibility: String,
+    has_dependency_manifest: bool,
     is_document: bool,
 }
 
@@ -750,15 +752,13 @@ fn collect_documents(root: &Path) -> Result<Vec<DocumentRecord>, String> {
             .map_err(|error| format!("read {}: {error}", path.display()))?;
         let lines: Vec<&str> = text.lines().collect();
         let title = markdown_title_for_path(Path::new(&relative_path), &lines);
-        let manifest = ManifestParser::parse(&relative_path, &text)
-            .map_err(|error| format!("parse manifest {relative_path}: {error}"))?;
         records.push(DocumentRecord {
             path: relative_path,
-            responsibility: manifest.responsibility.clone(),
-            design_dependencies: manifest_design_dependencies(&manifest),
-            coverage_rules: manifest_coverage_rules(&manifest),
-            manifest_present: manifest.manifest_present,
             title,
+            responsibility: dependency_responsibility(&lines),
+            upstream_design_targets: dependency_manifest_values(&lines, "upstream design "),
+            coverage_rules: dependency_coverage_rules(&lines),
+            has_dependency_manifest: has_dependency_manifest(&lines),
             text,
         });
     }
@@ -787,24 +787,23 @@ fn collect_files(root: &Path) -> Result<Vec<FileRecord>, String> {
             continue;
         }
         let bytes = fs::read(&path).map_err(|error| format!("read {}: {error}", path.display()))?;
-        let text = String::from_utf8_lossy(&bytes);
-        let lines: Vec<&str> = text.lines().collect();
-        let manifest = ManifestParser::parse(&relative_path, &text)
-            .map_err(|error| format!("parse manifest {relative_path}: {error}"))?;
+        let header_bytes = &bytes[..bytes.len().min(HEADER_SCAN_BYTES)];
+        let header_text = String::from_utf8_lossy(header_bytes);
+        let lines: Vec<&str> = header_text.lines().collect();
         let extension = path
             .extension()
             .and_then(|value| value.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
-        let title = markdown_title_for_path(&path, &lines);
         records.push(FileRecord {
             path: relative_path,
             file_kind: file_kind(&path),
             extension,
             byte_len: bytes.len() as u64,
             content_sha256: sha256_hex(&bytes),
-            responsibility: manifest.responsibility,
-            title,
+            title: markdown_title_for_path(&path, &lines),
+            responsibility: dependency_responsibility(&lines),
+            has_dependency_manifest: has_dependency_manifest(&lines),
             is_document: is_document_path(&path),
         });
     }
@@ -948,36 +947,66 @@ fn is_markdown_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn manifest_design_dependencies(manifest: &ManifestAst) -> Vec<String> {
-    manifest
-        .dependencies
-        .iter()
-        .filter(|dependency| {
-            dependency.direction == ManifestDirection::Upstream
-                && dependency.kind == DependencyKind::Design
-        })
-        .map(|dependency| format!("{} {}", dependency.target, dependency.reason))
+fn has_dependency_manifest(lines: &[&str]) -> bool {
+    let header = &lines[..lines.len().min(HEADER_SCAN_LINES)];
+    header.iter().any(|line| line.contains("@dependency-start"))
+        && header.iter().any(|line| line.contains("@dependency-end"))
+}
+
+fn dependency_responsibility(lines: &[&str]) -> String {
+    dependency_manifest_values(lines, "responsibility ")
+        .into_iter()
+        .next()
+        .unwrap_or_default()
+}
+
+fn dependency_manifest_values(lines: &[&str], prefix: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    for line in lines.iter().take(HEADER_SCAN_LINES) {
+        let stripped = strip_comment_prefix(line.trim());
+        if let Some(value) = stripped.strip_prefix(prefix) {
+            values.push(value.trim().to_string());
+        }
+    }
+    values
+}
+
+fn dependency_coverage_rules(lines: &[&str]) -> Vec<CoverageRule> {
+    dependency_manifest_values(lines, "coverage ")
+        .into_iter()
+        .filter_map(|value| parse_coverage_rule(&value))
         .collect()
 }
 
-fn manifest_coverage_rules(manifest: &ManifestAst) -> Vec<CoverageRule> {
-    manifest
-        .coverage
-        .iter()
-        .map(|declaration| CoverageRule {
-            id: declaration.id.clone(),
-            requirement_groups: declaration
-                .requirements
-                .iter()
-                .map(|group| {
-                    group
-                        .iter()
-                        .map(|term| normalize_coverage_term(term))
-                        .collect()
-                })
-                .collect(),
+fn parse_coverage_rule(value: &str) -> Option<CoverageRule> {
+    let (id, requirements) = value.split_once(" requires ")?;
+    let id = id.trim().to_string();
+    if id.is_empty() {
+        return None;
+    }
+    let requirement_groups = requirements
+        .split(';')
+        .filter_map(|group| {
+            let alternatives = group
+                .split('|')
+                .map(normalize_coverage_term)
+                .filter(|term| !term.is_empty())
+                .collect::<Vec<_>>();
+            if alternatives.is_empty() {
+                None
+            } else {
+                Some(alternatives)
+            }
         })
-        .collect()
+        .collect::<Vec<_>>();
+    if requirement_groups.is_empty() {
+        None
+    } else {
+        Some(CoverageRule {
+            id,
+            requirement_groups,
+        })
+    }
 }
 
 fn normalize_coverage_term(value: &str) -> String {
@@ -991,7 +1020,7 @@ fn normalize_coverage_term(value: &str) -> String {
 }
 
 fn markdown_title(lines: &[&str]) -> String {
-    for line in lines {
+    for line in lines.iter().take(HEADER_SCAN_LINES) {
         if let Some(value) = line.strip_prefix("# ") {
             return value.trim().to_string();
         }
@@ -1004,6 +1033,22 @@ fn markdown_title_for_path(path: &Path, lines: &[&str]) -> String {
         markdown_title(lines)
     } else {
         String::new()
+    }
+}
+
+fn strip_comment_prefix(line: &str) -> &str {
+    let mut value = line.trim();
+    loop {
+        let stripped = value
+            .strip_prefix('#')
+            .or_else(|| value.strip_prefix("//"))
+            .or_else(|| value.strip_prefix('*'))
+            .or_else(|| value.strip_prefix("<!--"))
+            .or_else(|| value.strip_prefix("-->"));
+        let Some(next) = stripped else {
+            return value.trim();
+        };
+        value = next.trim();
     }
 }
 
@@ -1097,7 +1142,7 @@ fn direct_findings(
             reason: "closed issue files are immutable operational records".to_string(),
         });
     }
-    if !record.manifest_present {
+    if !record.has_dependency_manifest {
         findings.push(DocumentFinding {
             path: record.path.clone(),
             kind: "missing_dependency_manifest".to_string(),
@@ -1126,7 +1171,7 @@ fn document_responsibility_findings(
     records_by_path: &BTreeMap<&str, &DocumentRecord>,
 ) -> Vec<DocumentFinding> {
     let mut findings = Vec::new();
-    for upstream_design in &record.design_dependencies {
+    for upstream_design in &record.upstream_design_targets {
         let Some(upstream_path) = resolve_manifest_target_path(&record.path, upstream_design)
         else {
             continue;
@@ -1171,9 +1216,7 @@ fn normalize_repo_path(path: &Path) -> Option<String> {
     for component in path.components() {
         match component {
             std::path::Component::CurDir => {}
-            std::path::Component::Normal(part) => {
-                parts.push(part.to_string_lossy().to_string());
-            }
+            std::path::Component::Normal(part) => parts.push(part.to_string_lossy().to_string()),
             std::path::Component::ParentDir => {
                 parts.pop()?;
             }
@@ -1335,6 +1378,7 @@ fn document_json(record: &DocumentRecord) -> Value {
         "path": record.path,
         "title": record.title,
         "responsibility": record.responsibility,
+        "has_dependency_manifest": record.has_dependency_manifest,
     })
 }
 
@@ -2225,6 +2269,7 @@ fn import_artifact_layer(
             "content_sha256": file.content_sha256,
             "title": file.title,
             "responsibility": file.responsibility,
+            "has_dependency_manifest": file.has_dependency_manifest,
             "is_document": file.is_document,
         })
         .to_string();
@@ -2721,18 +2766,12 @@ pub(crate) fn initialize_graph_schema(connection: &Connection) -> rusqlite::Resu
     )
 }
 
-pub(crate) fn validate_graph_connection(connection: &Connection) -> Result<(), String> {
-    let findings =
-        validate_graph_contract(connection).map_err(|error| format!("graph-contract: {error}"))?;
-    let blockers = findings
-        .iter()
-        .filter(|finding| finding.severity == "blocker")
-        .map(|finding| format!("{}:{}", finding.rule, finding.location))
-        .collect::<Vec<_>>();
-    if blockers.is_empty() {
+pub(crate) fn validate_graph_connection(connection: &Connection) -> rusqlite::Result<()> {
+    let findings = validate_graph_contract(connection)?;
+    if findings.is_empty() {
         Ok(())
     } else {
-        Err(blockers.join(","))
+        Err(rusqlite::Error::InvalidQuery)
     }
 }
 
@@ -2784,6 +2823,7 @@ fn import_inventory_payload(
             "path": path,
             "title": title,
             "responsibility": responsibility,
+            "has_dependency_manifest": record.get("has_dependency_manifest").and_then(Value::as_bool).unwrap_or(false),
             "inventory_path": inventory_path.to_string_lossy(),
         })
         .to_string();
@@ -2917,7 +2957,7 @@ fn document_canon_severity(kind: &str) -> &'static str {
         "duplicate_heading_candidate"
         | "stale_name_candidate"
         | "missing_reverse_edge"
-        | "document_responsibility_gap" => "warn",
+        | DOCUMENT_RESPONSIBILITY_GAP => "warn",
         _ => "info",
     }
 }
@@ -2929,7 +2969,7 @@ fn document_canon_suggested_action_json(
     canonical_path: &str,
     reason: &str,
 ) -> String {
-    if kind == "document_responsibility_gap" {
+    if kind == DOCUMENT_RESPONSIBILITY_GAP {
         return json!({
             "action": action,
             "path": path,
@@ -3185,12 +3225,12 @@ mod tests {
         write_fixture(
             &root,
             "issues/README.md",
-            "<!--\n@dependency-start\ncontract design\nresponsibility Documents local issue storage.\nupstream design ../README.md repo root\n@dependency-end\n-->\n\n# Issues\n",
+            "<!--\n@dependency-start\nresponsibility Documents local issue storage.\nupstream design ../README.md repo root\n@dependency-end\n-->\n\n# Issues\n",
         );
         write_fixture(
             &root,
             "issues/closed/AC-20260517-legacy-tool-directory-regression.md",
-            "<!--\n@dependency-start\ncontract issue\nresponsibility Records a closed legacy tool directory issue.\nupstream design ../README.md issue storage\n@dependency-end\n-->\n\n# Closed Issue\n",
+            "<!--\n@dependency-start\nresponsibility Records a closed legacy tool directory issue.\nupstream design ../README.md issue storage\n@dependency-end\n-->\n\n# Closed Issue\n",
         );
 
         let report = build_report(&root).expect("report");
@@ -3215,16 +3255,16 @@ mod tests {
         write_fixture(
             &root,
             "documents/prose-reasoning-graph/dsl-spec.md",
-            "<!--\n@dependency-start\ncontract design\nresponsibility Defines fixture DSL.\ncoverage dsl_design_trace requires source-truth anchor|source truth|source span; lower graph|lower text unit; typed relation; projection view|derived projection|reader-state|macro-claim\n@dependency-end\n-->\n\n# DSL Spec\n",
+            "<!--\n@dependency-start\nresponsibility Defines fixture DSL.\ncoverage dsl_design_trace requires source-truth anchor|source truth|source span; lower graph|lower text unit; typed relation; projection view|derived projection|reader-state|macro-claim\n@dependency-end\n-->\n\n# DSL Spec\n",
         );
         write_fixture(
             &root,
             "documents/tools/sample_tool.md",
-            "<!--\n@dependency-start\ncontract tool\nresponsibility Documents sample_tool.py usage and contract.\nupstream design ../prose-reasoning-graph/dsl-spec.md normative graph and DSL contract\nupstream implementation ../../tools/sample_tool.py implements the tool.\n@dependency-end\n-->\n\n# sample_tool.py\n\n## Tool Design\n\nThe graph pipeline connects ingest, analyze, project, and handoff stages.\n",
+            "<!--\n@dependency-start\nresponsibility Documents sample_tool.py usage and contract.\nupstream design ../prose-reasoning-graph/dsl-spec.md normative graph and DSL contract\nupstream implementation ../../tools/sample_tool.py implements the tool.\n@dependency-end\n-->\n\n# sample_tool.py\n\n## Tool Design\n\nThe graph pipeline connects ingest, analyze, project, and handoff stages.\n",
         );
 
         let report = build_report(&root).expect("report");
-        let reasons = finding_reasons(&report, "document_responsibility_gap");
+        let reasons = finding_reasons(&report, DOCUMENT_RESPONSIBILITY_GAP);
         assert!(reasons.iter().any(|reason| {
             reason.contains("missing_responsibility_coverage=`dsl_design_trace`")
                 && reason.contains("upstream_design=`../prose-reasoning-graph/dsl-spec.md normative graph and DSL contract`")
@@ -3239,16 +3279,16 @@ mod tests {
         write_fixture(
             &root,
             "documents/prose-reasoning-graph/dsl-spec.md",
-            "<!--\n@dependency-start\ncontract design\nresponsibility Defines fixture DSL.\ncoverage dsl_design_trace requires source-truth anchor|source truth|source span; lower graph|lower text unit; typed relation; projection view|derived projection|reader-state|macro-claim\ncoverage graph_format_trace requires node record|nodes table; edge record|edges table; payload_json|payload json\n@dependency-end\n-->\n\n# DSL Spec\n",
+            "<!--\n@dependency-start\nresponsibility Defines fixture DSL.\ncoverage dsl_design_trace requires source-truth anchor|source truth|source span; lower graph|lower text unit; typed relation; projection view|derived projection|reader-state|macro-claim\ncoverage graph_format_trace requires node record|nodes table; edge record|edges table; payload_json|payload json\n@dependency-end\n-->\n\n# DSL Spec\n",
         );
         write_fixture(
             &root,
             "documents/tools/sample_tool.md",
-            "<!--\n@dependency-start\ncontract tool\nresponsibility Documents sample_tool.py usage and contract.\nupstream design ../prose-reasoning-graph/dsl-spec.md normative graph and DSL contract\nupstream implementation ../../tools/sample_tool.py implements the tool.\n@dependency-end\n-->\n\n# sample_tool.py\n\nThe contract keeps source-truth anchors in lower text units, records typed relations in the lower graph, and derives projection views for macro claims and reader state. The graph format uses a node record, an edge record, and payload_json for structured fields.\n",
+            "<!--\n@dependency-start\nresponsibility Documents sample_tool.py usage and contract.\nupstream design ../prose-reasoning-graph/dsl-spec.md normative graph and DSL contract\nupstream implementation ../../tools/sample_tool.py implements the tool.\n@dependency-end\n-->\n\n# sample_tool.py\n\nThe contract keeps source-truth anchors in lower text units, records typed relations in the lower graph, and derives projection views for macro claims and reader state. The graph format uses a node record, an edge record, and payload_json for structured fields.\n",
         );
 
         let report = build_report(&root).expect("report");
-        let reasons = finding_reasons(&report, "document_responsibility_gap");
+        let reasons = finding_reasons(&report, DOCUMENT_RESPONSIBILITY_GAP);
         assert!(!reasons
             .iter()
             .any(|reason| reason.contains("missing_responsibility_coverage=`dsl_design_trace`")));
@@ -3265,16 +3305,16 @@ mod tests {
         write_fixture(
             &root,
             "documents/prose-reasoning-graph/dsl-spec.md",
-            "<!--\n@dependency-start\ncontract design\nresponsibility Defines fixture DSL.\ncoverage graph_format_trace requires node record|nodes table; edge record|edges table; payload_json|payload json\n@dependency-end\n-->\n\n# DSL Spec\n",
+            "<!--\n@dependency-start\nresponsibility Defines fixture DSL.\ncoverage graph_format_trace requires node record|nodes table; edge record|edges table; payload_json|payload json\n@dependency-end\n-->\n\n# DSL Spec\n",
         );
         write_fixture(
             &root,
             "documents/tools/sample_tool.md",
-            "<!--\n@dependency-start\ncontract tool\nresponsibility Documents sample_tool.py usage and contract.\nupstream design ../prose-reasoning-graph/dsl-spec.md normative graph and DSL contract\n@dependency-end\n-->\n\n# sample_tool.py\n\nThe contract explains source-truth anchors and typed relations, but it does not define the storage shape.\n",
+            "<!--\n@dependency-start\nresponsibility Documents sample_tool.py usage and contract.\nupstream design ../prose-reasoning-graph/dsl-spec.md normative graph and DSL contract\n@dependency-end\n-->\n\n# sample_tool.py\n\nThe contract explains source-truth anchors and typed relations, but it does not define the storage shape.\n",
         );
 
         let report = build_report(&root).expect("report");
-        let reasons = finding_reasons(&report, "document_responsibility_gap");
+        let reasons = finding_reasons(&report, DOCUMENT_RESPONSIBILITY_GAP);
         assert!(reasons.iter().any(|reason| {
             reason.contains("missing_responsibility_coverage=`graph_format_trace`")
                 && reason.contains("missing_terms=`node record|nodes table; edge record|edges table; payload_json|payload json`")
@@ -3289,11 +3329,11 @@ mod tests {
         write_fixture(
             &root,
             "documents/tools/sample_tool.md",
-            "<!--\n@dependency-start\ncontract tool\nresponsibility Documents sample_tool.py operator usage.\nupstream implementation ../../tools/sample_tool.py implements the tool.\n@dependency-end\n-->\n\n# sample_tool.py\n\nThis document explains command usage.\n",
+            "<!--\n@dependency-start\nresponsibility Documents sample_tool.py operator usage.\nupstream implementation ../../tools/sample_tool.py implements the tool.\n@dependency-end\n-->\n\n# sample_tool.py\n\nThis document explains command usage.\n",
         );
 
         let report = build_report(&root).expect("report");
-        let reasons = finding_reasons(&report, "document_responsibility_gap");
+        let reasons = finding_reasons(&report, DOCUMENT_RESPONSIBILITY_GAP);
         assert!(reasons.is_empty());
 
         let _ = fs::remove_dir_all(root);
@@ -3306,8 +3346,8 @@ mod tests {
         let db = root.join("graph.sqlite");
         let inventory = json!({
             "documents": [
-                {"path": "documents/a.md", "title": "A", "responsibility": "Documents A."},
-                {"path": "documents/b.md", "title": "A", "responsibility": "Documents B."}
+                {"path": "documents/a.md", "title": "A", "responsibility": "Documents A.", "has_dependency_manifest": true},
+                {"path": "documents/b.md", "title": "A", "responsibility": "Documents B.", "has_dependency_manifest": true}
             ],
             "findings": [
                 {"path": "documents/b.md", "kind": "duplicate_heading_candidate", "canonical_path": "documents/a.md", "action": "merge", "reason": "shares H1 title"}
@@ -3341,13 +3381,13 @@ mod tests {
         let db = root.join("graph.sqlite");
         let inventory = json!({
             "documents": [
-                {"path": "documents/design.md", "title": "Design", "responsibility": "Defines graph format."},
-                {"path": "documents/tool.md", "title": "Tool", "responsibility": "Documents tool usage."}
+                {"path": "documents/design.md", "title": "Design", "responsibility": "Defines graph format.", "has_dependency_manifest": true},
+                {"path": "documents/tool.md", "title": "Tool", "responsibility": "Documents tool usage.", "has_dependency_manifest": true}
             ],
             "findings": [
                 {
                     "path": "documents/tool.md",
-                    "kind": "document_responsibility_gap",
+                    "kind": DOCUMENT_RESPONSIBILITY_GAP,
                     "canonical_path": "documents/design.md",
                     "action": "cover_upstream_design_rule",
                     "reason": "missing_responsibility_coverage=`graph_format_trace`"
@@ -3367,7 +3407,7 @@ mod tests {
         let action_json: String = connection
             .query_row(
                 "SELECT suggested_action_json FROM diagnostics WHERE rule = ?",
-                ["document_responsibility_gap"],
+                [DOCUMENT_RESPONSIBILITY_GAP],
                 |row| row.get(0),
             )
             .expect("suggested action");
@@ -3400,8 +3440,8 @@ mod tests {
         let diagnostics_db = root.join("diagnostics.sqlite");
         let inventory = json!({
             "documents": [
-                {"path": "documents/a.md", "title": "A", "responsibility": "Documents A."},
-                {"path": "documents/b.md", "title": "A", "responsibility": "Documents B."}
+                {"path": "documents/a.md", "title": "A", "responsibility": "Documents A.", "has_dependency_manifest": true},
+                {"path": "documents/b.md", "title": "A", "responsibility": "Documents B.", "has_dependency_manifest": true}
             ],
             "findings": [
                 {"path": "documents/b.md", "kind": "duplicate_heading_candidate", "canonical_path": "documents/a.md", "action": "merge", "reason": "shares H1 title"}
@@ -3441,12 +3481,12 @@ mod tests {
         write_fixture(
             &root,
             "documents/README.md",
-            "# Fixture Documents\n\n<!--\n@dependency-start\ncontract design\nresponsibility Documents fixture files.\nupstream design ../README.md fixture root\n@dependency-end\n-->\n",
+            "# Fixture Documents\n\n<!--\n@dependency-start\nresponsibility Documents fixture files.\nupstream design ../README.md fixture root\n@dependency-end\n-->\n",
         );
         write_fixture(
             &root,
             "src/main.rs",
-            "// @dependency-start\n// contract implementation\n// responsibility Implements fixture Rust code.\n// upstream design ../documents/README.md fixture docs\n// @dependency-end\nfn main() {}\n",
+            "// @dependency-start\n// responsibility Implements fixture Rust code.\n// upstream design ../documents/README.md fixture docs\n// @dependency-end\nfn main() {}\n",
         );
 
         let result = build_structured_analysis_cache(&BuildArgs {
@@ -3512,17 +3552,17 @@ mod tests {
         write_fixture(
             &root,
             "docs/README.md",
-            "# Docs\n\n<!--\n@dependency-start\ncontract design\nresponsibility Documents the docs index.\n@dependency-end\n-->\n",
+            "# Docs\n\n<!--\n@dependency-start\nresponsibility Documents the docs index.\n@dependency-end\n-->\n",
         );
         write_fixture(
             &root,
             "docs/solver.md",
-            "# Solver\n\n<!--\n@dependency-start\ncontract design\nresponsibility Defines solver API and convergence contracts.\n@dependency-end\n-->\n",
+            "# Solver\n\n<!--\n@dependency-start\nresponsibility Defines solver API and convergence contracts.\n@dependency-end\n-->\n",
         );
         write_fixture(
             &root,
             "docs/runtime.md",
-            "# Runtime\n\n<!--\n@dependency-start\ncontract design\nresponsibility Documents runtime cache and bootstrap behavior.\n@dependency-end\n-->\n",
+            "# Runtime\n\n<!--\n@dependency-start\nresponsibility Documents runtime cache and bootstrap behavior.\n@dependency-end\n-->\n",
         );
 
         let result = build_structured_analysis_cache(&BuildArgs {
@@ -3573,12 +3613,12 @@ mod tests {
         write_fixture(
             &root,
             "README.md",
-            "# Fixture\n\n<!--\n@dependency-start\ncontract design\nresponsibility Documents fixture root.\n@dependency-end\n-->\n",
+            "# Fixture\n\n<!--\n@dependency-start\nresponsibility Documents fixture root.\n@dependency-end\n-->\n",
         );
         write_fixture(
             &root,
             "src/main.rs",
-            "// @dependency-start\n// contract implementation\n// responsibility Implements fixture Rust code.\n// upstream design ../README.md fixture root\n// @dependency-end\nfn main() {}\n",
+            "// @dependency-start\n// responsibility Implements fixture Rust code.\n// upstream design ../README.md fixture root\n// @dependency-end\nfn main() {}\n",
         );
 
         let result = build_structured_analysis_cache(&BuildArgs {

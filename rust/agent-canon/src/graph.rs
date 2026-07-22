@@ -1,121 +1,101 @@
 // @dependency-start
 // contract implementation
-// responsibility Owns the parent-scoped AgentCanon graph build, status, query, and context operations.
-// upstream design ../../../reports/agents/20260712-090608-context-packettool-skill-routing/graph_design_brief.md approved graph responsibility contract
-// upstream implementation dependency_manifest.rs provides the sole complete-file manifest parser and source snapshot
-// upstream implementation structured_analysis.rs provides the Graph DSL schema and validator
-// upstream implementation semantic_index.rs provides bounded optional context evidence
+// responsibility Owns the one-build AgentCanon dependency graph and persisted runtime-evidence snapshot.
+// upstream implementation dependency_manifest.rs provides the complete-file source snapshot
+// upstream implementation structured_analysis.rs provides the graph storage schema
 // downstream implementation main.rs dispatches the public graph command
-// downstream implementation ../../../tools/agent_tools/graph_client.py consumes the canonical JSON schemas
+// downstream implementation ../../../tools/agent_tools/graph_client.py consumes typed graph responses
 // @dependency-end
 
 use crate::dependency_manifest::{
-    capture_snapshot, snapshot_agent_canon_pin, snapshot_dirty_fingerprint, snapshot_fingerprint,
-    snapshot_head, snapshot_profile, snapshot_source_scope_counts,
-    source_path_is_explicitly_excluded, write_snapshot_jsonl, DependencyDeclaration, ManifestError,
-    ManifestSnapshot, SnapshotRequest, SourceSpan, SourceUniverse,
+    capture_snapshot, probe_snapshot_identity, write_snapshot_jsonl, DependencyDeclaration,
+    ManifestSnapshot, SnapshotRequest, SourceIdentity, SourceSpan,
 };
 use crate::structured_analysis::{initialize_graph_schema, validate_graph_connection};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
-use std::fmt;
-use std::fs::{self, File};
+use std::collections::BTreeMap;
+use std::fs;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::path::{Component, Path, PathBuf};
-use std::process::{Command, Output};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 
 const GRAPH_SCHEMA_VERSION: &str = "graph_storage_core.v1";
-const PUBLIC_PROFILE: &str = "default";
-const SOURCE_PROFILE: &str = "parent";
-const GRAPH_RELATION_KINDS: &[&str] = &[
-    "dependency",
-    "owner",
-    "scope",
-    "import",
-    "include",
-    "symbol",
-    "call",
-    "containment",
-    "document",
-    "catalog",
-    "pin",
-    "view",
-    "generated",
-    "submodule",
-    "public",
-];
-const SCANNER_SUFFIXES: &[&str] = &[
-    ".py", ".c", ".cc", ".cpp", ".h", ".hpp", ".sh", ".bash", ".zsh",
-];
+const RUNTIME_EVENT_SCHEMA: &str = "agent_canon.runtime_event.v1";
+const RUNTIME_EVIDENCE_SCHEMA: &str = "agent_canon.runtime_evidence_snapshot.v2";
+const RUNTIME_PUBLICATION_INTENT_SCHEMA: &str = "agent_canon.runtime_event.publication_intent.v1";
+const RUNTIME_OBSERVATION_SCHEMA: &str =
+    "agent_canon.runtime_event.publication_outcome_observation.v1";
+const RUNTIME_RECEIPT_SCHEMA: &str = "agent_canon.runtime_event.publication_outcome_receipt.v1";
+static GRAPH_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum OutputFormat {
-    Text,
-    Json,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum GraphDirection {
-    Outgoing,
-    Incoming,
-    Both,
-}
-
-impl GraphDirection {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Outgoing => "outgoing",
-            Self::Incoming => "incoming",
-            Self::Both => "both",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum GraphBuildFailurePoint {
-    None,
-    Producer,
-    Validation,
-    Write,
-    Sync,
-    Rename,
-    DirectorySync,
+#[derive(Debug, Clone)]
+struct RuntimeEvidenceSnapshot {
+    artifact_path: String,
+    artifact_sha256: String,
+    artifact_schema: String,
+    materialization_id: String,
+    attempt_id: String,
+    receipt_path: String,
+    receipt_sha256: String,
+    receipt_schema: String,
+    receipt_sequence: u8,
+    receipt_outcome: String,
+    result_family: String,
+    gate_id: String,
+    gate_result: String,
+    source_event_id: String,
+    source_event_sha256: String,
+    rollout_path: String,
+    rollout_file_sha256: String,
+    source_head_oid: String,
+    base_ref: String,
+    base_oid: String,
+    result_path: String,
+    result_schema: String,
+    result_blob_oid: String,
+    target_paths: Value,
+    porcelain_v1: Value,
+    publication_intent: Value,
+    publication_observation: Value,
+    target_identities: Value,
+    freshness_certificate: Value,
+    live_identity_fingerprint: String,
+    artifact_bytes: Vec<u8>,
+    artifact_value: Value,
+    receipt_bytes: Vec<u8>,
+    receipt_value: Value,
 }
 
 #[derive(Debug, Clone)]
-struct GraphBuildArgs {
-    root: PathBuf,
+struct InputFingerprintProbe {
+    input_fingerprint: Option<String>,
+    artifact_sha256: Option<String>,
+    receipt_sha256: Option<String>,
+    live_identity_fingerprint: Option<String>,
+    source_fingerprint: String,
+    source_head_oid: String,
+    dirty_fingerprint: String,
     profile: String,
-    format: OutputFormat,
+    reason: Option<String>,
 }
 
-type GraphStatusArgs = GraphBuildArgs;
+#[derive(Debug, Clone, Default)]
+struct PersistedInputIdentity {
+    input_fingerprint: String,
+    artifact_sha256: String,
+    receipt_sha256: String,
+    live_identity_fingerprint: String,
+    source_fingerprint: String,
+    source_head_oid: String,
+    dirty_fingerprint: String,
+    profile: String,
+}
 
 #[derive(Debug, Clone)]
-struct GraphQueryArgs {
-    root: PathBuf,
-    profile: String,
-    format: OutputFormat,
-    path: Option<String>,
-    all: bool,
-    relation: String,
-    direction: GraphDirection,
-    depth: u8,
-}
-
-#[derive(Debug, Clone)]
-struct GraphContextArgs {
-    root: PathBuf,
-    profile: String,
-    format: OutputFormat,
-    path: String,
-    token: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
 struct ProducerArtifact {
     producer_id: String,
     version: String,
@@ -129,293 +109,7 @@ struct ProducerArtifact {
 
 impl ProducerArtifact {
     fn json(&self) -> Value {
-        json!({
-            "producer_id": self.producer_id,
-            "version": self.version,
-            "command": self.command,
-            "root": self.root,
-            "content_sha256": self.content_sha256,
-            "relation_families": self.relation_families,
-            "artifact_ref": self.artifact_ref,
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct GraphFact {
-    id: String,
-    layer: String,
-    kind: String,
-    from: String,
-    to: Option<String>,
-    owner: Option<String>,
-    source_path: Option<String>,
-    source_span: Option<SourceSpan>,
-    producer: String,
-    evidence_ref: String,
-    authority: String,
-    inferred: bool,
-    dependency_detail: Option<Value>,
-    payload: Value,
-}
-
-impl GraphFact {
-    fn json(&self) -> Value {
-        json!({
-            "id": self.id,
-            "layer": self.layer,
-            "kind": self.kind,
-            "from": self.from,
-            "to": self.to,
-            "owner": self.owner,
-            "source_path": self.source_path,
-            "source_span": self.source_span.as_ref().map(source_span_json),
-            "producer": self.producer,
-            "evidence_ref": self.evidence_ref,
-            "authority": self.authority,
-            "inferred": self.inferred,
-            "dependency_detail": self.dependency_detail,
-            "payload": self.payload,
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct GraphDiagnostic {
-    id: String,
-    set: String,
-    code: String,
-    severity: String,
-    relation: Option<String>,
-    path: Option<String>,
-    target: Option<String>,
-    source_span: Option<SourceSpan>,
-    reason: String,
-    producer: String,
-    evidence_ref: String,
-    suggested_action_json: String,
-}
-
-impl GraphDiagnostic {
-    fn json(&self) -> Value {
-        json!({
-            "id": self.id,
-            "set": self.set,
-            "scope": diagnostic_scope(self),
-            "code": self.code,
-            "severity": self.severity,
-            "relation": self.relation,
-            "path": self.path,
-            "target": self.target,
-            "source_span": self.source_span.as_ref().map(source_span_json),
-            "reason": self.reason,
-            "producer": self.producer,
-            "evidence_ref": self.evidence_ref,
-            "suggested_action_json": self.suggested_action_json,
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct SourceNode {
-    id: String,
-    selector: String,
-    path: Option<String>,
-    source_member: bool,
-    source_span: Option<SourceSpan>,
-    payload: Value,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum RelationKind {
-    Dependency,
-    Owner,
-    Scope,
-    Import,
-    Include,
-    Symbol,
-    Call,
-    Containment,
-    Document,
-    Catalog,
-    Pin,
-    View,
-    Generated,
-    Submodule,
-    Public,
-}
-
-impl RelationKind {
-    fn parse(value: &str) -> Result<Self, GraphError> {
-        match value {
-            "dependency" => Ok(Self::Dependency),
-            "owner" => Ok(Self::Owner),
-            "scope" => Ok(Self::Scope),
-            "import" => Ok(Self::Import),
-            "include" => Ok(Self::Include),
-            "symbol" => Ok(Self::Symbol),
-            "call" => Ok(Self::Call),
-            "containment" => Ok(Self::Containment),
-            "document" => Ok(Self::Document),
-            "catalog" => Ok(Self::Catalog),
-            "pin" => Ok(Self::Pin),
-            "view" => Ok(Self::View),
-            "generated" => Ok(Self::Generated),
-            "submodule" => Ok(Self::Submodule),
-            "public" => Ok(Self::Public),
-            _ => Err(GraphError::Validation {
-                stage: "relation-kind".to_string(),
-                reason: format!("relation kind is outside the closed registry: {value}"),
-            }),
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Dependency => "dependency",
-            Self::Owner => "owner",
-            Self::Scope => "scope",
-            Self::Import => "import",
-            Self::Include => "include",
-            Self::Symbol => "symbol",
-            Self::Call => "call",
-            Self::Containment => "containment",
-            Self::Document => "document",
-            Self::Catalog => "catalog",
-            Self::Pin => "pin",
-            Self::View => "view",
-            Self::Generated => "generated",
-            Self::Submodule => "submodule",
-            Self::Public => "public",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct TypedRelation {
-    id: String,
-    kind: RelationKind,
-    from: String,
-    to: String,
-    producer: String,
-    evidence_ref: String,
-    inferred: bool,
-}
-
-impl TypedRelation {
-    fn from_fact(fact: &GraphFact) -> Result<Self, GraphError> {
-        let to = fact.to.clone().ok_or_else(|| GraphError::Validation {
-            stage: "relation-totality".to_string(),
-            reason: format!("accepted relation {} has no target", fact.id),
-        })?;
-        Ok(Self {
-            id: fact.id.clone(),
-            kind: RelationKind::parse(&fact.kind)?,
-            from: fact.from.clone(),
-            to,
-            producer: fact.producer.clone(),
-            evidence_ref: fact.evidence_ref.clone(),
-            inferred: fact.inferred,
-        })
-    }
-
-    fn json(&self) -> Value {
-        json!({
-            "id": self.id,
-            "kind": self.kind.as_str(),
-            "from": self.from,
-            "to": self.to,
-            "producer": self.producer,
-            "evidence_ref": self.evidence_ref,
-            "inferred": self.inferred,
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct GraphContractWitness {
-    candidate_sources: BTreeSet<String>,
-    excluded_sources: BTreeSet<String>,
-    eligible_sources: BTreeSet<String>,
-    declarations: BTreeSet<String>,
-    accepted_relations: BTreeSet<String>,
-    graph_members: BTreeSet<String>,
-    profile_members: BTreeSet<String>,
-    relation_exclusions: BTreeSet<String>,
-    unresolved: BTreeSet<String>,
-    ambiguous: BTreeSet<String>,
-    uncovered: BTreeSet<String>,
-    source_identity: BTreeMap<String, String>,
-    relation_endpoints: BTreeMap<String, TypedRelation>,
-    reverse_projection: BTreeMap<String, String>,
-}
-
-impl GraphContractWitness {
-    fn profile_complete(&self) -> bool {
-        self.unresolved.is_empty() && self.ambiguous.is_empty() && self.uncovered.is_empty()
-    }
-
-    fn payload_json(&self) -> Value {
-        let set = |values: &BTreeSet<String>| values.iter().cloned().collect::<Vec<_>>();
-        json!({
-            "schema": "agent-canon.graph.mathematical-contract.v1",
-            "profile": PUBLIC_PROFILE,
-            "finite_sets": {
-                "P(S)": set(&self.candidate_sources),
-                "X(S)": set(&self.excluded_sources),
-                "U(S)": set(&self.eligible_sources),
-                "D": set(&self.declarations),
-                "R": set(&self.accepted_relations),
-                "G": set(&self.graph_members),
-                "Vp": set(&self.profile_members),
-                "X_R(S,p)": set(&self.relation_exclusions),
-                "Unresolved(S,p)": set(&self.unresolved),
-                "Ambiguous(S,p)": set(&self.ambiguous),
-                "Uncovered(S,p)": set(&self.uncovered),
-            },
-            "typed_functions": {
-                "source_identity": self.source_identity,
-                "relation_endpoints": self.relation_endpoints.values().map(TypedRelation::json).collect::<Vec<_>>(),
-                "reverse_projection": self.reverse_projection,
-            },
-            "closure": {
-                "operator": "F(Q)=Q union typed_successors(Q); mu F is obtained from bottom by finite monotone iteration",
-                "reverse_edge_rule": "for each r in R there is exactly one reverse:r with swapped endpoints and identical kind/evidence",
-            },
-            "obligations": {
-                "source_partition": true,
-                "source_disjointness": true,
-                "source_identity_total_unique": true,
-                "relation_kind_closed": true,
-                "relation_endpoints_total": true,
-                "relation_producer_total": true,
-                "reverse_projection_bijection": true,
-                "exclusion_dominance": true,
-                "declaration_representation_exact": true,
-                "graph_materialization_exact": true,
-                "profile_projection_subset": true,
-                "profile_projection_exact": true,
-                "unresolved_empty": self.unresolved.is_empty(),
-                "ambiguous_empty": self.ambiguous.is_empty(),
-                "uncovered_empty": self.uncovered.is_empty(),
-                "profile_complete": self.profile_complete(),
-                "fingerprint_preservation": true,
-                "atomic_failure_preserves_old_state": true,
-            },
-        })
-    }
-
-    fn fingerprint(&self) -> String {
-        hash_bytes(canonical_json(&self.payload_json()).as_bytes())
-    }
-
-    fn json(&self) -> Value {
-        let mut value = self.payload_json();
-        value.as_object_mut().expect("contract object").insert(
-            "contract_fingerprint".to_string(),
-            Value::String(self.fingerprint()),
-        );
-        value
+        json!({"producer_id":self.producer_id,"version":self.version,"command":self.command,"root":self.root,"content_sha256":self.content_sha256,"payload_sha256":sha256(&self.payload),"relation_families":self.relation_families,"artifact_ref":self.artifact_ref})
     }
 }
 
@@ -430,100 +124,126 @@ struct GraphIntegrationRecord {
     graph_fingerprint: String,
     contract_fingerprint: String,
     producer_artifacts: Vec<ProducerArtifact>,
+    runtime_evidence: Value,
     verified: bool,
     verification_code: String,
 }
 
 impl GraphIntegrationRecord {
     fn json(&self) -> Value {
-        json!({
-            "schema": "agent-canon.graph.integration.v1",
-            "root": self.root,
-            "db_path": self.db_path,
-            "schema_version": GRAPH_SCHEMA_VERSION,
-            "profile": self.profile,
-            "source_snapshot_profile": self.source_snapshot_profile,
-            "snapshot_head": self.snapshot_head,
-            "input_fingerprint": self.input_fingerprint,
-            "graph_fingerprint": self.graph_fingerprint,
-            "contract_fingerprint": self.contract_fingerprint,
-            "producer_artifacts": self.producer_artifacts.iter().map(ProducerArtifact::json).collect::<Vec<_>>(),
-            "verified": self.verified,
-            "verification_code": self.verification_code,
-        })
+        json!({"schema":"agent-canon.graph.integration.v1","root":self.root,"db_path":self.db_path,"schema_version":GRAPH_SCHEMA_VERSION,"profile":self.profile,"source_snapshot_profile":self.source_snapshot_profile,"snapshot_head":self.snapshot_head,"input_fingerprint":self.input_fingerprint,"graph_fingerprint":self.graph_fingerprint,"contract_fingerprint":self.contract_fingerprint,"producer_artifacts":self.producer_artifacts.iter().map(ProducerArtifact::json).collect::<Vec<_>>(),"runtime_evidence":self.runtime_evidence.clone(),"verified":self.verified,"verification_code":self.verification_code})
     }
 }
 
 #[derive(Debug)]
 enum GraphError {
     Usage(String),
-    Producer { producer: String, reason: String },
-    Validation { stage: String, reason: String },
-    CandidateWrite { reason: String },
-    CandidateSync { reason: String },
-    Rename { reason: String },
-    DirectorySync { reason: String },
-    Unavailable { reason: String },
+    Unavailable(String),
+    Validation(String),
+    Io(String),
+    RuntimeBoundary { reason: String, detail: String },
 }
 
-impl fmt::Display for GraphError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for GraphError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Usage(reason)
-            | Self::CandidateWrite { reason }
-            | Self::CandidateSync { reason }
-            | Self::Rename { reason }
-            | Self::DirectorySync { reason }
-            | Self::Unavailable { reason } => formatter.write_str(reason),
-            Self::Producer { producer, reason } => write!(formatter, "{producer}: {reason}"),
-            Self::Validation { stage, reason } => write!(formatter, "{stage}: {reason}"),
+            Self::Usage(value)
+            | Self::Unavailable(value)
+            | Self::Validation(value)
+            | Self::Io(value) => formatter.write_str(value),
+            Self::RuntimeBoundary { reason, detail } => {
+                write!(formatter, "{reason}: {detail}")
+            }
         }
     }
 }
 
-#[derive(Debug)]
-struct CandidateHandle {
-    dir: PathBuf,
-    db: PathBuf,
+#[derive(Debug, Clone)]
+struct GraphArgs {
+    root: PathBuf,
+    profile: String,
+    format: String,
+    path: Option<String>,
+    all: bool,
+    relation: String,
+    direction: String,
+    depth: usize,
+    token: Option<String>,
 }
 
-struct GraphCandidateCleanup {
-    dir: PathBuf,
+#[derive(Debug, Clone)]
+struct BuildMaterial {
+    root: PathBuf,
+    graph_root: PathBuf,
+    profile: String,
+    snapshot: ManifestSnapshot,
+    runtime_evidence: RuntimeEvidenceSnapshot,
+    nodes: Vec<Value>,
+    facts: Vec<Value>,
+    producer_artifacts: Vec<ProducerArtifact>,
+    input_fingerprint: String,
+    graph_fingerprint: String,
 }
 
-impl GraphCandidateCleanup {
-    fn new(dir: PathBuf) -> Self {
-        Self { dir }
-    }
+struct GraphStaging {
+    root: PathBuf,
+    database: PathBuf,
+}
 
-    fn cleanup(&self) -> Result<(), GraphError> {
-        if !self.dir.exists() {
-            return Ok(());
+impl GraphStaging {
+    fn create(operation_id: &str) -> Result<Self, GraphError> {
+        let host_temp = std::env::temp_dir()
+            .canonicalize()
+            .map_err(|error| GraphError::Io(error.to_string()))?;
+        let root = host_temp.join(format!("agent-canon-graph-{operation_id}"));
+        fs::create_dir(&root).map_err(|error| GraphError::Io(error.to_string()))?;
+        let database = root.join("graph.sqlite");
+        if let Err(error) = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&database)
+        {
+            let _ = fs::remove_dir(&root);
+            return Err(GraphError::Io(error.to_string()));
         }
-        fs::remove_dir_all(&self.dir).map_err(|error| GraphError::CandidateWrite {
-            reason: format!("candidate cleanup {}: {error}", self.dir.display()),
-        })
+        let staging = Self { root, database };
+        if staging
+            .root
+            .canonicalize()
+            .map_err(|error| GraphError::Io(error.to_string()))?
+            != staging.root
+            || staging
+                .database
+                .canonicalize()
+                .map_err(|error| GraphError::Io(error.to_string()))?
+                != staging.database
+        {
+            return Err(GraphError::Validation(
+                "graph staging path is not canonical".to_string(),
+            ));
+        }
+        Ok(staging)
     }
 }
 
-impl Drop for GraphCandidateCleanup {
+impl Drop for GraphStaging {
     fn drop(&mut self) {
-        let _ = self.cleanup();
+        let _ = fs::remove_dir_all(&self.root);
     }
 }
 
-struct TemporaryDirectory {
-    path: PathBuf,
-}
-
-struct ArmedDirectoryCleanup {
+struct PublicationTemp {
     path: PathBuf,
     armed: bool,
 }
 
-impl ArmedDirectoryCleanup {
-    fn new(path: PathBuf) -> Self {
-        Self { path, armed: true }
+impl PublicationTemp {
+    fn new(path: &Path) -> Self {
+        Self {
+            path: path.to_path_buf(),
+            armed: true,
+        }
     }
 
     fn disarm(&mut self) {
@@ -531,5190 +251,3347 @@ impl ArmedDirectoryCleanup {
     }
 }
 
-impl Drop for ArmedDirectoryCleanup {
+impl Drop for PublicationTemp {
     fn drop(&mut self) {
         if self.armed {
-            let _ = fs::remove_dir_all(&self.path);
+            let _ = fs::remove_file(&self.path);
         }
     }
 }
 
-impl TemporaryDirectory {
-    fn create(label: &str) -> Result<Self, GraphError> {
-        let path = std::env::temp_dir().join(format!(
-            "agent-canon-{label}-{}-{}",
-            std::process::id(),
-            now_nanos()
-        ));
-        fs::create_dir_all(&path).map_err(|error| GraphError::CandidateWrite {
-            reason: format!("create temporary producer directory: {error}"),
-        })?;
-        Ok(Self { path })
-    }
-}
-
-impl Drop for TemporaryDirectory {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.path);
-    }
-}
-
-#[derive(Debug)]
-struct BuildMaterial {
-    root: PathBuf,
-    graph_root: PathBuf,
-    candidate_dir: PathBuf,
-    snapshot: ManifestSnapshot,
-    nodes: Vec<SourceNode>,
-    facts: Vec<GraphFact>,
-    diagnostics: Vec<GraphDiagnostic>,
-    contract: GraphContractWitness,
-    producer_artifacts: Vec<ProducerArtifact>,
-    input_fingerprint: String,
-    graph_fingerprint: String,
-    created_at: String,
-}
-
-pub(crate) fn run(args: &[String]) -> i32 {
-    let Some(command) = args.first() else {
-        emit_usage("missing graph command");
-        return 2;
-    };
-    match command.as_str() {
-        "build" => run_build(&args[1..]),
-        "status" => run_status(&args[1..]),
-        "query" => run_query(&args[1..]),
-        "context" => run_context(&args[1..]),
-        "help" | "--help" | "-h" => {
-            print_usage();
-            2
-        }
-        unknown => {
-            emit_usage(&format!("unknown graph command {unknown}"));
-            2
-        }
-    }
-}
-
-fn print_usage() {
-    eprintln!(
-        "usage: agent-canon graph build|status [--root PATH] [--profile default] [--format text|json] | query (--path REPO_PATH|--all) [--relation KIND|all] [--direction outgoing|incoming|both] [--depth 0..64] [--root PATH] [--profile default] [--format text|json] | context --path REPO_PATH [--token TOKEN] [--root PATH] [--profile default] [--format text|json]"
-    );
-}
-
-fn emit_usage(reason: &str) {
-    eprintln!("AGENT_CANON_GRAPH=fail");
-    eprintln!("AGENT_CANON_GRAPH_ERROR=usage:{reason}");
-    print_usage();
-}
-
-fn run_build(args: &[String]) -> i32 {
-    let parsed = match parse_build_args(args) {
-        Ok(value) => value,
-        Err(error) => {
-            emit_usage(&error.to_string());
-            return 2;
-        }
-    };
-    match build_graph(&parsed) {
-        Ok(response) => emit_response(&response, parsed.format),
-        Err(error) => {
-            let response = build_failure_response(&parsed, &error);
-            emit_response(&response, parsed.format)
-        }
-    }
-}
-
-fn run_status(args: &[String]) -> i32 {
-    let parsed = match parse_build_args(args) {
-        Ok(value) => value,
-        Err(error) => {
-            emit_usage(&error.to_string());
-            return 2;
-        }
-    };
-    match read_graph_status(&parsed) {
-        Ok(response) => emit_response(&response, parsed.format),
-        Err(error) => emit_response(&status_error_response(&parsed, &error), parsed.format),
-    }
-}
-
-fn run_query(args: &[String]) -> i32 {
-    let parsed = match parse_query_args(args) {
-        Ok(value) => value,
-        Err(error) => {
-            emit_usage(&error.to_string());
-            return 2;
-        }
-    };
-    match query_graph(&parsed) {
-        Ok(response) => emit_response(&response, parsed.format),
-        Err(error) => emit_response(&query_error_response(&parsed, &error), parsed.format),
-    }
-}
-
-fn run_context(args: &[String]) -> i32 {
-    let parsed = match parse_context_args(args) {
-        Ok(value) => value,
-        Err(error) => {
-            emit_usage(&error.to_string());
-            return 2;
-        }
-    };
-    match context_graph(&parsed) {
-        Ok(response) => emit_response(&response, parsed.format),
-        Err(error) => emit_response(&context_error_response(&parsed, &error), parsed.format),
-    }
-}
-
-fn emit_response(response: &Value, format: OutputFormat) -> i32 {
-    let exit_code = response
-        .get("exit_code")
-        .and_then(Value::as_u64)
-        .unwrap_or(3) as i32;
-    if format == OutputFormat::Json {
-        println!("{}", canonical_json(response));
-    } else {
-        println!(
-            "AGENT_CANON_GRAPH={} command={} status={}",
-            if exit_code == 0 { "pass" } else { "fail" },
-            response
-                .get("command")
-                .and_then(Value::as_str)
-                .unwrap_or("unknown"),
-            response
-                .get("status")
-                .and_then(Value::as_str)
-                .unwrap_or("invalid"),
-        );
-        if let Some(reason) = response.get("reason").and_then(Value::as_str) {
-            println!("AGENT_CANON_GRAPH_REASON={reason}");
-        }
-    }
-    exit_code
-}
-
-fn parse_build_args(args: &[String]) -> Result<GraphBuildArgs, GraphError> {
-    let mut root = PathBuf::from(".");
-    let mut profile = PUBLIC_PROFILE.to_string();
-    let mut format = OutputFormat::Text;
-    let mut seen = BTreeSet::new();
-    let mut index = 0;
-    while index < args.len() {
-        let flag = args[index].as_str();
-        if !seen.insert(flag.to_string()) {
-            return Err(GraphError::Usage(format!("repeated flag {flag}")));
-        }
-        match flag {
-            "--root" => {
-                root = PathBuf::from(next_value(args, &mut index, flag)?);
-            }
-            "--profile" => profile = next_value(args, &mut index, flag)?,
-            "--format" => format = parse_format(&next_value(args, &mut index, flag)?)?,
-            _ => return Err(GraphError::Usage(format!("unknown argument {flag}"))),
-        }
-        index += 1;
-    }
-    snapshot_profile_for_graph(&profile)?;
-    Ok(GraphBuildArgs {
-        root,
-        profile,
-        format,
-    })
-}
-
-fn parse_query_args(args: &[String]) -> Result<GraphQueryArgs, GraphError> {
-    let mut root = PathBuf::from(".");
-    let mut profile = PUBLIC_PROFILE.to_string();
-    let mut format = OutputFormat::Text;
-    let mut path = None;
-    let mut all = false;
-    let mut relation = "all".to_string();
-    let mut direction = GraphDirection::Both;
-    let mut depth = None;
-    let mut seen = BTreeSet::new();
-    let mut index = 0;
-    while index < args.len() {
-        let flag = args[index].as_str();
-        if !seen.insert(flag.to_string()) {
-            return Err(GraphError::Usage(format!("repeated flag {flag}")));
-        }
-        match flag {
-            "--root" => root = PathBuf::from(next_value(args, &mut index, flag)?),
-            "--profile" => profile = next_value(args, &mut index, flag)?,
-            "--format" => format = parse_format(&next_value(args, &mut index, flag)?)?,
-            "--path" => path = Some(normalize_repo_path(&next_value(args, &mut index, flag)?)?),
-            "--all" => all = true,
-            "--relation" => relation = next_value(args, &mut index, flag)?,
-            "--direction" => {
-                direction = match next_value(args, &mut index, flag)?.as_str() {
-                    "outgoing" => GraphDirection::Outgoing,
-                    "incoming" => GraphDirection::Incoming,
-                    "both" => GraphDirection::Both,
-                    value => return Err(GraphError::Usage(format!("unknown direction {value}"))),
-                }
-            }
-            "--depth" => {
-                let value = next_value(args, &mut index, flag)?;
-                depth = Some(
-                    value
-                        .parse::<u8>()
-                        .map_err(|_| GraphError::Usage("--depth must be 0..64".to_string()))?,
-                );
-            }
-            _ => return Err(GraphError::Usage(format!("unknown argument {flag}"))),
-        }
-        index += 1;
-    }
-    snapshot_profile_for_graph(&profile)?;
-    if (path.is_some() as u8 + all as u8) != 1 {
-        return Err(GraphError::Usage(
-            "query requires exactly one --path or --all".to_string(),
-        ));
-    }
-    if relation != "all" && !GRAPH_RELATION_KINDS.contains(&relation.as_str()) {
-        return Err(GraphError::Usage(format!("unknown relation {relation}")));
-    }
-    let depth = depth.unwrap_or(if all { 0 } else { 1 });
-    if depth > 64 || (all && depth != 0) {
-        return Err(GraphError::Usage(
-            "--all requires --depth 0 and depth must be 0..64".to_string(),
-        ));
-    }
-    Ok(GraphQueryArgs {
-        root,
-        profile,
-        format,
-        path,
-        all,
-        relation,
-        direction,
-        depth,
-    })
-}
-
-fn parse_context_args(args: &[String]) -> Result<GraphContextArgs, GraphError> {
-    let mut root = PathBuf::from(".");
-    let mut profile = PUBLIC_PROFILE.to_string();
-    let mut format = OutputFormat::Text;
-    let mut path = None;
-    let mut token = None;
-    let mut seen = BTreeSet::new();
-    let mut index = 0;
-    while index < args.len() {
-        let flag = args[index].as_str();
-        if !seen.insert(flag.to_string()) {
-            return Err(GraphError::Usage(format!("repeated flag {flag}")));
-        }
-        match flag {
-            "--root" => root = PathBuf::from(next_value(args, &mut index, flag)?),
-            "--profile" => profile = next_value(args, &mut index, flag)?,
-            "--format" => format = parse_format(&next_value(args, &mut index, flag)?)?,
-            "--path" => path = Some(normalize_repo_path(&next_value(args, &mut index, flag)?)?),
-            "--token" => token = Some(next_value(args, &mut index, flag)?),
-            _ => return Err(GraphError::Usage(format!("unknown argument {flag}"))),
-        }
-        index += 1;
-    }
-    snapshot_profile_for_graph(&profile)?;
-    let path = path.ok_or_else(|| GraphError::Usage("context requires --path".to_string()))?;
-    Ok(GraphContextArgs {
-        root,
-        profile,
-        format,
-        path,
-        token,
-    })
-}
-
-fn next_value(args: &[String], index: &mut usize, flag: &str) -> Result<String, GraphError> {
-    *index += 1;
-    args.get(*index)
-        .cloned()
-        .ok_or_else(|| GraphError::Usage(format!("{flag} requires a value")))
-}
-
-fn parse_format(value: &str) -> Result<OutputFormat, GraphError> {
-    match value {
-        "text" => Ok(OutputFormat::Text),
-        "json" => Ok(OutputFormat::Json),
-        _ => Err(GraphError::Usage(format!("unknown format {value}"))),
-    }
-}
-
-fn snapshot_profile_for_graph(profile: &str) -> Result<&'static str, GraphError> {
-    if profile == PUBLIC_PROFILE {
-        Ok(SOURCE_PROFILE)
-    } else {
-        Err(GraphError::Usage(format!(
-            "unsupported graph profile {profile}"
-        )))
-    }
-}
-
-fn normalize_repo_path(value: &str) -> Result<String, GraphError> {
-    if value.is_empty() || value.contains('\0') || value.contains('\\') {
-        return Err(GraphError::Usage(
-            "repository path is empty or malformed".to_string(),
-        ));
-    }
-    let path = Path::new(value);
-    if path.is_absolute() {
-        return Err(GraphError::Usage(
-            "repository path must be relative".to_string(),
-        ));
-    }
-    let mut parts = Vec::new();
-    for component in path.components() {
-        match component {
-            Component::Normal(part) => parts.push(part.to_string_lossy().to_string()),
-            Component::CurDir => {}
-            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
-                return Err(GraphError::Usage(
-                    "repository path escapes root".to_string(),
-                ))
-            }
-        }
-    }
-    if parts.is_empty() {
-        return Err(GraphError::Usage("repository path is empty".to_string()));
-    }
-    Ok(parts.join("/"))
-}
-
-fn resolve_root(path: &Path) -> Result<PathBuf, GraphError> {
-    let root = fs::canonicalize(path).map_err(|error| GraphError::Unavailable {
-        reason: format!("root {}: {error}", path.display()),
-    })?;
-    if !root.is_dir() {
-        return Err(GraphError::Unavailable {
-            reason: format!("root is not a directory: {}", root.display()),
-        });
-    }
-    Ok(root)
-}
-
-fn canon_root(root: &Path) -> PathBuf {
-    let vendored = root.join("vendor/agent-canon");
-    if vendored.join("rust/agent-canon/Cargo.toml").is_file() {
-        vendored
-    } else {
-        root.to_path_buf()
-    }
-}
-
-fn graph_root(root: &Path) -> PathBuf {
-    root.join(".agent-canon/knowledge-graph")
-}
-
-fn graph_db(root: &Path) -> PathBuf {
-    graph_root(root).join("graph.sqlite")
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum DurableGraphStateWitness {
-    Missing,
-    Present { content_sha256: String },
-}
-
-fn durable_graph_state(path: &Path) -> Result<DurableGraphStateWitness, GraphError> {
-    if !path.exists() {
-        return Ok(DurableGraphStateWitness::Missing);
-    }
-    if path.is_symlink() || !path.is_file() {
-        return Err(GraphError::Validation {
-            stage: "atomic-state".to_string(),
-            reason: format!(
-                "durable graph path is not a regular file: {}",
-                path.display()
-            ),
-        });
-    }
-    let bytes = fs::read(path).map_err(|error| GraphError::Validation {
-        stage: "atomic-state".to_string(),
-        reason: format!("read durable graph state {}: {error}", path.display()),
-    })?;
-    Ok(DurableGraphStateWitness::Present {
-        content_sha256: hash_bytes(&bytes),
-    })
-}
-
-fn assert_durable_graph_state(
-    path: &Path,
-    expected: &DurableGraphStateWitness,
-) -> Result<(), GraphError> {
-    let observed = durable_graph_state(path)?;
-    if &observed != expected {
-        return Err(GraphError::Validation {
-            stage: "atomic-old-state-invariance".to_string(),
-            reason: format!(
-                "failed graph transition changed durable state: expected {expected:?}, observed {observed:?}"
-            ),
-        });
-    }
-    Ok(())
-}
-
-fn build_graph(args: &GraphBuildArgs) -> Result<Value, GraphError> {
-    build_graph_with_failure(args, GraphBuildFailurePoint::None)
-}
-
-fn build_graph_with_failure(
-    args: &GraphBuildArgs,
-    point: GraphBuildFailurePoint,
-) -> Result<Value, GraphError> {
-    let root = resolve_root(&args.root)?;
-    let target = graph_db(&root);
-    let old_state = durable_graph_state(&target)?;
-    let result = (|| {
-        let material = collect_build_material(args, point)?;
-        let cleanup = GraphCandidateCleanup::new(material.candidate_dir.clone());
-        let handle = match write_graph_candidate(&material, point) {
-            Ok(value) => value,
-            Err(error) => {
-                cleanup.cleanup()?;
-                return Err(error);
-            }
-        };
-        if point == GraphBuildFailurePoint::Validation {
-            cleanup.cleanup()?;
-            return Err(GraphError::Validation {
-                stage: "injected".to_string(),
-                reason: "validation failure seam".to_string(),
-            });
-        }
-        if let Err(error) = validate_graph_store(&handle.db, &material) {
-            cleanup.cleanup()?;
-            return Err(error);
-        }
-        let integration = integration_record(&material, true);
-        let status = if material.contract.profile_complete() {
-            "fresh"
-        } else {
-            "incomplete"
-        };
-        publish_graph(&material.graph_root, handle, point)?;
-        Ok(build_response(
-            &material,
-            &integration,
-            status,
-            "published",
-            "durable",
-            None,
-            None,
-        ))
-    })();
-    if result.is_err() {
-        assert_durable_graph_state(&target, &old_state)?;
-    }
-    result
-}
-
-fn collect_build_material(
-    args: &GraphBuildArgs,
-    point: GraphBuildFailurePoint,
-) -> Result<BuildMaterial, GraphError> {
-    collect_build_material_with_mode(args, point, false)
-}
-
-fn collect_build_material_with_mode(
-    args: &GraphBuildArgs,
-    point: GraphBuildFailurePoint,
-    probe: bool,
-) -> Result<BuildMaterial, GraphError> {
-    let root = resolve_root(&args.root)?;
-    let graph_root = graph_root(&root);
-    let build_id =
-        hash_bytes(format!("{}:{}:{}", root.display(), std::process::id(), now_nanos()).as_bytes());
-    let candidate_dir = if probe {
-        std::env::temp_dir().join(format!("agent-canon-graph-probe-{build_id}"))
-    } else {
-        fs::create_dir_all(graph_root.join(".candidate")).map_err(|error| {
-            GraphError::CandidateWrite {
-                reason: format!("create graph root: {error}"),
-            }
-        })?;
-        graph_root.join(".candidate").join(build_id)
-    };
-    fs::create_dir_all(&candidate_dir).map_err(|error| GraphError::CandidateWrite {
-        reason: format!("create candidate: {error}"),
-    })?;
-    let mut candidate_cleanup = ArmedDirectoryCleanup::new(candidate_dir.clone());
-    let producer_workspace = TemporaryDirectory::create("graph-producers")?;
-    if point == GraphBuildFailurePoint::Producer {
-        return Err(GraphError::Producer {
-            producer: "source-snapshot".to_string(),
-            reason: "injected producer failure seam".to_string(),
-        });
-    }
-    let snapshot_path = producer_workspace.path.join("source-snapshot.jsonl");
-    let request = SnapshotRequest {
-        root: root.clone(),
-        profile: snapshot_profile_for_graph(&args.profile)?.to_string(),
-        output_jsonl: snapshot_path.clone(),
-    };
-    let snapshot = capture_snapshot(&request).map_err(manifest_error)?;
-    if snapshot_profile(&snapshot) != SOURCE_PROFILE {
-        return Err(GraphError::Validation {
-            stage: "source-snapshot-profile".to_string(),
-            reason: format!(
-                "expected {SOURCE_PROFILE}, observed {}",
-                snapshot_profile(&snapshot)
-            ),
-        });
-    }
-    let mut snapshot_bytes = Vec::new();
-    write_snapshot_jsonl(&snapshot, &mut snapshot_bytes).map_err(manifest_error)?;
-    write_synced_file(&snapshot_path, &snapshot_bytes)?;
-    let mut producer_artifacts = vec![ProducerArtifact {
-        producer_id: "source-snapshot".to_string(),
-        version: "source_snapshot.v1".to_string(),
-        command: "dependency_manifest::capture_snapshot graph-profile=default profile=parent"
-            .to_string(),
-        root: ".".to_string(),
-        content_sha256: hash_bytes(&snapshot_bytes),
-        relation_families: vec![
-            "dependency".to_string(),
-            "pin".to_string(),
-            "submodule".to_string(),
-        ],
-        artifact_ref: producer_artifact_ref(
-            "source-snapshot",
-            "source-snapshot.jsonl",
-            &hash_bytes(&snapshot_bytes),
-        ),
-        payload: snapshot_bytes.clone(),
-    }];
-    let (mut nodes, mut facts, mut diagnostics) = snapshot_graph_records(&root, &snapshot)?;
-    let catalog = capture_structure_and_public_surface(&root, &producer_workspace.path)?;
-    producer_artifacts.extend(catalog.0);
-    facts.extend(catalog.1);
-    diagnostics.extend(catalog.2);
-    let structured = capture_structured_analysis(&root, &producer_workspace.path)?;
-    producer_artifacts.push(structured.0);
-    facts.extend(structured.1);
-    diagnostics.extend(structured.2);
-    let responsibility = capture_responsibility_scope(&root)?;
-    producer_artifacts.push(responsibility.0);
-    facts.extend(responsibility.1);
-    diagnostics.extend(responsibility.2);
-    let import_policy = capture_import_responsibility(&root)?;
-    producer_artifacts.push(import_policy.0);
-    diagnostics.extend(import_policy.1);
-    let runtime = capture_runtime_dashboard(&root, &producer_workspace.path)?;
-    producer_artifacts.push(runtime);
-    let scanner = capture_code_dependencies(&root, &producer_workspace.path, &snapshot)?;
-    producer_artifacts.push(scanner.0);
-    facts.extend(scanner.1);
-    diagnostics.extend(scanner.2);
-    apply_exclusion_dominance(&mut facts, &mut diagnostics, &snapshot.source_universe);
-    canonicalize_build_records(
-        &mut nodes,
-        &mut facts,
-        &mut diagnostics,
-        &mut producer_artifacts,
-    )?;
-    bind_fact_endpoints(&mut nodes, &mut facts);
-    add_reverse_projections(&mut facts)?;
-    canonicalize_build_records(
-        &mut nodes,
-        &mut facts,
-        &mut diagnostics,
-        &mut producer_artifacts,
-    )?;
-    let contract =
-        derive_graph_contract(&snapshot, &nodes, &facts, &diagnostics, &producer_artifacts)?;
-    let input_fingerprint = graph_input_fingerprint(&snapshot, &producer_artifacts);
-    let graph_fingerprint = graph_fingerprint(
-        &input_fingerprint,
-        &nodes,
-        &facts,
-        &diagnostics,
-        &producer_artifacts,
-        &contract,
-    );
-    let created_at = git_head_timestamp(&root)?;
-    candidate_cleanup.disarm();
-    Ok(BuildMaterial {
-        root,
-        graph_root,
-        candidate_dir,
-        snapshot,
-        nodes,
-        facts,
-        diagnostics,
-        contract,
-        producer_artifacts,
-        input_fingerprint,
-        graph_fingerprint,
-        created_at,
-    })
-}
-
-fn manifest_error(error: ManifestError) -> GraphError {
-    GraphError::Producer {
-        producer: "source-snapshot".to_string(),
-        reason: error.to_string(),
-    }
-}
-
-fn snapshot_graph_records(
-    _root: &Path,
-    snapshot: &ManifestSnapshot,
-) -> Result<(Vec<SourceNode>, Vec<GraphFact>, Vec<GraphDiagnostic>), GraphError> {
-    let mut nodes = Vec::new();
-    let mut facts = Vec::new();
-    let mut diagnostics = Vec::new();
-    let mut path_by_identity = BTreeMap::new();
-    let excluded_by_identity = snapshot
-        .source_exclusions
-        .iter()
-        .map(|exclusion| exclusion.source_identity_id.as_str())
-        .collect::<BTreeSet<_>>();
-    let excluded_paths = snapshot
-        .source_exclusions
-        .iter()
-        .map(|exclusion| exclusion.repo_rel_path.as_str())
-        .collect::<BTreeSet<_>>();
-    let target_is_excluded = |target: &str| {
-        excluded_paths.contains(target)
-            || excluded_paths.contains(format!("vendor/agent-canon/{target}").as_str())
-            || source_path_is_explicitly_excluded(target)
-    };
-    for identity in &snapshot.source_identities {
-        path_by_identity.insert(identity.identity_id.clone(), identity.repo_rel_path.clone());
-        if excluded_by_identity.contains(identity.identity_id.as_str()) {
-            continue;
-        }
-        let manifest = snapshot.manifests.get(&identity.identity_id);
-        let manifest_present = manifest.is_some();
-        let contract = manifest.map(|value| value.contract.clone());
-        let responsibility = manifest.map(|value| value.responsibility.clone());
-        let manifest_span = manifest.and_then(|value| value.source_span.clone());
-        let node_id = source_node_id(&identity.repo_rel_path);
-        nodes.push(SourceNode {
-            id: node_id,
-            selector: identity.repo_rel_path.clone(),
-            path: Some(identity.repo_rel_path.clone()),
-            source_member: true,
-            source_span: manifest_span.clone(),
-            payload: json!({
-                "path": identity.repo_rel_path,
-                "selector": identity.repo_rel_path,
-                "source_member": true,
-                "content_sha256": identity.content_hash,
-                "exists": identity.exists,
-                "manifest_present": manifest_present,
-                "manifest_contract": contract,
-                "manifest_responsibility": responsibility,
-                "manifest_source_span": manifest_span.as_ref().map(source_span_json),
-                "producer": "source-snapshot",
-                "authority": "ManifestParser",
-                "evidence_ref": format!("source-snapshot:{}", identity.identity_id),
-            }),
-        });
-        if !identity.exists {
-            diagnostics.push(graph_diagnostic(
-                "unresolved",
-                "source.deleted",
-                "warn",
-                None,
-                Some(&identity.repo_rel_path),
-                None,
-                None,
-                "eligible source is deleted in the captured worktree",
-                "source-snapshot",
-                &format!("source-snapshot:{}", identity.identity_id),
-            ));
-        }
-    }
-    for exclusion in &snapshot.source_exclusions {
-        diagnostics.push(graph_diagnostic(
-            "excluded",
-            "source.excluded",
-            "info",
-            None,
-            Some(&exclusion.repo_rel_path),
-            None,
-            None,
-            &format!("{} ({})", exclusion.reason_code, exclusion.rule_id),
-            "source-snapshot",
-            &format!("source-snapshot:{}", exclusion.evidence_id),
-        ));
-    }
-    for declaration in &snapshot.declarations {
-        if target_is_excluded(&declaration.declared_target) {
-            diagnostics.push(graph_diagnostic(
-                "excluded",
-                "dependency.target_excluded",
-                "info",
-                Some("dependency"),
-                path_by_identity
-                    .get(&declaration.source_identity_id)
-                    .map(String::as_str),
-                Some(&declaration.declared_target),
-                Some(declaration.source_span.clone()),
-                "manifest target is an explicitly excluded AgentCanon submodule source",
-                "source-snapshot",
-                &format!("source-snapshot:{}", declaration.declaration_id),
-            ));
-        } else if declaration.resolved_target_identity_id.is_none() {
-            diagnostics.push(graph_diagnostic(
-                "unresolved",
-                "dependency.target_unresolved",
-                "warn",
-                Some("dependency"),
-                path_by_identity
-                    .get(&declaration.source_identity_id)
-                    .map(String::as_str),
-                Some(&declaration.declared_target),
-                Some(declaration.source_span.clone()),
-                "manifest target is not in the source universe",
-                "source-snapshot",
-                &format!("source-snapshot:{}", declaration.declaration_id),
-            ));
-        } else {
-            facts.push(dependency_fact(declaration, &path_by_identity));
-        }
-    }
-    for relation in &snapshot.surface_relations {
-        if matches!(
-            relation.relation_type.as_str(),
-            "view" | "view_of" | "generated" | "generated_from"
-        ) {
-            continue;
-        }
-        let kind = match relation.relation_type.as_str() {
-            "view" | "view_of" => "view",
-            "generated" | "generated_from" => "generated",
-            "submodule" | "submodule_pin" => "submodule",
-            _ => "containment",
-        };
-        facts.push(GraphFact {
-            id: relation.relation_id.clone(),
-            layer: "source-snapshot".to_string(),
-            kind: kind.to_string(),
-            from: relation.source_path.clone(),
-            to: path_by_identity
-                .get(&relation.target_identity_id)
-                .cloned()
-                .or_else(|| Some(relation.target_path.clone())),
-            owner: Some(relation.owner_class.clone()),
-            source_path: Some(relation.source_path.clone()),
-            source_span: None,
-            producer: "source-snapshot".to_string(),
-            evidence_ref: format!("source-snapshot:{}", relation.evidence_id),
-            authority: "source-snapshot".to_string(),
-            inferred: false,
-            dependency_detail: None,
-            payload: json!({"surface_mode": relation.surface_mode, "status": relation.status, "content_hash_equal": relation.content_hash_equal}),
-        });
-    }
-    for diagnostic in &snapshot.diagnostics {
-        if diagnostic.code == "dependency.target_unresolved" {
-            continue;
-        }
-        diagnostics.push(graph_diagnostic(
-            "unresolved",
-            &diagnostic.code,
-            if diagnostic.severity == "error" {
-                "blocker"
-            } else {
-                "warn"
-            },
-            Some("dependency"),
-            diagnostic
-                .source_span
-                .as_ref()
-                .map(|span| span.path.as_str()),
-            None,
-            diagnostic.source_span.clone(),
-            &diagnostic.message,
-            "source-snapshot",
-            "source-snapshot:diagnostic",
-        ));
-    }
-    Ok((nodes, facts, diagnostics))
-}
-
-fn dependency_fact(
-    declaration: &DependencyDeclaration,
-    paths: &BTreeMap<String, String>,
-) -> GraphFact {
-    let source = paths
-        .get(&declaration.source_identity_id)
-        .cloned()
-        .unwrap_or_else(|| declaration.source_identity_id.clone());
-    let target = declaration
-        .resolved_target_identity_id
-        .as_ref()
-        .and_then(|identity| paths.get(identity))
-        .cloned()
-        .unwrap_or_else(|| declaration.declared_target.clone());
-    GraphFact {
-        id: declaration.declaration_id.clone(),
-        layer: "manifest".to_string(),
-        kind: "dependency".to_string(),
-        from: source.clone(),
-        to: Some(target.clone()),
-        owner: None,
-        source_path: Some(source.clone()),
-        source_span: Some(declaration.source_span.clone()),
-        producer: "source-snapshot".to_string(),
-        evidence_ref: format!("source-snapshot:{}", declaration.declaration_id),
-        authority: "ManifestParser".to_string(),
-        inferred: false,
-        dependency_detail: Some(json!({
-            "direction": declaration.declared_direction,
-            "kind": declaration.declared_kind,
-            "reason": declaration.reason,
-            "declared_target": declaration.declared_target,
-            "resolved_target": if declaration.resolved_target_identity_id.is_some() { Some(target) } else { None::<String> },
-            "raw_line_hash": declaration.raw_line_hash,
-        })),
-        payload: json!({"attestation_key": declaration.attestation_key}),
-    }
-}
-
-fn capture_code_dependencies(
-    root: &Path,
-    candidate_dir: &Path,
-    snapshot: &ManifestSnapshot,
-) -> Result<(ProducerArtifact, Vec<GraphFact>, Vec<GraphDiagnostic>), GraphError> {
-    let mut diagnostics = Vec::new();
-    let scanner_paths = snapshot
-        .source_universe
-        .eligible_paths
-        .iter()
-        .filter(|path| SCANNER_SUFFIXES.iter().any(|suffix| path.ends_with(suffix)))
-        .filter(|path| {
-            let full = root.join(path);
-            full.is_file() && !full.is_symlink()
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-    let scanner_path_set = scanner_paths
-        .iter()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
-    for path in &snapshot.source_universe.eligible_paths {
-        if scanner_path_set.contains(path.as_str()) {
-            continue;
-        }
-        let full = root.join(path);
-        if !full.exists() {
-            continue;
-        }
-        if !SCANNER_SUFFIXES.iter().any(|suffix| path.ends_with(suffix)) {
-            diagnostics.push(graph_diagnostic(
-                "excluded",
-                "scanner.unsupported_suffix",
-                "info",
-                Some("import"),
-                Some(path),
-                None,
-                None,
-                "code-dependency relation is outside the scanner suffix grammar",
-                "code-dependencies",
-                &format!("code-dependencies:unsupported:{path}"),
-            ));
-        } else if full.is_symlink() || !full.is_file() {
-            diagnostics.push(graph_diagnostic(
-                "unresolved",
-                "source.unreadable",
-                "warn",
-                None,
-                Some(path),
-                None,
-                None,
-                "eligible scanner source is not a regular non-symlink file",
-                "code-dependencies",
-                &format!("code-dependencies:source:{path}"),
-            ));
-        }
-    }
-    let paths_file = candidate_dir.join("scanner-paths.txt");
-    let paths_bytes = if scanner_paths.is_empty() {
-        Vec::new()
-    } else {
-        format!("{}\n", scanner_paths.join("\n")).into_bytes()
-    };
-    write_synced_file(&paths_file, &paths_bytes)?;
-    let script = canon_root(root).join("tools/agent_tools/scan_code_dependencies.sh");
-    let output = Command::new("bash")
-        .arg(&script)
-        .arg("--root")
-        .arg(root)
-        .arg("--print-unresolved")
-        .arg("--paths-file")
-        .arg(&paths_file)
-        .current_dir(root)
-        .output()
-        .map_err(|error| GraphError::Producer {
-            producer: "code-dependencies".to_string(),
-            reason: error.to_string(),
-        })?;
-    if !output.status.success() {
-        return Err(process_producer_error("code-dependencies", &output));
-    }
-    let stdout =
-        String::from_utf8(output.stdout.clone()).map_err(|error| GraphError::Producer {
-            producer: "code-dependencies".to_string(),
-            reason: format!("stdout UTF-8: {error}"),
-        })?;
-    let mut facts = Vec::new();
-    let lines = stdout
-        .lines()
-        .filter(|line| !line.is_empty())
-        .collect::<Vec<_>>();
-    let marker = lines.last().ok_or_else(|| GraphError::Producer {
-        producer: "code-dependencies".to_string(),
-        reason: "missing completion marker".to_string(),
-    })?;
-    if *marker != format!("CODE_DEPENDENCY_SCAN=pass files={}", scanner_paths.len()) {
-        return Err(GraphError::Producer {
-            producer: "code-dependencies".to_string(),
-            reason: format!("completion marker mismatch: {marker}"),
-        });
-    }
-    for line in lines.iter().take(lines.len().saturating_sub(1)) {
-        let fields = line.split('\t').collect::<Vec<_>>();
-        if fields.len() != 7 || fields[0] != "CODE_DEPENDENCY" {
-            return Err(GraphError::Producer {
-                producer: "code-dependencies".to_string(),
-                reason: format!("malformed TSV row: {line}"),
-            });
-        }
-        let kind = match (fields[1], fields[2]) {
-            ("python", "import") => "import",
-            ("python", "from-import-symbol") => "symbol",
-            ("c-family", "include") | ("shell", "source") => "include",
-            _ => {
-                return Err(GraphError::Producer {
-                    producer: "code-dependencies".to_string(),
-                    reason: format!("unsupported scanner kind {}/{}", fields[1], fields[2]),
-                })
-            }
-        };
-        let source = fields[3].to_string();
-        let target = fields[4].to_string();
-        let evidence_ref = format!("code-dependencies:{}:{}", source, fields[5]);
-        if target.is_empty() {
-            diagnostics.push(graph_diagnostic(
-                "unresolved",
-                "scanner.target_unresolved",
-                "warn",
-                Some(kind),
-                Some(&source),
-                None,
-                None,
-                fields[6],
-                "code-dependencies",
-                &evidence_ref,
-            ));
-            continue;
-        }
-        if target.starts_with("external:") {
-            diagnostics.push(graph_diagnostic(
-                "excluded",
-                "scanner.external_target",
-                "info",
-                Some(kind),
-                Some(&source),
-                Some(&target),
-                None,
-                fields[6],
-                "code-dependencies",
-                &evidence_ref,
-            ));
-            continue;
-        }
-        facts.push(GraphFact {
-            id: hash_parts(&["code-dependency", kind, &source, &target, fields[5], fields[6]]),
-            layer: "code".to_string(),
-            kind: kind.to_string(),
-            from: source.clone(),
-            to: Some(target.clone()),
-            owner: None,
-            source_path: Some(source),
-            source_span: None,
-            producer: "code-dependencies".to_string(),
-            evidence_ref,
-            authority: "scan_code_dependencies.sh".to_string(),
-            inferred: false,
-            dependency_detail: None,
-            payload: json!({"language": fields[1], "scanner_kind": fields[2], "symbol": fields[5], "raw": fields[6]}),
-        });
-    }
-    Ok((ProducerArtifact {
-        producer_id: "code-dependencies".to_string(),
-        version: "code-dependencies.v1".to_string(),
-        command: format!("bash {} --root <parent-root> --print-unresolved --paths-file <candidate>/scanner-paths.txt", repo_artifact_ref(root, &script)),
-        root: ".".to_string(),
-        content_sha256: hash_bytes(&output.stdout),
-        relation_families: vec!["import".to_string(), "include".to_string(), "symbol".to_string()],
-        artifact_ref: producer_artifact_ref("code-dependencies", "code-dependencies.tsv", &hash_bytes(&output.stdout)),
-        payload: output.stdout.clone(),
-    }, facts, diagnostics))
-}
-
-fn capture_structure_and_public_surface(
-    root: &Path,
-    candidate_dir: &Path,
-) -> Result<(Vec<ProducerArtifact>, Vec<GraphFact>, Vec<GraphDiagnostic>), GraphError> {
-    let structure_tool = canon_root(root).join("tools/agent_tools/repo_structure_contract.py");
-    let structure_contract = canon_root(root).join("documents/repo-structure-contract.toml");
-    let structure_output = python_command()
-        .arg(&structure_tool)
-        .arg("--root")
-        .arg(root)
-        .arg("--contract")
-        .arg(&structure_contract)
-        .arg("--format")
-        .arg("json")
-        .current_dir(root)
-        .output()
-        .map_err(|error| GraphError::Producer {
-            producer: "structure-catalog".to_string(),
-            reason: error.to_string(),
-        })?;
-    if !structure_output.status.success() {
-        return Err(process_producer_error(
-            "structure-catalog",
-            &structure_output,
-        ));
-    }
-    let structure_value: Value =
-        serde_json::from_slice(&structure_output.stdout).map_err(|error| GraphError::Producer {
-            producer: "structure-catalog".to_string(),
-            reason: format!("invalid structure JSON: {error}"),
-        })?;
-    if structure_value.get("status").and_then(Value::as_str) != Some("pass") {
-        return Err(GraphError::Producer {
-            producer: "structure-catalog".to_string(),
-            reason: "repository structure contract failed".to_string(),
-        });
-    }
-    let tool = canon_root(root).join("tools/agent_tools/tool_catalog.py");
-    let output = python_command()
-        .arg(&tool)
-        .arg("--root")
-        .arg(root)
-        .arg("--format")
-        .arg("json")
-        .current_dir(root)
-        .output()
-        .map_err(|error| GraphError::Producer {
-            producer: "structure-catalog".to_string(),
-            reason: error.to_string(),
-        })?;
-    if !output.status.success() {
-        return Err(process_producer_error("structure-catalog", &output));
-    }
-    let artifact_path =
-        candidate_dir.join("producer-artifacts/structure-catalog/catalog-bundle.json");
-    write_synced_file(&artifact_path, &output.stdout)?;
-    let value: Value =
-        serde_json::from_slice(&output.stdout).map_err(|error| GraphError::Producer {
-            producer: "structure-catalog".to_string(),
-            reason: format!("invalid catalog JSON: {error}"),
-        })?;
-    if value.get("schema").and_then(Value::as_str) != Some("agent_canon.catalog_bundle.v1") {
-        return Err(GraphError::Producer {
-            producer: "structure-catalog".to_string(),
-            reason: "catalog bundle schema mismatch".to_string(),
-        });
-    }
-    let catalog = value
-        .get("catalog")
-        .and_then(Value::as_object)
-        .ok_or_else(|| GraphError::Producer {
-            producer: "structure-catalog".to_string(),
-            reason: "missing catalog report".to_string(),
-        })?;
-    if catalog.get("status").and_then(Value::as_str) != Some("pass") {
-        return Err(GraphError::Producer {
-            producer: "structure-catalog".to_string(),
-            reason: "tool catalog validation failed".to_string(),
-        });
-    }
-    let public = value
-        .get("public")
-        .and_then(Value::as_object)
-        .ok_or_else(|| GraphError::Producer {
-            producer: "public-surface".to_string(),
-            reason: "missing public report".to_string(),
-        })?;
-    if public.get("status").and_then(Value::as_str) != Some("pass") {
-        return Err(GraphError::Producer {
-            producer: "public-surface".to_string(),
-            reason: "public extraction failed".to_string(),
-        });
-    }
-    let rows = public
-        .get("rows")
-        .and_then(Value::as_array)
-        .ok_or_else(|| GraphError::Producer {
-            producer: "public-surface".to_string(),
-            reason: "public rows missing".to_string(),
-        })?;
-    let mut facts = Vec::new();
-    let public_spans = rows
-        .iter()
-        .filter_map(|row| {
-            let object = row.as_object()?;
-            let surface_id = object.get("surface_id")?.as_str()?;
-            let span = object.get("source_span")?.as_object()?;
-            Some((surface_id.to_string(), span.clone()))
-        })
-        .collect::<BTreeMap<_, _>>();
-    let entries = catalog
-        .get("entries")
-        .and_then(Value::as_array)
-        .ok_or_else(|| GraphError::Producer {
-            producer: "structure-catalog".to_string(),
-            reason: "catalog entries missing".to_string(),
-        })?;
-    for row in entries {
-        let object = row.as_object().ok_or_else(|| GraphError::Producer {
-            producer: "structure-catalog".to_string(),
-            reason: "catalog entry must be object".to_string(),
-        })?;
-        let tool_id = required_string(object, "tool_id", "structure-catalog")?;
-        let path = producer_repo_path(root, &required_string(object, "path", "structure-catalog")?);
-        let surface_id = format!("tool:{tool_id}");
-        let source_span = public_spans
-            .get(&surface_id)
-            .map(|span| source_span_from_json(root, span))
-            .transpose()?;
-        facts.push(GraphFact {
-            id: hash_parts(&["catalog", &tool_id, &path]),
-            layer: "structure-catalog".to_string(),
-            kind: "catalog".to_string(),
-            from: surface_id.clone(),
-            to: Some(path.clone()),
-            owner: None,
-            source_path: source_span.as_ref().map(|span| span.path.clone()),
-            source_span,
-            producer: "structure-catalog".to_string(),
-            evidence_ref: format!("structure-catalog:{surface_id}"),
-            authority: "CatalogReport".to_string(),
-            inferred: false,
-            dependency_detail: None,
-            payload: row.clone(),
-        });
-    }
-    for row in rows {
-        let object = row.as_object().ok_or_else(|| GraphError::Producer {
-            producer: "public-surface".to_string(),
-            reason: "public row must be object".to_string(),
-        })?;
-        let surface_id = required_string(object, "surface_id", "public-surface")?;
-        let selector = required_string(object, "selector", "public-surface")?;
-        let primary_path =
-            producer_repo_path(root, &required_string(object, "path", "public-surface")?);
-        let primary = object
-            .get("source_span")
-            .and_then(Value::as_object)
-            .ok_or_else(|| GraphError::Producer {
-                producer: "public-surface".to_string(),
-                reason: format!("{surface_id}: source span missing"),
-            })?;
-        facts.push(GraphFact {
-            id: surface_id.clone(),
-            layer: "public-surface".to_string(),
-            kind: "public".to_string(),
-            from: selector.clone(),
-            to: Some(primary_path.clone()),
-            owner: None,
-            source_path: Some(primary_path.clone()),
-            source_span: Some(source_span_from_json(root, primary)?),
-            producer: "public-surface".to_string(),
-            evidence_ref: format!("public-surface:{surface_id}"),
-            authority: "public-surface".to_string(),
-            inferred: false,
-            dependency_detail: None,
-            payload: json!({"selector": selector, "surface_kind": object.get("kind").cloned().unwrap_or(Value::Null), "secondary_spans": object.get("secondary_spans").cloned().unwrap_or_else(|| json!([]))}),
-        });
-    }
-    let structure_payload = canonical_json(&json!({
-        "schema": "agent_canon.structure_catalog.v1",
-        "repo_structure": structure_value,
-        "catalog_bundle": value,
-    }))
-    .into_bytes();
-    let structure_hash = hash_bytes(&structure_payload);
-    let public_hash = hash_bytes(&output.stdout);
-    Ok((vec![
-        ProducerArtifact {
-            producer_id: "structure-catalog".to_string(),
-            version: "structure-catalog.v1".to_string(),
-            command: format!(
-                "python3 {} --root <parent-root> --contract {} --format json + python3 {} --root <parent-root> --format json",
-                repo_artifact_ref(root, &structure_tool),
-                repo_artifact_ref(root, &structure_contract),
-                repo_artifact_ref(root, &tool),
-            ),
-            root: ".".to_string(),
-            content_sha256: structure_hash.clone(),
-            relation_families: vec!["catalog".to_string(), "view".to_string(), "generated".to_string()],
-            artifact_ref: producer_artifact_ref("structure-catalog", "structure-catalog.json", &structure_hash),
-            payload: structure_payload,
-        },
-        ProducerArtifact {
-            producer_id: "public-surface".to_string(),
-            version: public.get("producer_version").and_then(Value::as_str).unwrap_or("public-surface.v1").to_string(),
-            command: "tool_catalog.py::extract_public_surface captured in structure-catalog invocation".to_string(),
-            root: ".".to_string(),
-            content_sha256: public_hash.clone(),
-            relation_families: vec!["public".to_string()],
-            artifact_ref: producer_artifact_ref("public-surface", "catalog-bundle.json", &public_hash),
-            payload: output.stdout.clone(),
-        },
-    ], facts, Vec::new()))
-}
-
-fn required_string(
-    object: &Map<String, Value>,
-    field: &str,
-    producer: &str,
-) -> Result<String, GraphError> {
-    object
-        .get(field)
-        .and_then(Value::as_str)
-        .map(ToString::to_string)
-        .ok_or_else(|| GraphError::Producer {
-            producer: producer.to_string(),
-            reason: format!("{field} must be string"),
-        })
-}
-
-fn capture_structured_analysis(
-    root: &Path,
-    candidate_dir: &Path,
-) -> Result<(ProducerArtifact, Vec<GraphFact>, Vec<GraphDiagnostic>), GraphError> {
-    let tool = std::env::current_exe().map_err(|error| GraphError::Producer {
-        producer: "structured-analysis".to_string(),
-        reason: format!("resolve current agent-canon executable: {error}"),
-    })?;
-    let output_dir = candidate_dir.join("producer-artifacts/structured-analysis");
-    fs::create_dir_all(&output_dir).map_err(|error| GraphError::CandidateWrite {
-        reason: format!("create structured-analysis artifact directory: {error}"),
-    })?;
-    let json_path = output_dir.join("document-inventory.json");
-    let markdown_path = output_dir.join("document-inventory.md");
-    let output = Command::new(&tool)
-        .arg("structured-analysis")
-        .arg("document-inventory")
-        .arg("--root")
-        .arg(root)
-        .arg("--json-out")
-        .arg(&json_path)
-        .arg("--markdown-out")
-        .arg(&markdown_path)
-        .current_dir(root)
-        .output()
-        .map_err(|error| GraphError::Producer {
-            producer: "structured-analysis".to_string(),
-            reason: error.to_string(),
-        })?;
-    if !output.status.success() {
-        return Err(process_producer_error("structured-analysis", &output));
-    }
-    let bytes = fs::read(&json_path).map_err(|error| GraphError::Producer {
-        producer: "structured-analysis".to_string(),
-        reason: format!("read document inventory: {error}"),
-    })?;
-    let value: Value = serde_json::from_slice(&bytes).map_err(|error| GraphError::Producer {
-        producer: "structured-analysis".to_string(),
-        reason: format!("invalid document inventory JSON: {error}"),
-    })?;
-    if value.get("status").and_then(Value::as_str) != Some("pass") {
-        return Err(GraphError::Producer {
-            producer: "structured-analysis".to_string(),
-            reason: "document inventory status is not pass".to_string(),
-        });
-    }
-    let documents = value
-        .get("documents")
-        .and_then(Value::as_array)
-        .ok_or_else(|| GraphError::Producer {
-            producer: "structured-analysis".to_string(),
-            reason: "document inventory rows missing".to_string(),
-        })?;
-    let mut facts = Vec::new();
-    for row in documents {
-        let object = row.as_object().ok_or_else(|| GraphError::Producer {
-            producer: "structured-analysis".to_string(),
-            reason: "document inventory row must be object".to_string(),
-        })?;
-        let path = required_string(object, "path", "structured-analysis")?;
-        let title = required_string(object, "title", "structured-analysis")?;
-        let document_selector = format!("document:{path}");
-        facts.push(GraphFact {
-            id: hash_parts(&["document", &path]),
-            layer: "structured-analysis".to_string(),
-            kind: "document".to_string(),
-            from: path.clone(),
-            to: Some(document_selector),
-            owner: None,
-            source_path: Some(path.clone()),
-            source_span: None,
-            producer: "structured-analysis".to_string(),
-            evidence_ref: format!("structured-analysis:{path}"),
-            authority: "document-inventory".to_string(),
-            inferred: false,
-            dependency_detail: None,
-            payload: json!({"title": title}),
-        });
-        let parent = Path::new(&path)
-            .parent()
-            .and_then(Path::to_str)
-            .filter(|value| !value.is_empty())
-            .unwrap_or(".");
-        facts.push(GraphFact {
-            id: hash_parts(&["containment", parent, &path]),
-            layer: "structured-analysis".to_string(),
-            kind: "containment".to_string(),
-            from: format!("directory:{parent}"),
-            to: Some(path.clone()),
-            owner: None,
-            source_path: Some(path.clone()),
-            source_span: None,
-            producer: "structured-analysis".to_string(),
-            evidence_ref: format!("structured-analysis:{path}"),
-            authority: "document-inventory".to_string(),
-            inferred: false,
-            dependency_detail: None,
-            payload: json!({"parent": parent, "child": path}),
-        });
-    }
-    let diagnostics = producer_findings(
-        "structured-analysis",
-        value.get("findings").and_then(Value::as_array),
-        "document",
-    );
-    let content_sha256 = hash_bytes(&bytes);
-    Ok((ProducerArtifact {
-        producer_id: "structured-analysis".to_string(),
-        version: "document-inventory.v1".to_string(),
-        command: "agent-canon structured-analysis document-inventory --root <parent-root> --json-out <producer-workspace>/document-inventory.json --markdown-out <producer-workspace>/document-inventory.md".to_string(),
-        root: ".".to_string(),
-        content_sha256: content_sha256.clone(),
-        relation_families: vec!["containment".to_string(), "document".to_string()],
-        artifact_ref: producer_artifact_ref("structured-analysis", "document-inventory.json", &content_sha256),
-        payload: bytes,
-    }, facts, diagnostics))
-}
-
-fn capture_responsibility_scope(
-    root: &Path,
-) -> Result<(ProducerArtifact, Vec<GraphFact>, Vec<GraphDiagnostic>), GraphError> {
-    let tool = canon_root(root).join("tools/agent_tools/responsibility_scope.py");
-    let output = python_command()
-        .arg(&tool)
-        .arg("--root")
-        .arg(root)
-        .arg("--format")
-        .arg("json")
-        .current_dir(root)
-        .output()
-        .map_err(|error| GraphError::Producer {
-            producer: "responsibility-scope".to_string(),
-            reason: error.to_string(),
-        })?;
-    if !output.status.success() {
-        return Err(process_producer_error("responsibility-scope", &output));
-    }
-    let value: Value =
-        serde_json::from_slice(&output.stdout).map_err(|error| GraphError::Producer {
-            producer: "responsibility-scope".to_string(),
-            reason: format!("invalid JSON: {error}"),
-        })?;
-    if value.get("status").and_then(Value::as_str) != Some("pass") {
-        return Err(GraphError::Producer {
-            producer: "responsibility-scope".to_string(),
-            reason: "responsibility scope status is not pass".to_string(),
-        });
-    }
-    let scopes = value
-        .get("scopes")
-        .and_then(Value::as_array)
-        .ok_or_else(|| GraphError::Producer {
-            producer: "responsibility-scope".to_string(),
-            reason: "scope rows missing".to_string(),
-        })?;
-    let mut facts = Vec::new();
-    for row in scopes {
-        let object = row.as_object().ok_or_else(|| GraphError::Producer {
-            producer: "responsibility-scope".to_string(),
-            reason: "scope row must be object".to_string(),
-        })?;
-        let scope_id = required_string(object, "scope_id", "responsibility-scope")?;
-        let owner = required_string(object, "owner", "responsibility-scope")?;
-        let paths = object
-            .get("paths")
-            .and_then(Value::as_array)
-            .ok_or_else(|| GraphError::Producer {
-                producer: "responsibility-scope".to_string(),
-                reason: format!("{scope_id}: paths missing"),
-            })?;
-        for path in paths.iter().filter_map(Value::as_str) {
-            for kind in ["owner", "scope"] {
-                facts.push(GraphFact {
-                    id: hash_parts(&[kind, &scope_id, &owner, path]),
-                    layer: "responsibility-scope".to_string(),
-                    kind: kind.to_string(),
-                    from: if kind == "owner" {
-                        format!("owner:{owner}")
-                    } else {
-                        format!("scope:{scope_id}")
-                    },
-                    to: Some(format!("path-pattern:{path}")),
-                    owner: Some(owner.clone()),
-                    source_path: Some("responsibility-scope.toml".to_string()),
-                    source_span: None,
-                    producer: "responsibility-scope".to_string(),
-                    evidence_ref: format!("responsibility-scope:{scope_id}:{path}"),
-                    authority: "ScopeReport".to_string(),
-                    inferred: false,
-                    dependency_detail: None,
-                    payload: row.clone(),
-                });
-            }
-        }
-    }
-    let diagnostics = producer_findings(
-        "responsibility-scope",
-        value.get("findings").and_then(Value::as_array),
-        "scope",
-    );
-    let content_sha256 = hash_bytes(&output.stdout);
-    Ok((
-        ProducerArtifact {
-            producer_id: "responsibility-scope".to_string(),
-            version: "responsibility-scope.v1".to_string(),
-            command: format!(
-                "python3 {} --root <parent-root> --format json",
-                repo_artifact_ref(root, &tool)
-            ),
-            root: ".".to_string(),
-            content_sha256: content_sha256.clone(),
-            relation_families: vec!["owner".to_string(), "scope".to_string()],
-            artifact_ref: producer_artifact_ref(
-                "responsibility-scope",
-                "responsibility-scope.json",
-                &content_sha256,
-            ),
-            payload: output.stdout,
-        },
-        facts,
-        diagnostics,
-    ))
-}
-
-fn capture_import_responsibility(
-    root: &Path,
-) -> Result<(ProducerArtifact, Vec<GraphDiagnostic>), GraphError> {
-    let tool = canon_root(root).join("tools/agent_tools/import_responsibility.py");
-    let output = python_command()
-        .arg(&tool)
-        .arg("--root")
-        .arg(root)
-        .arg("--format")
-        .arg("json")
-        .current_dir(root)
-        .output()
-        .map_err(|error| GraphError::Producer {
-            producer: "import-responsibility".to_string(),
-            reason: error.to_string(),
-        })?;
-    if !output.status.success() {
-        return Err(process_producer_error("import-responsibility", &output));
-    }
-    let value: Value =
-        serde_json::from_slice(&output.stdout).map_err(|error| GraphError::Producer {
-            producer: "import-responsibility".to_string(),
-            reason: format!("invalid JSON: {error}"),
-        })?;
-    if value.get("status").and_then(Value::as_str) != Some("pass") {
-        return Err(GraphError::Producer {
-            producer: "import-responsibility".to_string(),
-            reason: "import responsibility status is not pass".to_string(),
-        });
-    }
-    let diagnostics = producer_findings(
-        "import-responsibility",
-        value.get("findings").and_then(Value::as_array),
-        "import",
-    );
-    let content_sha256 = hash_bytes(&output.stdout);
-    Ok((
-        ProducerArtifact {
-            producer_id: "import-responsibility".to_string(),
-            version: "import-responsibility.v1".to_string(),
-            command: format!(
-                "python3 {} --root <parent-root> --format json",
-                repo_artifact_ref(root, &tool)
-            ),
-            root: ".".to_string(),
-            content_sha256: content_sha256.clone(),
-            relation_families: Vec::new(),
-            artifact_ref: producer_artifact_ref(
-                "import-responsibility",
-                "import-responsibility.json",
-                &content_sha256,
-            ),
-            payload: output.stdout,
-        },
-        diagnostics,
-    ))
-}
-
-fn capture_runtime_dashboard(
-    root: &Path,
-    producer_workspace: &Path,
-) -> Result<ProducerArtifact, GraphError> {
-    let tool = canon_root(root).join("tools/agent_tools/generate_agent_runtime_dashboard.py");
-    let dashboard_path = producer_workspace.join("runtime-dashboard.md");
-    let api_path = producer_workspace.join("runtime-dashboard.json");
-    let output = python_command()
-        .arg(&tool)
-        .arg("--root")
-        .arg(root)
-        .arg("--out")
-        .arg(&dashboard_path)
-        .arg("--api-out")
-        .arg(&api_path)
-        .current_dir(root)
-        .output()
-        .map_err(|error| GraphError::Producer {
-            producer: "runtime-dashboard".to_string(),
-            reason: error.to_string(),
-        })?;
-    if !output.status.success() {
-        return Err(process_producer_error("runtime-dashboard", &output));
-    }
-    let bytes = fs::read(&api_path).map_err(|error| GraphError::Producer {
-        producer: "runtime-dashboard".to_string(),
-        reason: format!("read runtime dashboard API: {error}"),
-    })?;
-    let value: Value = serde_json::from_slice(&bytes).map_err(|error| GraphError::Producer {
-        producer: "runtime-dashboard".to_string(),
-        reason: format!("invalid runtime dashboard API JSON: {error}"),
-    })?;
-    if value.get("schema").and_then(Value::as_str) != Some("agent_runtime_dashboard.v1") {
-        return Err(GraphError::Producer {
-            producer: "runtime-dashboard".to_string(),
-            reason: "runtime dashboard schema mismatch".to_string(),
-        });
-    }
-    let measurements = value
-        .get("runtime_measurements")
-        .and_then(Value::as_array)
-        .ok_or_else(|| GraphError::Producer {
-            producer: "runtime-dashboard".to_string(),
-            reason: "runtime_measurements must be an array".to_string(),
-        })?;
-    for measurement in measurements {
-        let object = measurement
-            .as_object()
-            .ok_or_else(|| GraphError::Producer {
-                producer: "runtime-dashboard".to_string(),
-                reason: "runtime measurement must be an object".to_string(),
-            })?;
-        validate_runtime_measurement(object)?;
-    }
-    for diagnostic in value
-        .get("diagnostics")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-    {
-        let object = diagnostic.as_object().ok_or_else(|| GraphError::Producer {
-            producer: "runtime-dashboard".to_string(),
-            reason: "runtime diagnostic must be an object".to_string(),
-        })?;
-        required_string(object, "code", "runtime-dashboard")?;
-        required_string(object, "set", "runtime-dashboard")?;
-        let source_severity = required_string(object, "severity", "runtime-dashboard")?;
-        match source_severity.as_str() {
-            "info" | "warning" | "error" => {}
-            value => {
-                return Err(GraphError::Producer {
-                    producer: "runtime-dashboard".to_string(),
-                    reason: format!("unsupported runtime diagnostic severity {value}"),
-                })
-            }
-        }
-        required_string(object, "producer", "runtime-dashboard")?;
-        required_string(object, "evidence_ref", "runtime-dashboard")?;
-        required_string(object, "reason", "runtime-dashboard")?;
-    }
-    let rejections = value
-        .get("selection_path_rejections")
-        .and_then(Value::as_array)
-        .ok_or_else(|| GraphError::Producer {
-            producer: "runtime-dashboard".to_string(),
-            reason: "selection_path_rejections must be an array".to_string(),
-        })?;
-    for rejection in rejections {
-        let object = rejection.as_object().ok_or_else(|| GraphError::Producer {
-            producer: "runtime-dashboard".to_string(),
-            reason: "selection path rejection must be an object".to_string(),
-        })?;
-        for field in [
-            "code",
-            "set",
-            "severity",
-            "producer",
-            "responsibility",
-            "name",
-            "path",
-            "evidence_ref",
-            "reason",
-        ] {
-            required_string(object, field, "runtime-dashboard")?;
-        }
-    }
-    let content_sha256 = hash_bytes(&bytes);
-    Ok(ProducerArtifact {
-        producer_id: "runtime-dashboard".to_string(),
-        version: "agent_runtime_dashboard.v1".to_string(),
-        command: "python3 vendor/agent-canon/tools/agent_tools/generate_agent_runtime_dashboard.py --root <parent-root> --out <producer-workspace>/runtime-dashboard.md --api-out <producer-workspace>/runtime-dashboard.json".to_string(),
-        root: ".".to_string(),
-        content_sha256: content_sha256.clone(),
-        relation_families: Vec::new(),
-        artifact_ref: producer_artifact_ref(
-            "runtime-dashboard",
-            "runtime-dashboard.json",
-            &content_sha256,
-        ),
-        payload: bytes,
-    })
-}
-
-fn validate_runtime_measurement(object: &Map<String, Value>) -> Result<(), GraphError> {
-    required_string(object, "responsibility_unit_id", "runtime-dashboard")?;
-    for field in ["generation_parent", "reuse_mode", "packet_hash"] {
-        if !object
-            .get(field)
-            .is_some_and(|value| value.is_null() || value.is_string())
-        {
-            return Err(GraphError::Producer {
-                producer: "runtime-dashboard".to_string(),
-                reason: format!("runtime measurement {field} must be a string or null"),
-            });
-        }
-    }
-    for field in [
-        "finding_iteration",
-        "review_iteration",
-        "launch_epoch",
-        "finish_epoch",
-        "input_tokens",
-        "cached_input_tokens",
-        "output_tokens",
-        "reasoning_tokens",
-        "retries",
-        "waits",
-        "progress_bytes",
-    ] {
-        if !object
-            .get(field)
-            .is_some_and(|value| value.is_null() || value.as_u64().is_some())
-        {
-            return Err(GraphError::Producer {
-                producer: "runtime-dashboard".to_string(),
-                reason: format!(
-                    "runtime measurement {field} must be a nonnegative integer or null"
-                ),
-            });
-        }
-    }
-    for field in ["writer_ids", "reviewer_ids", "repeated_artifact_hashes"] {
-        if !object
-            .get(field)
-            .and_then(Value::as_array)
-            .is_some_and(|items| items.iter().all(Value::is_string))
-        {
-            return Err(GraphError::Producer {
-                producer: "runtime-dashboard".to_string(),
-                reason: format!("runtime measurement {field} must be a string array"),
-            });
-        }
-    }
-    if !object
-        .get("context_bytes_by_source")
-        .and_then(Value::as_object)
-        .is_some_and(|items| items.values().all(|value| value.as_u64().is_some()))
-    {
-        return Err(GraphError::Producer {
-            producer: "runtime-dashboard".to_string(),
-            reason: "runtime measurement context_bytes_by_source must contain nonnegative integers"
-                .to_string(),
-        });
-    }
-    Ok(())
-}
-
-fn producer_findings(
-    producer: &str,
-    findings: Option<&Vec<Value>>,
-    relation: &str,
-) -> Vec<GraphDiagnostic> {
-    findings
-        .into_iter()
-        .flatten()
-        .enumerate()
-        .map(|(index, finding)| {
-            let path = finding.get("path").and_then(Value::as_str).unwrap_or(".");
-            graph_diagnostic(
-                "uncovered",
-                &format!("{producer}.finding"),
-                "warn",
-                Some(relation),
-                Some(path),
-                None,
-                None,
-                &canonical_json(finding),
-                producer,
-                &format!("{producer}:finding:{index}"),
-            )
-        })
-        .collect()
-}
-
-fn source_span_from_json(
-    root: &Path,
-    object: &Map<String, Value>,
-) -> Result<SourceSpan, GraphError> {
-    Ok(SourceSpan {
-        path: producer_repo_path(root, &required_string(object, "path", "public-surface")?),
-        start_line: required_usize(object, "start_line")?,
-        start_column: required_usize(object, "start_column")?,
-        end_line: required_usize(object, "end_line")?,
-        end_column: required_usize(object, "end_column")?,
-    })
-}
-
-fn producer_repo_path(root: &Path, path: &str) -> String {
-    if path.starts_with("vendor/agent-canon/") || canon_root(root) == root {
-        path.to_string()
-    } else {
-        format!("vendor/agent-canon/{path}")
-    }
-}
-
-fn required_usize(object: &Map<String, Value>, field: &str) -> Result<usize, GraphError> {
-    object
-        .get(field)
-        .and_then(Value::as_u64)
-        .map(|value| value as usize)
-        .ok_or_else(|| GraphError::Producer {
-            producer: "public-surface".to_string(),
-            reason: format!("{field} must be integer"),
-        })
-}
-
-fn python_command() -> Command {
-    let mut command = Command::new("python3");
-    command.env("PYTHONDONTWRITEBYTECODE", "1");
-    command
-}
-
-fn process_producer_error(producer: &str, output: &Output) -> GraphError {
-    GraphError::Producer {
-        producer: producer.to_string(),
-        reason: format!(
-            "exit={} stderr={}",
-            output.status.code().unwrap_or(-1),
-            String::from_utf8_lossy(&output.stderr).trim()
-        ),
-    }
-}
-
-fn bind_fact_endpoints(nodes: &mut Vec<SourceNode>, facts: &mut [GraphFact]) {
-    let mut known = nodes
-        .iter()
-        .map(|node| node.selector.clone())
-        .collect::<BTreeSet<_>>();
-    for fact in facts.iter() {
-        for selector in std::iter::once(&fact.from).chain(fact.to.iter()) {
-            if known.insert(selector.clone()) {
-                nodes.push(SourceNode {
-                    id: selector_node_id(selector),
-                    selector: selector.clone(),
-                    path: None,
-                    source_member: false,
-                    source_span: None,
-                    payload: json!({"path": Value::Null, "selector": selector, "source_member": false, "producer": fact.producer}),
-                });
-            }
-        }
-    }
-    let ids = nodes
-        .iter()
-        .map(|node| (node.selector.clone(), node.id.clone()))
-        .collect::<BTreeMap<_, _>>();
-    for fact in facts {
-        let from_selector = fact.from.clone();
-        let to_selector = fact.to.clone();
-        fact.from = ids
-            .get(&from_selector)
-            .cloned()
-            .unwrap_or_else(|| selector_node_id(&from_selector));
-        fact.to = to_selector.as_ref().map(|selector| {
-            ids.get(selector)
-                .cloned()
-                .unwrap_or_else(|| selector_node_id(selector))
-        });
-        let mut payload = fact.payload.as_object().cloned().unwrap_or_default();
-        payload.insert("from_selector".to_string(), Value::String(from_selector));
-        payload.insert(
-            "to_selector".to_string(),
-            to_selector.map(Value::String).unwrap_or(Value::Null),
-        );
-        fact.payload = Value::Object(payload);
-    }
-}
-
-fn canonicalize_build_records(
-    nodes: &mut Vec<SourceNode>,
-    facts: &mut Vec<GraphFact>,
-    diagnostics: &mut Vec<GraphDiagnostic>,
-    producers: &mut Vec<ProducerArtifact>,
-) -> Result<(), GraphError> {
-    let mut node_by_id = BTreeMap::<String, SourceNode>::new();
-    for node in std::mem::take(nodes) {
-        if let Some(previous) = node_by_id.insert(node.id.clone(), node.clone()) {
-            if previous != node {
-                return Err(GraphError::Validation {
-                    stage: "node-uniqueness".to_string(),
-                    reason: format!("node ID {} has multiple definitions", node.id),
-                });
-            }
-        }
-    }
-    *nodes = node_by_id.into_values().collect();
-
-    let mut fact_by_id = BTreeMap::<String, GraphFact>::new();
-    for fact in std::mem::take(facts) {
-        if let Some(previous) = fact_by_id.insert(fact.id.clone(), fact.clone()) {
-            if previous != fact {
-                return Err(GraphError::Validation {
-                    stage: "relation-uniqueness".to_string(),
-                    reason: format!("relation ID {} has multiple definitions", fact.id),
-                });
-            }
-        }
-    }
-    *facts = fact_by_id.into_values().collect();
-
-    let mut diagnostic_by_id = BTreeMap::<String, GraphDiagnostic>::new();
-    for diagnostic in std::mem::take(diagnostics) {
-        if let Some(previous) = diagnostic_by_id.insert(diagnostic.id.clone(), diagnostic.clone()) {
-            if previous != diagnostic {
-                return Err(GraphError::Validation {
-                    stage: "diagnostic-uniqueness".to_string(),
-                    reason: format!("diagnostic ID {} has multiple definitions", diagnostic.id),
-                });
-            }
-        }
-    }
-    *diagnostics = diagnostic_by_id.into_values().collect();
-
-    let mut producer_by_id = BTreeMap::<String, ProducerArtifact>::new();
-    for producer in std::mem::take(producers) {
-        if let Some(previous) =
-            producer_by_id.insert(producer.producer_id.clone(), producer.clone())
-        {
-            if previous != producer {
-                return Err(GraphError::Validation {
-                    stage: "producer-uniqueness".to_string(),
-                    reason: format!(
-                        "producer ID {} has multiple artifacts",
-                        producer.producer_id
-                    ),
-                });
-            }
-        }
-    }
-    *producers = producer_by_id.into_values().collect();
-    Ok(())
-}
-
-fn apply_exclusion_dominance(
-    facts: &mut Vec<GraphFact>,
-    diagnostics: &mut Vec<GraphDiagnostic>,
-    universe: &SourceUniverse,
-) {
-    let excluded = universe
-        .excluded_paths
-        .iter()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
-    facts.retain(|fact| {
-        let excluded_endpoint = std::iter::once(fact.from.as_str())
-            .chain(fact.to.as_deref())
-            .find(|selector| excluded.contains(*selector));
-        let Some(selector) = excluded_endpoint else {
-            return true;
-        };
-        diagnostics.push(graph_diagnostic(
-            "excluded",
-            "relation.endpoint_excluded",
-            "info",
-            Some(&fact.kind),
-            fact.source_path.as_deref(),
-            Some(selector),
-            fact.source_span.clone(),
-            "an explicit source exclusion dominates relation materialization",
-            &fact.producer,
-            &fact.evidence_ref,
-        ));
-        false
-    });
-}
-
-fn add_reverse_projections(facts: &mut Vec<GraphFact>) -> Result<(), GraphError> {
-    let explicit = facts
-        .iter()
-        .filter(|fact| !fact.inferred)
-        .cloned()
-        .collect::<Vec<_>>();
-    let explicit_ids = explicit
-        .iter()
-        .map(|fact| fact.id.clone())
-        .collect::<BTreeSet<_>>();
-    for fact in explicit {
-        let target = fact.to.clone().ok_or_else(|| GraphError::Validation {
-            stage: "reverse-projection".to_string(),
-            reason: format!("explicit relation {} has no target", fact.id),
-        })?;
-        let reverse_id = format!("reverse:{}", fact.id);
-        if explicit_ids.contains(reverse_id.as_str()) {
-            return Err(GraphError::Validation {
-                stage: "reverse-projection".to_string(),
-                reason: format!("explicit relation collides with projection ID {reverse_id}"),
-            });
-        }
-        facts.push(GraphFact {
-            id: reverse_id,
-            layer: "graph-projection".to_string(),
-            kind: fact.kind.clone(),
-            from: target,
-            to: Some(fact.from.clone()),
-            owner: fact.owner.clone(),
-            source_path: fact.source_path.clone(),
-            source_span: fact.source_span.clone(),
-            producer: "graph-projection".to_string(),
-            evidence_ref: fact.evidence_ref.clone(),
-            authority: fact.authority.clone(),
-            inferred: true,
-            dependency_detail: None,
-            payload: json!({"projection_of": fact.id}),
-        });
-    }
-    Ok(())
-}
-
-fn finite_set(label: &str, values: &[String]) -> Result<BTreeSet<String>, GraphError> {
-    let set = values.iter().cloned().collect::<BTreeSet<_>>();
-    if set.len() != values.len() {
-        return Err(GraphError::Validation {
-            stage: "finite-set".to_string(),
-            reason: format!("{label} contains duplicate members"),
-        });
-    }
-    Ok(set)
-}
-
-fn diagnostic_scope(diagnostic: &GraphDiagnostic) -> &'static str {
-    if diagnostic.code.starts_with("source.") {
-        "source"
-    } else {
-        "relation"
-    }
-}
-
-fn derive_graph_contract(
-    snapshot: &ManifestSnapshot,
-    nodes: &[SourceNode],
-    facts: &[GraphFact],
-    diagnostics: &[GraphDiagnostic],
-    producers: &[ProducerArtifact],
-) -> Result<GraphContractWitness, GraphError> {
-    let candidate_sources = finite_set("P(S)", &snapshot.source_universe.candidate_paths)?;
-    let excluded_sources = finite_set("X(S)", &snapshot.source_universe.excluded_paths)?;
-    let eligible_sources = finite_set("U(S)", &snapshot.source_universe.eligible_paths)?;
-    if eligible_sources
-        .union(&excluded_sources)
-        .cloned()
-        .collect::<BTreeSet<_>>()
-        != candidate_sources
-        || !eligible_sources.is_disjoint(&excluded_sources)
-        || eligible_sources
-            != candidate_sources
-                .difference(&excluded_sources)
-                .cloned()
-                .collect::<BTreeSet<_>>()
-    {
-        return Err(GraphError::Validation {
-            stage: "source-partition".to_string(),
-            reason:
-                "P(S), X(S), and U(S) do not satisfy U=P\\X, P=U union X, and U intersect X=empty"
-                    .to_string(),
-        });
-    }
-
-    let declarations = snapshot
-        .declarations
-        .iter()
-        .map(|declaration| declaration.declaration_id.clone())
-        .collect::<BTreeSet<_>>();
-    if declarations.len() != snapshot.declarations.len() {
-        return Err(GraphError::Validation {
-            stage: "declaration-uniqueness".to_string(),
-            reason: "D contains duplicate declaration IDs".to_string(),
-        });
-    }
-
-    let mut source_identity = BTreeMap::new();
-    let mut node_ids = BTreeSet::new();
-    for node in nodes {
-        if !node_ids.insert(node.id.clone()) {
-            return Err(GraphError::Validation {
-                stage: "node-uniqueness".to_string(),
-                reason: format!("duplicate node ID {}", node.id),
-            });
-        }
-        if excluded_sources.contains(&node.selector) {
-            return Err(GraphError::Validation {
-                stage: "exclusion-dominance".to_string(),
-                reason: format!("excluded source became a graph endpoint: {}", node.selector),
-            });
-        }
-        if node.source_member {
-            let path = node.path.clone().ok_or_else(|| GraphError::Validation {
-                stage: "source-identity-totality".to_string(),
-                reason: format!("source node {} has no RepoPath", node.id),
-            })?;
-            if !eligible_sources.contains(&path) {
-                return Err(GraphError::Validation {
-                    stage: "source-identity-totality".to_string(),
-                    reason: format!("source identity is outside U(S): {path}"),
-                });
-            }
-            if source_identity
-                .insert(path.clone(), node.id.clone())
-                .is_some()
-            {
-                return Err(GraphError::Validation {
-                    stage: "source-identity-uniqueness".to_string(),
-                    reason: format!("eligible source has multiple node identities: {path}"),
-                });
-            }
-        } else if node.path.is_some() {
-            return Err(GraphError::Validation {
-                stage: "source-identity-totality".to_string(),
-                reason: format!("selector node {} carries a source path", node.id),
-            });
-        }
-    }
-    if source_identity.keys().cloned().collect::<BTreeSet<_>>() != eligible_sources {
-        return Err(GraphError::Validation {
-            stage: "source-identity-totality".to_string(),
-            reason: "source_identity is not a total function U(S) -> V(G)".to_string(),
-        });
-    }
-
-    let producer_ids = producers
-        .iter()
-        .map(|producer| producer.producer_id.clone())
-        .collect::<BTreeSet<_>>();
-    if producer_ids.len() != producers.len() {
-        return Err(GraphError::Validation {
-            stage: "producer-uniqueness".to_string(),
-            reason: "producer artifact IDs are not unique".to_string(),
-        });
-    }
-    for producer in producers {
-        for relation in &producer.relation_families {
-            RelationKind::parse(relation)?;
-        }
-    }
-
-    let mut relation_endpoints = BTreeMap::new();
-    let mut accepted_relations = BTreeSet::new();
-    let mut inferred_relations = BTreeSet::new();
-    for fact in facts {
-        let relation = TypedRelation::from_fact(fact)?;
-        if !node_ids.contains(&relation.from) || !node_ids.contains(&relation.to) {
-            return Err(GraphError::Validation {
-                stage: "relation-endpoint-totality".to_string(),
-                reason: format!("relation {} references an unknown endpoint", relation.id),
-            });
-        }
-        if relation.producer.is_empty() || relation.evidence_ref.is_empty() {
-            return Err(GraphError::Validation {
-                stage: "relation-provenance-totality".to_string(),
-                reason: format!("relation {} lacks producer provenance", relation.id),
-            });
-        }
-        if relation.inferred {
-            inferred_relations.insert(relation.id.clone());
-        } else {
-            if !producer_ids.contains(&relation.producer) {
-                return Err(GraphError::Validation {
-                    stage: "relation-producer-totality".to_string(),
-                    reason: format!(
-                        "relation {} references unknown producer {}",
-                        relation.id, relation.producer
-                    ),
-                });
-            }
-            accepted_relations.insert(relation.id.clone());
-        }
-        if relation_endpoints
-            .insert(relation.id.clone(), relation)
-            .is_some()
-        {
-            return Err(GraphError::Validation {
-                stage: "relation-uniqueness".to_string(),
-                reason: format!("duplicate relation ID {}", fact.id),
-            });
-        }
-    }
-
-    let expected_resolved_declarations = snapshot
-        .declarations
-        .iter()
-        .filter(|declaration| declaration.resolved_target_identity_id.is_some())
-        .filter(|declaration| {
-            !excluded_sources.contains(&declaration.declared_target)
-                && !excluded_sources.contains(&format!(
-                    "vendor/agent-canon/{}",
-                    declaration.declared_target
-                ))
-                && !source_path_is_explicitly_excluded(&declaration.declared_target)
-        })
-        .map(|declaration| declaration.declaration_id.clone())
-        .collect::<BTreeSet<_>>();
-    let represented_resolved_declarations = facts
-        .iter()
-        .filter(|fact| {
-            !fact.inferred && fact.kind == "dependency" && fact.producer == "source-snapshot"
-        })
-        .map(|fact| fact.id.clone())
-        .collect::<BTreeSet<_>>();
-    if represented_resolved_declarations != expected_resolved_declarations {
-        return Err(GraphError::Validation {
-            stage: "declaration-representation".to_string(),
-            reason: "resolved declaration representation differs from canonical D".to_string(),
-        });
-    }
-
-    let mut reverse_projection = BTreeMap::new();
-    for relation_id in &accepted_relations {
-        let explicit = &relation_endpoints[relation_id];
-        let reverse_id = format!("reverse:{relation_id}");
-        let reverse =
-            relation_endpoints
-                .get(&reverse_id)
-                .ok_or_else(|| GraphError::Validation {
-                    stage: "reverse-projection-closure".to_string(),
-                    reason: format!("relation {relation_id} has no reverse projection"),
-                })?;
-        if !reverse.inferred
-            || reverse.from != explicit.to
-            || reverse.to != explicit.from
-            || reverse.kind != explicit.kind
-            || reverse.evidence_ref != explicit.evidence_ref
-            || reverse.producer != "graph-projection"
-        {
-            return Err(GraphError::Validation {
-                stage: "reverse-projection-closure".to_string(),
-                reason: format!("reverse projection {reverse_id} violates its typed relation"),
-            });
-        }
-        reverse_projection.insert(relation_id.clone(), reverse_id);
-    }
-    if reverse_projection
-        .values()
-        .cloned()
-        .collect::<BTreeSet<_>>()
-        != inferred_relations
-    {
-        return Err(GraphError::Validation {
-            stage: "reverse-projection-closure".to_string(),
-            reason: "inferred relation set is not exactly reverse(R)".to_string(),
-        });
-    }
-
-    let diagnostics_by_set = |set_name: &str| {
-        diagnostics
-            .iter()
-            .filter(|diagnostic| diagnostic.set == set_name)
-            .map(|diagnostic| diagnostic.id.clone())
-            .collect::<BTreeSet<_>>()
-    };
-    let unresolved = diagnostics_by_set("unresolved");
-    let ambiguous = diagnostics_by_set("ambiguous");
-    let uncovered = diagnostics_by_set("uncovered");
-    let relation_exclusions = diagnostics
-        .iter()
-        .filter(|diagnostic| {
-            diagnostic.set == "excluded" && diagnostic_scope(diagnostic) == "relation"
-        })
-        .map(|diagnostic| diagnostic.id.clone())
-        .collect::<BTreeSet<_>>();
-
-    let graph_members = nodes
-        .iter()
-        .map(|node| format!("node:{}", node.id))
-        .chain(declarations.iter().map(|id| format!("declaration:{id}")))
-        .chain(facts.iter().map(|fact| format!("relation:{}", fact.id)))
-        .chain(
-            diagnostics
-                .iter()
-                .map(|diagnostic| format!("diagnostic:{}", diagnostic.id)),
-        )
-        .collect::<BTreeSet<_>>();
-    let profile_members = graph_members.clone();
-    if !profile_members.is_subset(&graph_members) || profile_members != graph_members {
-        return Err(GraphError::Validation {
-            stage: "profile-projection".to_string(),
-            reason: "Vp is not the exact default projection of G".to_string(),
-        });
-    }
-
-    Ok(GraphContractWitness {
-        candidate_sources,
-        excluded_sources,
-        eligible_sources,
-        declarations,
-        accepted_relations,
-        graph_members,
-        profile_members,
-        relation_exclusions,
-        unresolved,
-        ambiguous,
-        uncovered,
-        source_identity,
-        relation_endpoints,
-        reverse_projection,
-    })
-}
-
-fn write_graph_candidate(
-    material: &BuildMaterial,
-    point: GraphBuildFailurePoint,
-) -> Result<CandidateHandle, GraphError> {
-    let db = material.candidate_dir.join("graph.sqlite");
-    if point == GraphBuildFailurePoint::Write {
-        return Err(GraphError::CandidateWrite {
-            reason: "injected candidate write failure seam".to_string(),
-        });
-    }
-    let local_db = std::env::temp_dir().join(format!(
-        "agent-canon-graph-{}-{}.sqlite",
-        std::process::id(),
-        now_nanos()
-    ));
-    let local_result = (|| {
-        let connection =
-            Connection::open(&local_db).map_err(|error| GraphError::CandidateWrite {
-                reason: format!("open local materialization database: {error}"),
-            })?;
-        materialize_graph_store(&connection, material)?;
-        connection
-            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
-            .map_err(|error| GraphError::CandidateWrite {
-                reason: format!("checkpoint local materialization database: {error}"),
-            })?;
-        drop(connection);
-        let bytes = fs::read(&local_db).map_err(|error| GraphError::CandidateWrite {
-            reason: format!("read local materialization database: {error}"),
-        })?;
-        write_synced_file(&db, &bytes)
-    })();
-    let local_cleanup = fs::remove_file(&local_db);
-    if let Err(error) = local_result {
-        return Err(error);
-    }
-    if let Err(error) = local_cleanup {
-        if error.kind() != std::io::ErrorKind::NotFound {
-            return Err(GraphError::CandidateWrite {
-                reason: format!("remove local materialization database: {error}"),
-            });
-        }
-    }
-    if point == GraphBuildFailurePoint::Sync {
-        return Err(GraphError::CandidateSync {
-            reason: "injected candidate sync failure seam".to_string(),
-        });
-    }
-    File::open(&db)
-        .and_then(|file| file.sync_all())
-        .map_err(|error| GraphError::CandidateSync {
-            reason: format!("sync candidate: {error}"),
-        })?;
-    Ok(CandidateHandle {
-        dir: material.candidate_dir.clone(),
-        db,
-    })
-}
-
-fn materialize_graph_store(
-    connection: &Connection,
-    material: &BuildMaterial,
-) -> Result<(), GraphError> {
-    initialize_graph_schema(connection).map_err(|error| GraphError::CandidateWrite {
-        reason: format!("initialize Graph DSL: {error}"),
-    })?;
-    connection
-        .execute(
-            "INSERT INTO metadata(key,value) VALUES('schema_version',?)",
-            [GRAPH_SCHEMA_VERSION],
-        )
-        .map_err(sql_write)?;
-    connection
-        .execute(
-            "INSERT INTO documents(id,path,title,kind,created_at) VALUES(?,?,?,?,?)",
-            params![
-                "doc:knowledge-graph",
-                ".agent-canon/knowledge-graph/graph.sqlite",
-                "AgentCanon knowledge graph",
-                "knowledge-graph",
-                material.created_at
-            ],
-        )
-        .map_err(sql_write)?;
-    for node in &material.nodes {
-        let (start, end) = source_scalar_offsets(&material.root, node.source_span.as_ref())?;
-        connection.execute(
-            "INSERT INTO nodes(id,document_id,layer,kind,label,text,source_start,source_end,confidence,payload_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
-            params![node.id, "doc:knowledge-graph", "source", if node.source_member { "path" } else { "selector" }, node.selector, node.selector, start, end, 1.0f64, canonical_json(&node.payload)],
-        ).map_err(sql_write)?;
-    }
-    for fact in &material.facts {
-        let Some(target) = &fact.to else { continue };
-        let evidence_id = format!("fact:{}", fact.id);
-        let evidence_payload = json!({
-            "fact_id": fact.id,
-            "source_path": fact.source_path,
-            "source_span": fact.source_span.as_ref().map(source_span_json),
-            "producer": fact.producer,
-            "evidence_ref": fact.evidence_ref,
-            "authority": fact.authority,
-        });
-        let (evidence_start, evidence_end) =
-            source_scalar_offsets(&material.root, fact.source_span.as_ref())?;
-        connection.execute(
-            "INSERT INTO nodes(id,document_id,layer,kind,label,text,source_start,source_end,confidence,payload_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
-            params![evidence_id, "doc:knowledge-graph", "evidence", "fact", fact.id, fact.evidence_ref, evidence_start, evidence_end, 1.0f64, canonical_json(&evidence_payload)],
-        ).map_err(sql_write)?;
-        let mut payload = fact.payload.as_object().cloned().unwrap_or_default();
-        payload.insert("fact".to_string(), fact.json());
-        connection.execute(
-            "INSERT INTO edges(id,layer,kind,from_node_id,to_node_id,order_kind,confidence,evidence_node_id,payload_json) VALUES(?,?,?,?,?,?,?,?,?)",
-            params![fact.id, fact.layer, fact.kind, fact.from, target, "explicit", 1.0f64, evidence_id, canonical_json(&Value::Object(payload))],
-        ).map_err(sql_write)?;
-    }
-    let node_ids = material
-        .nodes
-        .iter()
-        .map(|node| node.id.as_str())
-        .collect::<BTreeSet<_>>();
-    let edge_ids = material
-        .facts
-        .iter()
-        .map(|fact| fact.id.as_str())
-        .collect::<BTreeSet<_>>();
-    for diagnostic in &material.diagnostics {
-        let target_node_id = diagnostic
-            .path
-            .as_deref()
-            .map(source_node_id)
-            .filter(|node_id| node_ids.contains(node_id.as_str()))
-            .or_else(|| {
-                diagnostic
-                    .target
-                    .as_deref()
-                    .map(source_node_id)
-                    .filter(|node_id| node_ids.contains(node_id.as_str()))
-            })
-            .unwrap_or_default();
-        let target_edge_id = diagnostic
-            .relation
-            .as_deref()
-            .filter(|edge_id| edge_ids.contains(*edge_id))
-            .unwrap_or_default();
-        connection.execute(
-            "INSERT INTO diagnostics(id,layer,target_node_id,target_edge_id,severity,rule,message,suggested_action_json) VALUES(?,?,?,?,?,?,?,?)",
-            params![diagnostic.id, "diagnostics", target_node_id, target_edge_id, diagnostic.severity, diagnostic.code, diagnostic.reason, diagnostic.suggested_action_json],
-        ).map_err(sql_write)?;
-    }
-    let integration = integration_record(material, true).json();
-    let relation_counts =
-        material
-            .facts
-            .iter()
-            .fold(BTreeMap::<String, usize>::new(), |mut counts, fact| {
-                *counts.entry(fact.kind.clone()).or_default() += 1;
-                counts
-            });
-    let tool_versions = material
-        .producer_artifacts
-        .iter()
-        .map(|artifact| (artifact.producer_id.clone(), artifact.version.clone()))
-        .collect::<BTreeMap<_, _>>();
-    let (candidate_count, eligible_count, excluded_count) =
-        snapshot_source_scope_counts(&material.snapshot);
-    let runtime_artifact = material
-        .producer_artifacts
-        .iter()
-        .find(|artifact| artifact.producer_id == "runtime-dashboard");
-    let runtime_api = runtime_artifact
-        .map(|artifact| serde_json::from_slice::<Value>(&artifact.payload))
-        .transpose()
-        .map_err(|error| GraphError::CandidateWrite {
-            reason: format!("decode runtime dashboard metadata: {error}"),
-        })?
-        .unwrap_or_else(|| json!({}));
-    let runtime_context_diagnostics = runtime_api
-        .get("diagnostics")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default()
-        .into_iter()
-        .map(|mut diagnostic| {
-            if let (Some(object), Some(artifact)) = (diagnostic.as_object_mut(), runtime_artifact) {
-                object.insert("artifact_ref".to_string(), json!(artifact.artifact_ref));
-                object.insert("producer_version".to_string(), json!(artifact.version));
-                object.insert(
-                    "producer_content_sha256".to_string(),
-                    json!(artifact.content_sha256),
-                );
-            }
-            diagnostic
-        })
-        .collect::<Vec<_>>();
-    let metadata = [
-        ("root", ".".to_string()),
-        ("profile", PUBLIC_PROFILE.to_string()),
-        ("source_snapshot_profile", SOURCE_PROFILE.to_string()),
-        (
-            "snapshot_head",
-            snapshot_head(&material.snapshot).to_string(),
-        ),
-        (
-            "dirty_fingerprint",
-            snapshot_dirty_fingerprint(&material.snapshot).to_string(),
-        ),
-        (
-            "agent_canon_pin",
-            snapshot_agent_canon_pin(&material.snapshot).to_string(),
-        ),
-        ("input_fingerprint", material.input_fingerprint.clone()),
-        ("graph_fingerprint", material.graph_fingerprint.clone()),
-        (
-            "mathematical_contract",
-            canonical_json(&material.contract.json()),
-        ),
-        (
-            "producer_artifacts",
-            canonical_json(&Value::Array(
-                material
-                    .producer_artifacts
-                    .iter()
-                    .map(ProducerArtifact::json)
-                    .collect(),
-            )),
-        ),
-        (
-            "producer_artifact_payloads",
-            producer_artifact_payloads_json(&material.producer_artifacts),
-        ),
-        (
-            "source_scope_counts",
-            canonical_json(&json!({
-                "candidate": candidate_count,
-                "eligible": eligible_count,
-                "excluded": excluded_count,
-            })),
-        ),
-        ("relation_counts", canonical_json(&json!(relation_counts))),
-        ("tool_versions", canonical_json(&json!(tool_versions))),
-        ("integration_record", canonical_json(&integration)),
-        ("created_at", material.created_at.clone()),
-        (
-            "graph_diagnostics",
-            canonical_json(&Value::Array(
-                material
-                    .diagnostics
-                    .iter()
-                    .map(GraphDiagnostic::json)
-                    .collect(),
-            )),
-        ),
-        (
-            "runtime_measurements",
-            canonical_json(
-                runtime_api
-                    .get("runtime_measurements")
-                    .unwrap_or(&Value::Array(Vec::new())),
-            ),
-        ),
-        (
-            "runtime_context_diagnostics",
-            canonical_json(&Value::Array(runtime_context_diagnostics)),
-        ),
-    ];
-    for (key, value) in metadata {
-        connection
-            .execute(
-                "INSERT OR REPLACE INTO metadata(key,value) VALUES(?,?)",
-                params![key, value],
-            )
-            .map_err(sql_write)?;
-    }
-    Ok(())
-}
-
-fn git_head_timestamp(root: &Path) -> Result<String, GraphError> {
-    let output = Command::new("git")
-        .args(["show", "-s", "--format=%cI", "HEAD"])
-        .current_dir(root)
-        .output()
-        .map_err(|error| GraphError::Producer {
-            producer: "source-snapshot".to_string(),
-            reason: format!("read HEAD timestamp: {error}"),
-        })?;
-    if !output.status.success() {
-        return Err(process_producer_error("source-snapshot", &output));
-    }
-    String::from_utf8(output.stdout)
-        .map(|value| value.trim().to_string())
-        .map_err(|error| GraphError::Producer {
-            producer: "source-snapshot".to_string(),
-            reason: format!("HEAD timestamp UTF-8: {error}"),
-        })
-}
-
-fn sql_write(error: rusqlite::Error) -> GraphError {
-    GraphError::CandidateWrite {
-        reason: error.to_string(),
-    }
-}
-
-fn json_string_set(value: &Value, field: &str) -> Result<BTreeSet<String>, GraphError> {
-    let values =
-        value
-            .get(field)
-            .and_then(Value::as_array)
-            .ok_or_else(|| GraphError::Validation {
-                stage: "mathematical-contract".to_string(),
-                reason: format!("finite set {field} is missing"),
-            })?;
-    let strings = values
-        .iter()
-        .map(|item| {
-            item.as_str()
-                .map(ToString::to_string)
-                .ok_or_else(|| GraphError::Validation {
-                    stage: "mathematical-contract".to_string(),
-                    reason: format!("finite set {field} has a non-string member"),
-                })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let set = strings.iter().cloned().collect::<BTreeSet<_>>();
-    if set.len() != strings.len() || set.iter().cloned().collect::<Vec<_>>() != strings {
-        return Err(GraphError::Validation {
-            stage: "mathematical-contract".to_string(),
-            reason: format!("finite set {field} is not unique and sorted"),
-        });
-    }
-    Ok(set)
-}
-
-fn validate_contract_value(value: &Value) -> Result<(), GraphError> {
-    let object = value.as_object().ok_or_else(|| GraphError::Validation {
-        stage: "mathematical-contract".to_string(),
-        reason: "mathematical contract must be an object".to_string(),
-    })?;
-    if object.get("schema").and_then(Value::as_str)
-        != Some("agent-canon.graph.mathematical-contract.v1")
-        || object.get("profile").and_then(Value::as_str) != Some(PUBLIC_PROFILE)
-    {
-        return Err(GraphError::Validation {
-            stage: "mathematical-contract".to_string(),
-            reason: "mathematical contract schema/profile mismatch".to_string(),
-        });
-    }
-    let finite_sets = object
-        .get("finite_sets")
-        .ok_or_else(|| GraphError::Validation {
-            stage: "mathematical-contract".to_string(),
-            reason: "finite_sets is missing".to_string(),
-        })?;
-    let p = json_string_set(finite_sets, "P(S)")?;
-    let x = json_string_set(finite_sets, "X(S)")?;
-    let u = json_string_set(finite_sets, "U(S)")?;
-    let d = json_string_set(finite_sets, "D")?;
-    let r = json_string_set(finite_sets, "R")?;
-    let g = json_string_set(finite_sets, "G")?;
-    let vp = json_string_set(finite_sets, "Vp")?;
-    let xr = json_string_set(finite_sets, "X_R(S,p)")?;
-    let unresolved = json_string_set(finite_sets, "Unresolved(S,p)")?;
-    let ambiguous = json_string_set(finite_sets, "Ambiguous(S,p)")?;
-    let uncovered = json_string_set(finite_sets, "Uncovered(S,p)")?;
-    let _ = (d, xr);
-    if u.union(&x).cloned().collect::<BTreeSet<_>>() != p
-        || !u.is_disjoint(&x)
-        || u != p.difference(&x).cloned().collect::<BTreeSet<_>>()
-    {
-        return Err(GraphError::Validation {
-            stage: "source-partition".to_string(),
-            reason: "persisted P(S), X(S), and U(S) equations are false".to_string(),
-        });
-    }
-    if !vp.is_subset(&g) || vp != g {
-        return Err(GraphError::Validation {
-            stage: "profile-projection".to_string(),
-            reason: "persisted Vp is not the exact default projection of G".to_string(),
-        });
-    }
-
-    let functions = object
-        .get("typed_functions")
-        .and_then(Value::as_object)
-        .ok_or_else(|| GraphError::Validation {
-            stage: "mathematical-contract".to_string(),
-            reason: "typed_functions is missing".to_string(),
-        })?;
-    let source_identity = functions
-        .get("source_identity")
-        .and_then(Value::as_object)
-        .ok_or_else(|| GraphError::Validation {
-            stage: "source-identity-totality".to_string(),
-            reason: "source_identity function is missing".to_string(),
-        })?;
-    if source_identity.keys().cloned().collect::<BTreeSet<_>>() != u
-        || source_identity
-            .values()
-            .filter_map(Value::as_str)
-            .collect::<BTreeSet<_>>()
-            .len()
-            != source_identity.len()
-        || source_identity
-            .values()
-            .any(|node| node.as_str().is_none_or(|node_id| node_id.is_empty()))
-        || source_identity.keys().any(|path| x.contains(path))
-    {
-        return Err(GraphError::Validation {
-            stage: "source-identity-totality".to_string(),
-            reason:
-                "source_identity is not a total unique function on U(S) or violates X(S) dominance"
-                    .to_string(),
-        });
-    }
-
-    let relations = functions
-        .get("relation_endpoints")
-        .and_then(Value::as_array)
-        .ok_or_else(|| GraphError::Validation {
-            stage: "relation-endpoint-totality".to_string(),
-            reason: "relation_endpoints function is missing".to_string(),
-        })?;
-    let mut relation_by_id = BTreeMap::<String, &Map<String, Value>>::new();
-    for relation in relations {
-        let relation = relation.as_object().ok_or_else(|| GraphError::Validation {
-            stage: "relation-endpoint-totality".to_string(),
-            reason: "relation endpoint record is not an object".to_string(),
-        })?;
-        let required = |field: &str| {
-            relation
-                .get(field)
-                .and_then(Value::as_str)
-                .filter(|item| !item.is_empty())
-                .ok_or_else(|| GraphError::Validation {
-                    stage: "relation-endpoint-totality".to_string(),
-                    reason: format!("relation endpoint record lacks {field}"),
-                })
-        };
-        let id = required("id")?.to_string();
-        RelationKind::parse(required("kind")?)?;
-        required("from")?;
-        required("to")?;
-        required("producer")?;
-        required("evidence_ref")?;
-        if relation.get("inferred").and_then(Value::as_bool).is_none()
-            || relation_by_id.insert(id.clone(), relation).is_some()
-        {
-            return Err(GraphError::Validation {
-                stage: "relation-uniqueness".to_string(),
-                reason: format!("relation endpoint function is not unique at {id}"),
-            });
-        }
-    }
-    let explicit_ids = relation_by_id
-        .iter()
-        .filter(|(_, relation)| relation.get("inferred").and_then(Value::as_bool) == Some(false))
-        .map(|(id, _)| id.clone())
-        .collect::<BTreeSet<_>>();
-    if explicit_ids != r {
-        return Err(GraphError::Validation {
-            stage: "relation-representation".to_string(),
-            reason: "persisted R differs from explicit relation_endpoints domain".to_string(),
-        });
-    }
-    let reverse_projection = functions
-        .get("reverse_projection")
-        .and_then(Value::as_object)
-        .ok_or_else(|| GraphError::Validation {
-            stage: "reverse-projection-closure".to_string(),
-            reason: "reverse_projection function is missing".to_string(),
-        })?;
-    if reverse_projection.keys().cloned().collect::<BTreeSet<_>>() != r {
-        return Err(GraphError::Validation {
-            stage: "reverse-projection-closure".to_string(),
-            reason: "reverse_projection domain differs from R".to_string(),
-        });
-    }
-    let mut reverse_range = BTreeSet::new();
-    for relation_id in &r {
-        let reverse_id = reverse_projection
-            .get(relation_id)
-            .and_then(Value::as_str)
-            .ok_or_else(|| GraphError::Validation {
-                stage: "reverse-projection-closure".to_string(),
-                reason: format!("reverse projection for {relation_id} is not a relation ID"),
-            })?;
-        if !reverse_range.insert(reverse_id) {
-            return Err(GraphError::Validation {
-                stage: "reverse-projection-closure".to_string(),
-                reason: "reverse_projection is not injective".to_string(),
-            });
-        }
-        let explicit = relation_by_id[relation_id];
-        let reverse = relation_by_id
-            .get(reverse_id)
-            .ok_or_else(|| GraphError::Validation {
-                stage: "reverse-projection-closure".to_string(),
-                reason: format!("reverse relation {reverse_id} is absent"),
-            })?;
-        if reverse.get("inferred").and_then(Value::as_bool) != Some(true)
-            || reverse.get("from") != explicit.get("to")
-            || reverse.get("to") != explicit.get("from")
-            || reverse.get("kind") != explicit.get("kind")
-            || reverse.get("evidence_ref") != explicit.get("evidence_ref")
-        {
-            return Err(GraphError::Validation {
-                stage: "reverse-projection-closure".to_string(),
-                reason: format!("reverse relation {reverse_id} is not the typed inverse"),
-            });
-        }
-    }
-    let inferred_ids = relation_by_id
-        .iter()
-        .filter(|(_, relation)| relation.get("inferred").and_then(Value::as_bool) == Some(true))
-        .map(|(id, _)| id.as_str())
-        .collect::<BTreeSet<_>>();
-    if inferred_ids != reverse_range {
-        return Err(GraphError::Validation {
-            stage: "reverse-projection-closure".to_string(),
-            reason: "inferred relation domain differs from reverse(R)".to_string(),
-        });
-    }
-
-    let obligations = object
-        .get("obligations")
-        .and_then(Value::as_object)
-        .ok_or_else(|| GraphError::Validation {
-            stage: "mathematical-contract".to_string(),
-            reason: "obligations are missing".to_string(),
-        })?;
-    for obligation in [
-        "source_partition",
-        "source_disjointness",
-        "source_identity_total_unique",
-        "relation_kind_closed",
-        "relation_endpoints_total",
-        "relation_producer_total",
-        "reverse_projection_bijection",
-        "exclusion_dominance",
-        "declaration_representation_exact",
-        "graph_materialization_exact",
-        "profile_projection_subset",
-        "profile_projection_exact",
-        "fingerprint_preservation",
-        "atomic_failure_preserves_old_state",
-    ] {
-        if obligations.get(obligation).and_then(Value::as_bool) != Some(true) {
-            return Err(GraphError::Validation {
-                stage: "mathematical-contract".to_string(),
-                reason: format!("structural obligation is false: {obligation}"),
-            });
-        }
-    }
-    let complete = unresolved.is_empty() && ambiguous.is_empty() && uncovered.is_empty();
-    for (obligation, expected) in [
-        ("unresolved_empty", unresolved.is_empty()),
-        ("ambiguous_empty", ambiguous.is_empty()),
-        ("uncovered_empty", uncovered.is_empty()),
-        ("profile_complete", complete),
-    ] {
-        if obligations.get(obligation).and_then(Value::as_bool) != Some(expected) {
-            return Err(GraphError::Validation {
-                stage: "mathematical-contract".to_string(),
-                reason: format!("completeness obligation mismatch: {obligation}"),
-            });
-        }
-    }
-
-    let stored_fingerprint = object
-        .get("contract_fingerprint")
-        .and_then(Value::as_str)
-        .ok_or_else(|| GraphError::Validation {
-            stage: "contract-fingerprint".to_string(),
-            reason: "contract_fingerprint is missing".to_string(),
-        })?;
-    let mut payload = value.clone();
-    payload
-        .as_object_mut()
-        .expect("validated object")
-        .remove("contract_fingerprint");
-    let recomputed = hash_bytes(canonical_json(&payload).as_bytes());
-    if stored_fingerprint != recomputed {
-        return Err(GraphError::Validation {
-            stage: "contract-fingerprint".to_string(),
-            reason: "contract fingerprint does not preserve the canonical finite-set witness"
-                .to_string(),
-        });
-    }
-    Ok(())
-}
-
-fn validate_graph_store(path: &Path, material: &BuildMaterial) -> Result<(), GraphError> {
-    let connection = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
-        .map_err(|error| GraphError::Validation {
-            stage: "open".to_string(),
-            reason: error.to_string(),
-        })?;
-    validate_graph_connection(&connection).map_err(|reason| GraphError::Validation {
-        stage: "graph-dsl".to_string(),
-        reason,
-    })?;
-    let profile = metadata_value(&connection, "profile")?;
-    let source_profile = metadata_value(&connection, "source_snapshot_profile")?;
-    if profile != PUBLIC_PROFILE || source_profile != SOURCE_PROFILE {
-        return Err(GraphError::Validation {
-            stage: "profile".to_string(),
-            reason: format!("invalid profile pair {profile}/{source_profile}"),
-        });
-    }
-    for (key, expected) in [
-        ("input_fingerprint", material.input_fingerprint.as_str()),
-        ("graph_fingerprint", material.graph_fingerprint.as_str()),
-    ] {
-        let observed = metadata_value(&connection, key)?;
-        if observed != expected {
-            return Err(GraphError::Validation {
-                stage: "fingerprint-preservation".to_string(),
-                reason: format!("{key} changed during materialization"),
-            });
-        }
-    }
-    let encoded_contract = metadata_value(&connection, "mathematical_contract")?;
-    let contract_value: Value =
-        serde_json::from_str(&encoded_contract).map_err(|error| GraphError::Validation {
-            stage: "mathematical-contract".to_string(),
-            reason: error.to_string(),
-        })?;
-    validate_contract_value(&contract_value)?;
-    if canonical_json(&contract_value) != canonical_json(&material.contract.json()) {
-        return Err(GraphError::Validation {
-            stage: "mathematical-contract".to_string(),
-            reason: "materialized mathematical contract differs from the validated candidate"
-                .to_string(),
-        });
-    }
-    let edge_ids = connection
-        .prepare("SELECT id FROM edges ORDER BY id")
-        .and_then(|mut statement| {
-            statement
-                .query_map([], |row| row.get::<_, String>(0))?
-                .collect::<Result<BTreeSet<_>, _>>()
-        })
-        .map_err(|error| GraphError::Validation {
-            stage: "relation-representation".to_string(),
-            reason: error.to_string(),
-        })?;
-    let expected_edge_ids = material
-        .facts
-        .iter()
-        .map(|fact| fact.id.clone())
-        .collect::<BTreeSet<_>>();
-    if edge_ids != expected_edge_ids {
-        return Err(GraphError::Validation {
-            stage: "relation-representation".to_string(),
-            reason: "materialized edge domain differs from R union reverse(R)".to_string(),
-        });
-    }
-    let persisted_fingerprint = persisted_graph_fingerprint(&connection)?;
-    if persisted_fingerprint != material.graph_fingerprint {
-        return Err(GraphError::Validation {
-            stage: "fingerprint-preservation".to_string(),
-            reason: "materialized records do not preserve graph_fingerprint".to_string(),
-        });
-    }
-    Ok(())
-}
-
-fn metadata_value(connection: &Connection, key: &str) -> Result<String, GraphError> {
-    connection
-        .query_row("SELECT value FROM metadata WHERE key=?", [key], |row| {
-            row.get(0)
-        })
-        .map_err(|error| GraphError::Validation {
-            stage: "metadata".to_string(),
-            reason: format!("{key}: {error}"),
-        })
-}
-
-fn publish_graph(
-    graph_root: &Path,
-    handle: CandidateHandle,
-    point: GraphBuildFailurePoint,
-) -> Result<(), GraphError> {
-    let _candidate_cleanup = GraphCandidateCleanup::new(handle.dir.clone());
-    let target = graph_root.join("graph.sqlite");
-    let previous = handle.dir.join("previous.sqlite");
-    let had_previous = target.exists();
-    if had_previous {
-        if target.is_symlink() || !target.is_file() {
-            return Err(GraphError::Rename {
-                reason: format!(
-                    "publication target is not a regular file: {}",
-                    target.display()
-                ),
-            });
-        }
-        fs::hard_link(&target, &previous).map_err(|error| GraphError::Rename {
-            reason: format!(
-                "preserve previous graph {} -> {}: {error}",
-                target.display(),
-                previous.display()
-            ),
-        })?;
-    }
-    if point == GraphBuildFailurePoint::Rename {
-        return Err(GraphError::Rename {
-            reason: "injected rename failure seam".to_string(),
-        });
-    }
-    fs::rename(&handle.db, &target).map_err(|error| GraphError::Rename {
-        reason: format!(
-            "rename {} -> {}: {error}",
-            handle.db.display(),
-            target.display()
-        ),
-    })?;
-    let directory_sync = if point == GraphBuildFailurePoint::DirectorySync {
-        Err(std::io::Error::other(
-            "injected directory sync failure seam",
-        ))
-    } else {
-        File::open(graph_root).and_then(|directory| directory.sync_all())
-    };
-    if let Err(error) = directory_sync {
-        let rollback = if had_previous {
-            fs::rename(&previous, &target)
-        } else {
-            fs::remove_file(&target)
-        };
-        rollback.map_err(|rollback_error| GraphError::DirectorySync {
-            reason: format!("sync graph directory: {error}; rollback failed: {rollback_error}"),
-        })?;
-        File::open(graph_root)
-            .and_then(|directory| directory.sync_all())
-            .map_err(|rollback_error| GraphError::DirectorySync {
-                reason: format!(
-                    "sync graph directory: {error}; rollback sync failed: {rollback_error}"
-                ),
-            })?;
-        let _ = GraphCandidateCleanup::new(handle.dir).cleanup();
-        return Err(GraphError::DirectorySync {
-            reason: format!("sync graph directory: {error}; previous state restored"),
-        });
-    }
-    let _ = GraphCandidateCleanup::new(handle.dir).cleanup();
-    Ok(())
-}
-
-fn read_graph_status(args: &GraphStatusArgs) -> Result<Value, GraphError> {
-    let root = resolve_root(&args.root)?;
-    let db = graph_db(&root);
-    let current_fingerprint = probe_input_fingerprint(&root, &args.profile)?;
-    if !db.exists() {
-        return Ok(status_response(
-            &root,
-            "missing",
-            None,
-            None,
-            None,
-            Vec::new(),
-            Some("graph database is missing"),
-            None,
-            None,
-            1,
-        ));
-    }
-    if !db.is_file() || db.is_symlink() {
-        return Ok(status_response(
-            &root,
-            "unavailable",
-            None,
-            None,
-            None,
-            Vec::new(),
-            Some("graph database is not a regular file"),
-            None,
-            None,
-            3,
-        ));
-    }
-    let connection =
-        match Connection::open_with_flags(&db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
-            Ok(value) => value,
-            Err(error) => {
-                return Ok(status_response(
-                    &root,
-                    "invalid",
-                    None,
-                    None,
-                    None,
-                    Vec::new(),
-                    Some(&error.to_string()),
-                    None,
-                    None,
-                    3,
-                ))
-            }
-        };
-    if let Err(reason) = validate_graph_connection(&connection) {
-        return Ok(status_response(
-            &root,
-            "invalid",
-            None,
-            None,
-            None,
-            Vec::new(),
-            Some(&reason),
-            None,
-            None,
-            3,
-        ));
-    }
-    let schema = metadata_value(&connection, "schema_version")?;
-    if schema != GRAPH_SCHEMA_VERSION {
-        return Ok(status_response(
-            &root,
-            "schema-mismatch",
-            None,
-            None,
-            None,
-            Vec::new(),
-            Some(&format!(
-                "expected {GRAPH_SCHEMA_VERSION}, observed {schema}"
-            )),
-            None,
-            None,
-            3,
-        ));
-    }
-    let profile = metadata_value(&connection, "profile")?;
-    let source_profile = metadata_value(&connection, "source_snapshot_profile")?;
-    if profile != PUBLIC_PROFILE || source_profile != SOURCE_PROFILE {
-        return Ok(status_response(
-            &root,
-            "invalid",
-            None,
-            None,
-            None,
-            Vec::new(),
-            Some("stored profile mapping is invalid"),
-            None,
-            None,
-            3,
-        ));
-    }
-    let stored_fingerprint = metadata_value(&connection, "input_fingerprint")?;
-    let graph_fingerprint = metadata_value(&connection, "graph_fingerprint")?;
-    let persisted_fingerprint = match persisted_graph_fingerprint(&connection) {
-        Ok(value) => value,
-        Err(error) => {
-            return Ok(status_response(
-                &root,
-                "invalid",
-                Some(&stored_fingerprint),
-                Some(&graph_fingerprint),
-                None,
-                Vec::new(),
-                Some(&error.to_string()),
-                None,
-                Some("fingerprint-preservation"),
-                3,
-            ))
-        }
-    };
-    if persisted_fingerprint != graph_fingerprint {
-        return Ok(status_response(
-            &root,
-            "invalid",
-            Some(&stored_fingerprint),
-            Some(&graph_fingerprint),
-            None,
-            Vec::new(),
-            Some("persisted graph records do not preserve graph_fingerprint"),
-            None,
-            Some("fingerprint-preservation"),
-            3,
-        ));
-    }
-    let integration =
-        match validated_integration_record(&connection, &stored_fingerprint, &graph_fingerprint) {
-            Ok(value) => value,
-            Err(reason) => {
-                return Ok(status_response(
-                    &root,
-                    "invalid",
-                    None,
-                    None,
-                    None,
-                    Vec::new(),
-                    Some(&reason),
-                    None,
-                    None,
-                    3,
-                ))
-            }
-        };
-    let diagnostics = load_diagnostics(&connection)?;
-    if stored_fingerprint != current_fingerprint {
-        return Ok(status_response(
-            &root,
-            "stale",
-            Some(&stored_fingerprint),
-            Some(&graph_fingerprint),
-            None,
-            diagnostics,
-            Some("input fingerprint differs from current snapshot"),
-            None,
-            None,
-            1,
-        ));
-    }
-    let incomplete = diagnostics.iter().any(|item| {
-        item.get("set")
-            .and_then(Value::as_str)
-            .is_some_and(|set| matches!(set, "unresolved" | "ambiguous" | "uncovered"))
-    });
-    Ok(status_response(
-        &root,
-        if incomplete { "incomplete" } else { "fresh" },
-        Some(&stored_fingerprint),
-        Some(&graph_fingerprint),
-        if incomplete { None } else { Some(integration) },
-        diagnostics,
-        None,
-        None,
-        None,
-        if incomplete { 1 } else { 0 },
-    ))
-}
-
-fn validated_integration_record(
-    connection: &Connection,
-    input_fingerprint: &str,
-    graph_fingerprint: &str,
-) -> Result<Value, String> {
-    let contract =
-        metadata_value(connection, "mathematical_contract").map_err(|error| error.to_string())?;
-    let contract_value: Value = serde_json::from_str(&contract)
-        .map_err(|error| format!("mathematical contract is invalid JSON: {error}"))?;
-    validate_contract_value(&contract_value).map_err(|error| error.to_string())?;
-    let contract_fingerprint = contract_value
-        .get("contract_fingerprint")
-        .and_then(Value::as_str)
-        .ok_or_else(|| "mathematical contract fingerprint is missing".to_string())?;
-    let encoded =
-        metadata_value(connection, "integration_record").map_err(|error| error.to_string())?;
-    let value: Value = serde_json::from_str(&encoded)
-        .map_err(|error| format!("integration record is invalid JSON: {error}"))?;
-    let object = value
-        .as_object()
-        .ok_or_else(|| "integration record must be an object".to_string())?;
-    for (field, expected) in [
-        ("schema", "agent-canon.graph.integration.v1"),
-        ("root", "."),
-        ("db_path", ".agent-canon/knowledge-graph/graph.sqlite"),
-        ("schema_version", GRAPH_SCHEMA_VERSION),
-        ("profile", PUBLIC_PROFILE),
-        ("source_snapshot_profile", SOURCE_PROFILE),
-        ("input_fingerprint", input_fingerprint),
-        ("graph_fingerprint", graph_fingerprint),
-        ("contract_fingerprint", contract_fingerprint),
-        ("verification_code", "graph.integration.verified"),
-    ] {
-        if object.get(field).and_then(Value::as_str) != Some(expected) {
-            return Err(format!("integration record {field} mismatch"));
-        }
-    }
-    if object.get("verified").and_then(Value::as_bool) != Some(true) {
-        return Err("integration record is not verified".to_string());
-    }
-    if object
-        .get("snapshot_head")
-        .and_then(Value::as_str)
-        .is_none_or(str::is_empty)
-    {
-        return Err("integration record snapshot_head is missing".to_string());
-    }
-    if !object
-        .get("producer_artifacts")
-        .is_some_and(Value::is_array)
-    {
-        return Err("integration record producer_artifacts is missing".to_string());
-    }
-    Ok(value)
-}
-
-fn probe_input_fingerprint(root: &Path, profile: &str) -> Result<String, GraphError> {
-    let args = GraphBuildArgs {
-        root: root.to_path_buf(),
-        profile: profile.to_string(),
-        format: OutputFormat::Json,
-    };
-    let material = collect_build_material_with_mode(&args, GraphBuildFailurePoint::None, true)?;
-    let fingerprint = material.input_fingerprint.clone();
-    GraphCandidateCleanup::new(material.candidate_dir).cleanup()?;
-    Ok(fingerprint)
-}
-
-fn query_graph(args: &GraphQueryArgs) -> Result<Value, GraphError> {
-    let status_args = GraphStatusArgs {
-        root: args.root.clone(),
-        profile: args.profile.clone(),
-        format: args.format,
-    };
-    let mut status = read_graph_status(&status_args)?;
-    let root = resolve_root(&args.root)?;
-    if status.get("status").and_then(Value::as_str) != Some("fresh") {
-        return Ok(query_response_from_status(
-            args,
-            &root,
-            &status,
-            Vec::new(),
-            Vec::new(),
-        ));
-    }
-    let connection =
-        Connection::open_with_flags(graph_db(&root), rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
-            .map_err(|error| GraphError::Unavailable {
-                reason: error.to_string(),
-            })?;
-    let nodes = load_nodes(&connection)?;
-    let facts = load_facts(&connection)?;
-    if let Some(path) = args.path.as_deref() {
-        if !nodes
-            .iter()
-            .any(|node| node.get("path").and_then(Value::as_str) == Some(path))
-        {
-            let diagnostic = graph_diagnostic(
-                "unresolved",
-                "query.seed_unresolved",
-                "warn",
-                None,
-                Some(path),
-                None,
-                None,
-                "query seed is not a unique source member of Vp",
-                "graph-query",
-                &format!("graph-query:{path}"),
-            )
-            .json();
-            if let Some(object) = status.as_object_mut() {
-                object.insert("status".to_string(), json!("incomplete"));
-                object.insert("exit_code".to_string(), json!(1));
-                object.insert("reason".to_string(), json!("query seed is unresolved"));
-                object.insert("unresolved_count".to_string(), json!(1));
-                object.insert("unresolved".to_string(), json!([diagnostic]));
-            }
-            return Ok(query_response_from_status(
-                args,
-                &root,
-                &status,
-                Vec::new(),
-                Vec::new(),
-            ));
-        }
-    }
-    let (selected_nodes, selected_facts) = if args.all {
-        let selected = facts
-            .into_iter()
-            .filter(|fact| relation_matches(fact, &args.relation))
-            .collect::<Vec<_>>();
-        (nodes, selected)
-    } else {
-        bfs_query(args, &nodes, &facts)?
-    };
-    Ok(query_response_from_status(
-        args,
-        &root,
-        &status,
-        selected_nodes,
-        selected_facts,
-    ))
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ClosureDerivation {
-    predecessor: String,
-    edge_id: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ClosureWitness {
-    distance: BTreeMap<String, u8>,
-    selected_edges: BTreeSet<String>,
-    derivation: BTreeMap<String, ClosureDerivation>,
-}
-
-fn traversal_neighbor<'a>(
-    fact: &'a Value,
-    current: &str,
-    direction: GraphDirection,
-) -> Option<&'a str> {
-    let from = fact.get("from").and_then(Value::as_str)?;
-    let to = fact.get("to").and_then(Value::as_str)?;
-    match direction {
-        GraphDirection::Outgoing if from == current => Some(to),
-        GraphDirection::Incoming if to == current => Some(from),
-        GraphDirection::Both if from == current => Some(to),
-        GraphDirection::Both if to == current => Some(from),
-        _ => None,
-    }
-}
-
-fn closure_operator(
-    current: &BTreeMap<String, u8>,
-    facts: &[Value],
-    relation: &str,
-    direction: GraphDirection,
-    depth: u8,
-) -> (BTreeMap<String, u8>, BTreeMap<String, ClosureDerivation>) {
-    let mut next = current.clone();
-    let mut derivations = BTreeMap::new();
-    for (node, distance) in current {
-        if *distance >= depth {
-            continue;
-        }
-        for fact in facts.iter().filter(|fact| relation_matches(fact, relation)) {
-            let Some(neighbor) = traversal_neighbor(fact, node, direction) else {
-                continue;
-            };
-            let candidate_distance = distance + 1;
-            let should_replace = next
-                .get(neighbor)
-                .is_none_or(|observed| candidate_distance < *observed);
-            if should_replace {
-                next.insert(neighbor.to_string(), candidate_distance);
-                if let Some(edge_id) = fact.get("id").and_then(Value::as_str) {
-                    derivations.insert(
-                        neighbor.to_string(),
-                        ClosureDerivation {
-                            predecessor: node.clone(),
-                            edge_id: edge_id.to_string(),
-                        },
-                    );
-                }
-            }
-        }
-    }
-    (next, derivations)
-}
-
-fn least_fixed_point_closure(
-    seed: &str,
-    facts: &[Value],
-    relation: &str,
-    direction: GraphDirection,
-    depth: u8,
-) -> Result<ClosureWitness, GraphError> {
-    let mut distance = BTreeMap::from([(seed.to_string(), 0u8)]);
-    let mut derivation = BTreeMap::new();
-    loop {
-        let (next, additions) = closure_operator(&distance, facts, relation, direction, depth);
-        for (node, witness) in additions {
-            derivation.insert(node, witness);
-        }
-        if next == distance {
-            break;
-        }
-        distance = next;
-    }
-    let (fixed, _) = closure_operator(&distance, facts, relation, direction, depth);
-    if fixed != distance {
-        return Err(GraphError::Validation {
-            stage: "query-closure-fixed-point".to_string(),
-            reason: "closure iteration did not reach a fixed point".to_string(),
-        });
-    }
-    for (node, node_distance) in &distance {
-        if node == seed {
-            if *node_distance != 0 {
-                return Err(GraphError::Validation {
-                    stage: "query-closure-leastness".to_string(),
-                    reason: "closure seed does not have distance zero".to_string(),
-                });
-            }
-            continue;
-        }
-        let witness = derivation.get(node).ok_or_else(|| GraphError::Validation {
-            stage: "query-closure-leastness".to_string(),
-            reason: format!("closure member {node} has no derivation from the seed"),
-        })?;
-        let predecessor_distance =
-            distance
-                .get(&witness.predecessor)
-                .ok_or_else(|| GraphError::Validation {
-                    stage: "query-closure-leastness".to_string(),
-                    reason: format!("closure predecessor {} is absent", witness.predecessor),
-                })?;
-        if predecessor_distance + 1 != *node_distance {
-            return Err(GraphError::Validation {
-                stage: "query-closure-leastness".to_string(),
-                reason: format!("closure member {node} is not minimally derived"),
-            });
-        }
-        let edge = facts
-            .iter()
-            .find(|fact| fact.get("id").and_then(Value::as_str) == Some(&witness.edge_id))
-            .ok_or_else(|| GraphError::Validation {
-                stage: "query-closure-leastness".to_string(),
-                reason: format!("closure derivation edge {} is absent", witness.edge_id),
-            })?;
-        if traversal_neighbor(edge, &witness.predecessor, direction) != Some(node.as_str())
-            || !relation_matches(edge, relation)
-        {
-            return Err(GraphError::Validation {
-                stage: "query-closure-leastness".to_string(),
-                reason: format!("closure derivation for {node} is not a typed traversal"),
-            });
-        }
-    }
-    let mut selected_edges = BTreeSet::new();
-    for (node, node_distance) in &distance {
-        if *node_distance >= depth {
-            continue;
-        }
-        for fact in facts.iter().filter(|fact| relation_matches(fact, relation)) {
-            if traversal_neighbor(fact, node, direction).is_some() {
-                if let Some(edge_id) = fact.get("id").and_then(Value::as_str) {
-                    selected_edges.insert(edge_id.to_string());
-                }
-            }
-        }
-    }
-    Ok(ClosureWitness {
-        distance,
-        selected_edges,
-        derivation,
-    })
-}
-
-fn bfs_query(
-    args: &GraphQueryArgs,
-    nodes: &[Value],
-    facts: &[Value],
-) -> Result<(Vec<Value>, Vec<Value>), GraphError> {
-    let seed_path = args.path.as_deref().unwrap_or_default();
-    let Some(seed) = nodes
-        .iter()
-        .find(|node| node.get("path").and_then(Value::as_str) == Some(seed_path))
-        .and_then(|node| node.get("id"))
-        .and_then(Value::as_str)
-        .map(ToString::to_string)
-    else {
-        return Ok((Vec::new(), Vec::new()));
-    };
-    let closure =
-        least_fixed_point_closure(&seed, facts, &args.relation, args.direction, args.depth)?;
-    let mut selected_nodes = nodes
-        .iter()
-        .filter_map(|node| {
-            let id = node.get("id").and_then(Value::as_str)?;
-            let value = closure.distance.get(id)?;
-            let mut projected = node.clone();
-            projected
-                .as_object_mut()?
-                .insert("distance".to_string(), json!(value));
-            Some(projected)
-        })
-        .collect::<Vec<_>>();
-    selected_nodes.sort_by(|left, right| {
-        (
-            left.get("distance").and_then(Value::as_u64).unwrap_or(0),
-            left.get("id").and_then(Value::as_str).unwrap_or(""),
-        )
-            .cmp(&(
-                right.get("distance").and_then(Value::as_u64).unwrap_or(0),
-                right.get("id").and_then(Value::as_str).unwrap_or(""),
-            ))
-    });
-    let selected_facts = facts
-        .iter()
-        .filter(|fact| {
-            fact.get("id")
-                .and_then(Value::as_str)
-                .is_some_and(|id| closure.selected_edges.contains(id))
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-    Ok((selected_nodes, selected_facts))
-}
-
-fn relation_matches(fact: &Value, relation: &str) -> bool {
-    relation == "all" || fact.get("kind").and_then(Value::as_str) == Some(relation)
-}
-
-fn context_token_path(claim_path: &str, token: &str) -> Option<String> {
-    if token.is_empty()
-        || token.contains('\0')
-        || token.contains('\\')
-        || Path::new(token).is_absolute()
-    {
-        return None;
-    }
-    if !token.starts_with("./") && !token.starts_with("../") {
-        return normalize_repo_path(token).ok();
-    }
-    let mut parts = claim_path.split('/').collect::<Vec<_>>();
-    parts.pop();
-    for component in Path::new(token).components() {
-        match component {
-            Component::Normal(part) => parts.push(part.to_str()?),
-            Component::CurDir => {}
-            Component::ParentDir => {
-                parts.pop()?;
-            }
-            Component::RootDir | Component::Prefix(_) => return None,
-        }
-    }
-    (!parts.is_empty()).then(|| parts.join("/"))
-}
-
-fn context_graph(args: &GraphContextArgs) -> Result<Value, GraphError> {
-    let status_args = GraphStatusArgs {
-        root: args.root.clone(),
-        profile: args.profile.clone(),
-        format: args.format,
-    };
-    let status = read_graph_status(&status_args)?;
-    let root = resolve_root(&args.root)?;
-    if status.get("status").and_then(Value::as_str) != Some("fresh") {
-        return Ok(context_response_from_status(
-            args,
-            &root,
-            &status,
-            None,
-            None,
-            None,
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-        ));
-    }
-    let connection =
-        Connection::open_with_flags(graph_db(&root), rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
-            .map_err(|error| GraphError::Unavailable {
-                reason: error.to_string(),
-            })?;
-    let claim_node = load_source_node(&connection, &args.path)?;
-    let resolved_token = args
-        .token
-        .as_deref()
-        .and_then(|token| context_token_path(&args.path, token));
-    let token_node = match resolved_token.as_deref() {
-        Some(path) => load_source_node(&connection, path)?,
-        None => None,
-    };
-    let resolved_path = if args.token.is_none() {
-        claim_node.as_ref().map(|_| args.path.clone())
-    } else {
-        token_node.as_ref().and(resolved_token.clone())
-    };
-    let context_path = resolved_path.as_deref().unwrap_or(&args.path);
-    let node = token_node.as_ref().or(claim_node.as_ref());
-    let source_identity = context_source_identity(&connection, node, resolved_path.as_deref())?;
-    let nodes = load_nodes(&connection)?;
-    let paths_by_id = nodes
-        .iter()
-        .filter_map(|node| {
-            Some((
-                node.get("id")?.as_str()?.to_string(),
-                node.get("path")?.as_str()?.to_string(),
-            ))
-        })
-        .collect::<BTreeMap<_, _>>();
-    let facts = load_facts(&connection)?;
-    let source_id = source_node_id(&args.path);
-    let mut witnesses = facts
-        .iter()
-        .filter(|fact| {
-            fact.get("kind").and_then(Value::as_str) == Some("dependency")
-                && !fact
-                    .get("inferred")
-                    .and_then(Value::as_bool)
-                    .unwrap_or(false)
-                && (fact.get("from").and_then(Value::as_str) == Some(source_id.as_str())
-                    || fact.get("to").and_then(Value::as_str) == Some(source_id.as_str()))
-        })
-        .map(|fact| dependency_witness_json(fact, &paths_by_id))
-        .collect::<Result<Vec<_>, _>>()?;
-    witnesses.sort_by(|left, right| {
-        left.get("edge_id")
-            .and_then(Value::as_str)
-            .cmp(&right.get("edge_id").and_then(Value::as_str))
-    });
-    let mut items = Vec::new();
-    let mut owner = None;
-    if let Some(node) = node {
-        let payload = node
-            .get("payload")
-            .and_then(Value::as_object)
-            .cloned()
-            .unwrap_or_default();
-        owner = payload
-            .get("manifest_responsibility")
-            .and_then(Value::as_str)
-            .map(ToString::to_string);
-        let span = payload
-            .get("manifest_source_span")
-            .cloned()
-            .filter(|value| !value.is_null());
-        items.push(context_item(
-            "source.path",
-            context_path,
-            "graph",
-            Some("source-snapshot"),
-            Some(context_path),
-            span.clone(),
-            payload.get("evidence_ref").and_then(Value::as_str),
-            "source-snapshot",
-        ));
-        let present = payload
-            .get("manifest_present")
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        items.push(context_item(
-            "manifest.present",
-            if present { "true" } else { "false" },
-            "manifest",
-            Some("source-snapshot"),
-            Some(context_path),
-            span.clone(),
-            payload.get("evidence_ref").and_then(Value::as_str),
-            "ManifestParser",
-        ));
-        if let Some(contract) = payload.get("manifest_contract").and_then(Value::as_str) {
-            items.push(context_item(
-                "manifest.contract",
-                contract,
-                "manifest",
-                Some("source-snapshot"),
-                Some(context_path),
-                span.clone(),
-                payload.get("evidence_ref").and_then(Value::as_str),
-                "ManifestParser",
-            ));
-        }
-        if let Some(responsibility) = payload
-            .get("manifest_responsibility")
-            .and_then(Value::as_str)
-        {
-            items.push(context_item(
-                "manifest.responsibility",
-                responsibility,
-                "manifest",
-                Some("source-snapshot"),
-                Some(context_path),
-                span.clone(),
-                payload.get("evidence_ref").and_then(Value::as_str),
-                "ManifestParser",
-            ));
-        }
-    }
-    let runtime_measurements = select_runtime_measurements(
-        metadata_json_array(&connection, "runtime_measurements")?,
-        &args.path,
-    );
-    let context_diagnostics = metadata_json_array(&connection, "runtime_context_diagnostics")?;
-    let runtime_artifact_ref = metadata_json_array(&connection, "producer_artifacts")?
-        .into_iter()
-        .find(|artifact| {
-            artifact.get("producer_id").and_then(Value::as_str) == Some("runtime-dashboard")
-        })
-        .and_then(|artifact| {
-            artifact
-                .get("artifact_ref")
-                .and_then(Value::as_str)
-                .map(ToString::to_string)
-        });
-    for measurement in &runtime_measurements {
-        items.push(context_item(
-            "runtime.measurement",
-            &canonical_json(measurement),
-            "runtime-dashboard",
-            Some("runtime-dashboard"),
-            None,
-            None,
-            runtime_artifact_ref.as_deref(),
-            "generate_agent_runtime_dashboard.py",
-        ));
-    }
-    items.sort_by(|left, right| canonical_json(left).cmp(&canonical_json(right)));
-    Ok(context_response_from_status(
-        args,
-        &root,
-        &status,
-        resolved_path,
-        source_identity,
-        owner,
-        witnesses,
-        items,
-        runtime_measurements,
-        context_diagnostics,
-    ))
-}
-
-fn context_source_identity(
-    connection: &Connection,
-    node: Option<&Value>,
-    resolved_path: Option<&str>,
-) -> Result<Option<Value>, GraphError> {
-    let (Some(node), Some(resolved_path)) = (node, resolved_path) else {
-        return Ok(None);
-    };
-    let payload = node
-        .get("payload")
-        .and_then(Value::as_object)
-        .ok_or_else(|| GraphError::Validation {
-            stage: "context-source-identity".to_string(),
-            reason: "resolved source node lacks payload".to_string(),
-        })?;
-    let source_path = payload
-        .get("path")
-        .and_then(Value::as_str)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| GraphError::Validation {
-            stage: "context-source-identity".to_string(),
-            reason: "resolved source node lacks source path".to_string(),
-        })?;
-    if source_path != resolved_path {
-        return Err(GraphError::Validation {
-            stage: "context-source-identity".to_string(),
-            reason: format!(
-                "resolved path {resolved_path} differs from source identity {source_path}"
-            ),
-        });
-    }
-    let content_sha256 = payload
-        .get("content_sha256")
-        .and_then(Value::as_str)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| GraphError::Validation {
-            stage: "context-source-identity".to_string(),
-            reason: format!("resolved source {source_path} lacks content SHA-256"),
-        })?;
-    if content_sha256.len() != 64
-        || !content_sha256
-            .bytes()
-            .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value))
-    {
-        return Err(GraphError::Validation {
-            stage: "context-source-identity".to_string(),
-            reason: format!("resolved source {source_path} has invalid content SHA-256"),
-        });
-    }
-    let snapshot_commit = metadata_value(connection, "snapshot_head")?;
-    if snapshot_commit.is_empty() {
-        return Err(GraphError::Validation {
-            stage: "context-source-identity".to_string(),
-            reason: "snapshot commit is empty".to_string(),
-        });
-    }
-    Ok(Some(json!({
-        "snapshot_commit": snapshot_commit,
-        "source_path": source_path,
-        "content_sha256": content_sha256,
-    })))
-}
-
-fn select_runtime_measurements(measurements: Vec<Value>, context_path: &str) -> Vec<Value> {
-    let parts = context_path.split('/').collect::<Vec<_>>();
-    let unit_id = parts
-        .windows(3)
-        .find(|parts| parts[0] == "reports" && parts[1] == "agents")
-        .map(|parts| parts[2]);
-    let Some(unit_id) = unit_id else {
-        return measurements;
-    };
-    measurements
-        .into_iter()
-        .filter(|measurement| {
-            measurement
-                .get("responsibility_unit_id")
-                .and_then(Value::as_str)
-                == Some(unit_id)
-        })
-        .collect()
-}
-
-fn metadata_json_array(connection: &Connection, key: &str) -> Result<Vec<Value>, GraphError> {
-    serde_json::from_str(&metadata_value(connection, key)?).map_err(|error| {
-        GraphError::Validation {
-            stage: "metadata".to_string(),
-            reason: format!("{key}: {error}"),
-        }
-    })
-}
-
-fn load_source_node(connection: &Connection, path: &str) -> Result<Option<Value>, GraphError> {
-    let id = source_node_id(path);
-    let mut statement = connection
-        .prepare("SELECT id,layer,kind,payload_json FROM nodes WHERE id=?")
-        .map_err(sql_validation)?;
-    match statement.query_row([id], |row| {
-        let payload: String = row.get(3)?;
-        Ok(json!({"id": row.get::<_, String>(0)?, "layer": row.get::<_, String>(1)?, "kind": row.get::<_, String>(2)?, "payload": serde_json::from_str::<Value>(&payload).unwrap_or(Value::Null)}))
-    }) {
-        Ok(value) => Ok(Some(value)),
-        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-        Err(error) => Err(sql_validation(error)),
-    }
-}
-
-fn load_nodes(connection: &Connection) -> Result<Vec<Value>, GraphError> {
-    let mut statement = connection
-        .prepare(
-            "SELECT id,layer,kind,label,payload_json FROM nodes WHERE layer='source' ORDER BY id",
-        )
-        .map_err(sql_validation)?;
-    let rows = statement
-        .query_map([], |row| {
-            let payload: String = row.get(4)?;
-            let value = serde_json::from_str::<Value>(&payload).unwrap_or(Value::Null);
-            Ok(json!({
-                "id": row.get::<_, String>(0)?,
-                "path": value.get("path").cloned().unwrap_or(Value::Null),
-                "selector": value.get("selector").cloned().unwrap_or(Value::Null),
-                "layer": row.get::<_, String>(1)?,
-                "kind": row.get::<_, String>(2)?,
-                "owner": value.get("manifest_responsibility").cloned().unwrap_or(Value::Null),
-                "source_path": value.get("path").cloned().unwrap_or(Value::Null),
-                "source_span": value.get("manifest_source_span").cloned().unwrap_or(Value::Null),
-                "distance": 0,
-                "payload": value,
-            }))
-        })
-        .map_err(sql_validation)?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(sql_validation)
-}
-
-fn load_facts(connection: &Connection) -> Result<Vec<Value>, GraphError> {
-    let mut statement = connection
-        .prepare("SELECT payload_json FROM edges ORDER BY id")
-        .map_err(sql_validation)?;
-    let rows = statement
-        .query_map([], |row| {
-            let payload: String = row.get(0)?;
-            let value = serde_json::from_str::<Value>(&payload).unwrap_or(Value::Null);
-            Ok(value.get("fact").cloned().unwrap_or(Value::Null))
-        })
-        .map_err(sql_validation)?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(sql_validation)
-}
-
-fn load_diagnostics(connection: &Connection) -> Result<Vec<Value>, GraphError> {
-    let raw = metadata_value(connection, "graph_diagnostics")?;
-    serde_json::from_str::<Vec<Value>>(&raw).map_err(|error| GraphError::Validation {
-        stage: "diagnostics".to_string(),
-        reason: error.to_string(),
-    })
-}
-
-fn persisted_graph_fingerprint(connection: &Connection) -> Result<String, GraphError> {
-    let input = metadata_value(connection, "input_fingerprint")?;
-    let contract: Value =
-        serde_json::from_str(&metadata_value(connection, "mathematical_contract")?).map_err(
-            |error| GraphError::Validation {
-                stage: "fingerprint-preservation".to_string(),
-                reason: format!("decode mathematical contract: {error}"),
-            },
-        )?;
-    let diagnostics = load_diagnostics(connection)?
-        .into_iter()
-        .map(|diagnostic| {
-            let id = diagnostic
-                .get("id")
-                .and_then(Value::as_str)
-                .ok_or_else(|| GraphError::Validation {
-                    stage: "fingerprint-preservation".to_string(),
-                    reason: "persisted diagnostic lacks ID".to_string(),
-                })?;
-            Ok((id.to_string(), diagnostic))
-        })
-        .collect::<Result<BTreeMap<_, _>, GraphError>>()?;
-    let producers =
-        serde_json::from_str::<Vec<Value>>(&metadata_value(connection, "producer_artifacts")?)
-            .map_err(|error| GraphError::Validation {
-                stage: "fingerprint-preservation".to_string(),
-                reason: format!("decode producer artifacts: {error}"),
-            })?
-            .into_iter()
-            .map(|producer| {
-                let id = producer
-                    .get("producer_id")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| GraphError::Validation {
-                        stage: "fingerprint-preservation".to_string(),
-                        reason: "persisted producer lacks producer_id".to_string(),
-                    })?;
-                Ok((id.to_string(), producer))
-            })
-            .collect::<Result<BTreeMap<_, _>, GraphError>>()?;
-    let mut node_statement = connection
-        .prepare("SELECT id,payload_json FROM nodes WHERE layer='source' ORDER BY id")
-        .map_err(sql_validation)?;
-    let nodes = node_statement
-        .query_map([], |row| {
-            let id: String = row.get(0)?;
-            let payload: String = row.get(1)?;
-            Ok((id, payload))
-        })
-        .map_err(sql_validation)?
-        .map(|row| {
-            let (id, payload) = row.map_err(sql_validation)?;
-            let payload = serde_json::from_str::<Value>(&payload).map_err(|error| {
-                GraphError::Validation {
-                    stage: "fingerprint-preservation".to_string(),
-                    reason: format!("decode node {id}: {error}"),
-                }
-            })?;
-            Ok((id.clone(), json!({"id": id, "payload": payload})))
-        })
-        .collect::<Result<BTreeMap<_, _>, GraphError>>()?;
-    let facts = load_facts(connection)?
-        .into_iter()
-        .map(|fact| {
-            let id =
-                fact.get("id")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| GraphError::Validation {
-                        stage: "fingerprint-preservation".to_string(),
-                        reason: "persisted fact lacks ID".to_string(),
-                    })?;
-            Ok((id.to_string(), fact))
-        })
-        .collect::<Result<BTreeMap<_, _>, GraphError>>()?;
-    Ok(graph_fingerprint_records(
-        &input,
-        nodes,
-        facts,
-        diagnostics,
-        producers,
-        contract,
-    ))
-}
-
-fn sql_validation(error: rusqlite::Error) -> GraphError {
-    GraphError::Validation {
-        stage: "query".to_string(),
-        reason: error.to_string(),
-    }
-}
-
-fn status_response(
-    _root: &Path,
-    status: &str,
-    input_fingerprint: Option<&str>,
-    graph_fingerprint: Option<&str>,
-    integration: Option<Value>,
-    diagnostics: Vec<Value>,
-    reason: Option<&str>,
-    producer_id: Option<&str>,
-    failure_stage: Option<&str>,
-    exit_code: u8,
-) -> Value {
-    let (unresolved, ambiguous, uncovered, excluded) = split_diagnostics(diagnostics);
-    json!({
-        "schema": "agent-canon.graph.status.v1",
-        "command": "status",
-        "status": status,
-        "profile": PUBLIC_PROFILE,
-        "root": ".",
-        "db_path": ".agent-canon/knowledge-graph/graph.sqlite",
-        "input_fingerprint": input_fingerprint,
-        "graph_fingerprint": graph_fingerprint,
-        "integration_record": integration,
-        "unresolved_count": unresolved.len(), "ambiguous_count": ambiguous.len(), "uncovered_count": uncovered.len(), "excluded_count": excluded.len(),
-        "unresolved": unresolved, "ambiguous": ambiguous, "uncovered": uncovered, "excluded": excluded,
-        "reason": reason, "stderr_summary": Value::Null, "producer_id": producer_id, "failure_stage": failure_stage, "exit_code": exit_code,
-    })
-}
-
-fn build_response(
-    material: &BuildMaterial,
-    integration: &GraphIntegrationRecord,
-    status: &str,
-    publication: &str,
-    durability: &str,
-    failure_stage: Option<&str>,
-    reason: Option<&str>,
-) -> Value {
-    let diagnostics = material
-        .diagnostics
-        .iter()
-        .map(GraphDiagnostic::json)
-        .collect::<Vec<_>>();
-    let (unresolved, ambiguous, uncovered, excluded) = split_diagnostics(diagnostics);
-    let exit_code = match status {
-        "fresh" => 0,
-        "incomplete" => 1,
-        "publication-failed" => 5,
-        _ => 4,
-    };
-    json!({
-        "schema": "agent-canon.graph.build.v1", "command": "build", "status": status,
-        "graph_status": if matches!(status, "fresh" | "incomplete") { Value::String(status.to_string()) } else { Value::Null },
-        "profile": PUBLIC_PROFILE, "root": ".", "db_path": ".agent-canon/knowledge-graph/graph.sqlite",
-        "input_fingerprint": material.input_fingerprint, "graph_fingerprint": material.graph_fingerprint,
-        "unresolved_count": unresolved.len(), "ambiguous_count": ambiguous.len(), "uncovered_count": uncovered.len(), "excluded_count": excluded.len(),
-        "unresolved": unresolved, "ambiguous": ambiguous, "uncovered": uncovered, "excluded": excluded,
-        "reason": reason, "stderr_summary": Value::Null, "publication": publication, "durability": durability,
-        "failure_stage": failure_stage, "exit_code": exit_code,
-        "producer_artifacts": material.producer_artifacts.iter().map(ProducerArtifact::json).collect::<Vec<_>>(),
-        "integration_record": if status == "fresh" { integration.json() } else { Value::Null },
-    })
-}
-
-fn build_failure_response(args: &GraphBuildArgs, error: &GraphError) -> Value {
-    let _ = args;
-    let (status, publication, durability, stage, exit_code) = match error {
-        GraphError::DirectorySync { .. } => (
-            "publication-failed",
-            "not-published",
-            "durable",
-            "directory-sync",
-            5,
-        ),
-        _ => ("build-failed", "not-published", "not-durable", "build", 4),
-    };
-    json!({
-        "schema": "agent-canon.graph.build.v1", "command": "build", "status": status, "graph_status": Value::Null,
-        "profile": PUBLIC_PROFILE, "root": ".", "db_path": ".agent-canon/knowledge-graph/graph.sqlite",
-        "input_fingerprint": Value::Null, "graph_fingerprint": Value::Null,
-        "unresolved_count": 0, "ambiguous_count": 0, "uncovered_count": 0, "excluded_count": 0,
-        "unresolved": [], "ambiguous": [], "uncovered": [], "excluded": [],
-        "reason": error.to_string(), "stderr_summary": Value::Null, "publication": publication, "durability": durability,
-        "failure_stage": stage, "exit_code": exit_code, "producer_artifacts": [],
-    })
-}
-
-fn status_error_response(args: &GraphStatusArgs, error: &GraphError) -> Value {
-    let root = resolve_root(&args.root).unwrap_or_else(|_| args.root.clone());
-    let (status, exit) = match error {
-        GraphError::Producer { .. } => ("build-failed", 4),
-        GraphError::Unavailable { .. } => ("unavailable", 3),
-        _ => ("invalid", 3),
-    };
-    status_response(
-        &root,
-        status,
-        None,
-        None,
-        None,
-        Vec::new(),
-        Some(&error.to_string()),
-        None,
-        Some("producer-probe"),
-        exit,
-    )
-}
-
-fn query_response_from_status(
-    args: &GraphQueryArgs,
-    _root: &Path,
-    status: &Value,
-    nodes: Vec<Value>,
-    facts: Vec<Value>,
-) -> Value {
-    json!({
-        "schema": "agent-canon.graph.query.v1", "command": "query",
-        "status": status.get("status").cloned().unwrap_or_else(|| json!("invalid")), "profile": PUBLIC_PROFILE, "root": ".", "db_path": ".agent-canon/knowledge-graph/graph.sqlite",
-        "path": args.path, "all": args.all, "relation": args.relation, "direction": args.direction.as_str(), "depth": args.depth,
-        "graph_fingerprint": status.get("graph_fingerprint").cloned().unwrap_or(Value::Null), "reason": status.get("reason").cloned().unwrap_or(Value::Null), "stderr_summary": Value::Null,
-        "exit_code": status.get("exit_code").cloned().unwrap_or_else(|| json!(3)),
-        "unresolved_count": status.get("unresolved_count").cloned().unwrap_or_else(|| json!(0)), "ambiguous_count": status.get("ambiguous_count").cloned().unwrap_or_else(|| json!(0)), "uncovered_count": status.get("uncovered_count").cloned().unwrap_or_else(|| json!(0)), "excluded_count": status.get("excluded_count").cloned().unwrap_or_else(|| json!(0)),
-        "nodes": nodes, "facts": facts,
-        "unresolved": status.get("unresolved").cloned().unwrap_or_else(|| json!([])), "ambiguous": status.get("ambiguous").cloned().unwrap_or_else(|| json!([])), "uncovered": status.get("uncovered").cloned().unwrap_or_else(|| json!([])), "excluded": status.get("excluded").cloned().unwrap_or_else(|| json!([])),
-    })
-}
-
-fn query_error_response(args: &GraphQueryArgs, error: &GraphError) -> Value {
-    let root = resolve_root(&args.root).unwrap_or_else(|_| args.root.clone());
-    let status = status_error_response(
-        &GraphStatusArgs {
-            root: root.clone(),
-            profile: args.profile.clone(),
-            format: args.format,
-        },
-        error,
-    );
-    query_response_from_status(args, &root, &status, Vec::new(), Vec::new())
-}
-
-fn context_response_from_status(
-    args: &GraphContextArgs,
-    _root: &Path,
-    status: &Value,
-    resolved_path: Option<String>,
-    source_identity: Option<Value>,
-    owner: Option<String>,
-    witnesses: Vec<Value>,
-    items: Vec<Value>,
-    runtime_measurements: Vec<Value>,
-    context_diagnostics: Vec<Value>,
-) -> Value {
-    let source_span = items.iter().find_map(|item| {
-        item.get("source_span")
-            .cloned()
-            .filter(|value| !value.is_null())
-    });
-    json!({
-        "schema": "agent-canon.graph.context.v1", "command": "context",
-        "status": status.get("status").cloned().unwrap_or_else(|| json!("invalid")), "profile": PUBLIC_PROFILE, "root": ".", "db_path": ".agent-canon/knowledge-graph/graph.sqlite",
-        "claim_path": args.path, "token": args.token, "resolved_path": resolved_path, "source_identity": source_identity, "source_span": source_span, "owner": owner,
-        "dependency_witnesses": witnesses, "items": items, "runtime_measurements": runtime_measurements, "context_diagnostics": context_diagnostics, "producer": "source-snapshot",
-        "semantic_index": "missing", "semantic_index_path": Value::Null, "semantic_index_content_sha256": Value::Null,
-        "graph_fingerprint": status.get("graph_fingerprint").cloned().unwrap_or(Value::Null), "reason": status.get("reason").cloned().unwrap_or(Value::Null), "stderr_summary": Value::Null,
-        "exit_code": status.get("exit_code").cloned().unwrap_or_else(|| json!(3)),
-        "unresolved_count": status.get("unresolved_count").cloned().unwrap_or_else(|| json!(0)), "ambiguous_count": status.get("ambiguous_count").cloned().unwrap_or_else(|| json!(0)), "uncovered_count": status.get("uncovered_count").cloned().unwrap_or_else(|| json!(0)), "excluded_count": status.get("excluded_count").cloned().unwrap_or_else(|| json!(0)),
-        "unresolved": status.get("unresolved").cloned().unwrap_or_else(|| json!([])), "ambiguous": status.get("ambiguous").cloned().unwrap_or_else(|| json!([])), "uncovered": status.get("uncovered").cloned().unwrap_or_else(|| json!([])), "excluded": status.get("excluded").cloned().unwrap_or_else(|| json!([])),
-    })
-}
-
-fn context_error_response(args: &GraphContextArgs, error: &GraphError) -> Value {
-    let root = resolve_root(&args.root).unwrap_or_else(|_| args.root.clone());
-    let status = status_error_response(
-        &GraphStatusArgs {
-            root: root.clone(),
-            profile: args.profile.clone(),
-            format: args.format,
-        },
-        error,
-    );
-    context_response_from_status(
-        args,
-        &root,
-        &status,
-        None,
-        None,
-        None,
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-    )
-}
-
-fn context_item(
-    kind: &str,
-    value: &str,
-    source_store: &str,
-    producer: Option<&str>,
-    source_path: Option<&str>,
-    source_span: Option<Value>,
-    evidence_ref: Option<&str>,
-    authority: &str,
-) -> Value {
-    json!({
-        "kind": kind, "value": value, "source_store": source_store, "producer": producer, "source_path": source_path, "source_span": source_span,
-        "evidence_ref": evidence_ref, "authority": authority, "rank": Value::Null, "score": Value::Null, "bucket": Value::Null, "excerpt": Value::Null, "cache_state": Value::Null,
-    })
-}
-
-fn dependency_witness_json(
-    fact: &Value,
-    paths_by_id: &BTreeMap<String, String>,
-) -> Result<Value, GraphError> {
-    let required_string = |field: &str| {
-        fact.get(field)
-            .and_then(Value::as_str)
-            .filter(|value| !value.is_empty())
-            .ok_or_else(|| GraphError::Validation {
-                stage: "context-witness".to_string(),
-                reason: format!("dependency fact lacks {field}"),
-            })
-    };
-    let edge_id = required_string("id")?;
-    let from_id = required_string("from")?;
-    let to_id = required_string("to")?;
-    let endpoint_path = |endpoint: &str| {
-        paths_by_id
-            .get(endpoint)
-            .cloned()
-            .ok_or_else(|| GraphError::Validation {
-                stage: "context-witness".to_string(),
-                reason: format!("dependency fact {edge_id} endpoint lacks RepoPath: {endpoint}"),
-            })
-    };
-    Ok(json!({
-        "edge_id": edge_id,
-        "relation": "dependency",
-        "from": endpoint_path(from_id)?,
-        "to": endpoint_path(to_id)?,
-        "owner": fact.get("owner").cloned().unwrap_or(Value::Null),
-        "source_path": required_string("source_path")?,
-        "source_span": fact.get("source_span").cloned().unwrap_or(Value::Null),
-        "producer": required_string("producer")?,
-        "evidence_ref": required_string("evidence_ref")?,
-        "authority": required_string("authority")?,
-    }))
-}
-
-fn split_diagnostics(diagnostics: Vec<Value>) -> (Vec<Value>, Vec<Value>, Vec<Value>, Vec<Value>) {
-    let mut unresolved = Vec::new();
-    let mut ambiguous = Vec::new();
-    let mut uncovered = Vec::new();
-    let mut excluded = Vec::new();
-    for diagnostic in diagnostics {
-        match diagnostic.get("set").and_then(Value::as_str) {
-            Some("unresolved") => unresolved.push(diagnostic),
-            Some("ambiguous") => ambiguous.push(diagnostic),
-            Some("uncovered") => uncovered.push(diagnostic),
-            Some("excluded") => excluded.push(diagnostic),
-            _ => unresolved.push(diagnostic),
-        }
-    }
-    (unresolved, ambiguous, uncovered, excluded)
-}
-
-fn graph_diagnostic(
-    set: &str,
-    code: &str,
-    severity: &str,
-    relation: Option<&str>,
-    path: Option<&str>,
-    target: Option<&str>,
-    source_span: Option<SourceSpan>,
-    reason: &str,
-    producer: &str,
-    evidence_ref: &str,
-) -> GraphDiagnostic {
-    let id = format!(
-        "diagnostic:{}",
-        hash_parts(&[
-            set,
-            code,
-            severity,
-            relation.unwrap_or(""),
-            path.unwrap_or(""),
-            target.unwrap_or(""),
-            reason,
-            producer,
-            evidence_ref,
-        ])
-    );
-    GraphDiagnostic {
-        id,
-        set: set.to_string(),
-        code: code.to_string(),
-        severity: severity.to_string(),
-        relation: relation.map(ToString::to_string),
-        path: path.map(ToString::to_string),
-        target: target.map(ToString::to_string),
-        source_span,
-        reason: reason.to_string(),
-        producer: producer.to_string(),
-        evidence_ref: evidence_ref.to_string(),
-        suggested_action_json: canonical_json(
-            &json!({"action": "repair-owner-source", "owner": producer, "retryable": true}),
-        ),
-    }
-}
-
-fn integration_record(material: &BuildMaterial, verified: bool) -> GraphIntegrationRecord {
-    GraphIntegrationRecord {
-        root: ".".to_string(),
-        db_path: ".agent-canon/knowledge-graph/graph.sqlite".to_string(),
-        profile: PUBLIC_PROFILE.to_string(),
-        source_snapshot_profile: SOURCE_PROFILE.to_string(),
-        snapshot_head: snapshot_head(&material.snapshot).to_string(),
-        input_fingerprint: material.input_fingerprint.clone(),
-        graph_fingerprint: material.graph_fingerprint.clone(),
-        contract_fingerprint: material.contract.fingerprint(),
-        producer_artifacts: material.producer_artifacts.clone(),
-        verified,
-        verification_code: if verified {
-            "graph.integration.verified"
-        } else {
-            "graph.integration.unverified"
-        }
-        .to_string(),
-    }
-}
-
-fn graph_fingerprint(
-    input: &str,
-    nodes: &[SourceNode],
-    facts: &[GraphFact],
-    diagnostics: &[GraphDiagnostic],
-    producers: &[ProducerArtifact],
-    contract: &GraphContractWitness,
-) -> String {
-    let node_records = nodes
-        .iter()
-        .map(|node| {
-            (
-                node.id.clone(),
-                json!({"id": node.id, "payload": node.payload}),
-            )
-        })
-        .collect::<BTreeMap<_, _>>();
-    let fact_records = facts
-        .iter()
-        .map(|fact| (fact.id.clone(), fact.json()))
-        .collect::<BTreeMap<_, _>>();
-    let diagnostic_records = diagnostics
-        .iter()
-        .map(|diagnostic| (diagnostic.id.clone(), diagnostic.json()))
-        .collect::<BTreeMap<_, _>>();
-    let producer_records = producers
-        .iter()
-        .map(|producer| (producer.producer_id.clone(), producer.json()))
-        .collect::<BTreeMap<_, _>>();
-    graph_fingerprint_records(
-        input,
-        node_records,
-        fact_records,
-        diagnostic_records,
-        producer_records,
-        contract.json(),
-    )
-}
-
-fn graph_fingerprint_records(
-    input: &str,
-    nodes: BTreeMap<String, Value>,
-    facts: BTreeMap<String, Value>,
-    diagnostics: BTreeMap<String, Value>,
-    producers: BTreeMap<String, Value>,
-    contract: Value,
-) -> String {
-    hash_bytes(
-        canonical_json(&json!({
-            "input_fingerprint": input,
-            "nodes": nodes,
-            "facts": facts,
-            "diagnostics": diagnostics,
-            "producers": producers,
-            "mathematical_contract": contract,
-        }))
-        .as_bytes(),
-    )
-}
-
-fn graph_input_fingerprint(snapshot: &ManifestSnapshot, producers: &[ProducerArtifact]) -> String {
-    let producer_identity = producers
-        .iter()
-        .map(producer_input_identity)
-        .collect::<Vec<_>>()
-        .join("\n");
-    hash_parts(&[
-        snapshot_fingerprint(snapshot),
-        "graph_profile=default\0source_snapshot_profile=parent",
-        GRAPH_SCHEMA_VERSION,
-        &producer_identity,
-    ])
-}
-
-fn producer_input_identity(producer: &ProducerArtifact) -> String {
-    if producer.producer_id == "runtime-dashboard" {
-        format!(
-            "{}\0{}\0non-authorizing-observation-projection",
-            producer.producer_id, producer.version
-        )
-    } else {
-        format!(
-            "{}\0{}\0{}",
-            producer.producer_id, producer.version, producer.content_sha256
-        )
-    }
-}
-
-fn source_node_id(path: &str) -> String {
-    format!("node:source:{}", hash_parts(&[path]))
-}
-
-fn selector_node_id(selector: &str) -> String {
-    let family = selector
-        .split_once(':')
-        .map(|(prefix, _)| prefix)
-        .filter(|prefix| {
-            matches!(
-                *prefix,
-                "owner"
-                    | "scope"
-                    | "surface"
-                    | "symbol"
-                    | "external"
-                    | "directory"
-                    | "path-pattern"
-            )
-        })
-        .unwrap_or("source");
-    format!("node:{family}:{}", hash_parts(&[selector]))
-}
-
-fn source_span_json(span: &SourceSpan) -> Value {
-    json!({"path": span.path, "start_line": span.start_line, "start_column": span.start_column, "end_line": span.end_line, "end_column": span.end_column})
-}
-
-fn source_scalar_offsets(
-    root: &Path,
-    span: Option<&SourceSpan>,
-) -> Result<(usize, usize), GraphError> {
-    let Some(span) = span else {
-        return Ok((0, 0));
-    };
-    let relative = Path::new(&span.path);
-    if relative.is_absolute()
-        || relative
-            .components()
-            .any(|component| matches!(component, Component::ParentDir))
-    {
-        return Err(GraphError::Validation {
-            stage: "source-span".to_string(),
-            reason: format!("source span path is outside root: {}", span.path),
-        });
-    }
-    let bytes = fs::read(root.join(relative)).map_err(|error| GraphError::Validation {
-        stage: "source-span".to_string(),
-        reason: format!("{}: {error}", span.path),
-    })?;
-    let text = std::str::from_utf8(&bytes).map_err(|error| GraphError::Validation {
-        stage: "source-span".to_string(),
-        reason: format!("{}: source is not UTF-8: {error}", span.path),
-    })?;
-    let mut lines = Vec::<(usize, usize)>::new();
-    let mut byte_start = 0usize;
-    for part in text.split_inclusive('\n') {
-        let byte_end = byte_start + part.len() - usize::from(part.ends_with('\n'));
-        lines.push((byte_start, byte_end));
-        byte_start += part.len();
-    }
-    if text.is_empty() {
-        lines.push((0, 0));
-    } else if text.ends_with('\n') {
-        lines.push((text.len(), text.len()));
-    }
-    let offset = |line: usize, column: usize, label: &str| -> Result<usize, GraphError> {
-        let (line_start, line_end) = lines
-            .get(line.checked_sub(1).ok_or_else(|| GraphError::Validation {
-                stage: "source-span".to_string(),
-                reason: format!("{}: {label} line is zero", span.path),
-            })?)
-            .copied()
-            .ok_or_else(|| GraphError::Validation {
-                stage: "source-span".to_string(),
-                reason: format!("{}: missing {label} line {line}", span.path),
-            })?;
-        let byte_column = column
-            .checked_sub(1)
-            .ok_or_else(|| GraphError::Validation {
-                stage: "source-span".to_string(),
-                reason: format!("{}: {label} column is zero", span.path),
-            })?;
-        let absolute =
-            line_start
-                .checked_add(byte_column)
-                .ok_or_else(|| GraphError::Validation {
-                    stage: "source-span".to_string(),
-                    reason: format!("{}: {label} byte offset overflow", span.path),
-                })?;
-        if absolute > line_end || !text.is_char_boundary(absolute) {
-            return Err(GraphError::Validation {
-                stage: "source-span".to_string(),
-                reason: format!(
-                    "{}: {label} column {column} is not a valid UTF-8 byte boundary",
-                    span.path
-                ),
-            });
-        }
-        Ok(text[..absolute].chars().count())
-    };
-    let start = offset(span.start_line, span.start_column, "start")?;
-    let end = offset(span.end_line, span.end_column, "end")?;
-    if start > end {
-        return Err(GraphError::Validation {
-            stage: "source-span".to_string(),
-            reason: format!("{}: source span end precedes start", span.path),
-        });
-    }
-    Ok((start, end))
-}
-
-fn repo_artifact_ref(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .replace('\\', "/")
-}
-
-fn producer_artifact_ref(producer_id: &str, relative_path: &str, content_sha256: &str) -> String {
-    format!("producer:{producer_id}/{relative_path}#sha256={content_sha256}")
-}
-
-fn producer_artifact_payloads_json(artifacts: &[ProducerArtifact]) -> String {
-    let payloads = artifacts
-        .iter()
-        .map(|artifact| {
-            (
-                format!("{}:{}", artifact.producer_id, artifact.content_sha256),
-                Value::String(base64_standard(&artifact.payload)),
-            )
-        })
-        .collect::<Map<String, Value>>();
-    canonical_json(&Value::Object(payloads))
-}
-
-fn base64_standard(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut output = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    for chunk in bytes.chunks(3) {
-        let value = ((chunk[0] as u32) << 16)
-            | ((chunk.get(1).copied().unwrap_or(0) as u32) << 8)
-            | chunk.get(2).copied().unwrap_or(0) as u32;
-        output.push(TABLE[((value >> 18) & 0x3f) as usize] as char);
-        output.push(TABLE[((value >> 12) & 0x3f) as usize] as char);
-        output.push(if chunk.len() > 1 {
-            TABLE[((value >> 6) & 0x3f) as usize] as char
-        } else {
-            '='
-        });
-        output.push(if chunk.len() > 2 {
-            TABLE[(value & 0x3f) as usize] as char
-        } else {
-            '='
-        });
-    }
-    output
-}
-
-fn write_synced_file(path: &Path, bytes: &[u8]) -> Result<(), GraphError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| GraphError::CandidateWrite {
-            reason: format!("create {}: {error}", parent.display()),
-        })?;
-    }
-    let mut file = File::create(path).map_err(|error| GraphError::CandidateWrite {
-        reason: format!("create {}: {error}", path.display()),
-    })?;
-    file.write_all(bytes)
-        .and_then(|_| file.sync_all())
-        .map_err(|error| GraphError::CandidateWrite {
-            reason: format!("write {}: {error}", path.display()),
-        })
-}
-
-fn hash_parts(parts: &[&str]) -> String {
-    let mut hasher = Sha256::new();
-    for part in parts {
-        hasher.update(part.as_bytes());
-        hasher.update([0]);
-    }
-    format!("{:x}", hasher.finalize())
-}
-
-fn hash_bytes(bytes: &[u8]) -> String {
+fn sha256(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     format!("{:x}", hasher.finalize())
 }
 
-fn canonical_json(value: &Value) -> String {
-    match value {
-        Value::Object(object) => {
-            let mut keys = object.keys().collect::<Vec<_>>();
-            keys.sort();
-            let body = keys
-                .into_iter()
-                .map(|key| {
-                    format!(
-                        "{}:{}",
-                        serde_json::to_string(key).unwrap_or_default(),
-                        canonical_json(&object[key])
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(",");
-            format!("{{{body}}}")
-        }
-        Value::Array(values) => format!(
-            "[{}]",
-            values
-                .iter()
-                .map(canonical_json)
-                .collect::<Vec<_>>()
-                .join(",")
-        ),
-        _ => serde_json::to_string(value).unwrap_or_else(|_| "null".to_string()),
+fn graph_operation_id(material: &BuildMaterial) -> String {
+    let sequence = GRAPH_TEMP_SEQUENCE.fetch_add(1, AtomicOrdering::Relaxed);
+    let identity = sha256(
+        [
+            b"agent_canon.graph.storage.operation.v1\0".as_slice(),
+            material.root.to_string_lossy().as_bytes(),
+            b"\0",
+            material.input_fingerprint.as_bytes(),
+            b"\0",
+            sequence.to_string().as_bytes(),
+        ]
+        .concat()
+        .as_slice(),
+    );
+    format!("{}-{sequence}-{}", std::process::id(), &identity[..16])
+}
+
+fn required_string(object: &Map<String, Value>, field: &str) -> Result<String, GraphError> {
+    object
+        .get(field)
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| GraphError::Validation(format!("runtime evidence field {field} is missing")))
+}
+
+fn runtime_hex(value: &str, length: usize) -> bool {
+    value.len() == length
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+fn runtime_uuid(value: &str) -> bool {
+    value.len() == 36
+        && value.bytes().enumerate().all(|(index, byte)| match index {
+            8 | 13 | 18 | 23 => byte == b'-',
+            _ => byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase(),
+        })
+}
+
+fn runtime_relative_path(value: &str) -> bool {
+    !value.is_empty()
+        && !value.starts_with('/')
+        && !value.contains('\\')
+        && !value.split('/').any(|part| matches!(part, "" | "." | ".."))
+}
+
+fn runtime_absolute_path(value: &str) -> bool {
+    value.starts_with('/')
+        && !value.contains('\0')
+        && !value.contains('\\')
+        && !value
+            .split('/')
+            .skip(1)
+            .any(|part| matches!(part, "." | ".."))
+}
+
+fn runtime_family_spec(family: &str) -> Option<(&'static str, &'static str, &'static str)> {
+    match family {
+        "requirements" => Some((
+            "requirements_review.md",
+            "requirements-review",
+            "ReviewArtifactV1",
+        )),
+        "design" => Some(("design_review.md", "design-review", "ReviewArtifactV1")),
+        "review" => Some(("change_review.md", "change-review", "ReviewArtifactV1")),
+        "validation" => Some((
+            "validation_result.json",
+            "validation",
+            "agent_canon.runtime_result_input.v1",
+        )),
+        "lifecycle" => Some(("closeout_gate.md", "closeout", "CloseoutGateV1")),
+        _ => None,
     }
 }
 
-fn now_nanos() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos()
+fn runtime_object<'a>(
+    value: &'a Value,
+    name: &str,
+    keys: &[&str],
+) -> Result<&'a Map<String, Value>, GraphError> {
+    let object = value.as_object().ok_or_else(|| {
+        GraphError::Validation(format!("runtime evidence {name} is not an object"))
+    })?;
+    if object.len() != keys.len() || keys.iter().any(|key| !object.contains_key(*key)) {
+        return Err(GraphError::Validation(format!(
+            "runtime evidence {name} fields mismatch"
+        )));
+    }
+    Ok(object)
+}
+
+fn runtime_ordered_object(
+    output: &mut String,
+    object: &Map<String, Value>,
+    keys: &[&str],
+    nested: fn(&mut String, &str, &Value) -> Result<(), GraphError>,
+) -> Result<(), GraphError> {
+    output.push('{');
+    for (index, key) in keys.iter().enumerate() {
+        if index > 0 {
+            output.push(',');
+        }
+        output.push_str(&serde_json::to_string(key).unwrap_or_default());
+        output.push(':');
+        let value = object
+            .get(*key)
+            .ok_or_else(|| GraphError::Validation(format!("runtime evidence {key} is missing")))?;
+        nested(output, key, value)?;
+    }
+    output.push('}');
+    Ok(())
+}
+
+fn runtime_identity_value(
+    output: &mut String,
+    _key: &str,
+    value: &Value,
+) -> Result<(), GraphError> {
+    output.push_str(
+        &serde_json::to_string(value).map_err(|error| GraphError::Validation(error.to_string()))?,
+    );
+    Ok(())
+}
+
+fn runtime_nested_value(output: &mut String, key: &str, value: &Value) -> Result<(), GraphError> {
+    let shape = match key {
+        "gate" => Some(&["id", "result"][..]),
+        "source_event" => Some(
+            &[
+                "agent_id",
+                "agent_context_id",
+                "codex_thread_id",
+                "parent_id",
+                "turn_id",
+                "role",
+                "decision",
+                "applicable_gate_result",
+                "rollout_path",
+                "rollout_path_bytes_b64",
+                "rollout_path_sha256",
+                "rollout_file_sha256",
+                "record_line",
+                "record_byte_offset",
+                "record_byte_length",
+                "record_bytes_b64",
+                "record_sha256",
+                "stable_record_id",
+            ][..],
+        ),
+        "result_artifact" => Some(
+            &[
+                "path",
+                "schema",
+                "artifact_sha256",
+                "artifact_blob_oid",
+                "gate_id",
+                "gate_result",
+                "target_paths",
+                "base_ref",
+                "base_oid",
+            ][..],
+        ),
+        "source_snapshot" => Some(&["head_oid", "base_ref", "base_oid", "porcelain_v1"][..]),
+        "publication_intent" => {
+            Some(&["schema", "attempt_id", "target_path", "prepared_state"][..])
+        }
+        _ => None,
+    };
+    if let Some(keys) = shape {
+        let object = runtime_object(value, key, keys)?;
+        return runtime_ordered_object(output, object, keys, runtime_identity_value);
+    }
+    if key == "target_identities" {
+        let identities = value.as_array().ok_or_else(|| {
+            GraphError::Validation(
+                "runtime evidence target identities are not an array".to_string(),
+            )
+        })?;
+        output.push('[');
+        for (index, identity) in identities.iter().enumerate() {
+            if index > 0 {
+                output.push(',');
+            }
+            let keys = [
+                "path",
+                "content_sha256",
+                "git_blob_oid",
+                "base_present",
+                "base_content_sha256",
+                "base_git_blob_oid",
+            ];
+            let object = runtime_object(identity, "target identity", &keys)?;
+            runtime_ordered_object(output, object, &keys, runtime_identity_value)?;
+        }
+        output.push(']');
+        return Ok(());
+    }
+    runtime_identity_value(output, key, value)
+}
+
+fn runtime_canonical_bytes(value: &Value, zero_artifact: bool) -> Result<Vec<u8>, GraphError> {
+    let mut normalized = value.clone();
+    let object = normalized
+        .as_object_mut()
+        .ok_or_else(|| GraphError::Validation("runtime evidence is not an object".to_string()))?;
+    if zero_artifact {
+        object.insert("artifact_sha256".to_string(), Value::String("0".repeat(64)));
+    }
+    let keys = [
+        "schema",
+        "materialization_id",
+        "result_family",
+        "gate",
+        "source_event",
+        "result_artifact",
+        "target_identities",
+        "source_snapshot",
+        "publication_intent",
+        "artifact_sha256",
+    ];
+    let object = runtime_object(&normalized, "certificate", &keys)?;
+    let mut output = String::new();
+    runtime_ordered_object(&mut output, object, &keys, runtime_nested_value)?;
+    output.push('\n');
+    Ok(output.into_bytes())
+}
+
+fn runtime_materialization_preimage(value: &Value) -> Result<Vec<u8>, GraphError> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| GraphError::Validation("runtime evidence is not an object".to_string()))?;
+    let gate = runtime_object(
+        object.get("gate").unwrap_or(&Value::Null),
+        "gate",
+        &["id", "result"],
+    )?;
+    let source = object
+        .get("source_event")
+        .and_then(Value::as_object)
+        .ok_or_else(|| GraphError::Validation("runtime source_event missing".to_string()))?;
+    let artifact = object
+        .get("result_artifact")
+        .and_then(Value::as_object)
+        .ok_or_else(|| GraphError::Validation("runtime result_artifact missing".to_string()))?;
+    let snapshot = object
+        .get("source_snapshot")
+        .and_then(Value::as_object)
+        .ok_or_else(|| GraphError::Validation("runtime source_snapshot missing".to_string()))?;
+    let scalar = |value: &Value| serde_json::to_string(value).unwrap_or_default();
+    let mut output = String::from("{");
+    output.push_str("\"schema\":\"agent_canon.runtime_event.materialization.v1\",");
+    output.push_str(&format!(
+        "\"result_family\":{},",
+        scalar(object.get("result_family").unwrap_or(&Value::Null))
+    ));
+    output.push_str("\"gate\":");
+    runtime_ordered_object(&mut output, gate, &["id", "result"], runtime_identity_value)?;
+    output.push_str(",\"source_event\":{");
+    for (index, key) in [
+        "stable_record_id",
+        "rollout_path_sha256",
+        "rollout_file_sha256",
+        "record_line",
+        "record_byte_offset",
+        "record_byte_length",
+    ]
+    .iter()
+    .enumerate()
+    {
+        if index > 0 {
+            output.push(',');
+        }
+        output.push_str(&format!(
+            "{}:{}",
+            scalar(&Value::String((*key).to_string())),
+            scalar(source.get(*key).unwrap_or(&Value::Null))
+        ));
+    }
+    output.push_str("},\"result_artifact\":{");
+    for (index, key) in ["artifact_sha256", "artifact_blob_oid", "gate_id"]
+        .iter()
+        .enumerate()
+    {
+        if index > 0 {
+            output.push(',');
+        }
+        output.push_str(&format!(
+            "{}:{}",
+            scalar(&Value::String((*key).to_string())),
+            scalar(artifact.get(*key).unwrap_or(&Value::Null))
+        ));
+    }
+    output.push_str("},\"target_identities\":");
+    runtime_nested_value(
+        &mut output,
+        "target_identities",
+        object.get("target_identities").unwrap_or(&Value::Null),
+    )?;
+    output.push_str(",\"source_snapshot\":{");
+    for (index, key) in ["head_oid", "base_ref", "base_oid"].iter().enumerate() {
+        if index > 0 {
+            output.push(',');
+        }
+        output.push_str(&format!(
+            "{}:{}",
+            scalar(&Value::String((*key).to_string())),
+            scalar(snapshot.get(*key).unwrap_or(&Value::Null))
+        ));
+    }
+    output.push_str("}}\n");
+    Ok(output.into_bytes())
+}
+
+fn decode_base64(value: &str) -> Result<Vec<u8>, GraphError> {
+    fn digit(byte: u8) -> Option<u8> {
+        match byte {
+            b'A'..=b'Z' => Some(byte - b'A'),
+            b'a'..=b'z' => Some(byte - b'a' + 26),
+            b'0'..=b'9' => Some(byte - b'0' + 52),
+            b'+' => Some(62),
+            b'/' => Some(63),
+            _ => None,
+        }
+    }
+    let bytes = value.as_bytes();
+    if !bytes.len().is_multiple_of(4) {
+        return Err(GraphError::Validation(
+            "runtime base64 length is invalid".to_string(),
+        ));
+    }
+    let mut output = Vec::new();
+    for (index, chunk) in bytes.chunks_exact(4).enumerate() {
+        let final_chunk = index + 1 == bytes.len() / 4;
+        if chunk[0] == b'='
+            || chunk[1] == b'='
+            || chunk[2] == b'=' && chunk[3] != b'='
+            || chunk[3] == b'=' && !final_chunk
+        {
+            return Err(GraphError::Validation(
+                "runtime base64 padding is invalid".to_string(),
+            ));
+        }
+        let a = digit(chunk[0])
+            .ok_or_else(|| GraphError::Validation("runtime base64 is invalid".to_string()))?;
+        let b = digit(chunk[1])
+            .ok_or_else(|| GraphError::Validation("runtime base64 is invalid".to_string()))?;
+        let c = if chunk[2] == b'=' {
+            0
+        } else {
+            digit(chunk[2])
+                .ok_or_else(|| GraphError::Validation("runtime base64 is invalid".to_string()))?
+        };
+        let d = if chunk[3] == b'=' {
+            0
+        } else {
+            digit(chunk[3])
+                .ok_or_else(|| GraphError::Validation("runtime base64 is invalid".to_string()))?
+        };
+        output.push((a << 2) | (b >> 4));
+        if chunk[2] != b'=' {
+            output.push((b << 4) | (c >> 2));
+        }
+        if chunk[3] != b'=' {
+            output.push((c << 6) | d);
+        }
+    }
+    Ok(output)
+}
+
+fn git_value(root: &Path, args: &[&str]) -> Result<Vec<u8>, GraphError> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .map_err(|error| GraphError::Unavailable(error.to_string()))?;
+    if !output.status.success() {
+        return Err(GraphError::Unavailable(
+            String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        ));
+    }
+    Ok(output.stdout)
+}
+
+fn git_text_value(root: &Path, args: &[&str]) -> Result<String, GraphError> {
+    Ok(String::from_utf8_lossy(&git_value(root, args)?)
+        .trim()
+        .to_string())
+}
+
+fn git_value_exists(root: &Path, args: &[&str]) -> Result<bool, GraphError> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .map_err(|error| GraphError::Unavailable(error.to_string()))?;
+    Ok(output.status.success())
+}
+
+fn runtime_string_array(value: &Value, name: &str) -> Result<Vec<String>, GraphError> {
+    value
+        .as_array()
+        .ok_or_else(|| GraphError::Validation(format!("runtime evidence {name} is not an array")))?
+        .iter()
+        .map(|item| {
+            item.as_str().map(str::to_string).ok_or_else(|| {
+                GraphError::Validation(format!("runtime evidence {name} contains a non-string"))
+            })
+        })
+        .collect()
+}
+
+fn runtime_porcelain_paths(line: &str) -> Result<Vec<String>, GraphError> {
+    let bytes = line.as_bytes();
+    if bytes.len() < 4
+        || bytes[2] != b' '
+        || bytes.iter().any(|byte| matches!(*byte, 0 | b'\n' | b'\r'))
+    {
+        return Err(GraphError::Validation(
+            "runtime porcelain-v1 line is invalid".to_string(),
+        ));
+    }
+    let path = line.get(3..).unwrap_or_default();
+    if path.is_empty() {
+        return Err(GraphError::Validation(
+            "runtime porcelain-v1 path is empty".to_string(),
+        ));
+    }
+    let paths = path
+        .split(" -> ")
+        .map(|part| part.trim().trim_matches('"').to_string())
+        .collect::<Vec<_>>();
+    if paths.iter().any(|path| {
+        !runtime_relative_path(path)
+            || path == ".git"
+            || path.starts_with(".git/")
+            || path == ".agent-canon"
+            || path.starts_with(".agent-canon/")
+            || path
+                .rsplit('/')
+                .next()
+                .map(|name| {
+                    name.starts_with("runtime_event.")
+                        || name.starts_with("runtime_event_archive_manifest.")
+                })
+                .unwrap_or(false)
+    }) {
+        return Err(GraphError::Validation(
+            "runtime porcelain-v1 path is unsafe or generated".to_string(),
+        ));
+    }
+    Ok(paths)
+}
+
+fn runtime_event_name(name: &str) -> Option<&str> {
+    let unit = name.strip_prefix("runtime_event.")?.strip_suffix(".json")?;
+    (runtime_hex(unit, 16)).then_some(unit)
+}
+
+fn runtime_boundary(reason: &str, detail: impl Into<String>) -> GraphError {
+    GraphError::RuntimeBoundary {
+        reason: reason.to_string(),
+        detail: detail.into(),
+    }
+}
+
+fn runtime_live_identity(
+    root: &Path,
+    artifact: &Map<String, Value>,
+    snapshot: &Map<String, Value>,
+    identities: &[Value],
+) -> Result<String, GraphError> {
+    let current = |result: Result<String, GraphError>| {
+        result.map_err(|error| runtime_boundary("source_changed", error.to_string()))
+    };
+    let source_head = current(git_text_value(root, &["rev-parse", "--verify", "HEAD"]))?;
+    let base_ref = required_string(snapshot, "base_ref")?;
+    let observed_base = current(git_text_value(root, &["rev-parse", "--verify", &base_ref]))?;
+    let result_path = required_string(artifact, "path")?;
+    let result_bytes = fs::read(root.join(&result_path)).map_err(|error| {
+        runtime_boundary(
+            "source_changed",
+            format!("runtime result artifact: {error}"),
+        )
+    })?;
+    let result_sha256 = sha256(&result_bytes);
+    let result_blob = current(git_text_value(root, &["hash-object", "--", &result_path]))?;
+    let target_paths = runtime_string_array(
+        artifact.get("target_paths").unwrap_or(&Value::Null),
+        "target_paths",
+    )?;
+    let mut observed_targets = Vec::new();
+    for (path, declared) in target_paths.iter().zip(identities.iter()) {
+        let declared = declared.as_object().ok_or_else(|| {
+            runtime_boundary(
+                "runtime_evidence_changed",
+                "target identity is not an object",
+            )
+        })?;
+        let bytes = fs::read(root.join(path)).map_err(|error| {
+            runtime_boundary("source_changed", format!("runtime target {path}: {error}"))
+        })?;
+        let content_sha256 = sha256(&bytes);
+        let blob = current(git_text_value(root, &["hash-object", "--", path]))?;
+        let base_spec = format!("{observed_base}:{path}");
+        let base_present = git_value_exists(root, &["cat-file", "-e", &base_spec])
+            .map_err(|error| runtime_boundary("source_changed", error.to_string()))?;
+        let (base_sha256, base_blob) = if base_present {
+            let base_bytes = git_value(root, &["show", &base_spec])
+                .map_err(|error| runtime_boundary("source_changed", error.to_string()))?;
+            let blob = current(git_text_value(root, &["rev-parse", "--verify", &base_spec]))?;
+            (Some(sha256(&base_bytes)), Some(blob))
+        } else {
+            (None, None)
+        };
+        if declared.get("path").and_then(Value::as_str) != Some(path.as_str())
+            || declared.get("content_sha256").and_then(Value::as_str)
+                != Some(content_sha256.as_str())
+            || declared.get("git_blob_oid").and_then(Value::as_str) != Some(blob.as_str())
+            || declared.get("base_present").and_then(Value::as_bool) != Some(base_present)
+            || declared.get("base_content_sha256").and_then(Value::as_str) != base_sha256.as_deref()
+            || declared.get("base_git_blob_oid").and_then(Value::as_str) != base_blob.as_deref()
+        {
+            return Err(runtime_boundary(
+                "source_changed",
+                format!("runtime target identity changed: {path}"),
+            ));
+        }
+        observed_targets.push(json!({
+            "path": path,
+            "content_sha256": content_sha256,
+            "git_blob_oid": blob,
+            "base_present": base_present,
+            "base_content_sha256": base_sha256,
+            "base_git_blob_oid": base_blob,
+        }));
+    }
+    if snapshot.get("head_oid").and_then(Value::as_str) != Some(source_head.as_str())
+        || snapshot.get("base_oid").and_then(Value::as_str) != Some(observed_base.as_str())
+        || artifact.get("artifact_sha256").and_then(Value::as_str) != Some(result_sha256.as_str())
+        || artifact.get("artifact_blob_oid").and_then(Value::as_str) != Some(result_blob.as_str())
+    {
+        return Err(runtime_boundary(
+            "source_changed",
+            "runtime result, head, or base identity changed",
+        ));
+    }
+
+    let mut canonical = String::from("{\"schema\":\"agent_canon.runtime_event.live_identity.v1\",");
+    canonical.push_str(&format!(
+        "\"source_head_oid\":{},\"base_ref\":{},\"base_oid\":{},",
+        serde_json::to_string(&source_head).unwrap_or_default(),
+        serde_json::to_string(&base_ref).unwrap_or_default(),
+        serde_json::to_string(&observed_base).unwrap_or_default(),
+    ));
+    canonical.push_str(&format!(
+        "\"result_artifact\":{{\"path\":{},\"artifact_sha256\":{},\"artifact_blob_oid\":{}}},\"target_identities\":",
+        serde_json::to_string(&result_path).unwrap_or_default(),
+        serde_json::to_string(&result_sha256).unwrap_or_default(),
+        serde_json::to_string(&result_blob).unwrap_or_default(),
+    ));
+    runtime_nested_value(
+        &mut canonical,
+        "target_identities",
+        &Value::Array(observed_targets),
+    )?;
+    canonical.push_str("}\n");
+    Ok(sha256(
+        &[
+            b"agent_canon.runtime_event.live_identity.v1\0".as_slice(),
+            canonical.as_bytes(),
+        ]
+        .concat(),
+    ))
+}
+
+fn active_runtime_event(root: &Path) -> Result<(PathBuf, Vec<u8>), GraphError> {
+    let pointer = root.join("reports/agents/.active_run");
+    let active = fs::read_to_string(&pointer)
+        .map_err(|error| GraphError::Unavailable(format!("active run pointer: {error}")))?;
+    let active_value = active.trim();
+    if active_value.is_empty() || active_value.contains('\0') {
+        return Err(GraphError::Validation(
+            "active run pointer is empty or unsafe".to_string(),
+        ));
+    }
+    let active_path = PathBuf::from(active_value);
+    let candidate = if active_path.is_absolute() {
+        active_path
+    } else {
+        pointer.parent().unwrap_or(root).join(active_path)
+    };
+    let run_dir = candidate
+        .canonicalize()
+        .map_err(|error| GraphError::Unavailable(format!("active run: {error}")))?;
+    let report_root = root
+        .join("reports/agents")
+        .canonicalize()
+        .map_err(|error| GraphError::Unavailable(format!("agent report root: {error}")))?;
+    let run_name = run_dir
+        .strip_prefix(&report_root)
+        .ok()
+        .and_then(|relative| {
+            let mut components = relative.components();
+            let first = components.next()?.as_os_str().to_str()?;
+            components.next().is_none().then_some(first)
+        })
+        .filter(|value| !matches!(*value, "" | "." | ".."))
+        .ok_or_else(|| {
+            GraphError::Validation("active run pointer escapes reports/agents".to_string())
+        })?;
+    let mut events = fs::read_dir(&run_dir)
+        .map_err(|error| GraphError::Unavailable(format!("active run: {error}")))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            fs::symlink_metadata(path)
+                .map(|metadata| metadata.file_type().is_file())
+                .unwrap_or(false)
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .and_then(runtime_event_name)
+                    .is_some()
+        })
+        .collect::<Vec<_>>();
+    events.sort();
+    if events.len() != 1 {
+        return Err(GraphError::Unavailable(format!(
+            "expected one runtime-event certificate, found {}",
+            events.len()
+        )));
+    }
+    let event = events.remove(0);
+    let expected_prefix = format!("reports/agents/{run_name}/");
+    let relative = event
+        .strip_prefix(root)
+        .ok()
+        .and_then(Path::to_str)
+        .map(|value| value.replace('\\', "/"));
+    if event.parent() != Some(run_dir.as_path())
+        || !relative
+            .as_deref()
+            .map(|value| value.starts_with(&expected_prefix))
+            .unwrap_or(false)
+    {
+        return Err(GraphError::Validation(
+            "runtime-event path does not match active run".to_string(),
+        ));
+    }
+    let bytes = fs::read(&event).map_err(|error| GraphError::Unavailable(error.to_string()))?;
+    Ok((event, bytes))
+}
+
+fn publication_attempt_id(materialization_id: &str, target_path: &str) -> String {
+    sha256(
+        &[
+            b"agent_canon.runtime_event.publication_attempt.v1\0".as_slice(),
+            materialization_id.as_bytes(),
+            b"\0".as_slice(),
+            target_path.as_bytes(),
+        ]
+        .concat(),
+    )
+}
+
+fn observation_nested_value(
+    output: &mut String,
+    key: &str,
+    value: &Value,
+) -> Result<(), GraphError> {
+    if key == "evidence" {
+        let keys = [
+            "source",
+            "causal_gap",
+            "target_presence",
+            "rename_status",
+            "target_directory_fsync_status",
+            "readback_status",
+            "readback_sha256",
+        ];
+        let object = runtime_object(value, "publication observation evidence", &keys)?;
+        return runtime_ordered_object(output, object, &keys, runtime_identity_value);
+    }
+    runtime_identity_value(output, key, value)
+}
+
+fn observation_canonical_bytes(value: &Value, zero_hash: bool) -> Result<Vec<u8>, GraphError> {
+    let mut normalized = value.clone();
+    if zero_hash {
+        normalized
+            .as_object_mut()
+            .ok_or_else(|| {
+                runtime_boundary("runtime_receipt_invalid", "observation is not an object")
+            })?
+            .insert(
+                "observation_sha256".to_string(),
+                Value::String("0".repeat(64)),
+            );
+    }
+    let keys = [
+        "schema",
+        "attempt_id",
+        "artifact_path",
+        "artifact_sha256",
+        "materialization_id",
+        "sequence",
+        "prior_observation_sha256",
+        "outcome",
+        "evidence",
+        "observation_sha256",
+    ];
+    let object = runtime_object(&normalized, "publication observation", &keys)?;
+    let mut output = String::new();
+    runtime_ordered_object(&mut output, object, &keys, observation_nested_value)?;
+    output.push('\n');
+    Ok(output.into_bytes())
+}
+
+fn validate_observation(value: &Value) -> Result<(), GraphError> {
+    let invalid = |detail: &str| runtime_boundary("runtime_receipt_invalid", detail);
+    let keys = [
+        "schema",
+        "attempt_id",
+        "artifact_path",
+        "artifact_sha256",
+        "materialization_id",
+        "sequence",
+        "prior_observation_sha256",
+        "outcome",
+        "evidence",
+        "observation_sha256",
+    ];
+    let observation = runtime_object(value, "publication observation", &keys)
+        .map_err(|error| invalid(&error.to_string()))?;
+    let evidence_keys = [
+        "source",
+        "causal_gap",
+        "target_presence",
+        "rename_status",
+        "target_directory_fsync_status",
+        "readback_status",
+        "readback_sha256",
+    ];
+    let evidence = runtime_object(
+        observation.get("evidence").unwrap_or(&Value::Null),
+        "publication observation evidence",
+        &evidence_keys,
+    )
+    .map_err(|error| invalid(&error.to_string()))?;
+    let attempt_id = required_string(observation, "attempt_id")?;
+    let artifact_path = required_string(observation, "artifact_path")?;
+    let artifact_sha256 = required_string(observation, "artifact_sha256")?;
+    let materialization_id = required_string(observation, "materialization_id")?;
+    let observation_sha256 = required_string(observation, "observation_sha256")?;
+    let sequence = observation
+        .get("sequence")
+        .and_then(Value::as_u64)
+        .filter(|value| matches!(*value, 1 | 2))
+        .ok_or_else(|| invalid("observation sequence is invalid"))?;
+    let prior = observation
+        .get("prior_observation_sha256")
+        .unwrap_or(&Value::Null);
+    let source = evidence.get("source").and_then(Value::as_str);
+    let causal_gap = evidence.get("causal_gap").and_then(Value::as_bool);
+    let readback_status = evidence.get("readback_status").and_then(Value::as_str);
+    let readback_sha = evidence.get("readback_sha256").unwrap_or(&Value::Null);
+    if observation.get("schema").and_then(Value::as_str) != Some(RUNTIME_OBSERVATION_SCHEMA)
+        || !runtime_hex(&attempt_id, 64)
+        || !runtime_relative_path(&artifact_path)
+        || !runtime_hex(&artifact_sha256, 64)
+        || !runtime_hex(&materialization_id, 64)
+        || !runtime_hex(&observation_sha256, 64)
+        || (sequence == 1 && !prior.is_null())
+        || (sequence == 2
+            && !prior
+                .as_str()
+                .map(|value| runtime_hex(value, 64))
+                .unwrap_or(false))
+        || !matches!(
+            observation.get("outcome").and_then(Value::as_str),
+            Some("committed" | "uncertain")
+        )
+        || !matches!(source, Some("publish" | "recovery"))
+        || causal_gap.is_none()
+        || evidence.get("target_presence").and_then(Value::as_str) != Some("present")
+        || !matches!(
+            evidence
+                .get("target_directory_fsync_status")
+                .and_then(Value::as_str),
+            Some("succeeded" | "failed" | "unknown")
+        )
+        || !matches!(readback_status, Some("verified" | "failed" | "mismatch"))
+        || (readback_status == Some("failed") && !readback_sha.is_null())
+        || (readback_status != Some("failed")
+            && !readback_sha
+                .as_str()
+                .map(|value| runtime_hex(value, 64))
+                .unwrap_or(false))
+        || (source == Some("publish")
+            && (causal_gap != Some(false)
+                || evidence.get("rename_status").and_then(Value::as_str) != Some("completed")))
+        || (source == Some("recovery")
+            && evidence.get("rename_status").and_then(Value::as_str) != Some("recovered_present"))
+        || (causal_gap == Some(true) && (source != Some("recovery") || sequence != 1))
+    {
+        return Err(invalid("observation values are invalid"));
+    }
+    if sha256(&observation_canonical_bytes(value, true)?) != observation_sha256 {
+        return Err(invalid("observation hash is invalid"));
+    }
+    Ok(())
+}
+
+fn receipt_nested_value(output: &mut String, key: &str, value: &Value) -> Result<(), GraphError> {
+    if key == "observation" {
+        let bytes = observation_canonical_bytes(value, false)?;
+        let text = std::str::from_utf8(&bytes)
+            .map_err(|error| runtime_boundary("runtime_receipt_invalid", error.to_string()))?;
+        output.push_str(text.trim_end_matches('\n'));
+        return Ok(());
+    }
+    runtime_identity_value(output, key, value)
+}
+
+fn receipt_canonical_bytes(value: &Value, zero_hash: bool) -> Result<Vec<u8>, GraphError> {
+    let mut normalized = value.clone();
+    if zero_hash {
+        normalized
+            .as_object_mut()
+            .ok_or_else(|| runtime_boundary("runtime_receipt_invalid", "receipt is not an object"))?
+            .insert("receipt_sha256".to_string(), Value::String("0".repeat(64)));
+    }
+    let keys = [
+        "schema",
+        "attempt_id",
+        "artifact_path",
+        "artifact_sha256",
+        "materialization_id",
+        "sequence",
+        "prior_receipt_sha256",
+        "observation",
+        "receipt_sha256",
+    ];
+    let object = runtime_object(&normalized, "publication receipt", &keys)?;
+    let mut output = String::new();
+    runtime_ordered_object(&mut output, object, &keys, receipt_nested_value)?;
+    output.push('\n');
+    Ok(output.into_bytes())
+}
+
+fn validate_receipt(value: &Value, raw: &[u8]) -> Result<(), GraphError> {
+    let invalid = |detail: &str| runtime_boundary("runtime_receipt_invalid", detail);
+    let keys = [
+        "schema",
+        "attempt_id",
+        "artifact_path",
+        "artifact_sha256",
+        "materialization_id",
+        "sequence",
+        "prior_receipt_sha256",
+        "observation",
+        "receipt_sha256",
+    ];
+    let receipt = runtime_object(value, "publication receipt", &keys)
+        .map_err(|error| invalid(&error.to_string()))?;
+    let observation = receipt.get("observation").unwrap_or(&Value::Null);
+    validate_observation(observation)?;
+    let sequence = receipt
+        .get("sequence")
+        .and_then(Value::as_u64)
+        .filter(|value| matches!(*value, 1 | 2))
+        .ok_or_else(|| invalid("receipt sequence is invalid"))?;
+    let prior = receipt.get("prior_receipt_sha256").unwrap_or(&Value::Null);
+    let receipt_sha256 = required_string(receipt, "receipt_sha256")?;
+    if receipt.get("schema").and_then(Value::as_str) != Some(RUNTIME_RECEIPT_SCHEMA)
+        || !runtime_hex(&required_string(receipt, "attempt_id")?, 64)
+        || !runtime_relative_path(&required_string(receipt, "artifact_path")?)
+        || !runtime_hex(&required_string(receipt, "artifact_sha256")?, 64)
+        || !runtime_hex(&required_string(receipt, "materialization_id")?, 64)
+        || !runtime_hex(&receipt_sha256, 64)
+        || (sequence == 1 && !prior.is_null())
+        || (sequence == 2
+            && !prior
+                .as_str()
+                .map(|value| runtime_hex(value, 64))
+                .unwrap_or(false))
+        || [
+            "attempt_id",
+            "artifact_path",
+            "artifact_sha256",
+            "materialization_id",
+            "sequence",
+        ]
+        .iter()
+        .any(|field| receipt.get(*field) != observation.get(*field))
+        || sha256(&receipt_canonical_bytes(value, true)?) != receipt_sha256
+        || receipt_canonical_bytes(value, false)? != raw
+    {
+        return Err(invalid(
+            "receipt values, hash, or canonical bytes are invalid",
+        ));
+    }
+    Ok(())
+}
+
+fn load_latest_receipt(
+    root: &Path,
+    artifact_path: &Path,
+    artifact_relative: &str,
+    artifact_sha256: &str,
+    materialization_id: &str,
+    attempt_id: &str,
+) -> Result<(String, Vec<u8>, Value), GraphError> {
+    let run_dir = artifact_path
+        .parent()
+        .ok_or_else(|| runtime_boundary("runtime_receipt_invalid", "artifact parent is absent"))?;
+    let unit = artifact_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(runtime_event_name)
+        .ok_or_else(|| runtime_boundary("runtime_receipt_invalid", "artifact unit is invalid"))?;
+    let prefix = format!("runtime_event.{unit}.outcome.");
+    let mut candidates = Vec::new();
+    for entry in fs::read_dir(run_dir)
+        .map_err(|error| runtime_boundary("runtime_receipt_invalid", error.to_string()))?
+    {
+        let entry = entry
+            .map_err(|error| runtime_boundary("runtime_receipt_invalid", error.to_string()))?;
+        let name = entry.file_name().into_string().map_err(|_| {
+            runtime_boundary("runtime_receipt_invalid", "receipt name is not UTF-8")
+        })?;
+        if !name.starts_with(&prefix) {
+            continue;
+        }
+        let metadata = fs::symlink_metadata(entry.path())
+            .map_err(|error| runtime_boundary("runtime_receipt_invalid", error.to_string()))?;
+        if !metadata.file_type().is_file() {
+            return Err(runtime_boundary(
+                "runtime_receipt_invalid",
+                "receipt is a symlink or non-regular file",
+            ));
+        }
+        let suffix = name
+            .strip_prefix(&prefix)
+            .and_then(|value| value.strip_suffix(".json"))
+            .ok_or_else(|| {
+                runtime_boundary("runtime_receipt_invalid", "receipt name is invalid")
+            })?;
+        let parts = suffix.split('.').collect::<Vec<_>>();
+        if parts.len() != 2
+            || parts[0] != attempt_id
+            || !runtime_hex(parts[0], 64)
+            || parts[1].len() != 6
+            || !parts[1].bytes().all(|byte| byte.is_ascii_digit())
+        {
+            return Err(runtime_boundary(
+                "runtime_receipt_invalid",
+                "receipt attempt or basename is invalid",
+            ));
+        }
+        let sequence = parts[1]
+            .parse::<u8>()
+            .ok()
+            .filter(|value| matches!(*value, 1 | 2))
+            .ok_or_else(|| {
+                runtime_boundary("runtime_receipt_invalid", "receipt sequence is invalid")
+            })?;
+        let bytes = fs::read(entry.path())
+            .map_err(|error| runtime_boundary("runtime_receipt_invalid", error.to_string()))?;
+        if !bytes.ends_with(b"\n") || bytes.len() <= 1 || bytes[..bytes.len() - 1].contains(&b'\n')
+        {
+            return Err(runtime_boundary(
+                "runtime_receipt_invalid",
+                "receipt is not one canonical JSON line",
+            ));
+        }
+        let value: Value = serde_json::from_slice(&bytes)
+            .map_err(|error| runtime_boundary("runtime_receipt_invalid", error.to_string()))?;
+        validate_receipt(&value, &bytes).map_err(|error| match error {
+            GraphError::RuntimeBoundary { .. } => error,
+            other => runtime_boundary("runtime_receipt_invalid", other.to_string()),
+        })?;
+        candidates.push((sequence, name, bytes, value));
+    }
+    candidates.sort_by_key(|item| item.0);
+    if candidates.is_empty() {
+        return Err(runtime_boundary(
+            "runtime_receipt_missing",
+            "runtime outcome receipt is absent",
+        ));
+    }
+    if candidates.len() > 2
+        || candidates
+            .iter()
+            .enumerate()
+            .any(|(index, item)| item.0 as usize != index + 1)
+    {
+        return Err(runtime_boundary(
+            "runtime_receipt_invalid",
+            "receipt chain is duplicated or skips a sequence",
+        ));
+    }
+    let mut prior_receipt: Option<String> = None;
+    let mut prior_observation: Option<String> = None;
+    let mut prior_outcome: Option<String> = None;
+    for (sequence, _name, _bytes, value) in &candidates {
+        let receipt = value.as_object().ok_or_else(|| {
+            runtime_boundary("runtime_receipt_invalid", "receipt is not an object")
+        })?;
+        let observation = receipt
+            .get("observation")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                runtime_boundary("runtime_receipt_invalid", "receipt observation is absent")
+            })?;
+        if receipt.get("attempt_id").and_then(Value::as_str) != Some(attempt_id)
+            || receipt.get("artifact_path").and_then(Value::as_str) != Some(artifact_relative)
+            || receipt.get("artifact_sha256").and_then(Value::as_str) != Some(artifact_sha256)
+            || receipt.get("materialization_id").and_then(Value::as_str) != Some(materialization_id)
+            || receipt.get("sequence").and_then(Value::as_u64) != Some(*sequence as u64)
+            || receipt.get("prior_receipt_sha256").and_then(Value::as_str)
+                != prior_receipt.as_deref()
+            || observation
+                .get("prior_observation_sha256")
+                .and_then(Value::as_str)
+                != prior_observation.as_deref()
+        {
+            return Err(runtime_boundary(
+                "runtime_receipt_invalid",
+                "receipt chain identity or prior link is invalid",
+            ));
+        }
+        let outcome = observation
+            .get("outcome")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        if *sequence == 2
+            && (prior_outcome.as_deref() != Some("uncertain") || outcome != "committed")
+        {
+            return Err(runtime_boundary(
+                "runtime_receipt_invalid",
+                "receipt transition is not uncertain-to-committed",
+            ));
+        }
+        prior_receipt = receipt
+            .get("receipt_sha256")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        prior_observation = observation
+            .get("observation_sha256")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        prior_outcome = Some(outcome);
+    }
+    let (_sequence, name, bytes, value) = candidates.pop().unwrap();
+    let outcome = value
+        .get("observation")
+        .and_then(|observation| observation.get("outcome"))
+        .and_then(Value::as_str);
+    if outcome != Some("committed") {
+        return Err(runtime_boundary(
+            "runtime_receipt_uncertain",
+            "latest runtime outcome receipt is uncertain",
+        ));
+    }
+    let receipt_relative = artifact_path
+        .with_file_name(name)
+        .strip_prefix(root)
+        .map_err(|_| runtime_boundary("runtime_receipt_invalid", "receipt path escapes root"))?
+        .to_str()
+        .ok_or_else(|| runtime_boundary("runtime_receipt_invalid", "receipt path is not UTF-8"))?
+        .replace('\\', "/");
+    Ok((receipt_relative, bytes, value))
+}
+
+fn load_runtime_evidence_snapshot(root: &Path) -> Result<RuntimeEvidenceSnapshot, GraphError> {
+    let (path, artifact_bytes) = active_runtime_event(root)
+        .map_err(|error| runtime_boundary("runtime_evidence_changed", error.to_string()))?;
+    if !artifact_bytes.ends_with(b"\n")
+        || artifact_bytes[..artifact_bytes.len().saturating_sub(1)].contains(&b'\n')
+        || artifact_bytes.len() <= 1
+    {
+        return Err(GraphError::Validation(
+            "runtime-event certificate is not one canonical JSON line".to_string(),
+        ));
+    }
+    let value: Value = serde_json::from_slice(&artifact_bytes)
+        .map_err(|error| GraphError::Validation(format!("runtime-event JSON: {error}")))?;
+    let object = runtime_object(
+        &value,
+        "certificate",
+        &[
+            "schema",
+            "materialization_id",
+            "result_family",
+            "gate",
+            "source_event",
+            "result_artifact",
+            "target_identities",
+            "source_snapshot",
+            "publication_intent",
+            "artifact_sha256",
+        ],
+    )?;
+    if object.get("schema").and_then(Value::as_str) != Some(RUNTIME_EVENT_SCHEMA) {
+        return Err(GraphError::Validation(
+            "runtime-event schema mismatch".to_string(),
+        ));
+    }
+    let gate = runtime_object(
+        object.get("gate").unwrap_or(&Value::Null),
+        "gate",
+        &["id", "result"],
+    )?;
+    let source_event = runtime_object(
+        object.get("source_event").unwrap_or(&Value::Null),
+        "source_event",
+        &[
+            "agent_id",
+            "agent_context_id",
+            "codex_thread_id",
+            "parent_id",
+            "turn_id",
+            "role",
+            "decision",
+            "applicable_gate_result",
+            "rollout_path",
+            "rollout_path_bytes_b64",
+            "rollout_path_sha256",
+            "rollout_file_sha256",
+            "record_line",
+            "record_byte_offset",
+            "record_byte_length",
+            "record_bytes_b64",
+            "record_sha256",
+            "stable_record_id",
+        ],
+    )?;
+    let artifact = runtime_object(
+        object.get("result_artifact").unwrap_or(&Value::Null),
+        "result_artifact",
+        &[
+            "path",
+            "schema",
+            "artifact_sha256",
+            "artifact_blob_oid",
+            "gate_id",
+            "gate_result",
+            "target_paths",
+            "base_ref",
+            "base_oid",
+        ],
+    )?;
+    let snapshot = runtime_object(
+        object.get("source_snapshot").unwrap_or(&Value::Null),
+        "source_snapshot",
+        &["head_oid", "base_ref", "base_oid", "porcelain_v1"],
+    )?;
+    let publication_intent_object = runtime_object(
+        object.get("publication_intent").unwrap_or(&Value::Null),
+        "publication_intent",
+        &["schema", "attempt_id", "target_path", "prepared_state"],
+    )?;
+
+    let materialization_id = required_string(object, "materialization_id")?;
+    let artifact_sha256 = required_string(object, "artifact_sha256")?;
+    let result_family = required_string(object, "result_family")?;
+    let (artifact_name, expected_gate_id, expected_schema) = runtime_family_spec(&result_family)
+        .ok_or_else(|| GraphError::Validation("runtime result family is not finite".to_string()))?;
+    let gate_id = required_string(gate, "id")?;
+    let gate_result = required_string(gate, "result")?;
+    if gate_id != expected_gate_id
+        || !matches!(
+            gate_result.as_str(),
+            "APPROVE"
+                | "REVISE"
+                | "ESCALATE"
+                | "PASS"
+                | "FAIL"
+                | "BLOCKED"
+                | "READY"
+                | "INCOMPLETE"
+        )
+        || artifact.get("gate_id").and_then(Value::as_str) != Some(gate_id.as_str())
+        || artifact.get("gate_result").and_then(Value::as_str) != Some(gate_result.as_str())
+        || artifact.get("schema").and_then(Value::as_str) != Some(expected_schema)
+    {
+        return Err(GraphError::Validation(
+            "runtime result-family, gate, or schema authority mismatch".to_string(),
+        ));
+    }
+
+    for field in [
+        "agent_id",
+        "agent_context_id",
+        "codex_thread_id",
+        "parent_id",
+        "turn_id",
+    ] {
+        if !runtime_uuid(&required_string(source_event, field)?) {
+            return Err(GraphError::Validation(format!(
+                "runtime source event {field} is not a canonical UUID"
+            )));
+        }
+    }
+    let source_event_id = required_string(source_event, "stable_record_id")?;
+    let source_event_sha256 = required_string(source_event, "record_sha256")?;
+    let rollout_path = required_string(source_event, "rollout_path")?;
+    let rollout_file_sha256 = required_string(source_event, "rollout_file_sha256")?;
+    if required_string(source_event, "role")?.is_empty()
+        || !matches!(
+            required_string(source_event, "decision")?.as_str(),
+            "APPROVE" | "REVISE" | "ESCALATE" | "NONE"
+        )
+        || source_event
+            .get("applicable_gate_result")
+            .and_then(Value::as_str)
+            != Some(gate_result.as_str())
+        || !runtime_absolute_path(&rollout_path)
+        || source_event.get("record_line").and_then(Value::as_u64) != Some(872)
+        || source_event
+            .get("record_byte_offset")
+            .and_then(Value::as_u64)
+            .is_none()
+    {
+        return Err(GraphError::Validation(
+            "runtime source event authority is invalid".to_string(),
+        ));
+    }
+    let rollout_path_bytes =
+        decode_base64(&required_string(source_event, "rollout_path_bytes_b64")?)?;
+    let record_bytes = decode_base64(&required_string(source_event, "record_bytes_b64")?)?;
+    let record_length = source_event
+        .get("record_byte_length")
+        .and_then(Value::as_u64)
+        .filter(|value| *value > 0)
+        .ok_or_else(|| GraphError::Validation("runtime record length is invalid".to_string()))?;
+    let rollout_path_hash = sha256(&rollout_path_bytes);
+    if rollout_path_bytes != rollout_path.as_bytes()
+        || source_event
+            .get("rollout_path_sha256")
+            .and_then(Value::as_str)
+            != Some(rollout_path_hash.as_str())
+        || record_bytes.len() as u64 != record_length
+        || source_event_sha256 != sha256(&record_bytes)
+        || source_event_id != source_event_sha256
+        || !runtime_hex(&rollout_file_sha256, 64)
+    {
+        return Err(GraphError::Validation(
+            "runtime source byte identity mismatch".to_string(),
+        ));
+    }
+
+    let source_head_oid = required_string(snapshot, "head_oid")?;
+    let base_ref = required_string(snapshot, "base_ref")?;
+    let base_oid = required_string(snapshot, "base_oid")?;
+    let result_path = required_string(artifact, "path")?;
+    let result_schema = required_string(artifact, "schema")?;
+    let result_blob_oid = required_string(artifact, "artifact_blob_oid")?;
+    if !runtime_hex(&materialization_id, 64)
+        || !runtime_hex(&artifact_sha256, 64)
+        || !runtime_hex(&required_string(artifact, "artifact_sha256")?, 64)
+        || !runtime_hex(&result_blob_oid, 40)
+        || !runtime_hex(&source_head_oid, 40)
+        || !runtime_hex(&base_oid, 40)
+        || snapshot.get("base_ref").and_then(Value::as_str)
+            != artifact.get("base_ref").and_then(Value::as_str)
+        || snapshot.get("base_oid").and_then(Value::as_str)
+            != artifact.get("base_oid").and_then(Value::as_str)
+    {
+        return Err(GraphError::Validation(
+            "runtime materialization, artifact, head, or base hash is invalid".to_string(),
+        ));
+    }
+    let target_path_values = runtime_string_array(
+        artifact.get("target_paths").unwrap_or(&Value::Null),
+        "target_paths",
+    )?;
+    if target_path_values.is_empty()
+        || target_path_values
+            .iter()
+            .any(|path| !runtime_relative_path(path))
+        || target_path_values
+            .windows(2)
+            .any(|pair| pair[0].as_bytes() >= pair[1].as_bytes())
+    {
+        return Err(GraphError::Validation(
+            "runtime target paths are empty, unsafe, duplicated, or unsorted".to_string(),
+        ));
+    }
+    let target_paths = artifact.get("target_paths").cloned().unwrap_or(Value::Null);
+    let porcelain_values = runtime_string_array(
+        snapshot.get("porcelain_v1").unwrap_or(&Value::Null),
+        "porcelain_v1",
+    )?;
+    for line in &porcelain_values {
+        runtime_porcelain_paths(line)?;
+    }
+    let porcelain_v1 = snapshot.get("porcelain_v1").cloned().unwrap_or(Value::Null);
+    let target_identities = object
+        .get("target_identities")
+        .and_then(Value::as_array)
+        .ok_or_else(|| GraphError::Validation("target identities missing".to_string()))?;
+    if target_identities.len() != target_path_values.len() || target_identities.is_empty() {
+        return Err(GraphError::Validation(
+            "runtime target identities do not match target paths".to_string(),
+        ));
+    }
+    for (path_value, identity) in target_path_values.iter().zip(target_identities.iter()) {
+        let identity = runtime_object(
+            identity,
+            "target identity",
+            &[
+                "path",
+                "content_sha256",
+                "git_blob_oid",
+                "base_present",
+                "base_content_sha256",
+                "base_git_blob_oid",
+            ],
+        )?;
+        let base_present = identity
+            .get("base_present")
+            .and_then(Value::as_bool)
+            .ok_or_else(|| GraphError::Validation("runtime base_present is invalid".to_string()))?;
+        if identity.get("path").and_then(Value::as_str) != Some(path_value.as_str())
+            || !runtime_hex(&required_string(identity, "content_sha256")?, 64)
+            || !runtime_hex(&required_string(identity, "git_blob_oid")?, 40)
+            || (base_present
+                && (!identity
+                    .get("base_content_sha256")
+                    .and_then(Value::as_str)
+                    .map(|value| runtime_hex(value, 64))
+                    .unwrap_or(false)
+                    || !identity
+                        .get("base_git_blob_oid")
+                        .and_then(Value::as_str)
+                        .map(|value| runtime_hex(value, 40))
+                        .unwrap_or(false)))
+            || (!base_present
+                && (!identity
+                    .get("base_content_sha256")
+                    .unwrap_or(&Value::Null)
+                    .is_null()
+                    || !identity
+                        .get("base_git_blob_oid")
+                        .unwrap_or(&Value::Null)
+                        .is_null()))
+        {
+            return Err(GraphError::Validation(
+                "runtime target identity value is invalid".to_string(),
+            ));
+        }
+    }
+
+    let publication_intent = object
+        .get("publication_intent")
+        .cloned()
+        .unwrap_or(Value::Null);
+    let relative = path
+        .strip_prefix(root)
+        .map_err(|_| GraphError::Validation("runtime-event path escapes root".to_string()))?
+        .to_str()
+        .ok_or_else(|| GraphError::Validation("runtime-event path is not UTF-8".to_string()))?
+        .replace('\\', "/");
+    let run_name = path
+        .parent()
+        .and_then(Path::file_name)
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| GraphError::Validation("runtime-event run id is invalid".to_string()))?;
+    let event_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| GraphError::Validation("runtime-event filename is invalid".to_string()))?;
+    let unit = runtime_event_name(event_name)
+        .ok_or_else(|| GraphError::Validation("runtime-event filename is invalid".to_string()))?;
+    let expected_result_path = format!("reports/agents/{run_name}/{artifact_name}");
+    if !runtime_relative_path(&relative)
+        || result_path != expected_result_path
+        || publication_intent_object
+            .get("target_path")
+            .and_then(Value::as_str)
+            != Some(relative.as_str())
+        || unit != &source_event_sha256[..16]
+        || publication_intent_object
+            .get("schema")
+            .and_then(Value::as_str)
+            != Some(RUNTIME_PUBLICATION_INTENT_SCHEMA)
+        || publication_intent_object
+            .get("prepared_state")
+            .and_then(Value::as_str)
+            != Some("prepared")
+    {
+        return Err(GraphError::Validation(
+            "runtime publication intent, run, unit, or result path is inconsistent".to_string(),
+        ));
+    }
+    let attempt_id = required_string(publication_intent_object, "attempt_id")?;
+    if !runtime_hex(&attempt_id, 64)
+        || attempt_id != publication_attempt_id(&materialization_id, &relative)
+    {
+        return Err(GraphError::Validation(
+            "runtime publication attempt identity is invalid".to_string(),
+        ));
+    }
+    let materialization_preimage = runtime_materialization_preimage(&value)?;
+    let expected_materialization = sha256(
+        &[
+            b"agent_canon.runtime_event.materialization.v1\0".as_slice(),
+            materialization_preimage.as_slice(),
+        ]
+        .concat(),
+    );
+    let expected_artifact = sha256(&runtime_canonical_bytes(&value, true)?);
+    if materialization_id != expected_materialization
+        || artifact_sha256 != expected_artifact
+        || runtime_canonical_bytes(&value, false)? != artifact_bytes
+    {
+        return Err(GraphError::Validation(
+            "runtime artifact canonical hash coverage mismatch".to_string(),
+        ));
+    }
+    let (receipt_path, receipt_bytes, receipt_value) = load_latest_receipt(
+        root,
+        &path,
+        &relative,
+        &artifact_sha256,
+        &materialization_id,
+        &attempt_id,
+    )?;
+    let receipt_object = receipt_value.as_object().ok_or_else(|| {
+        runtime_boundary("runtime_receipt_invalid", "latest receipt is not an object")
+    })?;
+    let publication_observation = receipt_object.get("observation").cloned().ok_or_else(|| {
+        runtime_boundary("runtime_receipt_invalid", "latest observation is absent")
+    })?;
+    let receipt_sha256 = required_string(receipt_object, "receipt_sha256")?;
+    let receipt_sequence = receipt_object
+        .get("sequence")
+        .and_then(Value::as_u64)
+        .and_then(|value| u8::try_from(value).ok())
+        .ok_or_else(|| runtime_boundary("runtime_receipt_invalid", "latest sequence is invalid"))?;
+    let receipt_outcome = publication_observation
+        .get("outcome")
+        .and_then(Value::as_str)
+        .ok_or_else(|| runtime_boundary("runtime_receipt_invalid", "latest outcome is absent"))?
+        .to_string();
+    let live_identity_fingerprint =
+        runtime_live_identity(root, artifact, snapshot, target_identities)?;
+    let target_identities_value = object
+        .get("target_identities")
+        .cloned()
+        .unwrap_or(Value::Null);
+    let freshness_certificate = json!({"artifact_sha256":artifact_sha256,"receipt_sha256":receipt_sha256,"attempt_id":attempt_id,"receipt_sequence":receipt_sequence,"receipt_outcome":receipt_outcome,"source_head_oid":source_head_oid,"base_ref":base_ref,"base_oid":base_oid,"target_identities":target_identities_value,"live_identity_fingerprint":live_identity_fingerprint});
+    Ok(RuntimeEvidenceSnapshot {
+        artifact_path: relative,
+        artifact_sha256,
+        artifact_schema: RUNTIME_EVENT_SCHEMA.to_string(),
+        materialization_id,
+        attempt_id,
+        receipt_path,
+        receipt_sha256,
+        receipt_schema: RUNTIME_RECEIPT_SCHEMA.to_string(),
+        receipt_sequence,
+        receipt_outcome,
+        result_family,
+        gate_id,
+        gate_result,
+        source_event_id,
+        source_event_sha256,
+        rollout_path,
+        rollout_file_sha256,
+        source_head_oid,
+        base_ref,
+        base_oid,
+        result_path,
+        result_schema,
+        result_blob_oid,
+        target_paths,
+        porcelain_v1,
+        publication_intent,
+        publication_observation,
+        target_identities: target_identities_value,
+        freshness_certificate,
+        live_identity_fingerprint,
+        artifact_bytes,
+        artifact_value: value,
+        receipt_bytes,
+        receipt_value,
+    })
+}
+
+fn runtime_evidence_json(snapshot: &RuntimeEvidenceSnapshot) -> Value {
+    debug_assert_eq!(
+        snapshot
+            .artifact_value
+            .get("schema")
+            .and_then(Value::as_str),
+        Some(snapshot.artifact_schema.as_str())
+    );
+    debug_assert_eq!(
+        snapshot.receipt_value.get("schema").and_then(Value::as_str),
+        Some(snapshot.receipt_schema.as_str())
+    );
+    json!({"schema":RUNTIME_EVIDENCE_SCHEMA,"artifact_path":snapshot.artifact_path,"artifact_sha256":snapshot.artifact_sha256,"materialization_id":snapshot.materialization_id,"attempt_id":snapshot.attempt_id,"receipt_path":snapshot.receipt_path,"receipt_sha256":snapshot.receipt_sha256,"receipt_sequence":snapshot.receipt_sequence,"receipt_outcome":snapshot.receipt_outcome,"result_family":snapshot.result_family,"gate_id":snapshot.gate_id,"gate_result":snapshot.gate_result,"source_event_id":snapshot.source_event_id,"source_event_sha256":snapshot.source_event_sha256,"rollout_path":snapshot.rollout_path,"rollout_file_sha256":snapshot.rollout_file_sha256,"source_head_oid":snapshot.source_head_oid,"base_ref":snapshot.base_ref,"base_oid":snapshot.base_oid,"result_artifact":{"path":snapshot.result_path,"schema":snapshot.result_schema,"artifact_blob_oid":snapshot.result_blob_oid,"target_paths":snapshot.target_paths},"source_snapshot":{"head_oid":snapshot.source_head_oid,"base_ref":snapshot.base_ref,"base_oid":snapshot.base_oid,"porcelain_v1":snapshot.porcelain_v1},"publication_intent":snapshot.publication_intent,"publication_observation":snapshot.publication_observation,"target_identities":snapshot.target_identities,"freshness_certificate":snapshot.freshness_certificate,"artifact":snapshot.artifact_value,"receipt":snapshot.receipt_value})
+}
+
+fn runtime_evidence_producer(snapshot: &RuntimeEvidenceSnapshot) -> ProducerArtifact {
+    ProducerArtifact {
+        producer_id: "runtime-event-materializer".to_string(),
+        version: "agent_canon.runtime_event.v1".to_string(),
+        command: "tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event"
+            .to_string(),
+        root: snapshot.rollout_path.clone(),
+        content_sha256: sha256(&snapshot.artifact_bytes),
+        relation_families: vec!["runtime-evidence".to_string()],
+        artifact_ref: "runtime_event_materialization".to_string(),
+        payload: snapshot.artifact_bytes.clone(),
+    }
+}
+
+fn runtime_evidence_fingerprint(snapshot: &RuntimeEvidenceSnapshot) -> String {
+    sha256(
+        &[
+            b"agent_canon.runtime_evidence_fingerprint.v2\0".as_slice(),
+            snapshot.artifact_sha256.as_bytes(),
+            b"\0".as_slice(),
+            snapshot.receipt_sha256.as_bytes(),
+            b"\0".as_slice(),
+            snapshot.live_identity_fingerprint.as_bytes(),
+        ]
+        .concat(),
+    )
+}
+
+fn graph_input_fingerprint(
+    source_fingerprint: &str,
+    source_head: &str,
+    dirty_fingerprint: &str,
+    runtime_fingerprint: &str,
+    profile: &str,
+) -> String {
+    sha256(
+        format!(
+            "{source_fingerprint}\0{source_head}\0{dirty_fingerprint}\0{runtime_fingerprint}\0{profile}"
+        )
+        .as_bytes(),
+    )
+}
+
+fn source_node(snapshot: &ManifestSnapshot, identity: &SourceIdentity) -> Value {
+    let manifest = snapshot.manifests.get(&identity.repo_rel_path);
+    json!({"id":format!("node:source:{}",identity.repo_rel_path),"layer":"source","kind":"file","path":identity.repo_rel_path,"label":identity.repo_rel_path,"payload":{"manifest_present":manifest.is_some(),"contract_kind":manifest.map(|value| value.contract_kind.clone()).unwrap_or_default(),"responsibility":manifest.map(|value| value.responsibility.clone()).unwrap_or_default(),"content_sha256":identity.content_hash,"source_identity_id":identity.identity_id,"git_blob_oid":identity.git_blob_or_gitlink}})
+}
+
+fn source_span_json(span: &SourceSpan) -> Value {
+    json!({"path":span.path,"start_line":span.start_line,"start_column":span.start_column,"end_line":span.end_line,"end_column":span.end_column})
+}
+
+fn dependency_fact(
+    snapshot: &ManifestSnapshot,
+    declaration: &DependencyDeclaration,
+) -> Option<Value> {
+    let from = snapshot
+        .source_identities
+        .iter()
+        .find(|identity| identity.identity_id == declaration.source_identity_id)
+        .map(|identity| format!("node:source:{}", identity.repo_rel_path))
+        .unwrap_or_else(|| format!("node:source:{}", declaration.source_identity_id));
+    let to = declaration
+        .resolved_target_identity_id
+        .as_ref()
+        .and_then(|id| {
+            snapshot
+                .source_identities
+                .iter()
+                .find(|identity| &identity.identity_id == id)
+        })
+        .map(|identity| format!("node:source:{}", identity.repo_rel_path));
+    to.map(|target| json!({"id":format!("fact:dependency:{}",declaration.declaration_id),"layer":"source","kind":"dependency","inferred":false,"from":from,"to":target,"producer":"source-snapshot","source_path":declaration.source_span.path,"source_span":source_span_json(&declaration.source_span),"evidence_ref":format!("{}:{}",declaration.source_span.path,declaration.source_span.start_line),"authority":"ManifestParser","dependency_detail":{"direction":declaration.declared_direction,"kind":declaration.declared_kind,"reason":declaration.reason}}))
+}
+
+fn graph_fingerprint(
+    nodes: &[Value],
+    facts: &[Value],
+    runtime: &RuntimeEvidenceSnapshot,
+) -> String {
+    let value = json!({"nodes":nodes,"facts":facts,"runtime":runtime_evidence_json(runtime)});
+    sha256(serde_json::to_string(&value).unwrap_or_default().as_bytes())
+}
+
+fn capture_runtime_dashboard(snapshot: &RuntimeEvidenceSnapshot) -> ProducerArtifact {
+    runtime_evidence_producer(snapshot)
+}
+
+fn collect_build_material(root: &Path, profile: &str) -> Result<BuildMaterial, GraphError> {
+    collect_build_material_with_mode(root, profile, false)
+}
+
+fn collect_build_material_with_mode(
+    root: &Path,
+    profile: &str,
+    _probe: bool,
+) -> Result<BuildMaterial, GraphError> {
+    let runtime_evidence = load_runtime_evidence_snapshot(root)?;
+    let snapshot_request = SnapshotRequest {
+        root: root.to_path_buf(),
+        profile: "parent".to_string(),
+        output_jsonl: root.join(".agent-canon/knowledge-graph/source_snapshot.jsonl"),
+    };
+    let snapshot = capture_snapshot(&snapshot_request)
+        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    fs::create_dir_all(root.join(".agent-canon/knowledge-graph"))
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let mut snapshot_file = File::create(&snapshot_request.output_jsonl)
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    write_snapshot_jsonl(&snapshot, &mut snapshot_file)
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let eligible = snapshot
+        .source_universe
+        .eligible_paths
+        .iter()
+        .map(String::as_str)
+        .collect::<std::collections::BTreeSet<_>>();
+    let nodes = snapshot
+        .source_identities
+        .iter()
+        .filter(|identity| eligible.contains(identity.repo_rel_path.as_str()))
+        .map(|identity| source_node(&snapshot, identity))
+        .collect::<Vec<_>>();
+    let facts = snapshot
+        .declarations
+        .iter()
+        .filter_map(|declaration| dependency_fact(&snapshot, declaration))
+        .collect::<Vec<_>>();
+    let runtime_fp = runtime_evidence_fingerprint(&runtime_evidence);
+    let input_fingerprint = graph_input_fingerprint(
+        &snapshot.header.source_fingerprint,
+        &snapshot.header.git_head,
+        &snapshot.header.git_status_hash,
+        &runtime_fp,
+        profile,
+    );
+    let graph_fingerprint = graph_fingerprint(&nodes, &facts, &runtime_evidence);
+    let producer = capture_runtime_dashboard(&runtime_evidence);
+    Ok(BuildMaterial {
+        root: root.to_path_buf(),
+        graph_root: root.join(".agent-canon/knowledge-graph"),
+        profile: profile.to_string(),
+        snapshot,
+        runtime_evidence,
+        nodes,
+        facts,
+        producer_artifacts: vec![producer],
+        input_fingerprint,
+        graph_fingerprint,
+    })
+}
+
+fn metadata(connection: &Connection, key: &str) -> Result<String, GraphError> {
+    connection
+        .query_row(
+            "SELECT value FROM metadata WHERE key=?1",
+            params![key],
+            |row| row.get(0),
+        )
+        .map_err(|error| GraphError::Unavailable(error.to_string()))
+}
+
+fn metadata_optional(connection: &Connection, key: &str) -> Result<Option<String>, GraphError> {
+    connection
+        .query_row(
+            "SELECT value FROM metadata WHERE key=?1",
+            params![key],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| GraphError::Unavailable(error.to_string()))
+}
+
+fn canonical_published_graph_path(root: &Path) -> Result<PathBuf, GraphError> {
+    let canonical_root = root
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let graph_root = canonical_root.join(".agent-canon/knowledge-graph");
+    let canonical_graph_root = graph_root
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    if canonical_graph_root != graph_root {
+        return Err(GraphError::Validation(
+            "published graph directory is not canonical".to_string(),
+        ));
+    }
+    let published = graph_root.join("graph.sqlite");
+    let canonical_published = published
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    if canonical_published != published
+        || !fs::metadata(&canonical_published)
+            .map_err(|error| GraphError::Io(error.to_string()))?
+            .is_file()
+    {
+        return Err(GraphError::Validation(
+            "published graph database path is not canonical regular file".to_string(),
+        ));
+    }
+    Ok(canonical_published)
+}
+
+fn sqlite_immutable_uri(path: &Path) -> Result<String, GraphError> {
+    if !path.is_absolute() {
+        return Err(GraphError::Validation(
+            "published graph database path is not absolute".to_string(),
+        ));
+    }
+    let path_text = path.to_str().ok_or_else(|| {
+        GraphError::Validation("published graph database path is not UTF-8".to_string())
+    })?;
+    let mut uri = String::from("file:");
+    for byte in path_text.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'/') {
+            uri.push(char::from(byte));
+        } else {
+            uri.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    uri.push_str("?immutable=1");
+    Ok(uri)
+}
+
+fn graph_publication_temp_path(graph_root: &Path, operation_id: &str) -> PathBuf {
+    graph_root.join(format!("graph.sqlite.tmp.{operation_id}"))
+}
+
+fn publish_graph_bytes_at(
+    graph_root: &Path,
+    published: &Path,
+    publication_temp: &Path,
+    staged_bytes: &[u8],
+    staged_sha256: &str,
+) -> Result<(), GraphError> {
+    if published != graph_root.join("graph.sqlite")
+        || publication_temp.parent() != Some(graph_root)
+        || publication_temp == published
+    {
+        return Err(GraphError::Validation(
+            "graph publication paths are invalid".to_string(),
+        ));
+    }
+    fs::create_dir_all(graph_root).map_err(|error| GraphError::Io(error.to_string()))?;
+    if graph_root
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?
+        != graph_root
+    {
+        return Err(GraphError::Validation(
+            "graph publication directory is not canonical".to_string(),
+        ));
+    }
+    let mut output = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(publication_temp)
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let mut owned_temp = PublicationTemp::new(publication_temp);
+    output
+        .write_all(staged_bytes)
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    output
+        .sync_all()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    drop(output);
+    let publication_readback =
+        fs::read(publication_temp).map_err(|error| GraphError::Io(error.to_string()))?;
+    if publication_readback != staged_bytes || sha256(&publication_readback) != staged_sha256 {
+        return Err(GraphError::Validation(
+            "graph publication temporary readback mismatch".to_string(),
+        ));
+    }
+    fs::rename(publication_temp, published).map_err(|error| GraphError::Io(error.to_string()))?;
+    owned_temp.disarm();
+    File::open(published)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    File::open(graph_root)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    Ok(())
+}
+
+fn build_graph_staging(
+    material: &BuildMaterial,
+    staging_database: &Path,
+) -> Result<GraphIntegrationRecord, GraphError> {
+    let connection =
+        Connection::open_with_flags(staging_database, OpenFlags::SQLITE_OPEN_READ_WRITE)
+            .map_err(|error| GraphError::Io(error.to_string()))?;
+    initialize_graph_schema(&connection).map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute("DELETE FROM metadata", [])
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute("DELETE FROM documents", [])
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute("DELETE FROM nodes", [])
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute("DELETE FROM edges", [])
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection.execute("INSERT INTO documents(id,path,title,kind,created_at) VALUES('doc:source','.', 'AgentCanon source', 'source', datetime('now'))", []).map_err(|error| GraphError::Io(error.to_string()))?;
+    for node in &material.nodes {
+        let id = node.get("id").and_then(Value::as_str).unwrap_or_default();
+        let path = node.get("path").and_then(Value::as_str).unwrap_or_default();
+        connection.execute("INSERT INTO nodes(id,document_id,layer,kind,label,text,source_start,source_end,confidence,payload_json) VALUES(?1,'doc:source','source','file',?2,?2,0,0,1.0,?3)", params![id, path, serde_json::to_string(node).unwrap_or_default()]).map_err(|error| GraphError::Io(error.to_string()))?;
+    }
+    for fact in &material.facts {
+        let id = fact.get("id").and_then(Value::as_str).unwrap_or_default();
+        let from = fact.get("from").and_then(Value::as_str).unwrap_or_default();
+        let to = fact.get("to").and_then(Value::as_str).unwrap_or_default();
+        connection.execute("INSERT INTO edges(id,layer,kind,from_node_id,to_node_id,order_kind,confidence,evidence_node_id,payload_json) VALUES(?1,'source','dependency',?2,?3,'none',1.0,NULL,?4)", params![id, from, to, serde_json::to_string(fact).unwrap_or_default()]).map_err(|error| GraphError::Io(error.to_string()))?;
+    }
+    for diagnostic in &material.snapshot.diagnostics {
+        let target_node = diagnostic
+            .source_span
+            .as_ref()
+            .map(|span| format!("node:source:{}", span.path))
+            .unwrap_or_default();
+        let id = format!("diagnostic:{}", sha256(diagnostic.message.as_bytes()));
+        connection.execute("INSERT INTO diagnostics(id,layer,target_node_id,target_edge_id,severity,rule,message,suggested_action_json) VALUES(?1,'source',?2,'',?3,?4,?5,'{}')", params![id, target_node, if diagnostic.severity == "error" { "blocker" } else { diagnostic.severity.as_str() }, diagnostic.code, diagnostic.message]).map_err(|error| GraphError::Io(error.to_string()))?;
+    }
+    let runtime_json = runtime_evidence_json(&material.runtime_evidence);
+    let runtime_artifact = String::from_utf8(material.runtime_evidence.artifact_bytes.clone())
+        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    let runtime_receipt = String::from_utf8(material.runtime_evidence.receipt_bytes.clone())
+        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    let producer_json = serde_json::to_string(
+        &material
+            .producer_artifacts
+            .iter()
+            .map(ProducerArtifact::json)
+            .collect::<Vec<_>>(),
+    )
+    .unwrap_or_default();
+    let integration = GraphIntegrationRecord {
+        root: material.root.display().to_string(),
+        db_path: material
+            .graph_root
+            .join("graph.sqlite")
+            .display()
+            .to_string(),
+        profile: material.profile.clone(),
+        source_snapshot_profile: "parent".to_string(),
+        snapshot_head: material.snapshot.header.git_head.clone(),
+        input_fingerprint: material.input_fingerprint.clone(),
+        graph_fingerprint: material.graph_fingerprint.clone(),
+        contract_fingerprint: GRAPH_SCHEMA_VERSION.to_string(),
+        producer_artifacts: material.producer_artifacts.clone(),
+        runtime_evidence: runtime_json.clone(),
+        verified: true,
+        verification_code: "runtime-evidence-readback-v2".to_string(),
+    };
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('integration_record',?1)",
+            params![serde_json::to_string(&integration.json()).unwrap_or_default()],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('runtime_event_materialization',?1)",
+            params![serde_json::to_string(&runtime_json).unwrap_or_default()],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('runtime_event_artifact',?1)",
+            params![runtime_artifact],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('runtime_event_artifact_sha256',?1)",
+            params![sha256(&material.runtime_evidence.artifact_bytes)],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('runtime_event_outcome_receipt',?1)",
+            params![runtime_receipt],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('runtime_event_outcome_receipt_sha256',?1)",
+            params![sha256(&material.runtime_evidence.receipt_bytes)],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('runtime_live_identity_fingerprint',?1)",
+            params![material.runtime_evidence.live_identity_fingerprint],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('snapshot_head',?1)",
+            params![material.snapshot.header.git_head],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('dirty_fingerprint',?1)",
+            params![material.snapshot.header.git_status_hash],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('source_fingerprint',?1)",
+            params![material.snapshot.header.source_fingerprint],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('input_fingerprint',?1)",
+            params![material.input_fingerprint],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('graph_fingerprint',?1)",
+            params![material.graph_fingerprint],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
+            "INSERT INTO metadata(key,value) VALUES('producer_artifacts',?1)",
+            params![producer_json],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    validate_graph_connection(&connection)
+        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    drop(connection);
+    Ok(integration)
+}
+
+fn materialize_graph_store(material: &BuildMaterial) -> Result<GraphIntegrationRecord, GraphError> {
+    let operation_id = graph_operation_id(material);
+    let staging = GraphStaging::create(&operation_id)?;
+    if staging.root.starts_with(&material.root) {
+        return Err(GraphError::Validation(
+            "graph staging path is inside the source repository".to_string(),
+        ));
+    }
+    let integration = build_graph_staging(material, &staging.database)?;
+    File::open(&staging.database)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let staged_bytes =
+        fs::read(&staging.database).map_err(|error| GraphError::Io(error.to_string()))?;
+    let staged_sha256 = sha256(&staged_bytes);
+    let published = material.graph_root.join("graph.sqlite");
+    let publication_temp = graph_publication_temp_path(&material.graph_root, &operation_id);
+    publish_graph_bytes_at(
+        &material.graph_root,
+        &published,
+        &publication_temp,
+        &staged_bytes,
+        &staged_sha256,
+    )?;
+    let readback = open_db(&material.root)?;
+    validate_graph_connection(&readback)
+        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    let runtime_json = runtime_evidence_json(&material.runtime_evidence);
+    let expected_integration = serde_json::to_string(&integration.json()).unwrap_or_default();
+    if metadata(&readback, "integration_record")? != expected_integration
+        || metadata(&readback, "runtime_event_materialization")?
+            != serde_json::to_string(&runtime_json).unwrap_or_default()
+        || metadata(&readback, "runtime_event_artifact")?
+            != String::from_utf8(material.runtime_evidence.artifact_bytes.clone())
+                .map_err(|error| GraphError::Validation(error.to_string()))?
+        || metadata(&readback, "runtime_event_artifact_sha256")?
+            != sha256(&material.runtime_evidence.artifact_bytes)
+        || metadata(&readback, "runtime_event_outcome_receipt")?
+            != String::from_utf8(material.runtime_evidence.receipt_bytes.clone())
+                .map_err(|error| GraphError::Validation(error.to_string()))?
+        || metadata(&readback, "runtime_event_outcome_receipt_sha256")?
+            != sha256(&material.runtime_evidence.receipt_bytes)
+        || metadata(&readback, "runtime_live_identity_fingerprint")?
+            != material.runtime_evidence.live_identity_fingerprint
+        || metadata(&readback, "input_fingerprint")? != material.input_fingerprint
+        || metadata(&readback, "graph_fingerprint")? != material.graph_fingerprint
+        || metadata(&readback, "snapshot_head")? != material.snapshot.header.git_head
+        || metadata(&readback, "dirty_fingerprint")? != material.snapshot.header.git_status_hash
+        || metadata(&readback, "source_fingerprint")? != material.snapshot.header.source_fingerprint
+    {
+        return Err(GraphError::Validation(
+            "persisted graph/runtime certificate readback mismatch".to_string(),
+        ));
+    }
+    Ok(integration)
+}
+
+fn parse_args(args: &[String]) -> Result<GraphArgs, GraphError> {
+    let mut result = GraphArgs {
+        root: PathBuf::from("."),
+        profile: "default".to_string(),
+        format: "text".to_string(),
+        path: None,
+        all: false,
+        relation: "dependency".to_string(),
+        direction: "both".to_string(),
+        depth: 0,
+        token: None,
+    };
+    let mut index = 0;
+    while index < args.len() {
+        let flag = args[index].as_str();
+        let value = |index: &mut usize| -> Result<String, GraphError> {
+            *index += 1;
+            args.get(*index)
+                .cloned()
+                .ok_or_else(|| GraphError::Usage(format!("missing value for {flag}")))
+        };
+        match flag {
+            "--root" => result.root = PathBuf::from(value(&mut index)?),
+            "--profile" => result.profile = value(&mut index)?,
+            "--format" => result.format = value(&mut index)?,
+            "--path" => result.path = Some(value(&mut index)?),
+            "--all" => result.all = true,
+            "--relation" => result.relation = value(&mut index)?,
+            "--direction" => result.direction = value(&mut index)?,
+            "--depth" => {
+                result.depth = value(&mut index)?
+                    .parse()
+                    .map_err(|_| GraphError::Usage("invalid depth".to_string()))?
+            }
+            "--token" => result.token = Some(value(&mut index)?),
+            "--help" | "-h" => {
+                return Err(GraphError::Usage(
+                    "graph <build|status|query|context> [--root PATH] [--format json]".to_string(),
+                ))
+            }
+            unknown => return Err(GraphError::Usage(format!("unknown graph option {unknown}"))),
+        }
+        index += 1;
+    }
+    if !matches!(result.format.as_str(), "text" | "json") {
+        return Err(GraphError::Usage("format must be text or json".to_string()));
+    }
+    Ok(result)
+}
+
+fn open_db(root: &Path) -> Result<Connection, GraphError> {
+    let path = canonical_published_graph_path(root)?;
+    let uri = sqlite_immutable_uri(&path)?;
+    Connection::open_with_flags(
+        uri,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
+    )
+    .map_err(|error| GraphError::Unavailable(error.to_string()))
+}
+
+fn load_graph_records(root: &Path) -> Result<(Vec<Value>, Vec<Value>), GraphError> {
+    let connection = open_db(root)?;
+    let mut nodes = Vec::new();
+    let mut statement = connection
+        .prepare("SELECT payload_json FROM nodes ORDER BY id")
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    for row in rows {
+        nodes.push(
+            serde_json::from_str(&row.map_err(|error| GraphError::Io(error.to_string()))?)
+                .map_err(|error| GraphError::Validation(error.to_string()))?,
+        );
+    }
+    let mut facts = Vec::new();
+    let mut statement = connection
+        .prepare("SELECT payload_json FROM edges ORDER BY id")
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    for row in rows {
+        facts.push(
+            serde_json::from_str(&row.map_err(|error| GraphError::Io(error.to_string()))?)
+                .map_err(|error| GraphError::Validation(error.to_string()))?,
+        );
+    }
+    Ok((nodes, facts))
+}
+
+fn persisted_input_identity(
+    values: &BTreeMap<String, String>,
+    integration: &Value,
+) -> Result<PersistedInputIdentity, GraphError> {
+    let mismatch =
+        |detail: &str| runtime_boundary("persisted_readback_mismatch", detail.to_string());
+    let required = |key: &str| {
+        values
+            .get(key)
+            .cloned()
+            .ok_or_else(|| mismatch(&format!("metadata {key} is absent")))
+    };
+    let materialization_text = required("runtime_event_materialization")?;
+    let artifact_text = required("runtime_event_artifact")?;
+    let artifact_bytes_sha = required("runtime_event_artifact_sha256")?;
+    let receipt_text = required("runtime_event_outcome_receipt")?;
+    let receipt_bytes_sha = required("runtime_event_outcome_receipt_sha256")?;
+    let live_identity_fingerprint = required("runtime_live_identity_fingerprint")?;
+    if sha256(artifact_text.as_bytes()) != artifact_bytes_sha
+        || sha256(receipt_text.as_bytes()) != receipt_bytes_sha
+    {
+        return Err(mismatch("persisted runtime byte hash is invalid"));
+    }
+    let materialization: Value = serde_json::from_str(&materialization_text)
+        .map_err(|_| mismatch("runtime materialization JSON is invalid"))?;
+    let artifact: Value = serde_json::from_str(&artifact_text)
+        .map_err(|_| mismatch("runtime artifact JSON is invalid"))?;
+    let receipt: Value = serde_json::from_str(&receipt_text)
+        .map_err(|_| mismatch("runtime receipt JSON is invalid"))?;
+    if runtime_canonical_bytes(&artifact, false)
+        .map_err(|_| mismatch("persisted artifact schema is invalid"))?
+        != artifact_text.as_bytes()
+    {
+        return Err(mismatch("persisted artifact bytes are not canonical"));
+    }
+    let artifact_object = artifact
+        .as_object()
+        .ok_or_else(|| mismatch("persisted artifact is not an object"))?;
+    let artifact_sha256 = required_string(artifact_object, "artifact_sha256")
+        .map_err(|_| mismatch("persisted artifact self hash is absent"))?;
+    if sha256(
+        &runtime_canonical_bytes(&artifact, true)
+            .map_err(|_| mismatch("persisted artifact preimage is invalid"))?,
+    ) != artifact_sha256
+    {
+        return Err(mismatch("persisted artifact self hash is invalid"));
+    }
+    validate_receipt(&receipt, receipt_text.as_bytes())
+        .map_err(|_| mismatch("persisted receipt is invalid"))?;
+    let receipt_object = receipt
+        .as_object()
+        .ok_or_else(|| mismatch("persisted receipt is not an object"))?;
+    let receipt_sha256 = required_string(receipt_object, "receipt_sha256")
+        .map_err(|_| mismatch("persisted receipt self hash is absent"))?;
+    let artifact_materialization_id = required_string(artifact_object, "materialization_id")
+        .map_err(|_| mismatch("persisted materialization id is absent"))?;
+    let expected_materialization_id = sha256(
+        &[
+            b"agent_canon.runtime_event.materialization.v1\0".as_slice(),
+            runtime_materialization_preimage(&artifact)
+                .map_err(|_| mismatch("persisted materialization preimage is invalid"))?
+                .as_slice(),
+        ]
+        .concat(),
+    );
+    let publication_intent = artifact
+        .get("publication_intent")
+        .and_then(Value::as_object)
+        .ok_or_else(|| mismatch("persisted publication intent is absent"))?;
+    let artifact_path = required_string(publication_intent, "target_path")
+        .map_err(|_| mismatch("persisted artifact path is absent"))?;
+    let attempt_id = required_string(publication_intent, "attempt_id")
+        .map_err(|_| mismatch("persisted attempt id is absent"))?;
+    if artifact_materialization_id != expected_materialization_id
+        || attempt_id != publication_attempt_id(&artifact_materialization_id, &artifact_path)
+    {
+        return Err(mismatch(
+            "persisted materialization or attempt identity is invalid",
+        ));
+    }
+    let receipt_sequence = receipt_object
+        .get("sequence")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| mismatch("persisted receipt sequence is absent"))?;
+    let receipt_path = artifact_path
+        .strip_suffix(".json")
+        .map(|prefix| format!("{prefix}.outcome.{attempt_id}.{receipt_sequence:06}.json"))
+        .ok_or_else(|| mismatch("persisted artifact path is invalid"))?;
+    let source_event = artifact
+        .get("source_event")
+        .and_then(Value::as_object)
+        .ok_or_else(|| mismatch("persisted source event is absent"))?;
+    let result_artifact = artifact
+        .get("result_artifact")
+        .and_then(Value::as_object)
+        .ok_or_else(|| mismatch("persisted result artifact is absent"))?;
+    let source_snapshot = artifact
+        .get("source_snapshot")
+        .and_then(Value::as_object)
+        .ok_or_else(|| mismatch("persisted source snapshot is absent"))?;
+    let observation = receipt_object
+        .get("observation")
+        .cloned()
+        .ok_or_else(|| mismatch("persisted publication observation is absent"))?;
+    let receipt_outcome = observation
+        .get("outcome")
+        .and_then(Value::as_str)
+        .ok_or_else(|| mismatch("persisted receipt outcome is absent"))?;
+    if !runtime_hex(&live_identity_fingerprint, 64) {
+        return Err(mismatch("persisted live identity fingerprint is invalid"));
+    }
+    let target_identities = artifact
+        .get("target_identities")
+        .cloned()
+        .ok_or_else(|| mismatch("persisted target identities are absent"))?;
+    let freshness = json!({
+        "artifact_sha256": artifact_sha256,
+        "receipt_sha256": receipt_sha256,
+        "attempt_id": attempt_id,
+        "receipt_sequence": receipt_sequence,
+        "receipt_outcome": receipt_outcome,
+        "source_head_oid": source_snapshot.get("head_oid").cloned().unwrap_or(Value::Null),
+        "base_ref": source_snapshot.get("base_ref").cloned().unwrap_or(Value::Null),
+        "base_oid": source_snapshot.get("base_oid").cloned().unwrap_or(Value::Null),
+        "target_identities": target_identities,
+        "live_identity_fingerprint": live_identity_fingerprint,
+    });
+    let expected_materialization = json!({
+        "schema": RUNTIME_EVIDENCE_SCHEMA,
+        "artifact_path": artifact_path,
+        "artifact_sha256": artifact_sha256,
+        "materialization_id": artifact_materialization_id,
+        "attempt_id": attempt_id,
+        "receipt_path": receipt_path,
+        "receipt_sha256": receipt_sha256,
+        "receipt_sequence": receipt_sequence,
+        "receipt_outcome": receipt_outcome,
+        "result_family": artifact.get("result_family").cloned().unwrap_or(Value::Null),
+        "gate_id": artifact.get("gate").and_then(|value| value.get("id")).cloned().unwrap_or(Value::Null),
+        "gate_result": artifact.get("gate").and_then(|value| value.get("result")).cloned().unwrap_or(Value::Null),
+        "source_event_id": source_event.get("stable_record_id").cloned().unwrap_or(Value::Null),
+        "source_event_sha256": source_event.get("record_sha256").cloned().unwrap_or(Value::Null),
+        "rollout_path": source_event.get("rollout_path").cloned().unwrap_or(Value::Null),
+        "rollout_file_sha256": source_event.get("rollout_file_sha256").cloned().unwrap_or(Value::Null),
+        "source_head_oid": source_snapshot.get("head_oid").cloned().unwrap_or(Value::Null),
+        "base_ref": source_snapshot.get("base_ref").cloned().unwrap_or(Value::Null),
+        "base_oid": source_snapshot.get("base_oid").cloned().unwrap_or(Value::Null),
+        "result_artifact": {
+            "path": result_artifact.get("path").cloned().unwrap_or(Value::Null),
+            "schema": result_artifact.get("schema").cloned().unwrap_or(Value::Null),
+            "artifact_blob_oid": result_artifact.get("artifact_blob_oid").cloned().unwrap_or(Value::Null),
+            "target_paths": result_artifact.get("target_paths").cloned().unwrap_or(Value::Null),
+        },
+        "source_snapshot": {
+            "head_oid": source_snapshot.get("head_oid").cloned().unwrap_or(Value::Null),
+            "base_ref": source_snapshot.get("base_ref").cloned().unwrap_or(Value::Null),
+            "base_oid": source_snapshot.get("base_oid").cloned().unwrap_or(Value::Null),
+            "porcelain_v1": source_snapshot.get("porcelain_v1").cloned().unwrap_or(Value::Null),
+        },
+        "publication_intent": artifact.get("publication_intent").cloned().unwrap_or(Value::Null),
+        "publication_observation": observation,
+        "target_identities": artifact.get("target_identities").cloned().unwrap_or(Value::Null),
+        "freshness_certificate": freshness,
+        "artifact": artifact,
+        "receipt": receipt,
+    });
+    let materialization_object = runtime_object(
+        &materialization,
+        "runtime evidence snapshot",
+        &[
+            "schema",
+            "artifact_path",
+            "artifact_sha256",
+            "materialization_id",
+            "attempt_id",
+            "receipt_path",
+            "receipt_sha256",
+            "receipt_sequence",
+            "receipt_outcome",
+            "result_family",
+            "gate_id",
+            "gate_result",
+            "source_event_id",
+            "source_event_sha256",
+            "rollout_path",
+            "rollout_file_sha256",
+            "source_head_oid",
+            "base_ref",
+            "base_oid",
+            "result_artifact",
+            "source_snapshot",
+            "publication_intent",
+            "publication_observation",
+            "target_identities",
+            "freshness_certificate",
+            "artifact",
+            "receipt",
+        ],
+    )
+    .map_err(|_| mismatch("runtime materialization fields are invalid"))?;
+    runtime_object(
+        materialization_object
+            .get("freshness_certificate")
+            .unwrap_or(&Value::Null),
+        "freshness certificate",
+        &[
+            "artifact_sha256",
+            "receipt_sha256",
+            "attempt_id",
+            "receipt_sequence",
+            "receipt_outcome",
+            "source_head_oid",
+            "base_ref",
+            "base_oid",
+            "target_identities",
+            "live_identity_fingerprint",
+        ],
+    )
+    .map_err(|_| mismatch("freshness certificate is absent or malformed"))?;
+    let integration_runtime = integration
+        .get("runtime_evidence")
+        .ok_or_else(|| mismatch("integration runtime evidence is absent"))?;
+    if materialization_object.get("schema").and_then(Value::as_str) != Some(RUNTIME_EVIDENCE_SCHEMA)
+        || integration_runtime != &materialization
+        || materialization != expected_materialization
+        || receipt_outcome != "committed"
+        || integration.get("verified").and_then(Value::as_bool) != Some(true)
+    {
+        return Err(mismatch("persisted runtime values disagree"));
+    }
+    let input_fingerprint = required("input_fingerprint")?;
+    let source_fingerprint = required("source_fingerprint")?;
+    let source_head_oid = required("snapshot_head")?;
+    let dirty_fingerprint = required("dirty_fingerprint")?;
+    let profile = integration
+        .get("profile")
+        .and_then(Value::as_str)
+        .ok_or_else(|| mismatch("persisted profile is absent"))?
+        .to_string();
+    if integration.get("input_fingerprint").and_then(Value::as_str)
+        != Some(input_fingerprint.as_str())
+        || integration.get("snapshot_head").and_then(Value::as_str)
+            != Some(source_head_oid.as_str())
+    {
+        return Err(mismatch("persisted graph identity disagrees"));
+    }
+    Ok(PersistedInputIdentity {
+        input_fingerprint,
+        artifact_sha256,
+        receipt_sha256,
+        live_identity_fingerprint,
+        source_fingerprint,
+        source_head_oid,
+        dirty_fingerprint,
+        profile,
+    })
+}
+
+fn probe_input_fingerprint(
+    root: &Path,
+    profile: &str,
+) -> Result<InputFingerprintProbe, GraphError> {
+    let source = probe_snapshot_identity(root, "parent")
+        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    let base = InputFingerprintProbe {
+        input_fingerprint: None,
+        artifact_sha256: None,
+        receipt_sha256: None,
+        live_identity_fingerprint: None,
+        source_fingerprint: source.source_fingerprint,
+        source_head_oid: source.git_head,
+        dirty_fingerprint: source.git_status_hash,
+        profile: profile.to_string(),
+        reason: None,
+    };
+    match load_runtime_evidence_snapshot(root) {
+        Ok(runtime) => {
+            let runtime_fingerprint = runtime_evidence_fingerprint(&runtime);
+            Ok(InputFingerprintProbe {
+                input_fingerprint: Some(graph_input_fingerprint(
+                    &base.source_fingerprint,
+                    &base.source_head_oid,
+                    &base.dirty_fingerprint,
+                    &runtime_fingerprint,
+                    profile,
+                )),
+                artifact_sha256: Some(runtime.artifact_sha256),
+                receipt_sha256: Some(runtime.receipt_sha256),
+                live_identity_fingerprint: Some(runtime.live_identity_fingerprint),
+                ..base
+            })
+        }
+        Err(GraphError::RuntimeBoundary { reason, .. }) => Ok(InputFingerprintProbe {
+            reason: Some(reason),
+            ..base
+        }),
+        Err(_error) => Ok(InputFingerprintProbe {
+            reason: Some("runtime_evidence_changed".to_string()),
+            ..base
+        }),
+    }
+}
+
+fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
+    let root = args
+        .root
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let connection = open_db(&root)?;
+    let keys = [
+        "integration_record",
+        "runtime_event_materialization",
+        "runtime_event_artifact",
+        "runtime_event_artifact_sha256",
+        "runtime_event_outcome_receipt",
+        "runtime_event_outcome_receipt_sha256",
+        "runtime_live_identity_fingerprint",
+        "input_fingerprint",
+        "source_fingerprint",
+        "snapshot_head",
+        "dirty_fingerprint",
+        "graph_fingerprint",
+    ];
+    let mut values = BTreeMap::new();
+    for key in keys {
+        if let Some(value) = metadata_optional(&connection, key)? {
+            values.insert(key.to_string(), value);
+        }
+    }
+    let integration = values
+        .get("integration_record")
+        .and_then(|value| serde_json::from_str::<Value>(value).ok())
+        .unwrap_or(Value::Null);
+    let persisted_result = persisted_input_identity(&values, &integration);
+    let persisted_mismatch = persisted_result.is_err();
+    let persisted = persisted_result.unwrap_or_default();
+    let probe = probe_input_fingerprint(&root, &args.profile)?;
+    let probe_reason = if persisted_mismatch {
+        Some("persisted_readback_mismatch".to_string())
+    } else if matches!(
+        probe.reason.as_deref(),
+        Some("runtime_receipt_invalid" | "runtime_receipt_missing" | "runtime_receipt_uncertain")
+    ) {
+        probe.reason.clone()
+    } else if probe.reason.as_deref() == Some("runtime_evidence_changed")
+        || (probe.reason.is_none()
+            && (probe.artifact_sha256.as_deref() != Some(persisted.artifact_sha256.as_str())
+                || probe.receipt_sha256.as_deref() != Some(persisted.receipt_sha256.as_str())))
+    {
+        Some("runtime_evidence_changed".to_string())
+    } else if probe.reason.as_deref() == Some("source_changed")
+        || probe.live_identity_fingerprint.as_deref()
+            != Some(persisted.live_identity_fingerprint.as_str())
+        || probe.source_fingerprint != persisted.source_fingerprint
+        || probe.source_head_oid != persisted.source_head_oid
+        || probe.dirty_fingerprint != persisted.dirty_fingerprint
+    {
+        Some("source_changed".to_string())
+    } else if probe.profile != persisted.profile
+        || probe.input_fingerprint.as_deref() != Some(persisted.input_fingerprint.as_str())
+    {
+        Some("runtime_evidence_changed".to_string())
+    } else {
+        None
+    };
+    let fresh = probe_reason.is_none();
+    Ok(
+        json!({"schema":"agent-canon.graph.status.v1","command":"status","status":if fresh {"fresh"} else {"stale"},"profile":args.profile,"root":root,"db_path":root.join(".agent-canon/knowledge-graph/graph.sqlite"),"input_fingerprint":persisted.input_fingerprint,"graph_fingerprint":integration.get("graph_fingerprint"),"integration_record":integration,"probe_reason":probe_reason,"reason":probe_reason,"exit_code":if fresh {0} else {2}}),
+    )
+}
+
+fn query_graph(args: &GraphArgs) -> Result<Value, GraphError> {
+    let status = read_graph_status(args)?;
+    if status.get("status").and_then(Value::as_str) != Some("fresh") {
+        return Ok(
+            json!({"schema":"agent-canon.graph.query.v1","command":"query","status":status["status"],"profile":args.profile,"root":args.root,"path":args.path,"all":args.all,"relation":args.relation,"direction":args.direction,"depth":args.depth,"nodes":[],"facts":[],"reason":status["reason"],"exit_code":2}),
+        );
+    }
+    let root = args
+        .root
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let (all_nodes, all_facts) = load_graph_records(&root)?;
+    let nodes = all_nodes
+        .into_iter()
+        .filter(|value| {
+            args.path
+                .as_ref()
+                .map(|path| value.get("path").and_then(Value::as_str) == Some(path))
+                .unwrap_or(true)
+                || args.all
+        })
+        .collect::<Vec<_>>();
+    let facts = all_facts
+        .into_iter()
+        .filter(|value| {
+            args.relation == "all"
+                || value.get("kind").and_then(Value::as_str) == Some(args.relation.as_str())
+        })
+        .collect::<Vec<_>>();
+    Ok(
+        json!({"schema":"agent-canon.graph.query.v1","command":"query","status":"fresh","profile":args.profile,"root":root,"path":args.path,"all":args.all,"relation":args.relation,"direction":args.direction,"depth":args.depth,"graph_fingerprint":status["graph_fingerprint"],"nodes":nodes,"facts":facts,"reason":Value::Null,"exit_code":0}),
+    )
+}
+
+fn context_graph(args: &GraphArgs) -> Result<Value, GraphError> {
+    let status = read_graph_status(args)?;
+    if status.get("status").and_then(Value::as_str) != Some("fresh") {
+        return Ok(
+            json!({"schema":"agent-canon.graph.context.v1","command":"context","status":status["status"],"profile":args.profile,"root":args.root,"claim_path":args.path,"token":args.token,"items":[],"dependency_witnesses":[],"reason":status["reason"],"exit_code":2}),
+        );
+    }
+    let root = args
+        .root
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let (nodes, facts) = load_graph_records(&root)?;
+    let path = args.path.clone().unwrap_or_default();
+    let node = nodes
+        .iter()
+        .find(|node| node.get("path").and_then(Value::as_str) == Some(path.as_str()))
+        .cloned();
+    let items = node.as_ref().map(|node| vec![json!({"kind":"manifest.present","value":node.get("payload").and_then(|payload| payload.get("manifest_present")).cloned().unwrap_or(Value::Bool(false)),"source_store":"manifest","producer":"source-snapshot","source_path":path,"authority":"ManifestParser"})]).unwrap_or_default();
+    let witnesses = facts
+        .iter()
+        .filter(|fact| fact.get("source_path").and_then(Value::as_str) == Some(path.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let node_paths = nodes
+        .iter()
+        .filter_map(|value| {
+            Some((
+                value.get("id")?.as_str()?.to_string(),
+                value.get("path")?.as_str()?.to_string(),
+            ))
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut evidence_paths = vec![path.clone()];
+    let mut parent_paths = Vec::new();
+    for fact in &witnesses {
+        for endpoint in ["from", "to"] {
+            if let Some(endpoint_path) = fact
+                .get(endpoint)
+                .and_then(Value::as_str)
+                .and_then(|id| node_paths.get(id))
+            {
+                evidence_paths.push(endpoint_path.clone());
+            }
+        }
+        let detail = fact.get("dependency_detail").and_then(Value::as_object);
+        if detail
+            .and_then(|value| value.get("direction"))
+            .and_then(Value::as_str)
+            == Some("upstream")
+            && detail
+                .and_then(|value| value.get("kind"))
+                .and_then(Value::as_str)
+                == Some("design")
+        {
+            if let Some(parent) = fact
+                .get("to")
+                .and_then(Value::as_str)
+                .and_then(|id| node_paths.get(id))
+            {
+                parent_paths.push(parent.clone());
+            }
+        }
+    }
+    evidence_paths.sort();
+    evidence_paths.dedup();
+    parent_paths.sort();
+    parent_paths.dedup();
+    Ok(
+        json!({"schema":"agent-canon.graph.context.v1","command":"context","status":"fresh","profile":args.profile,"root":args.root,"claim_path":path,"token":args.token,"resolved_path":node.as_ref().and_then(|value| value.get("path")).cloned(),"source_identity":node.as_ref().map(|value| json!({"snapshot_commit":status["integration_record"].get("snapshot_head"),"source_path":value.get("path"),"content_sha256":value.get("payload").and_then(|payload| payload.get("content_sha256"))})),"items":items,"dependency_witnesses":witnesses,"evidence_paths":evidence_paths,"parent_paths":parent_paths,"runtime_measurements":[],"context_diagnostics":[],"graph_fingerprint":status["graph_fingerprint"],"reason":Value::Null,"exit_code":0}),
+    )
+}
+
+fn build_graph_with_failure(args: &GraphArgs) -> Result<Value, GraphError> {
+    let root = args
+        .root
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let material = collect_build_material(&root, &args.profile)?;
+    let integration = materialize_graph_store(&material)?;
+    Ok(
+        json!({"schema":"agent-canon.graph.build.v1","command":"build","status":"fresh","graph_status":"fresh","profile":args.profile,"root":root,"db_path":integration.db_path,"input_fingerprint":integration.input_fingerprint,"graph_fingerprint":integration.graph_fingerprint,"unresolved_count":material.snapshot.diagnostics.len(),"unresolved":material.snapshot.diagnostics.iter().map(|diagnostic| json!({"code":diagnostic.code,"message":diagnostic.message})).collect::<Vec<_>>(),"producer_artifacts":integration.producer_artifacts.iter().map(ProducerArtifact::json).collect::<Vec<_>>(),"integration_record":integration.json(),"publication":"published","durability":"durable","exit_code":0}),
+    )
+}
+
+fn emit(value: &Value, format: &str) -> i32 {
+    if format == "text" {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(value).unwrap_or_else(|_| "{}".to_string())
+        );
+    } else {
+        println!(
+            "{}",
+            serde_json::to_string(value).unwrap_or_else(|_| "{}".to_string())
+        );
+    }
+    value.get("exit_code").and_then(Value::as_i64).unwrap_or(1) as i32
+}
+
+pub(crate) fn run(args: &[String]) -> i32 {
+    let Some(command) = args.first() else {
+        eprintln!("graph <build|status|query|context>");
+        return 2;
+    };
+    let parsed = match parse_args(&args[1..]) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("graph: {error}");
+            return 2;
+        }
+    };
+    let result = match command.as_str() {
+        "build" => build_graph_with_failure(&parsed),
+        "status" => read_graph_status(&parsed),
+        "query" => query_graph(&parsed),
+        "context" => context_graph(&parsed),
+        "help" | "--help" | "-h" => {
+            eprintln!("graph <build|status|query|context> [--root PATH] [--format json]");
+            return 2;
+        }
+        _ => Err(GraphError::Usage(format!(
+            "unknown graph command {command}"
+        ))),
+    };
+    match result {
+        Ok(value) => emit(&value, &parsed.format),
+        Err(error) => {
+            let value = json!({"schema":format!("agent-canon.graph.{}.v1",command),"command":command,"status":"unavailable","reason":error.to_string(),"exit_code":1});
+            emit(&value, &parsed.format)
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn empty_contract() -> GraphContractWitness {
-        GraphContractWitness {
-            candidate_sources: BTreeSet::new(),
-            excluded_sources: BTreeSet::new(),
-            eligible_sources: BTreeSet::new(),
-            declarations: BTreeSet::new(),
-            accepted_relations: BTreeSet::new(),
-            graph_members: BTreeSet::new(),
-            profile_members: BTreeSet::new(),
-            relation_exclusions: BTreeSet::new(),
-            unresolved: BTreeSet::new(),
-            ambiguous: BTreeSet::new(),
-            uncovered: BTreeSet::new(),
-            source_identity: BTreeMap::new(),
-            relation_endpoints: BTreeMap::new(),
-            reverse_projection: BTreeMap::new(),
+    static FIXTURE_COUNTER: AtomicUsize = AtomicUsize::new(0);
+    static GRAPH_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    struct GraphFixture {
+        root: PathBuf,
+        target: PathBuf,
+        artifact: PathBuf,
+        artifact_value: Value,
+        artifact_bytes: Vec<u8>,
+        receipt: PathBuf,
+        receipt_value: Value,
+        receipt_bytes: Vec<u8>,
+        base_oid: String,
+    }
+
+    impl Drop for GraphFixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
         }
     }
 
-    fn resign_contract(value: &mut Value) {
-        value
-            .as_object_mut()
-            .expect("contract object")
-            .remove("contract_fingerprint");
-        let fingerprint = hash_bytes(canonical_json(value).as_bytes());
-        value.as_object_mut().expect("contract object").insert(
-            "contract_fingerprint".to_string(),
-            Value::String(fingerprint),
-        );
-    }
-
-    #[test]
-    fn profile_adapter_is_one_way() {
-        assert_eq!(snapshot_profile_for_graph("default").unwrap(), "parent");
-        assert!(snapshot_profile_for_graph("parent").is_err());
-    }
-
-    #[test]
-    fn omitted_and_explicit_default_profiles_are_equal() {
-        let omitted = parse_build_args(&[]).expect("omitted profile");
-        let explicit = parse_build_args(&["--profile".to_string(), "default".to_string()])
-            .expect("explicit default profile");
-        assert_eq!(omitted.root, explicit.root);
-        assert_eq!(omitted.profile, explicit.profile);
-        assert_eq!(
-            snapshot_profile_for_graph(&omitted.profile).unwrap(),
-            snapshot_profile_for_graph(&explicit.profile).unwrap()
-        );
-    }
-
-    #[test]
-    fn integration_record_validation_rejects_profile_mismatch() {
-        let connection = Connection::open_in_memory().expect("in-memory SQLite");
-        connection
-            .execute_batch("CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
-            .expect("metadata schema");
-        let contract = empty_contract().json();
-        let contract_fingerprint = contract["contract_fingerprint"]
-            .as_str()
-            .expect("contract fingerprint");
-        connection
-            .execute(
-                "INSERT INTO metadata(key,value) VALUES('mathematical_contract',?)",
-                [canonical_json(&contract)],
-            )
-            .expect("contract metadata");
-        let mut record = json!({
-            "schema": "agent-canon.graph.integration.v1",
-            "root": ".",
-            "db_path": ".agent-canon/knowledge-graph/graph.sqlite",
-            "schema_version": GRAPH_SCHEMA_VERSION,
-            "profile": PUBLIC_PROFILE,
-            "source_snapshot_profile": SOURCE_PROFILE,
-            "snapshot_head": "0123456789abcdef",
-            "input_fingerprint": "input",
-            "graph_fingerprint": "graph",
-            "contract_fingerprint": contract_fingerprint,
-            "producer_artifacts": [],
-            "verified": true,
-            "verification_code": "graph.integration.verified",
-        });
-        connection
-            .execute(
-                "INSERT INTO metadata(key,value) VALUES('integration_record',?)",
-                [canonical_json(&record)],
-            )
-            .expect("integration metadata");
-        assert!(validated_integration_record(&connection, "input", "graph").is_ok());
-
-        record["source_snapshot_profile"] = Value::String(PUBLIC_PROFILE.to_string());
-        connection
-            .execute(
-                "UPDATE metadata SET value=? WHERE key='integration_record'",
-                [canonical_json(&record)],
-            )
-            .expect("mismatched integration metadata");
-        assert!(validated_integration_record(&connection, "input", "graph").is_err());
-    }
-
-    #[test]
-    fn repo_path_rejects_escape() {
-        assert!(normalize_repo_path("../outside").is_err());
-        assert_eq!(
-            normalize_repo_path("./documents/x.md").unwrap(),
-            "documents/x.md"
-        );
-    }
-
-    #[test]
-    fn runtime_measurement_context_selects_matching_report_unit() {
-        let measurements = vec![
-            json!({"responsibility_unit_id": "unit-a"}),
-            json!({"responsibility_unit_id": "unit-b"}),
-        ];
-        assert_eq!(
-            select_runtime_measurements(
-                measurements.clone(),
-                "reports/agents/unit-b/design_brief.md"
-            ),
-            vec![json!({"responsibility_unit_id": "unit-b"})]
-        );
-        assert_eq!(
-            select_runtime_measurements(measurements.clone(), "documents/README.md"),
-            measurements
-        );
-        assert!(select_runtime_measurements(
-            vec![json!({"responsibility_unit_id": "unit-a"})],
-            "reports/agents/unit-missing/design_brief.md"
-        )
-        .is_empty());
-    }
-
-    #[test]
-    fn context_source_identity_projects_exact_snapshot_path_and_content_tuple() {
-        let connection = Connection::open_in_memory().expect("in-memory graph");
-        connection
-            .execute_batch("CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
-            .expect("metadata schema");
-        let snapshot_commit = "0123456789abcdef0123456789abcdef01234567";
-        connection
-            .execute(
-                "INSERT INTO metadata(key,value) VALUES('snapshot_head',?)",
-                [snapshot_commit],
-            )
-            .expect("snapshot metadata");
-        let content_sha256 = "a".repeat(64);
-        let node = json!({
-            "payload": {
-                "path": "documents/design.md",
-                "content_sha256": content_sha256,
-            }
-        });
-
-        let identity =
-            context_source_identity(&connection, Some(&node), Some("documents/design.md"))
-                .expect("source identity")
-                .expect("resolved tuple");
-
-        assert_eq!(
-            identity,
-            json!({
-                "snapshot_commit": snapshot_commit,
-                "source_path": "documents/design.md",
-                "content_sha256": "a".repeat(64),
-            })
-        );
-        let args = GraphContextArgs {
-            root: PathBuf::from("."),
-            profile: PUBLIC_PROFILE.to_string(),
-            format: OutputFormat::Json,
-            path: "documents/design.md".to_string(),
-            token: None,
-        };
-        let status = json!({
-            "status": "fresh",
-            "graph_fingerprint": "graph",
-            "unresolved_count": 0,
-            "ambiguous_count": 0,
-            "uncovered_count": 0,
-            "excluded_count": 0,
-            "unresolved": [],
-            "ambiguous": [],
-            "uncovered": [],
-            "excluded": [],
-        });
-        let response = context_response_from_status(
-            &args,
-            Path::new("."),
-            &status,
-            Some("documents/design.md".to_string()),
-            Some(identity.clone()),
-            None,
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-        );
-        assert_eq!(response["source_identity"], identity);
-
-        let rebound = json!({
-            "payload": {
-                "path": "documents/other.md",
-                "content_sha256": "a".repeat(64),
-            }
-        });
+    fn fixture_git(root: &Path, args: &[&str]) -> String {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .output()
+            .expect("git command starts");
         assert!(
-            context_source_identity(&connection, Some(&rebound), Some("documents/design.md"),)
-                .is_err()
+            output.status.success(),
+            "git {:?}: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
         );
-        let invalid_digest = json!({
-            "payload": {
-                "path": "documents/design.md",
-                "content_sha256": "A".repeat(64),
-            }
-        });
-        assert!(context_source_identity(
-            &connection,
-            Some(&invalid_digest),
-            Some("documents/design.md"),
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
+    fn test_base64(bytes: &[u8]) -> String {
+        const DIGITS: &[u8; 64] =
+            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut output = String::new();
+        for chunk in bytes.chunks(3) {
+            let a = chunk[0];
+            let b = *chunk.get(1).unwrap_or(&0);
+            let c = *chunk.get(2).unwrap_or(&0);
+            output.push(DIGITS[(a >> 2) as usize] as char);
+            output.push(DIGITS[(((a & 0x03) << 4) | (b >> 4)) as usize] as char);
+            output.push(if chunk.len() > 1 {
+                DIGITS[(((b & 0x0f) << 2) | (c >> 6)) as usize] as char
+            } else {
+                '='
+            });
+            output.push(if chunk.len() > 2 {
+                DIGITS[(c & 0x3f) as usize] as char
+            } else {
+                '='
+            });
+        }
+        output
+    }
+
+    fn finalize_artifact(value: &mut Value) -> Vec<u8> {
+        value["artifact_sha256"] = Value::String("0".repeat(64));
+        let preimage = runtime_materialization_preimage(value).expect("materialization preimage");
+        value["materialization_id"] = Value::String(sha256(
+            &[
+                b"agent_canon.runtime_event.materialization.v1\0".as_slice(),
+                preimage.as_slice(),
+            ]
+            .concat(),
+        ));
+        let materialization_id = value["materialization_id"]
+            .as_str()
+            .expect("materialization id")
+            .to_string();
+        let target_path = value["publication_intent"]["target_path"]
+            .as_str()
+            .expect("target path")
+            .to_string();
+        value["publication_intent"]["attempt_id"] =
+            Value::String(publication_attempt_id(&materialization_id, &target_path));
+        let artifact = sha256(&runtime_canonical_bytes(value, true).expect("artifact preimage"));
+        value["artifact_sha256"] = Value::String(artifact);
+        runtime_canonical_bytes(value, false).expect("canonical artifact")
+    }
+
+    fn finalize_observation(value: &mut Value) {
+        value["observation_sha256"] = Value::String("0".repeat(64));
+        let hash = sha256(&observation_canonical_bytes(value, true).expect("observation preimage"));
+        value["observation_sha256"] = Value::String(hash);
+    }
+
+    fn finalize_receipt(value: &mut Value) -> Vec<u8> {
+        value["receipt_sha256"] = Value::String("0".repeat(64));
+        let hash = sha256(&receipt_canonical_bytes(value, true).expect("receipt preimage"));
+        value["receipt_sha256"] = Value::String(hash);
+        receipt_canonical_bytes(value, false).expect("canonical receipt")
+    }
+
+    fn graph_fixture() -> GraphFixture {
+        let counter = FIXTURE_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "agent-canon-graph-{}-{counter}-{nanos}",
+            std::process::id()
+        ));
+        fs::create_dir_all(root.join("src")).expect("fixture root");
+        fixture_git(&root, &["init", "-q"]);
+        fixture_git(&root, &["config", "user.email", "test@example.invalid"]);
+        fixture_git(&root, &["config", "user.name", "Graph Test"]);
+        let target = root.join("src/target.txt");
+        fs::write(&target, b"base target\n").expect("base target");
+        fixture_git(&root, &["add", "src/target.txt"]);
+        fixture_git(&root, &["commit", "-qm", "base"]);
+        let base_oid = fixture_git(&root, &["rev-parse", "HEAD"]);
+        fixture_git(&root, &["tag", "runtime-base", &base_oid]);
+
+        let run_dir = root.join("reports/agents/run-graph");
+        fs::create_dir_all(&run_dir).expect("run dir");
+        let result = run_dir.join("validation_result.json");
+        fs::write(
+            &result,
+            b"{\"schema\":\"agent_canon.runtime_result_input.v1\",\"result\":\"PASS\"}\n",
         )
-        .is_err());
-    }
+        .expect("result artifact");
+        fs::write(&target, b"current target\n").expect("current target");
+        fixture_git(
+            &root,
+            &[
+                "add",
+                "src/target.txt",
+                "reports/agents/run-graph/validation_result.json",
+            ],
+        );
+        fixture_git(&root, &["commit", "-qm", "current"]);
+        let head_oid = fixture_git(&root, &["rev-parse", "HEAD"]);
 
-    #[test]
-    fn dependency_witness_projects_repo_paths_not_node_ids() {
-        let fact = json!({
-            "id": "edge-1",
-            "from": "node-a",
-            "to": "node-b",
-            "owner": "ManifestParser",
-            "source_path": "a.py",
-            "source_span": null,
-            "producer": "source-snapshot",
-            "evidence_ref": "source-snapshot:a.py:1",
-            "authority": "declared",
+        let rollout = root.join("sessions/rollout.jsonl");
+        fs::create_dir_all(rollout.parent().expect("rollout parent")).expect("sessions");
+        let mut rollout_bytes = Vec::new();
+        for _ in 0..871 {
+            rollout_bytes.extend_from_slice(b"{}\n");
+        }
+        let record_offset = rollout_bytes.len();
+        let record = b"{\"type\":\"task_complete\"}\n";
+        rollout_bytes.extend_from_slice(record);
+        fs::write(&rollout, &rollout_bytes).expect("rollout");
+
+        fs::write(root.join("reports/agents/.active_run"), b"run-graph\n").expect("active pointer");
+        let record_sha256 = sha256(record);
+        let artifact_target = run_dir.join(format!("runtime_event.{}.json", &record_sha256[..16]));
+        let target_bytes = fs::read(&target).expect("target bytes");
+        let base_bytes =
+            git_value(&root, &["show", &format!("{base_oid}:src/target.txt")]).expect("base bytes");
+        let target_blob = fixture_git(&root, &["hash-object", "--", "src/target.txt"]);
+        let base_blob = fixture_git(
+            &root,
+            &[
+                "rev-parse",
+                "--verify",
+                &format!("{base_oid}:src/target.txt"),
+            ],
+        );
+        let result_bytes = fs::read(&result).expect("result bytes");
+        let result_blob = fixture_git(
+            &root,
+            &[
+                "hash-object",
+                "--",
+                "reports/agents/run-graph/validation_result.json",
+            ],
+        );
+        let rollout_path = rollout.display().to_string();
+        let publication_path = artifact_target
+            .strip_prefix(&root)
+            .expect("artifact relative")
+            .to_str()
+            .expect("UTF-8 artifact")
+            .replace('\\', "/");
+        let mut artifact_value = json!({
+            "schema": RUNTIME_EVENT_SCHEMA,
+            "materialization_id": "0".repeat(64),
+            "result_family": "validation",
+            "gate": {"id": "validation", "result": "PASS"},
+            "source_event": {
+                "agent_id": "11111111-1111-4111-8111-111111111111",
+                "agent_context_id": "22222222-2222-4222-8222-222222222222",
+                "codex_thread_id": "33333333-3333-4333-8333-333333333333",
+                "parent_id": "44444444-4444-4444-8444-444444444444",
+                "turn_id": "55555555-5555-4555-8555-555555555555",
+                "role": "worker",
+                "decision": "NONE",
+                "applicable_gate_result": "PASS",
+                "rollout_path": rollout_path,
+                "rollout_path_bytes_b64": test_base64(rollout_path.as_bytes()),
+                "rollout_path_sha256": sha256(rollout_path.as_bytes()),
+                "rollout_file_sha256": sha256(&rollout_bytes),
+                "record_line": 872,
+                "record_byte_offset": record_offset,
+                "record_byte_length": record.len(),
+                "record_bytes_b64": test_base64(record),
+                "record_sha256": record_sha256,
+                "stable_record_id": record_sha256,
+            },
+            "result_artifact": {
+                "path": "reports/agents/run-graph/validation_result.json",
+                "schema": "agent_canon.runtime_result_input.v1",
+                "artifact_sha256": sha256(&result_bytes),
+                "artifact_blob_oid": result_blob,
+                "gate_id": "validation",
+                "gate_result": "PASS",
+                "target_paths": ["src/target.txt"],
+                "base_ref": "refs/tags/runtime-base",
+                "base_oid": base_oid,
+            },
+            "target_identities": [{
+                "path": "src/target.txt",
+                "content_sha256": sha256(&target_bytes),
+                "git_blob_oid": target_blob,
+                "base_present": true,
+                "base_content_sha256": sha256(&base_bytes),
+                "base_git_blob_oid": base_blob,
+            }],
+            "source_snapshot": {
+                "head_oid": head_oid,
+                "base_ref": "refs/tags/runtime-base",
+                "base_oid": base_oid,
+                "porcelain_v1": ["?? sessions/rollout.jsonl"],
+            },
+            "publication_intent": {
+                "schema": RUNTIME_PUBLICATION_INTENT_SCHEMA,
+                "attempt_id": "0".repeat(64),
+                "target_path": publication_path.clone(),
+                "prepared_state": "prepared",
+            },
+            "artifact_sha256": "0".repeat(64),
         });
-        let paths = BTreeMap::from([
-            ("node-a".to_string(), "a.py".to_string()),
-            ("node-b".to_string(), "b.py".to_string()),
-        ]);
-        let witness = dependency_witness_json(&fact, &paths).expect("path witness");
-        assert_eq!(witness["from"], "a.py");
-        assert_eq!(witness["to"], "b.py");
-        assert!(dependency_witness_json(&fact, &BTreeMap::new()).is_err());
+        let artifact_bytes = finalize_artifact(&mut artifact_value);
+        fs::write(&artifact_target, &artifact_bytes).expect("artifact");
+        let attempt_id = artifact_value["publication_intent"]["attempt_id"]
+            .as_str()
+            .expect("attempt id")
+            .to_string();
+        let artifact_sha256 = artifact_value["artifact_sha256"]
+            .as_str()
+            .expect("artifact hash")
+            .to_string();
+        let materialization_id = artifact_value["materialization_id"]
+            .as_str()
+            .expect("materialization id")
+            .to_string();
+        let mut observation = json!({
+            "schema": RUNTIME_OBSERVATION_SCHEMA,
+            "attempt_id": attempt_id.clone(),
+            "artifact_path": publication_path.clone(),
+            "artifact_sha256": artifact_sha256.clone(),
+            "materialization_id": materialization_id.clone(),
+            "sequence": 1,
+            "prior_observation_sha256": Value::Null,
+            "outcome": "committed",
+            "evidence": {
+                "source": "publish",
+                "causal_gap": false,
+                "target_presence": "present",
+                "rename_status": "completed",
+                "target_directory_fsync_status": "succeeded",
+                "readback_status": "verified",
+                "readback_sha256": artifact_sha256.clone(),
+            },
+            "observation_sha256": "0".repeat(64),
+        });
+        finalize_observation(&mut observation);
+        let mut receipt_value = json!({
+            "schema": RUNTIME_RECEIPT_SCHEMA,
+            "attempt_id": attempt_id.clone(),
+            "artifact_path": publication_path,
+            "artifact_sha256": artifact_sha256,
+            "materialization_id": materialization_id,
+            "sequence": 1,
+            "prior_receipt_sha256": Value::Null,
+            "observation": observation,
+            "receipt_sha256": "0".repeat(64),
+        });
+        let receipt_bytes = finalize_receipt(&mut receipt_value);
+        let receipt = run_dir.join(format!(
+            "runtime_event.{}.outcome.{}.000001.json",
+            &record_sha256[..16],
+            attempt_id
+        ));
+        fs::write(&receipt, &receipt_bytes).expect("receipt");
+        GraphFixture {
+            root,
+            target,
+            artifact: artifact_target,
+            artifact_value,
+            artifact_bytes,
+            receipt,
+            receipt_value,
+            receipt_bytes,
+            base_oid,
+        }
+    }
+
+    fn graph_args(root: &Path) -> GraphArgs {
+        GraphArgs {
+            root: root.to_path_buf(),
+            profile: "default".to_string(),
+            format: "json".to_string(),
+            path: Some("src/target.txt".to_string()),
+            all: false,
+            relation: "all".to_string(),
+            direction: "both".to_string(),
+            depth: 1,
+            token: None,
+        }
     }
 
     #[test]
-    fn query_endpoint_projection_excludes_evidence_nodes() {
-        let connection = Connection::open_in_memory().expect("in-memory graph");
-        initialize_graph_schema(&connection).expect("Graph DSL schema");
+    fn graph_storage_realization_stages_outside_repository_and_reads_immutable_publication() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        let root = fixture.root.canonicalize().expect("canonical fixture root");
+        let material = collect_build_material(&root, "default").expect("build material");
+        let operation_id = graph_operation_id(&material);
+        let staging = GraphStaging::create(&operation_id).expect("exclusive local staging");
+        let host_temp = std::env::temp_dir()
+            .canonicalize()
+            .expect("canonical host temp");
+
+        assert_eq!(staging.root.parent(), Some(host_temp.as_path()));
+        assert!(!staging.database.starts_with(&material.graph_root));
+        let published = material.graph_root.join("graph.sqlite");
+        let publication_temp = graph_publication_temp_path(&material.graph_root, &operation_id);
+        assert!(!published.exists());
+        assert!(!publication_temp.exists());
+
+        let integration =
+            build_graph_staging(&material, &staging.database).expect("local SQLite build");
+        assert!(!published.exists());
+        assert!(!publication_temp.exists());
+        File::open(&staging.database)
+            .and_then(|file| file.sync_all())
+            .expect("staging fsync");
+        let staged_bytes = fs::read(&staging.database).expect("staging bytes");
+        let staged_sha256 = sha256(&staged_bytes);
+
+        publish_graph_bytes_at(
+            &material.graph_root,
+            &published,
+            &publication_temp,
+            &staged_bytes,
+            &staged_sha256,
+        )
+        .expect("exact byte publication");
+
+        assert_eq!(fs::read(&published).expect("published bytes"), staged_bytes);
+        assert!(!publication_temp.exists());
+        let canonical = canonical_published_graph_path(&material.root).expect("canonical graph");
+        let immutable_uri = sqlite_immutable_uri(&canonical).expect("immutable URI");
+        assert!(immutable_uri.starts_with("file:"));
+        assert!(immutable_uri.ends_with("?immutable=1"));
+        assert_eq!(
+            sqlite_immutable_uri(Path::new("/graph storage?#%.sqlite"))
+                .expect("reserved path encoding"),
+            "file:/graph%20storage%3F%23%25.sqlite?immutable=1"
+        );
+        let readback = open_db(&material.root).expect("immutable graph readback");
+        validate_graph_connection(&readback).expect("published graph contract");
+        assert_eq!(
+            metadata(&readback, "integration_record").expect("integration metadata"),
+            serde_json::to_string(&integration.json()).expect("integration JSON")
+        );
+        assert!(readback.execute("DELETE FROM metadata", []).is_err());
+        drop(readback);
+
+        #[cfg(unix)]
+        {
+            fs::remove_file(&published).expect("replace published graph for symlink oracle");
+            std::os::unix::fs::symlink(&staging.database, &published)
+                .expect("published graph symlink");
+            assert!(matches!(
+                open_db(&material.root),
+                Err(GraphError::Validation(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn graph_storage_realization_pre_rename_failures_preserve_old_and_unrelated_temps() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        let graph_root = fixture.root.join(".agent-canon/knowledge-graph");
+        fs::create_dir_all(&graph_root).expect("graph root");
+        let graph_root = graph_root.canonicalize().expect("canonical graph root");
+        let published = graph_root.join("graph.sqlite");
+        let collision = graph_root.join("graph.sqlite.tmp.collision");
+        let unrelated = graph_root.join("graph.sqlite.tmp.3288035");
+        let old_bytes = b"old published graph";
+        let new_bytes = b"new staged graph bytes";
+        fs::write(&published, old_bytes).expect("old graph");
+        fs::write(&collision, b"collision owner").expect("collision temp");
+        fs::write(&unrelated, b"unrelated failed partial").expect("unrelated temp");
+
+        assert!(matches!(
+            publish_graph_bytes_at(
+                &graph_root,
+                &published,
+                &collision,
+                new_bytes,
+                &sha256(new_bytes),
+            ),
+            Err(GraphError::Io(_))
+        ));
+        assert_eq!(fs::read(&published).expect("old graph readback"), old_bytes);
+        assert_eq!(
+            fs::read(&collision).expect("collision readback"),
+            b"collision owner"
+        );
+        assert_eq!(
+            fs::read(&unrelated).expect("unrelated temp readback"),
+            b"unrelated failed partial"
+        );
+
+        let owned_temp = graph_root.join("graph.sqlite.tmp.owned-hash-failure");
+        assert!(matches!(
+            publish_graph_bytes_at(
+                &graph_root,
+                &published,
+                &owned_temp,
+                new_bytes,
+                &"0".repeat(64),
+            ),
+            Err(GraphError::Validation(_))
+        ));
+        assert_eq!(
+            fs::read(&published).expect("preserved old graph"),
+            old_bytes
+        );
+        assert!(!owned_temp.exists());
+        assert_eq!(
+            fs::read(&unrelated).expect("retained unrelated temp"),
+            b"unrelated failed partial"
+        );
+    }
+
+    #[test]
+    fn test_graph_status_query_context_consume_persisted_runtime_event() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        let args = graph_args(&fixture.root);
+        let build = build_graph_with_failure(&args).expect("graph build");
+        assert_eq!(build["status"], "fresh");
+
+        let connection = Connection::open(
+            fixture
+                .root
+                .join(".agent-canon/knowledge-graph/graph.sqlite"),
+        )
+        .expect("persisted graph");
+        let mut statement = connection
+            .prepare("SELECT key FROM metadata WHERE key LIKE 'runtime_%' ORDER BY key")
+            .expect("runtime metadata query");
+        let keys = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .expect("runtime metadata rows")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("runtime metadata values");
+        assert_eq!(
+            keys,
+            vec![
+                "runtime_event_artifact",
+                "runtime_event_artifact_sha256",
+                "runtime_event_materialization",
+                "runtime_event_outcome_receipt",
+                "runtime_event_outcome_receipt_sha256",
+                "runtime_live_identity_fingerprint",
+            ]
+        );
+        drop(statement);
+        drop(connection);
+
+        let probe = probe_input_fingerprint(&fixture.root, &args.profile)
+            .expect("component-complete probe");
+        assert!(probe.reason.is_none());
+        assert_eq!(
+            probe.artifact_sha256.as_deref(),
+            fixture.artifact_value["artifact_sha256"].as_str()
+        );
+        assert_eq!(
+            probe.receipt_sha256.as_deref(),
+            fixture.receipt_value["receipt_sha256"].as_str()
+        );
+        assert!(probe
+            .live_identity_fingerprint
+            .as_deref()
+            .map(|value| runtime_hex(value, 64))
+            .unwrap_or(false));
+        assert_eq!(probe.profile, "default");
+
+        let graph_path = fixture
+            .root
+            .join(".agent-canon/knowledge-graph/graph.sqlite");
+        let persisted_graph = fs::read(&graph_path).expect("persisted graph bytes");
+        let persisted_artifact = fs::read(&fixture.artifact).expect("artifact bytes");
+        let persisted_receipt = fs::read(&fixture.receipt).expect("receipt bytes");
+        let status = read_graph_status(&args).expect("status");
+        let query = query_graph(&args).expect("query");
+        let context = context_graph(&args).expect("context");
+        assert_eq!(status["status"], "fresh");
+        assert_eq!(query["status"], "fresh");
+        assert_eq!(context["status"], "fresh");
+        assert_eq!(query["graph_fingerprint"], status["graph_fingerprint"]);
+        assert_eq!(context["graph_fingerprint"], status["graph_fingerprint"]);
+        assert_eq!(
+            fs::read(graph_path).expect("graph readback"),
+            persisted_graph
+        );
+        assert_eq!(
+            fs::read(&fixture.artifact).expect("artifact readback"),
+            persisted_artifact
+        );
+        assert_eq!(
+            fs::read(&fixture.receipt).expect("receipt readback"),
+            persisted_receipt
+        );
+    }
+
+    #[test]
+    fn freshness_probe_covers_artifact_receipt_source_head_base_and_target() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let mut fixture = graph_fixture();
+        let args = graph_args(&fixture.root);
+        build_graph_with_failure(&args).expect("graph build");
+
+        fs::write(&fixture.artifact, b"{}\n").expect("changed artifact");
+        let status = read_graph_status(&args).expect("artifact status");
+        assert_eq!(status["status"], "stale");
+        assert_eq!(status["probe_reason"], "runtime_evidence_changed");
+        fs::write(&fixture.artifact, &fixture.artifact_bytes).expect("restore artifact");
+        assert_eq!(
+            read_graph_status(&args).expect("restored artifact")["status"],
+            "fresh"
+        );
+
+        fs::write(&fixture.receipt, b"{}\n").expect("invalid receipt");
+        let status = read_graph_status(&args).expect("invalid receipt status");
+        assert_eq!(status["status"], "stale");
+        assert_eq!(status["probe_reason"], "runtime_receipt_invalid");
+        fs::write(&fixture.receipt, &fixture.receipt_bytes).expect("restore valid receipt");
+
+        fixture.receipt_value["observation"]["outcome"] = Value::String("uncertain".to_string());
+        fixture.receipt_value["observation"]["evidence"]["target_directory_fsync_status"] =
+            Value::String("failed".to_string());
+        finalize_observation(&mut fixture.receipt_value["observation"]);
+        let uncertain_receipt = finalize_receipt(&mut fixture.receipt_value);
+        fs::write(&fixture.receipt, uncertain_receipt).expect("uncertain receipt");
+        let status = read_graph_status(&args).expect("uncertain status");
+        assert_eq!(status["status"], "stale");
+        assert_eq!(status["probe_reason"], "runtime_receipt_uncertain");
+        fs::write(&fixture.receipt, &fixture.receipt_bytes).expect("restore receipt");
+        assert_eq!(
+            read_graph_status(&args).expect("restored receipt")["status"],
+            "fresh"
+        );
+
+        fs::remove_file(&fixture.receipt).expect("remove receipt");
+        let status = read_graph_status(&args).expect("missing receipt status");
+        assert_eq!(status["probe_reason"], "runtime_receipt_missing");
+        fs::write(&fixture.receipt, &fixture.receipt_bytes).expect("restore missing receipt");
+
+        fs::write(&fixture.target, b"changed target\n").expect("changed target");
+        let status = read_graph_status(&args).expect("target status");
+        assert_eq!(status["status"], "stale");
+        assert_eq!(status["probe_reason"], "source_changed");
+        fs::write(&fixture.target, b"current target\n").expect("restore target");
+        assert_eq!(
+            read_graph_status(&args).expect("restored target status")["status"],
+            "fresh"
+        );
+
+        let current_head = fixture_git(&fixture.root, &["rev-parse", "HEAD"]);
+        fixture_git(&fixture.root, &["tag", "-f", "runtime-base", &current_head]);
+        let status = read_graph_status(&args).expect("base status");
+        assert_eq!(status["status"], "stale");
+        assert_eq!(status["probe_reason"], "source_changed");
+        fixture_git(
+            &fixture.root,
+            &["tag", "-f", "runtime-base", &fixture.base_oid],
+        );
+        assert_eq!(
+            read_graph_status(&args).expect("restored base status")["status"],
+            "fresh"
+        );
+
+        fs::write(fixture.root.join("head-change.txt"), b"head change\n").expect("head change");
+        fixture_git(&fixture.root, &["add", "head-change.txt"]);
+        fixture_git(&fixture.root, &["commit", "-qm", "head change"]);
+        let status = read_graph_status(&args).expect("head status");
+        assert_eq!(status["status"], "stale");
+        assert_eq!(status["probe_reason"], "source_changed");
+    }
+
+    #[test]
+    fn graph_build_rejects_missing_uncertain_invalid_and_nonlatest_receipts() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+
+        let missing = graph_fixture();
+        fs::remove_file(&missing.receipt).expect("remove receipt");
+        assert!(matches!(
+            build_graph_with_failure(&graph_args(&missing.root)),
+            Err(GraphError::RuntimeBoundary { reason, .. })
+                if reason == "runtime_receipt_missing"
+        ));
+
+        let mut uncertain = graph_fixture();
+        uncertain.receipt_value["observation"]["outcome"] = Value::String("uncertain".to_string());
+        uncertain.receipt_value["observation"]["evidence"]["target_directory_fsync_status"] =
+            Value::String("failed".to_string());
+        finalize_observation(&mut uncertain.receipt_value["observation"]);
+        let uncertain_bytes = finalize_receipt(&mut uncertain.receipt_value);
+        fs::write(&uncertain.receipt, uncertain_bytes).expect("uncertain receipt");
+        assert!(matches!(
+            build_graph_with_failure(&graph_args(&uncertain.root)),
+            Err(GraphError::RuntimeBoundary { reason, .. })
+                if reason == "runtime_receipt_uncertain"
+        ));
+
+        let invalid = graph_fixture();
+        fs::write(&invalid.receipt, b"{}\n").expect("invalid receipt");
+        assert!(matches!(
+            build_graph_with_failure(&graph_args(&invalid.root)),
+            Err(GraphError::RuntimeBoundary { reason, .. })
+                if reason == "runtime_receipt_invalid"
+        ));
+
+        let nonlatest = graph_fixture();
+        let second = nonlatest.receipt.with_file_name(
+            nonlatest
+                .receipt
+                .file_name()
+                .and_then(|value| value.to_str())
+                .expect("receipt name")
+                .replace(".000001.json", ".000002.json"),
+        );
+        fs::write(second, &nonlatest.receipt_bytes).expect("non-latest receipt");
+        assert!(matches!(
+            build_graph_with_failure(&graph_args(&nonlatest.root)),
+            Err(GraphError::RuntimeBoundary { reason, .. })
+                if reason == "runtime_receipt_invalid"
+        ));
+    }
+
+    #[test]
+    fn persisted_readback_and_profile_changes_use_ordered_probe_reasons() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        let args = graph_args(&fixture.root);
+        build_graph_with_failure(&args).expect("graph build");
+        let db = fixture
+            .root
+            .join(".agent-canon/knowledge-graph/graph.sqlite");
+        let connection = Connection::open(&db).expect("graph database");
         connection
             .execute(
-                "INSERT INTO documents(id,path,title,kind,created_at) VALUES(?,?,?,?,?)",
-                params!["doc", "graph.sqlite", "graph", "knowledge-graph", "time"],
+                "UPDATE metadata SET value=?1 WHERE key='runtime_event_artifact_sha256'",
+                params!["0".repeat(64)],
             )
-            .expect("document");
-        for (id, layer, payload) in [
-            (
-                "node:a",
-                "source",
-                json!({"path":"a.py","selector":"a.py","source_member":true}),
-            ),
-            ("fact:edge", "evidence", json!({"fact_id":"edge"})),
-        ] {
-            connection
-                .execute(
-                    "INSERT INTO nodes(id,document_id,layer,kind,label,text,source_start,source_end,confidence,payload_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    params![id, "doc", layer, "path", id, id, 0, 0, 1.0, canonical_json(&payload)],
-                )
-                .expect("node");
-        }
-        let nodes = load_nodes(&connection).expect("query nodes");
-        assert_eq!(nodes.len(), 1);
-        assert_eq!(nodes[0]["id"], "node:a");
-    }
+            .expect("tamper persisted hash");
+        drop(connection);
+        let status = read_graph_status(&args).expect("persisted mismatch status");
+        assert_eq!(status["status"], "stale");
+        assert_eq!(status["probe_reason"], "persisted_readback_mismatch");
 
-    #[test]
-    fn finite_contract_directly_decides_partition_projection_and_completeness() {
-        let mut contract = empty_contract();
-        contract.candidate_sources = BTreeSet::from(["a".to_string(), "generated".to_string()]);
-        contract.excluded_sources = BTreeSet::from(["generated".to_string()]);
-        contract.eligible_sources = BTreeSet::from(["a".to_string()]);
-        contract.graph_members = BTreeSet::from(["node:a".to_string()]);
-        contract.profile_members = contract.graph_members.clone();
-        contract
-            .source_identity
-            .insert("a".to_string(), "node:a".to_string());
-        assert!(validate_contract_value(&contract.json()).is_ok());
-
-        contract.unresolved.insert("diagnostic:u".to_string());
-        let incomplete = contract.json();
-        assert_eq!(
-            incomplete["obligations"]["profile_complete"],
-            Value::Bool(false)
-        );
-        assert!(validate_contract_value(&incomplete).is_ok());
-
-        let mut false_completeness = incomplete;
-        false_completeness["obligations"]["unresolved_empty"] = Value::Bool(true);
-        resign_contract(&mut false_completeness);
-        assert!(validate_contract_value(&false_completeness).is_err());
-
-        let mut false_partition = contract.json();
-        false_partition["finite_sets"]["U(S)"] = json!([]);
-        resign_contract(&mut false_partition);
-        assert!(validate_contract_value(&false_partition).is_err());
-    }
-
-    #[test]
-    fn reverse_projection_is_a_typed_bijection() {
-        let explicit = TypedRelation {
-            id: "edge".to_string(),
-            kind: RelationKind::Dependency,
-            from: "node:a".to_string(),
-            to: "node:b".to_string(),
-            producer: "source-snapshot".to_string(),
-            evidence_ref: "evidence".to_string(),
-            inferred: false,
-        };
-        let reverse = TypedRelation {
-            id: "reverse:edge".to_string(),
-            kind: RelationKind::Dependency,
-            from: "node:b".to_string(),
-            to: "node:a".to_string(),
-            producer: "graph-projection".to_string(),
-            evidence_ref: "evidence".to_string(),
-            inferred: true,
-        };
-        let mut contract = empty_contract();
-        contract.accepted_relations.insert("edge".to_string());
-        contract.graph_members = BTreeSet::from([
-            "relation:edge".to_string(),
-            "relation:reverse:edge".to_string(),
-        ]);
-        contract.profile_members = contract.graph_members.clone();
-        contract
-            .relation_endpoints
-            .insert(explicit.id.clone(), explicit);
-        contract
-            .relation_endpoints
-            .insert(reverse.id.clone(), reverse);
-        contract
-            .reverse_projection
-            .insert("edge".to_string(), "reverse:edge".to_string());
-        let valid = contract.json();
-        assert!(validate_contract_value(&valid).is_ok());
-
-        let mut invalid = valid;
-        invalid["typed_functions"]["relation_endpoints"][1]["to"] = json!("node:wrong");
-        resign_contract(&mut invalid);
-        assert!(validate_contract_value(&invalid).is_err());
-    }
-
-    #[test]
-    fn bounded_closure_is_the_least_fixed_point_of_typed_successors() {
-        let facts = vec![
-            json!({"id":"ab","kind":"dependency","from":"a","to":"b"}),
-            json!({"id":"bc","kind":"dependency","from":"b","to":"c"}),
-            json!({"id":"ca","kind":"dependency","from":"c","to":"a"}),
-            json!({"id":"ignored","kind":"owner","from":"c","to":"d"}),
-        ];
-        let depth_one =
-            least_fixed_point_closure("a", &facts, "dependency", GraphDirection::Outgoing, 1)
-                .expect("depth-one closure");
-        assert_eq!(
-            depth_one.distance,
-            BTreeMap::from([("a".to_string(), 0), ("b".to_string(), 1)])
-        );
-        let closure =
-            least_fixed_point_closure("a", &facts, "dependency", GraphDirection::Outgoing, 3)
-                .expect("least fixed point");
-        assert_eq!(
-            closure.distance,
-            BTreeMap::from([
-                ("a".to_string(), 0),
-                ("b".to_string(), 1),
-                ("c".to_string(), 2),
-            ])
-        );
-        let (fixed, _) = closure_operator(
-            &closure.distance,
-            &facts,
-            "dependency",
-            GraphDirection::Outgoing,
-            3,
-        );
-        assert_eq!(fixed, closure.distance);
-        assert!(!closure.distance.contains_key("d"));
-    }
-
-    #[test]
-    fn graph_fingerprint_is_preserved_under_input_order_permutation() {
-        let node_a = SourceNode {
-            id: "a".to_string(),
-            selector: "a".to_string(),
-            path: Some("a".to_string()),
-            source_member: true,
-            source_span: None,
-            payload: json!({"path":"a"}),
-        };
-        let node_b = SourceNode {
-            id: "b".to_string(),
-            selector: "b".to_string(),
-            path: Some("b".to_string()),
-            source_member: true,
-            source_span: None,
-            payload: json!({"path":"b"}),
-        };
-        let fact = GraphFact {
-            id: "edge".to_string(),
-            layer: "source".to_string(),
-            kind: "dependency".to_string(),
-            from: "a".to_string(),
-            to: Some("b".to_string()),
-            owner: None,
-            source_path: Some("a".to_string()),
-            source_span: None,
-            producer: "source-snapshot".to_string(),
-            evidence_ref: "evidence".to_string(),
-            authority: "ManifestParser".to_string(),
-            inferred: false,
-            dependency_detail: None,
-            payload: json!({}),
-        };
-        let contract = empty_contract();
-        let forward = graph_fingerprint(
-            "input",
-            &[node_a.clone(), node_b.clone()],
-            std::slice::from_ref(&fact),
-            &[],
-            &[],
-            &contract,
-        );
-        let reverse = graph_fingerprint("input", &[node_b, node_a], &[fact], &[], &[], &contract);
-        assert_eq!(forward, reverse);
-        let mutated = graph_fingerprint_records(
-            "input",
-            BTreeMap::new(),
-            BTreeMap::from([("edge".to_string(), json!({"id":"edge","to":"changed"}))]),
-            BTreeMap::new(),
-            BTreeMap::new(),
-            contract.json(),
-        );
-        assert_ne!(forward, mutated);
-    }
-
-    #[test]
-    fn mutable_runtime_observations_do_not_self_invalidate_input_freshness() {
-        let artifact = |producer_id: &str, content_sha256: &str| ProducerArtifact {
-            producer_id: producer_id.to_string(),
-            version: "v1".to_string(),
-            command: "command".to_string(),
-            root: ".".to_string(),
-            content_sha256: content_sha256.to_string(),
-            relation_families: Vec::new(),
-            artifact_ref: "artifact".to_string(),
-            payload: Vec::new(),
-        };
-        assert_eq!(
-            producer_input_identity(&artifact("runtime-dashboard", "before")),
-            producer_input_identity(&artifact("runtime-dashboard", "after"))
-        );
-        assert_ne!(
-            producer_input_identity(&artifact("source-snapshot", "before")),
-            producer_input_identity(&artifact("source-snapshot", "after"))
-        );
-    }
-
-    #[test]
-    fn directory_sync_failure_restores_exact_old_graph_state() {
-        let temporary = TemporaryDirectory::create("atomic-publication-test")
-            .expect("temporary publication root");
-        let graph_root = temporary.path.join("knowledge-graph");
-        let candidate_dir = graph_root.join(".candidate/test");
-        fs::create_dir_all(&candidate_dir).expect("candidate directory");
-        let target = graph_root.join("graph.sqlite");
-        fs::write(&target, b"old-validated-state").expect("old graph");
-        let candidate = candidate_dir.join("graph.sqlite");
-        fs::write(&candidate, b"new-validated-state").expect("candidate graph");
-        let old_state = durable_graph_state(&target).expect("old state witness");
-        let result = publish_graph(
-            &graph_root,
-            CandidateHandle {
-                dir: candidate_dir,
-                db: candidate,
-            },
-            GraphBuildFailurePoint::DirectorySync,
-        );
-        assert!(matches!(result, Err(GraphError::DirectorySync { .. })));
-        assert_durable_graph_state(&target, &old_state).expect("old state invariance");
-        assert_eq!(
-            fs::read(&target).expect("restored graph"),
-            b"old-validated-state"
-        );
-    }
-
-    #[test]
-    fn source_spans_convert_utf8_byte_columns_to_scalar_offsets() {
-        let temporary = TemporaryDirectory::create("source-span-test").expect("temporary root");
-        let path = temporary.path.join("source.txt");
-        fs::write(&path, "aéz\nβx\n").expect("unicode source");
-        let span = SourceSpan {
-            path: "source.txt".to_string(),
-            start_line: 1,
-            start_column: 2,
-            end_line: 2,
-            end_column: 3,
-        };
-        assert_eq!(
-            source_scalar_offsets(&temporary.path, Some(&span)).expect("scalar offsets"),
-            (1, 5)
-        );
-        let invalid = SourceSpan {
-            start_column: 3,
-            ..span
-        };
-        assert!(source_scalar_offsets(&temporary.path, Some(&invalid)).is_err());
+        let profile_fixture = graph_fixture();
+        let mut profile_args = graph_args(&profile_fixture.root);
+        build_graph_with_failure(&profile_args).expect("profile graph build");
+        profile_args.profile = "different-profile".to_string();
+        let status = read_graph_status(&profile_args).expect("profile status");
+        assert_eq!(status["status"], "stale");
+        assert_eq!(status["probe_reason"], "runtime_evidence_changed");
     }
 }

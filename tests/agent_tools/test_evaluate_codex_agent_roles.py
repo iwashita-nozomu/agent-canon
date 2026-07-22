@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -62,6 +63,10 @@ def copy_eval_root(root: Path) -> None:
         PROJECT_ROOT / "agents" / "task_catalog.yaml",
         root / "agents" / "task_catalog.yaml",
     )
+    shutil.copy2(
+        PROJECT_ROOT / "agents" / "model_profiles.toml",
+        root / "agents" / "model_profiles.toml",
+    )
 
 
 class CodexAgentRoleEvalTest(unittest.TestCase):
@@ -101,8 +106,7 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             text = evaluator.read_text(encoding="utf-8")
             evaluator.write_text(
                 text.replace('sandbox_mode = "read-only"', 'sandbox_mode = "workspace-write"')
-                .replace('approval_policy = "never"', 'approval_policy = "on-request"')
-                .replace("call nested agents", "call agents"),
+                .replace('approval_policy = "never"', 'approval_policy = "on-request"'),
                 encoding="utf-8",
             )
 
@@ -111,7 +115,8 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("evaluator-not-read-only", result.stdout)
             self.assertIn("evaluator-approval-policy-not-never", result.stdout)
-            self.assertIn("evaluator-missing-no-nested-agent-rule", result.stdout)
+            self.assertIn("source-divergence-sandbox_mode", result.stdout)
+            self.assertIn("source-divergence-approval_policy", result.stdout)
 
     def test_missing_skill_evaluator_toml_is_reported_without_traceback(self) -> None:
         """A copied root reports a missing target TOML as a structured finding."""
@@ -186,31 +191,29 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             )
 
     def test_evaluator_grammar_is_packet_driven_and_parent_scored(self) -> None:
-        """Evaluator output stays observational while the parent owns scoring."""
-        evaluator = (PROJECT_ROOT / ".codex" / "agents" / "skill_evaluator.toml").read_text(
-            encoding="utf-8"
-        )
-        checklist = (PROJECT_ROOT / "documents" / "prompt-skill-evaluation-checklist.md").read_text(
-            encoding="utf-8"
-        )
-        checklist_flat = " ".join(checklist.split())
-        subagents = (PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md").read_text(
-            encoding="utf-8"
-        )
+        """Evaluator execution is a closed view generated from canonical profile truth."""
+        evaluator_path = PROJECT_ROOT / ".codex" / "agents" / "skill_evaluator.toml"
+        evaluator_text = evaluator_path.read_text(encoding="utf-8")
+        evaluator = tomllib.loads(evaluator_text)
+        expected_fields = {
+            "name",
+            "description",
+            "nickname_candidates",
+            "sandbox_mode",
+            "approval_policy",
+            "model",
+            "model_reasoning_effort",
+            "developer_instructions",
+        }
 
-        self.assertIn("R<integer>=<pass|fail|malformed>: <short evidence>", evaluator)
-        self.assertNotIn("R1=", evaluator)
-        self.assertNotIn("R2=", evaluator)
-        self.assertIn("extra_refs=<comma-separated extra references or none>", evaluator)
-        self.assertNotIn("status=<pass|fail|malformed>", evaluator)
-        self.assertNotIn("score_percent=", evaluator)
-        self.assertNotIn("critical_pass=", evaluator)
-        self.assertIn("missing or duplicated packet-listed requirement IDs", checklist_flat)
-        self.assertIn("unknown requirement IDs", checklist_flat)
-        self.assertIn("parent_score_percent=<0..100>", checklist_flat)
-        self.assertIn("parent_critical_pass=<yes|no>", checklist_flat)
-        self.assertIn("`parent_score_percent`", subagents)
-        self.assertIn("`parent_critical_pass`", subagents)
+        self.assertEqual(set(evaluator), expected_fields)
+        self.assertIn("generated role view: generated_role_view_v1", evaluator_text)
+        self.assertIn("agents/model_profiles.toml", evaluator_text)
+        self.assertEqual(evaluator["model"], "gpt-5.4-mini")
+        self.assertEqual(evaluator["model_reasoning_effort"], "medium")
+        self.assertIn("explicit evidence and typed outputs", evaluator["developer_instructions"])
+        self.assertNotIn("R<integer>", evaluator_text)
+        self.assertNotIn("score_percent=", evaluator_text)
 
     def test_role_eval_rejects_tier_and_service_tier_profile_keys(self) -> None:
         """Repository agent TOMLs must not introduce tier selectors."""

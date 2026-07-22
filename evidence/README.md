@@ -16,8 +16,8 @@ because the source-controlled evidence contract is reviewable repository state
 while generated run output is append-only runtime evidence.
 
 - [agent-evals/README.md](agent-evals/README.md)
-  - deterministic eval manifests for skills, workflows, routing, local LLM
-    responsibility analysis, report quality, and run-bundle behavior checks.
+  - deterministic eval manifests for skills, workflows, routing, report
+    quality, and run-bundle behavior checks.
 
 Runtime result accumulation does not live here. Append-only run output belongs
 in the mounted runtime log archive documented by

@@ -109,23 +109,51 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
   generated evidence cell を既定にします。
 - Normal analysis reads structured API fields first. `unknown_event_count` routes missing event taxonomy, `status_by_hook_family` routes status distribution, `failure_by_hook_family` routes failure ownership, `skip_by_hook_family` routes skipped hook ownership, `namespace_debt_by_hook_family` routes legacy namespace debt, and `oop_applicability` routes OOP hook applicability findings.
 
+## Work Amplification And Wave Interpretation
+
+Work amplification is an evidence relationship, not a raw file, line, spawn, or
+wave count. Compare tool selections, spawn records, planned and actual wave
+rows, packet materialization, checker execution, and the resulting owner action
+before proposing a repair. A large packet or manifest is evidence of work
+surface; it is not evidence that every planned action was launchable or needed.
+
+Classify every missing actual wave before proposing reconciliation:
+
+- `overplanning`: the planned row has no launch evidence and its surrounding
+  evidence is conditional, authority-blocked, skipped, or otherwise not
+  launchable;
+- `logging_gap`: launch, completion, or delegated execution evidence exists but
+  the corresponding actual row is absent; only this class is eligible for a
+  logging repair;
+- `unresolved`: the structured evidence cannot distinguish planning from
+  logging and must remain an owner-held unknown.
+
+Do not backfill `overplanning` or `unresolved` rows as executions. Group related
+findings by the owning replaceable responsibility and compatible context, then
+create one route or handoff per responsibility. A finding count does not create
+one agent, packet, wave, or review instance per finding; split only when owner,
+write authority, context integrity, validation route, or review gate is
+independent.
+
 ## Finding Route Packet
 
-Log analysis から修復 wave へ進むときは、次の deterministic packet を run
-bundle に残します。
+Log analysis から修復 wave へ進むときは、次の structured route packet を
+handoff message、tool result、または coordination/resumption 用の durable
+file に残します。repo-changing work alone does not require a run bundle or a
+file-backed packet.
 
 ```text
 finding_class=<wave_execution|skill_selection|tool_selection|workflow_selection|workflow_attribution|eval_gap|token_coverage|archive_hygiene|prompt_or_config_drift|structure_boundary>
 evidence_cells=<structured dashboard section or API field paths>
 route_target=<skill-or-role>
 instance_partition=<repo_key|hook_family|skill_name|workflow_name|issue_id|path_scope>
-required_packet=<artifact path>
+required_packet=<structured handoff or durable artifact path when needed>
 closeout_gate=<command or evidence field>
 ```
 
 | finding_class | route_target | required_packet | closeout_gate |
 | --- | --- | --- | --- |
-| `wave_execution` | `subagent-bootstrap` + `prompt_config_reviewer` when role config is implicated | compact Wave And Subagent Execution drilldown, affected run bundle paths, planned-vs-actual wave ids | `workflow_monitoring.md` actual wave rows reconciled or issue updated |
+| `wave_execution` | `subagent-bootstrap` + `prompt_config_reviewer` when role config is implicated | compact Wave And Subagent Execution drilldown, planned-vs-actual wave ids, and the overplanning/logging-gap classification | logging-gap rows reconciled or the unresolved owner finding is recorded |
 | `skill_selection` | affected skill + `prompt_config_reviewer` | Selection Evidence drilldown row, skill source path, reset basis | skill prompt eval or dashboard miss rate after reset window |
 | `tool_selection` | `tools/catalog.yaml`, owning tool docs, and invocation guidance | Selection Evidence drilldown row, tool catalog entry, owning tool doc path | tool catalog validation and dashboard miss rate after reset window |
 | `workflow_selection` | `agents/TASK_WORKFLOWS.md` and owning workflow guide | Selection Evidence drilldown row, workflow registry row, owning workflow doc path | workflow selection eval or dashboard miss rate after reset window |
@@ -136,6 +164,8 @@ closeout_gate=<command or evidence field>
 | `prompt_or_config_drift` | `prompt_config_reviewer` | affected prompt/config path and structured evidence cell | reviewed patch or routing issue updated |
 | `structure_boundary` | `structure-refactor` | evidence cell plus candidate path / view boundary | structure repair contract or structure issue updated |
 
-When one structured summary contains several independent findings, split follow-up
-subagents by `instance_partition`. Suggested same-role instance id:
+When one structured summary contains several findings, group them by owning
+replaceable responsibility before splitting follow-up work. Use
+`instance_partition` only for independent owner, write-authority, context,
+validation, or review boundaries. Suggested same-role instance id:
 `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>`.

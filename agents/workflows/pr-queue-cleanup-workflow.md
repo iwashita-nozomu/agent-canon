@@ -1,120 +1,104 @@
-# PR Queue Cleanup Workflow
+# AgentCanon Projection Queue And Cleanup Workflow
 
 <!--
 @dependency-start
 contract workflow
-responsibility Defines the ordered cleanup workflow for linked AgentCanon source PRs and dependent template PRs.
-upstream design agent-canon-pr-workflow.md defines AgentCanon source PR and template pin PR gates.
-upstream design codex-goals-workflow.md defines goal.md authority and loop-state handling.
-upstream design goal-plan-implementation-loop.md defines blocked-goal next-action handling.
-downstream design README.md lists this workflow in the maintenance catalog.
-downstream implementation ../../tools/ci/check_agent_canon_pr.sh enforces template-side AgentCanon PR gates.
-downstream implementation ../../tools/ci/check_agent_canon_latest.sh enforces AgentCanon freshness gates.
-downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates PR Essence queue markers.
+responsibility Owns ordered source projection, parent frontier consumption, and task-owned cleanup after remote readback.
+upstream design ../workflows/agent-canon-pr-workflow.md owns source PR merge and publication readback.
+upstream design ../../documents/agent-canon-update-route.md owns the end-to-end transaction.
+upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns QueueReceipt, DependencyFrontier, CleanupProof, and close token schemas.
+upstream implementation ../../tools/update_agent_canon.sh emits queue/frontier receipts and blocks early parent projection.
+upstream implementation ../../tools/agent_tools/report_artifact_checks.py remains the upstream completion Materializer.
+downstream implementation ../../tools/agent_tools/task_close.py consumes G1-G6 and terminal cleanup evidence.
+downstream implementation ../../tools/ci/check_agent_canon_latest.sh consumes G4/G5 receipts.
 @dependency-end
 -->
 
-Use this workflow when an AgentCanon source PR and one or more template /
-derived pin PRs are both open, and the user asks to clean up that PR queue.
-The normal example is:
+Use this workflow after exact source-main publication readback. It owns the
+boundary between source merge and parent projection, then the boundary between
+remote readback and cleanup. It does not grant mutation authority for an
+unrelated PR or unknown shared state.
 
-1. AgentCanon source PR is open.
-1. Template PR is draft or failing because it pins the source PR head.
-1. The next useful action is to merge or replace the source PR, then realign
-   the template pin to AgentCanon `main`.
+## Parent Projection Boundary
 
-## Reader Map
+Parent projection means the downstream `vendor/agent-canon` pin, AgentCanon-
+owned root views, parent validation, parent remote CI, merge, and readback. It
+is not source canon. It begins only from an accepted `DependencyFrontier` plus
+the current source publication readback.
 
-This workflow owns cleanup order for a named AgentCanon source PR and its
-dependent template or derived pin PRs. Read `Authority` before touching the
-queue, then follow `Cleanup Order`, stop on any `Stop Conditions`, and use
-`Goal Integration` only when `goal.md` is part of the queue state. The boundary
-is bounded PR-queue maintenance: this document does not grant branch deletion,
-review dismissal, bypass, force-merge, or unrelated PR mutation authority.
-
-## Authority
-
-PR queue cleanup is more bounded than general PR mutation authority.
-The current user request must name the PR queue, or a tracked maintainer policy
-must authorize this exact queue. A generic statement that `gh` works is not
-enough.
-
-For the named queue only, the cleanup operator may:
-
-- inspect PRs, checks, reviews, and mergeability;
-- update PR bodies or comments with evidence;
-- merge the AgentCanon source PR when it is mergeable and required checks are
-  passing or absent;
-- update the dependent template / derived pin PR after the source PR lands;
-- mark the dependent PR ready for review only after freshness, sync,
-  dependency, PR-template, and CI gates pass;
-- merge the dependent PR only when the current request explicitly asks to clear
-  that PR and all required gates pass.
-
-Do not delete branches, dismiss reviews, bypass failing checks, or force merge
-as part of default cleanup.
+Before acceptance, `parent_projection_evidence_ref` is null and no pin/root
+sync is permitted. The parent is monitor/integrator: it consumes G1-G3 and does
+not rerun source correctness, generated completeness, review, or source PR CAS.
 
 ## Cleanup Order
 
-1. Snapshot the queue.
-   - `gh pr view <source-pr> --json state,isDraft,mergeable,headRefOid,baseRefOid,statusCheckRollup,reviews,comments`
-   - `gh pr view <dependent-pr> --json state,isDraft,mergeable,headRefOid,baseRefOid,statusCheckRollup,reviews,comments`
-   - `gh pr checks <pr> --watch=false || true`
-1. If the source PR still needs a small workflow/documentation repair, make that
-   repair in the source branch first and rerun source validation.
-1. Merge the AgentCanon source PR only when:
-   - it is open;
-   - it is not draft;
-   - mergeability is `MERGEABLE`;
-   - no review requests block it;
-   - required checks pass or no checks are configured for that repository;
-   - the PR body contains `PR Essence`, validation evidence, and GitHub
-     automation evidence when applicable.
-1. After source merge, update the template / derived repo:
-   - fetch AgentCanon `main`;
-   - run `make agent-canon-ensure-latest`;
-   - run `bash tools/sync_agent_canon.sh link-root`;
-   - run `bash tools/sync_agent_canon.sh check`;
-   - commit and push the template pin / root-view update.
-1. Validate the dependent PR:
-   - `python3 tools/ci/check_github_workflows.py`;
-   - `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`;
-   - task-focused tests;
-   - `make agent-canon-pr-check`;
-   - `make ci`.
-1. Update the dependent PR body with:
-   - `PR Essence`: problem / user request, design intent, canonical owner,
-     behavior or contract delta, and evidence route;
-   - AgentCanon source PR URL and merge SHA;
-   - template pin SHA;
-   - validation pass lines or exact blockers;
-   - goal loop status;
-   - GitHub Automation Output fields when relevant.
-1. Mark ready or merge only after all required gates pass. If any gate fails,
-   keep the dependent PR draft or blocked and record the exact next action.
+1. Source merge/readback emits one accepted QueueReceipt under the exact
+   `(source_namespace,candidate_sha,tree_sha,input_digest)` key. Same-input
+   replay returns that receipt and does not enqueue twice.
+1. Materialize a pending DependencyFrontier whose ordered predecessor oracle is
+   `source_pr:#388 -> source_pr:#389 -> transaction:<current_transaction_id>`.
+   Pending acceptance evidence is null.
+1. Append accepted frontier evidence only after exact source-main candidate
+   readback, accepted queue identity, immutable rebind evidence, and dependency
+   checks pass. Accepted state links to the prior pending evidence record.
+1. Perform one parent pin/root projection. Run only parent-owned validation and
+   remote CI, merge by expected-old authority, and read the parent publication
+   back. Materialize G4 then G5.
+1. After G5, write DurableHandback for source/reviewer/PR/pin agents. Close every
+   declared descendant immediately after its durable handback and retain each
+   terminal receipt.
+1. Release every reservation and retain release receipts. A completed-but-open
+   child, unknown descendant, or active reservation is a closeout failure.
+1. Materialize CleanupProof from enumerated task-owned temp/cache paths,
+   before/after task state, and equal unknown-shared-state digests. Delete only
+   those task-owned paths.
+1. Materialize G6 from G1-G5, handback, descendant, reservation, and cleanup
+   evidence, then materialize and execute the canonical terminal `close_agent`
+   ToolCall token.
+
+The upstream report/archive Materializer and hook hot path are dependencies,
+not implementations in this workflow. A Materializer defect is recorded as an
+upstream blocker; no second archive/materialization loop is added here.
+
+## Authority
+
+- Source PR merge, parent PR mutation, ready/merge, and branch deletion require
+  current-task authority or tracked maintainer policy for that exact action.
+- Authentication success is not push or merge permission evidence.
+- Parent projection authority does not authorize source mutation or cleanup of
+  unknown state.
+- A successor transaction requires changed immutable input or an explicit
+  closed/conflict lifecycle transition.
 
 ## Stop Conditions
 
-Stop and update the PR body, issue, run bundle, or `goal.md` instead of
-continuing when:
+Stop the current transition with its typed failure and preserve all prior
+receipts when:
 
-- the source PR is not mergeable;
-- required checks fail;
-- reviews request changes;
-- `make agent-canon-ensure-latest` cannot align to AgentCanon `main`;
-- `make agent-canon-pr-check` or `make ci` fails for a non-expected reason;
-- a new source change would be needed outside the named PR queue.
+- QueueReceipt identity mismatches or an accepted key would be re-enqueued;
+- `#388/#389/current` evidence is missing, duplicated, or reordered;
+- source-main readback does not equal the current candidate/tree;
+- frontier is pending/failed or lacks its preceding pending evidence;
+- parent pin/root projection is attempted before acceptance;
+- parent publication readback mismatches the approved projection;
+- durable handback is absent;
+- a descendant is completed but open or is not declared;
+- a reservation remains active;
+- cleanup is attempted before G5 or names a non-task-owned path;
+- unknown shared state changes;
+- any G1-G6 evidence identity or terminal ToolCall binding is malformed.
 
-## Goal Integration
+No stop condition is based on timeout, retry count, file count, line count,
+search count, or check count. A typed transient failure may retry the same
+identity; changed input creates a successor.
 
-When `goal.md` was blocked on the source PR, update it after each queue step:
+## Completion Evidence
 
-- after source merge, mark the source PR backlog item complete;
-- after template pin realignment, mark the freshness item complete;
-- after dependent validation passes, mark the validation items complete;
-- only set `goal_status: achieved` when `goal_loop.py status` reports
-  `NEXT_ACTION=close_goal_loop`.
-
-## Convention Compliance Gate
-
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.
+- accepted QueueReceipt and pending/accepted frontier pair;
+- ordered `#388 -> #389 -> current` publication evidence;
+- G4 parent projection and G5 remote readback receipts;
+- parent PR/merge/readback identity;
+- DurableHandback and exact descendant terminal ledger;
+- reservation release ledger;
+- CleanupProof with task-owned paths and unchanged shared-state evidence;
+- G1-G6 evidence refs and terminal `CloseAgentToolCall` token ID.

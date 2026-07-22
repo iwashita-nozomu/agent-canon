@@ -13,6 +13,11 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
 このディレクトリは、設計の正本を集約する入口です。
 存在しない旧パスを経由せず、ここから現在の設計文書へ直接辿れる状態を保ちます。
 
+The approved Target-State-First implementation contract is
+[codex-spark-implementation-routing.md](codex-spark-implementation-routing.md).
+Its digest is immutable for this packet; projections must link to it rather
+than restate or edit the design artifact.
+
 ## 現在の正本
 
 - [protocols.md](protocols.md)

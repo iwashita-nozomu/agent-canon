@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import sqlite3
@@ -20,7 +19,6 @@ import textwrap
 import unittest
 from pathlib import Path
 from typing import cast
-from unittest import mock
 
 import yaml
 
@@ -28,7 +26,6 @@ from tools.agent_tools import prose_reasoning_graph as prose_graph
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "prose_reasoning_graph.py"
-TEST_LOCAL_LLM_ENV = {"AGENT_CANON_LLAMA_CLI": str(PROJECT_ROOT / ".missing-test-llama-cli")}
 
 
 def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
@@ -39,7 +36,7 @@ def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
         check=False,
         capture_output=True,
         text=True,
-        env={**os.environ, **TEST_LOCAL_LLM_ENV},
+        env=os.environ.copy(),
     )
 
 
@@ -51,7 +48,7 @@ def run_graph_with_env(env: dict[str, str], *args: str) -> subprocess.CompletedP
         check=False,
         capture_output=True,
         text=True,
-        env={**os.environ, **TEST_LOCAL_LLM_ENV, **env},
+        env={**os.environ, **env},
     )
 
 
@@ -66,25 +63,6 @@ def stdout_value(result: subprocess.CompletedProcess[str], key: str) -> str:
 
 class ProseReasoningGraphTest(unittest.TestCase):
     """Exercise graph ingest, analysis, projection, and handoff."""
-
-    def test_agent_canon_cli_honors_env_override(self) -> None:
-        """CLI selection should allow tests and callers to pin an entrypoint."""
-        with mock.patch.dict(os.environ, {"AGENT_CANON_CLI": "/tmp/agent-canon-test"}, clear=False):
-            self.assertEqual(prose_graph.agent_canon_cli(PROJECT_ROOT), "/tmp/agent-canon-test")
-
-    def test_agent_canon_cli_prefers_stable_wrapper_over_target_artifact(self) -> None:
-        """CLI selection should not couple LocalLLM tests to stale target binaries."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            stale_target = root / "rust" / "agent-canon" / "target" / "debug" / "agent-canon"
-            stable_wrapper = root / "tools" / "bin" / "agent-canon"
-            stale_target.parent.mkdir(parents=True)
-            stable_wrapper.parent.mkdir(parents=True)
-            stale_target.write_text("#!/bin/sh\nexit 127\n", encoding="utf-8")
-            stable_wrapper.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-
-            with mock.patch.dict(os.environ, {"AGENT_CANON_CLI": ""}, clear=False):
-                self.assertEqual(prose_graph.agent_canon_cli(root), stable_wrapper)
 
     def test_selected_ordering_topology_overrides_source_order(self) -> None:
         """Explicit ordering edges should control whole-document sentence order."""
@@ -529,11 +507,9 @@ class ProseReasoningGraphTest(unittest.TestCase):
             corpus_hints = typed_items(payload, "corpus_hints")
             self.assertTrue(any(item.get("corpus_id") == "software_engineering" for item in corpus_hints))
             self.assertTrue(any(item.get("corpus_id") == "academic_writing" for item in corpus_hints))
-            local_ir = cast(dict[str, object], payload["local_llm_prose_ir"])
-            self.assertEqual(local_ir["schema"], "agent_canon.local_llm.prose_ir.v1")
-            self.assertGreaterEqual(cast(int, local_ir["part_count"]), 1)
-            dsl_seed = cast(dict[str, object], local_ir["dsl_seed"])
-            self.assertGreaterEqual(len(cast(list[object], dsl_seed["nodes"])), 1)
+            semantic_ir = cast(dict[str, object], payload["semantic_prose_ir"])
+            self.assertEqual(semantic_ir["schema"], "semantic-prose-ir/v1")
+            self.assertGreaterEqual(len(cast(list[object], semantic_ir["terms"])), 1)
             self.assertIn("$long-form-writing", handoff_targets(payload))
             self.assertIn("$experiment-lifecycle", handoff_targets(payload))
             self.assertIn("$formal-proof-workflow", handoff_targets(payload))
@@ -1123,99 +1099,6 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertNotIn("metric_without_baseline", rules)
             self.assertNotIn("experiment_without_expected_result", rules)
 
-    def test_local_llm_ir_controls_experiment_plan_applicability(self) -> None:
-        """Experiment-plan applicability should come from LocalLLM IR, not text cues alone."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            source = root / "tool_profile.md"
-            ir = root / "local_ir.json"
-            db = root / "graph.sqlite"
-            source.write_text(
-                textwrap.dedent(
-                    """
-                    # Tool Profile
-
-                    The hypothesis is a routing vocabulary example. The metric is a field name.
-                    """
-                ).strip(),
-                encoding="utf-8",
-            )
-            ir.write_text(
-                json.dumps(
-                    {
-                        "schema": "agent_canon.local_llm.prose_ir.v1",
-                        "task_owner": "local_llm",
-                        "status": "extracted_intermediate_representation",
-                        "analysis_intents": [
-                            {
-                                "intent": "experiment_plan",
-                                "path": str(source),
-                                "status": "vocabulary_only",
-                                "field_kinds": [],
-                                "vocabulary_kinds": ["hypothesis", "metric"],
-                                "basis": "test-local-llm-ir",
-                            }
-                        ],
-                        "corpus_hints": [],
-                        "dsl_seed": {"nodes": [], "edges": []},
-                    },
-                    ensure_ascii=False,
-                ),
-                encoding="utf-8",
-            )
-            self.assertEqual(
-                run_graph("ingest", str(source), "--db", str(db), "--local-llm-ir-json", str(ir)).returncode,
-                0,
-            )
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0)
-
-            self.assertEqual(nodes_by_layer(db, "experiment"), [])
-            rules = diagnostic_rules(db)
-            self.assertNotIn("experiment_without_hypothesis", rules)
-            self.assertNotIn("experiment_without_metric", rules)
-
-    def test_missing_local_llm_ir_reports_environment_defect(self) -> None:
-        """Missing LocalLLM IR is an environment defect, not an alternate classifier."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            source = root / "legacy_experiment.md"
-            db = root / "legacy.sqlite"
-            source.write_text(
-                "The experiment compares workflows without enough planning detail.",
-                encoding="utf-8",
-            )
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            with sqlite3.connect(db) as connection:
-                connection.execute("DELETE FROM metadata WHERE key = ?", ("local_llm_prose_ir",))
-
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0)
-
-            rules = diagnostic_rules(db)
-            self.assertIn("local_llm_experiment_plan_ir_missing", rules)
-            self.assertNotIn("experiment_without_hypothesis", rules)
-            self.assertNotIn("experiment_without_metric", rules)
-
-    def test_missing_local_llm_ir_reports_even_for_plain_text(self) -> None:
-        """Missing LocalLLM IR is visible even when no experiment claim is obvious."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            source = root / "plain_report.md"
-            db = root / "plain.sqlite"
-            source.write_text(
-                "This tool writes a compact report artifact for reviewers.",
-                encoding="utf-8",
-            )
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            with sqlite3.connect(db) as connection:
-                connection.execute("DELETE FROM metadata WHERE key = ?", ("local_llm_prose_ir",))
-
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0)
-
-            rules = diagnostic_rules(db)
-            self.assertIn("local_llm_experiment_plan_ir_missing", rules)
-            self.assertNotIn("experiment_without_hypothesis", rules)
-            self.assertNotIn("experiment_without_metric", rules)
-
     def test_one_sentence_can_materialize_multiple_experiment_fields(self) -> None:
         """One sentence may state more than one experiment-plan field."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1388,9 +1271,9 @@ class ProseReasoningGraphTest(unittest.TestCase):
             corpus_hints = typed_items(payload, "corpus_hints")
             self.assertTrue(any(item.get("corpus_id") == "software_engineering" for item in corpus_hints))
             self.assertTrue(any(item.get("corpus_id") == "academic_writing" for item in corpus_hints))
-            local_ir = cast(dict[str, object], payload["local_llm_prose_ir"])
-            self.assertEqual(local_ir["task_owner"], "local_llm")
-            self.assertEqual(cast(dict[str, object], local_ir["partition"])["document_batch_size"], 4)
+            semantic_ir = cast(dict[str, object], payload["semantic_prose_ir"])
+            self.assertEqual(semantic_ir["source"], "deterministic_capability_evidence")
+            self.assertEqual(len(cast(list[object], semantic_ir["documents"])), 1)
 
             missing = run_graph("ingest", str(source), "--db", str(db), "--prompt-file", str(root / "missing.txt"))
             self.assertNotEqual(missing.returncode, 0)
@@ -1414,16 +1297,6 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 str(db),
                 "--prompt",
                 "structured analysis code dependency report",
-                "--term",
-                "第一文書",
-                "--term",
-                "第二文書",
-                "--local-llm-document-batch-size",
-                "1",
-                "--local-llm-term-batch-size",
-                "1",
-                "--local-llm-jobs",
-                "2",
             )
             self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
             self.assertIn("PROSE_REASONING_GRAPH_INGEST_SET=pass", ingest.stdout)
@@ -1464,83 +1337,6 @@ class ProseReasoningGraphTest(unittest.TestCase):
             documents = typed_items(payload, "documents")
             self.assertEqual(len(documents), 3)
             self.assertTrue(any(item.get("document_id") == "doc:analysis" for item in documents))
-            local_ir = cast(dict[str, object], payload["local_llm_prose_ir"])
-            self.assertEqual(local_ir["document_count"], 2)
-            self.assertEqual(local_ir["term_count"], 2)
-            self.assertEqual(local_ir["part_count"], 4)
-            llm_execution = cast(dict[str, object], local_ir["llm_execution"])
-            self.assertEqual(llm_execution["status"], "skipped_llama_cli_not_found")
-            self.assertEqual(llm_execution["jobs"], 2)
-
-    def test_local_llm_payload_passes_jobs_to_extract_command(self) -> None:
-        """The Python LocalLLM wrapper should keep part execution in the Rust CLI."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            first = root / "first.md"
-            second = root / "second.md"
-            db = root / "graph.sqlite"
-            ir_path = root / "local_llm_prose_ir.json"
-            first.write_text("# First\n\nAlpha evidence.", encoding="utf-8")
-            second.write_text("# Second\n\nBeta evidence.", encoding="utf-8")
-            args = argparse.Namespace(
-                local_llm_ir_json=None,
-                local_llm_root=root,
-                local_llm_document_batch_size=1,
-                local_llm_term_batch_size=1,
-                local_llm_jobs=2,
-                term=["evidence"],
-                terms_file=[],
-            )
-            ir_path.write_text(
-                json.dumps(
-                    {
-                        "schema": "agent_canon.local_llm.prose_ir.v1",
-                        "llm_execution": {"status": "completed", "jobs": 2},
-                        "parts": [
-                            {"part_id": "part:d1:t1", "llm_status": "pass"},
-                            {"part_id": "part:d2:t1", "llm_status": "pass"},
-                        ],
-                    }
-                ),
-                encoding="utf-8",
-            )
-
-            with mock.patch.object(prose_graph.subprocess, "run") as run_mock:
-                run_mock.return_value = subprocess.CompletedProcess(
-                    args=[],
-                    returncode=0,
-                    stdout=f"{prose_graph.LOCAL_LLM_PROSE_IR_STDOUT_KEY}={ir_path}\n",
-                    stderr="",
-                )
-                local_ir = prose_graph.local_llm_prose_ir_payload(args, [first, second], "", db)
-
-            llm_execution = cast(dict[str, object], local_ir["llm_execution"])
-            self.assertEqual(llm_execution["status"], "completed")
-            self.assertEqual(llm_execution["jobs"], 2)
-            parts = cast(list[dict[str, object]], local_ir["parts"])
-            self.assertEqual([part["part_id"] for part in parts], ["part:d1:t1", "part:d2:t1"])
-            self.assertTrue(all(part["llm_status"] == "pass" for part in parts))
-            command = run_mock.call_args.args[0]
-            self.assertIn("--llm-jobs", command)
-            self.assertEqual(command[command.index("--llm-jobs") + 1], "2")
-
-    def test_check_document_accepts_llm_jobs_alias(self) -> None:
-        """check-document should accept the Rust-facing llm jobs option name."""
-        parser = prose_graph.build_parser()
-
-        args = parser.parse_args(
-            [
-                "check-document",
-                "agents/skills/md-style-check.md",
-                "--out-dir",
-                "reports/agents/test/prose",
-                "--llm-jobs",
-                "3",
-            ]
-        )
-
-        self.assertEqual(args.local_llm_jobs, 3)
-
     def test_rewrite_packet_reports_missing_operation(self) -> None:
         """Missing operation ids should fail clearly through the CLI."""
         with tempfile.TemporaryDirectory() as tmp_dir:

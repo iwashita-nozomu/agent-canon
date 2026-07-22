@@ -63,6 +63,14 @@ navigation unless this file or an owner surface explicitly routes to them.
 
 ## Reader Map
 
+Target-State-First, Decision Sufficiency, model/profile, ToolCall, capacity,
+and lifecycle behavior is projected from the canonical owners:
+[workflow](agents/canonical/CODEX_WORKFLOW.md),
+[subagents](agents/canonical/CODEX_SUBAGENTS.md),
+[communication](agents/COMMUNICATION_PROTOCOL.md), and the approved
+[implementation contract](documents/design/codex-spark-implementation-routing.md).
+This entrypoint does not create a second policy source.
+
 - This file owns the template-root runtime entrypoint for Codex and points each
   runtime contract to its owner surface and checker.
 - Start with Scope Discipline and Structure-First Scope Formation, then use the
@@ -187,9 +195,14 @@ record a concrete deferral.
 
 Before implementation or write-capable handoff, prove that the work is derived
 from an owning responsibility model rather than from a nearby file, current
-finding, or chat impression. Full staged and subagent-implemented work uses the
-`Abstract Design Frame`, `Implementation Source Packet`,
-`Design Side-Effect Map`, and `Design-To-Implementation Trace`. A
+finding, or chat impression. Semantic decision sufficiency is the universal
+gate: owner, replaceable unit, implementation mechanism, validation route, and
+each unresolved branch that could change one of those decisions must be explicit.
+When the active workflow or touched surface selects a full design route, or
+coordination/resumption needs durable transport, use the `Abstract Design
+Frame`, `Implementation Source Packet`, `Design Side-Effect Map`, and
+`Design-To-Implementation Trace`. A structured handoff, approved source packet,
+or tool result is sufficient when those file artifacts are not selected. A
 parent-direct write exception may use the short owner/path/design-boundary note
 only after the exception route is recorded; the note is exception evidence and
 not authorization to bypass `spark_worker` or `worker`.
@@ -269,7 +282,7 @@ proof obligation, or replacement unit together even when the chunk is long.
 | skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml`; `vendor/agent-canon/.agents/skills/*/SKILL.md` | `python3 tools/agent_tools/route.py --prompt`; `check_agent_runtime_alignment.py` |
 | internal workflow routines | `vendor/agent-canon/agents/internal-routines/README.md` | `repo_structure_contract.py`; runtime alignment |
 | implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
-| search, read scope, and reuse survey | semantic-index, local-llm search, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
+| search, read scope, and reuse survey | semantic-index, deterministic `search.py` / `search_index.py`, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
 | repo structure and root views | `vendor/agent-canon/documents/repo-structure-contract.toml`; `responsibility-scope.toml`; `documents/shared-runtime-surfaces.toml` | structure/scope/import tools; `sync_agent_canon.sh` |
 | shared-checkout Git mutation and branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/.codex/hooks/branch_worktree_guard.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation route | `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md` | profile-selected validation |
@@ -304,7 +317,7 @@ short owner/design/validation note.
 - `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md`
 
 Task-specific packet expansion is owned by the generated task packet,
-semantic-index/local-llm search, and dependency review artifacts when those
+semantic-index/deterministic search, and dependency review artifacts when those
 routes are selected. The base packet is not a required reading list for every
 task.
 

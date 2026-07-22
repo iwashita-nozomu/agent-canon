@@ -4,7 +4,6 @@
 contract agent-runtime
 responsibility Documents CLI Entrypoints for this repository.
 upstream design README.md canonical workflow index
-downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates the canonical packet terminology
 @dependency-end
 -->
 
@@ -69,33 +68,9 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
   --workspace-root "$PWD"
 ```
 
-nonstandard design packet を run-local input として固定する場合は、
-`bootstrap_agent_run.py` と `task_start.py` の共通 flag
-`--active-design-packet JSON` を使います。JSON は four-entry active design
-packet `waterfall.design_packet.v1` の schema、3 つの相対 artifact path、
-`document_flow_required`、clause registry、および four entries それぞれの exact
-clause/owner/source/dependency/output/reviewer references を一つの object として渡します。
-partial objectやcaller独自shapeはrejectされ、runは作成されません。生成後の唯一の
-authorityは `team_manifest.yaml#run.active_design_packet` です。
-
-```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
-  --task "graph design packet run" \
-  --task-id T12 \
-  --owner codex \
-  --workspace-root "$PWD" \
-  --active-design-packet "$COMPLETE_PACKET_JSON"
-```
-
-`COMPLETE_PACKET_JSON` は `agents/agents_config.json` の
-`artifacts.active_design_packet` と同じclosed shapeを使用し、artifact path変更時は
-four entries の `output_refs` も同じ artifact へ更新します。`task_start.py` と
-`bootstrap_agent_run.py` は packetを解釈・投影・追記せず、complete specを
-`agent_team.py::create_run_bundle` へ一度だけ渡します。このdelegatorが全referenceと
-全projectionをvalidate/renderしてから一つのlock下でstage、no-replace publish、
-pointer-last activationを行い、失敗時はpartial bundleやpointer advanceを返しません。
-
-task catalog の default specialist と default review pack をそのまま使うのが既定です。狭い例外だけ `--enable` で足します。
+task catalog の default specialist と default review pack は候補です。owner-critical
+decision または distinct unresolved claim/risk が選択したものだけ materialize し、
+その他は `--enable` または明示された route で有効化します。
 `--task` の文面は `route.py --prompt` にも使われ、prompt-derived skill は
 `SUGGESTED_SKILLS` と `team_manifest.yaml` の `run.repo_tool_routing_policy`
 へ反映されます。
@@ -110,9 +85,10 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 環境変更では `--task-id T8`、学術文章では `--task-id T10` を起点にします。
 
-包括的開発では次を起点にします。T12 の default-active specialists は
-`scheduler`、`schedule_reviewer`、`project_reviewer`、
-`docs_workflow_steward`、`prompt_config_reviewer` の 5 role だけです。
+包括的開発では次を起点にします。T12 の
+`scheduler`、`schedule_reviewer`、`project_reviewer`、`docs_workflow_steward`、
+`prompt_config_reviewer` は候補であり、owner-critical decision または distinct
+unresolved claim/risk が選択した role だけを materialize します。
 
 ```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \
@@ -131,7 +107,8 @@ bounded slice で `spark_worker` を選ぶ場合だけ、parent packet から
 `parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は
 parent packet と wave の改訂を必須にします。
 
-post-implementation change review は `diff_triage_reviewer` が既定です。
+post-implementation change review は selected owning gate が必要な場合に
+`diff_triage_reviewer` を候補にします。
 `python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet evidence、
 または明示 review-pack activation がある場合だけ materialize します。
 
@@ -139,58 +116,73 @@ post-implementation change review は `diff_triage_reviewer` が既定です。
 
 GitHub Actions から回すときは `.github/workflows/agent-coordination.yml` を使います。
 
-## Canonical Knowledge Graph
+## Runtime Evidence and Knowledge Graph
 
-Parent repository の構造・責任・依存・公開 surface を参照するときは、固定 DB
-`.agent-canon/knowledge-graph/graph.sqlite` を所有する次の4操作だけを使います。
-`--root` は parent repository root、公開 profile は `default` です。
-
-```bash
-tools/bin/agent-canon graph build --root . --profile default --format json
-tools/bin/agent-canon graph status --root . --profile default --format json
-tools/bin/agent-canon graph query --root . --profile default --path README.md --format json
-tools/bin/agent-canon graph context --root . --profile default --path README.md --format json
-```
-
-consumer は `status=fresh` と verified integration record を確認してから query / context
-を使います。非 fresh 状態で source header や private transport を再解析する fallback は
-ありません。`context` が source を解決した場合は、同じ response の
-`source_identity` が `snapshot_commit`、`source_path`、`content_sha256` の exact
-tuple を返し、typed consumer は `resolved_path` との一致を検証します。
-
-## Predecessor Integration
-
-Source PR merge後に限り、approved unitごとのimmutable recordをderived filename
-`predecessor_integration.<unit_id>.json` へ生成します。producer、individual verifier、
-exact set verifierのparser/serializer/exit ownerはすべて `github_publish.py` です。
+The generic source-bound context certificate is created first from native
+Codex rollout evidence and the active run bundle:
 
 ```bash
-python3 tools/agent_tools/github_publish.py --root . predecessor-integration \
-  --user-task "$USER_TASK" \
-  --repo OWNER/REPOSITORY \
-  --pr PR_NUMBER_OR_URL \
-  --report-dir reports/agents/RUN_ID \
-  --unit-id knowledge_graph \
-  --design-path reports/agents/RUN_ID/graph_design_brief.md \
-  --approve-review-path reports/agents/RUN_ID/graph_design_review.md
-
-python3 tools/agent_tools/github_publish.py --root . verify-predecessor-integration \
-  --record ARCHIVE/predecessor_integration.knowledge_graph.json \
-  --archive-manifest ARCHIVE/archive_manifest.json \
-  --expected-unit-id knowledge_graph
-
-python3 tools/agent_tools/github_publish.py --root . verify-predecessor-integration-set \
-  --required-unit-id knowledge_graph \
-  --required-unit-id active_design_packet_materialization \
-  --record knowledge_graph=ARCHIVE/predecessor_integration.knowledge_graph.json \
-  --record active_design_packet_materialization=ARCHIVE/predecessor_integration.active_design_packet_materialization.json \
-  --archive-manifest knowledge_graph=ARCHIVE/archive_manifest.json \
-  --archive-manifest active_design_packet_materialization=ARCHIVE/archive_manifest.json
+python3 tools/agent_tools/runtime_log_archive_git.py append-context-discovery \
+  --run-id <run-id> --agent-context-id <agent-context-id> --turn-id <turn-id>
 ```
 
-Success is one canonical JSON line on stdout and zero stderr. Failure is zero
-stdout and one typed canonical error line on stderr with exit `2` through `6`.
-The producer renders complete bytes before identity-owned no-replace publication;
-verifiers are read-only and set verification suppresses every partial prefix.
-Before both source units merge, these record files must remain absent and must
-never be synthesized manually.
+The producer accepts only those three selectors. It reads the finite native
+`session_meta` / `event_msg` rollout source, publishes exactly one immutable
+`context_discovery.<certificate-id>.json` certificate, and prints its path,
+certificate ID, task-completion record hash, and `CONTEXT_DISCOVERY_APPEND=pass`.
+Missing, duplicate, malformed, or mismatched native evidence fails closed.
+The runtime-event materializer then consumes exactly one certificate:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
+  --result-family <requirements|design|review|validation|lifecycle> \
+  --run-id <run-id> --gate-id <gate-id> --base-ref <base-ref>
+```
+
+The command writes one immutable prepared
+`runtime_event.<unit-id>.json` artifact, appends post-target evidence to the
+repo-local outcome spool, and publishes a separate hash-linked
+`runtime_event.<unit-id>.outcome.<attempt-id>.<sequence>.json` receipt. The
+artifact contains `publication_intent.prepared_state=prepared` and never
+contains a future-valued outcome. Success requires a durability-confirmed
+latest `committed` receipt; missing, uncertain, malformed, colliding, or
+unconfirmed records fail closed.
+
+Success prints the artifact path/unit/source-record hash, materialization and
+attempt IDs, latest receipt path/hash, `RUNTIME_EVENT_OUTCOME=committed`, and
+`RUNTIME_EVENT_MATERIALIZE=pass` only after the attempt lock is released. A
+typed transaction failure prints only
+`RUNTIME_EVENT_ERROR_CODE=<code>` and
+`RUNTIME_EVENT_MATERIALIZE=fail`, writes no stderr, and exits `1`. Retrying the
+same command confirms or appends records for the deterministic attempt; it
+does not replace prior artifact, observation, or receipt bytes.
+
+PostToolUse uses a separate O(1) local spool and never invokes this CLI. Check
+the hot path without building repository/archive context, then publish one
+explicit checkpoint when requested:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py check-hook-hot-path
+python3 tools/agent_tools/runtime_log_archive_git.py sync
+```
+
+`sync` owns one nonblocking lock and one archive ensure. It snapshots, ingests,
+deduplicates, projects, publishes, reads back, and only then removes certified
+spool files. `archive_transaction_busy`, `partial_retained`, `failed`, and
+`uncertain` states leave source events for a later checkpoint.
+
+The Rust graph uses one build transaction and one prepared-artifact/committed-
+receipt pair:
+
+```bash
+tools/bin/agent-canon graph build --root <repo-root> --format json
+tools/bin/agent-canon graph status --root <repo-root> --format json
+tools/bin/agent-canon graph query --root <repo-root> --relation dependency --all --format json
+tools/bin/agent-canon graph context --root <repo-root> --path <repo-relative-path> --format json
+```
+
+`status`, `query`, and `context` are read-only consumers. They reuse the
+persisted v2 snapshot and return stale/unavailable state when the artifact,
+receipt, live source identity, worktree manifest identity, or profile changes;
+each command performs one bounded freshness probe and does not regenerate
+runtime evidence.
