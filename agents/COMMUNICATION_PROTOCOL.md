@@ -7,6 +7,10 @@ upstream design README.md agent canon overview
 downstream design skills/agent-orchestration.md routes pre-edit investigation before path selection
 downstream design skills/codex-task-workflow.md consumes pre-edit investigation and context capsules
 downstream design skills/subagent-bootstrap.md consumes fresh subagent context capsules
+downstream design TASK_WORKFLOWS.md routes active design packet ownership
+downstream design workflows/implementation-waterfall-workflow.md consumes the active design packet contract
+downstream implementation ../tools/agent_tools/agent_team.py normalizes and materializes active design packets
+downstream implementation ../tools/agent_tools/waterfall_gate_check.py validates persisted active design packets
 downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predicts edit-time tool rejection gates
 @dependency-end
 -->
@@ -195,6 +199,33 @@ current `design_brief.md` path or revision and the selected owner/design gate.
 Missing candidate review artifacts do not block an otherwise semantically
 sufficient handoff; an active gate with missing, stale, or non-approve evidence
 returns the task to its owning route.
+
+## Active Design Packet Schema
+
+This document owns the artifact-level schema named
+`waterfall.design_packet.v1`. The record is closed and contains exactly these
+fields:
+
+- `schema`
+- `design_artifact`
+- `design_review_artifact`
+- `document_flow_review_artifact`
+- `document_flow_required`
+
+`schema` must equal `waterfall.design_packet.v1`. The three artifact fields are
+non-empty relative paths that remain inside one run bundle and do not traverse
+symlinks. `document_flow_required` is a boolean. Missing, unknown, mistyped, or
+outside-bundle fields fail closed with the input boundary's typed field prefix.
+
+`agents/agents_config.json#artifacts.active_design_packet` owns the standard
+record. `agent_team.py` owns the executable schema constants, normalization,
+precedence, and materialization used by task-start and bootstrap. An explicit
+`--active-design-packet` record overrides a workflow-family record, which
+overrides the standard registry record. The selected record is persisted at
+`team_manifest.yaml#run.active_design_packet`; after publication, that manifest
+record is the only gate input. Producers, shared normalizers, materializers,
+runtime checkers, and the waterfall gate must consume this same closed field
+set and schema name.
 
 ## Pre-Edit Repository Investigation Packet
 

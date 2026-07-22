@@ -42,6 +42,8 @@ rather than local implementation judgment.
 
 <!-- Before selecting files or patches, describe the abstract responsibility model, concept graph, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces. Implementation slices must be derived from this frame, not selected only from the nearest file, helper, or finding. -->
 
+<!-- Packet entry: entry_id=abstract-design-frame. Record responsibility_id plus exact clause_refs, owner_refs, source_refs, dependency_refs, output_refs, and reviewer_refs from the active packet; do not infer them from prose. -->
+
 - Responsibility model:
 - Concept or layer model:
 - Non-goals:
@@ -72,11 +74,15 @@ rather than local implementation judgment.
 
 ## Implementation Source Packet
 
-<!-- List every artifact the worker must read before editing: user_request_contract.md, schedule.md, this design brief, design_review.md, document_flow_review.md when active, test_plan.md, repo docs, dependency surfaces, code paths, tests, and external references if any. Mark each item required or not used. -->
+<!-- List every artifact the worker must read before editing: user_request_contract.md, schedule.md, this design brief, design_review.md when active, document_flow_review.md when active, test_plan.md only when post-implementation test design is active, repo docs, dependency surfaces, code paths, tests, and external references if any. Mark each item required or not used. -->
+
+<!-- Packet entry: entry_id=implementation-source-packet. Preserve the exact active-packet references and dependency on entry:abstract-design-frame. -->
 
 ## Design Side-Effect Map
 
 <!-- For each major design decision, list downstream implementation, document, workflow, prompt/config, validation, dependency-manifest, and user-facing surfaces it affects. Connect each item to the Abstract Design Frame responsibility, request clause ID, reuse precedent, owner stage, review gate, and validation or test-plan item. -->
+
+<!-- Packet entry: entry_id=design-side-effect-map. Preserve the exact active-packet references and dependency on entry:abstract-design-frame. -->
 
 ## Canonical Tree-Head Plan
 
@@ -101,6 +107,8 @@ rather than local implementation judgment.
 ## Design-To-Implementation Trace
 
 <!-- For each planned edit, map design section, user-request clause ID, source/reuse document or code path, test-plan item, and expected validation evidence. The worker must cite this mapping before editing. -->
+
+<!-- Packet entry: entry_id=design-to-implementation-trace. Preserve dependencies on the other three entries and map every source and deletion record to one integrated responsibility unit. -->
 
 ## Identifier And Naming Plan
 
