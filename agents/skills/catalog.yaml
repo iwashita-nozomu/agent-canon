@@ -1261,3 +1261,12 @@ skill_families:
         - ["skill", "not", "invoked"]
         - ["起動コマンド", "ミス"]
         - ["ミス", "多発"]
+
+  - id: wiki-publication
+    purpose: Publishes AgentCanon wiki pages only through the dedicated wiki sidecar using default-branch-only pushes and source commit binding.
+    canonical_doc: agents/skills/wiki-publication.md
+    shim: .agents/skills/wiki-publication/SKILL.md
+    related_skills:
+      - owner-bounded-routing
+      - result-artifact-writeout
+      - github-publish
