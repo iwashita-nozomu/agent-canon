@@ -29,6 +29,7 @@ from agent_team import (  # noqa: E402
     TaskCatalog,
     codex_runtime_max_depth,
     load_team_config,
+    resolve_active_design_packet_config,
     resolve_cross_cutting_document_packet,
     resolve_document_section_locators,
     resolve_role,
@@ -152,6 +153,31 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             with self.assertRaisesRegex(
                 RuntimeError,
                 "experimenter codex_agents must not include skill_evaluator",
+            ):
+                runtime_alignment.validate_team_config_references()
+
+    def test_team_config_rejects_unknown_active_design_packet_field(self) -> None:
+        """Runtime alignment consumes the shared closed packet schema."""
+        config = load_team_config()
+        packet = cast(
+            dict[str, object],
+            config.artifact_registry["active_design_packet"],
+        )
+        mutated_config = replace(
+            config,
+            artifact_registry={
+                **config.artifact_registry,
+                "active_design_packet": {
+                    **packet,
+                    "unexpected_contract": True,
+                },
+            },
+        )
+
+        with patch.object(runtime_alignment, "load_team_config", return_value=mutated_config):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                r"^artifacts\.active_design_packet:field_unknown:unexpected_contract$",
             ):
                 runtime_alignment.validate_team_config_references()
 
@@ -946,11 +972,13 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
             config = load_team_config()
             role = resolve_role(config, "design_reviewer")
+            active_design_packet = resolve_active_design_packet_config(config)
             packet = resolve_role_document_packet(
                 config=config,
                 role=role,
                 report_dir=workspace_root / "reports" / "agents" / "_packet_probe",
                 workspace_root=workspace_root,
+                active_design_packet=active_design_packet,
             )
             non_artifact_paths = {
                 entry.path for entry in packet.read_before_work if not entry.rationale.startswith("run artifact:")
@@ -963,11 +991,13 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         """Section locators stay separate from paths and fail if required headings move."""
         config = load_team_config()
         role = resolve_role(config, "implementer")
+        active_design_packet = resolve_active_design_packet_config(config)
         packet = resolve_role_document_packet(
             config=config,
             role=role,
             report_dir=PROJECT_ROOT / "reports" / "agents" / "_packet_probe",
             workspace_root=PROJECT_ROOT,
+            active_design_packet=active_design_packet,
         )
         sectioned_entries = [
             entry for entry in packet.read_before_work if entry.sections

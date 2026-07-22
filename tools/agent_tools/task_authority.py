@@ -116,10 +116,15 @@ def authority_baseline_path(authority_path: Path) -> Path:
     return authority_path.with_name(authority_path.name + AUTHORITY_BASELINE_SUFFIX)
 
 
+def hash_baseline_bytes(payload: bytes) -> bytes:
+    """Return canonical SHA-256 baseline bytes for one authority payload."""
+    return (hashlib.sha256(payload).hexdigest() + "\n").encode("ascii")
+
+
 def write_hash_baseline(path: Path, baseline_path: Path) -> None:
     """Write a hash baseline sidecar for a runtime authority file."""
     baseline_path.parent.mkdir(parents=True, exist_ok=True)
-    baseline_path.write_text(file_sha256(path) + "\n", encoding="utf-8")
+    baseline_path.write_bytes(hash_baseline_bytes(path.read_bytes()))
 
 
 def path_changed_from_baseline(path: Path, baseline_path: Path) -> bool:

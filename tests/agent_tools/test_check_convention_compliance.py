@@ -590,7 +590,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "`python3 tools/agent_tools/route.py --prompt` |\n"
         "| implementation stage gate | "
         "`agents/workflows/implementation-waterfall-workflow.md` |\n"
-        "| implementation packet schema | `agents/COMMUNICATION_PROTOCOL.md` |\n"
+        "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
+        "`agents/agents_config.json#artifacts.active_design_packet` |\n"
         "| closeout authority | `task_close.py`; `report_artifact_checks.py` |\n\n"
         "## Workflow Family Reader Paths\n\n"
         "| Family | Owner Row |\n"
@@ -2061,6 +2062,30 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("owner_map_entrypoints", result.stdout)
             self.assertIn(
                 "missing-owner-row:skill selection",
+                result.stdout,
+            )
+
+    def test_owner_map_entrypoint_requires_active_design_packet_schema_row(self) -> None:
+        """The workflow reader map keeps the canonical packet schema owners."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflows = root / "agents" / "TASK_WORKFLOWS.md"
+            workflows.write_text(
+                workflows.read_text(encoding="utf-8").replace(
+                    "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
+                    "`agents/agents_config.json#artifacts.active_design_packet` |\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("owner_map_entrypoints", result.stdout)
+            self.assertIn(
+                "missing-owner-row:active design packet schema",
                 result.stdout,
             )
 

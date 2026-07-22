@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -25,6 +26,40 @@ from tools.agent_tools import implementation_route  # noqa: E402
 
 class AgentTeamTemplateTest(unittest.TestCase):
     """Verify reusable template partial expansion."""
+
+    def test_active_design_packet_normalizer_rejects_unknown_mapping_fields(
+        self,
+    ) -> None:
+        """Workflow and config mappings share the closed packet field set."""
+        config = agent_team.load_team_config()
+        base_packet = config.artifact_registry["active_design_packet"]
+        self.assertIsInstance(base_packet, dict)
+        packet_with_unknown = {
+            **base_packet,
+            "unexpected_contract": True,
+        }
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"^workflow_family\.active_design_packet:field_unknown:unexpected_contract$",
+        ):
+            agent_team.resolve_active_design_packet_config(
+                config,
+                {"active_design_packet": packet_with_unknown},
+            )
+
+        config_with_unknown = replace(
+            config,
+            artifact_registry={
+                **config.artifact_registry,
+                "active_design_packet": packet_with_unknown,
+            },
+        )
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"^artifacts\.active_design_packet:field_unknown:unexpected_contract$",
+        ):
+            agent_team.resolve_active_design_packet_config(config_with_unknown)
 
     def test_review_template_expands_partials_and_replacements(self) -> None:
         """Rendered review artifacts should contain expanded tables and run metadata."""
