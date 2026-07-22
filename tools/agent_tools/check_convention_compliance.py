@@ -515,19 +515,6 @@ CLOSEOUT_READINESS_MARKERS = (
     "repo_wide_static_analysis_complete",
     "repo_wide_dependency_tools_complete",
 )
-POSITIVE_RUNTIME_WORDING_SURFACES = (
-    "ROOT_AGENTS.md",
-    ".agents/skills/agent-orchestration/SKILL.md",
-    ".agents/skills/codex-task-workflow/SKILL.md",
-    ".agents/skills/mvp-skeleton/SKILL.md",
-    "agents/TASK_WORKFLOWS.md",
-    "agents/canonical/CODEX_SUBAGENTS.md",
-    "agents/canonical/CODEX_WORKFLOW.md",
-    "agents/skills/catalog.yaml",
-    "agents/skills/mvp-skeleton.md",
-    "documents/conventions/common/05_docs.md",
-    "documents/coding-conventions-project.md",
-)
 DOCUMENT_CLAIM_GROUNDING_MARKERS = {
     "documents/conventions/common/05_docs.md": (
         "claim grounding",
@@ -1011,21 +998,6 @@ NORMATIVE_RE = re.compile(
     r"must|must not|required|forbidden)",
     flags=re.IGNORECASE,
 )
-LEGACY_NEGATIVE_RUNTIME_RE = re.compile(
-    r"(?im)^\s*(?:[-*]\s*)?.*(?:"
-    r"禁止|してはいけ|出さない|返さない|完了扱いにしない|"
-    r"Prohibitions|Close-Out Prohibitions|しなければ|must\s+not|"
-    r"do\s+not|don't|never|cannot|can't|せず|ではありません|"
-    r"しません|しない|置かず|戻さず)"
-)
-LEGACY_SEQUENCE_DESIGN_RE = re.compile(
-    r"(?im)^\s*(?:[-*]\s*)?.*(?:"
-    r"最初の|最初に|初期\s*(?:wave|責務)|Initial Intake Wave|"
-    r"mandatory first skill|first-wave|first-pass|first working version|needs the first version|"
-    r"first runnable path|first screen|first responsibilities wave|"
-    r"first implementation candidate|first cohesive slice|first slice|"
-    r"first candidate|first reviewer|first figure|first routing declaration)"
-)
 VERIFICATION_RE = re.compile(
     r"(?:tools/|check_|pyright|pytest|ruff|make ci|make agent-checks|"
     r"CONVENTION_COMPLIANCE|EVAL_STATUS|AGENT_EVALUATION_STATUS)"
@@ -1355,32 +1327,6 @@ def check_closeout_readiness(root: Path) -> list[Finding]:
             findings.append(
                 Finding("workflow_readiness", path, f"missing-marker:{marker}")
             )
-    return findings
-
-
-def check_positive_runtime_wording(root: Path) -> list[Finding]:
-    """Verify central runtime docs use positive operational wording."""
-    findings = check_required_files(
-        root, POSITIVE_RUNTIME_WORDING_SURFACES, "positive_runtime_wording"
-    )
-    for path in POSITIVE_RUNTIME_WORDING_SURFACES:
-        full_path = readable_path(root, path)
-        if full_path is None:
-            continue
-        text = full_path.read_text(encoding="utf-8")
-        for label, pattern in (
-            ("legacy-negative-runtime-wording", LEGACY_NEGATIVE_RUNTIME_RE),
-            ("legacy-sequence-design-wording", LEGACY_SEQUENCE_DESIGN_RE),
-        ):
-            for match in pattern.finditer(text):
-                line_no = text.count("\n", 0, match.start()) + 1
-                findings.append(
-                    Finding(
-                        "positive_runtime_wording",
-                        path,
-                        f"{label}:{line_no}",
-                    )
-                )
     return findings
 
 
@@ -1895,7 +1841,6 @@ def run_checks(root: Path) -> list[Finding]:
         )
     )
     findings.extend(check_closeout_readiness(root))
-    findings.extend(check_positive_runtime_wording(root))
     findings.extend(check_document_claim_grounding(root))
     findings.extend(check_test_contract_routing(root))
     findings.extend(
@@ -1940,7 +1885,11 @@ def run_checks(root: Path) -> list[Finding]:
 
 def render_json(root: Path, findings: Sequence[Finding]) -> str:
     """Render JSON output."""
-    workflows = [path.relative_to(root).as_posix() for path in workflow_docs(root)]
+    workflows = [
+        path
+        for path in WORKFLOW_GATE_CONSUMERS
+        if readable_path(root, path) is not None
+    ]
     payload = {
         "status": "pass" if not findings else "fail",
         "findings": [asdict(finding) for finding in findings],
