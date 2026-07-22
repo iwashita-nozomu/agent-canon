@@ -184,31 +184,17 @@ class GraphClient:
             process.returncode,
         )
 
-    def build(self, profile: str | None = None) -> GraphResponse:
+    def build(self) -> GraphResponse:
         """Build one fresh graph transaction."""
-        options: list[str] = []
-        if profile is not None:
-            options.extend(["--profile", profile])
-        return self.invoke("build", options)
+        return self.invoke("build")
 
     def status(self) -> GraphResponse:
         """Read persisted graph status without rebuilding producers."""
         return self.invoke("status")
 
-    def query(
-        self,
-        *,
-        path: str | None = None,
-        relation: str = "dependency",
-        direction: str = "both",
-        depth: int = 0,
-        all_nodes: bool = False,
-        profile: str | None = None,
-    ) -> GraphResponse:
+    def query(self, *, path: str | None = None, relation: str = "dependency", direction: str = "both", depth: int = 0, all_nodes: bool = False) -> GraphResponse:
         """Query persisted graph facts without source or runtime reparse."""
         options = ["--relation", relation, "--direction", direction, "--depth", str(depth)]
-        if profile is not None:
-            options.extend(["--profile", profile])
         if path is not None:
             options.extend(("--path", path))
         if all_nodes:
