@@ -32,6 +32,7 @@ from report_artifact_checks import (
     check_schedule_artifact,
     check_work_log_artifact,
     has_approve_decision,
+    markdown_without_adjudicated_rejected_hypotheses,
     section_has_content,
 )
 
@@ -423,7 +424,9 @@ def status_in(status: dict[str, str], key: str, allowed: set[str]) -> bool:
 def has_open_review_findings(*texts: str) -> bool:
     """Return whether review artifacts still carry open fix-now findings."""
     for text in texts:
-        cleaned = markdown_without_comments(text).lower()
+        cleaned = markdown_without_adjudicated_rejected_hypotheses(
+            markdown_without_comments(text)
+        ).lower()
         for line in cleaned.splitlines():
             if re.search(r"\b(no|none)\b.*\b(fix-now|required_change|open)\b", line):
                 continue

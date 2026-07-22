@@ -68,7 +68,9 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
   --workspace-root "$PWD"
 ```
 
-task catalog の default specialist と default review pack をそのまま使うのが既定です。狭い例外だけ `--enable` で足します。
+task catalog の default specialist と default review pack は候補です。owner-critical
+decision または distinct unresolved claim/risk が選択したものだけ materialize し、
+その他は `--enable` または明示された route で有効化します。
 `--task` の文面は `route.py --prompt` にも使われ、prompt-derived skill は
 `SUGGESTED_SKILLS` と `team_manifest.yaml` の `run.repo_tool_routing_policy`
 へ反映されます。
@@ -83,9 +85,10 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 環境変更では `--task-id T8`、学術文章では `--task-id T10` を起点にします。
 
-包括的開発では次を起点にします。T12 の default-active specialists は
-`scheduler`、`schedule_reviewer`、`project_reviewer`、
-`docs_workflow_steward`、`prompt_config_reviewer` の 5 role だけです。
+包括的開発では次を起点にします。T12 の
+`scheduler`、`schedule_reviewer`、`project_reviewer`、`docs_workflow_steward`、
+`prompt_config_reviewer` は候補であり、owner-critical decision または distinct
+unresolved claim/risk が選択した role だけを materialize します。
 
 ```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \
@@ -104,7 +107,8 @@ bounded slice で `spark_worker` を選ぶ場合だけ、parent packet から
 `parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は
 parent packet と wave の改訂を必須にします。
 
-post-implementation change review は `diff_triage_reviewer` が既定です。
+post-implementation change review は selected owning gate が必要な場合に
+`diff_triage_reviewer` を候補にします。
 `python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet evidence、
 または明示 review-pack activation がある場合だけ materialize します。
 

@@ -50,7 +50,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Fix `Question`, `Comparison Target`, `Exit Criteria`, `Stop Budget`, and `Improvement Backlog` before choosing the next iteration.
 1. Keep one extension, one waterfall run id, one change pass, and one decision state at a time.
 1. Treat the iteration number as progress metadata, not as a completion condition; only explicit achieved criteria close the loop.
-1. Before moving to a second extension, finish the previous extension's waterfall gate checks, final review, `task-close`, commit, and push.
+1. Before moving to a second extension, finish the previous extension's selected waterfall gate checks, selected review gate (final review only when activated), `task-close`, commit, and push.
 1. Do not close the loop while `report_rewrite_required`, `extra_validation_required`, `rerun_required`, or `direction_rethink_required` remains.
 1. Do not close the loop while MCP `goal.loop_status` or `goal_loop.py status` reports `NEXT_ACTION=run_next_iteration`.
 1. Whenever this run uses skills, run `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate --run-id <run-id> --skill-used <skill>` and record `EVAL_RUN_ID` plus `EVAL_ACCUMULATED_REPORT`.

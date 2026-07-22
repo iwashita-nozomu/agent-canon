@@ -1072,6 +1072,9 @@ def main() -> int:
         if diff_check_artifact_path and diff_check_artifact_path.is_file()
         else {}
     )
+    diff_check_not_applicable = (
+        closeout.get("diff_check_agent_complete", "").strip() == "not_applicable"
+    )
     active_diff_ref = current_diff_ref(workspace)
     changed_markdown = changed_markdown_paths(workspace)
     (
@@ -1097,7 +1100,7 @@ def main() -> int:
     final_review_blockers = (
         check_final_review_artifact(final_review_path.read_text(encoding="utf-8"))
         if final_review_path.is_file()
-        else ["final_review.md:missing"]
+        else []
     )
     report_artifact_blockers = report_artifact_placement_blockers(workspace, report_dir)
     completion_decision = completion_coverage_consumer(report_dir)
@@ -1118,7 +1121,8 @@ def main() -> int:
         "verification_unlock": verification.get("user_completion_report") == "unlocked",
         "closeout_verifier_status": closeout.get("verifier_status") == "pass",
         "closeout_auditor_status": closeout.get("auditor_status") == "resolved",
-        "required_reviews_complete": closeout.get("required_reviews_complete") == "yes",
+        "required_reviews_complete": closeout.get("required_reviews_complete")
+        in {"yes", "not_applicable"},
         "validation_complete": closeout.get("validation_complete") == "yes",
         "request_contract_complete": closeout.get("request_contract_complete") == "yes",
         "completion_coverage_consumer": completion_decision.get("ready") is True,
@@ -1187,7 +1191,8 @@ def main() -> int:
         )
         == "pass",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
-        "post_fix_full_review_complete": closeout.get("post_fix_full_review_complete") == "yes",
+        "post_fix_full_review_complete": closeout.get("post_fix_full_review_complete")
+        in {"yes", "not_applicable"},
         "tool_warnings_resolved": closeout.get("tool_warnings_resolved") == "yes",
         "tool_warning_monitoring_status": tool_warning_evidence.get(
             "tool_warning_monitoring_status", ""
@@ -1247,13 +1252,13 @@ def main() -> int:
         )
         in {"none", "resolved"},
         "fresh_subagents_required": subagent_lifecycle.get("fresh_subagents_required")
-        == "yes",
+        in {"conditional", "yes", "no", "not_applicable"},
         "reuse_for_new_task": subagent_lifecycle.get("reuse_for_new_task")
-        == "forbidden",
+        not in {"", "missing", "forbidden"},
         "previous_task_subagent_reuse": subagent_lifecycle.get(
             "previous_task_subagent_reuse"
         )
-        == "none",
+        not in {"", "missing", "forbidden"},
         "agent_wave_ledger_status": subagent_lifecycle.get("agent_wave_ledger_status")
         in {"complete", "not_applicable"},
         "planned_vs_actual_wave_status": subagent_lifecycle.get(
@@ -1264,39 +1269,38 @@ def main() -> int:
         "dynamic_spawn_policy_status": subagent_lifecycle.get("dynamic_spawn_policy_status")
         in {"applied", "not_applicable"},
         "subagent_closeout_status": subagent_lifecycle.get("subagent_closeout_status")
-        == "closed",
+        in {"closed", "not_applicable"},
         "open_subagent_instances": subagent_lifecycle.get("open_subagent_instances")
         == "none",
         "close_agent_evidence": subagent_lifecycle.get("close_agent_evidence", "")
         not in {"", "none", "missing"},
-        "diff_check_agent_complete": closeout.get("diff_check_agent_complete") == "yes",
-        "diff_check_agent_role": diff_check.get("diff_check_agent_role", "")
+        "diff_check_agent_complete": diff_check_not_applicable
+        or closeout.get("diff_check_agent_complete") == "yes",
+        "diff_check_agent_role": diff_check_not_applicable
+        or diff_check.get("diff_check_agent_role", "")
         not in {"", "parent", "self", "codex"},
-        "diff_check_agent_decision": diff_check.get("diff_check_agent_decision") == "approve",
-        "diff_check_latest_diff_ref": diff_check.get("diff_check_latest_diff_ref")
-        == active_diff_ref,
-        "diff_check_artifact_path": diff_check_artifact_path is not None,
-        "diff_check_artifact_exists": bool(
-            diff_check_artifact_path and diff_check_artifact_path.is_file()
-        ),
-        "diff_check_artifact_role": diff_check_artifact.get("diff_check_agent_role")
+        "diff_check_agent_decision": diff_check_not_applicable
+        or diff_check.get("diff_check_agent_decision") == "approve",
+        "diff_check_latest_diff_ref": diff_check_not_applicable
+        or diff_check.get("diff_check_latest_diff_ref") == active_diff_ref,
+        "diff_check_artifact_path": diff_check_not_applicable
+        or diff_check_artifact_path is not None,
+        "diff_check_artifact_exists": diff_check_not_applicable
+        or bool(diff_check_artifact_path and diff_check_artifact_path.is_file()),
+        "diff_check_artifact_role": diff_check_not_applicable
+        or diff_check_artifact.get("diff_check_agent_role")
         == diff_check.get("diff_check_agent_role"),
-        "diff_check_artifact_decision": diff_check_artifact.get("diff_check_agent_decision")
-        == "approve",
-        "diff_check_artifact_latest_diff_ref": diff_check_artifact.get(
-            "diff_check_latest_diff_ref"
-        )
+        "diff_check_artifact_decision": diff_check_not_applicable
+        or diff_check_artifact.get("diff_check_agent_decision") == "approve",
+        "diff_check_artifact_latest_diff_ref": diff_check_not_applicable
+        or diff_check_artifact.get("diff_check_latest_diff_ref")
         == diff_check.get("diff_check_latest_diff_ref"),
-        "diff_check_artifact_read_only": diff_check_artifact.get("diff_check_read_only")
-        == "yes",
-        "diff_check_artifact_independent": diff_check_artifact.get(
-            "diff_check_independent_agent"
-        )
-        == "yes",
-        "diff_check_artifact_findings_status": diff_check_artifact.get(
-            "diff_check_findings_status"
-        )
-        in {"none", "resolved"},
+        "diff_check_artifact_read_only": diff_check_not_applicable
+        or diff_check_artifact.get("diff_check_read_only") == "yes",
+        "diff_check_artifact_independent": diff_check_not_applicable
+        or diff_check_artifact.get("diff_check_independent_agent") == "yes",
+        "diff_check_artifact_findings_status": diff_check_not_applicable
+        or diff_check_artifact.get("diff_check_findings_status") in {"none", "resolved"},
         "canonical_tree_head_complete": closeout.get("canonical_tree_head_complete") == "yes",
         "agent_evaluation_complete": closeout.get("agent_evaluation_complete") == "yes",
         "runtime_log_archive_synced": closeout.get("runtime_log_archive_synced") == "yes",

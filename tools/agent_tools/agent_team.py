@@ -113,11 +113,11 @@ DEFERRED_SPAWN_ROLE_IDS = {
     "verifier",
     "auditor",
 }
-STANDARD_AGENT_WAVE_SEQUENCE = ("plan", "review", "edit")
+STANDARD_AGENT_WAVE_SEQUENCE = ("selected_stages_only",)
 STANDARD_AGENT_WAVE_SEQUENCE_SOURCE = (
     "agents/canonical/CODEX_SUBAGENTS.md#Wave Plan Contract"
 )
-STANDARD_AGENT_WAVE_SEQUENCE_GATE = "plan_packet,review_gate,edit_handoff"
+STANDARD_AGENT_WAVE_SEQUENCE_GATE = "selected_stage_evidence"
 USER_FACING_LANGUAGE_POLICY_SOURCE = "AGENTS.md#Template Context"
 USER_FACING_LANGUAGE = "ja"
 USER_FACING_LANGUAGE_SCOPE = (
@@ -189,15 +189,13 @@ TOOL_CALL_SCHEMA = "agent-canon.tool-call.v1"
 SKILL_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.skill-tool-commands.args.v1"
 ROUTE_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.route.args.v1"
 DECISION_SUFFICIENCY_OWNER = "agents/skills/agent-orchestration.md#Decision Sufficiency Packet"
-DECISION_SUFFICIENCY_VALIDATOR = "validate_decision_sufficiency_packet"
+DECISION_SUFFICIENCY_VALIDATOR = "semantic_decision_sufficiency"
 DECISION_SUFFICIENCY_MACHINE_FIELDS = (
-    "H",
-    "downstream_decision",
-    "possible_branches",
-    "invariant",
-    "value_of_information",
-    "route_verdict",
-    "rejection",
+    "owner",
+    "replaceable_unit",
+    "implementation_mechanism",
+    "validation_route",
+    "unresolved_branch",
 )
 PRE_HANDOFF_SCOPE_POLICY_SOURCE = (
     "agents/COMMUNICATION_PROTOCOL.md#Pre-Edit Repository Investigation Packet"
@@ -240,10 +238,7 @@ DEFAULT_QUALITY_CHECK_ROLE_IDS = (
     "cpp_reviewer",
     "change_reviewer",
 )
-DEFAULT_QUALITY_CHECK_STAGES = (
-    "review_before_edit_handoff",
-    "post_edit_review",
-)
+DEFAULT_QUALITY_CHECK_STAGES = ("selected_stages_only",)
 DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
     "tools/bin/agent-canon docs check <changed-markdown-paths>",
     "python3 tools/agent_tools/check_convention_compliance.py",
@@ -367,7 +362,6 @@ STANDARD_RUN_ARTIFACT_KEYS = (
     "closeout_gate",
     "agent_evaluation",
     "workflow_monitoring",
-    "final_review",
 )
 CURRENT_STAGE_SKILLS = {
     "$agent-orchestration",
@@ -437,11 +431,13 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "schedule",
             "design_brief",
             "design_review",
-            "test_plan",
             "change_review",
         ],
         "workspace_paths": ["documents/REVIEW_PROCESS.md"],
-        "notes": "Checkpoint review verifies that implementation cited the approved packet.",
+        "notes": (
+            "Checkpoint review is the selected owning gate; test_plan is read only when "
+            "post-implementation test design was activated."
+        ),
     },
     "final_reviewer": {
         "artifact_keys": [
@@ -449,11 +445,13 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "schedule",
             "design_brief",
             "design_review",
-            "test_plan",
             "final_review",
         ],
         "workspace_paths": ["documents/REVIEW_PROCESS.md"],
-        "notes": "Final review verifies whole-request traceability back to the approved packet.",
+        "notes": (
+            "Final review is a selected escalation gate; test_plan is read only when "
+            "post-implementation test design was activated."
+        ),
     },
     "scheduler": {
         "artifact_keys": ["user_request_contract", "schedule"],
@@ -480,7 +478,7 @@ ROLE_DOCUMENT_PACKET_SECTION_SPECS: dict[str, dict[str, tuple[str, ...]]] = {
             "Gate 7. 文書通読レビュー",
             "Gate 8. 実装",
             "Gate 8.5. 実装後の条件付きテストケース設計",
-            "Gate 9. 最終受け入れ review",
+            "Gate 9. 条件付き受け入れ review",
         ),
         "agents/canonical/CODEX_WORKFLOW.md": (
             "4. Run Bootstrap",
@@ -697,7 +695,7 @@ class RunBundleSpec:
     workflow_family_id: str = ""
     manual_specialists: tuple[str, ...] = ()
     task_default_specialists: tuple[str, ...] = ()
-    auto_specialists: tuple[str, ...] = ()
+    language_review_candidates: tuple[str, ...] = ()
     default_review_packs_enabled: bool = False
     default_review_pack_ids: tuple[str, ...] = ()
     selected_skills: tuple[str, ...] = ()
@@ -1239,20 +1237,20 @@ def default_quality_check_policy_output_lines(
     *,
     manual_specialists: tuple[str, ...] = (),
     task_default_specialists: tuple[str, ...] = (),
-    auto_specialists: tuple[str, ...] = (),
+    language_review_candidates: tuple[str, ...] = (),
     default_review_packs_enabled: bool = False,
     default_review_pack_ids: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
     """Return machine-readable stdout lines for default quality-check routing."""
     review_pack_state = (
-        "active" if default_review_packs_enabled else "route_without_default_packs"
+        "active" if default_review_packs_enabled else "candidate_only"
     )
     return (
-        "DEFAULT_QUALITY_CHECKS=enabled",
+        "DEFAULT_QUALITY_CHECKS=candidate_only",
         f"DEFAULT_QUALITY_CHECK_SOURCE={DEFAULT_QUALITY_CHECK_POLICY_SOURCE}",
-        "DEFAULT_QUALITY_CHECK_ROLES="
+        "DEFAULT_QUALITY_CHECK_ROLE_CANDIDATES="
         f"{','.join(default_quality_check_role_ids(roles)) or '-'}",
-        "DEFAULT_QUALITY_CHECK_AGENT_TYPES="
+        "DEFAULT_QUALITY_CHECK_AGENT_TYPE_CANDIDATES="
         f"{','.join(default_quality_check_agent_types(roles)) or '-'}",
         f"DEFAULT_QUALITY_CHECK_STAGES={','.join(DEFAULT_QUALITY_CHECK_STAGES)}",
         f"DEFAULT_QUALITY_CHECK_EVIDENCE={','.join(OOP_EVIDENCE_DIMENSIONS)}",
@@ -1261,8 +1259,8 @@ def default_quality_check_policy_output_lines(
         f"OFFICIAL_HOOK_SCHEMA={OFFICIAL_HOOK_SCHEMA}",
         "DEFAULT_QUALITY_CHECK_TASK_DEFAULT_SPECIALISTS="
         f"{','.join(task_default_specialists) or '-'}",
-        "DEFAULT_QUALITY_CHECK_AUTO_LANGUAGE_REVIEWERS="
-        f"{','.join(auto_specialists) or '-'}",
+        "DEFAULT_QUALITY_CHECK_LANGUAGE_REVIEW_CANDIDATES="
+        f"{','.join(language_review_candidates) or '-'}",
         "DEFAULT_QUALITY_CHECK_MANUAL_SPECIALISTS="
         f"{','.join(manual_specialists) or '-'}",
         f"DEFAULT_QUALITY_CHECK_REVIEW_PACKS={review_pack_state}",
@@ -1397,11 +1395,11 @@ def discover_changed_paths(workspace_root: Path) -> tuple[str, ...]:
     return tuple(changed)
 
 
-def auto_language_specialists(
+def language_review_candidates(
     workspace_root: Path,
     changed_paths: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
-    """Infer language-specific reviewers from changed paths."""
+    """Return explicit language-review candidates from changed paths."""
     candidate_paths = changed_paths or discover_changed_paths(workspace_root)
     normalized_paths = tuple(
         raw_path.replace("\\", "/").lstrip("./") for raw_path in candidate_paths
@@ -2515,13 +2513,10 @@ def select_roles(
             selected_roles.append(role)
             selected_ids.add(role.id)
     enabled_set = {role.id for role in enabled_roles}
-    enabled_activations = {
-        role.activation for role in enabled_roles if role in config.specialist_roles
-    }
     selected_specialists = tuple(
         role
         for role in config.specialist_roles
-        if role.id in enabled_set or role.activation in enabled_activations
+        if role.id in enabled_set
         if role.id not in selected_ids
     )
     return tuple(selected_roles) + selected_specialists
@@ -3069,20 +3064,21 @@ def manifest_run_lines(
     lines.extend(
         [
         "  subagent_lifecycle_policy:",
-        "    fresh_subagents_required: true",
-        "    reuse_for_new_task: forbidden",
-        "    previous_task_subagent_reuse: forbidden",
-        "    mid_task_user_input_policy: parent_checkpoint_then_route_delta",
-        "    same_task_delta_reuse: allowed_with_updated_packet",
-        "    scope_change_reuse: forbidden_spawn_fresh_wave",
-        "    new_task_reuse: forbidden_spawn_fresh_run",
+        "    fresh_subagents_required: conditional",
+        "    reuse_for_new_task: allowed_when_owner_context_compatible",
+        "    previous_task_subagent_reuse: allowed_when_owner_context_compatible",
+        "    mid_task_user_input_policy: classify_then_reuse_or_route_fresh",
+        "    same_task_delta_reuse: allowed_when_owner_context_compatible",
+        "    scope_change_reuse: evaluate_owner_context_compatibility",
+        "    new_task_reuse: evaluate_owner_context_compatibility",
         "    close_before_user_completion: true",
         "    closeout_gate_key: subagents_closed",
         "    closeout_evidence_section: 'Subagent Lifecycle Evidence'",
-        "    handoff_rule: 'Do not send_input to agents from another user request; spawn a "
-        "fresh run-local agent for each new task. Same-task user deltas require a parent "
-        "checkpoint, updated packet path, wave-ledger entry, and unchanged role scope before "
-        "send_input; scope changes spawn a fresh wave.'",
+        "    handoff_rule: 'Reuse an active agent when owner, responsibility, context, write "
+        "authority, and validation route remain compatible, including revised scope. Use a "
+        "fresh agent only for independent review, disjoint write authority, incompatible "
+        "owner/context, or failed context integrity. Durable checkpoints and packet paths "
+        "are conditional on coordination or resumption.'",
         "  handoff_context_policy:",
         "    inactive_profile_docs: not_applicable",
         "    broad_cross_cutting_packet: available_not_default_read",
@@ -3093,11 +3089,12 @@ def manifest_run_lines(
         "    pre_edit_rejection_prediction_status: pending",
         "    pre_edit_rejection_command: 'python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>'",
         "  standard_wave_sequence:",
+        "    activation: candidate_sequence_selected_per_wave",
         f"    source: {STANDARD_AGENT_WAVE_SEQUENCE_SOURCE!r}",
         "    stages:",
         *(f"      - {stage}" for stage in STANDARD_AGENT_WAVE_SEQUENCE),
-        f"    gate_order: {STANDARD_AGENT_WAVE_SEQUENCE_GATE!r}",
-        "    edit_handoff_rule: 'write-capable handoff は review gate 後の bounded write scope から開始し、read-only wave は read scope と次の review gate を記録する'",
+        "    gate_order: 'selected_stages_only'",
+        "    edit_handoff_rule: 'selected owner-critical edit stage only; no fixed plan-review-edit sequence'",
         *manifest_user_facing_language_policy_lines(),
         *manifest_contract_complete_implementation_policy_lines(spec.task),
         *manifest_pre_handoff_scope_policy_lines(),
@@ -3258,7 +3255,9 @@ def manifest_run_lines(
         lines.append("      - child_role")
         lines.append("      - child_instance_id")
         lines.append("      - input_packet")
-        lines.append("      - decision_sufficiency_packet_ref")
+        lines.append("      - replaceable_unit")
+        lines.append("      - implementation_mechanism")
+        lines.append("      - validation_route")
         lines.append("      - tool_route")
         lines.append("      - tool_call_token")
         lines.append("      - tool_evidence")
@@ -3266,28 +3265,30 @@ def manifest_run_lines(
         lines.append("      - do_not_read")
         lines.append("      - expected_output")
         lines.append("      - write_scope")
-        lines.append("      - validation_route")
+        lines.append("      - remaining_spawn_budget")
+        lines.append("    handoff_optional_fields:")
+        lines.append("      - decision_sufficiency_packet_ref")
+        lines.append("      - unresolved_branch")
         lines.append("      - review_gate")
         lines.append("      - plan_artifact")
         lines.append("      - edit_handoff")
         lines.append("      - pre_handoff_gate_status")
-        lines.append("      - remaining_spawn_budget")
         lines.append("    required_before_spawn:")
         lines.append(
-            "      - plan artifact, review gate decision, and edit handoff evidence "
-            "following run.standard_wave_sequence"
+            "      - owner, replaceable unit, implementation mechanism, validation "
+            "route, and any unresolved branch that can change them"
         )
         lines.append(
-            "      - include run.default_quality_check_policy in review and edit "
-            "handoff packets"
+            "      - include run.default_quality_check_policy only when a selected "
+            "review or edit route consumes it"
         )
         lines.append(
             "      - include run.pre_handoff_scope_policy and dependency-expanded "
             "handoff scope evidence"
         )
         lines.append(
-            "      - include run.pre_handoff_gate_status before implementation or "
-            "write-capable handoff when design_brief.md exists"
+            "      - include run.pre_handoff_gate_status only before the selected "
+            "implementation or write-capable handoff when design_brief.md exists"
         )
         lines.append(
             "      - include run.repo_tool_routing_policy selected-skill ToolCall tokens, "
@@ -3305,7 +3306,7 @@ def manifest_run_lines(
             "include remaining_spawn_budget"
         )
         lines.append(
-            "      - schedule.md Agent Wave Ledger row with spawn_authority, "
+            "      - selected schedule.md Agent Wave Ledger row with spawn_authority, "
             "budget, runtime ceilings, paths, validation_route, review_gate, "
             "handoff_artifacts, and delegated policy ref"
         )
@@ -3313,16 +3314,16 @@ def manifest_run_lines(
             "      - workflow_monitoring.md intervention or behavior-event for spawned/skipped roles"
         )
         lines.append(
-            "      - bounded handoff packet with allowed_paths, do_not_read, expected_output, and write_policy"
+            "      - structured handoff with allowed_paths, do_not_read, expected_output, "
+            "and write_policy; durable packet transport is conditional"
         )
         lines.append("    closeout_required_evidence:")
         lines.append(
             "      - closeout_gate.md Subagent Lifecycle Evidence planned-vs-actual wave status"
         )
         lines.append(
-            "      - closed run-local agent ids or parent_direct_no_subagents with "
-            "PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes and "
-            "PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>"
+            "      - closed selected run-local agent ids, or the applicable structured "
+            "parent handoff / recorded parent-direct exception evidence"
         )
         lines.append("  write_scope_policy:")
         lines.append("    parent_managed: true")
@@ -3522,34 +3523,49 @@ def _yaml_mapping_lines(value: Mapping[str, object], *, indent: int) -> list[str
 
 
 def manifest_decision_sufficiency_lines(spec: RunBundleSpec) -> list[str]:
-    """Import and render an owner-produced DSV packet without policy validation."""
+    """Render semantic decision sufficiency and optional durable transport."""
     lines = [
         "  decision_sufficiency:",
         f"    owner: {DECISION_SUFFICIENCY_OWNER!r}",
         f"    validator: {DECISION_SUFFICIENCY_VALIDATOR!r}",
-        "    consumer_policy: 'import_owner_verdict_without_revalidation'",
-        "    required_machine_fields:",
+        "    consumer_policy: 'consume_semantic_record_without_second_form'",
+        "    semantic_fields:",
     ]
     for field in DECISION_SUFFICIENCY_MACHINE_FIELDS:
         lines.append(f"      - {field}")
+    lines.extend(
+        [
+            "    transport_fields_optional:",
+            "      - packet_ref",
+            "      - packet",
+            "      - digest",
+        ]
+    )
     if spec.decision_sufficiency_packet is None:
         lines.extend(
             [
-                "    status: owner_verdict_required",
+                "    status: semantic_record_required",
                 "    packet_ref: null",
             ]
         )
         return lines
     packet = import_decision_sufficiency_verdict(spec.decision_sufficiency_packet)
-    if not spec.decision_sufficiency_packet_ref:
-        raise RuntimeError(
-            "decision_sufficiency_packet_ref is required with an owner verdict"
-        )
+    fixed_spark_legacy_fields = {
+        "H",
+        "possible_branches",
+        "route_verdict",
+    }
+    transport_scope = (
+        "fixed_spark_route_only"
+        if fixed_spark_legacy_fields.intersection(packet)
+        else "semantic_record_only"
+    )
     lines.extend(
         [
-            "    status: owner_verdict_imported",
-            f"    packet_ref: {spec.decision_sufficiency_packet_ref!r}",
-            "    packet:",
+            "    status: semantic_record_with_optional_transport",
+            f"    packet_ref: {spec.decision_sufficiency_packet_ref or None!r}",
+            f"    optional_packet_scope: {transport_scope!r}",
+            "    optional_packet:",
             *_yaml_mapping_lines(packet, indent=6),
         ]
     )
@@ -3561,30 +3577,31 @@ def manifest_default_quality_check_policy_lines(spec: RunBundleSpec) -> list[str
     role_ids = default_quality_check_role_ids(spec.roles)
     agent_types = default_quality_check_agent_types(spec.roles)
     review_pack_state = (
-        "active" if spec.default_review_packs_enabled else "route_without_default_packs"
+        "active" if spec.default_review_packs_enabled else "candidate_not_activated"
     )
     lines = [
         "  default_quality_check_policy:",
-        "    enabled: true",
+        "    enabled: false",
         f"    source: {DEFAULT_QUALITY_CHECK_POLICY_SOURCE!r}",
-        "    wave_sequence_ref: run.standard_wave_sequence",
+        "    activation: owner_critical_or_distinct_unresolved_claim_or_risk",
+        "    wave_sequence_ref: run.standard_wave_sequence (selected stages only)",
         "    role_topology_ref: 'agents/task_catalog.yaml#role_topology_defaults.role_families.review'",
         "    stages:",
     ]
     for stage in DEFAULT_QUALITY_CHECK_STAGES:
         lines.append(f"      - {stage}")
     if role_ids:
-        lines.append("    roles:")
+        lines.append("    candidate_roles:")
         for role_id in role_ids:
             lines.append(f"      - {role_id}")
     else:
-        lines.append("    roles: []")
+        lines.append("    candidate_roles: []")
     if agent_types:
-        lines.append("    codex_agent_types:")
+        lines.append("    candidate_codex_agent_types:")
         for agent_type in agent_types:
             lines.append(f"      - {agent_type}")
     else:
-        lines.append("    codex_agent_types: []")
+        lines.append("    candidate_codex_agent_types: []")
     lines.append("    provenance:")
     if spec.task_default_specialists:
         lines.append("      task_default_specialists:")
@@ -3592,12 +3609,12 @@ def manifest_default_quality_check_policy_lines(spec: RunBundleSpec) -> list[str
             lines.append(f"        - {role_id}")
     else:
         lines.append("      task_default_specialists: []")
-    if spec.auto_specialists:
-        lines.append("      auto_language_reviewers:")
-        for role_id in spec.auto_specialists:
+    if spec.language_review_candidates:
+        lines.append("      language_review_candidates:")
+        for role_id in spec.language_review_candidates:
             lines.append(f"        - {role_id}")
     else:
-        lines.append("      auto_language_reviewers: []")
+        lines.append("      language_review_candidates: []")
     if spec.manual_specialists:
         lines.append("      manual_specialists:")
         for role_id in spec.manual_specialists:
@@ -4005,7 +4022,6 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
                 "abstract_design_frame",
                 "implementation_source_packet",
                 "design_to_implementation_trace",
-                "test_plan_item",
                 "remaining_planned_work_units",
             )
         )

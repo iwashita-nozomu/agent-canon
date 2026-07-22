@@ -195,9 +195,14 @@ record a concrete deferral.
 
 Before implementation or write-capable handoff, prove that the work is derived
 from an owning responsibility model rather than from a nearby file, current
-finding, or chat impression. Full staged and subagent-implemented work uses the
-`Abstract Design Frame`, `Implementation Source Packet`,
-`Design Side-Effect Map`, and `Design-To-Implementation Trace`. A
+finding, or chat impression. Semantic decision sufficiency is the universal
+gate: owner, replaceable unit, implementation mechanism, validation route, and
+each unresolved branch that could change one of those decisions must be explicit.
+When the active workflow or touched surface selects a full design route, or
+coordination/resumption needs durable transport, use the `Abstract Design
+Frame`, `Implementation Source Packet`, `Design Side-Effect Map`, and
+`Design-To-Implementation Trace`. A structured handoff, approved source packet,
+or tool result is sufficient when those file artifacts are not selected. A
 parent-direct write exception may use the short owner/path/design-boundary note
 only after the exception route is recorded; the note is exception evidence and
 not authorization to bypass `spark_worker` or `worker`.

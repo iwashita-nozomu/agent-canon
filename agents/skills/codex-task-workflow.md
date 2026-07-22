@@ -58,33 +58,50 @@ coverage, mutation, private-helper, or checker-retest completion gate.
 
 ## Stages
 
-1. intake
-1. required context and library sweep
-1. workflow selection
-1. artifact placement
-1. explicit subagent bootstrap
-1. execution plan and plan review for full staged routes
-1. detailed design and detailed design review for full staged routes
-1. document flow review for reader-facing docs, new terms, public APIs, or full staged routes
-1. implementation
-1. validation
+1. intake and semantic decision sufficiency
+1. owner-critical context and validation route
+1. workflow and skill selection
+1. optional durable artifact placement when coordination or resumption needs it
+1. optional subagent bootstrap for a launchable wave
+1. selected implementation
+1. selected validation and review
 1. closeout
+
+The stages are conditional route points, not a fixed plan-review-edit sequence.
+Task-catalog roles, default review packs, and related skills are candidates;
+they become work only when an owner-critical operation, unresolved branch, or
+selected validation route activates them. A wave is launchable only when its
+owner, replaceable responsibility, context, write authority, and validation
+route are ready.
 
 ## Required Output
 
 - 着手時の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
-- `task_start.py` / `bootstrap_agent_run.py` が出す `REPO_TOOL_ROUTING_SEQUENCE`、
-  `REPO_TOOL_ROUTING_NEXT_COMMAND`、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` を
-  run-local packet として扱い、`team_manifest.yaml` の
-  `run.repo_tool_routing_policy` を handoff に渡す
-- Shared canon / Large delivery / high-risk / multi-step task では `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` から始める
+- `task_start.py` / `bootstrap_agent_run.py` が出す
+  `REPO_TOOL_ROUTING_SEQUENCE`、`REPO_TOOL_ROUTING_NEXT_COMMAND`、
+  `REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` は、選択された route が必要と
+  する場合にだけ handoff または durable packet へ渡す。構造化された
+  handoff message/tool result が意味上十分なら、それを packet として扱い、
+  file-backed run-local packet は coordination または resumption のために
+  必要な場合だけ作る
+- Shared canon / Large delivery / high-risk / multi-step task でも、
+  `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` は
+  coordination、resumption、または選択された launchable wave が必要と
+  する場合にだけ実行する。作業が repo を変更することだけでは bundle の
+  根拠にならない
 - owner-bounded route では boundary-evidenced local route を使い、document-flow / broad design review は escalation 条件がある場合だけ起動する
-- repo-changing implementation / patch / doc-edit work では、実装前に
-  selected write-capable implementer handoff を bootstrap または schedule
-  する。Routine docs / Focused code でも targeted validation は使うが、
-  parent-direct repo edit は `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` と
-  `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を
-  記録した場合だけ使う
+- repo-changing implementation / patch / doc-edit work では、別の writer
+  が必要なときだけ selected write-capable implementer handoff を bootstrap
+  または schedule する。owner、責務、context、write authority、validation
+  route が互換な active agent は revised scope でも再利用する。独立 review、
+  disjoint write authority、互換性のない owner/context、または context
+  integrity failure の場合だけ fresh agent を起動する。parent-direct repo
+  edit は、別 writer が不要な場合でも明示承認または spawn/tool gate blocker
+  の例外証拠を記録する既存ルートに従う
+- Routine docs / Focused code でも targeted validation は使うが、
+  task-catalog の role や default review pack は候補であり、selected
+  owner-critical operation または unresolved branch が有効化した場合だけ
+  handoff、review、wave を作る
 - repo-changing execution の編集では、既存 tool の実行や owner-bounded patching の前提として runtime `SKILL.md` 読了を要求しません。対象 property を正本として持つ既存 tool または command packet を先に使い、結果の解釈や修正に必要な owner surface だけを開きます。owner boundary、差し替え可能な単位、targeted validation route、public impact boundary が evidence で閉じた修正は `$owner-bounded-routing` に流し、owner boundary、existing-tool route、targeted validation を evidence に残す。外形的な作業量や file 数だけでは route を固定しません。実装 behavior は契約完全実装ポリシーから導く
 - research-backed implementation、benchmark、external research、prior art、
   公式 docs、文献由来の design decision によって code、protocol、report claim、

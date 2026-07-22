@@ -52,13 +52,16 @@ runtime feedback では、prompt routing の結果を入口にし、観測 evide
 
 ## Standard Command
 
-Consume `run.decision_sufficiency.packet_ref` before selecting a route. The
-packet supplies `H`, `downstream_decision`, `possible_branches`, `invariant`,
-`value_of_information`, `route_verdict`, and `rejection`; this skill forwards
-those owner-produced fields and does not validate their policy meaning.
+Consume the semantic decision-sufficiency record before selecting a route. It
+must identify the owner, replaceable unit, implementation mechanism, validation
+route, and any unresolved branch that could change them. A handoff message or
+tool result is sufficient; `run.decision_sufficiency.packet_ref` is used only
+when coordination or resumption needs durable state. This skill forwards the
+record and does not create a second sufficiency form or threshold policy.
 
 Executable routing is supplied directly in
-`run.repo_tool_routing_policy.*.tool_call_token`. The canonical route token has
+`run.repo_tool_routing_policy.*.tool_call_token` when a route operation is
+selected. The canonical route token has
 `tool_id=route`, an `agent-canon.route.args.v1` argument schema, typed
 arguments, intent, and typed failure semantics. The selected-skill packet token
 has `tool_id=skill-tool-commands` and
@@ -84,12 +87,20 @@ python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format t
 - `COMMANDS`
 - `EVIDENCE`
 - `DECISION_SUFFICIENCY_PACKET_REF`
-- owner-produced `H`, `downstream_decision`, `possible_branches`, `invariant`,
-  `value_of_information`, `route_verdict`, and `rejection`
+- owner-produced semantic sufficiency fields: `owner`, `replaceable_unit`,
+  `implementation_mechanism`, `validation_route`, and `unresolved_branch`
 - machine-readable `TOOL_CALL_TOKEN`
 - prompt routing の場合は `MODE`, `SKILLS`, `ACTIVE_SKILLS`,
   `DEFERRED_SKILLS`, `MATCHED_SKILLS`, `RELATED_SKILL_CANDIDATES`,
   `RELATED_SKILLS`, `REASONS`
+
+## Activation Boundary
+
+Task-catalog roles, default review packs, and related-skill candidates are
+candidate evidence, not automatic work. Activate an owner-critical skill before
+its edit, artifact, PR, pin, or integration operation. Activate a reviewer only
+when the selected validation or unresolved branch needs that review. Deferred
+candidates do not create packets, waves, or follow-up work.
 
 Long candidate names are aliases. Do not create a new public tool or skill
 until `route.py --name <candidate>` returns `STATUS=unknown` and the missing

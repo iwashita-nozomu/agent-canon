@@ -77,8 +77,8 @@ def emit_block(state: Mapping[str, object]) -> None:
             "candidate_id": candidate_id,
             "observed_decision": decision_name,
             "remediation": [
-                "Resume the same reviewer runtime for the current candidate.",
-                "Repair every REVISE finding and record an explicit APPROVE receipt.",
+                "Have the parent or integration owner adjudicate each current-candidate hypothesis.",
+                "Repair accepted findings that change the contract decision; record rejected findings with reason_code and evidence_ref before approval.",
                 "Do not publish or report completion before the current candidate is approved.",
             ],
         },

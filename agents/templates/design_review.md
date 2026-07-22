@@ -18,8 +18,9 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py verif
 
 ## Reader Map
 
-This template owns review of the detailed design artifact itself before
-implementation. Record the exact design artifact under review, then work
+This template is materialized only when a distinct unresolved design claim is
+not judgeable by the owning gate. When selected, it owns review of the detailed
+design artifact itself before implementation. Record the exact design artifact under review, then work
 through document completeness, reuse/style, cross-doc coverage, upstream
 requirements, abstract design frame, evidence, assumptions, parent-doc
 alignment, source packet, side effects, canonical tree head, naming,
@@ -31,7 +32,7 @@ only to the current artifact recorded below.
 
 ## Design Artifact Under Review
 
-<!-- Name the exact design_brief.md path, revision or section set, source packet, and reviewer separation evidence. Return revise if the review target is a chat summary, implementation diff, worker summary, or stale design artifact. -->
+<!-- When this gate is selected, name the exact design_brief.md path, revision or section set, source packet, and reviewer separation evidence. Return revise if the review target is a chat summary, implementation diff, worker summary, or stale design artifact. -->
 
 - Design artifact path:
 - Design revision or section set:
@@ -77,7 +78,7 @@ only to the current artifact recorded below.
 
 ## Implementation Source Packet Review
 
-<!-- Check whether the design names every required read-before-edit artifact: request contract, schedule, design, design review, document flow review, test plan, repo docs, code paths, tests, and external references. Return revise if the worker would need chat context or unstated assumptions. -->
+<!-- Check whether the design names every selected read-before-edit artifact: request contract, schedule, design, design review when active, document flow review when active, test plan only when post-implementation test design is active, repo docs, code paths, tests, and external references. Return revise if the worker would need chat context or unstated assumptions. -->
 
 ## Design Side-Effect Map Review
 

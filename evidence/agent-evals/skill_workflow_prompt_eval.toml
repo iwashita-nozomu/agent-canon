@@ -350,8 +350,16 @@ required_regex = ["Before assigning read-only exploration", "canonical checker",
 [[evals.checklist]]
 id = "SUBAGENT-FRESH-CAPSULE-1"
 critical = true
-description = "Requires the fresh context capsule fields in handoff prompts."
-required_regex = ["Treat every spawned subagent as fresh", "Fresh Subagent Context Capsule", "Context Visibility Contract", "protocol-owned"]
+description = "Requires compatible-context reuse and limits fresh launches to independent or incompatible responsibility."
+required_regex = [
+  "Compatible active agents may\\s+be reused for revised scope",
+  "Reuse an active agent when owner, responsibility, context, write authority,\\s+and validation route remain compatible",
+  "independent\\s+review, disjoint authority, incompatible\\s+owner/context",
+  "New turns or\\s+renamed packets alone do not require fresh launch",
+  "Fresh Subagent Context Capsule",
+  "Context Visibility Contract",
+  "protocol-owned",
+]
 
 [[evals]]
 id = "md-style-check-human-doc-unified-rust-docs"
@@ -1272,8 +1280,14 @@ description = "The discoverable orchestration shim points to the sole policy own
 [[evals.checklist]]
 id = "ORCH-SHIM-POINTER-1"
 critical = true
-description = "Points to the canonical policy and owner-produced sufficiency packet without restating its schema."
-required_regex = ["agents/skills/agent-orchestration\\.md", "sole policy owner", "owner-produced `DecisionSufficiencyPacket`"]
+description = "Points to the canonical policy and consumes semantic sufficiency through conditional structured transport."
+required_regex = [
+  "agents/skills/agent-orchestration\\.md",
+  "sole policy owner",
+  "semantic decision-sufficiency record",
+  "structured handoff or tool result is sufficient",
+  "durable packet reference only for coordination or resumption",
+]
 forbidden_regex = ["(?m)^## Decision Sufficiency Packet$", "agent-canon\\.decision-sufficiency\\.v1"]
 
 [[evals.checklist]]
@@ -1303,44 +1317,83 @@ required_regex = ["PR body", "reader-facing report", "report-writing", "JSON / J
 [[evals.checklist]]
 id = "DSV-ZERO-VALUE-1"
 critical = true
-description = "A fixed owner/edit/validation tuple across H rejects another read and starts execution."
-required_regex = ["h in H", "owner、edit surface、validation が同一", "decision value は `zero`", "zero_value_investigation"]
+description = "Rejects zero-value reads, searches, reviews, and checks when they cannot change the next decision."
+required_regex = [
+  "same owner, unit, mechanism, and validation\\s+route",
+  "Additional reads, searches, reviews, and checks are justified only\\s+when they can change",
+  "otherwise return to the selected work",
+  "do not manufacture a zero-value investigation, packet, or review stage",
+]
 
 [[evals.checklist]]
 id = "DSV-BRANCH-NAMING-1"
 critical = true
-description = "Every proposed investigation names the downstream decision and all branches it can change."
-required_regex = ["downstream_decision", "possible_branches", "対応する decision や branch", "がない追加調査は拒否"]
+description = "Requires only unresolved branches that can change the owner, unit, mechanism, or validation route."
+required_regex = [
+  "each unresolved branch that could change the owner, unit, mechanism, or route",
+  "changes_next_decision",
+  "unresolved owner/edit/validation\\s+branch",
+]
 
 [[evals.checklist]]
 id = "DSV-SPARK-FAST-PATH-1"
 critical = true
-description = "A fixed design/path/failure packet routes directly to Spark and one owner gate."
-required_regex = ["route=spark_worker", "exactly one `owner_gate`", "repo survey", "broad tests", "追加 reviewer"]
+description = "Keeps Spark scoped to explicit typed selection and routes one owner gate without broad review or test stages."
+required_regex = [
+  "固定 Spark implementation route",
+  "parent packet が.*--select-agent-type implementer=spark_worker:<evidence>",
+  "one owning review gate",
+  "Do not materialize empty reviewer or template artifacts",
+  "Validation is static/targeted first",
+  "Full suites, full dependency review, and\\s+remote CI are selected once for the final candidate only",
+]
 
 [[evals.checklist]]
 id = "DSV-IRRELEVANT-UNKNOWN-POSITIVE-1"
 critical = true
-description = "An irrelevant unknown is serialized and remains non-blocking."
-required_regex = ["affects_owner_edit_validation", "blocking", "serialized_in_decision_packet", "IrrelevantUnknown", "blocker に", "しません"]
+description = "An irrelevant unknown may be serialized while remaining non-blocking and non-decision-changing."
+required_regex = [
+  "affects_owner_edit_validation",
+  "\\\"blocking\\\": false",
+  "\\\"serialized_in_decision_packet\\\": true",
+  "Unknowns that cannot change the next decision are non-blocking\\s+and may remain in local context",
+]
 
 [[evals.checklist]]
 id = "DSV-IRRELEVANT-UNKNOWN-NEGATIVE-1"
 critical = true
-description = "The owner rejects an irrelevant unknown that is made blocking or decision-changing."
-required_regex = ["irrelevant_unknown_as_blocker", "unknown fact が次の owner / edit /", "validation を変えない"]
+description = "The owner prevents irrelevant unknowns and missing evidence fields from becoming blocking gates."
+required_regex = [
+  "Unknowns that cannot change the next decision are non-blocking",
+  "Do not convert missing artifact fields, counts, or digests into\\s+a new mandatory gate",
+  "affects_owner_edit_validation",
+]
 
 [[evals.checklist]]
 id = "DSV-NO-THRESHOLD-1"
 critical = true
-description = "Observed timing/count evidence is allowed while threshold cutoffs are rejected."
-required_regex = ["threshold_policy=none", "count / time /", "cutoff", "観測した duration、attempt、read count"]
+description = "Rejects fixed thresholds and zero-value repeat reads when they cannot change the owner decision."
+required_regex = [
+  "\\\"threshold_policy\\\": \\\"none\\\"",
+  "No artifact shape, digest, count, or fixed stage sequence is a substitute",
+  "no hypothesis-space or read-count form is\\s+required",
+  "Additional reads, searches, reviews, and checks are justified only\\s+when they can change",
+]
 
 [[evals.checklist]]
 id = "VERTICAL-WAVE-POLICY-3"
 critical = true
-description = "Requires Decision-Sufficiency when the owner/edit/validation action is invariant, with one complete Spark unit, one owning gate, and StructuralDesignGap."
-required_regex = ["Decision\\s+Sufficiency", "owner/edit/validation action is invariant", "one\\s+complete Spark unit", "one owning gate", "StructuralDesignGap"]
+description = "Requires launchable owner-bounded waves, one owning gate, and targeted-final validation without default review or test waves."
+required_regex = [
+  "ready dependency-DAG frontier",
+  "stage owner",
+  "vertical dynamic wave",
+  "Select one owning review gate for the claims in one replaceable responsibility",
+  "Activate a specialist only when a distinct unresolved claim or risk cannot be\\s+judged by that gate",
+  "Validation is static/targeted first",
+  "Full suites, full dependency review, and\\s+remote CI are selected once for the final candidate only",
+  "Do not materialize empty reviewer or template artifacts",
+]
 
 [[evals.checklist]]
 id = "HTML-OUTPUT-ROUTING-CANONICAL-1"
@@ -1730,8 +1783,21 @@ description = "Codex subagent canon must require structured context capsules for
 [[evals.checklist]]
 id = "CODEX-SUBAGENTS-FRESH-CAPSULE-1"
 critical = true
-description = "Requires exact bounded context fields for fresh subagent launches."
-required_regex = ["Fresh Subagent Context Capsule", "context_artifacts", "allowed_paths", "do_not_read", "return_contract", "protocol-owned", "schema の定義は同文書だけ"]
+description = "Keeps the context schema protocol-owned while reusing compatible agents and limiting fresh launches to independent or incompatible responsibility."
+required_regex = [
+  "fresh subagent は必要な launch ごとに",
+  "active agent を再利用",
+  "compatible な revised scope",
+  "独立 review",
+  "disjoint write authority",
+  "incompatible\\s+owner/context",
+  "context_artifacts",
+  "allowed_paths",
+  "do_not_read",
+  "return_contract",
+  "protocol-owned",
+  "schema の定義は\\s+同文書だけ",
+]
 
 [[evals]]
 id = "slide-production-workflow"

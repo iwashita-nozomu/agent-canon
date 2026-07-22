@@ -23,7 +23,7 @@ from agent_team import (
     RunBundleSpec,
     TaskCatalog,
     TeamConfig,
-    auto_language_specialists,
+    language_review_candidates,
     capacity_start_output_lines,
     codex_agent_model_matrix_for_roles,
     codex_runtime_max_depth,
@@ -81,7 +81,7 @@ class BootstrapRunContext:
     manual_specialists: tuple[str, ...]
     enabled_specialists: tuple[str, ...]
     task_default_specialists: tuple[str, ...]
-    auto_specialists: tuple[str, ...]
+    language_review_candidates: tuple[str, ...]
     default_review_pack_ids: tuple[str, ...]
     workflow_family_id: str | None
     workflow_family_name: str | None
@@ -184,8 +184,8 @@ def build_parser(
         action="append",
         default=[],
         help=(
-            "Optional changed path hint. Repeat to drive automatic language-specific "
-            "reviewer selection."
+            "Optional changed path hint. Repeat to populate explicit language-review "
+            "candidates."
         ),
     )
     parser.add_argument(
@@ -199,11 +199,10 @@ def build_parser(
         ),
     )
     parser.add_argument(
-        "--no-auto-language-reviewers",
+        "--no-language-review-candidates",
         action="store_true",
         help=(
-            "Disable automatic language-specific reviewer selection from changed paths "
-            "or git status."
+            "Disable language-review candidate discovery from changed paths or git status."
         ),
     )
     parser.add_argument(
@@ -281,18 +280,14 @@ def resolve_bootstrap_context(
                 catalog,
                 args.task_id,
             )
-        for role_id in task_default_specialists:
-            if role_id not in enabled_specialists:
-                enabled_specialists.append(role_id)
-    auto_specialists: tuple[str, ...] = ()
-    if not args.no_auto_language_reviewers:
-        auto_specialists = auto_language_specialists(
+        # Task-catalog specialists and default review packs remain candidates;
+        # explicit enablement or an owner-critical route activates them.
+    language_candidates: tuple[str, ...] = ()
+    if not args.no_language_review_candidates:
+        language_candidates = language_review_candidates(
             workspace_root=workspace_root,
             changed_paths=tuple(args.changed_path),
         )
-        for role_id in auto_specialists:
-            if role_id not in enabled_specialists:
-                enabled_specialists.append(role_id)
     return BootstrapRunContext(
         created_at_iso=created_at_iso,
         report_root=report_root,
@@ -301,7 +296,7 @@ def resolve_bootstrap_context(
         manual_specialists=tuple(manual_specialists),
         enabled_specialists=tuple(enabled_specialists),
         task_default_specialists=task_default_specialists,
-        auto_specialists=auto_specialists,
+        language_review_candidates=language_candidates,
         default_review_pack_ids=default_review_pack_ids,
         workflow_family_id=workflow_family_id,
         workflow_family_name=workflow_family_name,
@@ -455,15 +450,16 @@ def emit_bootstrap_output(
         runtime.roles,
         manual_specialists=context.manual_specialists,
         task_default_specialists=context.task_default_specialists,
-        auto_specialists=context.auto_specialists,
-        default_review_packs_enabled=bool(
-            args.task_id is not None and not args.no_default_review_packs
-        ),
+        language_review_candidates=context.language_review_candidates,
+        default_review_packs_enabled=False,
         default_review_pack_ids=context.default_review_pack_ids,
     ):
         print(line)
-    if not args.no_auto_language_reviewers:
-        print(f"AUTO_SPECIALISTS={','.join(context.auto_specialists)}")
+    if not args.no_language_review_candidates:
+        print(
+            "LANGUAGE_REVIEW_CANDIDATES="
+            f"{','.join(context.language_review_candidates)}"
+        )
     print(
         "IMPLEMENTATION_CODEX_AGENTS="
         f"{','.join(codex_agents_for_role(config, 'implementer'))}"
@@ -590,10 +586,8 @@ def main() -> int:
             workflow_family_id=context.workflow_family_id or "",
             manual_specialists=context.manual_specialists,
             task_default_specialists=context.task_default_specialists,
-            auto_specialists=context.auto_specialists,
-            default_review_packs_enabled=bool(
-                args.task_id is not None and not args.no_default_review_packs
-            ),
+            language_review_candidates=context.language_review_candidates,
+            default_review_packs_enabled=False,
             default_review_pack_ids=context.default_review_pack_ids,
             selected_skills=selected_skills,
             task_catalog=catalog,

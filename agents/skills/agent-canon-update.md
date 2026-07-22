@@ -51,10 +51,11 @@ TODO state up to date.
 
 ## Route
 
-1. Consume the owner-produced `DecisionSufficiencyPacket` from
-   `agents/skills/agent-orchestration.md#Decision Sufficiency Packet`. This
-   skill forwards the verdict and never reclassifies `H`, value of information,
-   or irrelevant unknowns.
+1. Consume the semantic decision-sufficiency record from
+   `agents/skills/agent-orchestration.md#Decision Sufficiency Packet`: owner,
+   replaceable unit, implementation mechanism, validation route, and unresolved
+   branches that can change them. A durable packet reference is conditional on
+   coordination or resumption; this skill does not create a second form.
 1. Consume the final-structure-first owner in
    `agents/skills/structure-refactor.md#Pre-Task Structure Repair Contract` and
    fix the target structure, owner graph, and namespace. Evidence reads are
@@ -68,6 +69,12 @@ TODO state up to date.
    source-main rebind and preserves task dirt while rebinding. In parent mode it
    owns pin/root projection and remains blocked while a current transaction has
    no accepted `DependencyFrontier`.
+1. Before any branch, tag, PR, merge, or pin mutation, record the authoritative
+   integration identities: source `origin/main` commit/tree and clean status,
+   parent `origin/main` gitlink and clean status, target tree, selected merge
+   strategy, and selected remote. Fetch is readback evidence; do not rebase or
+   alter unrelated history, and do not engineer ancestry to preserve internal
+   commit ids when reviewed final-tree identity is the contract.
 1. Once the target graph is coherent, immediately implement the complete source
    mechanisms and generated views. `UpdateTransaction` and `Snapshot` preserve
    resumable state; preparation/generation labels are internal state and do not
@@ -101,7 +108,8 @@ TODO state up to date.
    release every reservation, prove task-owned cleanup and unchanged unknown
    shared state, pass G6, and execute only the canonical `close_agent` ToolCall
    token. Cleanup before readback and prose close checklists are invalid.
-1. Parent root projection uses the accepted frontier once. Parent-owned
+1. Parent root projection uses the accepted frontier exactly once after source
+   publication. Parent-owned
    validation, remote CI, merge, and readback follow there; they do not rerun
    source correctness, generated completeness, or source PR CAS.
 
@@ -110,7 +118,8 @@ TODO state up to date.
 Record:
 
 - update route decision and dirty-surface classification
-- Decision Sufficiency packet reference and imported owner verdict
+- semantic decision-sufficiency record; durable packet reference only when
+  coordination or resumption required it
 - exact `RecordBinding`, timing, first-missing checkpoint, G1-G6 evidence IDs,
   source-main rebind/freeze/review/CAS/readback receipt chain
 - immutable `PullRequestLifecycle`, source PR/merge/main readback, accepted

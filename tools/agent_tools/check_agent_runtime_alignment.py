@@ -763,6 +763,24 @@ def validate_task_catalog_references() -> None:
         not (SCOPED_MODEL_POLICY_KEYS & set(catalog.raw)),
         "task_catalog.yaml must not own model, effort, review model, or tier policy",
     )
+    review_policy = require_mapping(
+        catalog.raw.get("review_activation_policy"),
+        "review_activation_policy must be a mapping",
+    )
+    ensure(
+        review_policy.get("mode") == "candidate_only",
+        "review_activation_policy must keep catalog reviews candidate-only",
+    )
+    ensure(
+        review_policy.get("owner_gate_cardinality")
+        == "one_gate_per_replaceable_responsibility",
+        "review_activation_policy must use one owning gate per responsibility",
+    )
+    ensure(
+        review_policy.get("specialist_activation")
+        == "distinct_unresolved_claim_or_risk_only",
+        "review_activation_policy specialist activation must be conditional",
+    )
     runtime_max_threads = codex_runtime_max_threads()
     role_ids = {role.id for role in config.always_on_roles + config.specialist_roles}
     topology = require_mapping(
@@ -1044,7 +1062,7 @@ def validate_task_catalog_references() -> None:
             "docs_workflow_steward",
             "prompt_config_reviewer",
         ),
-        f"T12 default-active specialists must be the five role topology defaults, got {t12_specialists}",
+        f"T12 candidate specialists must remain the five catalog candidates, got {t12_specialists}",
     )
     derivation = declared_team_capacity_derivation(catalog)
     ensure(derivation.requested_max_threads() == 26, "declared topology must derive max_threads=26")
@@ -1527,17 +1545,21 @@ def task_by_id(catalog: TaskCatalog, task_id: str) -> dict[str, object]:
 
 
 def roles_for_task(config: TeamConfig, catalog: TaskCatalog, task_id: str) -> tuple[Role, ...]:
-    """Return always-on plus default specialist roles for one task."""
-    enabled = default_specialists_for_task(
-        config=config,
-        catalog=catalog,
-        task_id=task_id,
-        include_default_review_packs=True,
-    )
+    """Return roles materialized by the normal route, not catalog candidates."""
     task = task_by_id(catalog, task_id)
+    enabled_specialists: list[str] = []
+    if str(task["family"]) == "skill_evaluation":
+        enabled_specialists = list(
+            default_specialists_for_task(
+                config=config,
+                catalog=catalog,
+                task_id=task_id,
+                include_default_review_packs=False,
+            )
+        )
     return select_roles(
         config=config,
-        enabled_specialists=list(enabled),
+        enabled_specialists=enabled_specialists,
         full_team=False,
         catalog=catalog,
         workflow_family_id=str(task["family"]),
@@ -1643,12 +1665,13 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         "child_role",
         "child_instance_id",
         "input_packet",
+        "replaceable_unit",
+        "implementation_mechanism",
         "allowed_paths",
         "do_not_read",
         "expected_output",
         "write_scope",
         "validation_route",
-        "review_gate",
         "remaining_spawn_budget",
     }
     ensure(
@@ -1845,9 +1868,9 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         f"task {task_id} subagent_prompt_packet must not keep prose command aliases",
     )
     ensure(
-        "fresh_subagents_required: true" in manifest_text
-        and "reuse_for_new_task: forbidden" in manifest_text,
-        f"task {task_id} manifest missing fresh subagent lifecycle policy",
+        "fresh_subagents_required: conditional" in manifest_text
+        and "reuse_for_new_task: allowed_when_owner_context_compatible" in manifest_text,
+        f"task {task_id} manifest missing conditional subagent lifecycle policy",
     )
     lifecycle_policy = require_mapping(
         run.get("subagent_lifecycle_policy"),
@@ -1855,16 +1878,18 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     )
     ensure(
         lifecycle_policy.get("mid_task_user_input_policy")
-        == "parent_checkpoint_then_route_delta",
-        f"task {task_id} manifest missing mid-task user input checkpoint policy",
+        == "classify_then_reuse_or_route_fresh",
+        f"task {task_id} manifest missing semantic mid-task input policy",
     )
     ensure(
-        lifecycle_policy.get("same_task_delta_reuse") == "allowed_with_updated_packet",
-        f"task {task_id} manifest missing same-task delta reuse policy",
+        lifecycle_policy.get("same_task_delta_reuse")
+        == "allowed_when_owner_context_compatible",
+        f"task {task_id} manifest missing compatible same-task reuse policy",
     )
     ensure(
-        lifecycle_policy.get("scope_change_reuse") == "forbidden_spawn_fresh_wave",
-        f"task {task_id} manifest missing scope-change fresh wave policy",
+        lifecycle_policy.get("scope_change_reuse")
+        == "evaluate_owner_context_compatibility",
+        f"task {task_id} manifest missing scope-change compatibility policy",
     )
     ensure(
         "prompt_contract:" in manifest_text,
@@ -1933,7 +1958,6 @@ def ensure_skill_evaluator_manifest_contract(
             "closeout_gate",
             "agent_evaluation",
             "workflow_monitoring",
-            "final_review",
         )
     }
     ensure(
@@ -2062,7 +2086,6 @@ def validate_task_bundle_output(
             "closeout_gate",
             "agent_evaluation",
             "workflow_monitoring",
-            "final_review",
         )
     }
     missing_closeout_artifacts = sorted(

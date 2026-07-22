@@ -47,6 +47,11 @@ Execute the required and task-matching conditional commands that the packet prin
    `documents/agent-canon-parent-repo-latest-checklist.md`.
 1. Classify the repo as standalone AgentCanon, parent submodule repo, or legacy
    compatibility repo before running update commands.
+1. Before any branch, tag, PR, merge, or pin mutation, record source
+   `origin/main` commit/tree and clean status, parent `origin/main` gitlink and
+   clean status, target tree, selected merge strategy, and selected remote.
+   Do not rebase, alter unrelated history, or preserve internal commit ids by
+   ancestry engineering when reviewed final-tree identity is the contract.
 1. In parent repos, classify dirty state by AgentCanon update surface:
    `vendor/agent-canon/`, parent gitlink, `.gitmodules`, and AgentCanon-owned
    root views. Do not let unrelated parent dirty files block the update route.
@@ -90,7 +95,8 @@ authorize checkout switching or branch/worktree creation.
    workflow route does not authorize creation: current-task user approval and
    all four same-command authority/reason values are required.
 
-1. After a safe update or PR merge, repair and verify root views:
+1. After a safe update or PR merge, project the accepted source tree into parent
+   root views exactly once, then repair and verify root views:
 
 ```bash
 bash tools/sync_agent_canon.sh link-root

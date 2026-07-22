@@ -45,12 +45,25 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 - 各 finding に `issue_route` があり、既存 issue、new local issue、
   GitHub mirror plan、または run-local resolution のいずれかへ分類されている
 - review で見ていない範囲や validation gap が残っている
+- reviewer output is a set of hypotheses, not edit, revert, or publication
+  authority. Parent / integration owner adjudicates every hypothesis.
+- one owning review gate covers the claims in one replaceable responsibility.
+  Add a specialist only for a distinct unresolved claim or risk that the owning
+  gate cannot judge.
 
 ## Mandatory Checklist
 
 - 実際の diff を先に読んでいる
 - change set の意図と影響範囲を把握している
-- `bash tools/agent_tools/run_repo_dependency_review.sh` を全 repo に対して実行し、`--changed` だけで済ませていない
+- current source snapshot, reachable input/control path, violated
+  request/design/behavior contract, and a witness or static proof are present
+  before a finding can be accepted.
+- reject hypotheses that are unreachable under type/schema/parser/compiler/static
+  invariants, use a stale snapshot, concern a private/incidental detail, duplicate
+  an existing finding, lack a witness, fall outside the owner/request contract,
+  or conflict with approved design without proving it incorrect. Rejected rows
+  carry `reason_code` and `evidence_ref` and do not open a wave or cause rollback.
+- `bash tools/agent_tools/run_repo_dependency_review.sh` を全 repo に対して実行するのは、選択された最終候補の責務がその review を必要とするときだけとし、静的解析・targeted validation を先に選ぶ
 - 回帰、欠落テスト、stale documentation を優先して見ている
 - 必要な validation が走っているか、未実行なら明記している
 - validation failure を受けた修正では、pass 目的の単純化、revert、intended
@@ -74,6 +87,8 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 - durable finding を作る場合は `issues/README.md` の required fields と
   `issue_sync.py` の mirror route を使う
 - `no findings` の場合でも residual risk を残している
+- validation is static/targeted first. Full suites or remote CI run once for the
+  final candidate only when the touched contract requires them.
 
 ## Default Sequence
 
@@ -81,8 +96,11 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 1. 破壊的変更、削除、rename、config 変更を先に見ます。
 1. docs と tests が実装に追随しているか確認します。
 1. Python の class、dataclass、`Protocol`、継承、public API、型境界、依存方向が変わる場合は `python-review` を追加し、`$oop-readability-check` と `check_solid_evidence.py` の evidence を review input にします。
-1. `bash tools/agent_tools/run_repo_dependency_review.sh` を実行し、全 repo の dependency manifest coverage / format / graph を確認します。
-1. findings を priority 順に並べ、evidence を付けます。
+1. まず static checks と targeted validation を実行し、full repository
+   dependency review、full suite、remote CI は最終候補の契約が選択した場合だけ一度実行します。
+1. findings を hypothesis として priority 順に並べ、current snapshot、reachable
+   path、contract、witness/static proof を付けます。parent / integration owner が
+   accept または reject を adjudicate します。
 1. 各 finding に `issue_route` を付けます。現在の review loop で閉じるものは
    `run_local_resolution`、運用上残すものは既存 `issues/open/` または新規
    local issue、外部 triage が必要なものは `issue_sync.py` による GitHub mirror
@@ -94,6 +112,7 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 - `fix now`
 - `follow-up`
 - `delete-ok`
+- `rejected` (requires `reason_code` and `evidence_ref`; no repair/review wave)
 
 Finding rows include:
 
@@ -103,6 +122,17 @@ Finding rows include:
 - `intent_preservation`
 - `issue_route`
 - `rerun_review_required`
+- `snapshot_ref`
+- `reachable_path`
+- `contract_ref`
+- `witness_or_static_proof`
+- `adjudication` (`accepted` or `rejected`)
+- `reason_code` and `evidence_ref` for rejected hypotheses
+
+Only an accepted finding that changes requested behavior, owner/design boundary,
+correctness, validation, or publication state opens same-owner rework. Duplicate,
+stylistic, already-covered, or evidence-free findings are recorded as rejected
+and do not create a new wave.
 
 ## Boundary
 

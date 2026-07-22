@@ -63,7 +63,7 @@ upstream design ../canonical/skills.md skill canon registry
 - 同じ goal に対して 2 回の実行経路があり得る場合は、`tools/agent_tools/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run <run-b>` で `execution_path`、`route_efficiency`、`static_analysis_feedback` を比較します。`route_efficiency=inefficient` または `selected_inefficient_route=yes` が出た場合は、agent behavior eval が fail するようにし、非効率経路を選ばないよう skill / workflow prompt を修正します。
 - コード改善 iteration では、`agents/workflows/hypothesis-validation-workflow.md` を overlay にし、`Observation`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、`Disconfirming Evidence`、`Support Evidence`、`Hypothesis Decision` を iteration artifact に残します。`Hypothesis Decision` が `supported` でない場合は、同じ pass を拡張せず次仮説へ戻します。
 - closeout 前に `python3 tools/agent_tools/evaluate_agent_run.py --report-dir <run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write` を実行し、`AGENT_EVALUATION_STATUS=pass` まで workflow artifact または prompt を修正します。
-- 2 つ目の extension に進む前に、直前 extension の `waterfall-gate-check`、final review、`task-close`、commit / push を完了させます。
+- 2 つ目の extension に進む前に、直前 extension の selected `waterfall-gate-check`、selected review gate（final review は活性化された場合のみ）、`task-close`、commit / push を完了させます。
 - baseline、comparison target、fairness rule は iteration ごとに勝手にずらしません。
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required`、`direction_rethink_required` が残る限り loop を閉じません。
 - `goal_loop.py status` が `NEXT_ACTION=run_next_iteration` を返す限り loop を閉じません。

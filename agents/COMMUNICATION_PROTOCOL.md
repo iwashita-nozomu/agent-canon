@@ -188,12 +188,13 @@ descendants, unknown descendants, missing handback, and reservation leaks fail.
 
 `pre_handoff_gate_status` records gate evidence before a write-capable
 implementation handoff. Design-backed implementation handoffs require the
-current `design_brief.md` path or revision, matching `design_review.md`
-`Design Artifact Under Review`, `design_review.md decision=approve`,
-`waterfall-gate-check --gate design` pass evidence, and selected
-`document_flow_review.md` status when that workflow gate is active. Missing,
-stale, or non-approve design review status returns the task to Gate 5-6 before
-handoff.
+current `design_brief.md` path or revision and the selected owner/design gate.
+`design_review.md` `Design Artifact Under Review`, approve evidence,
+`waterfall-gate-check --gate design` evidence, and selected
+`document_flow_review.md` status are required only when those gates are active.
+Missing candidate review artifacts do not block an otherwise semantically
+sufficient handoff; an active gate with missing, stale, or non-approve evidence
+returns the task to its owning route.
 
 ## Pre-Edit Repository Investigation Packet
 
