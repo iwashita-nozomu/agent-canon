@@ -60,13 +60,15 @@ export NVIDIA_VISIBLE_DEVICES="${NVIDIA_VISIBLE_DEVICES:-}"
 PYTHON_SOURCE_PATHS=()
 PYTHON_TEST_PATHS=()
 if [ -d python ]; then
-  for candidate_path in python tests; do
-    if [ -d "${candidate_path}" ]; then
-      PYTHON_SOURCE_PATHS+=("${candidate_path}")
-    fi
-  done
+  PYTHON_SOURCE_PATHS+=(python)
   if [ -d tests ]; then
-    PYTHON_TEST_PATHS+=(tests)
+    while IFS= read -r candidate_path; do
+      PYTHON_SOURCE_PATHS+=("$candidate_path")
+      PYTHON_TEST_PATHS+=("$candidate_path")
+    done < <(
+      find tests \
+        -type f \( -name 'test_*.py' -o -name '*_test.py' \) -print | sort
+    )
   fi
 else
   AGENT_CANON_W2_OWNER_PATHS=(
@@ -105,7 +107,9 @@ fi
 EXIT_CODE=0
 
 echo "3️⃣  pytest を実行中..."
-if "$PYTHON_BIN" -m pytest "${PYTHON_TEST_PATHS[@]}" -q --tb=short 2>&1; then
+if [ ${#PYTHON_TEST_PATHS[@]} -eq 0 ]; then
+  echo "PYTEST=skip reason=no_parent_owned_tests"
+elif "$PYTHON_BIN" -m pytest "${PYTHON_TEST_PATHS[@]}" -q --tb=short 2>&1; then
   echo "✅ pytest 成功"
 else
   echo "❌ pytest 失敗"
