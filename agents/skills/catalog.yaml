@@ -24,6 +24,9 @@ skill_families:
       - owner-bounded-routing
       - subagent-bootstrap
       - dependency-analysis
+    tool_commands:
+      required:
+        - python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root .
     routing:
       stage_policy: active
       reason: workflow, skill, subagent, or stage routing is part of the request

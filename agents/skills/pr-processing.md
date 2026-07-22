@@ -4,6 +4,7 @@
 contract skill
 responsibility Documents PR Processing Skill for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design agent-orchestration.md execution-time-aware work-conservation contract
 upstream design ../workflows/pr-queue-cleanup-workflow.md AgentCanon source and parent pin PR cleanup workflow
 upstream design ../workflows/agent-canon-pr-workflow.md AgentCanon source PR workflow
 upstream design ../../documents/agent-canon-update-route.md AgentCanon source PR versus parent pin route
@@ -20,7 +21,8 @@ downstream implementation ../../tools/agent_tools/check_convention_compliance.py
 - Purpose: process GitHub PR and Issue queues with authority, validation,
   evidence, and AgentCanon source/parent-pin separation.
 - Section path: Purpose, Use When, and Boundary define scope; Processing Graph
-  shows the high-level flow; PR Log Report Contract and Procedure define
+  shows the high-level flow; Execution-Time-Aware Queue Specialization consumes
+  the orchestration owner; PR Log Report Contract and Procedure define
   operational evidence; AgentCanon Queue covers source/pin coordination.
 - Use when: a user asks to inventory, repair, merge, publish, ready, or triage
   PRs/issues with durable run-bundle and PR Essence evidence.
@@ -61,6 +63,38 @@ inventory、authority、conflict、validation、merge、Issue 処理、closeout 
   target tree, merge strategy, and remote. The reviewed final tree is the
   identity contract; do not rebase or preserve internal commit ids by ancestry
   engineering.
+
+## Execution-Time-Aware Queue Specialization
+
+`agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`
+owns the dependency DAG, makespan objective, ready-set dispatch, batching,
+warm-context reuse, closure, and scope-preserving wait rules. This skill
+specializes that contract for PR and Issue queues:
+
+- Executable scheduling fields: `dependency_dag`, `makespan_objective`,
+  `responsibility_completeness`, `correctness`, `critical_path`, `ready_set`,
+  `context_reuse`, `affected_evidence_invalidation`.
+
+1. Take one immutable, batched queue snapshot for all in-scope PR and Issue
+   candidates, including the fields required for classification and dependency
+   ordering. Batch remote and tool reads while retaining exact candidate
+   identity and readback evidence.
+2. Compute each candidate's complete owner, schema, dependency, validation, and
+   publication closure before its first owning review. Prepare and, only with
+   the required mutation authority, publish independent candidates in
+   non-conflicting lanes; do not serialize independent candidate preparation.
+3. Run one closure review for each exact candidate after that candidate's
+   closure is complete. A review finding invalidates only the affected
+   candidate evidence and its dependent evidence; rerun that affected closure
+   with the same warm worker and reviewer context when the route is unchanged.
+4. Merge candidates in dependency order. Independent preparation and
+   publication may remain batched, but a dependent source, parent pin, or root
+   projection cannot merge before its accepted predecessor receipt and exact
+   readback.
+5. Never use elapsed time or a fixed duration to cut queue scope, skip a
+   candidate, replace closure review, or declare closeout. When no useful ready
+   candidate exists, record the actual dependency, conflict, capacity, or
+   external-state blocker and wait for that state to change.
 
 ## Processing Graph
 

@@ -57,6 +57,7 @@ __all__ = (
     "load_skill_route_rules",
     "load_skill_route_rules_from_root",
     "load_skill_related_map",
+    "load_skill_required_tool_commands",
     "build_capability_index",
     "ordered_unique",
     "related_skill_candidates",
@@ -589,6 +590,32 @@ def load_skill_route_rules_from_root(
 def load_skill_related_map(root: Path) -> dict[str, tuple[str, ...]]:
     """Return catalog-backed related-skill candidates keyed by public skill id."""
     return {rule.skill: rule.related_skills for rule in load_skill_route_rules(root)}
+
+
+def load_skill_required_tool_commands(root: Path) -> dict[str, tuple[str, ...]]:
+    """Return catalog-owned required commands keyed by public skill id."""
+    if not (root / SKILL_CATALOG_PATH).is_file():
+        return {}
+    data = load_skill_catalog(root)
+    families = object_sequence(data.get("skill_families"), "skill_families")
+    result: dict[str, tuple[str, ...]] = {}
+    for index, entry in enumerate(families):
+        entry_mapping = object_mapping(entry, f"skill_families[{index}]")
+        skill_id = entry_mapping.get("id")
+        if not isinstance(skill_id, str) or not skill_id.strip():
+            raise ValueError(f"skill_families[{index}].id must be a non-empty string")
+        if skill_id in result:
+            raise ValueError(f"duplicate skill catalog id: {skill_id}")
+        commands = entry_mapping.get("tool_commands")
+        if commands is None:
+            result[skill_id] = ()
+            continue
+        command_mapping = object_mapping(commands, f"{skill_id}.tool_commands")
+        result[skill_id] = optional_string_list(
+            command_mapping.get("required"),
+            f"{skill_id}.tool_commands.required",
+        )
+    return result
 
 
 def build_capability_index(rules: Sequence[SkillRoutingRule]) -> CapabilityIndex:

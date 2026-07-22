@@ -22,7 +22,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from route import load_skill_related_map
+from route import load_skill_related_map, load_skill_required_tool_commands
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_SKILL_ROOT = Path(".agents/skills")
@@ -246,7 +246,7 @@ def packet_for_skill(root: Path, skill: str) -> SkillCommandPacket:
     discovered = unique_preserve_order(
         command for text in texts for command in iter_command_lines(text)
     )
-    required: tuple[str, ...] = ()
+    required = load_skill_required_tool_commands(root).get(skill, ())
     validation = (
         "python3 tools/agent_tools/check_skill_frontmatter.py --root .",
         "python3 tools/agent_tools/skill_tool_commands.py check",
