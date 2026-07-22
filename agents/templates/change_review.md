@@ -39,7 +39,7 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Design-Base Implementation Review
 
-<!-- Check whether each changed slice traces to the Abstract Design Frame, approved design section, Implementation Source Packet entry, Design Side-Effect Map item, user-request clause ID, source/reuse document or code path, and test-plan item only when test design was activated. Return revise when a slice is justified only by the nearest file, helper, current finding, or chat context instead of the abstract responsibility model. Return escalate for design drift or design gaps. -->
+<!-- Check the one integrated responsibility-unit diff against all four active-packet entries, including the Abstract Design Frame and Implementation Source Packet. Confirm that every changed slice traces to the approved design section, Design Side-Effect Map item, user-request clause ID, source/reuse document or code path, and test-plan item only when test design was activated. Confirm that scope came from the approved responsibility model rather than the nearest file, helper, or current finding. Every source and deletion record must trace to the approved artifact, clause, owner, source/reuse path, dependency order, and validation evidence. Return revise for duplicate parser/writer paths, partial file-sized completion, or test-first production behavior; return escalate for design drift or design gaps. -->
 
 ## Canonical Tree-Head Review
 

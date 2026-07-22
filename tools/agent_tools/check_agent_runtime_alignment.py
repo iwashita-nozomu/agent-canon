@@ -11,6 +11,7 @@
 # upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
 # upstream implementation ./model_profile_registry.py owns canonical model/profile projections
 # upstream implementation ./capacity_handshake.py owns typed capacity readback
+# upstream implementation ./agent_team.py owns active design packet normalization and materialization
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""
@@ -54,6 +55,7 @@ from agent_team import (
     recommended_dynamic_expansion_wave_slots,
     recommended_initial_subagent_wave,
     required_output_templates_missing,
+    resolve_active_design_packet_config,
     resolve_cross_cutting_document_packet,
     resolve_role,
     resolve_role_document_packet,
@@ -611,6 +613,7 @@ def validate_codex_agent_settings() -> None:
 def validate_team_config_references() -> None:
     """Check role references inside the team config."""
     config = load_team_config()
+    active_design_packet = resolve_active_design_packet_config(config)
     ensure(
         not (SCOPED_MODEL_POLICY_KEYS & set(config.raw)),
         "agents_config.json must not own model, effort, review model, or tier policy",
@@ -735,6 +738,7 @@ def validate_team_config_references() -> None:
             role=role,
             report_dir=packet_probe_report_dir,
             workspace_root=packet_probe_workspace,
+            active_design_packet=active_design_packet,
         )
         for entry in packet.read_before_work:
             ensure(
