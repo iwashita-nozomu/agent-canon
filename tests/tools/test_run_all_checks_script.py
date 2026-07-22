@@ -94,7 +94,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertIn("PYTHON_QUALITY_CHECKS=pass", quality_text)
         self.assertIn("PYTHON_SOURCE_PATHS+=(\"$candidate_path\")", quality_text)
         self.assertIn("PYTHON_TEST_PATHS+=(\"$candidate_path\")", quality_text)
-        self.assertIn("find tests -mindepth 1 -maxdepth 2", quality_text)
+        self.assertIn("find tests", quality_text)
         self.assertIn("-type f", quality_text)
         self.assertNotIn("-prune", quality_text)
         self.assertIn("if [ ${#PYTHON_TEST_PATHS[@]} -eq 0 ]; then", quality_text)

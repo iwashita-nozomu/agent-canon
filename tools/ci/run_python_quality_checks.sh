@@ -66,7 +66,7 @@ if [ -d python ]; then
       PYTHON_SOURCE_PATHS+=("$candidate_path")
       PYTHON_TEST_PATHS+=("$candidate_path")
     done < <(
-      find tests -mindepth 1 -maxdepth 2 \
+      find tests \
         -type f \( -name 'test_*.py' -o -name '*_test.py' \) -print | sort
     )
   fi
