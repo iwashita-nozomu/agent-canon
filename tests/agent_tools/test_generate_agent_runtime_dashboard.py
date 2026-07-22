@@ -20,7 +20,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_runtime_dashboard.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from generate_agent_runtime_dashboard import HookWorkflowBreakdownReader  # noqa: E402
+from generate_agent_runtime_dashboard import (  # noqa: E402
+    HookWorkflowBreakdownReader,
+    tool_source_path_candidates,
+)
 from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
 
 DASHBOARD_PROMPT_CHAR_COUNT = 27
@@ -556,6 +559,57 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         )
         self.assertNotIn("| `tool` | `docs check` |", dashboard)
         self.assertNotIn("| `tool` | `docs format` |", dashboard)
+
+    def test_invalid_tool_selection_label_does_not_abort_dashboard(self) -> None:
+        """Regex-like tool labels stay aggregate evidence without a reset path."""
+        invalid_tool = "pattern='AGENT_CANON_LLAMA_CPP|...'"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            hook_dir = (
+                mounted_log_archive_root(root)
+                / "hook-runs"
+                / repo_log_key(root)
+                / "test-container"
+            )
+            with (hook_dir / "skill_usage.jsonl").open("a", encoding="utf-8") as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "hook_run_id": "hook-invalid-tool-label",
+                            "hook_log_namespace": "test-container",
+                            "event": "UserPromptSubmit",
+                            "status": "pass",
+                            "payload_fingerprint": "payload-invalid-tool-label",
+                            "timestamp": "2026-05-17T01:02:07Z",
+                            "candidate_tools": [invalid_tool],
+                        }
+                    )
+                    + "\n"
+                )
+            output = root / "reports" / "dashboard.md"
+
+            self.assertEqual(tool_source_path_candidates(invalid_tool), ())
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            dashboard = output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "| `tool` | `pattern='AGENT_CANON_LLAMA_CPP|...'` | `0` | `1` | `1` |",
+            dashboard,
+        )
 
     def test_selection_metrics_ignore_related_only_skill_candidates(self) -> None:
         """Related skill hints should not inflate missed skill selections."""

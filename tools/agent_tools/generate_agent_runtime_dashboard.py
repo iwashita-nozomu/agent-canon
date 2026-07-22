@@ -102,6 +102,7 @@ TOOL_SELECTION_ALIASES = {
     "docs check": "agent-canon-cli",
     "docs format": "agent-canon-cli",
 }
+SELECTION_SOURCE_CANDIDATE_RE = re.compile(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*")
 SELECTION_EVIDENCE_TARGET = "compact report Selection Evidence Drilldown"
 MARKDOWN_EVIDENCE_TARGET = "compact report Markdown And Prompt Drilldown"
 PROMPT_TOOL_EVIDENCE_TARGET = "compact report Markdown And Prompt Drilldown"
@@ -3909,7 +3910,11 @@ def read_candidate_selection_resets(
     """Return reset windows for existing candidate source paths."""
     resets: list[SelectionReset] = []
     for relative_path in selection_source_path_candidates(responsibility, name):
-        if (root / relative_path).exists():
+        try:
+            exists = (root / relative_path).exists()
+        except (OSError, ValueError):
+            continue
+        if exists:
             resets.append(read_selection_path_reset(root, relative_path))
     return tuple(resets)
 
@@ -3946,6 +3951,10 @@ def read_selection_path_reset(root: Path, relative_path: Path) -> SelectionReset
 def selection_source_path_candidates(responsibility: str, name: str) -> tuple[Path, ...]:
     """Return likely source paths for one skill, workflow, or tool."""
     slug = name.removeprefix("$")
+    if not _is_valid_selection_source_candidate(slug):
+        return ()
+    if responsibility in {"skill", "workflow"} and "/" in slug:
+        return ()
     if responsibility == "skill":
         return skill_source_path_candidates(slug)
     if responsibility == "workflow":
@@ -3975,6 +3984,8 @@ def workflow_source_path_candidates(slug: str) -> tuple[Path, ...]:
 
 def tool_source_path_candidates(slug: str) -> tuple[Path, ...]:
     """Return likely source paths for one tool name."""
+    if not _is_valid_selection_source_candidate(slug):
+        return ()
     if "/" in slug:
         return (Path(slug),)
     return (
@@ -3984,6 +3995,14 @@ def tool_source_path_candidates(slug: str) -> tuple[Path, ...]:
         Path("tools") / "docs" / slug,
         Path("tools") / "oop" / "python" / slug,
         Path("tools") / slug,
+    )
+
+
+def _is_valid_selection_source_candidate(value: str) -> bool:
+    """Return whether an evidence label can be projected as a repo-relative path."""
+    return bool(
+        SELECTION_SOURCE_CANDIDATE_RE.fullmatch(value)
+        and all(part not in {".", ".."} for part in value.split("/"))
     )
 
 
