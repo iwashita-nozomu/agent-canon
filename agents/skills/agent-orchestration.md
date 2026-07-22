@@ -239,6 +239,15 @@ review wave and cannot cause rollback. Only an accepted finding that changes
 requested behavior, owner/design boundary, correctness, validation, or
 publication state enters same-owner rework.
 
+Adjudicate failures against the selected final validation topology. A failure
+observable only through a duplicate, superseded, or non-owner gate removed from
+that route is unreachable for the active task: reject it with
+`reason_code=superseded_gate_unreachable` and an `evidence_ref`; it opens no
+repair/review wave, and production/source is not changed to satisfy that gate.
+A still-valid issue owned by another trust boundary is recorded with
+`reason_code=outside_active_trust_boundary` and handed to that owner separately;
+do not import it into the active G4 parent-projection task.
+
 Validation is static/targeted first. Full suites, full dependency review, and
 remote CI are selected once for the final candidate only when the touched
 contract requires them. Do not materialize empty reviewer or template artifacts.
