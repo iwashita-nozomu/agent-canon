@@ -11,12 +11,18 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
+
+from tools.agent_tools import search as search_tool
+from tools.agent_tools.graph_client import GraphResponse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SEARCH = PROJECT_ROOT / "tools" / "agent_tools" / "search.py"
@@ -108,6 +114,56 @@ def run_search_with_input(
         capture_output=True,
         text=True,
         input=input_text,
+    )
+
+
+def run_graph_search(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """Run header-dependency search against a materialized graph response."""
+    graph = Mock()
+    graph.query.return_value = GraphResponse(
+        schema="agent-canon.graph.query.v1",
+        command="query",
+        status="fresh",
+        payload={
+            "nodes": [
+                {"id": "workflow", "path": "documents/workflow.md"},
+                {"id": "python", "path": "python/workflow.py"},
+            ],
+            "facts": [
+                {
+                    "id": "workflow-python",
+                    "kind": "dependency",
+                    "inferred": False,
+                    "from": "workflow",
+                    "to": "python",
+                    "producer": "source-snapshot",
+                    "source_path": "documents/workflow.md",
+                    "source_span": None,
+                    "evidence_ref": "documents/workflow.md:4",
+                    "authority": "ManifestParser",
+                    "dependency_detail": {
+                        "direction": "upstream",
+                        "kind": "implementation",
+                        "reason": "alpha dispatch implementation",
+                    },
+                }
+            ],
+        },
+        exit_code=0,
+    )
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with (
+        patch.object(search_tool, "GraphClient", return_value=graph),
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        return_code = search_tool.main(["--root", str(root), *args])
+    return subprocess.CompletedProcess(
+        args=[str(SEARCH), *args],
+        returncode=return_code,
+        stdout=stdout.getvalue(),
+        stderr=stderr.getvalue(),
     )
 
 
@@ -295,7 +351,7 @@ class CoordinatedSearchTest(unittest.TestCase):
             root = Path(tmp_dir)
             write_search_fixture(root)
 
-            result = run_search(
+            result = run_graph_search(
                 root,
                 "--purpose",
                 "alpha dispatch workflow implementation target",

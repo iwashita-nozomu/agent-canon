@@ -14,6 +14,7 @@
 # upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
 # upstream implementation ./tool_catalog.py validates catalog structure
 # upstream implementation ./check_convention_compliance.py verifies skill-routing markers
+# upstream implementation ./graph_client.py provides verified manifest dependency facts
 # upstream implementation ./tool_path_policy.py defines retired legacy path policy
 # downstream implementation ../../tools/ci/run_all_checks.sh runs drift checker
 # downstream implementation ../../tests/agent_tools/test_tool_drift.py tests checker
@@ -24,32 +25,28 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
+import sys
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
 
 import yaml
-from tool_path_policy import (
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from tools.agent_tools.graph_client import (
+    CANONICAL_GRAPH_EXECUTABLE,
+    GraphClient,
+    GraphClientError,
+    GraphDependencyFact,
+)
+from tools.agent_tools.tool_path_policy import (
     is_retired_legacy_tool_path,
     iter_retired_legacy_tool_paths,
     retired_legacy_tool_detail,
 )
-
-HEADER_SCAN_LINES = 80
-MANIFEST_FIELD_COUNT = 4
-MANIFEST_REASON_MAX_SPLIT = MANIFEST_FIELD_COUNT - 1
-
-
-@dataclass(frozen=True)
-class ManifestEdge:
-    """One dependency manifest edge."""
-
-    direction: str
-    kind: str
-    source: str
-    target: str
 
 
 @dataclass(frozen=True)
@@ -458,25 +455,14 @@ def as_sequence(value: object) -> Sequence[object] | None:
     return None
 
 
-def has_dependency_manifest(path: Path) -> bool:
-    """Return whether one file has dependency manifest markers near the top."""
-    if not path.is_file():
-        return False
-    lines = path.read_text(encoding="utf-8").splitlines()[:HEADER_SCAN_LINES]
-    return any("@dependency-start" in line for line in lines) and any(
-        "@dependency-end" in line for line in lines
-    )
-
-
 def resolve_repo_path(root: Path, relative_path: str) -> Path:
-    """Resolve a path through the root view or vendored AgentCanon source."""
-    root_path = root / relative_path
-    if root_path.exists():
-        return root_path
-    vendor_path = root / "vendor" / "agent-canon" / relative_path
-    if vendor_path.exists():
-        return vendor_path
-    return root_path
+    """Resolve an AgentCanon source path from standalone or parent root."""
+    canon_root = (
+        root / "vendor" / "agent-canon"
+        if (root / "vendor" / "agent-canon").is_dir()
+        else root
+    )
+    return canon_root / relative_path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -494,80 +480,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def strip_manifest_line(line: str) -> str:
-    """Strip common comment syntax from one manifest line."""
-    stripped = line.rstrip("\r").strip()
-    for prefix in ("#", "//", "*"):
-        if stripped.startswith(prefix):
-            stripped = stripped[len(prefix) :].strip()
-    stripped = stripped.rstrip(",").strip()
-    if stripped.startswith('"') and stripped.endswith('"'):
-        stripped = stripped[1:-1]
-    return stripped.strip()
-
-
-def repo_relative(root: Path, path: Path) -> str:
-    """Return a stable repository-relative path."""
-    absolute_root = Path(os.path.normpath(root.absolute().as_posix()))
-    absolute_path = Path(os.path.normpath(path.absolute().as_posix()))
-    try:
-        relative = absolute_path.relative_to(absolute_root).as_posix()
-    except ValueError:
-        return path.as_posix()
-    vendor_prefix = "vendor/agent-canon/"
-    if relative.startswith(vendor_prefix):
-        return relative[len(vendor_prefix) :]
-    return relative
-
-
-def normalize_target(root: Path, source: Path, relative_target: str) -> str:
-    """Normalize one manifest target relative to its source file."""
-    return repo_relative(root, source.parent / relative_target)
-
-
-def manifest_edges(root: Path, relative_path: str) -> tuple[ManifestEdge, ...]:
-    """Extract dependency manifest edges from one file."""
-    path = resolve_repo_path(root, relative_path)
-    if not path.is_file():
-        return ()
-    lines = path.read_text(encoding="utf-8").splitlines()[:HEADER_SCAN_LINES]
-    in_manifest = False
-    edges: list[ManifestEdge] = []
-    source = repo_relative(root, path)
-    for line in lines:
-        stripped = strip_manifest_line(line)
-        if stripped == "@dependency-start":
-            in_manifest = True
-            continue
-        if stripped == "@dependency-end":
-            break
-        if not in_manifest or not stripped:
-            continue
-        if stripped in {"<!--", "-->", "/*", "*/", '"""', "'''"}:
-            continue
-        fields = stripped.split(maxsplit=MANIFEST_REASON_MAX_SPLIT)
-        if len(fields) < MANIFEST_FIELD_COUNT:
-            continue
-        direction, kind, target_path, _reason = fields
-        if direction not in {"upstream", "downstream"}:
-            continue
-        edges.append(
-            ManifestEdge(
-                direction=direction,
-                kind=kind,
-                source=source,
-                target=normalize_target(root, path, target_path),
-            )
-        )
-    return tuple(edges)
-
-
 def opposite_direction(direction: str) -> str:
     """Return the reverse dependency direction."""
     return "downstream" if direction == "upstream" else "upstream"
 
 
-def compatible_reverse_kind(direct: ManifestEdge, reverse: ManifestEdge) -> bool:
+def compatible_reverse_kind(
+    direct: GraphDependencyFact, reverse: GraphDependencyFact
+) -> bool:
     """Return whether a direct/reverse pair has compatible edge kinds."""
     if direct.kind == reverse.kind:
         return True
@@ -585,23 +505,27 @@ def compatible_reverse_kind(direct: ManifestEdge, reverse: ManifestEdge) -> bool
 
 
 def matching_direct_edges(
-    edges: Sequence[ManifestEdge], tool: str, target: str
-) -> tuple[ManifestEdge, ...]:
+    edges: Sequence[GraphDependencyFact], tool: str, target: str
+) -> tuple[GraphDependencyFact, ...]:
     """Return direct tool-to-target manifest edges."""
-    return tuple(edge for edge in edges if edge.source == tool and edge.target == target)
+    return tuple(
+        edge for edge in edges if edge.source == tool and edge.target == target
+    )
 
 
 def matching_reverse_edges(
-    edges: Sequence[ManifestEdge], tool: str, target: str
-) -> tuple[ManifestEdge, ...]:
+    edges: Sequence[GraphDependencyFact], tool: str, target: str
+) -> tuple[GraphDependencyFact, ...]:
     """Return target-to-tool manifest edges."""
-    return tuple(edge for edge in edges if edge.source == target and edge.target == tool)
+    return tuple(
+        edge for edge in edges if edge.source == target and edge.target == tool
+    )
 
 
 def check_link(
     contract: ToolContract,
     link: LinkCheck,
-    all_edges: Sequence[ManifestEdge],
+    all_edges: Sequence[GraphDependencyFact],
 ) -> list[Finding]:
     """Check one required manifest link."""
     direct = matching_direct_edges(all_edges, contract.tool, link.target)
@@ -654,7 +578,9 @@ def check_link(
     return findings
 
 
-def check_text(root: Path, contract: ToolContract, text_check: TextCheck) -> list[Finding]:
+def check_text(
+    root: Path, contract: ToolContract, text_check: TextCheck
+) -> list[Finding]:
     """Check one required snippet."""
     path = resolve_repo_path(root, text_check.path)
     if not path.is_file():
@@ -665,7 +591,9 @@ def check_text(root: Path, contract: ToolContract, text_check: TextCheck) -> lis
     if text_check.snippet in text:
         return []
     return [
-        Finding("missing-required-text", contract.name, text_check.path, text_check.detail)
+        Finding(
+            "missing-required-text", contract.name, text_check.path, text_check.detail
+        )
     ]
 
 
@@ -673,35 +601,58 @@ def check_catalog_entries(root: Path) -> list[Finding]:
     """Check catalog entries for stale paths and legacy/default confusion."""
     catalog_path = resolve_repo_path(root, "tools/catalog.yaml")
     if not catalog_path.is_file():
-        return [Finding("missing-file", "tool_catalog", "tools/catalog.yaml", "catalog")]
-    if not has_dependency_manifest(catalog_path):
-        return [Finding("missing-dependency-header", "tool_catalog", "tools/catalog.yaml", "catalog")]
+        return [
+            Finding("missing-file", "tool_catalog", "tools/catalog.yaml", "catalog")
+        ]
     raw = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
     catalog = as_mapping(raw)
     if catalog is None:
-        return [Finding("invalid-catalog", "tool_catalog", "tools/catalog.yaml", "not-mapping")]
+        return [
+            Finding(
+                "invalid-catalog", "tool_catalog", "tools/catalog.yaml", "not-mapping"
+            )
+        ]
     entries = as_sequence(catalog.get("entries"))
     if entries is None:
-        return [Finding("invalid-catalog", "tool_catalog", "tools/catalog.yaml", "entries-not-list")]
+        return [
+            Finding(
+                "invalid-catalog",
+                "tool_catalog",
+                "tools/catalog.yaml",
+                "entries-not-list",
+            )
+        ]
     findings: list[Finding] = []
     catalog_retired_paths: set[str] = set()
     for index, raw_entry in enumerate(entries, start=1):
         entry = as_mapping(raw_entry)
         if entry is None:
             findings.append(
-                Finding("invalid-catalog-entry", "tool_catalog", "tools/catalog.yaml", f"entry-{index}-not-mapping")
+                Finding(
+                    "invalid-catalog-entry",
+                    "tool_catalog",
+                    "tools/catalog.yaml",
+                    f"entry-{index}-not-mapping",
+                )
             )
             continue
         entry_path = entry.get("path")
         status = entry.get("status")
         if not isinstance(entry_path, str):
             findings.append(
-                Finding("invalid-catalog-entry", "tool_catalog", "tools/catalog.yaml", f"entry-{index}-missing-path")
+                Finding(
+                    "invalid-catalog-entry",
+                    "tool_catalog",
+                    "tools/catalog.yaml",
+                    f"entry-{index}-missing-path",
+                )
             )
             continue
         if not resolve_repo_path(root, entry_path).exists():
             findings.append(
-                Finding("stale-catalog-entry", "tool_catalog", entry_path, "missing-path")
+                Finding(
+                    "stale-catalog-entry", "tool_catalog", entry_path, "missing-path"
+                )
             )
         if is_retired_legacy_tool_path(entry_path) or status == "legacy_provenance":
             catalog_retired_paths.add(entry_path.replace("\\", "/").removeprefix("./"))
@@ -738,20 +689,18 @@ def selected_contracts(names: Sequence[str]) -> tuple[ToolContract, ...]:
 def run_checks(root: Path, names: Sequence[str]) -> list[Finding]:
     """Run drift checks."""
     contracts = selected_contracts(names)
-    paths = sorted(
-        {
-            path
-            for contract in contracts
-            for path in (
-                contract.tool,
-                *(link.target for link in contract.links),
-                *(text_check.path for text_check in contract.text_checks),
-            )
-        }
+    graph = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE).query(
+        all_nodes=True,
+        relation="dependency",
+        direction="both",
+        depth=0,
     )
-    all_edges: list[ManifestEdge] = []
-    for path in paths:
-        all_edges.extend(manifest_edges(root, path))
+    if graph.status != "fresh" or graph.exit_code != 0:
+        raise GraphClientError(
+            "canonical graph dependency query is unavailable: "
+            f"status={graph.status} reason={graph.payload.get('reason')}"
+        )
+    all_edges = graph.dependency_facts
     findings: list[Finding] = []
     for contract in contracts:
         if not resolve_repo_path(root, contract.tool).is_file():
@@ -772,7 +721,12 @@ def run_checks(root: Path, names: Sequence[str]) -> list[Finding]:
             findings.extend(check_catalog_entries(root))
     return sorted(
         findings,
-        key=lambda finding: (finding.kind, finding.contract, finding.path, finding.detail),
+        key=lambda finding: (
+            finding.kind,
+            finding.contract,
+            finding.path,
+            finding.detail,
+        ),
     )
 
 
@@ -790,13 +744,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run tool/convention drift checks."""
     args = build_parser().parse_args(argv)
     root = args.root.resolve()
-    findings = run_checks(root, args.contract)
+    try:
+        findings = run_checks(root, args.contract)
+    except GraphClientError as error:
+        findings = [Finding("graph-unavailable", "canonical_graph", ".", str(error))]
     if args.format == "json":
         print(render_json(findings))
     else:
         for finding in findings:
             print(finding.render())
-        print(f"TOOL_CONVENTION_DRIFT_CONTRACTS={len(selected_contracts(args.contract))}")
+        print(
+            f"TOOL_CONVENTION_DRIFT_CONTRACTS={len(selected_contracts(args.contract))}"
+        )
         print(f"TOOL_CONVENTION_DRIFT_FINDINGS={len(findings)}")
         print(f"TOOL_CONVENTION_DRIFT={'pass' if not findings else 'fail'}")
     return 1 if findings else 0

@@ -29,8 +29,9 @@ import yaml
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import vector_search  # noqa: E402
+    import vector_search  # type: ignore[no-redef]  # noqa: E402
+else:
+    from . import vector_search  # noqa: E402
 
 DEFAULT_INDEX_DIR = ".agent-canon/search-index"
 DEFAULT_CARD_FILE = "semantic-cards.jsonl"
@@ -42,6 +43,7 @@ SUMMARY_CHARS = 220
 DEFAULT_HASH_LENGTH = 12
 ELLIPSIS_CHARS = 3
 TOKEN_RE = re.compile(r"[0-9A-Za-z_\u0080-\uFFFF]+")
+RESPONSIBILITY_SCAN_LINES = 80
 
 
 @dataclass(frozen=True)
@@ -206,10 +208,23 @@ def kind_for_path(path: str, tool: ToolEntry) -> str:
     return "text"
 
 
+def strip_manifest_line(line: str) -> str:
+    """Strip comment framing for text-only responsibility extraction."""
+    stripped = line.rstrip("\r\n").strip()
+    for prefix in ("<!--", "#", "//", "*"):
+        if stripped.startswith(prefix):
+            stripped = stripped[len(prefix) :].strip()
+    if stripped.endswith("-->"):
+        stripped = stripped[:-3].strip()
+    if stripped.startswith('"') and stripped.endswith('"'):
+        stripped = stripped[1:-1].strip()
+    return stripped.rstrip(",").strip()
+
+
 def responsibility_from_text(text: str) -> str:
-    """Extract dependency-header responsibility text when available."""
-    for raw_line in text.splitlines()[: vector_search.HEADER_SCAN_LINES]:
-        line = vector_search.strip_manifest_line(raw_line)
+    """Extract only responsibility prose; dependency edges stay graph-owned."""
+    for raw_line in text.splitlines()[:RESPONSIBILITY_SCAN_LINES]:
+        line = strip_manifest_line(raw_line)
         if line.startswith("responsibility "):
             return line.removeprefix("responsibility ").strip()
     return ""

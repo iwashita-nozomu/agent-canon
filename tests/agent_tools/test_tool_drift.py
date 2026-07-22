@@ -9,14 +9,102 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+from tools.agent_tools import tool_drift as drift_checker
+from tools.agent_tools.graph_client import GraphResponse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "tool_drift.py"
+
+
+class FakeToolGraphClient:
+    """Provide graph-owned dependency facts for isolated checker fixtures."""
+
+    def __init__(self, root: Path, _executable: Path | None = None) -> None:
+        self._root = root.resolve()
+
+    def query(self, **_kwargs: object) -> GraphResponse:
+        """Project fixture manifests into the graph query response shape."""
+        nodes: dict[str, str] = {}
+        facts: list[dict[str, object]] = []
+        for path in sorted(self._root.rglob("*")):
+            if not path.is_file() or any(part.startswith(".") for part in path.relative_to(self._root).parts):
+                continue
+            source = path.relative_to(self._root).as_posix()
+            in_manifest = False
+            try:
+                lines = path.read_text(encoding="utf-8").splitlines()[:80]
+            except UnicodeDecodeError:
+                continue
+            for line_number, raw_line in enumerate(lines, start=1):
+                line = raw_line.strip()
+                for prefix in ("<!--", "#", "//", "*"):
+                    if line.startswith(prefix):
+                        line = line[len(prefix) :].strip()
+                if line.endswith("-->"):
+                    line = line[:-3].strip()
+                if line == "@dependency-start":
+                    in_manifest = True
+                    continue
+                if line == "@dependency-end":
+                    in_manifest = False
+                    continue
+                if not in_manifest:
+                    continue
+                fields = line.split(maxsplit=3)
+                if len(fields) < 4 or fields[0] not in {"upstream", "downstream"}:
+                    continue
+                direction, kind, target, reason = fields
+                target_path = (path.parent / target).resolve()
+                try:
+                    target_name = target_path.relative_to(self._root).as_posix()
+                except ValueError:
+                    target_name = target_path.as_posix()
+                source_id = f"node:{source}"
+                target_id = f"node:{target_name}"
+                nodes[source_id] = source
+                nodes[target_id] = target_name
+                fact_id = f"fact:{len(facts)}"
+                facts.append(
+                    {
+                        "id": fact_id,
+                        "kind": "dependency",
+                        "inferred": False,
+                        "from": source_id,
+                        "to": target_id,
+                        "producer": "test-source-snapshot",
+                        "source_path": source,
+                        "source_span": None,
+                        "evidence_ref": f"{source}:{line_number}",
+                        "authority": "ManifestParser",
+                        "dependency_detail": {
+                            "direction": direction,
+                            "kind": kind,
+                            "reason": reason,
+                        },
+                    }
+                )
+        return GraphResponse(
+            schema="agent-canon.graph.query.v1",
+            command="query",
+            status="fresh",
+            payload={
+                "nodes": [
+                    {"id": node_id, "path": path}
+                    for node_id, path in sorted(nodes.items())
+                ],
+                "facts": facts,
+            },
+            exit_code=0,
+        )
 
 
 class CheckToolConventionDriftTest(unittest.TestCase):
@@ -24,12 +112,21 @@ class CheckToolConventionDriftTest(unittest.TestCase):
 
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the checker against a root."""
-        return subprocess.run(
-            [sys.executable, str(CHECKER), "--root", str(root), *args],
-            cwd=PROJECT_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        argv = [str(CHECKER), "--root", str(root), *args]
+        with (
+            patch.object(sys, "argv", argv),
+            patch.object(drift_checker, "GraphClient", FakeToolGraphClient),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            return_code = drift_checker.main()
+        return subprocess.CompletedProcess(
+            args=argv,
+            returncode=return_code,
+            stdout=stdout.getvalue(),
+            stderr=stderr.getvalue(),
         )
 
     def test_current_repository_passes(self) -> None:

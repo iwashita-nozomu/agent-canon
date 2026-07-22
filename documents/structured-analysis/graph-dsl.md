@@ -10,6 +10,8 @@ downstream design ../prose-reasoning-graph/dsl-spec.md prose adapter/profile ove
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs graph contract implementation
 downstream design ../tools/prose_reasoning_graph.md documents the prose graph adapter command surface
 downstream design ../tools/render_dependency_manifest_graph.md documents dependency graph projection rendering
+downstream implementation ../../rust/agent-canon/src/graph.rs materializes canonical repository graph facts into this schema
+downstream implementation ../../tools/agent_tools/graph_client.py supplies typed read-only graph projections
 @dependency-end
 -->
 
@@ -257,6 +259,7 @@ layer is promoted here.
 | --- | --- |
 | Prose Reasoning Graph | Source spans correspond to `source`/`form`; claims, evidence, discourse, presentation features, diagnostics, edit operations, and projections correspond to their matching layers in `../prose-reasoning-graph/dsl-spec.md`. |
 | Dependency manifest graph | Manifest records correspond to `deps` nodes and edges; dependency validation findings correspond to diagnostics/check records in `../dependency-manifest-design.md`. |
+| Canonical repository graph | `graph.rs` maps the parser-owned source snapshot and authoritative producer artifacts into validated nodes, edges, diagnostics, projections, and metadata. `GraphClient` reads command JSON only; no Python transport decoder or alternate SQLite writer exists. |
 | Code dependency graph | Source files and symbols correspond to `code` nodes or payload locators; imports/includes/source references correspond to `code` edges. |
 | Artifact and directory responsibility | Files/directories correspond to `artifact` nodes; containment and responsibility support correspond to `artifact` edges in `../../rust/agent-canon/src/structured_analysis.rs`. |
 | Document canon | Inventory rows and findings correspond to document-canon layer nodes, edges, and diagnostics in `../../rust/agent-canon/src/structured_analysis.rs`. |
@@ -287,6 +290,11 @@ Graph-contract diagnostics are emitted by
 `../../rust/agent-canon/src/structured_analysis.rs`. Semantic checks stay with
 the owning adapter:
 
+- the canonical repository adapter stores its exact `P(S)`, `X(S)`, `U(S)`,
+  `D`, `R`, `G`, and `Vp` witness in `metadata.mathematical_contract` and
+  directly validates partition, totality, reverse-closure, projection,
+  completeness, and fingerprint obligations before publication;
+
 - dependency graph validity remains with dependency manifest tools;
 - code correctness remains with language checkers/build/tests;
 - prose quality remains with prose graph diagnostics and reviewers;
@@ -306,6 +314,15 @@ The current Rust structured-analysis implementation materializes the core with:
 Dedicated attached databases or projection-specific tables may add richer
 storage. They remain faithful to this object contract by keeping stable ids,
 layer-qualified semantics, source/provenance payloads, and authority records.
+
+The canonical repository adapter receives `ManifestSnapshot` directly from the
+one Rust `ManifestParser`; there is no JSONL decoder, binder, byte schema, or
+Python transport authority between extraction and this SQLite boundary.
+`surface_relations` and `source_universe` are materialized only after the
+snapshot's injective locator preflight and finite-set equations pass. Review
+scope manifests and closeouts remain evidence artifacts, not graph facts. An
+absent declaration target is represented in `Unresolved(S,p)` and never gains
+a fabricated endpoint node.
 
 ## Extension Rule
 

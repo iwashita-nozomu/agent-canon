@@ -4,6 +4,7 @@
 # responsibility Coordinates purpose-based search across text, deterministic semantic cards, tool catalog, dependency headers, and Python code facts.
 # upstream design ../../documents/search-coordination.md coordinated search provider contract
 # upstream implementation ./vector_search.py provides text surfaces, TF-IDF search, dependency headers, and Python code facts
+# upstream implementation ./graph_client.py provides verified dependency graph facts
 # upstream implementation ./search_index.py builds repo-local deterministic semantic cards
 # downstream implementation ../../tests/agent_tools/test_search.py validates coordinated search providers
 # @dependency-end
@@ -21,9 +22,22 @@ from pathlib import Path
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import search_index  # noqa: E402
-import vector_search  # noqa: E402
+    import search_index  # type: ignore[no-redef]  # noqa: E402
+    import vector_search  # type: ignore[no-redef]  # noqa: E402
+    from graph_client import (  # type: ignore[no-redef]  # noqa: E402
+        CANONICAL_GRAPH_EXECUTABLE,
+        GraphClient,
+        GraphClientError,
+        GraphDependencyFact,
+    )
+else:
+    from . import search_index, vector_search  # noqa: E402
+    from .graph_client import (  # noqa: E402
+        CANONICAL_GRAPH_EXECUTABLE,
+        GraphClient,
+        GraphClientError,
+        GraphDependencyFact,
+    )
 
 DEFAULT_PROVIDERS = ("text", "semantic", "vector", "tool", "header-deps", "code-deps")
 DEFAULT_INDEX_DIR = search_index.DEFAULT_INDEX_DIR
@@ -74,7 +88,7 @@ class SearchCorpus:
     documents: tuple[vector_search.Document, ...]
     tool_entries: Mapping[str, search_index.ToolEntry]
     cards: tuple[search_index.SearchCard, ...]
-    dependency_edges: tuple[vector_search.DependencyEdge, ...]
+    dependency_edges: tuple[GraphDependencyFact, ...]
     python_symbols: tuple[vector_search.PythonSymbol, ...]
     python_edges: tuple[vector_search.PythonCallEdge, ...]
 
@@ -212,6 +226,22 @@ def load_index_cards(request: SearchRequest) -> tuple[search_index.SearchCard, .
     return cards
 
 
+def graph_dependency_edges(root: Path) -> tuple[GraphDependencyFact, ...]:
+    """Return explicit dependency facts from one fresh canonical graph query."""
+    response = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE).query(
+        all_nodes=True,
+        relation="dependency",
+        direction="both",
+        depth=0,
+    )
+    if response.status != "fresh" or response.exit_code != 0:
+        raise GraphClientError(
+            "canonical graph dependency query is unavailable: "
+            f"status={response.status} reason={response.payload.get('reason')}"
+        )
+    return response.dependency_facts
+
+
 def load_corpus(request: SearchRequest) -> SearchCorpus:
     """Load shared facts for providers."""
     documents = tuple(
@@ -223,11 +253,16 @@ def load_corpus(request: SearchRequest) -> SearchCorpus:
         )
     )
     symbols = vector_search.read_python_symbols(documents)
+    dependency_edges = (
+        graph_dependency_edges(request.root)
+        if "header-deps" in request.providers
+        else ()
+    )
     return SearchCorpus(
         documents=documents,
         tool_entries=search_index.load_tool_entries(request.root),
         cards=load_index_cards(request),
-        dependency_edges=tuple(vector_search.parse_dependency_edges(request.root, documents)),
+        dependency_edges=dependency_edges,
         python_symbols=symbols,
         python_edges=vector_search.build_python_call_edges(symbols),
     )
@@ -525,7 +560,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("AGENT_SEARCH=fail", file=sys.stderr)
         print(f"AGENT_SEARCH_ERROR={exc}", file=sys.stderr)
         return 2
-    report = run_search(request)
+    try:
+        report = run_search(request)
+    except GraphClientError as error:
+        print("AGENT_SEARCH=fail", file=sys.stderr)
+        print(f"AGENT_SEARCH_ERROR=canonical-graph:{error}", file=sys.stderr)
+        return 1
     if args.format == "json":
         print_json(report)
     else:
