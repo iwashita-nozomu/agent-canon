@@ -125,6 +125,30 @@ class SkillToolCommandsTest(unittest.TestCase):
             self.assertNotIn(forbidden, payload["discovered_commands"])
         self.assertNotIn("sed -n", result.stdout)
 
+    def test_agent_orchestration_packet_requires_execution_contract_checker(self) -> None:
+        """The canonical skill catalog supplies the required owner checker."""
+        result = self.run_tool(
+            PROJECT_ROOT,
+            "show",
+            "--skill",
+            "agent-orchestration",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(
+            payload["required_commands"],
+            [
+                "python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root ."
+            ],
+        )
+        shim = (PROJECT_ROOT / ".agents/skills/agent-orchestration/SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn(payload["required_commands"][0], shim)
+
     def test_show_marks_validation_as_maintenance_only(self) -> None:
         """Show keeps validation commands out of the default action path."""
         with tempfile.TemporaryDirectory() as tmp_dir:
