@@ -686,21 +686,118 @@ def selected_contracts(names: Sequence[str]) -> tuple[ToolContract, ...]:
     return tuple(contract for contract in CONTRACTS if contract.name in selected)
 
 
-def run_checks(root: Path, names: Sequence[str]) -> list[Finding]:
-    """Run drift checks."""
-    contracts = selected_contracts(names)
-    graph = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE).query(
+def _dependency_facts(root: Path) -> tuple[GraphDependencyFact, ...]:
+    """Return canonical dependency facts, building the graph when needed."""
+    client = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE)
+    response = client.query(
         all_nodes=True,
         relation="dependency",
         direction="both",
         depth=0,
     )
-    if graph.status != "fresh" or graph.exit_code != 0:
+    if response.status != "fresh" or response.exit_code != 0:
+        build = client.build()
+        if build.status != "fresh" or build.exit_code != 0:
+            raise GraphClientError(
+                "canonical graph dependency build is unavailable: "
+                f"status={build.status} reason={build.payload.get('reason')}"
+            )
+        response = client.query(
+            all_nodes=True,
+            relation="dependency",
+            direction="both",
+            depth=0,
+        )
+    if response.status != "fresh" or response.exit_code != 0:
         raise GraphClientError(
             "canonical graph dependency query is unavailable: "
-            f"status={graph.status} reason={graph.payload.get('reason')}"
+                f"status={response.status} reason={response.payload.get('reason')}"
         )
-    all_edges = graph.dependency_facts
+    return response.dependency_facts
+
+
+def _normalize_manifest_line(line: str) -> str:
+    """Normalize one dependency-manifest line before tokenization."""
+    stripped = line.strip().rstrip("\r").rstrip("-->").strip()
+    for prefix in ("# ", "#", "// ", "//", "/* ", "/*", "* ", "*", "; "):
+        if stripped.startswith(prefix):
+            stripped = stripped[len(prefix) :].strip()
+            break
+    return stripped
+
+
+def _manifest_dependency_facts(root: Path) -> tuple[GraphDependencyFact, ...]:
+    """Project dependency manifest declarations to graph edges as a fallback route."""
+    facts: list[GraphDependencyFact] = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        if path.is_symlink():
+            continue
+        relative_parts = path.relative_to(root).parts
+        if not relative_parts:
+            continue
+        if relative_parts[0] in {".git", ".agent-canon"}:
+            continue
+        if len(relative_parts) >= 2 and tuple(relative_parts[:2]) == (
+            "vendor",
+            "agent-canon",
+        ):
+            continue
+        relative = path.relative_to(root).as_posix()
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()[:80]
+        except OSError:
+            continue
+        except UnicodeDecodeError:
+            continue
+        in_manifest = False
+        for line_number, local_line in enumerate(lines, start=1):
+            raw = _normalize_manifest_line(local_line)
+            if raw == "@dependency-start":
+                in_manifest = True
+                continue
+            if raw == "@dependency-end":
+                in_manifest = False
+                continue
+            if not in_manifest:
+                continue
+            fields = raw.split(maxsplit=3)
+            if len(fields) < 4:
+                continue
+            direction, kind, target, reason = fields[:4]
+            if direction not in {"upstream", "downstream"}:
+                continue
+            target_path = path.parent / target
+            try:
+                target_name = target_path.relative_to(root).as_posix()
+            except ValueError:
+                target_name = target_path.as_posix()
+            facts.append(
+                GraphDependencyFact(
+                    f"fact:{len(facts)}",
+                    direction,
+                    kind,
+                    relative,
+                    target_name,
+                    reason,
+                    "source-snapshot",
+                    relative,
+                    None,
+                    f"{relative}:{line_number}",
+                    "ManifestParser",
+                )
+            )
+    return tuple(sorted(facts, key=lambda item: (item.source, item.target, item.direction, item.kind, item.id)))
+
+
+def run_checks(root: Path, names: Sequence[str]) -> list[Finding]:
+    """Run drift checks."""
+    contracts = selected_contracts(names)
+    try:
+        all_edges = _dependency_facts(root)
+    except GraphClientError:
+        all_edges = _manifest_dependency_facts(root)
     findings: list[Finding] = []
     for contract in contracts:
         if not resolve_repo_path(root, contract.tool).is_file():
