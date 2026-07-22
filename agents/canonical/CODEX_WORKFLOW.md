@@ -419,6 +419,9 @@ canonical formatter/dispatcher、validation-response、review integration が
 1. 選択された review の output は hypothesis として parent が adjudicate します。current snapshot、reachable path、contract、witness/static proof があり、behavior、owner boundary、correctness、validation、または publication state を変える accepted finding だけ same-owner repair loop を開きます。rejected hypothesis は `reason_code` と `evidence_ref` を残し、wave / rollback を起こしません。
    この修正 loop では、review finding への応答を、同じ意図を保つ修正、
    再設計、または authority 付き escalation / replacement として扱います。
+   Follow `agents/skills/agent-orchestration.md#Review Activation And Adjudication`
+   after final validation topology selection; this workflow surface does not
+   duplicate that semantic rule.
 1. diff-check agent が `approve` し、未完了 work unit、未解決 finding、未実行 validation、未同期 canon、未 commit / push、未判断 follow-up が無い場合だけ loop を止めます。
 
 `closeout_gate.md` の `mechanical_completion_loop_complete=yes` と `diff_check_agent_complete=yes` が揃った時点で、`user_completion_report=unlocked` にできます。

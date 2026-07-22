@@ -112,6 +112,12 @@ bash tools/sync_agent_canon.sh check
    AgentCanon source changes are integrated, or while preparing the parent
    pin/root-view PR.
 
+## Final-Topology Adjudication
+
+Follow the canonical
+`agents/skills/agent-canon-update.md#Final-Topology-Adjudication` section; this
+runtime mirror does not restate the adjudication rule.
+
 1. Check and apply parent update TODOs before unrelated work:
 
 ```bash

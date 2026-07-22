@@ -113,6 +113,14 @@ TODO state up to date.
    validation, remote CI, merge, and readback follow there; they do not rerun
    source correctness, generated completeness, or source PR CAS.
 
+## Final-Topology Adjudication
+
+Apply the full adjudication rule from
+`agents/skills/agent-orchestration.md#Review Activation And Adjudication` after
+final validation topology selection. For this update route, G1 source
+correctness and G4 parent projection remain separate; G4 does not import
+failures unreachable outside its final topology.
+
 ## Closeout Evidence
 
 Record:
