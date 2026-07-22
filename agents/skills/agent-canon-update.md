@@ -112,17 +112,13 @@ TODO state up to date.
    publication. Parent-owned
    validation, remote CI, merge, and readback follow there; they do not rerun
    source correctness, generated completeness, or source PR CAS.
-1. Adjudicate failures against the selected final validation topology. A failure
-   observable only through a duplicate, superseded, or non-owner gate removed
-   from that route is unreachable for the active task: reject it with
-   `reason_code=superseded_gate_unreachable` and an `evidence_ref`; it opens no
-   repair/review wave, and production/source is not changed to satisfy that
-   gate. A still-valid issue owned by another trust boundary is recorded with
-   `reason_code=outside_active_trust_boundary` and handed to that owner
-   separately; do not import it into the active G4 parent-projection task.
-   G1 source correctness and G4 parent projection remain separate owner
-   invariants; AgentCanon update consumes each side's evidence once and reruns
-   neither invariant.
+## Final-Topology Adjudication
+
+Apply the full adjudication rule from
+`agents/skills/agent-orchestration.md#Review Activation And Adjudication` after
+final validation topology selection. For this update route, G1 source
+correctness and G4 parent projection remain separate; G4 does not import
+failures unreachable outside its final topology.
 
 ## Closeout Evidence
 
