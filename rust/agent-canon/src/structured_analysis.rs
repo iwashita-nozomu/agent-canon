@@ -861,17 +861,16 @@ fn collect_document_paths_recursive(
             entry.map_err(|error| format!("read-dir-entry {}: {error}", current.display()))?;
         let path = entry.path();
         if path.is_dir() {
-            if skip_recursive_dir(&path) {
+            let relative = repo_relative_slash_path(root, &path);
+            if skip_recursive_dir(&path) || is_ephemeral_path(Path::new(&relative)) {
                 continue;
             }
             collect_document_paths_recursive(root, &path, paths)?;
         } else if path.is_file() && is_document_path(&path) {
-            let relative = path
-                .strip_prefix(root)
-                .unwrap_or(&path)
-                .to_string_lossy()
-                .replace('\\', "/");
-            paths.push(relative);
+            let relative = repo_relative_slash_path(root, &path);
+            if !is_ephemeral_path(Path::new(&relative)) {
+                paths.push(relative);
+            }
         }
     }
     Ok(())
@@ -889,20 +888,26 @@ fn collect_file_paths_recursive(
             entry.map_err(|error| format!("read-dir-entry {}: {error}", current.display()))?;
         let path = entry.path();
         if path.is_dir() {
-            if skip_recursive_dir(&path) {
+            let relative = repo_relative_slash_path(root, &path);
+            if skip_recursive_dir(&path) || is_ephemeral_path(Path::new(&relative)) {
                 continue;
             }
             collect_file_paths_recursive(root, &path, paths)?;
         } else if path.is_file() {
-            let relative = path
-                .strip_prefix(root)
-                .unwrap_or(&path)
-                .to_string_lossy()
-                .replace('\\', "/");
-            paths.push(relative);
+            let relative = repo_relative_slash_path(root, &path);
+            if !is_ephemeral_path(Path::new(&relative)) {
+                paths.push(relative);
+            }
         }
     }
     Ok(())
+}
+
+fn repo_relative_slash_path(root: &Path, path: &Path) -> String {
+    path.strip_prefix(root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/")
 }
 
 fn skip_recursive_dir(path: &Path) -> bool {
@@ -927,10 +932,12 @@ fn skip_recursive_dir(path: &Path) -> bool {
 }
 
 fn is_ephemeral_path(path: &Path) -> bool {
-    path.components()
-        .next()
+    let components = path
+        .components()
         .map(|component| component.as_os_str())
-        == Some("reports".as_ref())
+        .collect::<Vec<_>>();
+    components.first().copied() == Some("reports".as_ref())
+        || (components.len() >= 4 && components[0] == "experiments" && components[2] == "result")
 }
 
 fn is_document_path(path: &Path) -> bool {
@@ -3216,6 +3223,38 @@ mod tests {
             .findings
             .iter()
             .any(|finding| finding.kind == "generated_report"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn managed_experiment_results_are_excluded_by_exact_path() {
+        let root = test_root("structured-analysis-managed-result-boundary");
+        write_fixture(
+            &root,
+            "experiments/topic/result/run/artifact.md",
+            "# Managed Result\n\nGenerated.",
+        );
+        write_fixture(
+            &root,
+            "experiments/topic/subtopic/result/run/source.md",
+            "# Nested Topic Source\n\nSource.",
+        );
+        write_fixture(
+            &root,
+            "notes/result/source.md",
+            "# Unrelated Result Source\n\nSource.",
+        );
+
+        let report = build_report(&root).expect("report");
+        let paths = report
+            .documents
+            .iter()
+            .map(|record| record.path.as_str())
+            .collect::<BTreeSet<_>>();
+
+        assert!(!paths.contains("experiments/topic/result/run/artifact.md"));
+        assert!(paths.contains("experiments/topic/subtopic/result/run/source.md"));
+        assert!(paths.contains("notes/result/source.md"));
         let _ = fs::remove_dir_all(root);
     }
 

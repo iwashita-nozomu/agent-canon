@@ -55,6 +55,81 @@ class RepoStructureContractTest(unittest.TestCase):
             self.assertIn("REPO_STRUCTURE_PROFILE=agent_canon_standalone", result.stdout)
             self.assertIn("REPO_STRUCTURE_TREE_SOURCE=tree-command:", result.stdout)
 
+    def test_managed_results_are_excluded_by_exact_path(self) -> None:
+        """Managed result bytes do not broaden into a global result-directory ignore."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_standalone_fixture(root)
+            managed_artifact = root / "experiments" / "topic" / "result" / "run" / "artifact.json"
+            nested_topic_source = (
+                root
+                / "experiments"
+                / "topic"
+                / "subtopic"
+                / "result"
+                / "run"
+                / "source.md"
+            )
+            unrelated_result_source = root / "notes" / "result" / "source.md"
+            self.write_file(root, str(managed_artifact.relative_to(root)), "generated\n")
+            self.write_file(root, str(nested_topic_source.relative_to(root)), "nested source\n")
+            self.write_file(
+                root,
+                str(unrelated_result_source.relative_to(root)),
+                "unrelated source\n",
+            )
+
+            with_all_paths = self.run_checker(
+                root,
+                "--profile",
+                "agent_canon_standalone",
+                "--format",
+                "json",
+            )
+            managed_artifact.unlink()
+            without_managed_artifact = self.run_checker(
+                root,
+                "--profile",
+                "agent_canon_standalone",
+                "--format",
+                "json",
+            )
+            nested_topic_source.unlink()
+            without_nested_topic_source = self.run_checker(
+                root,
+                "--profile",
+                "agent_canon_standalone",
+                "--format",
+                "json",
+            )
+            unrelated_result_source.unlink()
+            without_unrelated_result_source = self.run_checker(
+                root,
+                "--profile",
+                "agent_canon_standalone",
+                "--format",
+                "json",
+            )
+
+            results = (
+                with_all_paths,
+                without_managed_artifact,
+                without_nested_topic_source,
+                without_unrelated_result_source,
+            )
+            for result in results:
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            reports = tuple(json.loads(result.stdout) for result in results)
+            self.assertEqual(reports[0]["checked_paths"], reports[1]["checked_paths"])
+            self.assertEqual(
+                reports[1]["checked_paths"],
+                reports[2]["checked_paths"] + 1,
+            )
+            self.assertEqual(
+                reports[2]["checked_paths"],
+                reports[3]["checked_paths"] + 1,
+            )
+
     def test_missing_required_path_fails(self) -> None:
         """Missing required paths should be reported as errors."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -159,6 +234,7 @@ class RepoStructureContractTest(unittest.TestCase):
             "documents/shared-runtime-surfaces.toml",
             "documents/repo-structure-contract.toml",
             "tools/catalog.yaml",
+            "tools/agent_tools/update_lifecycle_contract.py",
             "rust/agent-canon/Cargo.toml",
         ]:
             self.write_file(root, file_path, f"{file_path}\n")
@@ -240,7 +316,11 @@ class RepoStructureContractTest(unittest.TestCase):
                     "name": "tools",
                     "contents": [
                         {"type": "file", "name": "catalog.yaml"},
-                        {"type": "directory", "name": "agent_tools"},
+                        {
+                            "type": "directory",
+                            "name": "agent_tools",
+                            "contents": [{"type": "file", "name": "update_lifecycle_contract.py"}],
+                        },
                         {"type": "directory", "name": "user"},
                         {"type": "directory", "name": "internal"},
                         {"type": "directory", "name": "ci"},

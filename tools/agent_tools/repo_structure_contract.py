@@ -220,6 +220,34 @@ def load_contract(root: Path, contract_path: str) -> tuple[IgnoreRules, tuple[Pr
     return ignore_rules, tuple(profiles)
 
 
+def path_glob_matches(path: str, pattern: str) -> bool:
+    """Match slash-separated paths with `*` limited to one segment."""
+    path_parts = tuple(part for part in normalize_path(path).split("/") if part)
+    pattern_parts = tuple(part for part in normalize_path(pattern).split("/") if part)
+    memo: dict[tuple[int, int], bool] = {}
+
+    def matches(path_index: int, pattern_index: int) -> bool:
+        key = (path_index, pattern_index)
+        if key in memo:
+            return memo[key]
+        if pattern_index == len(pattern_parts):
+            result = path_index == len(path_parts)
+        elif pattern_parts[pattern_index] == "**":
+            result = matches(path_index, pattern_index + 1) or (
+                path_index < len(path_parts) and matches(path_index + 1, pattern_index)
+            )
+        else:
+            result = (
+                path_index < len(path_parts)
+                and fnmatch.fnmatchcase(path_parts[path_index], pattern_parts[pattern_index])
+                and matches(path_index + 1, pattern_index + 1)
+            )
+        memo[key] = result
+        return result
+
+    return matches(0, 0)
+
+
 def is_ignored(path: str, rules: IgnoreRules) -> bool:
     """Return whether a repo-relative path is ignored by contract defaults."""
     normalized = normalize_path(path)
@@ -228,10 +256,14 @@ def is_ignored(path: str, rules: IgnoreRules) -> bool:
     parts = normalized.split("/")
     if any(part in rules.names for part in parts):
         return True
-    return any(
-        fnmatch.fnmatch(normalized, pattern) or fnmatch.fnmatch(parts[-1], pattern)
-        for pattern in rules.globs
-    )
+    for pattern in rules.globs:
+        normalized_pattern = normalize_path(pattern)
+        if "/" in normalized_pattern:
+            if path_glob_matches(normalized, normalized_pattern):
+                return True
+        elif fnmatch.fnmatchcase(parts[-1], normalized_pattern):
+            return True
+    return False
 
 
 def records_from_tree_node(
@@ -287,6 +319,10 @@ def tree_ignore_pattern(rules: IgnoreRules) -> str:
     """Return the tree -I pattern derived from contract ignore names."""
     names = set(rules.names)
     for pattern in rules.globs:
+        # `tree -I` matches names at every depth, so a path-scoped glob such
+        # as `experiments/*/result` would incorrectly hide unrelated paths.
+        if "/" in pattern:
+            continue
         tail = pattern.rstrip("/").split("/")[-1]
         if tail and tail != "**":
             names.add(tail)

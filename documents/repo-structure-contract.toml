@@ -27,6 +27,8 @@ ignore_names = [
   "target",
 ]
 ignore_globs = [
+  "experiments/*/result",
+  "experiments/*/result/**",
   "*/__pycache__",
   "rust/agent-canon/target",
   "rust/agent-canon/target/**",
