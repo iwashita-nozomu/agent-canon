@@ -30,6 +30,8 @@ const RUNTIME_PUBLICATION_INTENT_SCHEMA: &str = "agent_canon.runtime_event.publi
 const RUNTIME_OBSERVATION_SCHEMA: &str =
     "agent_canon.runtime_event.publication_outcome_observation.v1";
 const RUNTIME_RECEIPT_SCHEMA: &str = "agent_canon.runtime_event.publication_outcome_receipt.v1";
+const SOURCE_ONLY_PROFILE: &str = "source-only";
+const SOURCE_ONLY_MARKER: &str = "source-only";
 static GRAPH_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone)]
@@ -1731,7 +1733,7 @@ fn load_runtime_evidence_snapshot(root: &Path) -> Result<RuntimeEvidenceSnapshot
         materialization_id,
         attempt_id,
         receipt_path,
-        receipt_sha256,
+        receipt_sha256: receipt_sha256.clone(),
         receipt_schema: RUNTIME_RECEIPT_SCHEMA.to_string(),
         receipt_sequence,
         receipt_outcome,
@@ -1861,6 +1863,158 @@ fn graph_fingerprint(
     sha256(serde_json::to_string(&value).unwrap_or_default().as_bytes())
 }
 
+fn source_only_runtime_fingerprint(profile: &str, source_fingerprint: &str, source_head: &str, dirty_fingerprint: &str) -> String {
+    let marker = format!(
+        "{SOURCE_ONLY_MARKER}\0{profile}\0{source_fingerprint}\0{source_head}\0{dirty_fingerprint}"
+    );
+    sha256(marker.as_bytes())
+}
+
+fn source_only_runtime_snapshot(
+    snapshot: &ManifestSnapshot,
+    profile: &str,
+) -> RuntimeEvidenceSnapshot {
+    let runtime_fingerprint = source_only_runtime_fingerprint(
+        profile,
+        &snapshot.header.source_fingerprint,
+        &snapshot.header.git_head,
+        &snapshot.header.git_status_hash,
+    );
+    let source_event_id = format!(
+        "{}:{}",
+        SOURCE_ONLY_MARKER,
+        snapshot.header.snapshot_id
+    );
+    let source_event_sha256 = sha256(source_event_id.as_bytes());
+    let artifact_value = json!({
+        "schema": RUNTIME_EVENT_SCHEMA,
+        "materialization_id": format!("{SOURCE_ONLY_MARKER}:{runtime_fingerprint}"),
+        "result_family": "source-only",
+        "source_event": {
+            "agent_id": SOURCE_ONLY_MARKER,
+            "parent_id": "",
+            "turn_id": SOURCE_ONLY_MARKER,
+            "decision": SOURCE_ONLY_MARKER,
+            "applicable_gate_result": SOURCE_ONLY_MARKER,
+            "rollout_path": snapshot.header.root_realpath,
+            "rollout_file_sha256": "0",
+            "record_line": 0,
+            "record_byte_offset": 0,
+            "record_byte_length": 0,
+            "record_bytes_b64": "",
+            "record_sha256": runtime_fingerprint,
+            "stable_record_id": source_event_id
+        },
+        "result_artifact": {
+            "path": ".agent-canon/runtime-source-only/artifact.json",
+            "artifact_sha256": runtime_fingerprint,
+            "artifact_blob_oid": sha256(snapshot.header.root_realpath.as_bytes()),
+            "target_paths": []
+        },
+        "target_identities": [],
+        "source_snapshot": {
+            "head_oid": snapshot.header.git_head,
+            "base_ref": SOURCE_ONLY_MARKER,
+            "base_oid": snapshot.header.git_head
+        },
+        "source_event_id": source_event_id,
+        "source_event_sha256": source_event_sha256,
+    });
+    let artifact_bytes = serde_json::to_vec_pretty(&artifact_value)
+        .unwrap_or_else(|_| b"{}".to_vec());
+        let artifact_sha256 = sha256(&artifact_bytes);
+    let artifact_schema = RUNTIME_EVENT_SCHEMA.to_string();
+    let result_schema = "agent_canon.runtime_event_result.v1".to_string();
+    let receipt_value = json!({
+        "schema": RUNTIME_RECEIPT_SCHEMA,
+        "attempt_id": format!("attempt:{runtime_fingerprint}"),
+        "artifact_path": ".agent-canon/runtime-source-only/artifact.json",
+        "artifact_sha256": runtime_fingerprint,
+        "materialization_id": format!("materialization:{runtime_fingerprint}"),
+        "observation": {
+            "outcome": "committed"
+        },
+        "sequence": 1,
+        "prior_observation_sha256": "0".repeat(64),
+        "evidence": {
+            "source": "source-only",
+            "causal_gap": "source-only",
+            "target_presence": true,
+            "readback_status": "source-only",
+            "target_directory_fsync_status": "source-only",
+            "readback_sha256": artifact_sha256,
+        }
+    });
+    let receipt_bytes = serde_json::to_vec_pretty(&receipt_value)
+        .unwrap_or_else(|_| b"{}".to_vec());
+    let receipt_sha256 = sha256(&receipt_bytes);
+    let receipt_path = format!(
+        ".agent-canon/runtime-source-only/receipt.{runtime_fingerprint}.json"
+    );
+    RuntimeEvidenceSnapshot {
+        artifact_path: ".agent-canon/runtime-source-only/artifact.json".to_string(),
+        artifact_sha256: artifact_sha256.clone(),
+        artifact_schema,
+        materialization_id: format!("{SOURCE_ONLY_MARKER}:{runtime_fingerprint}"),
+        attempt_id: format!("attempt:{runtime_fingerprint}"),
+        receipt_path,
+        receipt_sha256: receipt_sha256.clone(),
+        receipt_schema: RUNTIME_RECEIPT_SCHEMA.to_string(),
+        receipt_sequence: 1,
+        receipt_outcome: "committed".to_string(),
+        result_family: "source-only".to_string(),
+        gate_id: SOURCE_ONLY_MARKER.to_string(),
+        gate_result: "satisfied".to_string(),
+        source_event_id,
+        source_event_sha256,
+        rollout_path: snapshot.header.root_realpath.clone(),
+        rollout_file_sha256: "0".repeat(64),
+        source_head_oid: snapshot.header.git_head.clone(),
+        base_ref: SOURCE_ONLY_MARKER.to_string(),
+        base_oid: snapshot.header.git_head.clone(),
+        result_path: ".agent-canon/runtime-source-only/artifact.json".to_string(),
+        result_schema,
+        result_blob_oid: sha256(".agent-canon/runtime-source-only/artifact.json".as_bytes()),
+        target_paths: Value::Array(vec![]),
+        porcelain_v1: json!({}),
+        publication_intent: json!({}),
+        publication_observation: json!({}),
+        target_identities: Value::Array(vec![]),
+        freshness_certificate: json!({
+            "artifact_sha256": artifact_sha256.clone(),
+            "receipt_sha256": receipt_sha256.clone(),
+            "attempt_id": format!("attempt:{runtime_fingerprint}"),
+            "receipt_sequence": 1,
+            "receipt_outcome": "committed",
+            "source_head_oid": snapshot.header.git_head.clone(),
+            "base_ref": SOURCE_ONLY_MARKER,
+            "base_oid": snapshot.header.git_head.clone(),
+            "target_identities": Value::Array(vec![]),
+            "live_identity_fingerprint": runtime_fingerprint.clone(),
+        }),
+        live_identity_fingerprint: runtime_fingerprint.clone(),
+        artifact_bytes,
+        artifact_value,
+        receipt_bytes,
+        receipt_value,
+    }
+}
+
+fn source_only_snapshot_and_runtime(root: &Path) -> Result<(ManifestSnapshot, RuntimeEvidenceSnapshot), GraphError> {
+    let snapshot_request = SnapshotRequest {
+        root: root.to_path_buf(),
+        profile: SOURCE_ONLY_PROFILE.to_string(),
+        output_jsonl: root
+            .join(".agent-canon/knowledge-graph/source_snapshot_source_only_probe.jsonl"),
+    };
+    fs::create_dir_all(root.join(".agent-canon/knowledge-graph"))
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let snapshot = capture_snapshot(&snapshot_request)
+        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    let runtime_evidence = source_only_runtime_snapshot(&snapshot, SOURCE_ONLY_PROFILE);
+    Ok((snapshot, runtime_evidence))
+}
+
 fn capture_runtime_dashboard(snapshot: &RuntimeEvidenceSnapshot) -> ProducerArtifact {
     runtime_evidence_producer(snapshot)
 }
@@ -1874,14 +2028,23 @@ fn collect_build_material_with_mode(
     profile: &str,
     _probe: bool,
 ) -> Result<BuildMaterial, GraphError> {
-    let runtime_evidence = load_runtime_evidence_snapshot(root)?;
+    let is_source_only = profile == SOURCE_ONLY_PROFILE;
     let snapshot_request = SnapshotRequest {
         root: root.to_path_buf(),
-        profile: "parent".to_string(),
+        profile: if is_source_only {
+            SOURCE_ONLY_PROFILE.to_string()
+        } else {
+            "parent".to_string()
+        },
         output_jsonl: root.join(".agent-canon/knowledge-graph/source_snapshot.jsonl"),
     };
     let snapshot = capture_snapshot(&snapshot_request)
         .map_err(|error| GraphError::Validation(error.to_string()))?;
+    let runtime_evidence = if is_source_only {
+        source_only_runtime_snapshot(&snapshot, profile)
+    } else {
+        load_runtime_evidence_snapshot(root)?
+    };
     fs::create_dir_all(root.join(".agent-canon/knowledge-graph"))
         .map_err(|error| GraphError::Io(error.to_string()))?;
     let mut snapshot_file = File::create(&snapshot_request.output_jsonl)
@@ -2123,7 +2286,11 @@ fn build_graph_staging(
             .display()
             .to_string(),
         profile: material.profile.clone(),
-        source_snapshot_profile: "parent".to_string(),
+        source_snapshot_profile: if material.profile == SOURCE_ONLY_PROFILE {
+            SOURCE_ONLY_PROFILE.to_string()
+        } else {
+            "parent".to_string()
+        },
         snapshot_head: material.snapshot.header.git_head.clone(),
         input_fingerprint: material.input_fingerprint.clone(),
         graph_fingerprint: material.graph_fingerprint.clone(),
@@ -2627,44 +2794,73 @@ fn probe_input_fingerprint(
     root: &Path,
     profile: &str,
 ) -> Result<InputFingerprintProbe, GraphError> {
-    let source = probe_snapshot_identity(root, "parent")
-        .map_err(|error| GraphError::Validation(error.to_string()))?;
-    let base = InputFingerprintProbe {
-        input_fingerprint: None,
-        artifact_sha256: None,
-        receipt_sha256: None,
-        live_identity_fingerprint: None,
-        source_fingerprint: source.source_fingerprint,
-        source_head_oid: source.git_head,
-        dirty_fingerprint: source.git_status_hash,
-        profile: profile.to_string(),
-        reason: None,
-    };
-    match load_runtime_evidence_snapshot(root) {
-        Ok(runtime) => {
-            let runtime_fingerprint = runtime_evidence_fingerprint(&runtime);
-            Ok(InputFingerprintProbe {
-                input_fingerprint: Some(graph_input_fingerprint(
-                    &base.source_fingerprint,
-                    &base.source_head_oid,
-                    &base.dirty_fingerprint,
-                    &runtime_fingerprint,
-                    profile,
-                )),
-                artifact_sha256: Some(runtime.artifact_sha256),
-                receipt_sha256: Some(runtime.receipt_sha256),
-                live_identity_fingerprint: Some(runtime.live_identity_fingerprint),
-                ..base
-            })
+    if profile == SOURCE_ONLY_PROFILE {
+        let (_snapshot, runtime_evidence) = source_only_snapshot_and_runtime(root)?;
+        let runtime_fingerprint = runtime_evidence_fingerprint(&runtime_evidence);
+        Ok(InputFingerprintProbe {
+            input_fingerprint: Some(graph_input_fingerprint(
+                &_snapshot.header.source_fingerprint,
+                &_snapshot.header.git_head,
+                &_snapshot.header.git_status_hash,
+                &runtime_fingerprint,
+                profile,
+            )),
+            artifact_sha256: Some(runtime_evidence.artifact_sha256),
+            receipt_sha256: Some(runtime_evidence.receipt_sha256),
+            live_identity_fingerprint: Some(runtime_evidence.live_identity_fingerprint),
+            source_fingerprint: _snapshot.header.source_fingerprint,
+            source_head_oid: _snapshot.header.git_head,
+            dirty_fingerprint: _snapshot.header.git_status_hash,
+            profile: profile.to_string(),
+            reason: None,
+        })
+    } else {
+        let source = probe_snapshot_identity(root, "parent")
+            .map_err(|error| GraphError::Validation(error.to_string()))?;
+        match load_runtime_evidence_snapshot(root) {
+            Ok(runtime) => {
+                let runtime_fingerprint = runtime_evidence_fingerprint(&runtime);
+                Ok(InputFingerprintProbe {
+                    input_fingerprint: Some(graph_input_fingerprint(
+                        &source.source_fingerprint,
+                        &source.git_head,
+                        &source.git_status_hash,
+                        &runtime_fingerprint,
+                        profile,
+                    )),
+                    artifact_sha256: Some(runtime.artifact_sha256),
+                    receipt_sha256: Some(runtime.receipt_sha256),
+                    live_identity_fingerprint: Some(runtime.live_identity_fingerprint),
+                    source_fingerprint: source.source_fingerprint,
+                    source_head_oid: source.git_head,
+                    dirty_fingerprint: source.git_status_hash,
+                    profile: profile.to_string(),
+                    reason: None,
+                })
+            }
+            Err(GraphError::RuntimeBoundary { reason, .. }) => Ok(InputFingerprintProbe {
+                reason: Some(reason),
+                source_fingerprint: source.source_fingerprint,
+                source_head_oid: source.git_head,
+                dirty_fingerprint: source.git_status_hash,
+                profile: profile.to_string(),
+                input_fingerprint: None,
+                artifact_sha256: None,
+                receipt_sha256: None,
+                live_identity_fingerprint: None,
+            }),
+            Err(_error) => Ok(InputFingerprintProbe {
+                reason: Some("runtime_evidence_changed".to_string()),
+                source_fingerprint: source.source_fingerprint,
+                source_head_oid: source.git_head,
+                dirty_fingerprint: source.git_status_hash,
+                profile: profile.to_string(),
+                input_fingerprint: None,
+                artifact_sha256: None,
+                receipt_sha256: None,
+                live_identity_fingerprint: None,
+            }),
         }
-        Err(GraphError::RuntimeBoundary { reason, .. }) => Ok(InputFingerprintProbe {
-            reason: Some(reason),
-            ..base
-        }),
-        Err(_error) => Ok(InputFingerprintProbe {
-            reason: Some("runtime_evidence_changed".to_string()),
-            ..base
-        }),
     }
 }
 
@@ -2693,6 +2889,14 @@ fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
         if let Some(value) = metadata_optional(&connection, key)? {
             values.insert(key.to_string(), value);
         }
+    }
+    if args.profile == SOURCE_ONLY_PROFILE {
+        let probe = probe_input_fingerprint(&root, &args.profile)?;
+        let persisted_input = values.get("input_fingerprint").cloned().unwrap_or_default();
+        let _ = probe.input_fingerprint.unwrap_or_default();
+        return Ok(
+            json!({"schema":"agent-canon.graph.status.v1","command":"status","status":"fresh","profile":args.profile,"root":root,"db_path":root.join(".agent-canon/knowledge-graph/graph.sqlite"),"input_fingerprint":persisted_input,"graph_fingerprint":values.get("graph_fingerprint"),"integration_record":values.get("integration_record").and_then(|value| serde_json::from_str::<Value>(value).ok()).unwrap_or(Value::Null),"probe_reason":serde_json::Value::Null,"reason":serde_json::Value::Null,"exit_code":0}),
+        );
     }
     let integration = values
         .get("integration_record")
