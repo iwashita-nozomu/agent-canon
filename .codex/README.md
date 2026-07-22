@@ -97,9 +97,16 @@ waive workflow gates and do not authorize dropping decision-relevant context.
   `role_id+instance_id+agent_type` が instance key で、`max_threads` は runtime cap であり
   role cardinality の source ではありません。
 - write-capable subagent instance は既定 1 体から始めます。parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合だけ、同じ role type を含む複数 writer instance を spawn budget 内で並列化できます。衝突する target は禁止対象ではなく順序制約として先行 / 後続 wave に分けます。
-- 新規 user request では前 task の subagent を使い回さず、run bundle ごとに fresh subagent を起こします
-- active task の途中追加指示は parent が `same_active_task_delta` / `scope_or_contract_change` / `new_task` に分類し、same-task delta は run bundle checkpoint と updated packet path を残してから run-local subagent へ再配送し、scope 変更は fresh follow-up wave にします
-- `team_manifest.yaml` には `run.subagent_lifecycle_policy` を出し、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を handoff prompt に含めます
+- 各 user input は `same_active_task_delta` / `scope_or_contract_change` /
+  `new_task` に分類します。owner、責務、context、write authority、validation
+  route が互換なら active subagent を revised scope でも再利用します。独立
+  review、disjoint write authority、incompatible owner/context、または failed
+  context integrity の場合だけ fresh follow-up wave を選びます。新しい turn や
+  packet 名だけでは fresh の理由になりません。coordination または resumption
+  が必要な場合だけ checkpoint、updated packet path、run bundle を残します。
+- `team_manifest.yaml` には選択した `run.subagent_lifecycle_policy` と fresh
+  条件を出し、`fresh_subagents_required: true` と
+  `reuse_for_new_task: forbidden` を一律の handoff 契約にはしません
 - closeout は canonical `spawned -> active -> durable result/error -> handed
   back -> descendants closure verified -> close requested -> closed ->
   reservation released` を全 descendant で確認し、canonical `close_agent`

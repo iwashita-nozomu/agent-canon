@@ -338,8 +338,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             agent_team,
         )
         self.assertIn("import_decision_sufficiency_verdict", agent_team)
-        self.assertIn("route=spark_worker", subagents)
-        self.assertIn("exactly one owner gate", subagents)
+        self.assertIn("selected owner gate", subagents)
         self.assertIn("decision_sufficiency_packet_ref", agent_team)
         for path in consumer_docs:
             with self.subTest(path=path):
@@ -523,7 +522,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         catalog = task_catalog_from_raw(raw)
 
         with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
-            with self.assertRaisesRegex(RuntimeError, "T12 default-active specialists"):
+            with self.assertRaisesRegex(RuntimeError, "T12 candidate specialists"):
                 runtime_alignment.validate_task_catalog_references()
 
     def test_skill_config_accepts_project_owned_skill_overlay(self) -> None:

@@ -740,6 +740,17 @@ def dispatch_current_candidate_review(
     }
 
 
+def _review_text_without_rejected_hypotheses(text: str) -> str:
+    """Exclude adjudicated rejected table rows from approval checks."""
+    lines: list[str] = []
+    for line in text.splitlines():
+        cells = tuple(cell.strip().lower() for cell in line.split("|")[1:-1])
+        if "rejected" in cells:
+            continue
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def record_current_review_decision(
     workspace: Path,
     *,
@@ -780,7 +791,7 @@ def record_current_review_decision(
     decision = decisions[-1].upper()
     if decision == "APPROVE" and re.search(
         r"(?im)^\s*(?:[-*]|\|)\s*.*\b(?:fail|revise|required_change|blocker)\b",
-        text,
+        _review_text_without_rejected_hypotheses(text),
     ):
         raise AutomaticReviewError("automatic_review:approve_with_findings")
     observed_result = event.get("observed_result")

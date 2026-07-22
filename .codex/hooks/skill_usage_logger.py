@@ -553,6 +553,7 @@ TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
     "tool_rejection_preflight.py": ("tool rejection", "preflight", "はじかれる"),
     "workflow_monitor.py": ("workflow_monitor", "runtime-feedback", "runtime feedback"),
 }
+SHELL_ASSIGNMENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=.*")
 SUBAGENT_TOOL_ACTIONS: dict[str, str] = {
     "task": "spawn",
     "spawn_agent": "spawn",
@@ -1152,13 +1153,21 @@ def subagent_selection(payload: dict[str, object]) -> SubagentSelection:
 
 
 def command_verb(tool_input: object) -> str:
-    """Return the first command token for shell-like tool input."""
+    """Return the canonical executable after leading shell assignments."""
     if not isinstance(tool_input, dict):
         return ""
     command = tool_input.get("cmd") or tool_input.get("command")
     if not isinstance(command, str) or not command.strip():
         return ""
-    return command.strip().split()[0]
+    try:
+        parts = tuple(part for part in shlex.split(command) if part)
+    except ValueError:
+        parts = tuple(command.strip().split())
+    for part in parts:
+        if SHELL_ASSIGNMENT_RE.fullmatch(part):
+            continue
+        return part
+    return ""
 
 
 def command_selected_tools(tool_input: object) -> tuple[str, ...]:

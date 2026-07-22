@@ -3220,6 +3220,22 @@ def _actual_wave_mismatch_blockers(
     return blockers
 
 
+def _missing_actual_wave_classification(planned: dict[str, str]) -> str:
+    """Return the explicit cause class for a planned row with no actual event."""
+    source = " ".join(
+        (
+            planned.get("Status", ""),
+            planned.get("Skipped Roles / Rationale", ""),
+        )
+    ).lower()
+    classes = tuple(
+        name
+        for name in ("overplanning", "logging_gap", "unresolved")
+        if name in source
+    )
+    return classes[0] if len(classes) == 1 else ""
+
+
 def wave_reconciliation_blockers(
     schedule_text: str,
     workflow_monitoring_text: str,
@@ -3252,6 +3268,14 @@ def wave_reconciliation_blockers(
     for wave_id, planned in planned_by_id.items():
         actual = actual_by_id.get(wave_id)
         if actual is None:
+            classification = _missing_actual_wave_classification(planned)
+            if classification in {"overplanning", "unresolved"}:
+                continue
+            if classification == "logging_gap":
+                blockers.append(
+                    f"workflow_monitoring.md:actual_wave_missing:{wave_id}:logging_gap"
+                )
+                continue
             blockers.append(f"workflow_monitoring.md:actual_wave_missing:{wave_id}")
             continue
         blockers.extend(

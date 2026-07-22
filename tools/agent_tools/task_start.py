@@ -281,9 +281,9 @@ def resolve_task_start_context(
             )
     manual_specialists = expand_enabled_specialists(config, catalog, tuple(args.enable))
     enabled_specialists = list(manual_specialists)
-    for role_id in task_default_specialists:
-        if role_id not in enabled_specialists:
-            enabled_specialists.append(role_id)
+    # Task-catalog specialists and default review packs are routing candidates.
+    # They become active only through explicit enablement or an owner-critical
+    # activation path selected by the current route.
     auto_specialists: tuple[str, ...] = ()
     if not args.no_auto_language_reviewers:
         auto_specialists = auto_language_specialists(
@@ -447,9 +447,7 @@ def emit_task_start_output(
         manual_specialists=context.manual_specialists,
         task_default_specialists=context.task_default_specialists,
         auto_specialists=context.auto_specialists,
-        default_review_packs_enabled=bool(
-            args.task_id is not None and not args.no_default_review_packs
-        ),
+        default_review_packs_enabled=False,
         default_review_pack_ids=context.default_review_pack_ids,
     ):
         print(line)
@@ -556,9 +554,7 @@ def main() -> int:
             manual_specialists=context.manual_specialists,
             task_default_specialists=context.task_default_specialists,
             auto_specialists=context.auto_specialists,
-            default_review_packs_enabled=bool(
-                args.task_id is not None and not args.no_default_review_packs
-            ),
+            default_review_packs_enabled=False,
             default_review_pack_ids=context.default_review_pack_ids,
             selected_skills=selected_skills,
             task_catalog=catalog,

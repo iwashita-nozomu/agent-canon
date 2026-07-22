@@ -27,7 +27,9 @@ upstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py re
 - Tool Commands: run this skill's command packet, then read the canonical
   `agents/skills/agent-log-analysis.md` workflow.
 - Boundary: generate the structured dashboard first; do not start with broad raw
-  log reading.
+  log reading. Interpret tool selections, spawn records, planned/actual waves,
+  packet materialization, and checker evidence together when diagnosing work
+  amplification.
 
 ## Tool Commands
 
@@ -76,6 +78,11 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
 1. Read the API JSON or compact Markdown as the default analysis input. The
    archive repo owns append-only evidence; the AgentCanon source dashboard owns
    aggregation, moving averages, and routing evidence cells.
+1. Classify missing actual wave rows before proposing reconciliation as
+   `overplanning`, `logging_gap`, or `unresolved`. Do not backfill overplanning
+   or unresolved rows; only a supported logging gap routes to logging repair.
+   Group findings by owning replaceable responsibility and compatible context,
+   not one agent, packet, wave, or review per finding.
 1. Confirm the API JSON includes the normal analysis fields `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, and `oop_applicability`.
 1. When `generate_agent_runtime_dashboard.py` lacks a needed compact field,
    record `dashboard_api_contract_gap`, route that finding to the dashboard API owner,
@@ -87,7 +94,7 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
 1. When the user asks to turn structured evidence into durable skill issues, hand
    the structured API output, structured Markdown summary, and Finding Route Packet to
    `$issue-finding-report`.
-1. If the analysis drives a prompt, skill, workflow, or tool change, write the `Finding Route Packet` from `agents/skills/agent-log-analysis.md` before editing or spawning the repair wave. The packet must include `finding_class`, `evidence_cells`, `route_target`, `instance_partition`, `required_packet`, and `closeout_gate`.
+1. If the analysis drives a prompt, skill, workflow, or tool change, write the `Finding Route Packet` from `agents/skills/agent-log-analysis.md` before editing or spawning the repair wave. A structured handoff message or tool result satisfies it; use a durable file only for coordination or resumption. The packet must include `finding_class`, `evidence_cells`, `route_target`, `instance_partition`, `required_packet`, and `closeout_gate`.
 1. Route by finding class:
    wave execution findings to `$subagent-bootstrap`;
    skill selection findings to the affected skill plus `prompt_config_reviewer`;

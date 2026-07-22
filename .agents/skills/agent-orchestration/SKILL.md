@@ -21,7 +21,9 @@ upstream implementation ../../../tools/agent_tools/agent_team.py materializes ma
   `agents/skills/agent-orchestration.md#Decision Sufficiency Packet`.
 - Runtime packet producer: `tools/agent_tools/agent_team.py`.
 - Boundary: this file is a discovery shim and does not restate routing, DSV,
-  ToolCall, subagent, or validation rules.
+  ToolCall, subagent, or validation rules. The semantic sufficiency record is
+  owner, replaceable unit, implementation mechanism, validation route, and any
+  unresolved branch that can change them; durable packet transport is conditional.
 
 ## Tool Commands
 
@@ -36,7 +38,8 @@ Execute the required and task-matching conditional commands that the packet prin
 <!-- skill-tool-commands:end -->
 
 1. Read `agents/skills/agent-orchestration.md` as the sole policy owner.
-1. Consume the owner-produced `DecisionSufficiencyPacket` referenced by the
-   active route packet.
+1. Consume the owner-produced semantic decision-sufficiency record referenced by
+   the active route packet. A structured handoff or tool result is sufficient;
+   use a durable packet reference only for coordination or resumption.
 1. Execute the route packet's machine-readable ToolCall tokens and return their
    typed failure semantics without translating them into prose commands.

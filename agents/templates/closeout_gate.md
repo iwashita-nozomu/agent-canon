@@ -25,7 +25,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 - verifier_status: pending
 - auditor_status: pending
-- required_reviews_complete: no
+- required_reviews_complete: not_applicable
 - validation_complete: no
 - request_contract_complete: no
 - all_planned_chunks_complete: no
@@ -42,11 +42,11 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - repo_wide_static_analysis_complete: no
 - agent_canon_latest_complete: no
 - review_findings_integrated: no
-- post_fix_full_review_complete: no
+- post_fix_full_review_complete: not_applicable
 - tool_warnings_resolved: no
 - mechanical_completion_loop_complete: no
 - subagents_closed: no
-- diff_check_agent_complete: no
+- diff_check_agent_complete: not_applicable
 - canonical_tree_head_complete: no
 - agent_evaluation_complete: no
 - runtime_log_archive_synced: no
@@ -60,7 +60,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 - verifier_status: pass
 - auditor_status: resolved
-- required_reviews_complete: yes
+<!-- Set required_reviews_complete to yes when the selected owning gate is adjudicated; use not_applicable when no review is activated. -->
 - validation_complete: yes
 - request_contract_complete: yes
 - all_planned_chunks_complete: yes
@@ -77,11 +77,11 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - canonical_dispatcher_schema_status: pass
 - validation_failure_response_status: pass
 - review_findings_integrated: yes
-- post_fix_full_review_complete: yes
+<!-- Set post_fix_full_review_complete to yes when the selected final-contract rerun is complete; use not_applicable when it is not selected. -->
 - tool_warnings_resolved: yes
 - mechanical_completion_loop_complete: yes
 - subagents_closed: yes
-- diff_check_agent_complete: yes
+<!-- Set diff_check_agent_complete to yes when the diff-check gate is activated and complete; use not_applicable otherwise. -->
 - canonical_tree_head_complete: yes
 - agent_evaluation_complete: yes
 - runtime_log_archive_synced: yes
@@ -191,7 +191,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Subagent Lifecycle Evidence
 
-<!-- Record run-local subagent lifecycle evidence before user-facing completion. New user requests must use fresh subagents, not send_input to agents created for prior tasks. Mid-task user instructions must be classified as same_active_task_delta, scope_or_contract_change, or new_task; same-task deltas need a run-bundle checkpoint and updated packet path before any run-local send_input, while scope changes need a fresh follow-up wave. Close terminal stage-wave agents as lifecycle cleanup. Timeout, empty status, and absent final response map to termination_action=preserve_running_instance, write_scope=reserved, overlapping_writer=blocked, subagents_closed=no, and lifecycle_gate=pending. `close_agent` authority is runtime status completed, errored, or shutdown, or explicit user cancellation. `reuse_for_new_task` records policy and must be `forbidden`; `previous_task_subagent_reuse` records observed compliance and must be `none`. This section is intentionally about run-local subagents; if a repo-changing task used no subagents, record close_agent_evidence as parent_direct_no_subagents only with PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes and PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker> plus the run-bundle reason. For dynamic fanout, reconcile every schedule.md Agent Wave Ledger row with workflow_monitoring.md Actual Wave Events and terminal run-local agent ids. If `wait_agent` timed out, returned empty status, or a final response was absent at a wave decision point, record the subagent no-return investigation fields and keep the lifecycle gate incomplete until new state evidence or explicit user cancellation resolves the instance. -->
+<!-- Record run-local subagent lifecycle evidence before user-facing completion when a subagent or durable lifecycle route was selected. Classify each user input as same_active_task_delta, scope_or_contract_change, or new_task; reuse an active agent when owner, responsibility, context, write authority, and validation route remain compatible, including revised scope. Fresh agents are for independent review, disjoint write authority, incompatible owner/context, or failed context integrity. Durable checkpoints and updated packet paths are needed only for coordination or resumption. Close terminal stage-wave agents as lifecycle cleanup. Timeout, empty status, and absent final response map to termination_action=preserve_running_instance, write_scope=reserved, overlapping_writer=blocked, subagents_closed=no, and lifecycle_gate=pending. `close_agent` authority is runtime status completed, errored, or shutdown, or explicit user cancellation. `reuse_for_new_task` records the evaluated policy; `previous_task_subagent_reuse` records observed continuity, including `none` when no prior instance was reused. This section is intentionally about selected run-local subagents; a repo-changing task with no subagent may use a structured parent handoff, while parent-direct exception evidence remains required when the selected workflow requires it. For dynamic fanout, reconcile each selected schedule.md Agent Wave Ledger row with workflow_monitoring.md Actual Wave Events and terminal run-local agent ids. If `wait_agent` timed out, returned empty status, or a final response was absent at a wave decision point, record the subagent no-return investigation fields and keep the lifecycle gate incomplete until new state evidence or explicit user cancellation resolves the instance. -->
 
 - fresh_subagents_required:
 - reuse_for_new_task:
@@ -211,7 +211,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Diff-Check Agent Evidence
 
-<!-- Record the read-only diff-check agent instance, input packet paths, latest diff range or commit, decision, findings disposition, and rerun evidence after any fix. Parent self-review is not sufficient for this field. -->
+<!-- Record the selected owning review gate (and a read-only diff-check instance only when activated), input packet paths, latest diff range or commit, decision, findings disposition, and rerun evidence after any accepted same-owner fix. Reviewer output is hypothesis input; parent/integration owner adjudicates it. Each accepted finding must cite current snapshot, reachable path, contract, and witness/static proof. Rejected findings must carry reason_code and evidence_ref and do not open a wave or cause rollback. -->
 
 - diff_check_agent_role:
 - diff_check_agent_decision:

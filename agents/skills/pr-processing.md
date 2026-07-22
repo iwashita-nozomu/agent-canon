@@ -57,6 +57,10 @@ inventory、authority、conflict、validation、merge、Issue 処理、closeout 
 - AgentCanon source PR と parent pin PR がつながっている場合は、
   `agent-canon-update` と `pr-queue-cleanup-workflow.md` を使い、source merge と
   parent pin 同期を分けます。
+  Before mutation, record source `origin/main`, parent `origin/main` gitlink,
+  target tree, merge strategy, and remote. The reviewed final tree is the
+  identity contract; do not rebase or preserve internal commit ids by ancestry
+  engineering.
 
 ## Processing Graph
 
@@ -82,8 +86,9 @@ conflict-successor handling. Unknown permission never implies push authority.
 
 ## PR Log Report Contract
 
-PR 作成 / 更新は、GitHub 上の PR body だけでなく run-local report も同時に
-更新します。active run bundle が無い場合は、PR 操作前に
+PR 作成 / 更新は、GitHub 上の PR body と、選択された場合の durable run-local
+report を整合させます。coordination、resumption、または selected workflow が
+durable evidence を必要とし、active run bundle が無い場合は、PR 操作前に
 `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --owner codex --workspace-root "$PWD"`
 を実行し、bootstrap output の `RUN_ID`、`REPORT_DIR`、
 `AGENT_CANON_PREFLIGHT_*` を `work_log.md` または `workflow_monitoring.md`
@@ -109,9 +114,11 @@ route を短く書きます。
 
 ## Procedure
 
-1. Run bundle と PR log report を固定します。
+1. PR log report を固定します。run bundle は coordination、resumption、または
+   selected workflow が必要とする場合だけ作成します。
    - 既存の `REPORT_DIR` または `reports/agents/.active_run` を確認する
-   - 無ければ `bootstrap_agent_run.py` で作る
+   - durable evidence が必要で無ければ structured handoff message/tool result
+     を使い、必要な場合だけ `bootstrap_agent_run.py` で作る
    - `work_log.md` に bootstrap output、routing declaration、PR task summary を残す
    - `pr_body.md` と `github_publish.json` の path を決める
    - `pr_body.md` の `PR Essence` に problem / user request、design intent、
@@ -160,11 +167,14 @@ route を短く書きます。
    - AgentCanon source PR は parent pin PR より先に merge する
    - 同じ root/runtime surface に触る PR は一つずつ main に取り込む
    - conflict は、先に入れる PR が確定してから後続 PR の head branch で解く
+   - source publication readback が accepted になるまで parent pin/root projection
+     を開始せず、accepted source tree を一度だけ parent へ投影する
 1. Conflict repair は head branch 上で行います。
    - fetch without changing the current checkout
    - if the current checkout is not `<head-branch>`, keep it unchanged and
      request user direction; do not switch as a collision workaround
-   - `git merge origin/<base>` または repo の標準 update route
+   - 事前に記録した merge strategy に従う。`git merge origin/<base>` は選択された
+     strategy の場合だけ使い、rebase や unrelated history の変更を行わない
    - conflict は `ours` / `theirs` の機械選択ではなく、semantic integration として扱う
    - merge base、head branch の意図、incoming base 側の意図、owning contract、validation surface を確認する
    - 各 side から保持する clause、書き換える clause、意図的に捨てる clause と理由を PR log または run bundle に記録する
@@ -185,6 +195,8 @@ route を短く書きます。
    - obsolete / not planned: なぜ現在の責務に残さないかを書く
    - active: residual work、owner、next validation を追記して open のまま残す
    - local issue ledger は削除せず、`issues/closed/` など正本の lifecycle に従う
+   - deletion / retirement は dependency closure と active-reference validation を
+     先に行い、代替実装や unrelated latest-main changes を発明・取り込まない
 1. Closeout を残します。
    - PR action table
    - Issue action table

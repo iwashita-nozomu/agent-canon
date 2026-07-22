@@ -1,4 +1,4 @@
-# Final Review
+# Final Review (Selected Escalation)
 <!--
 @dependency-start
 contract template
@@ -20,7 +20,7 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Design Trace Acceptance
 
-<!-- Confirm that the final diff remains traceable to the Abstract Design Frame, approved design sections, user-request clause IDs, Implementation Source Packet entries, and test-plan items. Return revise if a changed slice is only justified by the nearest file, helper, current finding, or chat context instead of the abstract responsibility model. Record blockers or escalation points. -->
+<!-- This artifact is materialized only when final escalation or a distinct unresolved claim/risk is selected. Confirm that the final diff remains traceable to the Abstract Design Frame, approved design sections, user-request clause IDs, Implementation Source Packet entries, and test-plan items only when test design was activated. -->
 
 ## Design Side-Effect Trace Acceptance
 
@@ -40,7 +40,7 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Review Finding Incorporation Review
 
-<!-- Confirm that change review, language-specific review, docs review, final review, and required specialist findings were reflected in implementation or explicitly escalated. Return revise if fix-now findings were ignored or only recorded in review artifacts. -->
+<!-- Confirm that the selected owning review gate and any explicitly activated specialist findings were reflected in implementation or explicitly escalated. Reviewer output is hypothesis input; accepted findings require current snapshot, reachable path, contract, and witness/static proof. Rejected findings require reason_code/evidence_ref and do not create a repair wave. -->
 
 ## Review Rejection Response Review
 
@@ -52,11 +52,11 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Post-Fix Full Review Rerun Review
 
-<!-- Confirm that if any review-driven fix landed after an earlier review artifact, the active required review set for the risk class and changed surface was rerun against the latest diff. Record the refreshed review artifacts, or explicitly state that no post-review fixes occurred after the last applicable review pass. Return revise if any tiny fix skipped the rerun. -->
+<!-- Confirm that if an accepted review-driven fix changed behavior, owner/design boundary, correctness, validation, or publication state, the selected owning gate was rerun against the latest diff. Full review reruns are selected only for a final candidate when the touched contract requires them. -->
 
 ## Repo-Wide Dependency Review
 
-<!-- Confirm `bash tools/agent_tools/run_repo_dependency_review.sh` was run against the full repository after the latest fix. Return revise if only --changed checks were run or if any dependency manifest issue remains. -->
+<!-- Confirm the selected static/targeted validation route after the latest accepted fix. Run the full repository dependency review only when the final candidate contract requires it. -->
 
 ## Canonical Tree-Head Acceptance
 

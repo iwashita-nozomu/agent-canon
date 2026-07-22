@@ -5347,7 +5347,8 @@ class CodexHooksTest(unittest.TestCase):
                 / "test-container"
                 / f"skill_usage-{source_head[:12]}.jsonl"
             )
-            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+            event_paths = sorted((Path(f"{log_path}.events")).rglob("*.json"))
+            entry = json.loads(event_paths[0].read_text(encoding="utf-8"))
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(entry["source_repo_key"], repo_log_key(source_root))
@@ -5410,7 +5411,8 @@ class CodexHooksTest(unittest.TestCase):
                 text=True,
                 env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
             )
-            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+            event_paths = sorted((Path(f"{log_path}.events")).rglob("*.json"))
+            entry = json.loads(event_paths[0].read_text(encoding="utf-8"))
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(entry["prompt_capture_status"], "present")
@@ -5448,7 +5450,8 @@ class CodexHooksTest(unittest.TestCase):
                 text=True,
                 env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
             )
-            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+            event_paths = sorted((Path(f"{log_path}.events")).rglob("*.json"))
+            entry = json.loads(event_paths[0].read_text(encoding="utf-8"))
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(entry["event"], "PostToolUse")
@@ -5459,6 +5462,37 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["tool_input_keys"], ["cmd"])
         self.assertTrue(entry["tool_input_fingerprint"])
         self.assertFalse(entry["subagent_invoked"])
+
+    def test_skill_usage_logger_normalizes_assignment_first_command_verb(self) -> None:
+        """Assignment prefixes must not hide the canonical executable from routing logs."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(
+                ["git", "init"], cwd=temp_root, check=True, capture_output=True
+            )
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {
+                            "cmd": "FOO='pattern=AGENT_CANON_LLAMA_CPP|x' BAR=1 python3 tools/agent_tools/task_start.py"
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            event_paths = sorted((Path(f"{log_path}.events")).rglob("*.json"))
+            entry = json.loads(event_paths[0].read_text(encoding="utf-8"))
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["tool_command_verb"], "python3")
 
     def test_skill_usage_logger_inherits_workflow_context_for_post_tool(self) -> None:
         """The PostToolUse logs inherit the last declared workflow context."""

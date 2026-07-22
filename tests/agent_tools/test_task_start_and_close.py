@@ -337,8 +337,8 @@ def ready_closeout_evidence_lines(
         "- validation_failure_response_status: pass",
         "",
         "## Subagent Lifecycle Evidence",
-        "- fresh_subagents_required: yes",
-        "- reuse_for_new_task: forbidden",
+        "- fresh_subagents_required: conditional",
+        "- reuse_for_new_task: allowed_when_owner_context_compatible",
         "- previous_task_subagent_reuse: none",
         "- agent_wave_ledger_status: complete",
         "- planned_vs_actual_wave_status: reconciled",
@@ -1596,7 +1596,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "STANDARD_AGENT_WAVE_SEQUENCE=plan,review,edit",
+                "STANDARD_AGENT_WAVE_SEQUENCE=selected_stages_only",
                 result.stdout,
             )
             self.assertIn(
@@ -1683,20 +1683,20 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES=$task-routing",
                 result.stdout,
             )
-            self.assertIn("DEFAULT_QUALITY_CHECKS=enabled", result.stdout)
+            self.assertIn("DEFAULT_QUALITY_CHECKS=candidate_only", result.stdout)
             self.assertIn(
                 "DEFAULT_QUALITY_CHECK_SOURCE=agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default",
                 result.stdout,
             )
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_AGENT_TYPES=docs_workflow_steward,cpp_reviewer",
+                "DEFAULT_QUALITY_CHECK_AGENT_TYPE_CANDIDATES=docs_workflow_steward,cpp_reviewer",
                 result.stdout,
             )
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_STAGES=review_before_edit_handoff,post_edit_review",
+                "DEFAULT_QUALITY_CHECK_STAGES=selected_stages_only",
                 result.stdout,
             )
-            self.assertIn("DEFAULT_QUALITY_CHECK_REVIEW_PACKS=active", result.stdout)
+            self.assertIn("DEFAULT_QUALITY_CHECK_REVIEW_PACKS=candidate_only", result.stdout)
             self.assertIn(
                 "DEFAULT_QUALITY_CHECK_DEFAULT_REVIEW_PACKS=-",
                 result.stdout,
@@ -1754,11 +1754,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "allowed",
             )
             self.assertEqual(
-                standard_wave_sequence["stages"], ["plan", "review", "edit"]
+                standard_wave_sequence["stages"], ["selected_stages_only"]
             )
             self.assertEqual(
                 standard_wave_sequence["gate_order"],
-                "plan_packet,review_gate,edit_handoff",
+                "selected_stages_only",
             )
             self.assertTrue(pre_handoff_scope_policy["enabled"])
             self.assertEqual(
@@ -1875,28 +1875,28 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("canonical_doc", first_tool_route)
             self.assertIn("related_skills", first_tool_route)
             self.assertNotIn("check_command", repo_tool_routing_policy)
-            self.assertTrue(default_quality_check_policy["enabled"])
+            self.assertFalse(default_quality_check_policy["enabled"])
             self.assertEqual(
                 default_quality_check_policy["source"],
                 "agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default",
             )
             self.assertEqual(
                 default_quality_check_policy["wave_sequence_ref"],
-                "run.standard_wave_sequence",
+                "run.standard_wave_sequence (selected stages only)",
             )
             self.assertEqual(
                 default_quality_check_policy["stages"],
                 ["review_before_edit_handoff", "post_edit_review"],
             )
             self.assertEqual(
-                default_quality_check_policy["roles"],
+                default_quality_check_policy["candidate_roles"],
                 [
                     "docs_workflow_steward",
                     "cpp_reviewer",
                 ],
             )
             self.assertEqual(
-                default_quality_check_policy["codex_agent_types"],
+                default_quality_check_policy["candidate_codex_agent_types"],
                 [
                     "docs_workflow_steward",
                     "cpp_reviewer",
@@ -1904,7 +1904,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertEqual(
                 default_quality_check_policy["provenance"]["default_review_packs"],
-                "active",
+                "candidate_not_activated",
             )
             self.assertEqual(
                 default_quality_check_policy["provenance"]["default_review_pack_ids"],
@@ -2013,11 +2013,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_AGENT_TYPES=docs_workflow_steward",
+                "DEFAULT_QUALITY_CHECK_AGENT_TYPE_CANDIDATES=docs_workflow_steward",
                 result.stdout,
             )
             self.assertNotIn(
-                "DEFAULT_QUALITY_CHECK_AGENT_TYPES=docs_workflow_steward,"
+                "DEFAULT_QUALITY_CHECK_AGENT_TYPE_CANDIDATES=docs_workflow_steward,"
                 "python_reviewer",
                 result.stdout,
             )
@@ -2713,9 +2713,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertNotIn("PARENT_REPO_EDITS_ALLOWED=no", result.stdout)
             self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes", result.stdout)
             self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION=-", result.stdout)
-            self.assertIn("DEFAULT_QUALITY_CHECKS=enabled", result.stdout)
+            self.assertIn("DEFAULT_QUALITY_CHECKS=candidate_only", result.stdout)
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_ROLES=docs_workflow_steward,python_reviewer",
+                "DEFAULT_QUALITY_CHECK_ROLE_CANDIDATES=docs_workflow_steward,python_reviewer",
                 result.stdout,
             )
             self.assertNotIn("test_designer", result.stdout)
@@ -2832,7 +2832,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 delegated_spawn_policy["dynamic_mid_task_spawn"], "allowed"
             )
             self.assertEqual(
-                standard_wave_sequence["stages"], ["plan", "review", "edit"]
+                standard_wave_sequence["stages"], ["selected_stages_only"]
             )
             self.assertEqual(
                 pre_handoff_scope_policy["status"],
@@ -2847,14 +2847,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "seed_then_expand_before_handoff",
             )
             self.assertEqual(
-                default_quality_check_policy["roles"],
+                default_quality_check_policy["candidate_roles"],
                 [
                     "docs_workflow_steward",
                     "python_reviewer",
                 ],
             )
             self.assertEqual(
-                default_quality_check_policy["codex_agent_types"],
+                default_quality_check_policy["candidate_codex_agent_types"],
                 [
                     "docs_workflow_steward",
                     "python_reviewer",
@@ -2862,7 +2862,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertEqual(
                 default_quality_check_policy["provenance"]["default_review_packs"],
-                "active",
+                "candidate_not_activated",
             )
             self.assertEqual(
                 default_quality_check_policy["provenance"]["default_review_pack_ids"],
@@ -2993,7 +2993,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("runtime_max_depth: 2", manifest_text)
             self.assertIn("standard_wave_sequence:", manifest_text)
             self.assertIn(
-                "STANDARD_AGENT_WAVE_SEQUENCE=plan,review,edit", result.stdout
+                "STANDARD_AGENT_WAVE_SEQUENCE=selected_stages_only", result.stdout
             )
             self.assertIn("spawn_wave_recommendation:", manifest_text)
             self.assertIn("delegated_spawn_policy:", manifest_text)
@@ -3006,25 +3006,31 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("workflow_family:", manifest_text)
             self.assertIn("subagent_prompt_packet:", manifest_text)
             self.assertIn("subagent_lifecycle_policy:", manifest_text)
-            self.assertIn("fresh_subagents_required: true", manifest_text)
-            self.assertIn("reuse_for_new_task: forbidden", manifest_text)
-            self.assertIn("previous_task_subagent_reuse: forbidden", manifest_text)
+            self.assertIn("fresh_subagents_required: conditional", manifest_text)
+            self.assertIn(
+                "reuse_for_new_task: allowed_when_owner_context_compatible",
+                manifest_text,
+            )
+            self.assertIn(
+                "previous_task_subagent_reuse: allowed_when_owner_context_compatible",
+                manifest_text,
+            )
             lifecycle_policy = manifest["run"]["subagent_lifecycle_policy"]
             self.assertEqual(
                 lifecycle_policy["mid_task_user_input_policy"],
-                "parent_checkpoint_then_route_delta",
+                "classify_then_reuse_or_route_fresh",
             )
             self.assertEqual(
                 lifecycle_policy["same_task_delta_reuse"],
-                "allowed_with_updated_packet",
+                "allowed_when_owner_context_compatible",
             )
             self.assertEqual(
                 lifecycle_policy["scope_change_reuse"],
-                "forbidden_spawn_fresh_wave",
+                "evaluate_owner_context_compatibility",
             )
             self.assertEqual(
                 lifecycle_policy["new_task_reuse"],
-                "forbidden_spawn_fresh_run",
+                "evaluate_owner_context_compatibility",
             )
             common_prompt_fields = handoff_context_policy["common_prompt_must_include"]
             self.assertIn("context_artifacts", common_prompt_fields)
@@ -3211,7 +3217,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "-",
             )
             self.assertEqual(
-                default_quality_check_policy["roles"],
+                default_quality_check_policy["candidate_roles"],
                 ["change_reviewer"],
             )
             self.assertEqual(
@@ -5035,6 +5041,81 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "workflow_monitoring.md:actual_wave_missing:WAVE-1", result.stdout
             )
             self.assertIn("subagent_wave_reconciliation_clean", result.stdout)
+
+    def test_task_close_does_not_backfill_overplanned_wave(self) -> None:
+        """An explicitly overplanned wave is skipped without synthetic actual evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "init",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            run_id = "test-task-close-overplanned-wave"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            schedule_path = report_dir / "schedule.md"
+            schedule_path.write_text(
+                schedule_path.read_text(encoding="utf-8").replace(
+                    "| none | reports/agents/run |",
+                    "| overplanning | reports/agents/run |",
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "workflow_monitoring.md").write_text(
+                "\n".join(
+                    [
+                        "# Workflow Monitoring",
+                        "",
+                        "## Actual Wave Events",
+                        "",
+                        "## Tool Warnings",
+                        "",
+                        "- tool_warnings_status: none",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=\n", result.stdout)
+            self.assertIn("CAPACITY_LIFECYCLE_BLOCKERS=closeout_packet_missing", result.stdout)
 
     def test_task_close_rejects_comment_only_actual_wave_event(self) -> None:
         """Commented wave rows are documentation, not observed wave evidence."""
