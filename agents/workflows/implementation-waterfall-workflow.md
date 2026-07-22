@@ -222,7 +222,7 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 - 選択された route が必要とする場合だけ、`documents/`、`notes/`、`references/` と local library の sweep を行います
 - durable artifact route が選択された場合だけ、`user_request_contract.md`、`schedule.md`、`work_log.md` をその route の正本として更新します
 - repo-changing task の subagent は owner-critical operation、coordination/resumption、または selected unresolved risk がある場合だけ activate します
-- active runtime が explicit user request なしの subagent spawn を禁止する場合は、actual spawn の代わりに `SUBAGENT_AUTHORIZATION=required`、role、input packet、expected output、review gate を run bundle に固定し、許可が出るまでその specialist review を完了扱いにしません
+- active runtime が explicit user request なしの subagent spawn を禁止する場合は、actual spawn の代わりに `SUBAGENT_AUTHORIZATION=required`、role、input packet、expected output、review gate を structured handoff message/tool result に固定します。coordination/resumption が既に durable bundle を選択している場合だけ、その bundle を使います。許可が出るまでその specialist review を完了扱いにしません
 - selected review claims が同じ owner、responsibility、context、write authority、validation route を共有する場合は active instance を再利用します。独立 review、disjoint authority、incompatible context、または owning gate で判定できない distinct unresolved claim/risk の場合だけ別 instance にします
 - 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します
 - 包括的開発では、same directory / same public API surface の parallel write を許可しません

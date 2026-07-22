@@ -695,7 +695,7 @@ class RunBundleSpec:
     workflow_family_id: str = ""
     manual_specialists: tuple[str, ...] = ()
     task_default_specialists: tuple[str, ...] = ()
-    auto_specialists: tuple[str, ...] = ()
+    language_review_candidates: tuple[str, ...] = ()
     default_review_packs_enabled: bool = False
     default_review_pack_ids: tuple[str, ...] = ()
     selected_skills: tuple[str, ...] = ()
@@ -1237,7 +1237,7 @@ def default_quality_check_policy_output_lines(
     *,
     manual_specialists: tuple[str, ...] = (),
     task_default_specialists: tuple[str, ...] = (),
-    auto_specialists: tuple[str, ...] = (),
+    language_review_candidates: tuple[str, ...] = (),
     default_review_packs_enabled: bool = False,
     default_review_pack_ids: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
@@ -1259,8 +1259,8 @@ def default_quality_check_policy_output_lines(
         f"OFFICIAL_HOOK_SCHEMA={OFFICIAL_HOOK_SCHEMA}",
         "DEFAULT_QUALITY_CHECK_TASK_DEFAULT_SPECIALISTS="
         f"{','.join(task_default_specialists) or '-'}",
-        "DEFAULT_QUALITY_CHECK_AUTO_LANGUAGE_REVIEWERS="
-        f"{','.join(auto_specialists) or '-'}",
+        "DEFAULT_QUALITY_CHECK_LANGUAGE_REVIEW_CANDIDATES="
+        f"{','.join(language_review_candidates) or '-'}",
         "DEFAULT_QUALITY_CHECK_MANUAL_SPECIALISTS="
         f"{','.join(manual_specialists) or '-'}",
         f"DEFAULT_QUALITY_CHECK_REVIEW_PACKS={review_pack_state}",
@@ -1395,11 +1395,11 @@ def discover_changed_paths(workspace_root: Path) -> tuple[str, ...]:
     return tuple(changed)
 
 
-def auto_language_specialists(
+def language_review_candidates(
     workspace_root: Path,
     changed_paths: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
-    """Infer language-specific reviewers from changed paths."""
+    """Return explicit language-review candidates from changed paths."""
     candidate_paths = changed_paths or discover_changed_paths(workspace_root)
     normalized_paths = tuple(
         raw_path.replace("\\", "/").lstrip("./") for raw_path in candidate_paths
@@ -3609,12 +3609,12 @@ def manifest_default_quality_check_policy_lines(spec: RunBundleSpec) -> list[str
             lines.append(f"        - {role_id}")
     else:
         lines.append("      task_default_specialists: []")
-    if spec.auto_specialists:
-        lines.append("      auto_language_reviewers:")
-        for role_id in spec.auto_specialists:
+    if spec.language_review_candidates:
+        lines.append("      language_review_candidates:")
+        for role_id in spec.language_review_candidates:
             lines.append(f"        - {role_id}")
     else:
-        lines.append("      auto_language_reviewers: []")
+        lines.append("      language_review_candidates: []")
     if spec.manual_specialists:
         lines.append("      manual_specialists:")
         for role_id in spec.manual_specialists:

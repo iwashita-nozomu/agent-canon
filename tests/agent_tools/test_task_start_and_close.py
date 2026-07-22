@@ -1465,7 +1465,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=pass", resumed.stdout)
             self.assertFalse((workspace_root / "make-sentinel").exists())
 
-    def test_task_start_emits_workflow_skills_and_auto_specialists(self) -> None:
+    def test_task_start_emits_workflow_skills_and_language_review_candidates(self) -> None:
         """task_start should emit machine-friendly workflow and reviewer data."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -1583,7 +1583,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "DEFERRED_SKILLS=$codex-task-workflow",
                 result.stdout,
             )
-            self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
+            self.assertIn("LANGUAGE_REVIEW_CANDIDATES=cpp_reviewer", result.stdout)
             self.assertIn(
                 "IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker", result.stdout
             )
@@ -1702,7 +1702,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "DEFAULT_QUALITY_CHECK_AUTO_LANGUAGE_REVIEWERS=cpp_reviewer",
+                "DEFAULT_QUALITY_CHECK_LANGUAGE_REVIEW_CANDIDATES=cpp_reviewer",
                 result.stdout,
             )
             self.assertIn("ROLE_MODEL_MATRIX=", result.stdout)
@@ -1911,7 +1911,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 [],
             )
             self.assertEqual(
-                default_quality_check_policy["provenance"]["auto_language_reviewers"],
+                default_quality_check_policy["provenance"]["language_review_candidates"],
                 ["cpp_reviewer"],
             )
             self.assertEqual(
@@ -3225,7 +3225,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 [],
             )
             self.assertEqual(
-                default_quality_check_policy["provenance"]["auto_language_reviewers"],
+                default_quality_check_policy["provenance"]["language_review_candidates"],
                 [],
             )
             self.assertEqual(
