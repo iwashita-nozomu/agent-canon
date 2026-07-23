@@ -44,11 +44,11 @@ usage() {
   cat <<EOF
 Usage:
   bash tools/update_agent_canon.sh plan [branch]
-  bash tools/update_agent_canon.sh latest [branch]
-  bash tools/update_agent_canon.sh apply [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh latest [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh apply [branch]
   bash tools/update_agent_canon.sh rebuild-tools
-  bash tools/update_agent_canon.sh merge-main-into-current [branch]
-  bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty [branch]
   bash tools/update_agent_canon.sh status
 
 Commands:
@@ -434,8 +434,8 @@ emit_agentcanon_conflict_workflow_route() {
   echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_required"
   echo "AGENT_CANON_LATEST_BLOCK_REASON=$reason"
   echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-  echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty"
-  echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=make agent-canon-ensure-latest"
+  echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty"
+  echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest"
   echo "NEXT_ACTION=run_agentcanon_conflict_workflow"
 }
 
@@ -514,7 +514,7 @@ preserve_dirty_agentcanon_latest() {
   echo "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK=pass"
   echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_preserved_dirty"
   echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-  echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=make agent-canon-ensure-latest"
+  echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest"
   echo "NEXT_ACTION=continue_agentcanon_branch_PR_flow_with_restored_dirty_state"
   return 0
 }

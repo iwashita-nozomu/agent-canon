@@ -78,7 +78,9 @@ git diff --stat -- vendor/agent-canon .github/workflows .github/PULL_REQUEST_TEM
 - accidental drift: root symlink view の直接編集、生成物、backup、dated snapshot、旧 path、copy surface の不一致
 
 判断に迷う場合は、`documents/agent-canon-subtree-migration.md` と `documents/SHARED_RUNTIME_SURFACES.md` の ownership を優先します。
-accidental drift は `bash tools/sync_agent_canon.sh link-root` で復元し、shared-canon candidate と local wrapper を同じ commit に混ぜません。
+accidental drift は
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root`
+で復元し、shared-canon candidate と local wrapper を同じ commit に混ぜません。
 
 ## Stage 2. AgentCanon Branch へ渡す
 

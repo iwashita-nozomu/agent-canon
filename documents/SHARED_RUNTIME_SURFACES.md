@@ -78,7 +78,8 @@ AgentCanon-owned runtime and policy paths are symlink views in the template root
 Edit the `vendor/agent-canon/` source, then repair the root view with:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 ```
 
 Core runtime surfaces include `AGENTS.md`, `agents/`, `.agents/`,
@@ -229,7 +230,8 @@ from AgentCanon:
 - `.github/scripts/checkout_agent_canon_submodule.sh`
 
 Do not edit these root copies as independent truth surfaces. Edit the
-AgentCanon source, then run `bash tools/sync_agent_canon.sh link-root`.
+AgentCanon source, then run the request-evidence-authorized
+`bash tools/sync_agent_canon.sh link-root` command.
 The `.github/scripts/checkout_agent_canon_submodule.sh` root copy is only a
 GitHub-path wrapper; the shared checkout implementation lives in
 `tools/ci/checkout_agent_canon_submodule.sh`.
@@ -293,8 +295,8 @@ implementation.
 - Edit template-owned active contracts at the root after they are regular
   files.
 - Edit project-owned durable state at the root.
-- Repair root symlinks and GitHub copy surfaces with
-  `bash tools/sync_agent_canon.sh link-root`.
+- Repair root symlinks and GitHub copy surfaces with the request-evidence-authorized
+  `bash tools/sync_agent_canon.sh link-root` command.
 - Audit root-view drift with `bash tools/sync_agent_canon.sh check`.
 - Before recreating a missing shared path, check the template root,
   `vendor/agent-canon/`, standalone AgentCanon, the manifest, and

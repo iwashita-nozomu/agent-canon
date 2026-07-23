@@ -33,10 +33,10 @@ usage() {
   cat <<EOF
 Usage:
   bash tools/sync_agent_canon.sh plan [branch]
-  bash tools/sync_agent_canon.sh link-root
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root
   bash tools/sync_agent_canon.sh check
-  bash tools/sync_agent_canon.sh submodule-add <remote-url> [branch]
-  bash tools/sync_agent_canon.sh ensure-latest [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh submodule-add <remote-url> [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh ensure-latest [branch]
   bash tools/sync_agent_canon.sh status
 
 Legacy subtree / snapshot / direct push routes are compatibility-only and are
@@ -612,7 +612,7 @@ cmd_check() {
   fi
 
   if [ "$failed" -ne 0 ]; then
-    die "shared surface drift detected; run 'bash tools/sync_agent_canon.sh link-root'"
+    die "shared surface drift detected; set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and rerun 'bash tools/sync_agent_canon.sh link-root'"
   fi
 
   echo "shared surface is in sync"
@@ -896,7 +896,7 @@ print_plan_summary() {
   echo "agent_canon_plan_dirty_update_surface=$dirty_update_surface"
   echo "agent_canon_plan_route=$route"
   echo "agent_canon_plan_requires_clean=$requires_clean"
-  echo "agent_canon_plan_apply_command=bash tools/sync_agent_canon.sh ensure-latest $branch"
+  echo "agent_canon_plan_apply_command=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh ensure-latest $branch"
 }
 
 print_submodule_plan_details() {

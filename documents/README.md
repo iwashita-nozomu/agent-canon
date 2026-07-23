@@ -57,8 +57,8 @@ this file, but derived repositories own their local index.
 | Generated or run artifacts | agent reports, experiment outputs, logs | `reports/` or `experiments/`, not `documents/` |
 
 If a file is an AgentCanon-owned symlink, edit the source under
-`vendor/agent-canon/` and repair the root view with
-`bash tools/sync_agent_canon.sh link-root`. If a file is a template-owned active
+`vendor/agent-canon/` and repair the root view with the request-evidence-authorized
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root` command. If a file is a template-owned active
 contract, edit the root regular file.
 
 ## Reader Routes

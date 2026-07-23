@@ -64,8 +64,9 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Prefer the high-level parent route:
 
 Run `make agent-canon-update-plan` first. If it reports an update, request
-current-task user approval and rerun `make agent-canon-ensure-latest` with all
-four inline Git authority/reason fields in the same command segment.
+current-task user approval and rerun
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest`
+with all four inline Git authority/reason fields in the same command segment.
 
 1. If `vendor/agent-canon/` contains local AgentCanon source commits or source
    dirty state, do not hide them in a parent pin update. Route them through an
@@ -99,7 +100,8 @@ authorize checkout switching or branch/worktree creation.
    root views exactly once, then repair and verify root views:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 

@@ -357,7 +357,8 @@ the AgentCanon branch / PR workflow, then reflected in the template through the
 submodule pin and shared root views. Root view repair is owned by:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
@@ -386,7 +387,7 @@ For AgentCanon source, submodule pin, `.gitmodules`, root runtime view,
 root-copy surface, or parent root sync changes, closeout also cites
 `agentcanon_structure_followup=required` and
 `agentcanon_structure_followup=pass`, including the parent-root
-`bash tools/sync_agent_canon.sh link-root` and
+request-evidence-authorized `bash tools/sync_agent_canon.sh link-root` and
 `bash tools/sync_agent_canon.sh check` evidence.
 
 A no-subagents closeout is valid only for routing-only/advisory tasks, read-only

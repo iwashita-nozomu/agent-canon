@@ -27,7 +27,8 @@ python3 tools/agent_tools/parent_repo_readiness.py --root .
 If root views are broken:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
@@ -44,7 +45,7 @@ runtime data, and `goal.md` remain repo-local.
 | --- | --- |
 | `vendor/agent-canon` missing | `git submodule update --init --recursive` |
 | root symlink/copy drift | `bash tools/sync_agent_canon.sh check` |
-| stale AgentCanon pin | `make agent-canon-ensure-latest` |
+| stale AgentCanon pin | request-evidence-authorized `make agent-canon-ensure-latest` |
 | MCP unavailable | `documents/codex-configuration-reference.md` |
 | GitHub auth or workflow failure | `python3 tools/ci/check_github_workflows.py` |
 | need rollback | `documents/agent-canon-submodule-rollback.md` |
