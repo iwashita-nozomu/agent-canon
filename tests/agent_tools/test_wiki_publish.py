@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+"""Tests for the AgentCanon wiki publication deterministic gate and readback semantics."""
+
+# @dependency-start
+# contract test
+# responsibility Tests the AgentCanon wiki page-set publication gates and workflow transitions.
+# upstream implementation ../../tools/agent_tools/wiki_publish.py owns the canonical wiki publish tool.
+# upstream design ../../agents/skills/wiki-publication.md owns the workflow contract.
+# downstream implementation ../../documents/tools/wiki_publish.md documents the command semantics.
+# @dependency-end
+
 import argparse
 import hashlib
 import json
