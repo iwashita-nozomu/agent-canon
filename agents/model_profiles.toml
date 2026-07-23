@@ -196,7 +196,7 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "luna_impl"
-text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion."
+text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. For this role, execution is authority-bounded: implement/commit/push is allowed, but PR create/merge/close, admin override, and base integration decisions remain parent-only."
 priority = 1
 
 [[model_profiles]]
@@ -252,7 +252,7 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "spark_impl"
-text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema."
+text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Integrate only through commit/push and parent-owned handoff: do not create/merge/close PRs; parent will perform merge, base integration, and final editorial decision."
 priority = 1
 
 [[model_profiles]]
