@@ -22,6 +22,24 @@ for route meaning and `tools/agent_tools/update_lifecycle_contract.py` for exact
 machine schemas. Skills, README files, CI adapters, and parent views link here;
 they do not restate the transaction.
 
+## Auto-Commit Provenance Boundary
+
+Every mutating route that can stage, checkout, update a submodule, mutate a root
+view, park eval logs, or create an automatic sync commit must validate the
+existing four Git authority/reason fields and the additional
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` input before
+the first mutation. The evidence digest is the SHA-256 of the exact bytes of
+the user request record or canonical workflow authorization packet. Missing,
+uppercase, malformed, or fallback evidence is rejected; there is no actor or
+authority compatibility input.
+
+`tools/sync_agent_canon.sh::commit_sync_paths_if_needed` owns automatic sync
+commits. It always sets Author and Committer to
+`AgentCanon Sync Automation <agent-canon-sync@automation.invalid>` and emits
+formal `AgentCanon-*` trailers for the automation actor, validated authority
+source, destructive authority, request evidence, remote, update method, and
+prefix. The trailers must remain readable by `git interpret-trailers --parse`.
+
 The standalone AgentCanon clone is the source owner. A template or derived
 repository is a parent projection consumer and never becomes a second source
 namespace.

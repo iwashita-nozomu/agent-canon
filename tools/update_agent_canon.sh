@@ -24,6 +24,9 @@ fi
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
+COMMIT_AUTOMATION_AUTHOR_NAME="AgentCanon Sync Automation"
+COMMIT_AUTOMATION_AUTHOR_EMAIL="agent-canon-sync@automation.invalid"
+COMMIT_PROVENANCE_NEXT_ACTION="set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex> and rerun the same command"
 if [ -n "$SUPERPROJECT_DIR" ]; then
   AGENT_CANON_SOURCE_MODE="parent_projection"
   AGENT_CANON_DIR="$ROOT_DIR/$PREFIX"
@@ -104,6 +107,26 @@ require_protected_git_authority() {
   echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
   echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
   die "protected AgentCanon update requires same-command branch/worktree and explicit destructive approval authority"
+}
+
+require_commit_request_evidence() {
+  local mode="$1"
+  local evidence="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE:-}"
+
+  if [[ "$evidence" =~ ^evidence:[0-9a-f]{64}$ ]]; then
+    return 0
+  fi
+
+  echo "COMMIT_PROVENANCE_GUARD=block"
+  echo "AGENT_CANON_COMMIT_PROVENANCE_SUBCOMMAND=$mode"
+  echo "NEXT_ACTION=$COMMIT_PROVENANCE_NEXT_ACTION"
+  die "auto-commit requires AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>"
+}
+
+require_commit_provenance() {
+  local mode="$1"
+  require_protected_git_authority "$mode"
+  require_commit_request_evidence "$mode"
 }
 
 resolve_remote_branch_sha() {
@@ -351,10 +374,16 @@ park_eval_log_dirty_state_if_safe() {
     remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
     return 0
   fi
-  git -C "$tmp_worktree" \
-    -c user.name="${GIT_AUTHOR_NAME:-AgentCanon Log Park}" \
-    -c user.email="${GIT_AUTHOR_EMAIL:-agent-canon-log@example.invalid}" \
-    commit -m "Append $(parent_repo_log_slug) AgentCanon eval logs" >/dev/null
+  GIT_AUTHOR_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
+  GIT_AUTHOR_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
+  GIT_COMMITTER_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
+  GIT_COMMITTER_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
+    git -C "$tmp_worktree" commit \
+    -m "Append $(parent_repo_log_slug) AgentCanon eval logs" \
+    --trailer "AgentCanon-Automation-Actor=agent-canon-sync" \
+    --trailer "AgentCanon-Authority-Source=${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY}" \
+    --trailer "AgentCanon-Destructive-Authority=${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY}" \
+    --trailer "AgentCanon-Request-Evidence=${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" >/dev/null
   commit_sha="$(git -C "$tmp_worktree" rev-parse HEAD)"
   git -C "$tmp_worktree" push -u origin "HEAD:refs/heads/$log_branch" >/dev/null
   drop_stash_sha_if_present "$stash_sha"
@@ -524,7 +553,17 @@ acknowledge_update_todos_if_available() {
   if [ -f "$state_path" ]; then
     git -C "$ROOT_DIR" add "$state_path"
     if ! git -C "$ROOT_DIR" diff --cached --quiet -- "$state_path"; then
-      git -C "$ROOT_DIR" commit --only -m "chore: acknowledge agent-canon update tasks" -- "$state_path"
+      GIT_AUTHOR_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
+      GIT_AUTHOR_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
+      GIT_COMMITTER_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
+      GIT_COMMITTER_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
+        git -C "$ROOT_DIR" commit --only \
+        -m "chore: acknowledge agent-canon update tasks" \
+        --trailer "AgentCanon-Automation-Actor=agent-canon-sync" \
+        --trailer "AgentCanon-Authority-Source=${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY}" \
+        --trailer "AgentCanon-Destructive-Authority=${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY}" \
+        --trailer "AgentCanon-Request-Evidence=${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
+        -- "$state_path"
       echo "AGENT_CANON_LATEST_TODOS=acknowledged_committed"
       return 0
     fi
@@ -1297,7 +1336,7 @@ main() {
   local subcommand="${1:-}"
   case "$subcommand" in
     latest|apply|merge-main-into-current|merge-main-into-current-preserve-dirty)
-      require_protected_git_authority "$subcommand"
+      require_commit_provenance "$subcommand"
       ;;
   esac
   case "$subcommand" in

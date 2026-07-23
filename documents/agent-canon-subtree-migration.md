@@ -78,7 +78,10 @@ downstream implementation ../tools/update_agent_canon.sh derived repo update hel
 template repo 側では submodule-first の入口を使います。
 
 Run `make agent-canon-update-plan` first. A mutating latest route requires
-current-task user approval and all four inline Git authority/reason fields.
+current-task user approval, all four inline Git authority/reason fields, and
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` in the same
+command segment. The digest is the SHA-256 of the exact bytes of the user
+request record or canonical workflow authorization packet.
 After an approved update, repair and check root views.
 
 - `plan`:
@@ -228,6 +231,10 @@ submodule repo では `already_current_submodule` / `submodule_update` を通常
 
 `ensure-latest` は task 開始時の入口です。
 submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、upstream `agent-canon` と local submodule pin / worktree を比較します。
+provenance and existing authority validation run before eval-log parking,
+checkout, submodule update, root-view mutation, and staging. Automatic sync
+commits use the fixed AgentCanon Sync Automation identity and formal
+`AgentCanon-*` trailers.
 clean な submodule worktree が remote main を指していて parent gitlink だけ古い場合は、parent pin を更新対象として扱います。
 `agent-canon` remote が未設定の場合は、GitHub canonical remote
 `https://github.com/iwashita-nozomu/agent-canon.git` を自動追加します。

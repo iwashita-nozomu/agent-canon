@@ -78,6 +78,13 @@ If the read-only update plan reports a mutation, request current-task user
 approval, then invoke `make agent-canon-ensure-latest` with all four inline Git
 authority/reason fields in the same command segment.
 
+The same command segment must also set
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>`. The digest
+is the SHA-256 of the exact bytes of the user request record or canonical
+workflow authorization packet; no actor or authority fallback variable is
+accepted. Validation runs before eval-log parking, checkout, submodule update,
+root-view mutation, or staging.
+
 This target also runs the compiled AgentCanon tool rebuild. Treat
 `AGENT_CANON_TOOL_REBUILD_RUST=rebuilt` or
 `AGENT_CANON_TOOL_REBUILD_RUST=already_current` as the expected evidence. If the

@@ -69,6 +69,12 @@ TODO state up to date.
    source-main rebind and preserves task dirt while rebinding. In parent mode it
    owns pin/root projection and remains blocked while a current transaction has
    no accepted `DependencyFrontier`.
+   Every mutating wrapper or low-level sync invocation must carry the validated
+   branch/destructive authority fields and
+   `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` in the same
+   command segment. The digest is the SHA-256 of the exact bytes of the user
+   request record or canonical workflow authorization packet; no fallback
+   identity or authority input is accepted.
 1. Before any branch, tag, PR, merge, or pin mutation, record the authoritative
    integration identities: source `origin/main` commit/tree and clean status,
    parent `origin/main` gitlink and clean status, target tree, selected merge
