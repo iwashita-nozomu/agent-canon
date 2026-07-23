@@ -17,7 +17,6 @@ import argparse
 import hashlib
 import json
 import re
-import shutil
 import subprocess
 import tempfile
 from collections.abc import Callable, Sequence
@@ -428,51 +427,16 @@ def publish_to_wiki(
             "next_action": "initialize_wiki_sidecar_and_retry",
         }
 
-    work_root = wiki_root
-    remove_work_root = wiki_temp_root is None
-    if wiki_temp_root is None:
-        temp_root = Path(tempfile.mkdtemp(prefix="agent-canon-wiki-"))
-        work_root = temp_root
-    else:
-        temp_root = wiki_temp_root
+    work_root = wiki_temp_root if wiki_temp_root is not None else wiki_root
 
     try:
-        if wiki_temp_root is not None:
-            ensure_wiki_root(
-                runner=runner,
-                repo_root=source_root,
-                remote_url=target_remote,
-                default_branch=default_branch,
-                wiki_root=work_root,
-            )
-        else:
-            # explicit temporary clone path for non-mutating check or publish path.
-            run_command(
-                runner,
-                [
-                    "git",
-                    "clone",
-                    "--depth",
-                    "1",
-                    "--branch",
-                    default_branch,
-                    target_remote,
-                    str(work_root),
-                ],
-                source_root,
-                next_action="prepare_wiki_sidecar_clone",
-            )
-
-        if default_branch != git(
-            ["branch", "--show-current"],
-            work_root,
+        ensure_wiki_root(
             runner=runner,
-            next_action="ensure_default_wiki_branch_is_active",
-        ):
-            raise UserVisibleFailure(
-                message=f"expected default branch {default_branch!r}, but checked out a different branch",
-                next_action="checkout_default_wiki_branch_before_publish",
-            )
+            repo_root=source_root,
+            remote_url=target_remote,
+            default_branch=default_branch,
+            wiki_root=work_root,
+        )
 
         page_set_digest, prepared_pages = prepare_page_set(
             source_root=source_root,
@@ -526,8 +490,7 @@ def publish_to_wiki(
         )
         return summary
     finally:
-        if remove_work_root:
-            shutil.rmtree(work_root, ignore_errors=True)
+        pass
 
 
 def main() -> int:

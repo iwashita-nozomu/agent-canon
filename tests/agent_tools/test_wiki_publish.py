@@ -101,7 +101,6 @@ class WikiPublishTests(unittest.TestCase):
                 wiki_publish.publish_to_wiki(
                     build_args(source_root=source_root),
                     runner=runner,
-                    wiki_temp_root=Path(tmp) / "wiki",
                 )
         self.assertEqual(exc.exception.next_action, "source_commit_not_found_in_source_repo")
 
@@ -115,7 +114,6 @@ class WikiPublishTests(unittest.TestCase):
                 wiki_publish.publish_to_wiki(
                     build_args(source_root=source_root),
                     runner=runner,
-                    wiki_temp_root=Path(tmp) / "wiki",
                 )
         self.assertEqual(exc.exception.next_action, "source_commit_not_found_in_source_repo")
 
@@ -146,7 +144,6 @@ class WikiPublishTests(unittest.TestCase):
                 wiki_publish.publish_to_wiki(
                     build_args(source_root=source_root, wiki_root=wiki_root, summary_out=Path(tmp_output) / "summary.json"),
                     runner=runner,
-                    wiki_temp_root=wiki_root,
                 )
         self.assertEqual(exc.exception.next_action, "add_required_wiki_pages")
 
@@ -175,7 +172,6 @@ class WikiPublishTests(unittest.TestCase):
         summary = wiki_publish.publish_to_wiki(
             build_args(source_root=source_root, wiki_root=wiki_root),
             runner=runner,
-            wiki_temp_root=wiki_root,
         )
 
         self.assertEqual(summary["state"], "PREPARE_OK")
@@ -212,7 +208,6 @@ class WikiPublishTests(unittest.TestCase):
                     expected_page_set_digest="bad" + "1" * 63,
                 ),
                 runner=runner,
-                wiki_temp_root=wiki_root,
             )
 
         self.assertEqual(exc.exception.next_action, "page_set_digest_mismatch")
@@ -252,12 +247,46 @@ class WikiPublishTests(unittest.TestCase):
                 expected_page_set_digest=expected,
             ),
             runner=runner,
-            wiki_temp_root=wiki_root,
         )
 
         self.assertEqual(summary["state"], "PUBLISHED")
         self.assertEqual(summary["local_head"], sidecar_head)
         self.assertEqual(summary["remote_head"], sidecar_head)
+
+    def test_prepare_uses_supplied_wiki_root_including_untracked_pages_and_no_clone(self) -> None:
+        runner = FakeRunner()
+        source_root = Path(tempfile.mkdtemp())
+        wiki_root = source_root / "wiki"
+        wiki_root.mkdir()
+
+        source_page = "# Untracked\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=" + "a" * 40 + "-->\n"
+        for name in ("Home.md", "_Sidebar.md", "_Footer.md"):
+            (wiki_root / name).write_text(source_page, encoding="utf-8")
+        (wiki_root / "draft.txt").write_text("not a page\n", encoding="utf-8")
+
+        runner.add(["git", "cat-file", "-t", "a" * 40], stdout="commit")
+        runner.add(
+            [
+                "git",
+                "ls-remote",
+                "--symref",
+                "https://github.com/iwashita-nozomu/agent-canon.wiki.git",
+                "HEAD",
+            ],
+            stdout="ref: refs/heads/main\tHEAD\n",
+        )
+        runner.add(["git", "rev-parse", "--is-inside-work-tree"], stdout="true")
+        runner.add(["git", "branch", "--show-current"], stdout="main")
+
+        summary = wiki_publish.publish_to_wiki(
+            build_args(source_root=source_root, wiki_root=wiki_root),
+            runner=runner,
+        )
+
+        self.assertEqual(summary["state"], "PREPARE_OK")
+        self.assertEqual(summary["page_count"], 3)
+        self.assertEqual(summary["page_set_digest"], compute_digest(wiki_root, "a" * 40))
+        self.assertFalse(any(cmd[:2] == ("git", "clone") for cmd, _ in runner.calls))
 
 
 if __name__ == "__main__":
