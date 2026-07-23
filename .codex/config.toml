@@ -248,6 +248,10 @@ path = "../.agents/skills/worktree-health/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/wiki-publication/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/worktree-start/SKILL.md"
 enabled = true
 
