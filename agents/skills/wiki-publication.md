@@ -6,7 +6,7 @@ responsibility Documents Wiki Publication Workflow for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md skill and workflow registry
 upstream design ../canonical/CODEX_WORKFLOW.md tool/skill composition contract
 upstream design ./README.md runtime and repository separation contract
-upstream implementation ../../tools/agent_tools/wiki_publish.py
+upstream implementation ../../tools/agent_tools/wiki_publish.py wiki publication gate tool
 downstream implementation ../../.agents/skills/wiki-publication/SKILL.md
 @dependency-end
 -->
