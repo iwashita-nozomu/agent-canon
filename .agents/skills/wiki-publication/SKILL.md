@@ -18,7 +18,7 @@ upstream implementation ../../../tools/agent_tools/wiki_publish.py wiki publicat
 - Canonical owner: `agents/skills/wiki-publication.md`.
 - Runtime contract: `tools/agent_tools/wiki_publish.py`.
 
-## Tool Command
+## Tool Commands
 
 <!-- skill-tool-commands:start -->
 Use the command packet before applying this skill's workflow:
