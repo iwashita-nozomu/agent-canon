@@ -875,6 +875,12 @@ environment, produce resources, or duplicate tests/gates.
   相当の実装を始める
 - tracked repo change がある task では、selected review gate (when activated)、validation、
   commit、`origin` への push を完了条件にする
+- standalone local source-branch push は reversible branch transport として、
+  verified remote identity/permission、named branch、commit/tree、SHA ref
+  push、remote `ls-remote` readback、push 前後の local identity 不変を
+  completion evidence にする。G1/G2/G3/PR lifecycle は生成・主張しない。
+  packet-bound push と PR mutation は既存 sealed 要件を使い、CI fresh-clone
+  fixture は通常 publication の証拠に数えない
 - tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行する。user が明示的に停止を指定した場合や external block がある場合は、理由を evidence に残す
 - planned work、review finding、validation、commit / push、shared canon sync、follow-up 判断の completion evidence を揃えて user-facing completion を返す
 - `verification.txt`、`closeout_gate.md`、`user_request_contract.md` の close 条件を満たして user-facing completion を返す

@@ -88,6 +88,13 @@ There is no legacy subtree, snapshot, wrapper, or alternate owner route.
    source-main publication readback follows. Push, PR, and checks consume one
    sealed G3 authority; post-publication checks additionally consume sealed,
    same-binding G5 evidence.
+   Standalone `github_publish.py push` without a packet is reversible branch
+   transport only: verified remote identity/permission, named current branch,
+   captured local `HEAD`/tree, exact SHA refspec, remote `ls-remote` readback,
+   and push-spanning local identity invariance. It does not generate or claim
+   G1/G2/G3 or PR lifecycle evidence. Packet-bound push may additionally check
+   its sealed candidate identity; `publish-pr`, PR mutation, and merge remain
+   sealed packet/G1/G2/G3-bound.
 1. Enqueue exactly one accepted `QueueReceipt` keyed by
    `(source_namespace,candidate_sha,tree_sha,input_digest,
    publication_merge_sha,publication_merge_tree)`. Create a pending
