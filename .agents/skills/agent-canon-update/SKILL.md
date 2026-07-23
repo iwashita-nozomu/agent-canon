@@ -28,6 +28,12 @@ upstream implementation ../../../tools/agent_tools/agent_canon_preflight.py bloc
   update-route and parent latest-state documents.
 - Boundary: do not hide dirty AgentCanon source work inside a parent pin update
   or create branches without the documented reason.
+- Standalone local source-branch publication follows the canonical transport
+  contract in `documents/tools/github_publish.md`: verified remote identity/
+  permission, named branch, captured local identity, exact SHA ref push, remote
+  readback, and local invariance. It does not generate G1/G2/G3; packet-bound
+  push and PR operations retain the sealed publication requirements. CI
+  fresh-clone fixtures are not publication evidence.
 
 ## Tool Commands
 

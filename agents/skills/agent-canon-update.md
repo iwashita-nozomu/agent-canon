@@ -110,6 +110,13 @@ TODO state up to date.
    fork/contributor, permission, Essence, review, and contributor-diff state.
    Unknown or false push permission is a typed refusal rather than assumed
    authority.
+1. Standalone `github_publish.py push` is reversible branch transport. Without
+   a packet it verifies remote identity/permission, requires a named current
+   branch, captures local `HEAD`/tree, pushes the exact SHA refspec, reads back
+   the remote SHA, and requires local identity invariance across push. It does
+   not generate or claim G1/G2/G3 or PR lifecycle evidence. A supplied sealed
+   packet may add candidate matching; `publish-pr`, PR mutation, and merge keep
+   their sealed packet/G1/G2/G3 requirements.
 1. After G5, materialize `DurableHandback`, close every declared descendant,
    release every reservation, prove task-owned cleanup and unchanged unknown
    shared state, pass G6, and execute only the canonical `close_agent` ToolCall
