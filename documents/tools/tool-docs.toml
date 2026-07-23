@@ -103,6 +103,13 @@ language = "python"
 summary = "gh-backed GitHub branch and PR publish tool documentation."
 
 [[tool]]
+id = "wiki-publish"
+tool = "tools/agent_tools/wiki_publish.py"
+doc = "documents/tools/wiki_publish.md"
+language = "python"
+summary = "Deterministic AgentCanon wiki publication to repo.wiki.git with default-branch-only and source-commit binding."
+
+[[tool]]
 id = "visualization-contract"
 tool = "tools/agent_tools/visualization_contract.py"
 doc = "documents/tools/visualization_contract.md"

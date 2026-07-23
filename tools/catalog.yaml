@@ -574,6 +574,26 @@ entries:
     tests:
       - tests/agent_tools/test_github_publish.py
 
+  - id: wiki-publish
+    summary: Publishes one markdown wiki page to the dedicated repo.wiki.git sidecar using default-branch-only clone, format gates, source commit binding, and exact readback identity.
+    path: tools/agent_tools/wiki_publish.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/wiki_publish.py --help
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/wiki_publish.md
+      - documents/agent-canon-github-remote.md
+      - agents/skills/wiki-publication.md
+    tests:
+      - tests/agent_tools/test_wiki_publish.py
+
   - id: eval-accumulation-check
     summary: Validates append-only AgentCanon hook results and registered eval-family accumulation.
     path: tools/agent_tools/eval_accumulation_check.py
