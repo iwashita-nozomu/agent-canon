@@ -501,14 +501,14 @@ preserve_dirty_agentcanon_latest() {
   if ! bash "$ROOT_DIR/tools/sync_agent_canon.sh" link-root; then
     echo "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR=failed"
     echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_root_view_repair_failed"
-    echo "NEXT_ACTION=commit_or_stash_agentcanon_root_view_changes_then_rerun_make_agent-canon-ensure-latest"
+    echo "NEXT_ACTION=commit_or_stash_agentcanon_root_view_changes_then_rerun_make_agent-canon-ensure-latest AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>"
     return 1
   fi
   echo "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR=pass"
   if ! bash "$ROOT_DIR/tools/sync_agent_canon.sh" check; then
     echo "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK=failed"
     echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_shared_surface_check_failed"
-    echo "NEXT_ACTION=repair_shared_surface_with_link-root_then_rerun_make_agent-canon-ensure-latest"
+    echo "NEXT_ACTION=repair_shared_surface_with_link-root_then_rerun_make_agent-canon-ensure-latest AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>"
     return 1
   fi
   echo "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK=pass"

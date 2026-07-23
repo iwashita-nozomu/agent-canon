@@ -77,7 +77,7 @@ case "$route" in
       echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
       emit_submodule_worktree_evidence
       echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-      echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest"
+      echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest_with_request_evidence"
       echo "AGENT_CANON_LATEST_MERGE_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty"
       echo "AgentCanon update surface is dirty; commit the AgentCanon branch, merge GitHub main into it, and open an AgentCanon PR before treating the latest gate as clean." >&2
       exit 1
