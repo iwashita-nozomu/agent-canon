@@ -1269,4 +1269,3 @@ skill_families:
     related_skills:
       - owner-bounded-routing
       - result-artifact-writeout
-      - github-publish
