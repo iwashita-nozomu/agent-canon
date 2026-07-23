@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 7db23df415312d6812716cf160c3569d19bbe6d538b2ef16b5be89e76f3943ba
+# source canonical digest: 2ac6c4a88bc4ae5b18e1319c20120137f26f85b9221d3d495ffa506f84986e29
 
 name = "spark_worker"
 description = "Low-latency implementation agent for bounded code, docs, tests, or mechanical cleanup slices derived from the Abstract Design Frame and design trace."
@@ -18,4 +18,4 @@ approval_policy = "never"
 model = "gpt-5.3-codex-spark"
 model_reasoning_effort = "low"
 
-developer_instructions = "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only."
+developer_instructions = "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop."

@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 818c9fd1cd19240b757e2afac80e988b85797bef14525846351271f03e05f2e6
+# source canonical digest: 4148ef03f24e9e7916383342e2d197a1494b62169946840420543fb212f2b654
 
 name = "worker"
 description = "Implementation agent for bounded code, docs, or test changes."
@@ -18,4 +18,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "xhigh"
 
-developer_instructions = "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only."
+developer_instructions = "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop."
