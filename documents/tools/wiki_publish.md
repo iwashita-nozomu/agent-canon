@@ -11,49 +11,62 @@ downstream implementation ../../tests/agent_tools/test_wiki_publish.py validates
 
 # Wiki Publication Tool
 
-`tools/agent_tools/wiki_publish.py` publishes AgentCanon pages to a separate
-`owner/repo.wiki.git` sidecar, binds each publish to exact source commit identity,
-and performs explicit source/reference gates before and after push.
+`tools/agent_tools/wiki_publish.py` publishes AgentCanon wiki pages to a separate
+`owner/repo.wiki.git` sidecar, binds the entire top-level page set to exact source
+commit identity, and performs deterministic gates before publication.
 
 ## Command
 
 ```bash
 python3 tools/agent_tools/wiki_publish.py \
+  --wiki-root /path/to/agent-canon.wiki \
+  --source-root . \
+  --source-commit <40-char-sha1> \
   --repo iwashita-nozomu/agent-canon \
-  --source-page README.md \
-  --source-branch main \
-  --page-name Home.md \
   --writer "$USER" \
-  --reviewer "$REVIEWER"
+  --reviewer "$REVIEWER" \
+  --summary-out reports/agents/wiki-publication.json
 ```
 
-Optional summary artifact:
+To publish, add the reviewed digest:
 
 ```bash
-python3 tools/agent_tools/wiki_publish.py ... --summary-out reports/agents/wiki-publication.json
+python3 tools/agent_tools/wiki_publish.py \
+  --wiki-root /path/to/agent-canon.wiki \
+  --source-root . \
+  --source-commit <40-char-sha1> \
+  --repo iwashita-nozomu/agent-canon \
+  --writer "$USER" \
+  --reviewer "$REVIEWER" \
+  --expected-page-set-digest <sha256> \
+  --summary-out reports/agents/wiki-publication.json
 ```
 
 ## Gate Contract
 
 - `REMOTE_UNINITIALIZED` blocker:
   - emitted when the wiki remote has no default branch refs;
-  - no mutation is attempted before initialization.
+  - no mutation or push is attempted.
 - Default-branch only:
-  - wiki clone and push target the resolved default branch;
-  - push command is explicit `HEAD:<default branch>`.
-- Source binding:
-  - source page is resolved from `--source-page` and `--source-branch`;
-  - formatted page includes `AGENT_CANON_WIKI_SOURCE_COMMIT=<sha1>` marker;
-  - publish fails if marker does not match the exact source commit.
-- Formatting gates:
-  - runs `tools/bin/agent-canon docs format` on the staged copy;
-  - writer and reviewer identities must be distinct.
-- Readback gate:
-  - local and remote head SHA must match after push.
+  - wiki remote is `https://github.com/<repo>.wiki.git`;
+  - branch comes only from `git ls-remote --symref <repo>.wiki.git HEAD`;
+  - publish uses explicit `HEAD:<default branch>`.
+- Source validation:
+  - `--source-commit` must be full 40-char hex and a real commit in `--source-root`.
+- Page gates:
+  - inventory all top-level `*.md` pages;
+  - require `Home.md`, `_Sidebar.md`, `_Footer.md`;
+  - each page must contain exact `AGENT_CANON_WIKI_SOURCE_COMMIT=<sha>` binding.
+- Formatting and digest:
+  - checks/prepare runs markdown/math/Mermaid formatting before reviewer approval;
+  - deterministic SHA-256 is computed on sorted page paths and prepared bytes;
+  - publish requires exact `--expected-page-set-digest` match and rejects mismatch.
+- Publish readback:
+  - verifies exact local/remote head match after `git push`.
 
 ## Official GitHub Wiki Behavior Reference
 
-GitHub wiki pages are hosted in `<repo>.wiki.git`, and the default branch for
-that repository is the one that receives active page updates for page visibility.
-A wiki page must be initialized before subsequent default-branch clone/push and
-readback flows can proceed.
+GitHub wiki pages are hosted in `<repo>.wiki.git`, and the effective published
+branch is the remote default branch for that repository.
+A wiki page set must be initialized and aligned before clone/push and readback
+flows proceed.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Publishes one Markdown wiki page to repo.wiki.git with deterministic gates and exact readback.
+# responsibility Publishes AgentCanon wiki page sets to owner/repo.wiki.git with deterministic gates and exact readback.
 # upstream design ../../agents/skills/wiki-publication.md owns wiki publication workflow and source-binding contract.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md owns publication evidence ordering.
 # upstream design ../../documents/agent-canon-github-remote.md defines verified GitHub remote policy.
@@ -9,11 +9,12 @@
 # downstream implementation ../../tests/agent_tools/test_wiki_publish.py validates command shape and failure boundaries.
 # @dependency-end
 
-"""Publish one page from an AgentCanon source file into a dedicated wiki sidecar."""
+"""Publish an AgentCanon wiki sidecar page-set to a default-branch-only wiki remote."""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -26,8 +27,6 @@ from typing import Any
 
 MAX_ERROR_CHARS = 4000
 REMOTE_UNINITIALIZED = "REMOTE_UNINITIALIZED"
-DEFAULT_SOURCE_BRANCH = "main"
-DEFAULT_PAGE_NAME = "Home.md"
 WIKI_SOURCE_MARKER_PREFIX = "<!-- AGENT_CANON_WIKI_SOURCE_COMMIT="
 AGENT_CANON_BIN = Path("tools/bin/agent-canon")
 
@@ -87,33 +86,27 @@ def subprocess_runner(command: Sequence[str], workdir: Path) -> CommandResult:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", default=".", help="Source repository root")
+    parser.add_argument("--wiki-root", required=True, type=Path, help="Local wiki sidecar root.")
+    parser.add_argument("--source-root", required=True, type=Path, help="Source repo root used for commit validation.")
+    parser.add_argument(
+        "--source-commit",
+        required=True,
+        help="Exact source commit SHA1 bound to the wiki page set.",
+    )
     parser.add_argument(
         "--repo",
         required=True,
         help="Source repository slug, e.g. iwashita-nozomu/agent-canon.",
-    )
-    parser.add_argument(
-        "--source-branch",
-        default=DEFAULT_SOURCE_BRANCH,
-        help="Source branch that owns the publication source content.",
-    )
-    parser.add_argument(
-        "--source-page",
-        required=True,
-        type=Path,
-        help="Source markdown page relative to --root.",
-    )
-    parser.add_argument(
-        "--page-name",
-        default=DEFAULT_PAGE_NAME,
-        help="Target wiki page file name.",
     )
     parser.add_argument("--writer", required=True, help="Writer identity for this publication.")
     parser.add_argument(
         "--reviewer",
         required=True,
         help="Independent reviewer identity for this publication.",
+    )
+    parser.add_argument(
+        "--expected-page-set-digest",
+        help="Reviewer-approved SHA-256 digest of the prepared page-set. Omitting runs prepare/check mode.",
     )
     parser.add_argument(
         "--summary-out",
@@ -134,12 +127,32 @@ def normalized_slug(value: str) -> str:
 
 
 def wiki_url(slug: str) -> str:
-    return f"git@github.com:{slug}.wiki.git"
+    return f"https://github.com/{slug}.wiki.git"
 
 
 def git(command: Sequence[str], repo_root: Path, *, runner: Runner, next_action: str) -> str:
     result = run_command(runner, ["git", *command], repo_root, next_action=next_action)
     return result.stdout.strip()
+
+
+def validate_source_commit(runner: Runner, source_root: Path, source_commit: str) -> str:
+    if not re.fullmatch(r"[0-9a-f]{40}", source_commit):
+        raise UserVisibleFailure(
+            message=f"invalid source commit identity: {source_commit!r}",
+            next_action="pin_an_exact_full_sha1_source_commit",
+        )
+    kind = git(
+        ["cat-file", "-t", source_commit],
+        source_root,
+        runner=runner,
+        next_action="source_commit_not_found_in_source_repo",
+    )
+    if kind != "commit":
+        raise UserVisibleFailure(
+            message=f"source commit {source_commit!r} is not a commit in source repo",
+            next_action="source_commit_not_found_in_source_repo",
+        )
+    return source_commit
 
 
 def resolve_default_wiki_branch(runner: Runner, remote_url: str) -> str:
@@ -149,143 +162,31 @@ def resolve_default_wiki_branch(runner: Runner, remote_url: str) -> str:
         Path.cwd(),
         next_action="default_branch_unavailable",
     ).stdout
-    default_branch = ""
     for line in result.splitlines():
-        if line.startswith("ref:"):
-            match = re.match(r"^ref:\s*refs/heads/(?P<branch>[^\t\s]+)\tHEAD$", line)
-            if match:
-                default_branch = match.group("branch")
-                break
-    if not default_branch:
-        raise UserVisibleFailure(
-            message="default wiki branch is unavailable from remote symref",
-            next_action="default_branch_unavailable",
-        )
-    return default_branch
-
-
-def read_source_blob(runner: Runner, source_root: Path, source_commit: str, source_page: Path) -> str:
-    source_rel = str(source_page)
-    tree = run_command(
-        runner,
-        ["git", "ls-tree", "-z", source_commit, "--", source_rel],
-        source_root,
-        next_action="source_path_missing_or_not_blob",
-    ).stdout
-    parsed = False
-    for entry in tree.split("\x00"):
-        if not entry:
+        if not line.startswith("ref:"):
             continue
-        head, _, file_path = entry.partition("\t")
-        if file_path != source_rel:
-            continue
-        mode_and_type = head.split()
-        parsed = True
-        if len(mode_and_type) >= 2 and mode_and_type[1] == "blob":
-            return run_command(
-                runner,
-                ["git", "show", f"{source_commit}:{source_rel}"],
-                source_root,
-                next_action="read_source_blob",
-            ).stdout
-    if parsed:
-        raise UserVisibleFailure(
-            message=f"source path is not a blob in source commit: {source_rel!r}",
-            next_action="source_path_missing_or_not_blob",
-        )
+        match = re.match(r"^ref:\s*refs/heads/(?P<branch>[^\t\s]+)\tHEAD$", line)
+        if match:
+            return match.group("branch")
     raise UserVisibleFailure(
-        message=f"source path missing in source commit tree: {source_rel!r}",
-        next_action="source_path_missing_or_not_blob",
+        message="default wiki branch is unavailable from remote symref",
+        next_action="default_branch_unavailable",
     )
 
 
-def append_source_marker(text: str, source_commit: str) -> str:
-    marker = f"{WIKI_SOURCE_MARKER_PREFIX}{source_commit}-->"
-    lines = text.rstrip().splitlines()
-    for line in lines:
-        if line.startswith(WIKI_SOURCE_MARKER_PREFIX):
-            return "\n".join(lines)
-    lines.append("")
-    lines.append(marker)
-    return "\n".join(lines) + "\n"
+def required_wiki_remote(slug: str) -> str:
+    return wiki_url(slug)
 
 
-def extract_source_marker(text: str) -> str | None:
-    for line in text.splitlines():
-        if line.startswith(WIKI_SOURCE_MARKER_PREFIX):
-            return line.removeprefix(WIKI_SOURCE_MARKER_PREFIX).removesuffix("-->")
-    return None
-
-
-def check_source_marker(text: str, source_commit: str) -> None:
-    observed = extract_source_marker(text)
-    if observed != source_commit:
-        raise UserVisibleFailure(
-            message=f"wiki source marker mismatch: observed={observed!r}, expected={source_commit!r}",
-            next_action="rewrite_source_page_with_exact_source_marker",
-        )
-
-
-def publish_to_wiki(
-    args: argparse.Namespace,
+def ensure_wiki_root(
     *,
-    runner: Runner = subprocess_runner,
-    temp_root: Path | None = None,
-) -> dict[str, Any]:
-    source_root = Path(args.root).resolve()
-    if args.writer == args.reviewer:
-        raise UserVisibleFailure(
-            message="writer and reviewer must be different identities",
-            next_action="set_an_independent_reviewer",
-        )
-
-    source_page = args.source_page
-
-    source_commit = git(
-        ["rev-parse", args.source_branch],
-        source_root,
-        runner=runner,
-        next_action="fetch_source_head_commit",
-    )
-    if len(source_commit) != 40 or any(ch not in "0123456789abcdef" for ch in source_commit.lower()):
-        raise UserVisibleFailure(
-            message=f"invalid source commit identity: {source_commit!r}",
-            next_action="pin_an_exact_full_sha1_source_commit",
-        )
-    source_text = read_source_blob(
-        runner=runner,
-        source_root=source_root,
-        source_commit=source_commit,
-        source_page=source_page,
-    )
-
-    slug = normalized_slug(args.repo)
-    if not slug:
-        raise UserVisibleFailure(
-            message="invalid source repository slug",
-            next_action="pass_repo_in_owner_name_form",
-        )
-    target_remote = wiki_url(slug)
-
-    default_branch = resolve_default_wiki_branch(runner, target_remote)
-    if not default_branch:
-        return {
-            "action": "publish",
-            "state": REMOTE_UNINITIALIZED,
-            "repo": slug,
-            "wiki_remote": target_remote,
-            "page_name": args.page_name,
-            "source_branch": args.source_branch,
-            "source_commit": source_commit,
-            "next_action": "initialize_default_wiki_page_and_retry",
-            "writer": args.writer,
-            "reviewer": args.reviewer,
-        }
-
-    sidecar = temp_root or Path(tempfile.mkdtemp(prefix="agent-canon-wiki-"))
-    remove_sidecar = temp_root is None
-
-    try:
+    runner: Runner,
+    repo_root: Path,
+    remote_url: str,
+    default_branch: str,
+    wiki_root: Path,
+) -> None:
+    if not wiki_root.exists():
         run_command(
             runner,
             [
@@ -295,122 +196,338 @@ def publish_to_wiki(
                 "1",
                 "--branch",
                 default_branch,
-                target_remote,
-                str(sidecar),
+                remote_url,
+                str(wiki_root),
             ],
-            Path.cwd(),
+            repo_root,
             next_action="prepare_wiki_sidecar_clone",
         )
+        return
 
-        current = git(
-            ["branch", "--show-current"],
-            sidecar,
-            runner=runner,
-            next_action="ensure_default_branch_is_active",
+    current = git(
+        ["rev-parse", "--is-inside-work-tree"],
+        wiki_root,
+        runner=runner,
+        next_action="wiki_root_not_a_git_worktree",
+    )
+    if current != "true":
+        raise UserVisibleFailure(
+            message=f"wiki_root is not a git repository: {wiki_root}",
+            next_action="wiki_root_not_a_git_worktree",
         )
-        if current != default_branch:
-            raise UserVisibleFailure(
-                message=f"expected default branch {default_branch!r}, but checked out {current!r}",
-                next_action="checkout_default_wiki_branch_before_publish",
-            )
 
-        staged = sidecar / args.page_name
-        staged.write_text(source_text, encoding="utf-8")
+    current_branch = git(
+        ["branch", "--show-current"],
+        wiki_root,
+        runner=runner,
+        next_action="ensure_default_wiki_branch_is_active",
+    )
+    if current_branch != default_branch:
+        raise UserVisibleFailure(
+            message=f"expected default branch {default_branch!r}, but checked out {current_branch!r}",
+            next_action="checkout_default_wiki_branch_before_publish",
+        )
 
+
+def iter_top_level_markdown_pages(wiki_root: Path) -> list[Path]:
+    pages: list[Path] = []
+    for entry in sorted(wiki_root.iterdir()):
+        if not entry.is_file():
+            continue
+        if entry.suffix.lower() != ".md":
+            continue
+        pages.append(entry)
+    return pages
+
+
+def extract_source_marker(text: str) -> str | None:
+    for line in text.splitlines():
+        if line.startswith(WIKI_SOURCE_MARKER_PREFIX):
+            return line.removeprefix(WIKI_SOURCE_MARKER_PREFIX).removesuffix("-->")
+    return None
+
+
+def normalize_for_digest(text: str, source_commit: str, *, path: str) -> tuple[str, bytes]:
+    if extract_source_marker(text) != source_commit:
+        raise UserVisibleFailure(
+            message=f"wiki source marker mismatch for {path!r}: observed={extract_source_marker(text)!r}, expected={source_commit!r}",
+            next_action="rewrite_source_marker_before_publish",
+        )
+    return path, text.encode("utf-8")
+
+
+def format_page_for_publish(
+    source_root: Path,
+    runner: Runner,
+    page: Path,
+) -> bytes:
+    with tempfile.TemporaryDirectory() as page_tmp:
+        temp_page = Path(page_tmp) / "page.md"
+        temp_page.write_text(page.read_text(encoding="utf-8"), encoding="utf-8")
         run_command(
             runner,
-            [str(AGENT_CANON_BIN), "docs", "format", str(staged)],
+            [str(AGENT_CANON_BIN), "docs", "format", str(temp_page)],
             source_root,
             next_action="format_source_page",
         )
+        return temp_page.read_bytes()
 
-        formatted = append_source_marker(staged.read_text(encoding="utf-8"), source_commit)
-        staged.write_text(formatted, encoding="utf-8")
-        check_source_marker(formatted, source_commit)
 
-        run_command(
-            runner,
-            ["git", "config", "user.name", args.writer],
-            sidecar,
-            next_action="set_git_user_name",
-        )
-        run_command(
-            runner,
-            ["git", "config", "user.email", f"{args.writer}@example.invalid"],
-            sidecar,
-            next_action="set_git_user_email",
-        )
-
-        run_command(
-            runner,
-            ["git", "add", str(staged)],
-            sidecar,
-            next_action="stage_wiki_page",
+def prepare_page_set(
+    *,
+    source_root: Path,
+    source_commit: str,
+    wiki_root: Path,
+    runner: Runner,
+) -> tuple[str, dict[Path, bytes]]:
+    pages = iter_top_level_markdown_pages(wiki_root)
+    if not pages:
+        raise UserVisibleFailure(
+            message="no top-level markdown pages found in wiki root",
+            next_action="inventory_wiki_markdown_pages",
         )
 
-        status = run_command(
-            runner,
-            ["git", "status", "--porcelain"],
-            sidecar,
-            next_action="inspect_git_status",
-        ).stdout.strip()
+    required_pages = {"Home.md", "_Sidebar.md", "_Footer.md"}
+    found = {p.name for p in pages}
+    missing = required_pages - found
+    if missing:
+        raise UserVisibleFailure(
+            message=f"required wiki pages are missing: {', '.join(sorted(missing))}",
+            next_action="add_required_wiki_pages",
+        )
 
-        if status:
+    prepared: dict[Path, bytes] = {}
+    hasher = hashlib.sha256()
+    for path in sorted(pages):
+        formatted = format_page_for_publish(source_root, runner, path)
+        text = formatted.decode("utf-8")
+        rel = path.name
+        key, page_bytes = normalize_for_digest(text, source_commit, path=rel)
+        rel_data = f"{key}\0{len(page_bytes)}\0".encode("utf-8")
+        hasher.update(rel_data)
+        hasher.update(page_bytes)
+        prepared[path] = page_bytes
+
+    return hasher.hexdigest(), prepared
+
+
+def publish_prepared_pages(
+    *,
+    runner: Runner,
+    source_root: Path,
+    wiki_root: Path,
+    prepared: dict[Path, bytes],
+    writer: str,
+    source_commit: str,
+    default_branch: str,
+    remote_url: str,
+) -> tuple[str, str]:
+    for path, data in prepared.items():
+        path.write_bytes(data)
+
+    run_command(
+        runner,
+        ["git", "config", "user.name", writer],
+        wiki_root,
+        next_action="set_git_user_name",
+    )
+    run_command(
+        runner,
+        ["git", "config", "user.email", f"{writer}@example.invalid"],
+        wiki_root,
+        next_action="set_git_user_email",
+    )
+
+    run_command(
+        runner,
+        ["git", "add"] + [str(path.relative_to(wiki_root)) for path in sorted(prepared.keys())],
+        wiki_root,
+        next_action="stage_wiki_page_set",
+    )
+    status = run_command(
+        runner,
+        ["git", "status", "--porcelain"],
+        wiki_root,
+        next_action="inspect_git_status",
+    ).stdout.strip()
+    if status:
+        run_command(
+            runner,
+            [
+                "git",
+                "commit",
+                "-m",
+                f"Publish wiki pages for source {source_commit}",
+            ],
+            wiki_root,
+            next_action="commit_formatted_wiki_pages",
+        )
+
+    local_head = git(
+        ["rev-parse", "HEAD"],
+        wiki_root,
+        runner=runner,
+        next_action="read_local_wiki_head",
+    )
+    run_command(
+        runner,
+        ["git", "push", "origin", f"HEAD:{default_branch}"],
+        wiki_root,
+        next_action="push_default_wiki_branch",
+    )
+    remote_head = git(
+        ["ls-remote", remote_url, f"refs/heads/{default_branch}"],
+        Path.cwd(),
+        runner=runner,
+        next_action="read_remote_wiki_head",
+    ).split()[0]
+
+    if remote_head != local_head:
+        raise UserVisibleFailure(
+            message=f"remote readback {remote_head!r} does not match local {local_head!r}",
+            next_action="retry_with_exact_default_branch_readback",
+        )
+
+    return local_head, remote_head
+
+
+def publish_to_wiki(
+    args: argparse.Namespace,
+    *,
+    runner: Runner = subprocess_runner,
+    wiki_temp_root: Path | None = None,
+) -> dict[str, Any]:
+    source_root = Path(args.source_root).resolve()
+    wiki_root = Path(args.wiki_root).resolve()
+    if args.writer == args.reviewer:
+        raise UserVisibleFailure(
+            message="writer and reviewer must be different identities",
+            next_action="set_an_independent_reviewer",
+        )
+
+    source_commit = validate_source_commit(runner, source_root, args.source_commit)
+
+    slug = normalized_slug(args.repo)
+    if not slug:
+        raise UserVisibleFailure(
+            message="invalid source repository slug",
+            next_action="pass_repo_in_owner_name_form",
+        )
+    target_remote = required_wiki_remote(slug)
+
+    default_branch = resolve_default_wiki_branch(runner, target_remote)
+    if not default_branch:
+        return {
+            "action": "publish",
+            "state": REMOTE_UNINITIALIZED,
+            "repo": slug,
+            "wiki_remote": target_remote,
+            "writer": args.writer,
+            "reviewer": args.reviewer,
+            "source_commit": source_commit,
+            "next_action": "initialize_wiki_sidecar_and_retry",
+        }
+
+    work_root = wiki_root
+    remove_work_root = wiki_temp_root is None
+    if wiki_temp_root is None:
+        temp_root = Path(tempfile.mkdtemp(prefix="agent-canon-wiki-"))
+        work_root = temp_root
+    else:
+        temp_root = wiki_temp_root
+
+    try:
+        if wiki_temp_root is not None:
+            ensure_wiki_root(
+                runner=runner,
+                repo_root=source_root,
+                remote_url=target_remote,
+                default_branch=default_branch,
+                wiki_root=work_root,
+            )
+        else:
+            # explicit temporary clone path for non-mutating check or publish path.
             run_command(
                 runner,
                 [
                     "git",
-                    "commit",
-                    "-m",
-                    f"Publish wiki page {args.page_name} from {source_commit}",
+                    "clone",
+                    "--depth",
+                    "1",
+                    "--branch",
+                    default_branch,
+                    target_remote,
+                    str(work_root),
                 ],
-                sidecar,
-                next_action="commit_formatted_wiki_page",
+                source_root,
+                next_action="prepare_wiki_sidecar_clone",
             )
 
-        local_head = git(
-            ["rev-parse", "HEAD"],
-            sidecar,
+        if default_branch != git(
+            ["branch", "--show-current"],
+            work_root,
             runner=runner,
-            next_action="read_local_wiki_head",
-        )
-        run_command(
-            runner,
-            ["git", "push", "origin", "HEAD:" + default_branch],
-            sidecar,
-            next_action="push_default_wiki_branch",
-        )
-        remote_head = git(
-            ["ls-remote", target_remote, f"refs/heads/{default_branch}"],
-            Path.cwd(),
-            runner=runner,
-            next_action="read_remote_wiki_head",
-        ).split()[0]
-
-        if remote_head != local_head:
+            next_action="ensure_default_wiki_branch_is_active",
+        ):
             raise UserVisibleFailure(
-                message=f"remote readback {remote_head!r} does not match local {local_head!r}",
-                next_action="retry_with_exact_default_branch_readback",
+                message=f"expected default branch {default_branch!r}, but checked out a different branch",
+                next_action="checkout_default_wiki_branch_before_publish",
             )
 
-        return {
+        page_set_digest, prepared_pages = prepare_page_set(
+            source_root=source_root,
+            source_commit=source_commit,
+            wiki_root=work_root,
+            runner=runner,
+        )
+
+        summary: dict[str, Any] = {
             "action": "publish",
             "repo": slug,
+            "wiki_root": str(wiki_root),
             "wiki_remote": target_remote,
             "default_branch": default_branch,
-            "page_name": args.page_name,
-            "source_branch": args.source_branch,
             "source_commit": source_commit,
-            "local_head": local_head,
-            "remote_head": remote_head,
+            "page_set_digest": page_set_digest,
+            "page_count": len(prepared_pages),
             "writer": args.writer,
             "reviewer": args.reviewer,
-            "state": "PUBLISHED",
-            "next_action": "read_exact_remote_page_commit",
         }
+
+        if not args.expected_page_set_digest:
+            summary["state"] = "PREPARE_OK"
+            summary["next_action"] = "obtain_independent_reviewer_approval_for_page_set_digest"
+            return summary
+
+        if args.expected_page_set_digest != page_set_digest:
+            raise UserVisibleFailure(
+                message="wiki page-set digest does not match reviewer-approved digest",
+                next_action="page_set_digest_mismatch",
+            )
+
+        local_head, remote_head = publish_prepared_pages(
+            runner=runner,
+            source_root=source_root,
+            wiki_root=work_root,
+            prepared=prepared_pages,
+            writer=args.writer,
+            source_commit=source_commit,
+            default_branch=default_branch,
+            remote_url=target_remote,
+        )
+
+        summary.update(
+            {
+                "state": "PUBLISHED",
+                "local_head": local_head,
+                "remote_head": remote_head,
+                "next_action": "read_exact_remote_page_set_head",
+            }
+        )
+        return summary
     finally:
-        if remove_sidecar:
-            shutil.rmtree(sidecar, ignore_errors=True)
+        if remove_work_root:
+            shutil.rmtree(work_root, ignore_errors=True)
 
 
 def main() -> int:

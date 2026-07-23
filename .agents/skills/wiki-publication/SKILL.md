@@ -32,8 +32,23 @@ Execute the required and task-matching conditional commands that the packet prin
 
 1. Read `agents/skills/wiki-publication.md`.
 2. Run the wiki publication command with explicit `--writer` and `--reviewer` roles,
-   source commit binding, and default-branch push intent.
-3. Treat missing wiki page state as typed `REMOTE_UNINITIALIZED` and refuse mutation
+   explicit source commit, source and wiki roots, and summary output.
+3. If you need to publish, pass `--expected-page-set-digest` from an independent
+   review summary.
+4. Treat missing wiki page state as typed `REMOTE_UNINITIALIZED` and refuse mutation
    before explicit initialization.
-4. Always publish to `<repo>.wiki.git` sidecar and never to in-tree `wiki` content.
-5. Preserve only narrow, tool-defined validation gates in this route.
+5. Always publish to `<repo>.wiki.git` sidecar and never to in-tree `wiki` content.
+6. Preserve only narrow, tool-defined validation gates in this route.
+
+## Example
+
+```bash
+python3 tools/agent_tools/wiki_publish.py \
+  --wiki-root /path/to/agent-canon.wiki \
+  --source-root /path/to/agent-canon \
+  --source-commit <40-char-commit> \
+  --repo iwashita-nozomu/agent-canon \
+  --writer alice \
+  --reviewer bob \
+  --summary-out reports/agents/wiki-publication.json
+```

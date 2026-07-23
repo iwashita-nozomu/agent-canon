@@ -1,13 +1,8 @@
-# @dependency-start
-# contract test
-# responsibility Tests the AgentCanon wiki publication deterministic gate and binding tool.
-# upstream implementation ../../tools/agent_tools/wiki_publish.py implements the gate tool.
-# downstream design ../../agents/skills/wiki-publication.md defines the workflow contract.
-# @dependency-end
-
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -43,15 +38,21 @@ class FakeRunner:
         if key in self.outputs:
             return self.outputs[key]
 
-        # formatter and local non-network commands are accepted by default.
+        if key[:1] == ("git",) and key[1] in {
+            "config",
+            "add",
+            "commit",
+            "push",
+            "status",
+            "branch",
+            "rev-parse",
+            "ls-remote",
+            "clone",
+        }:
+            return wiki_publish.CommandResult(args=key, returncode=0, stdout="", stderr="")
+
         if key[:3] == ("tools/bin/agent-canon", "docs", "format"):
             return wiki_publish.CommandResult(args=key, returncode=0, stdout="", stderr="")
-        if key[:1] == ("git",) and key[1] in {"config", "add", "commit", "push", "status", "clone", "ls-remote"}:
-            return wiki_publish.CommandResult(args=key, returncode=0, stdout="", stderr="")
-        if key[:1] == ("git",) and key[1:3] == ("branch", "--show-current"):
-            return wiki_publish.CommandResult(args=key, returncode=0, stdout="main", stderr="")
-        if key[:1] == ("git",) and key[1:3] == ("rev-parse", "HEAD"):
-            return wiki_publish.CommandResult(args=key, returncode=0, stdout="b" * 40, stderr="")
 
         raise wiki_publish.UserVisibleFailure(
             message=f"unexpected command: {' '.join(command)}",
@@ -61,199 +62,202 @@ class FakeRunner:
 
 def build_args(**extra: object) -> argparse.Namespace:
     base = {
-        "root": ".",
+        "wiki_root": Path("/tmp/wiki"),
+        "source_root": Path("."),
+        "source_commit": "a" * 40,
         "repo": "iwashita-nozomu/agent-canon",
-        "source_branch": "main",
-        "source_page": Path("source.md"),
-        "page_name": "Home.md",
         "writer": "alice",
         "reviewer": "bob",
+        "expected_page_set_digest": None,
         "summary_out": None,
     }
     base.update(extra)
     return argparse.Namespace(**base)
 
 
+def compute_digest(page_root: Path, source_commit: str) -> str:
+    hasher = hashlib.sha256()
+    for path in sorted(p for p in page_root.iterdir() if p.is_file() and p.suffix == ".md"):
+        text = path.read_text(encoding="utf-8")
+        if f"<!-- AGENT_CANON_WIKI_SOURCE_COMMIT={source_commit}-->" not in text:
+            raise AssertionError("missing marker in fixture")
+        rel = path.name
+        rel_data = f"{rel}\0{len(text.encode('utf-8'))}\0".encode("utf-8")
+        hasher.update(rel_data)
+        hasher.update(text.encode("utf-8"))
+    return hasher.hexdigest()
+
+
 class WikiPublishTests(unittest.TestCase):
-    """Tests for wiki publish gates and readback determinism."""
+    """Tests for wiki publish gates and page-set publication determinism."""
 
     def test_default_branch_unavailable_is_typed_failure(self) -> None:
-        """Missing remote symref HEAD should produce a typed default-branch failure."""
         runner = FakeRunner()
-        runner.add(["git", "rev-parse", "main"], stdout="a" * 40)
-        runner.add(
-            ["git", "ls-remote", "--symref", "git@github.com:iwashita-nozomu/agent-canon.wiki.git", "HEAD"],
-            returncode=1,
-        )
-        runner.add(["git", "ls-tree", "-z", "a" * 40, "--", "source.md"], stdout="100644 blob " + "c" * 40 + "\tsource.md\x00")
-        runner.add(
-            ["git", "show", "a" * 40 + ":source.md"],
-            stdout="# Source\n\n"
-            + "<!-- AGENT_CANON_WIKI_SOURCE_COMMIT="
-            + "b" * 40
-            + "-->\n",
-        )
+        runner.add(["git", "cat-file", "-t", "a" * 40], returncode=1, stderr="not found")
 
         with tempfile.TemporaryDirectory() as tmp:
             source_root = Path(tmp)
-            (source_root / "source.md").write_text("# Source\n", encoding="utf-8")
-
             with self.assertRaises(wiki_publish.UserVisibleFailure) as exc:
-                wiki_publish.publish_to_wiki(build_args(root=source_root), runner=runner)
+                wiki_publish.publish_to_wiki(
+                    build_args(source_root=source_root),
+                    runner=runner,
+                    wiki_temp_root=Path(tmp) / "wiki",
+                )
+        self.assertEqual(exc.exception.next_action, "source_commit_not_found_in_source_repo")
 
-        self.assertEqual(exc.exception.next_action, "default_branch_unavailable")
-
-    def test_wiki_publish_rejects_writer_reviewer_collision(self) -> None:
-        """Writer and reviewer must remain independent."""
+    def test_publish_rejects_noncanonical_source_commit_in_source_root(self) -> None:
         runner = FakeRunner()
+        runner.add(["git", "cat-file", "-t", "a" * 40], stdout="tree")
+
         with tempfile.TemporaryDirectory() as tmp:
             source_root = Path(tmp)
-            (source_root / "source.md").write_text("# Source\n", encoding="utf-8")
-
-            with self.assertRaises(wiki_publish.UserVisibleFailure):
+            with self.assertRaises(wiki_publish.UserVisibleFailure) as exc:
                 wiki_publish.publish_to_wiki(
-                    build_args(root=source_root, writer="same", reviewer="same"),
+                    build_args(source_root=source_root),
                     runner=runner,
+                    wiki_temp_root=Path(tmp) / "wiki",
                 )
+        self.assertEqual(exc.exception.next_action, "source_commit_not_found_in_source_repo")
 
-    def test_publish_reads_source_from_exact_commit_blob(self) -> None:
-        """Published bytes must come from the exact source commit tree."""
+    def test_required_top_level_wiki_pages_are_enforced(self) -> None:
         runner = FakeRunner()
-        source_commit = "a" * 40
-        sidecar_head = "b" * 40
-        source_path = Path("source.md")
-
-        runner.add(["git", "rev-parse", "main"], stdout=source_commit)
-        runner.add(
-            ["git", "ls-remote", "--symref", "git@github.com:iwashita-nozomu/agent-canon.wiki.git", "HEAD"],
-            stdout="ref: refs/heads/main\tHEAD\n",
-        )
-        runner.add(
-            ["git", "ls-tree", "-z", source_commit, "--", str(source_path)],
-            stdout=f"100644 blob {'c'*40}\t{source_path}\x00",
-        )
-        runner.add(["git", "show", f"{source_commit}:{source_path}"], stdout="# Source @ {source_commit[:5]}\n")
+        source_root = Path(tempfile.mkdtemp())
+        wiki_root = source_root / "wiki"
+        wiki_root.mkdir()
+        runner.add(["git", "cat-file", "-t", "a" * 40], stdout="commit")
         runner.add(
             [
                 "git",
                 "ls-remote",
-                "git@github.com:iwashita-nozomu/agent-canon.wiki.git",
-                "refs/heads/main",
+                "--symref",
+                "https://github.com/iwashita-nozomu/agent-canon.wiki.git",
+                "HEAD",
             ],
-            stdout=f"{sidecar_head}\trefs/heads/main\n",
+            stdout="ref: refs/heads/main\tHEAD\n",
         )
+        runner.add(["git", "rev-parse", "--is-inside-work-tree"], stdout="true")
+        runner.add(["git", "branch", "--show-current"], stdout="main")
+
+        (wiki_root / "Home.md").write_text("# Home\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=a" * 40 + "-->\n", encoding="utf-8")
+        (wiki_root / "Other.md").write_text("# Other\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=a" * 40 + "-->\n", encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as tmp_output:
+            with self.assertRaises(wiki_publish.UserVisibleFailure) as exc:
+                wiki_publish.publish_to_wiki(
+                    build_args(source_root=source_root, wiki_root=wiki_root, summary_out=Path(tmp_output) / "summary.json"),
+                    runner=runner,
+                    wiki_temp_root=wiki_root,
+                )
+        self.assertEqual(exc.exception.next_action, "add_required_wiki_pages")
+
+    def test_prepare_without_expected_digest_outputs_page_set_digest(self) -> None:
+        runner = FakeRunner()
+        source_root = Path(tempfile.mkdtemp())
+        wiki_root = source_root / "wiki"
+        wiki_root.mkdir()
+        source_page = "# Home\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=" + "a" * 40 + "-->\n"
+        for name in ("Home.md", "_Sidebar.md", "_Footer.md"):
+            (wiki_root / name).write_text(source_page, encoding="utf-8")
+        runner.add(["git", "cat-file", "-t", "a" * 40], stdout="commit")
         runner.add(
             [
                 "git",
-                "clone",
-                "--depth",
-                "1",
-                "--branch",
-                "main",
-                "git@github.com:iwashita-nozomu/agent-canon.wiki.git",
-                "",
+                "ls-remote",
+                "--symref",
+                "https://github.com/iwashita-nozomu/agent-canon.wiki.git",
+                "HEAD",
             ],
-            returncode=0,
+            stdout="ref: refs/heads/main\tHEAD\n",
         )
-        runner.add(["git", "status", "--porcelain"], stdout="M\tHome.md")
-        runner.add(["git", "rev-parse", "HEAD"], stdout=sidecar_head)
+        runner.add(["git", "rev-parse", "--is-inside-work-tree"], stdout="true")
+        runner.add(["git", "branch", "--show-current"], stdout="main")
 
-        with tempfile.TemporaryDirectory() as tmp:
-            source_root = Path(tmp)
-            source_root.joinpath("source.md").write_text("# Working tree content\n", encoding="utf-8")
+        summary = wiki_publish.publish_to_wiki(
+            build_args(source_root=source_root, wiki_root=wiki_root),
+            runner=runner,
+            wiki_temp_root=wiki_root,
+        )
 
-            summary = wiki_publish.publish_to_wiki(
-                build_args(root=source_root, source_page=source_path),
+        self.assertEqual(summary["state"], "PREPARE_OK")
+        expected = compute_digest(wiki_root, "a" * 40)
+        self.assertEqual(summary["page_set_digest"], expected)
+
+    def test_publish_rejects_digest_mismatch_after_reviewer_step(self) -> None:
+        runner = FakeRunner()
+        source_root = Path(tempfile.mkdtemp())
+        wiki_root = source_root / "wiki"
+        wiki_root.mkdir()
+        source_page = "# Home\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=" + "a" * 40 + "-->\n"
+        for name in ("Home.md", "_Sidebar.md", "_Footer.md"):
+            (wiki_root / name).write_text(source_page, encoding="utf-8")
+        runner.add(["git", "cat-file", "-t", "a" * 40], stdout="commit")
+        runner.add(
+            [
+                "git",
+                "ls-remote",
+                "--symref",
+                "https://github.com/iwashita-nozomu/agent-canon.wiki.git",
+                "HEAD",
+            ],
+            stdout="ref: refs/heads/main\tHEAD\n",
+        )
+        runner.add(["git", "rev-parse", "--is-inside-work-tree"], stdout="true")
+        runner.add(["git", "branch", "--show-current"], stdout="main")
+
+        with self.assertRaises(wiki_publish.UserVisibleFailure) as exc:
+            wiki_publish.publish_to_wiki(
+                build_args(
+                    source_root=source_root,
+                    wiki_root=wiki_root,
+                    expected_page_set_digest="bad" + "1" * 63,
+                ),
                 runner=runner,
+                wiki_temp_root=wiki_root,
             )
 
-        self.assertEqual(summary["state"], "PUBLISHED")
-        self.assertIn(("git", "show", f"{source_commit}:{source_path}"), [cmd for cmd, _ in runner.calls])
-        self.assertEqual(summary["source_commit"], source_commit)
-        self.assertEqual(summary["local_head"], sidecar_head)
-        self.assertEqual(summary["remote_head"], sidecar_head)
+        self.assertEqual(exc.exception.next_action, "page_set_digest_mismatch")
 
-    def test_publish_source_path_missing_in_commit_fails_typed(self) -> None:
-        """Absent source path in commit tree is rejected with typed source path failure."""
+    def test_publish_requires_exact_default_branch_push_and_readback(self) -> None:
         runner = FakeRunner()
-        runner.add(["git", "rev-parse", "main"], stdout="a" * 40)
-        runner.add(
-            ["git", "ls-remote", "--symref", "git@github.com:iwashita-nozomu/agent-canon.wiki.git", "HEAD"],
-            stdout="ref: refs/heads/main\tHEAD\n",
-        )
-        runner.add(["git", "ls-tree", "-z", "a" * 40, "--", "source.md"], stdout="")
+        source_root = Path(tempfile.mkdtemp())
+        wiki_root = source_root / "wiki"
+        wiki_root.mkdir()
+        source_page = "# Home\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=" + "a" * 40 + "-->\n"
+        for name in ("Home.md", "_Sidebar.md", "_Footer.md"):
+            (wiki_root / name).write_text(source_page, encoding="utf-8")
 
-        with tempfile.TemporaryDirectory() as tmp:
-            source_root = Path(tmp)
-            source_root.joinpath("source.md").write_text("# Source\n", encoding="utf-8")
+        expected = compute_digest(wiki_root, "a" * 40)
+        sidecar_head = "c" * 40
 
-            with self.assertRaises(wiki_publish.UserVisibleFailure) as exc:
-                wiki_publish.publish_to_wiki(
-                    build_args(root=source_root, source_page=Path("source.md")),
-                    runner=runner,
-                )
-
-        self.assertEqual(exc.exception.next_action, "source_path_missing_or_not_blob")
-
-    def test_publish_source_path_non_blob_is_rejected(self) -> None:
-        """Directory-like tree entries are rejected with the source-path failure."""
-        runner = FakeRunner()
-        runner.add(["git", "rev-parse", "main"], stdout="a" * 40)
-        runner.add(
-            ["git", "ls-remote", "--symref", "git@github.com:iwashita-nozomu/agent-canon.wiki.git", "HEAD"],
-            stdout="ref: refs/heads/main\tHEAD\n",
-        )
-        runner.add(
-            ["git", "ls-tree", "-z", "a" * 40, "--", "source.md"],
-            stdout=f"040000 tree {'d'*40}\tsource.md\x00",
-        )
-
-        with tempfile.TemporaryDirectory() as tmp:
-            source_root = Path(tmp)
-            source_root.joinpath("source.md").write_text("# Source\n", encoding="utf-8")
-
-            with self.assertRaises(wiki_publish.UserVisibleFailure) as exc:
-                wiki_publish.publish_to_wiki(
-                    build_args(root=source_root, source_page=Path("source.md")),
-                    runner=runner,
-                )
-
-        self.assertEqual(exc.exception.next_action, "source_path_missing_or_not_blob")
-
-    def test_existing_marker_mismatch_is_rejected(self) -> None:
-        """Wrong source marker in target wiki page blocks publication with a typed action."""
-        runner = FakeRunner()
-        runner.add(["git", "rev-parse", "main"], stdout="a" * 40)
-        runner.add(
-            ["git", "ls-remote", "--symref", "git@github.com:iwashita-nozomu/agent-canon.wiki.git", "HEAD"],
-            stdout="ref: refs/heads/main\tHEAD\n",
-        )
-        runner.add(
-            ["git", "ls-tree", "-z", "a" * 40, "--", "source.md"],
-            stdout="100644 blob " + "c" * 40 + "\tsource.md\x00",
-        )
-        runner.add(
-            ["git", "show", "a" * 40 + ":source.md"],
-            stdout="# Source\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=" + "b" * 40 + "-->\n",
-        )
+        runner.add(["git", "cat-file", "-t", "a" * 40], stdout="commit")
         runner.add(
             [
                 "git",
                 "ls-remote",
-                "git@github.com:iwashita-nozomu/agent-canon.wiki.git",
-                "refs/heads/main",
+                "--symref",
+                "https://github.com/iwashita-nozomu/agent-canon.wiki.git",
+                "HEAD",
             ],
-            stdout="b" * 40 + "\trefs/heads/main\n",
+            stdout="ref: refs/heads/main\tHEAD\n",
+        )
+        runner.add(["git", "rev-parse", "--is-inside-work-tree"], stdout="true")
+        runner.add(["git", "branch", "--show-current"], stdout="main")
+        runner.add(["git", "rev-parse", "HEAD"], stdout=sidecar_head)
+        runner.add(["git", "ls-remote", "https://github.com/iwashita-nozomu/agent-canon.wiki.git", "refs/heads/main"], stdout=f"{sidecar_head}\trefs/heads/main\n")
+
+        summary = wiki_publish.publish_to_wiki(
+            build_args(
+                source_root=source_root,
+                wiki_root=wiki_root,
+                expected_page_set_digest=expected,
+            ),
+            runner=runner,
+            wiki_temp_root=wiki_root,
         )
 
-        with tempfile.TemporaryDirectory() as tmp:
-            source_root = Path(tmp)
-            (source_root / "source.md").write_text("# Working tree source\n", encoding="utf-8")
-            with self.assertRaises(wiki_publish.UserVisibleFailure):
-                wiki_publish.publish_to_wiki(
-                    build_args(root=source_root, source_page=Path("source.md")),
-                    runner=runner,
-                )
+        self.assertEqual(summary["state"], "PUBLISHED")
+        self.assertEqual(summary["local_head"], sidecar_head)
+        self.assertEqual(summary["remote_head"], sidecar_head)
 
 
 if __name__ == "__main__":

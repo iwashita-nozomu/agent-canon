@@ -17,9 +17,7 @@ downstream implementation ../../.agents/skills/wiki-publication/SKILL.md
   default-branch-only, source-bound workflow;
 - branch-independent, sidecar-published, reader-projection wiki updates are needed
   (never canonical, never a local project `wiki` directory);
-- initial page creation is intentionally separated from page updates and the
-  workflow requires an explicit `REMOTE_UNINITIALIZED` blocker state before clone;
-- PR-style reviewer separation and source-refined validation are required.
+- publication is approved in two stages: prepare/check then publish with reviewer digest.
 
 ## Scope
 
@@ -34,15 +32,18 @@ repo responsibilities.
    skill instructions.
 3. Resolve target wiki remote from `<repo>.wiki.git` and perform one deterministic
    projection gate:
-   - if remote has no branch refs, the workflow state is typed
-     `REMOTE_UNINITIALIZED` and no mutation is attempted;
-   - once initialized, fetch and clone the remote default branch, then bind content
-     to exact source commit.
-4. Normalize page content with the shared Markdown + math + Mermaid formatter,
-   write one source-reference marker, then push only the exact remote default
-   branch.
-5. Read back remote head commit and compare exact equality with local push head.
-6. Return a typed summary for writer and independent reviewer checks.
+   - if remote has no default branch refs, workflow state is typed
+     `REMOTE_UNINITIALIZED` and no wiki mutation is attempted;
+   - once initialized, clone default branch and require checked-out branch equals it.
+4. Inventory all top-level `.md` pages in the wiki sidecar; require
+   `Home.md`, `_Sidebar.md`, and `_Footer.md`.
+5. `tools/bin/agent-canon docs format` each page to normalized bytes,
+   bind the exact source commit marker,
+   and compute deterministic SHA-256 over sorted page path+bytes.
+6. In check mode, return digest and summary; publish requires
+   `--expected-page-set-digest` to match exactly that digest.
+7. On publish, commit the prepared page set, push only `HEAD:<default branch>`,
+   and read back exact remote branch head.
 
 ## Output Contract
 
@@ -50,8 +51,8 @@ repo responsibilities.
 
 - action (`publish`)
 - wiki remote URL
-- default branch and page path
-- source repo branch/commit
-- local and remote head commit
-- blocker if any
-
+- default branch
+- source repo commit
+- page-set digest and page count
+- local and remote head commit on publish
+- typed blockers if any
