@@ -143,15 +143,12 @@ def git(command: Sequence[str], repo_root: Path, *, runner: Runner, next_action:
 
 
 def resolve_default_wiki_branch(runner: Runner, remote_url: str) -> str:
-    try:
-        result = run_command(
-            runner,
-            ["git", "ls-remote", "--symref", remote_url, "HEAD"],
-            Path.cwd(),
-            next_action="read_wiki_default_branch_with_symref",
-        ).stdout
-    except UserVisibleFailure:
-        return ""
+    result = run_command(
+        runner,
+        ["git", "ls-remote", "--symref", remote_url, "HEAD"],
+        Path.cwd(),
+        next_action="default_branch_unavailable",
+    ).stdout
     default_branch = ""
     for line in result.splitlines():
         if line.startswith("ref:"):
@@ -159,22 +156,47 @@ def resolve_default_wiki_branch(runner: Runner, remote_url: str) -> str:
             if match:
                 default_branch = match.group("branch")
                 break
-    if default_branch:
-        return default_branch
-    # Fallback to first non-empty refs/heads entry.
-    refs = git(
-        ["ls-remote", "--heads", remote_url],
-        Path.cwd(),
-        runner=runner,
-        next_action="read_wiki_head_refs",
-    ).splitlines()
-    for line in refs:
-        if line.strip().endswith("/refs/heads/"):
+    if not default_branch:
+        raise UserVisibleFailure(
+            message="default wiki branch is unavailable from remote symref",
+            next_action="default_branch_unavailable",
+        )
+    return default_branch
+
+
+def read_source_blob(runner: Runner, source_root: Path, source_commit: str, source_page: Path) -> str:
+    source_rel = str(source_page)
+    tree = run_command(
+        runner,
+        ["git", "ls-tree", "-z", source_commit, "--", source_rel],
+        source_root,
+        next_action="source_path_missing_or_not_blob",
+    ).stdout
+    parsed = False
+    for entry in tree.split("\x00"):
+        if not entry:
             continue
-        parts = line.split()
-        if len(parts) == 2 and parts[1].startswith("refs/heads/"):
-            return parts[1].removeprefix("refs/heads/")
-    return ""
+        head, _, file_path = entry.partition("\t")
+        if file_path != source_rel:
+            continue
+        mode_and_type = head.split()
+        parsed = True
+        if len(mode_and_type) >= 2 and mode_and_type[1] == "blob":
+            return run_command(
+                runner,
+                ["git", "show", f"{source_commit}:{source_rel}"],
+                source_root,
+                next_action="read_source_blob",
+            ).stdout
+    if parsed:
+        raise UserVisibleFailure(
+            message=f"source path is not a blob in source commit: {source_rel!r}",
+            next_action="source_path_missing_or_not_blob",
+        )
+    raise UserVisibleFailure(
+        message=f"source path missing in source commit tree: {source_rel!r}",
+        next_action="source_path_missing_or_not_blob",
+    )
 
 
 def append_source_marker(text: str, source_commit: str) -> str:
@@ -217,12 +239,7 @@ def publish_to_wiki(
             next_action="set_an_independent_reviewer",
         )
 
-    source_page = (source_root / args.source_page).resolve()
-    if not source_page.exists():
-        raise UserVisibleFailure(
-            message=f"source page not found: {source_page}",
-            next_action="point_to_an_existing_source_page",
-        )
+    source_page = args.source_page
 
     source_commit = git(
         ["rev-parse", args.source_branch],
@@ -235,6 +252,12 @@ def publish_to_wiki(
             message=f"invalid source commit identity: {source_commit!r}",
             next_action="pin_an_exact_full_sha1_source_commit",
         )
+    source_text = read_source_blob(
+        runner=runner,
+        source_root=source_root,
+        source_commit=source_commit,
+        source_page=source_page,
+    )
 
     slug = normalized_slug(args.repo)
     if not slug:
@@ -292,7 +315,7 @@ def publish_to_wiki(
             )
 
         staged = sidecar / args.page_name
-        shutil.copyfile(source_page, staged)
+        staged.write_text(source_text, encoding="utf-8")
 
         run_command(
             runner,
