@@ -129,7 +129,7 @@ case "$route" in
     emit_submodule_worktree_evidence
     if [[ "${dirty_update_surface:-${dirty_worktree:-}}" == "yes" && "${prefix_mode:-}" == "submodule" ]]; then
       echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-      echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest"
+      echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest_with_request_evidence"
       echo "AGENT_CANON_LATEST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty"
       echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest"
       echo "Route shared-canon local changes through an AgentCanon branch and PR, merge GitHub main into the branch first, then set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and rerun 'make agent-canon-ensure-latest' to bring the pin back." >&2
