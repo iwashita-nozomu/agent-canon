@@ -270,7 +270,7 @@ before editing.
 | Step | Required check                                                                                                                             |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1    | Classify each touched path as AgentCanon-owned, template-owned, project-owned, or GitHub path-constrained copy.                            |
-| 2    | Check the AgentCanon submodule pin and repair shared views with `bash tools/sync_agent_canon.sh link-root` when needed.                    |
+| 2    | Check the AgentCanon submodule pin and repair shared views with the request-evidence-authorized `bash tools/sync_agent_canon.sh link-root` route when needed. |
 | 3    | Move agent convenience installs out of `Dockerfile` and into shared `.devcontainer/post-create.sh` when they are not product dependencies. |
 | 4    | Keep workspace-dependent Python package installation in `docker/install_python_dependencies.sh`.                                           |
 | 5    | Ensure Docker workflows checkout `vendor/agent-canon/` before shared devcontainer smoke.                                                   |
@@ -293,7 +293,8 @@ In template-derived repositories, also run the repository-native checks after th
 AgentCanon pin or root views change:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 make docker-build-check
 make ci
 ```

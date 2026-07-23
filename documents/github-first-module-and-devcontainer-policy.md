@@ -22,7 +22,8 @@ The normal route is:
 1. Merge to AgentCanon `main` after review and checks.
 1. Update template or derived repos by advancing the `vendor/agent-canon`
    submodule pin.
-1. Repair root views with `bash tools/sync_agent_canon.sh link-root`.
+1. Repair root views with the request-evidence-authorized
+   `bash tools/sync_agent_canon.sh link-root` route.
 
 Local Git remotes must not define the normal distribution path for
 self-authored reusable modules.
@@ -154,7 +155,8 @@ Template or derived repos that consume a new AgentCanon devcontainer pin must
 also run:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 make agent-canon-pr-check
 make ci

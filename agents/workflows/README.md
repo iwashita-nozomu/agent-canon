@@ -160,8 +160,10 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 1. template 側 pin PR を閉じる
 
 ```bash
-make agent-canon-ensure-latest
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  make agent-canon-ensure-latest
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 make agent-canon-pr-check
 ```
@@ -170,7 +172,8 @@ derived repo から shared canon だけ更新するときは、必要に応じ�
 
 ```bash
 bash tools/update_agent_canon.sh plan
-bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
 git -C vendor/agent-canon push origin HEAD
 ```
 

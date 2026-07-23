@@ -72,6 +72,40 @@ from update_lifecycle_contract import (  # noqa: E402
 )
 OVERLAY_EXCLUDED_NAMES = {".git", ".pytest_cache", ".ruff_cache", "reports"}
 SUBMODULE_GITFILE = Path("vendor") / "agent-canon" / ".git"
+COMMIT_REQUEST_EVIDENCE = "evidence:" + ("0" * 64)
+
+
+def authorized_test_env() -> dict[str, str]:
+    """Return the explicit authority and provenance inputs for mutating routes."""
+    env = dict(os.environ)
+    env.update(
+        {
+            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
+            "AGENT_CANON_BRANCH_WORKTREE_REASON": "test-approved-update",
+            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
+            "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "test-approved-update",
+            "AGENT_CANON_COMMIT_REQUEST_EVIDENCE": COMMIT_REQUEST_EVIDENCE,
+        }
+    )
+    return env
+
+
+class CommitProvenanceStaticContractTest(unittest.TestCase):
+    """Check that the representative fresh-clone caller forwards provenance."""
+
+    def test_fresh_clone_route_sets_commit_request_evidence(self) -> None:
+        """Fresh-clone update calls must pass the canonical workflow digest."""
+        script = (REPO_ROOT / "tools" / "ci" / "check_fresh_clone.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            'AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}"',
+            script,
+        )
+        self.assertIn(
+            'COMMIT_REQUEST_EVIDENCE_DIGEST="$(sha256sum agents/workflows/agent-canon-pr-workflow.md',
+            script,
+        )
 
 
 @unittest.skipIf(
@@ -210,6 +244,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env=authorized_test_env(),
             )
             check = subprocess.run(
                 ["bash", "tools/sync_agent_canon.sh", "check"],
@@ -598,6 +633,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env=authorized_test_env(),
             )
             self.assertEqual(apply.returncode, 0, apply.stderr)
             combined_output = f"{apply.stdout}\n{apply.stderr}"
@@ -726,6 +762,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env=authorized_test_env(),
             )
             self.assertNotEqual(apply.returncode, 0)
             combined_output = f"{apply.stdout}\n{apply.stderr}"
@@ -753,6 +790,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         "AGENT_CANON_BRANCH_WORKTREE_REASON": "test-approved-update",
         "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
         "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "test-approved-update",
+        "AGENT_CANON_COMMIT_REQUEST_EVIDENCE": COMMIT_REQUEST_EVIDENCE,
     }
 
     def setUp(self) -> None:
@@ -1070,6 +1108,44 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
             self.assertEqual(self.protected_state(repo), before)
 
+    def test_commit_request_evidence_fails_before_any_mutation(self) -> None:
+        """Missing or malformed request evidence blocks wrapper and low-level routes."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, _work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            before = self.protected_state(repo)
+            invalid_evidence = ("", "evidence:" + ("A" * 64), "evidence:" + ("0" * 63))
+            commands = (
+                ("latest", "tools/update_agent_canon.sh"),
+                ("apply", "tools/update_agent_canon.sh"),
+                ("ensure-latest", "tools/sync_agent_canon.sh"),
+                ("pull", "tools/sync_agent_canon.sh"),
+            )
+
+            for evidence in invalid_evidence:
+                env = self.unauthorized_env(
+                    AGENT_CANON_BRANCH_WORKTREE_AUTHORITY="user_request",
+                    AGENT_CANON_BRANCH_WORKTREE_REASON="test-approved-update",
+                    AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY="explicit_user_approval",
+                    AGENT_CANON_DESTRUCTIVE_GIT_REASON="test-approved-update",
+                    AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence,
+                )
+                for subcommand, script in commands:
+                    with self.subTest(evidence=evidence, subcommand=subcommand):
+                        result = subprocess.run(
+                            ["bash", script, subcommand],
+                            cwd=repo,
+                            check=False,
+                            capture_output=True,
+                            text=True,
+                            env=env,
+                        )
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn("COMMIT_PROVENANCE_GUARD=block", result.stdout)
+                        self.assertNotIn("AGENT_CANON_EVAL_LOG_PARK=", result.stdout)
+                        self.assertEqual(self.protected_state(repo), before)
+
     def test_sync_auto_commit_excludes_unrelated_pre_staged_sentinel(self) -> None:
         """Owned-path sync commits preserve but never absorb another chat's staged path."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1090,6 +1166,14 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env={
+                    **os.environ,
+                    "GIT_AUTHOR_NAME": "Hostile Author",
+                    "GIT_AUTHOR_EMAIL": "hostile-author@example.invalid",
+                    "GIT_COMMITTER_NAME": "Hostile Committer",
+                    "GIT_COMMITTER_EMAIL": "hostile-committer@example.invalid",
+                    "EMAIL": "hostile@example.invalid",
+                },
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -1109,6 +1193,53 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             ).stdout.splitlines()
             self.assertNotIn(sentinel.name, committed_paths)
             self.assertIn(sentinel.name, staged_paths)
+            identity = subprocess.run(
+                ["git", "show", "-s", "--format=%an%n%ae%n%cn%n%ce", "HEAD"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.splitlines()
+            self.assertEqual(
+                identity,
+                [
+                    "AgentCanon Sync Automation",
+                    "agent-canon-sync@automation.invalid",
+                    "AgentCanon Sync Automation",
+                    "agent-canon-sync@automation.invalid",
+                ],
+            )
+            commit_message = subprocess.run(
+                ["git", "show", "-s", "--format=%B", "HEAD"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            trailers = subprocess.run(
+                ["git", "interpret-trailers", "--parse"],
+                input=commit_message,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.splitlines()
+            remote_sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            for trailer in (
+                "AgentCanon-Automation-Actor: agent-canon-sync",
+                "AgentCanon-Authority-Source: user_request",
+                "AgentCanon-Destructive-Authority: explicit_user_approval",
+                f"AgentCanon-Request-Evidence: {COMMIT_REQUEST_EVIDENCE}",
+                f"AgentCanon-Remote: {remote_sha}",
+                "AgentCanon-Update-Method: submodule_update",
+                "AgentCanon-Prefix: vendor/agent-canon",
+            ):
+                self.assertIn(trailer, trailers)
 
     def test_update_todo_auto_commit_excludes_unrelated_pre_staged_sentinel(self) -> None:
         """TODO acknowledgement commits only its state path and preserves staged dirt."""
@@ -1153,6 +1284,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env=authorized_test_env(),
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -3063,6 +3195,7 @@ class StandaloneUpdateLifecycleTest(unittest.TestCase):
                 "AGENT_CANON_BRANCH_WORKTREE_REASON": "frontier test",
                 "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
                 "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "frontier test",
+                "AGENT_CANON_COMMIT_REQUEST_EVIDENCE": COMMIT_REQUEST_EVIDENCE,
             }
             command = ["bash", "tools/update_agent_canon.sh", "latest"]
             first = subprocess.run(

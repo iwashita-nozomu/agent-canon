@@ -293,7 +293,8 @@ repo-local の正本として残すもの:
 root view の修復と検証:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
 ```
@@ -339,7 +340,8 @@ packet を絞ったら、以後の保守では正本 surface を直接編集し�
 - root surface を戻すときは次を使います。
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
@@ -348,7 +350,8 @@ bash tools/sync_agent_canon.sh check
 template 側で shared canon を直した変更を upstream `agent-canon` repo に戻すときは次を使います。
 
 ```bash
-bash tools/update_agent_canon.sh merge-main-into-current
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/update_agent_canon.sh merge-main-into-current
 git -C vendor/agent-canon push origin HEAD
 ```
 
