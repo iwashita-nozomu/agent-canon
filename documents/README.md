@@ -4,6 +4,8 @@ contract reference
 responsibility Documents documents/ for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md documents ownership policy
 upstream design ./shared-runtime-surfaces.toml machine-readable ownership manifest
+downstream design ./rule/README.md document filename, placement, and structure rules
+downstream design ./design/README.md target-state and implementation-boundary index
 downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy
 downstream design ./codex-configuration-reference.md Codex configuration reference
 downstream design ./object-oriented-design.md general OOP coding policy
@@ -35,6 +37,13 @@ second agent hub.
 `documents/` is still a mixed documentation directory. The root
 `documents/README.md` stays repo-local after template clone. AgentCanon may seed
 this file, but derived repositories own their local index.
+
+## 文書規約と設計正本
+
+- [文書規約](./rule/README.md): filename、配置、構成判断の共通規約。
+- [設計正本](./design/README.md): target state、実装境界、設計上の前提。
+
+配置や分割の理由は文書規約を読み、個別の target state と実装境界は設計正本を読みます。
 
 ## Reader Map
 

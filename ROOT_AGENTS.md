@@ -3,6 +3,7 @@
 contract agent-runtime
 responsibility Documents Agent Instructions for this repository.
 upstream design README.md repository entrypoint and clone/update guidance.
+upstream design documents/rule/README.md document filename, placement, and structure rules.
 upstream design documents/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy.
 upstream design documents/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy.
 upstream design documents/template-agent-canon-audit-resolution.md audit resolution ledger for profile and gate simplification.
@@ -73,6 +74,7 @@ This entrypoint does not create a second policy source.
 
 - This file owns the template-root runtime entrypoint for Codex and points each
   runtime contract to its owner surface and checker.
+- 文書 filename は英語、本文は日本語とし、詳細は `documents/rule/README.md` を参照します。
 - Start with Scope Discipline and Structure-First Scope Formation, then use the
   runtime owner map only to find the surface that owns the next decision. Task
   entry, base runtime packet, shared canon flow, closeout evidence, and

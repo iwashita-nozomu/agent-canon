@@ -85,7 +85,7 @@ DESIGN_INTEGRITY_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
 CONVENTION_SOURCES = (
     "documents/conventions/README.md",
     "documents/conventions/common/01_principles.md",
-    "documents/conventions/common/02_naming.md",
+    "documents/rule/naming.md",
     "documents/conventions/common/03_comments.md",
     "documents/conventions/common/04_operators.md",
     "documents/conventions/common/05_docs.md",
@@ -144,7 +144,7 @@ TOOL_GATES = {
         (
             "tools/ci/run_all_checks.sh",
             "documents/coding-conventions-logging.md",
-            "documents/conventions/common/02_naming.md",
+            "documents/rule/naming.md",
         ),
     ),
     "notebook_quality": (

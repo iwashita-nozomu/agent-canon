@@ -11,6 +11,8 @@ upstream design ../workflows/implementation-waterfall-workflow.md implementation
 upstream design ../../AGENTS.md bounded handoff and subagent packet rules
 upstream design ../canonical/CODEX_SUBAGENTS.md Codex runtime surface and subagent config ownership
 upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared root runtime surface policy
+upstream design ../../documents/rule/README.md document rule canon
+upstream design ../../documents/design/README.md design canon reader route
 upstream design refactor-loop.md behavior-preserving refactor loop
 upstream design dependency-analysis.md dependency and change-impact packets
 upstream design prose-reasoning-graph.md graph-backed prose and README analysis
@@ -44,6 +46,14 @@ visualization owner.
   `.agents` boundaries, or directory responsibility evidence must change.
 - Boundary: this skill classifies and validates structure surfaces; generic
   behavior-preserving mechanics belong to `refactor-loop`.
+
+## 文書正本
+
+文書の filename、配置、構成判断は
+[`documents/rule/README.md`](../../documents/rule/README.md) を参照します。
+個別の target state と実装境界は
+[`documents/design/README.md`](../../documents/design/README.md) を参照します。
+配置規則や設計規則をこの skill に複製しません。
 
 ## Purpose
 
