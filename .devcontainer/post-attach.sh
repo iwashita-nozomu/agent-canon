@@ -3,6 +3,7 @@
 # contract environment
 # responsibility Reports shared devcontainer attach status.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
+# upstream design ../documents/rule/dependency-module-changes.md workspace-root source visibility contract
 # upstream design ../documents/gpu-admission-r5-source-packet.md observational readback receipt contract
 # upstream environment devcontainer.json postAttachCommand entrypoint
 # upstream implementation finalize-shared-runtime.sh publishes the exact readback receipt
@@ -10,7 +11,23 @@
 set -euo pipefail
 
 runtime_root="${AGENT_CANON_RUNTIME_ROOT:-/var/lib/agent-canon/runtime}"
-source_projection_root="${AGENT_CANON_SOURCE_PROJECTION_ROOT:-/workspace/reports/agents/devcontainer/runtime}"
+repo_root="${AGENT_CANON_REPOSITORY_ROOT:-}"
+[ -n "$repo_root" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=repository-root-env-missing" >&2
+  exit 1
+}
+case "$repo_root" in
+  /workspace/*) ;;
+  *)
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=repository-root-outside-workspace:${repo_root}" >&2
+    exit 1
+    ;;
+esac
+[ -d "$repo_root" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=repository-root-missing:${repo_root}" >&2
+  exit 1
+}
+source_projection_root="${AGENT_CANON_SOURCE_PROJECTION_ROOT:-${repo_root}/reports/agents/devcontainer/runtime}"
 readback_receipt="${runtime_root}/shared-runtime-readback.json"
 
 gpu_device_visible() {
@@ -84,12 +101,6 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   gh_auth_status="authenticated"
 fi
 
-repo_root="/workspace"
-if [ ! -f "${repo_root}/.codex/config.toml" ]; then
-  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  repo_root="$(cd "${script_dir}/.." && pwd)"
-fi
-
 codex_approval_policy="<unset>"
 codex_sandbox_mode="<unset>"
 if [ -f "${repo_root}/.codex/config.toml" ]; then
@@ -98,6 +109,52 @@ if [ -f "${repo_root}/.codex/config.toml" ]; then
   codex_approval_policy="${codex_approval_policy:-<unset>}"
   codex_sandbox_mode="${codex_sandbox_mode:-<unset>}"
 fi
+
+check_dependency_module_runtime() {
+  local dependency_tool="${repo_root}/tools/agent_tools/dependency_module_change.py"
+  local workspace_projection="${repo_root}/.vscode/module-sources.code-workspace"
+  [ "${AGENT_CANON_WORKSPACE_ROOT:-}" = "/workspace" ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=AGENT_CANON_WORKSPACE_ROOT must be /workspace" >&2
+    return 1
+  }
+  [ -d /workspace ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-root-mount-missing:/workspace" >&2
+    return 1
+  }
+  [ -f "$dependency_tool" ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=tool-missing:${dependency_tool}" >&2
+    return 1
+  }
+  [ ! -L "$workspace_projection" ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-projection-must-be-regular:${workspace_projection}" >&2
+    return 1
+  }
+  if [ -f "${repo_root}/.gitmodules" ]; then
+    topic="$(git -C "$repo_root" config --local --get agent-canon.topic.topic || true)"
+    [ -n "$topic" ] || {
+      echo "DEPENDENCY_MODULE_CONTAINER_ERROR=topic-marker-missing:${repo_root}" >&2
+      return 1
+    }
+    python3 "$dependency_tool" --root "$repo_root" status --topic "$topic"
+    [ ! -e "$workspace_projection" ] || python3 - "$workspace_projection" <<'PY'
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+workspace = Path(sys.argv[1])
+payload = json.loads(workspace.read_text(encoding="utf-8"))
+for folder in payload.get("folders", []):
+    path = folder.get("path") if isinstance(folder, dict) else None
+    if not isinstance(path, str) or not (workspace.parent / path).is_dir():
+        raise SystemExit(f"DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-folder-missing:{path}")
+PY
+  fi
+  echo "DEPENDENCY_MODULE_CONTAINER=pass tool=${dependency_tool} workspace=${workspace_projection}"
+}
+
+check_dependency_module_runtime
 
 echo
 echo "----------------------------------------"

@@ -72,10 +72,14 @@ packet is regenerated for that skill before the handoff proceeds.
 
 ## Design Artifact Shape
 
-Implementation design is owned by the neutral four-entry active design packet
+Implementation design is owned by the neutral closed four-entry active design packet
 `waterfall.design_packet.v1`, persisted at
-`team_manifest.yaml#run.active_design_packet`. It carries exactly one clause
-registry and these four typed entries:
+`team_manifest.yaml#run.active_design_packet`. Its selected artifact paths,
+review paths, and `document_flow_required` flag are typed runtime authority;
+chat, schedule prose, history, and inferred headings are not packet authority.
+The required reader-facing anchors are:
+Each entry declares its exact clause, owner, source, dependency, output, and
+reviewer references:
 
 - `Abstract Design Frame`
 - `Implementation Source Packet`

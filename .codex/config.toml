@@ -96,6 +96,10 @@ path = "../.agents/skills/dependency-analysis/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/dependency-module-change/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/document-canon-cleanup/SKILL.md"
 enabled = true
 
@@ -245,6 +249,10 @@ enabled = true
 
 [[skills.config]]
 path = "../.agents/skills/worktree-health/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/wiki-publication/SKILL.md"
 enabled = true
 
 [[skills.config]]

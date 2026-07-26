@@ -840,6 +840,98 @@ def _git_object_id(runner: Runner, revision: str, *, next_action: str) -> str:
     return value
 
 
+def _local_git_identity(runner: Runner) -> dict[str, str]:
+    """Read the current named branch, commit, and tree identity."""
+    try:
+        branch = current_branch(runner)
+    except CommandFailure as exc:
+        raise UserVisibleFailure(
+            message="local branch/ref cannot be read as a named branch",
+            next_action="checkout_the_sealed_lifecycle_branch_before_publication",
+        ) from exc
+    commit_sha = _git_object_id(
+        runner,
+        "HEAD",
+        next_action="read_back_the_local_candidate_commit_before_publication",
+    )
+    tree_sha = _git_object_id(
+        runner,
+        "HEAD^{tree}",
+        next_action="read_back_the_local_candidate_tree_before_publication",
+    )
+    return {
+        "branch": branch,
+        "ref": f"refs/heads/{branch}",
+        "commit_sha": commit_sha,
+        "tree_sha": tree_sha,
+    }
+
+
+def _sealed_head_identity(
+    lifecycle: Mapping[str, object],
+    branch: str,
+) -> tuple[str, str, str]:
+    """Return the exact branch/ref/commit/tree frozen by the lifecycle packet."""
+    head = lifecycle.get("head_identity")
+    if not isinstance(head, Mapping):
+        raise UserVisibleFailure(
+            message="sealed lifecycle packet does not contain head identity",
+            next_action="materialize_a_successor_lifecycle_with_exact_head_identity",
+        )
+    expected_ref = f"refs/heads/{branch}"
+    packet_ref = head.get("ref")
+    candidate_sha = head.get("commit_sha")
+    tree_sha = head.get("tree_sha")
+    if (
+        packet_ref != expected_ref
+        or not isinstance(candidate_sha, str)
+        or re.fullmatch(r"[0-9a-f]{40}", candidate_sha) is None
+        or not isinstance(tree_sha, str)
+        or re.fullmatch(r"[0-9a-f]{40}", tree_sha) is None
+    ):
+        raise UserVisibleFailure(
+            message="sealed lifecycle head identity differs from the selected branch",
+            next_action="materialize_a_successor_lifecycle_with_exact_head_identity",
+        )
+    return expected_ref, candidate_sha, tree_sha
+
+
+def _remote_head_readback(
+    runner: Runner,
+    *,
+    remote: str,
+    ref: str,
+    expected_sha: str,
+) -> str:
+    """Read back exactly one remote branch SHA and reject any mismatch."""
+    result = run_command(
+        runner,
+        ["git", "ls-remote", remote, ref],
+        next_action="read_back_the_exact_remote_branch_commit",
+    )
+    records = [line.split() for line in result.stdout.splitlines() if line.strip()]
+    if (
+        len(records) != 1
+        or len(records[0]) != 2
+        or records[0][1] != ref
+        or re.fullmatch(r"[0-9a-f]{40}", records[0][0]) is None
+    ):
+        raise UserVisibleFailure(
+            message="remote branch readback did not return one exact ref identity",
+            next_action="reject_remote_publication_and_preserve_the_local_identity",
+        )
+    remote_sha = records[0][0]
+    if remote_sha != expected_sha:
+        raise UserVisibleFailure(
+            message=(
+                "remote branch readback SHA differs from the sealed local candidate: "
+                f"expected {expected_sha}, received {remote_sha}"
+            ),
+            next_action="reject_remote_publication_and_preserve_the_local_identity",
+        )
+    return remote_sha
+
+
 def _permission_identity(verification: RemoteVerification) -> dict[str, object]:
     """Return verified or explicitly unknown push authority evidence."""
     evidence_id = verification.permission_evidence_id
@@ -1357,48 +1449,105 @@ def perform_push(
     verification: RemoteVerification,
     branch: str,
     *,
-    authority: GithubPublicationAuthority,
+    authority: GithubPublicationAuthority | None,
 ) -> dict[str, object]:
-    """Push the verified branch to origin."""
+    """Transport one local branch, optionally bound to a sealed packet."""
     if branch == "main" and not getattr(args, "allow_main", False):
         raise UserVisibleFailure(
             message="refusing to push main without --allow-main",
             next_action="publish_a_topic_branch_or_pass_--allow-main_with_explicit_authority",
         )
-    lifecycle, gate = consume_publication_authority(authority)
-    if lifecycle["state"] not in {
-        "draft",
-        "ready",
-        "changes_requested",
-        "external_review",
-    }:
-        raise UserVisibleFailure(
-            message=f"PR lifecycle state does not permit push: {lifecycle['state']}",
-            next_action="resolve_permission_remote_or_successor_state_before_push",
+    lifecycle: dict[str, object] | None = None
+    gate: dict[str, object] | None = None
+    expected_ref = f"refs/heads/{branch}"
+    sealed_candidate_sha: str | None = None
+    sealed_candidate_tree_sha: str | None = None
+    if authority is not None:
+        lifecycle, gate = consume_publication_authority(authority)
+        if lifecycle["state"] not in {
+            "draft",
+            "ready",
+            "changes_requested",
+            "external_review",
+        }:
+            raise UserVisibleFailure(
+                message=f"PR lifecycle state does not permit push: {lifecycle['state']}",
+                next_action="resolve_permission_remote_or_successor_state_before_push",
+            )
+        expected_ref, sealed_candidate_sha, sealed_candidate_tree_sha = _sealed_head_identity(
+            lifecycle, branch
         )
     dirty = worktree_dirty(runner)
-    push_ref = "main" if branch == "main" else branch
-    command = ["git", "push", "-u", verification.remote, push_ref]
-    if branch == "main":
-        command = ["git", "push", verification.remote, "main"]
+    local_before = _local_git_identity(runner)
+    if (
+        local_before["branch"] != branch
+        or local_before["ref"] != expected_ref
+    ):
+        raise UserVisibleFailure(
+            message="current local branch/ref differs from the selected branch",
+            next_action="checkout_the_selected_named_branch_before_publication",
+        )
+    if authority is not None and (
+        local_before["commit_sha"] != sealed_candidate_sha
+        or local_before["tree_sha"] != sealed_candidate_tree_sha
+    ):
+        raise UserVisibleFailure(
+            message=(
+                "local branch/ref/commit/tree differs from the sealed lifecycle "
+                "head identity"
+            ),
+            next_action="materialize_a_successor_lifecycle_for_the_current_local_commit",
+        )
+    candidate_sha = local_before["commit_sha"]
+    candidate_tree_sha = local_before["tree_sha"]
+    command = [
+        "git",
+        "push",
+        "-u",
+        "--force-with-lease",
+        verification.remote,
+        f"{candidate_sha}:{expected_ref}",
+    ]
     result = run_command(
         runner,
         command,
         next_action="fix_git_push_auth_or_remote_before_retrying_verified_push",
     )
+    local_after = _local_git_identity(runner)
+    remote_readback_sha = _remote_head_readback(
+        runner,
+        remote=verification.remote,
+        ref=expected_ref,
+        expected_sha=candidate_sha,
+    )
+    if local_after != local_before:
+        raise UserVisibleFailure(
+            message="local branch, commit, or tree changed across the push",
+            next_action="preserve_the_exact_pushed_identity_and_investigate_local_mutation",
+        )
     summary = base_summary(args, verification, branch)
     summary.update(
         {
             "action": "push",
+            "publication_boundary": (
+                "sealed_publication" if authority is not None else "branch_transport_only"
+            ),
             "worktree_dirty": dirty,
             "command": command,
             "git_push_stdout": result.stdout.strip(),
             "git_push_stderr": result.stderr.strip(),
-            "pull_request_lifecycle": lifecycle,
-            "g3_gate": gate,
+            "local_commit_sha": candidate_sha,
+            "local_tree_sha": candidate_tree_sha,
+            "remote_readback_sha": remote_readback_sha,
+            "remote_readback_ref": expected_ref,
+            "local_identity_before_push": local_before,
+            "local_identity_after_push": local_after,
             "status": "ok",
         }
     )
+    if lifecycle is not None and gate is not None:
+        summary["pull_request_lifecycle"] = lifecycle
+        summary["g3_gate"] = gate
     return summary
 
 
@@ -1582,9 +1731,14 @@ def summary_lines(summary: Mapping[str, object]) -> list[str]:
         "repo",
         "remote",
         "branch",
+        "publication_boundary",
         "permission_state",
         "permission_evidence_id",
         "worktree_dirty",
+        "local_commit_sha",
+        "local_tree_sha",
+        "remote_readback_sha",
+        "remote_readback_ref",
         "pr_number",
         "pr_url",
         "pr_selector",
@@ -1660,35 +1814,38 @@ def run(
         packet_path = Path(
             ".agent-canon/update-lifecycle/state/github-publication.json"
         )
-        if not packet_path.is_file():
+        if packet_path.is_file():
+            loaded = json.loads(packet_path.read_text(encoding="utf-8"))
+            publication_packet = cast(Mapping[str, object], loaded)
+        elif args.action != "push":
             raise UserVisibleFailure(
                 message="canonical GitHub publication packet is missing",
                 next_action="materialize_reviewed_CAS_and_G1_G2_G3_before_mutation",
             )
-        loaded = json.loads(packet_path.read_text(encoding="utf-8"))
-        publication_packet = cast(Mapping[str, object], loaded)
-    authority = GithubPublicationAuthority.from_packet(publication_packet)
-    packet = authority.consume()
-    lifecycle = cast(Mapping[str, object], packet["pull_request_lifecycle"])
-    remote_identity = cast(Mapping[str, object], lifecycle["remote_identity"])
-    base_identity = cast(Mapping[str, object], lifecycle["base_identity"])
-    permission = cast(Mapping[str, object], lifecycle["permission_identity"])
-    expected_head_repo = verification.head_repo or verification.remote_slug
-    if (
-        f"{remote_identity['repo_owner']}/{remote_identity['repo_name']}"
-        != expected_head_repo
-        or remote_identity["remote_name"] != verification.remote
-        or remote_identity["ref"] != f"refs/heads/{branch}"
-        or f"{base_identity['repo_owner']}/{base_identity['repo_name']}"
-        != verification.repo
-        or permission["actor_id"] != verification.actor_id
-        or permission["permission_evidence_id"]
-        != verification.permission_evidence_id
-    ):
-        raise UserVisibleFailure(
-            message="publication packet differs from verified immutable GitHub topology",
-            next_action="materialize_a_successor_publication_packet",
-        )
+    authority: GithubPublicationAuthority | None = None
+    if publication_packet is not None:
+        authority = GithubPublicationAuthority.from_packet(publication_packet)
+        packet = authority.consume()
+        lifecycle = cast(Mapping[str, object], packet["pull_request_lifecycle"])
+        remote_identity = cast(Mapping[str, object], lifecycle["remote_identity"])
+        base_identity = cast(Mapping[str, object], lifecycle["base_identity"])
+        permission = cast(Mapping[str, object], lifecycle["permission_identity"])
+        expected_head_repo = verification.head_repo or verification.remote_slug
+        if (
+            f"{remote_identity['repo_owner']}/{remote_identity['repo_name']}"
+            != expected_head_repo
+            or remote_identity["remote_name"] != verification.remote
+            or remote_identity["ref"] != f"refs/heads/{branch}"
+            or f"{base_identity['repo_owner']}/{base_identity['repo_name']}"
+            != verification.repo
+            or permission["actor_id"] != verification.actor_id
+            or permission["permission_evidence_id"]
+            != verification.permission_evidence_id
+        ):
+            raise UserVisibleFailure(
+                message="publication packet differs from verified immutable GitHub topology",
+                next_action="materialize_a_successor_publication_packet",
+            )
     if args.action == "push":
         return perform_push(
             args,
@@ -1696,6 +1853,11 @@ def run(
             verification,
             branch,
             authority=authority,
+        )
+    if authority is None:
+        raise UserVisibleFailure(
+            message="PR and checks actions require a sealed publication packet",
+            next_action="materialize_reviewed_CAS_and_G1_G2_G3_before_mutation",
         )
     if args.action == "pr":
         return perform_pr(

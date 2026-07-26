@@ -31,11 +31,13 @@ downstream design ../canonical/CODEX_WORKFLOW.md routes diverged canon workflows
 
 ## 固定ルール
 
-- shared canon の正本は常に `vendor/agent-canon/` です。root symlink view を直接直して解決した扱いにしません。
-- 派生 repo の shared canon 差分は、まず `vendor/agent-canon/` 内の named GitHub branch に commit します。
-- `ensure-latest` が local divergence で止まった場合、local 差分を消して再試行せず、AgentCanon branch / PR で差分の行き先を決めます。
-- `vendor/agent-canon/` が local checkout branch を指している場合、その branch は破棄対象ではありません。shared-canon candidate があるなら `merge-main-into-current-preserve-dirty` で GitHub `main` を取り込み、同じ branch を AgentCanon PR として進めます。`agent_canon_merge_remote_main_in_post_head=yes` と `agent_canon_merge_remote_main_verified=yes` が出ない branch は PR-ready と扱いません。
+- shared canon の source 正本は workspace-root の独立 branch clone です。root symlink view や `vendor/agent-canon` を直接直して解決した扱いにしません。
+- 派生 repo の shared canon source 差分は、`dependency-module-change` の owner-evidence と `--branch` で workspace-root clone に移してから commit します。
+- `ensure-latest` が local divergence や vendor dirt で止まった場合、parent mode では停止し、vendor stateを保存・継続せず、独立 clone routeで差分の行き先を決めます。
+- `vendor/agent-canon/` が local checkout branch を指している状態は parent source topology として認めません。`merge-main-into-current*` は parent modeで拒否され、clean source pin projectionだけを受け取ります。
 - shared canon main に取り込んだあとは、派生 repo 側で `make agent-canon-ensure-latest` を再実行し、submodule worktree HEAD と parent gitlink が shared canon main と同じ commit になるまで閉じません。
+- mutating な latest / apply / ensure-latest / pull / link-root route は、既存のGit authority/reason fieldsと `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` を同じcommand segmentで受け取る。evidence digestはuser request recordまたはcanonical workflow authorization packetのexact bytesのSHA-256で、検証は最初のstaging・checkout・submodule update・root-view mutation・eval-log parkingより前に行う。
+- 自動sync commitは `AgentCanon Sync Automation <agent-canon-sync@automation.invalid>` をAuthor/Committerに固定し、`AgentCanon-*` formal trailersを付ける。
 - template repo で作業している場合は、template `main`、template GitHub remote、parent gitlink 更新も completion evidence に含めます。
 - closeout 前に `schedule.md`、`work_log.md`、validation、commit、push、AgentCanon branch、shared canon main、派生 repo parent gitlink の未完了項目が無いことを確認します。
 
@@ -63,7 +65,7 @@ git diff --stat -- vendor/agent-canon .github/workflows .github/PULL_REQUEST_TEM
 | ----- | ------- | ------------------ |
 | `already_current_submodule` | parent gitlink、submodule worktree、shared canon main が一致 | root drift だけなら `link-root` / `check` へ進む |
 | `submodule_update` | shared canon main が進んでいる | AgentCanon update surface が repairable なら、親 repo の無関係な dirty state があっても `make agent-canon-ensure-latest` を実行し、parent pin commit を作る。unsafe な shared-canon 差分が同時にある場合は、先に AgentCanon branch / PR に出して merge 後に再実行する |
-| `diverged_submodule_history` | local submodule commit と remote main が分岐 | `merge-main-into-current-preserve-dirty` で current branch に GitHub main を取り込み、conflict は submodule 内で解消して AgentCanon PR に出す |
+| `diverged_submodule_history` | local submodule commit と remote main が分岐 | parent modeを停止し、topic workspace branch cloneへsourceを移してAgentCanon PRに出す |
 | `already_current_tree` / `already_current_split` | legacy subtree 互換 mode で local tree と shared canon main が一致 | legacy appendix のみ。submodule repo では使わない |
 | `snapshot_import_*` / `subtree_pull` | legacy subtree 互換 mode の update route | maintainer が legacy cleanup として扱い、通常の submodule repo には持ち込まない |
 
@@ -76,25 +78,34 @@ git diff --stat -- vendor/agent-canon .github/workflows .github/PULL_REQUEST_TEM
 - accidental drift: root symlink view の直接編集、生成物、backup、dated snapshot、旧 path、copy surface の不一致
 
 判断に迷う場合は、`documents/agent-canon-subtree-migration.md` と `documents/SHARED_RUNTIME_SURFACES.md` の ownership を優先します。
-accidental drift は `bash tools/sync_agent_canon.sh link-root` で復元し、shared-canon candidate と local wrapper を同じ commit に混ぜません。
+accidental drift は
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root`
+で復元し、shared-canon candidate と local wrapper を同じ commit に混ぜません。
 
 ## Stage 2. AgentCanon Branch へ渡す
 
 shared-canon candidate がある場合は、派生 repo から直接 shared canon main を更新しません。
-current `vendor/agent-canon/` branch に GitHub main を取り込み、その branch を GitHub へ push して AgentCanon PR を作ります。
-この current branch が local checkout 由来でも、それは通常の merge 対象です。消して作り直すのではなく、
-GitHub `main` を merge して conflict を解き、branch history を PR に載せます。
-merge 後の evidence には少なくとも `agent_canon_merge_source_sha`、
-`agent_canon_merge_post_head`、`agent_canon_merge_remote_main_in_post_head=yes`、
-`agent_canon_merge_remote_main_verified=yes` を残します。
+まず `documents/rule/dependency-module-changes.md` に従って topic workspace branch cloneへsourceを移し、そこでGitHub PRを作ります。parentの vendor checkoutにmerge、stash、保存、再開する経路はありません。
 
 ```bash
-bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
-git -C vendor/agent-canon push origin HEAD
+python3 tools/agent_tools/dependency_module_change.py --root . prepare \
+  --topic <topic> --module vendor/agent-canon --branch <source-branch> \
+  --owner-evidence <owner-evidence>
+git -C <CONTINUE_PATH> push origin HEAD
 ```
 
-push 前に submodule worktree が dirty なら submodule 内で commit するか、shared canon candidate だけを dedicated branch / commit に分けます。
-parent repo の root view や gitlink 変更だけを commit しても AgentCanon PR には乗りません。必ず `vendor/agent-canon/` 内の HEAD、status、target branch を evidence に残します。
+通常のmutating routeでは、canonical workflow packetのdigestを明示して
+実行します。
+
+```bash
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  make agent-canon-ensure-latest
+```
+
+`prepare` が返す `CONTINUE_PATH` の source clone で commit し、そこから
+pushします。parent repo の root view や gitlink 変更だけを commit しても
+AgentCanon PR には乗りません。source clone の HEAD、status、target branch を
+evidence に残します。
 
 ## Stage 3. Shared Canon Main へ取り込む
 
@@ -106,8 +117,10 @@ maintainer 側では `agents/workflows/agent-canon-pr-workflow.md` を primary m
 shared canon main へ取り込んだあと、派生 repo は submodule worktree と parent gitlink を canonical main へ戻します。
 
 ```bash
-make agent-canon-ensure-latest
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  make agent-canon-ensure-latest
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
@@ -120,8 +133,10 @@ template repo で作業している場合は、shared canon main と template pa
 
 ```bash
 git status --short
-make agent-canon-ensure-latest
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  make agent-canon-ensure-latest
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 make agent-canon-pr-check
 make ci

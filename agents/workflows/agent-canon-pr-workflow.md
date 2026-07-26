@@ -110,6 +110,15 @@ Push authority is never inferred from authentication success, branch name,
 repository naming, PR context, or a configured URL. Literal URL push and
 multiple-remote guessing are invalid routes.
 
+Standalone direct branch transport is outside the source PR publication gate:
+it verifies remote identity/permission, requires a named current branch,
+captures local commit/tree, pushes `<commit-sha>:refs/heads/<branch>`, reads
+back the exact SHA with `git ls-remote`, and requires branch/HEAD/tree
+invariance. It does not generate or claim G1/G2/G3 or PR lifecycle evidence.
+When a sealed packet is supplied, candidate matching is retained; PR mutation
+and merge remain packet/G1/G2/G3-bound. CI fresh-clone fixtures are
+bootstrap/update evidence, not ordinary publication evidence.
+
 ## Source PR Gate
 
 `.github/workflows/agent-canon-static-gates.yml` runs only for the PR candidate

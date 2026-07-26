@@ -103,6 +103,13 @@ language = "python"
 summary = "gh-backed GitHub branch and PR publish tool documentation."
 
 [[tool]]
+id = "wiki-publish"
+tool = "tools/agent_tools/wiki_publish.py"
+doc = "documents/tools/wiki_publish.md"
+language = "python"
+summary = "Deterministic AgentCanon wiki publication to repo.wiki.git with default-branch-only and source-commit binding."
+
+[[tool]]
 id = "visualization-contract"
 tool = "tools/agent_tools/visualization_contract.py"
 doc = "documents/tools/visualization_contract.md"
@@ -129,6 +136,13 @@ tool = "tools/agent_tools/check_design_doc_claims.py"
 doc = "documents/tools/check_design_doc_claims.md"
 language = "python"
 summary = "Design-document claim evidence checker documentation."
+
+[[tool]]
+id = "dependency-module-change"
+tool = "tools/agent_tools/dependency_module_change.py"
+doc = "documents/tools/dependency_module_change.md"
+language = "python"
+summary = "Independent dependency source clone lifecycle and workspace projection documentation."
 
 [[tool]]
 id = "classify-path-risk"

@@ -52,6 +52,7 @@ from skill_route_catalog import (
     build_capability_index,
     build_visualization_owner_tool_call,
     load_skill_related_map as _load_skill_related_map,
+    load_skill_required_tool_commands as _load_skill_required_tool_commands,
     load_skill_route_rules,
     load_skill_route_rules_from_root,
     ordered_unique,
@@ -67,6 +68,7 @@ from visualization_contract import (
 )
 
 load_skill_related_map = _load_skill_related_map
+load_skill_required_tool_commands = _load_skill_required_tool_commands
 
 
 ROUTE_NAME = "task-routing"

@@ -32,6 +32,7 @@ from agent_team import (  # noqa: E402
     load_team_config,
     validate_agent_type_selections,
 )
+from task_authority import hash_baseline_bytes  # noqa: E402
 from report_artifact_checks import write_completion_coverage_artifact  # noqa: E402
 from task_close import update_lifecycle_closeout_consumer  # noqa: E402
 from check_agent_canon_pr import (  # noqa: E402
@@ -56,6 +57,13 @@ GRAPH_ACTIVE_DESIGN_PACKET: dict[str, object] = {
     "design_artifact": "graph_design_brief.md",
     "design_review_artifact": "graph_design_review.md",
     "document_flow_review_artifact": "graph_document_flow_review.md",
+    "document_flow_required": True,
+}
+U2_ACTIVE_DESIGN_PACKET = {
+    "schema": "waterfall.design_packet.v1",
+    "design_artifact": "u2_design_brief.md",
+    "design_review_artifact": "u2_design_review.md",
+    "document_flow_review_artifact": "u2_document_flow_review.md",
     "document_flow_required": True,
 }
 
@@ -1232,163 +1240,114 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout
             )
 
-    def test_bootstrap_generates_explicit_graph_active_packet(self) -> None:
-        """Bootstrap should persist one explicit nonstandard packet end to end."""
+    def test_entrypoints_materialize_explicit_active_design_packet(self) -> None:
+        """Both run entrypoints persist and route one typed packet end to end."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            workspace_root = root / "workspace"
-            report_root = root / "reports"
-            workspace_root.mkdir()
-            run_id = "bootstrap-graph-packet"
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(BOOTSTRAP_SCRIPT),
-                    "--task",
-                    "bootstrap graph packet",
-                    "--task-id",
-                    "T12",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    run_id,
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-root",
-                    str(report_root),
-                    "--full-team",
-                    "--no-auto-language-reviewers",
-                    "--active-design-packet",
-                    json.dumps(GRAPH_ACTIVE_DESIGN_PACKET, separators=(",", ":")),
-                    "--skip-agent-canon-preflight",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            for script in (BOOTSTRAP_SCRIPT, TASK_START_SCRIPT):
+                report_root = root / f"reports-{script.stem}"
+                run_id = f"u2-{script.stem}"
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(script),
+                        "--task",
+                        "typed active packet smoke",
+                        "--owner",
+                        "codex",
+                        "--run-id",
+                        run_id,
+                        "--workspace-root",
+                        str(PROJECT_ROOT),
+                        "--report-root",
+                        str(report_root),
+                        "--active-design-packet",
+                        json.dumps(U2_ACTIVE_DESIGN_PACKET, separators=(",", ":")),
+                        "--skip-agent-canon-preflight",
+                    ],
+                    cwd=PROJECT_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                report_dir = report_root / run_id
+                manifest = yaml.safe_load(
+                    (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
+                )
+                self.assertEqual(
+                    manifest["run"]["active_design_packet"],
+                    U2_ACTIVE_DESIGN_PACKET,
+                )
+                for artifact in U2_ACTIVE_DESIGN_PACKET.values():
+                    if isinstance(artifact, str) and artifact.endswith(".md"):
+                        self.assertTrue((report_dir / artifact).is_file(), artifact)
+                        self.assertIn(artifact, result.stdout)
+                self.assertIn(
+                    "run.active_design_packet.design_artifact=u2_design_brief.md;",
+                    (report_dir / "team_manifest.yaml").read_text(encoding="utf-8"),
+                )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assert_graph_active_packet_bundle(
-                report_root / run_id,
-                result.stdout,
-            )
-
-    def test_task_start_generates_explicit_graph_active_packet(self) -> None:
-        """Task start should persist one explicit nonstandard packet end to end."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            workspace_root = root / "workspace"
-            report_root = root / "reports"
-            workspace_root.mkdir()
-            run_id = "task-start-graph-packet"
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_START_SCRIPT),
-                    "--task",
-                    "task-start graph packet",
-                    "--task-id",
-                    "T12",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    run_id,
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-root",
-                    str(report_root),
-                    "--full-team",
-                    "--no-auto-language-reviewers",
-                    "--active-design-packet",
-                    json.dumps(GRAPH_ACTIVE_DESIGN_PACKET, separators=(",", ":")),
-                    "--skip-agent-canon-preflight",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assert_graph_active_packet_bundle(
-                report_root / run_id,
-                result.stdout,
-            )
-
-    def test_entrypoints_reject_partial_or_invalid_active_packet_atomically(
+    def test_entrypoints_reject_invalid_active_design_packet_before_bundle_creation(
         self,
     ) -> None:
-        """Both entrypoints reject malformed packet input before creating a run."""
-        partial_packet = {
-            key: value
-            for key, value in GRAPH_ACTIVE_DESIGN_PACKET.items()
-            if key != "document_flow_review_artifact"
-        }
-        absolute_packet = {
-            **GRAPH_ACTIVE_DESIGN_PACKET,
-            "design_artifact": "/tmp/graph_design_brief.md",
-        }
-        wrong_bool_packet = {
-            **GRAPH_ACTIVE_DESIGN_PACKET,
-            "document_flow_required": "true",
-        }
+        """Malformed packet input fails before either entrypoint creates a run."""
         cases = (
             (
-                "partial",
-                partial_packet,
+                {key: value for key, value in U2_ACTIVE_DESIGN_PACKET.items() if key != "document_flow_review_artifact"},
                 "active_design_packet:field_missing:document_flow_review_artifact",
             ),
             (
-                "absolute",
-                absolute_packet,
+                {**U2_ACTIVE_DESIGN_PACKET, "design_artifact": "/tmp/u2_design.md"},
                 "active_design_packet:field_invalid:design_artifact",
             ),
             (
-                "wrong-bool",
-                wrong_bool_packet,
+                {**U2_ACTIVE_DESIGN_PACKET, "document_flow_required": "true"},
                 "active_design_packet:field_invalid:document_flow_required",
+            ),
+            (
+                {**U2_ACTIVE_DESIGN_PACKET, "unexpected_contract": True},
+                "active_design_packet:field_unknown:unexpected_contract",
             ),
         )
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            workspace_root = root / "workspace"
-            workspace_root.mkdir()
             for script in (BOOTSTRAP_SCRIPT, TASK_START_SCRIPT):
-                for case_name, packet, expected_error in cases:
-                    with self.subTest(script=script.name, case=case_name):
-                        report_root = root / f"reports-{script.stem}-{case_name}"
-                        run_id = f"invalid-{script.stem}-{case_name}"
-                        result = subprocess.run(
-                            [
-                                sys.executable,
-                                str(script),
-                                "--task",
-                                "reject invalid packet",
-                                "--owner",
-                                "codex",
-                                "--run-id",
-                                run_id,
-                                "--workspace-root",
-                                str(workspace_root),
-                                "--report-root",
-                                str(report_root),
-                                "--active-design-packet",
-                                json.dumps(packet, separators=(",", ":")),
-                                "--skip-agent-canon-preflight",
-                            ],
-                            cwd=PROJECT_ROOT,
-                            check=False,
-                            capture_output=True,
-                            text=True,
-                        )
+                for index, (packet, expected_error) in enumerate(cases):
+                    report_root = root / f"reports-{script.stem}-{index}"
+                    run_id = f"invalid-{script.stem}-{index}"
+                    result = subprocess.run(
+                        [
+                            sys.executable,
+                            str(script),
+                            "--task",
+                            "invalid packet",
+                            "--owner",
+                            "codex",
+                            "--run-id",
+                            run_id,
+                            "--workspace-root",
+                            str(PROJECT_ROOT),
+                            "--report-root",
+                            str(report_root),
+                            "--active-design-packet",
+                            json.dumps(packet, separators=(",", ":")),
+                            "--skip-agent-canon-preflight",
+                        ],
+                        cwd=PROJECT_ROOT,
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(expected_error, result.stdout + result.stderr)
+                    self.assertFalse((report_root / run_id).exists())
 
-                        self.assertNotEqual(result.returncode, 0)
-                        self.assertIn(
-                            expected_error,
-                            result.stdout + result.stderr,
-                        )
-                        self.assertFalse((report_root / run_id).exists())
+    def test_hash_baseline_bytes_is_canonical(self) -> None:
+        """Hash sidecars are derived from exact payload bytes with one newline."""
+        payload = b"authority: exact\n"
+        expected = (hashlib.sha256(payload).hexdigest() + "\n").encode("ascii")
+        self.assertEqual(hash_baseline_bytes(payload), expected)
 
     def test_task_start_routes_dirty_shared_canon_to_pr_first_workflow(self) -> None:
         """Dirty shared-canon surfaces should not point only to commit-or-stash."""

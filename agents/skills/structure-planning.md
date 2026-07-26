@@ -5,6 +5,8 @@ contract skill
 responsibility Documents reusable structure planning for reports, experiments, documents, and refactors.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
+upstream design ../../documents/rule/README.md document rule canon
+upstream design ../../documents/design/README.md design canon reader route
 upstream design prose-reasoning-graph.md prose graph overlay and handoff contract
 upstream design ../workflows/slide-production-workflow.md slide template, slot, and layout review workflow
 downstream implementation ../../.agents/skills/structure-planning/SKILL.md exposes this workflow as a runtime skill
@@ -39,6 +41,14 @@ not restate the owner's omission or granularity policy.
 - Boundary: this skill owns structure shape, not raw result storage, experiment
   execution, report prose, HTML rendering, or behavior-preserving
   implementation.
+
+## 文書正本
+
+文書の filename、配置、構成判断は
+[`documents/rule/README.md`](../../documents/rule/README.md) を参照します。
+個別の target state と実装境界は
+[`documents/design/README.md`](../../documents/design/README.md) を参照します。
+この skill に詳細規則を複製しません。
 
 ## Purpose
 

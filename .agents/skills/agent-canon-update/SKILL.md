@@ -9,7 +9,9 @@ responsibility Documents AgentCanon Update for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/agent-canon-update.md human-facing skill canon
 upstream design ../../../documents/agent-canon-update-route.md canonical AgentCanon update route
+upstream design ../../../documents/rule/dependency-module-changes.md generic dependency module change contract
 upstream design ../../../documents/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
+upstream design ../../../agents/skills/refactor-loop.md shared-structure refactor execution order
 upstream implementation ../../../tools/update_agent_canon.sh high-level AgentCanon update wrapper
 upstream implementation ../../../tools/sync_agent_canon.sh root-view and submodule sync helper
 upstream implementation ../../../tools/agent_tools/agent_canon_preflight.py blocks unsafe task-entry updates
@@ -26,8 +28,15 @@ upstream implementation ../../../tools/agent_tools/agent_canon_preflight.py bloc
   or routing local AgentCanon commits through source PRs before parent pins.
 - Tool Commands: run this skill's command packet, then read the canonical
   update-route and parent latest-state documents.
-- Boundary: do not hide dirty AgentCanon source work inside a parent pin update
-  or create branches without the documented reason.
+- Boundary: use `dependency-module-change` for source edits. Parent projection
+  consumes only a clean vendor pin projection; parent source changes go through
+  the managed topic workspace source clone.
+- Standalone local source-branch publication follows the canonical transport
+  contract in `documents/tools/github_publish.md`: verified remote identity/
+  permission, named branch, captured local identity, exact SHA ref push, remote
+  readback, and local invariance. It does not generate G1/G2/G3; packet-bound
+  push and PR operations retain the sealed publication requirements. CI
+  fresh-clone fixtures are not publication evidence.
 
 ## Tool Commands
 
@@ -42,7 +51,8 @@ Execute the required and task-matching conditional commands that the packet prin
 <!-- skill-tool-commands:end -->
 
 
-1. Read `agents/skills/agent-canon-update.md`.
+1. Read `documents/rule/dependency-module-changes.md`, then
+   `agents/skills/agent-canon-update.md`.
 1. Read `documents/agent-canon-update-route.md` and
    `documents/agent-canon-parent-repo-latest-checklist.md`.
 1. Classify the repo as standalone AgentCanon, parent submodule repo, or legacy
@@ -52,41 +62,32 @@ Execute the required and task-matching conditional commands that the packet prin
    clean status, target tree, selected merge strategy, and selected remote.
    Do not rebase, alter unrelated history, or preserve internal commit ids by
    ancestry engineering when reviewed final-tree identity is the contract.
-1. In parent repos, classify dirty state by AgentCanon update surface:
-   `vendor/agent-canon/`, parent gitlink, `.gitmodules`, and AgentCanon-owned
-   root views. Do not let unrelated parent dirty files block the update route.
+1. In parent repos, classify the AgentCanon projection surface:
+   `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned
+   root views. A dirty vendor checkout is a refusal condition: stop and route
+   the source change to the exact topic workspace branch clone. Do not preserve
+   the old vendor state or continue from it.
 1. Before the high-level update runs, task-start preflight fails closed when an
    exact `reports/agent-eval-runs/<run-id>/<producer>.stdout.txt` or
    `.stderr.txt` capture remains tracked, untracked, or ignored. Preserve the
    capture, sync and verify the eval archive, write its bounded summary, delete
    the transient explicitly, and rerun preflight. Ordinary unrelated parent
    dirt remains allowed.
-1. Prefer the high-level parent route:
+1. Prefer the high-level parent projection route for clean pins:
 
 Run `make agent-canon-update-plan` first. If it reports an update, request
-current-task user approval and rerun `make agent-canon-ensure-latest` with all
-four inline Git authority/reason fields in the same command segment.
+current-task user approval and rerun
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest`
+with all four inline Git authority/reason fields in the same command segment.
 
 1. If `vendor/agent-canon/` contains local AgentCanon source commits or source
-   dirty state, do not hide them in a parent pin update. Route them through an
-   AgentCanon branch/PR first:
-
-After current-task user approval, invoke the protected merge wrapper with all
-four inline Git authority/reason fields, then push the already-current branch.
-Do not switch or create a checkout as a recovery shortcut.
-
-```bash
-# Run only after current-task user approval.
-AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
-AGENT_CANON_BRANCH_WORKTREE_REASON='<reason>' \
-AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
-AGENT_CANON_DESTRUCTIVE_GIT_REASON='<reason>' \
-bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
-git -C vendor/agent-canon push origin HEAD
-```
-
-The push targets the already-current AgentCanon branch; the sequence does not
-authorize checkout switching or branch/worktree creation.
+   dirty state, stop. Do not invoke `merge-main-into-current*`, stash, preserve,
+   or resume that vendor state. Run the generic dependency-module tool from the
+   parent with owner evidence:
+   `prepare --topic <topic> --module vendor/agent-canon --branch <source-branch>`.
+   Make the source branch/PR in `workspace-<topic-slug>/agent-canon`; only the
+   resulting clean pin is projected into the parent. Standalone source clones retain the source-mode merge/publication
+   route.
 
    Reuse the current AgentCanon source branch / PR when it already owns the
    shared-canon work. Do not create a fresh branch for a bounded follow-up,
@@ -99,7 +100,8 @@ authorize checkout switching or branch/worktree creation.
    root views exactly once, then repair and verify root views:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 

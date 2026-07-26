@@ -58,6 +58,7 @@ Cross-Cutting Packet:
 - `documents/notes-lifecycle.md`
 - `agents/workflows/agent-learning-workflow.md`
 - `documents/runtime-profiles-and-check-matrix.md`
+- `documents/rule/dependency-module-changes.md`
 - `notes/guardrails/README.md`
 - `notes/guardrails/engineering_avoidances.md`
 - `docker/README.md`
@@ -73,10 +74,10 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - submodule repo では、read-only plan の判断対象を AgentCanon update surface に限定します。
 - AgentCanon update surface は `vendor/agent-canon/` submodule worktree、parent gitlink、`.gitmodules`、および `link-root` が触る AgentCanon-owned root symlink / copy view です。
 - clean な submodule worktree が remote main を指していて parent gitlink だけ古い場合も、preflight は checkout-preserving `approval_required` route を返します。承認後の protected update が parent gitlink の stage / commit を所有します。
-- clean な submodule worktree が non-default branch を指し、その branch head が remote branch に push 済みで fetched remote main を含み、parent gitlink だけが古い場合は `deferred_branch_pr` evidence として記録し、routing / planning / review を続けます。AgentCanon PR merge 後は再度 read-only plan を行い、mutation が必要なら approval と全 4 inline field を得た protected latest route を実行します。
-- `vendor/agent-canon/` に local commit、dirty state、remote main と diverge した history がある場合は current checkout を保存し、current-task user approval と全 4 inline field を得て protected `merge-main-into-current-preserve-dirty` を実行し、AgentCanon PR に出します。
-- local checkout branch は valid な shared-canon work surface です。local checkout に積まれた commit は消して最新化する対象ではなく、GitHub `main` を merge して conflict を解き、通常の AgentCanon PR として review / merge します。機械 evidence として `merge-main-into-current-preserve-dirty` の `agent_canon_merge_source_sha`、`agent_canon_merge_post_head`、`agent_canon_merge_remote_main_in_post_head=yes`、`agent_canon_merge_remote_main_verified=yes` を run bundle、PR body、または work log に残します。
-- update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出します。merge 後も read-only plan を先に行い、必要な approval と全 4 inline field を得た protected latest route の後で root view と parent pin を同期します。
+- clean な submodule worktree が non-default branch を指し、その branch head が remote branch に push 済みで fetched remote main を含み、parent gitlink だけが古い場合は `deferred_branch_pr` evidence として記録し、routing / planning / review を続けます。AgentCanon PR merge 後は再度 read-only plan を行い、mutation が必要なら approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route を実行します。
+- `vendor/agent-canon/` に local commit、dirty state、remote main と diverge した history がある場合は親モードの source-work surface として扱わず、直ちに `documents/rule/dependency-module-changes.md` の topic workspace branch clone route を案内して停止します。parent mode は vendor state を stash、保存、移送、再開しません。
+- local source branch は standalone source clone だけが所有します。parent projection は公開済み source の clean pin と root view の投影だけを受け取り、source correctness や dirty source state を vendor checkout で継続しません。
+- update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出します。merge 後も read-only plan を先に行い、必要な approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route の後で root view と parent pin を同期します。
 - AgentCanon source change、parent submodule pin change、`.gitmodules`
   change、AgentCanon-owned root runtime view / root-copy surface change、parent
   root sync PR は `agentcanon_structure_followup=required` です。template /
@@ -84,7 +85,7 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
   `bash tools/sync_agent_canon.sh check` が pass した後だけ
   `agentcanon_structure_followup=pass` として closeout に使えます。
 - 承認済み protected `ensure-latest` は `.gitmodules` の URL と immutable remote branch SHA を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定し、必要な pin と root shared surface を同期します。
-- local submodule commit が remote main に含まれている場合も、read-only plan の後に current-task user approval と全 4 inline field を得た protected `apply` / latest route で parent pin を remote main へ揃えます。
+- local submodule commit が remote main に含まれている場合も、read-only plan の後に current-task user approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected `apply` / latest route で parent pin を remote main へ揃えます。
 - local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って AgentCanon branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。
 - `task_start.py` と `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。template の root symlink view から起動したときに `skipped_source_canon` が出る場合は misconfiguration として扱い、workspace root、`.gitmodules`、`vendor/agent-canon` の状態を確認します。`skipped_source_canon` は standalone AgentCanon source checkout でだけ妥当です。
 
@@ -100,7 +101,7 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
 - branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に creation authority/reason と destructive authority/reason の全 4 値を置いた場合だけ実行できます。
-- AgentCanon source 変更は current `vendor/agent-canon` branch / AgentCanon PR を優先して継続します。parent repo の `canon-pin` branch は、AgentCanon PR route が確定した後に parent pin だけを隔離する場合に限ります。
+- AgentCanon source 変更は `dependency-module-change` で exact topic workspace clone を prepare/reuse し、その standalone source branch / AgentCanon PR を継続します。parent repo の `canon-pin` branch は source publication 後の clean parent pin projection だけを担います。
 
 ### Runtime Profile And Risk Selection
 
@@ -232,6 +233,20 @@ Gate 6 の detailed design review は、owner/design boundary、API shape、仕�
 設計文書の存在だけでは別 review stage や artifact を生成しません。reviewer output は
 hypothesis であり、parent / integration owner が current source snapshot、reachable
 input/control path、contract、witness/static proof を確認して adjudicate します。
+
+実装前の design gate は、run manifest の `run.active_design_packet` を唯一の
+artifact ownership source とします。schema は `waterfall.design_packet.v1` で、
+design artifact、technical design review、document-flow review の相対 path と
+`document_flow_required` を必須にします。generator の precedence は、explicit
+run `--active-design-packet` input、workflow-specific record、standard
+`agents_config` artifact registry の順です。generator は選択 record を生成済み
+run manifest に永続化し、以後その manifest が persisted authority になります。
+gate は persisted manifest の `run.active_design_packet` を唯一の runtime input として
+読み、manifest-declared path だけを active artifact route として消費します。
+missing / unknown field / unknown schema / invalid field / outside-bundle path は typed blocker として
+design owner に戻します。implementation handoff は、manifest-declared design artifact、
+両 review の一致する `Design artifact path:`、最終 `decision=approve`、および required
+な document-flow approval を要求します。
 
 API shape、責務境界、path layout、命名、アルゴリズム、test oracle、依存方向、
 runtime contract、config surface の判断が未確定なら、実装吸収ではなく
@@ -695,7 +710,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - 新規または rename する file、function、class、theorem、artifact、CLI flag、
   config key は、implementation handoff 前に naming plan で固定する。naming plan は
   対象概念、責務語彙、既存 naming family、採用名、avoid-name list を含み、
-  `documents/conventions/common/02_naming.md` と言語別規約を参照します。
+  `documents/rule/naming.md` と言語別規約を参照します。
   名前が未確定な場合は Gate 5-6 へ戻り、worker handoff 前に naming plan を確定します
 - 明示 spawn 許可がある場合、実装前の repo inventory と tool drift survey は Luna/high の通常 role TOML へ、static validation failure triage と diff-local language review も該当 decision がある場合だけ `gpt-5.6-luna/high` review role TOML へ渡します。`gpt-5.4-mini/medium` は明示 T14 `skill_evaluation` の fresh read-only artifact-only `skill_evaluator` に限り、permanent team role にはありません。`worker` は `gpt-5.6-luna/xhigh` の既定 implementer で、typed parent-packet selection がある機械的 slice だけ `spark_worker` へ渡します。`.codex/config.toml` の `gpt-5.6-sol/high` parent は統合判断と次 gate 判定に集中します
 - `spark_worker` を選択できる実装は、Abstract Design Frame から導かれた差し替え可能な単位で、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする。design trace と dependency-expanded handoff scope は必要 evidence であり、実際の選択には `--select-agent-type implementer=spark_worker:<evidence>` が必要です。
@@ -861,6 +876,12 @@ environment, produce resources, or duplicate tests/gates.
   相当の実装を始める
 - tracked repo change がある task では、selected review gate (when activated)、validation、
   commit、`origin` への push を完了条件にする
+- standalone local source-branch push は reversible branch transport として、
+  verified remote identity/permission、named branch、commit/tree、SHA ref
+  push、remote `ls-remote` readback、push 前後の local identity 不変を
+  completion evidence にする。G1/G2/G3/PR lifecycle は生成・主張しない。
+  packet-bound push と PR mutation は既存 sealed 要件を使い、CI fresh-clone
+  fixture は通常 publication の証拠に数えない
 - tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行する。user が明示的に停止を指定した場合や external block がある場合は、理由を evidence に残す
 - planned work、review finding、validation、commit / push、shared canon sync、follow-up 判断の completion evidence を揃えて user-facing completion を返す
 - `verification.txt`、`closeout_gate.md`、`user_request_contract.md` の close 条件を満たして user-facing completion を返す

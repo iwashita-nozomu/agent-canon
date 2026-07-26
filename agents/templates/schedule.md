@@ -3,6 +3,7 @@
 contract template
 responsibility Documents Schedule for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
+upstream design ../skills/agent-orchestration.md execution-time-aware work-conservation owner
 @dependency-end
 -->
 
@@ -17,6 +18,27 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 | Stage | Owner Agent | Review Agent | Inputs | Exit Criteria | Status |
 | ----- | ----------- | ------------ | ------ | ------------- | ------ |
+
+## Execution-Time-Aware Plan
+
+<!-- Project the canonical owner below; do not restate its scheduling policy or add duration cutoffs. -->
+
+- Owner contract: `agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`
+- Executable scheduling fields: `dependency_dag`, `makespan_objective`, `responsibility_completeness`, `correctness`, `critical_path`, `ready_set`, `context_reuse`, `affected_evidence_invalidation`.
+- Dependency DAG / closure:
+- Makespan objective:
+- Responsibility completeness:
+- Correctness:
+- Critical path:
+- Ready set:
+- Useful ready set:
+- Dispatch batch:
+- Wait reason (only when the useful ready set is empty):
+- Context reuse:
+- Affected evidence invalidation:
+
+| DAG Node | Depends On | Conflict Scope | Status | Evidence |
+| -------- | ---------- | -------------- | ------ | -------- |
 
 ## Clause Coverage
 

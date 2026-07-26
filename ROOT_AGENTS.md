@@ -3,6 +3,7 @@
 contract agent-runtime
 responsibility Documents Agent Instructions for this repository.
 upstream design README.md repository entrypoint and clone/update guidance.
+upstream design documents/rule/README.md document filename, placement, and structure rules.
 upstream design documents/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy.
 upstream design documents/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy.
 upstream design documents/template-agent-canon-audit-resolution.md audit resolution ledger for profile and gate simplification.
@@ -73,6 +74,7 @@ This entrypoint does not create a second policy source.
 
 - This file owns the template-root runtime entrypoint for Codex and points each
   runtime contract to its owner surface and checker.
+- 文書 filename は英語、本文は日本語とし、詳細は `documents/rule/README.md` を参照します。
 - Start with Scope Discipline and Structure-First Scope Formation, then use the
   runtime owner map only to find the surface that owns the next decision. Task
   entry, base runtime packet, shared canon flow, closeout evidence, and
@@ -352,12 +354,14 @@ task.
 
 ## Shared Canon Flow
 
-AgentCanon source changes are made in `vendor/agent-canon/`, reviewed through
-the AgentCanon branch / PR workflow, then reflected in the template through the
-submodule pin and shared root views. Root view repair is owned by:
+AgentCanon source changes are made in the managed dependency clone inside the
+`workspace-<topic-slug>` lifecycle boundary, reviewed through the AgentCanon
+branch / PR workflow, then reflected in the template through the clean
+`vendor/agent-canon` pin and shared root views. Root view repair is owned by:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
@@ -386,7 +390,7 @@ For AgentCanon source, submodule pin, `.gitmodules`, root runtime view,
 root-copy surface, or parent root sync changes, closeout also cites
 `agentcanon_structure_followup=required` and
 `agentcanon_structure_followup=pass`, including the parent-root
-`bash tools/sync_agent_canon.sh link-root` and
+request-evidence-authorized `bash tools/sync_agent_canon.sh link-root` and
 `bash tools/sync_agent_canon.sh check` evidence.
 
 A no-subagents closeout is valid only for routing-only/advisory tasks, read-only

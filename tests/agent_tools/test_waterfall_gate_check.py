@@ -16,34 +16,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import cast
-from unittest import mock
-
-import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-
-from agent_team import (  # noqa: E402
-    RunBundleSpec,
-    active_design_packet_mapping,
-    active_design_reference_projection_mapping,
-    build_active_design_reference_context,
-    iter_artifacts,
-    load_materialized_active_design_packet,
-    load_team_config,
-    parse_active_design_packet_input,
-    render_active_design_packet_violation,
-    resolve_active_design_packet,
-    resolve_role,
-)
 
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 GATE_CHECK_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "waterfall_gate_check.py"
-SECOND_DEPENDENCY_REF = (
-    "header:upstream:implementation:repo:tools/agent_tools/graph_client.py"
-    "->repo:rust/agent-canon/src/graph.rs"
-)
 
 
 def write_markdown(path: Path, lines: list[str]) -> None:
@@ -58,158 +35,20 @@ def write_active_packet_manifest(
     design_review_artifact: str = "design_review.md",
     document_flow_review_artifact: str = "document_flow_review.md",
     document_flow_required: bool = True,
+    schema: str = "waterfall.design_packet.v1",
 ) -> None:
-    """Persist a complete packet and projection through canonical owners."""
-    report_dir.mkdir(parents=True, exist_ok=True)
-    config = load_team_config()
-    packet_mapping = active_design_packet_mapping(
-        resolve_active_design_packet(
-            config,
-            workflow_family=None,
-            explicit=None,
-        )
-    )
-    design_output = f"artifact:{design_artifact}"
-    packet_mapping.update(
-        {
-            "design_artifact": design_artifact,
-            "design_review_artifact": design_review_artifact,
-            "document_flow_review_artifact": document_flow_review_artifact,
-            "document_flow_required": document_flow_required,
-        }
-    )
-    for section in (
-        "abstract_design_frame",
-        "implementation_source_packet",
-        "design_side_effect_map",
-    ):
-        cast("dict[str, object]", packet_mapping[section])["output_refs"] = [
-            design_output
-        ]
-    cast("dict[str, object]", packet_mapping["design_to_implementation_trace"])[
-        "output_refs"
-    ] = [
-        design_output,
-        f"artifact:{design_review_artifact}",
-        f"artifact:{document_flow_review_artifact}",
-    ]
-    source_packet = cast(
-        "dict[str, object]",
-        packet_mapping["implementation_source_packet"],
-    )
-    dependency_refs = cast("list[str]", source_packet["dependency_refs"])
-    dependency_refs.append(SECOND_DEPENDENCY_REF)
-    packet = parse_active_design_packet_input(
-        json.dumps(packet_mapping, separators=(",", ":"))
-    )
-    if packet is None:
-        raise AssertionError("canonical fixture packet unexpectedly resolved to null")
-    roles = tuple(
-        resolve_role(config, role_id)
-        for role_id in (
-            "designer",
-            "design_reviewer",
-            "document_flow_reviewer",
-        )
-    )
-    spec = RunBundleSpec(
-        config=config,
-        report_dir=report_dir,
-        run_id=report_dir.name,
-        task="waterfall fixture",
-        owner="test",
-        created_at_iso="2026-07-13T00:00:00Z",
-        roles=roles,
-        workspace_root=PROJECT_ROOT,
-        active_design_packet=packet,
-    )
-    rows = (
-        (
-            "upstream",
-            "design",
-            "agents/templates/design_brief.md",
-            "documents/dependency-manifest-design.md",
-        ),
-        (
-            "upstream",
-            "implementation",
-            "tools/agent_tools/graph_client.py",
-            "rust/agent-canon/src/graph.rs",
-        ),
-    )
-    with mock.patch("agent_team._canonical_dependency_rows", return_value=rows):
-        context = build_active_design_reference_context(
-            spec,
-            packet,
-            None,
-            artifact_names=iter_artifacts(config, roles, packet),
-        )
-    manifest = {
-        "run": {
-            "workspace_root": str(PROJECT_ROOT.resolve()),
-            "report_dir": str(report_dir.resolve()),
-            "active_design_packet": packet_mapping,
-            "active_design_packet_reference_projection": (
-                active_design_reference_projection_mapping(context)
-            ),
-        }
-    }
-    (report_dir / "team_manifest.yaml").write_text(
-        yaml.safe_dump(manifest, sort_keys=False),
-        encoding="utf-8",
-    )
-
-
-def rewrite_active_packet_field(
-    report_dir: Path,
-    field: str,
-    value: object = None,
-    *,
-    remove: bool = False,
-) -> None:
-    """Mutate one persisted packet field for a negative loader oracle."""
-    manifest_path = report_dir / "team_manifest.yaml"
-    manifest = cast(
-        "dict[str, object]",
-        yaml.safe_load(manifest_path.read_text(encoding="utf-8")),
-    )
-    run = cast("dict[str, object]", manifest["run"])
-    packet = cast("dict[str, object]", run["active_design_packet"])
-    if remove:
-        packet.pop(field)
-    else:
-        packet[field] = value
-    manifest_path.write_text(
-        yaml.safe_dump(manifest, sort_keys=False),
-        encoding="utf-8",
-    )
-
-
-def read_active_packet_projection(
-    report_dir: Path,
-) -> tuple[Path, dict[str, object], dict[str, object]]:
-    """Return one mutable manifest and its persisted projection fixture."""
-    manifest_path = report_dir / "team_manifest.yaml"
-    manifest = cast(
-        "dict[str, object]",
-        yaml.safe_load(manifest_path.read_text(encoding="utf-8")),
-    )
-    run = cast("dict[str, object]", manifest["run"])
-    projection = cast(
-        "dict[str, object]",
-        run["active_design_packet_reference_projection"],
-    )
-    return manifest_path, manifest, projection
-
-
-def write_active_packet_projection(
-    manifest_path: Path,
-    manifest: dict[str, object],
-) -> None:
-    """Persist one deliberately modified projection for a loader oracle."""
-    manifest_path.write_text(
-        yaml.safe_dump(manifest, sort_keys=False),
-        encoding="utf-8",
+    """Write the sole explicit active-design-packet route for a fixture."""
+    write_markdown(
+        report_dir / "team_manifest.yaml",
+        [
+            "run:",
+            "  active_design_packet:",
+            f"    schema: {schema}",
+            f"    design_artifact: {design_artifact}",
+            f"    design_review_artifact: {design_review_artifact}",
+            f"    document_flow_review_artifact: {document_flow_review_artifact}",
+            f"    document_flow_required: {str(document_flow_required).lower()}",
+        ],
     )
 
 
@@ -235,7 +74,6 @@ def write_document_flow_review(
     report_dir: Path,
     review_target_sha256: str | None = None,
     design_artifact_path: str = "design_brief.md",
-    review_artifact: str = "document_flow_review.md",
 ) -> None:
     """Write an approving document flow review fixture."""
     write_markdown(
@@ -430,11 +268,10 @@ def write_design_bundle_with_review(
     design_sha256 = hashlib.sha256(
         (report_dir / "design_brief.md").read_bytes()
     ).hexdigest()
-    review_lines = [
-        *design_review_lines,
-        f"review_target_sha256={design_sha256}",
-    ]
-    write_markdown(report_dir / "design_review.md", review_lines)
+    write_markdown(
+        report_dir / "design_review.md",
+        [*design_review_lines, f"review_target_sha256={design_sha256}"],
+    )
     write_document_flow_review(report_dir, design_sha256)
     write_active_packet_manifest(report_dir)
 
@@ -494,130 +331,76 @@ def write_unknown_requirement_bundle(report_dir: Path) -> None:
 class WaterfallGateCheckTest(unittest.TestCase):
     """Verify that intermediate waterfall gates fail closed."""
 
-    def test_materialized_source_projection_rebinds_every_declared_tuple_field(
-        self,
-    ) -> None:
-        """Persisted source rows cannot swap or rewrite canonical tuple fields."""
-        cases = (
-            "row_swap",
-            "declared_ref",
-            "root_key",
-            "relative_path",
-            "fragment_kind",
-            "fragment_value",
-        )
-        for field in cases:
-            with self.subTest(field=field), tempfile.TemporaryDirectory() as tmp_dir:
-                report_dir = Path(tmp_dir) / "reports" / field
-                write_active_packet_manifest(report_dir)
-                manifest_path, manifest, projection = read_active_packet_projection(
-                    report_dir
-                )
-                rows = cast(
-                    "list[dict[str, object]]",
-                    projection["source_results"],
-                )
-                target_index = next(
-                    index
-                    for index, row in enumerate(rows)
-                    if row["relative_path"] == "agents/templates/design_brief.md"
-                )
-                sibling_index = next(
-                    index
-                    for index, row in enumerate(rows)
-                    if index != target_index
-                    and row["relative_path"] == rows[target_index]["relative_path"]
-                    and row["fragment_value"] != rows[target_index]["fragment_value"]
-                )
-                target = rows[target_index]
-                sibling = rows[sibling_index]
-                if field == "row_swap":
-                    rows[target_index], rows[sibling_index] = sibling, target
-                elif field == "declared_ref":
-                    target[field] = sibling[field]
-                elif field == "root_key":
-                    target[field] = (
-                        "workspace"
-                        if target[field] == "agent_canon"
-                        else "agent_canon"
-                    )
-                elif field == "relative_path":
-                    target[field] = f"./{target[field]}"
-                elif field == "fragment_kind":
-                    target[field] = "none"
-                else:
-                    target[field] = sibling[field]
-                write_active_packet_projection(manifest_path, manifest)
+    def test_design_gate_rejects_unknown_packet_schema(self) -> None:
+        """An unknown packet schema is a typed design-owner blocker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "unknown-packet-schema"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_approved_design_bundle(report_dir, design_brief_lines())
+            write_active_packet_manifest(report_dir, schema="waterfall.design_packet.v0")
 
-                loaded = load_materialized_active_design_packet(report_dir)
+            result = run_gate(report_dir, "design")
 
-                self.assertIsNotNone(loaded.value)
-                self.assertIsNone(loaded.context)
-                self.assertEqual(
-                    tuple(
-                        render_active_design_packet_violation(violation)
-                        for violation in loaded.violations
-                    ),
-                    (
-                        "team_manifest.yaml:active_design_packet_field_invalid:"
-                        "active_design_packet_reference_projection",
-                    ),
-                )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "team_manifest.yaml:active_design_packet_schema_unknown:waterfall.design_packet.v0",
+                result.stdout,
+            )
 
-    def test_materialized_dependency_projection_rebinds_every_declared_tuple_field(
-        self,
-    ) -> None:
-        """Persisted dependency rows cannot swap or rewrite canonical edge tuples."""
-        cases = (
-            "row_swap",
-            "declared_ref",
-            "dependency_root_key",
-            "normalized_key",
-            "source_path",
-            "target_path",
-        )
-        for field in cases:
-            with self.subTest(field=field), tempfile.TemporaryDirectory() as tmp_dir:
-                report_dir = Path(tmp_dir) / "reports" / field
-                write_active_packet_manifest(report_dir)
-                manifest_path, manifest, projection = read_active_packet_projection(
-                    report_dir
-                )
-                rows = cast(
-                    "list[dict[str, object]]",
-                    projection["dependency_results"],
-                )
-                target, sibling = rows
-                if field == "row_swap":
-                    rows[0], rows[1] = sibling, target
-                elif field == "declared_ref":
-                    target[field] = sibling[field]
-                elif field == "dependency_root_key":
-                    target[field] = (
-                        "workspace"
-                        if target[field] == "agent_canon"
-                        else "agent_canon"
-                    )
-                elif field == "normalized_key":
-                    target[field] = sibling[field]
-                else:
-                    target[field] = f"./{target[field]}"
-                write_active_packet_projection(manifest_path, manifest)
+    def test_design_gate_rejects_unknown_packet_field(self) -> None:
+        """The gate should reject packet fields outside the typed contract."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "unknown-packet-field"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_approved_design_bundle(report_dir, design_brief_lines())
+            write_active_packet_manifest(report_dir)
+            manifest_path = report_dir / "team_manifest.yaml"
+            manifest_path.write_text(
+                manifest_path.read_text(encoding="utf-8")
+                + "    unexpected_contract: true\n",
+                encoding="utf-8",
+            )
 
-                loaded = load_materialized_active_design_packet(report_dir)
+            result = run_gate(report_dir, "design")
 
-                self.assertIsNotNone(loaded.value)
-                self.assertIsNone(loaded.context)
-                self.assertEqual(
-                    tuple(
-                        render_active_design_packet_violation(violation)
-                        for violation in loaded.violations
-                    ),
-                    (
-                        "team_manifest.yaml:active_design_packet_field_invalid:"
-                        "active_design_packet_reference_projection",
-                    ),
-                )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "team_manifest.yaml:active_design_packet_field_unknown:unexpected_contract",
+                result.stdout,
+            )
+
+    def test_design_gate_rejects_packet_path_outside_bundle(self) -> None:
+        """A declared path cannot escape the run bundle."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "outside-packet"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_approved_design_bundle(report_dir, design_brief_lines())
+            write_active_packet_manifest(report_dir, design_artifact="../design_brief.md")
+
+            result = run_gate(report_dir, "design")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "team_manifest.yaml:active_design_packet_path_outside_bundle:design_artifact",
+                result.stdout,
+            )
+
+    def test_design_gate_rejects_review_target_hash_mismatch(self) -> None:
+        """Review approval must bind to the current selected artifact bytes."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "stale-packet-review"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_approved_design_bundle(report_dir, design_brief_lines())
+            (report_dir / "design_brief.md").write_text(
+                (report_dir / "design_brief.md").read_text(encoding="utf-8")
+                + "\nchanged after review\n",
+                encoding="utf-8",
+            )
+
+            result = run_gate(report_dir, "design")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("design_review.md:review_target_sha256_mismatch", result.stdout)
 
     def test_requirements_gate_rejects_active_unknown_clause(self) -> None:
         """Requirements should defer unknowns instead of leaving them active."""
@@ -745,15 +528,21 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 self.assertTrue((report_dir / artifact).is_file())
             self.assertIn("/design_brief.md", manifest)
 
-    def test_document_flow_gate_is_ready_when_packet_marks_flow_inactive(self) -> None:
-        """An inactive selected flow stage has no approval blocker."""
+    def test_document_flow_gate_is_inactive_when_packet_marks_flow_optional(self) -> None:
+        """The typed packet controls whether document-flow approval is required."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "design-only"
             report_dir.mkdir(parents=True, exist_ok=True)
-            write_markdown(report_dir / "design_brief.md", design_brief_lines())
+            write_approved_design_bundle(report_dir, design_brief_lines())
+            (report_dir / "document_flow_review.md").unlink()
+            write_active_packet_manifest(
+                report_dir,
+                document_flow_required=False,
+                document_flow_review_artifact="inactive-flow-review.md",
+            )
             write_markdown(
-                report_dir / "design_review.md",
-                approved_design_review_lines(),
+                report_dir / "inactive-flow-review.md",
+                ["# Inactive flow review", "decision=revise"],
             )
             design_sha256 = hashlib.sha256(
                 (report_dir / "design_brief.md").read_bytes()
@@ -784,75 +573,8 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 design_result.stdout + design_result.stderr,
             )
             self.assertIn("WATERFALL_GATE_READY=yes", design_result.stdout)
-            self.assertEqual(
-                document_flow_result.returncode,
-                0,
-                document_flow_result.stdout + document_flow_result.stderr,
-            )
+            self.assertEqual(document_flow_result.returncode, 0, document_flow_result.stdout)
             self.assertIn("WATERFALL_GATE_READY=yes", document_flow_result.stdout)
-
-    def test_document_flow_gate_uses_declared_graph_review_and_ignores_generic(
-        self,
-    ) -> None:
-        """The standalone flow gate consumes only the manifest-selected review."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports" / "graph-flow"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_markdown(report_dir / "graph_design_brief.md", design_brief_lines())
-            design_sha256 = hashlib.sha256(
-                (report_dir / "graph_design_brief.md").read_bytes()
-            ).hexdigest()
-            write_markdown(report_dir / "graph_design_review.md", ["# Review"])
-            write_document_flow_review(
-                report_dir,
-                design_sha256,
-                design_artifact_path="graph_design_brief.md",
-                review_artifact="graph_document_flow_review.md",
-            )
-            write_markdown(
-                report_dir / "document_flow_review.md",
-                ["# Generic sibling", "decision=revise"],
-            )
-            write_active_packet_manifest(
-                report_dir,
-                design_artifact="graph_design_brief.md",
-                design_review_artifact="graph_design_review.md",
-                document_flow_review_artifact="graph_document_flow_review.md",
-            )
-
-            selected_approve = run_gate(report_dir, "document_flow")
-            write_markdown(
-                report_dir / "graph_document_flow_review.md",
-                [
-                    "# Graph Document Flow Review",
-                    "- Design artifact path: graph_design_brief.md",
-                    f"review_target_sha256={design_sha256}",
-                    "decision=revise",
-                ],
-            )
-            write_markdown(
-                report_dir / "document_flow_review.md",
-                ["# Generic sibling", "decision=approve"],
-            )
-            selected_revise = run_gate(report_dir, "document_flow")
-
-            self.assertEqual(
-                selected_approve.returncode,
-                0,
-                selected_approve.stdout + selected_approve.stderr,
-            )
-            self.assertNotEqual(selected_revise.returncode, 0)
-            self.assertIn(
-                "graph_document_flow_review.md:decision_not_approve",
-                selected_revise.stdout,
-            )
-            blocker_line = next(
-                line
-                for line in selected_revise.stdout.splitlines()
-                if line.startswith("WATERFALL_GATE_BLOCKERS=")
-            )
-            blockers = blocker_line.removeprefix("WATERFALL_GATE_BLOCKERS=").split(",")
-            self.assertNotIn("document_flow_review.md:decision_not_approve", blockers)
 
     def test_test_gate_rejects_dependency_header_only_plan(self) -> None:
         """Dependency headers alone should not satisfy the test-plan gate."""
@@ -980,10 +702,8 @@ class WaterfallGateCheckTest(unittest.TestCase):
             )
             self.assertIn(expected_blocker, result.stdout)
 
-    def test_design_gate_accepts_path_sha_decision_without_abstract_review(
-        self,
-    ) -> None:
-        """Review identity is governed by the declared packet and matching SHA."""
+    def test_design_gate_accepts_packet_approval_without_prose_abstract_review(self) -> None:
+        """Typed packet approval is the oracle for the selected design artifact."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "missing-abstract-review"
             report_dir.mkdir(parents=True, exist_ok=True)
@@ -1036,41 +756,8 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_design_gate_rejects_flow_review_wrong_path_with_same_sha(self) -> None:
-        """Flow review path identity is independent of matching bytes."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports" / "wrong-flow-artifact-path"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_markdown(report_dir / "design_brief.md", design_brief_lines())
-            design_sha256 = hashlib.sha256(
-                (report_dir / "design_brief.md").read_bytes()
-            ).hexdigest()
-            write_markdown(
-                report_dir / "design_review.md",
-                [
-                    *approved_design_review_lines(),
-                    f"review_target_sha256={design_sha256}",
-                ],
-            )
-            write_document_flow_review(
-                report_dir,
-                design_sha256,
-                design_artifact_path="historical/design_brief.md",
-            )
-            write_active_packet_manifest(report_dir)
-
-            result = run_gate(report_dir, "design")
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
-                "document_flow_review.md:design_artifact_path_mismatch",
-                result.stdout,
-            )
-
-    def test_design_gate_accepts_path_sha_decision_without_source_packet_metadata(
-        self,
-    ) -> None:
-        """Review SHA and decision are the active packet review identity."""
+    def test_design_gate_accepts_packet_approval_without_prose_source_packet_labels(self) -> None:
+        """Typed packet references replace prose source-packet heuristics."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "missing-review-evidence"
             report_dir.mkdir(parents=True, exist_ok=True)
@@ -1105,59 +792,40 @@ class WaterfallGateCheckTest(unittest.TestCase):
                     "approve",
                 ],
             )
-            design_sha256 = hashlib.sha256(
-                (report_dir / "design_brief.md").read_bytes()
-            ).hexdigest()
-            write_document_flow_review(
+            write_design_bundle_with_review(
                 report_dir,
-                design_sha256,
-                design_artifact_path="design_brief.md",
-                review_artifact="graph_document_flow_review.md",
+                design_brief_lines(),
+                approved_design_review_lines(),
             )
-            write_active_packet_manifest(
-                report_dir,
-                document_flow_review_artifact="graph_document_flow_review.md",
-            )
+            (report_dir / "design_review.md").unlink()
 
             missing_review = run_gate(report_dir, "implementation")
-            write_markdown(
-                report_dir / "design_review.md",
-                [
-                    line.replace("approve", "revise")
-                    for line in approved_design_review_lines()
-                ]
-                + [f"review_target_sha256={design_sha256}"],
-            )
-            write_document_flow_review(
+            write_design_bundle_with_review(
                 report_dir,
-                design_sha256,
-                design_artifact_path="design_brief.md",
-                review_artifact="graph_document_flow_review.md",
+                design_brief_lines(),
+                approved_design_review_lines(
+                    design_artifact_path="reports/agents/old/design_brief.md"
+                ),
             )
             stale_review = run_gate(report_dir, "implementation")
-            write_markdown(
-                report_dir / "design_review.md",
-                [*approved_design_review_lines(), f"review_target_sha256={design_sha256}"],
-            )
-            write_document_flow_review(
+            write_design_bundle_with_review(
                 report_dir,
-                design_sha256,
-                design_artifact_path="design_brief.md",
-                review_artifact="graph_document_flow_review.md",
+                design_brief_lines(),
+                approved_design_review_lines(),
             )
             approved_review = run_gate(report_dir, "implementation")
 
             self.assertNotEqual(missing_review.returncode, 0)
-            self.assertIn(
-                "team_manifest.yaml:active_design_packet_field_invalid:design_review_artifact",
-                missing_review.stdout,
-            )
+            self.assertIn("active_design_packet_field_invalid:design_review_artifact", missing_review.stdout)
             self.assertIn(
                 "NEXT_ACTION=return_to_design_owner_until_gate_approves",
                 missing_review.stdout,
             )
             self.assertNotEqual(stale_review.returncode, 0)
-            self.assertIn("design_review.md:decision_not_approve", stale_review.stdout)
+            self.assertIn(
+                "design_review.md:design_artifact_path_mismatch",
+                stale_review.stdout,
+            )
             self.assertIn(
                 "NEXT_ACTION=return_to_design_owner_until_gate_approves",
                 stale_review.stdout,
@@ -1550,8 +1218,8 @@ class WaterfallGateCheckTest(unittest.TestCase):
             )
             self.assertIn(expected_blocker, result.stdout)
 
-    def test_design_gate_rejects_missing_upstream_requirement_packet(self) -> None:
-        """The active packet gate does not substitute a legacy upstream basename check."""
+    def test_design_gate_accepts_typed_packet_without_upstream_prose_section(self) -> None:
+        """Typed packet fields, not an untyped upstream heading, own the gate."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "missing-upstream-packet"
             report_dir.mkdir(parents=True, exist_ok=True)
@@ -1562,119 +1230,6 @@ class WaterfallGateCheckTest(unittest.TestCase):
             result = run_gate(report_dir, "design")
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-    def test_graph_packet_selection_ignores_historical_design_basenames(self) -> None:
-        """The graph packet is selected by its declared paths only."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports" / "graph-packet"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_markdown(report_dir / "graph_design_brief.md", design_brief_lines())
-            design_sha256 = hashlib.sha256(
-                (report_dir / "graph_design_brief.md").read_bytes()
-            ).hexdigest()
-            write_markdown(
-                report_dir / "graph_design_review.md",
-                [
-                    "# Graph Design Review",
-                    "- Design artifact path: graph_design_brief.md",
-                    "## Decision",
-                    "approve",
-                    f"review_target_sha256={design_sha256}",
-                ],
-            )
-            write_document_flow_review(
-                report_dir,
-                design_sha256,
-                design_artifact_path="graph_design_brief.md",
-                review_artifact="graph_document_flow_review.md",
-            )
-            write_active_packet_manifest(
-                report_dir,
-                design_artifact="graph_design_brief.md",
-                design_review_artifact="graph_design_review.md",
-                document_flow_review_artifact="graph_document_flow_review.md",
-            )
-            write_markdown(
-                report_dir / "design_brief.md",
-                ["# Historical design", "## Decision", "decision=revise"],
-            )
-            write_markdown(
-                report_dir / "design_review.md",
-                ["# Historical review", "decision=revise"],
-            )
-            result = run_gate(report_dir, "design")
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-    def test_graph_packet_revise_review_fails_closed(self) -> None:
-        """A declared review with revise remains a design-gate blocker."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports" / "graph-revise"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_markdown(report_dir / "graph_design_brief.md", design_brief_lines())
-            design_sha256 = hashlib.sha256(
-                (report_dir / "graph_design_brief.md").read_bytes()
-            ).hexdigest()
-            write_markdown(
-                report_dir / "graph_design_review.md",
-                [
-                    "# Graph Design Review",
-                    "- Design artifact path: graph_design_brief.md",
-                    "decision=revise",
-                    f"review_target_sha256={design_sha256}",
-                ],
-            )
-            write_markdown(
-                report_dir / "graph_document_flow_review.md",
-                [
-                    "# Graph Document Flow Review",
-                    "- Design artifact path: graph_design_brief.md",
-                    "approve",
-                    f"review_target_sha256={design_sha256}",
-                ],
-            )
-            write_active_packet_manifest(
-                report_dir,
-                design_artifact="graph_design_brief.md",
-                design_review_artifact="graph_design_review.md",
-                document_flow_review_artifact="graph_document_flow_review.md",
-            )
-
-            result = run_gate(report_dir, "design")
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("graph_design_review.md:decision_not_approve", result.stdout)
-
-    def test_design_gate_rejects_missing_manifest(self) -> None:
-        """The design gate must not infer a packet from nearby files."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports" / "missing-manifest"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_markdown(report_dir / "graph_design_brief.md", design_brief_lines())
-
-            result = run_gate(report_dir, "design")
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("team_manifest.yaml:missing", result.stdout)
-
-    def test_design_gate_rejects_missing_packet_field(self) -> None:
-        """Every active packet field is mandatory."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports" / "missing-packet-field"
-            write_active_packet_manifest(report_dir)
-            rewrite_active_packet_field(
-                report_dir,
-                "document_flow_review_artifact",
-                remove=True,
-            )
-
-            result = run_gate(report_dir, "design")
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
-                "team_manifest.yaml:active_design_packet_field_missing:document_flow_review_artifact",
-                result.stdout,
-            )
 
     def test_design_gate_rejects_wrong_packet_field_type(self) -> None:
         """YAML scalar coercion cannot bypass packet path validation."""

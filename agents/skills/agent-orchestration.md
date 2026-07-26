@@ -7,6 +7,8 @@ responsibility Documents agent-orchestration for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../workflows/hypothesis-validation-workflow.md analysis-prioritized overlay routing
 upstream design ../COMMUNICATION_PROTOCOL.md pre-edit investigation and fresh subagent context packets
+upstream design agent-orchestration.execution-contract.toml machine-readable execution contract
+downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py execution contract checker
 @dependency-end
 -->
 
@@ -15,9 +17,10 @@ upstream design ../COMMUNICATION_PROTOCOL.md pre-edit investigation and fresh su
 - Purpose: mandatory repository-task routing that selects workflow family,
   active skills, roles, reviews, run bundle, and implementation route.
 - Section path: Purpose, Use When, and Core References orient the reader;
-  Decision Order contains the operational rules; Outputs, Workflow Family
-  Mapping, Public Skill Selection, Entrypoint Precedence, Review And Specialist
-  Expectations, and Codex Implementation Routing define the routing result.
+  Decision Order and the Execution-Time-Aware Work-Conservation Contract
+  contain the operational rules; Outputs, Workflow Family Mapping, Public
+  Skill Selection, Entrypoint Precedence, Review And Specialist Expectations,
+  and Codex Implementation Routing define the routing result.
 - Use when: starting any repository task or choosing workflow, skill, subagent,
   review, runtime entrypoint, or run-bundle policy.
 - Boundary: this skill routes and records the packet; task-specific execution
@@ -91,7 +94,7 @@ that decision.
 1. subagent scheduling は `CODEX_SUBAGENTS.md` が所有する typed capacity handshake と lifecycle ledger を消費し、ready dependency-DAG frontier の stage owner ごとに `vertical dynamic wave` を組みます。requested / configured / platform-effective / workflow-demand / write-cap / nested-reserved / available を分離し、既知制約の最小値を startup で read back してから reservation 成功時だけ spawn します。capacity が足りない ready work は失敗させず queue し、durable handback、全 descendant close readback、reservation release を終えた slot から再開します。固定 active/write 数、disposable capacity probe、または generated role view は scheduling authority になりません
 1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
 1. prompt-derived skill routing が必要なら `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。`task_start.py` / `bootstrap_agent_run.py` を使う場合は、`SUGGESTED_SKILLS`、`ACTIVE_SKILLS`、`DEFERRED_SKILLS` と `run.repo_tool_routing_policy` を同じ source packet として保持し、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` から later wave の skill を追加したらその skill の command packet を再生成する
-1. `agents/skills/README.md` から current stage に必要な public skill だけを足す。routing update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
+1. `agents/skills/README.md` から current stage に必要な public skill だけを足す。依存 source clone / module lifecycle が scope の場合は `$dependency-module-change` を一般 route として先に選び、AgentCanon update はその具体例として後続に置く。routing update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
 1. repo-changing execution の編集では、既存 tool の実行や owner-bounded patching の前提として runtime `SKILL.md` 読了を要求しません。対象 property を正本として持つ既存 tool または command packet を先に使い、結果の解釈や修正に必要な owner surface だけを開きます。
 1. owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている修正、Routine docs、Focused code、typo / link / format-only、明示的な bounded route 依頼では `$owner-bounded-routing` を追加し、owner boundary、existing-tool route、targeted validation をそこで固定する。file 数や外形的な作業量だけで route を固定しません。実装 behavior は契約完全実装ポリシーから導く
 1. prompt / routing / subagent-config drift が task の中心なら、親が policy prose を直接広く直す前に `prompt_config_reviewer` で prompt/config audit を切る
@@ -115,6 +118,61 @@ mode の意味:
   - 普通の相談、壁打ち、説明だけの turn を含む
   - repo state 確認、shell / GitHub check を走らせず、会話だけで応答する
   - user が repo inspection、file edit、validation、PR / issue 処理、CI 確認、または実装作業を求めた時点で `repo-changing execution` へ切り替え、切り替えをユーザー向け update で明示してから preflight へ進む
+
+## Execution-Time-Aware Work-Conservation Contract
+
+This is the canonical owner for execution-time-aware scheduling across
+repository workflows. Consumers may project its state fields, but they must
+not create a second scheduling policy or reduce the requested responsibility.
+The machine-readable contract is
+`agents/skills/agent-orchestration.execution-contract.toml`; its production
+checker is `tools/agent_tools/check_execution_time_aware_orchestration.py`.
+The selected-skill command catalog owns the required checker invocation; this
+owner and its runtime shim do not duplicate that command.
+
+Model the complete requested work as a dependency DAG. Each node is a full
+replaceable responsibility unit, not a file-sized chunk, timed slice, or review
+fragment. Edges represent owner, schema, dependency, validation, conflict, and
+publication prerequisites. The DAG includes the complete owner and consumer
+closure before dispatch begins; prompt-keyword routing is not a scheduling
+signal.
+
+The optimization objective is to minimize makespan subject to responsibility
+completeness and correctness. Efficiency is therefore a scheduling objective,
+never permission to omit, split, weaken, or prematurely close a required node.
+Runtime observations may inform ordering, but no fixed duration, elapsed-time
+limit, or timeout cutoff may cut the requested scope. An operational timeout
+may mark a node blocked and trigger recovery; it may not turn incomplete work
+into completion.
+
+At every dispatch decision:
+
+1. Refresh the dependency DAG and compute the complete remaining closure.
+2. Compute the critical path through the remaining DAG. Use it to prioritize
+   ready work, not to discard other ready work or to manufacture durations.
+3. Compute the ready set: nodes whose predecessors and required closure
+   evidence are satisfied. Dispatch every ready node that is non-conflicting
+   and admissible under actual capacity; do not serialize while another useful
+   ready node can run.
+4. Batch remote reads, queue snapshots, and tool operations that share an
+   authority, input, or readback boundary. Preserve each node's identity and
+   exact evidence even when operations are batched.
+5. Reuse the warm worker and reviewer contexts for repeated repair when the
+   responsibility unit and route are unchanged. Invalidate only evidence
+   affected by the repaired node and its dependent closure; retain unaffected
+   evidence.
+6. Compute owner, schema, dependency, validation, and publication closure
+   before opening the owning review. Review the exact candidate closure once;
+   accepted findings create only the affected repair nodes.
+7. Wait only when the useful ready set is empty. Record the predecessor,
+   conflict, capacity, or external-state blocker that makes it empty, then
+   resume when that state changes. Waiting is not an elapsed-time scope gate.
+
+The schedule must continue until every required node is complete and correct,
+including its review, validation, and publication evidence. This contract is
+state- and dependency-driven; prompt keywords, arbitrary serial waits, and
+hard-coded durations cannot replace the DAG, ready-set, critical-path, or
+closure decisions.
 
 ## Decision Sufficiency Packet
 

@@ -7,12 +7,22 @@ description: Use for code review, doc review, or AI-generated diff review when y
 contract skill
 responsibility Documents Change Review for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
+upstream design ../../../documents/rule/README.md document rule canon
+upstream design ../../../documents/design/README.md design canon reader route
 upstream design ../../../issues/README.md durable issue and GitHub mirror policy
 @dependency-end
 -->
 
 
 # Change Review
+
+## 文書正本
+
+文書の filename、配置、構成判断は
+[`documents/rule/README.md`](../../../documents/rule/README.md) を参照します。
+個別の target state と実装境界は
+[`documents/design/README.md`](../../../documents/design/README.md) を参照します。
+詳細規則はこの runtime shim に複製しません。
 
 ## Tool Commands
 

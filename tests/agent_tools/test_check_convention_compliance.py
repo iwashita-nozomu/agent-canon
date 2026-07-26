@@ -61,7 +61,7 @@ def skill_fixture(skill: str, body: str) -> str:
 MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/README.md": "conventions\n",
     "documents/conventions/common/01_principles.md": "check_hardcoded_numbers.py\n",
-    "documents/conventions/common/02_naming.md": "check_log_helper_names.py\n",
+    "documents/rule/naming.md": "check_log_helper_names.py\n",
     "documents/conventions/common/03_comments.md": "comments\n",
     "documents/conventions/common/04_operators.md": "operators\n",
     "documents/conventions/common/05_docs.md": (
@@ -2063,6 +2063,30 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("owner_map_entrypoints", result.stdout)
             self.assertIn(
                 "missing-owner-row:skill selection",
+                result.stdout,
+            )
+
+    def test_owner_map_entrypoint_requires_active_design_packet_schema_row(self) -> None:
+        """The workflow reader map keeps the canonical packet schema owners."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflows = root / "agents" / "TASK_WORKFLOWS.md"
+            workflows.write_text(
+                workflows.read_text(encoding="utf-8").replace(
+                    "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
+                    "`agents/agents_config.json#artifacts.active_design_packet` |\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("owner_map_entrypoints", result.stdout)
+            self.assertIn(
+                "missing-owner-row:active design packet schema",
                 result.stdout,
             )
 

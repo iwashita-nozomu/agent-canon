@@ -17,6 +17,11 @@ upstream implementation ../../../tools/agent_tools/agent_team.py materializes ma
 ## Reader Map
 
 - Canonical policy: `agents/skills/agent-orchestration.md`.
+- Execution-Time-Aware Work-Conservation Contract:
+  `agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`.
+- Executable scheduling fields: `dependency_dag`, `makespan_objective`,
+  `responsibility_completeness`, `correctness`, `critical_path`, `ready_set`,
+  `context_reuse`, `affected_evidence_invalidation`.
 - Decision Sufficiency owner:
   `agents/skills/agent-orchestration.md#Decision Sufficiency Packet`.
 - Runtime packet producer: `tools/agent_tools/agent_team.py`.

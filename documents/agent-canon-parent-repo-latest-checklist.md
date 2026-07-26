@@ -66,7 +66,9 @@ git -C vendor/agent-canon status --short --branch --untracked-files=all 2>/dev/n
 
 1. If `vendor/agent-canon/` is a submodule, unrelated parent dirty state does not block an AgentCanon update. `make agent-canon-ensure-latest` classifies the update surface directly:
 
-- safe dirty `vendor/agent-canon/` checkout state is preserved, AgentCanon `main` is merged into the current named branch, the dirty state is restored, root views are repaired, and shared-surface drift is checked.
+- dirty `vendor/agent-canon/` checkout state is a parent-mode refusal. Stop and
+  route source work to the managed topic workspace clone. Root views and pin
+  updates consume only a clean projection.
 - local AgentCanon source commits stay on the AgentCanon branch/PR route.
 - detached heads, merge conflicts, restore conflicts, unresolved local pin changes, `.gitmodules` edits, and AgentCanon-owned root-view edits that `link-root` would overwrite still report a recovery action instead of being hidden.
 
@@ -77,6 +79,13 @@ Template-owned active contracts such as `documents/README.md`, bootstrap docs, h
 If the read-only update plan reports a mutation, request current-task user
 approval, then invoke `make agent-canon-ensure-latest` with all four inline Git
 authority/reason fields in the same command segment.
+
+The same command segment must also set
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>`. The digest
+is the SHA-256 of the exact bytes of the user request record or canonical
+workflow authorization packet; no actor or authority fallback variable is
+accepted. Validation runs before eval-log parking, checkout, submodule update,
+root-view mutation, or staging.
 
 This target also runs the compiled AgentCanon tool rebuild. Treat
 `AGENT_CANON_TOOL_REBUILD_RUST=rebuilt` or
@@ -89,17 +98,21 @@ binary just because the source commit has not changed yet.
 
 1. If only unrelated parent paths are dirty, keep those changes intact and still run the latest update. Record that the dirty paths were outside the AgentCanon update surface.
 
-1. If latest preserves dirty AgentCanon checkout state, continue the AgentCanon branch/PR flow with the restored state. If latest reports a detached head, merge conflict, restore conflict, `.gitmodules` change, parent gitlink conflict, or AgentCanon-owned root-view overwrite risk, fix that recovery target before rerunning latest.
+1. If latest reports dirty AgentCanon checkout state, stop and prepare the
+   topic workspace branch clone. Detached head, merge conflict, `.gitmodules`
+   change, parent gitlink conflict, or AgentCanon-owned root-view overwrite risk
+   is repaired only after the source/pin owner is selected; no vendor state is
+   restored as a source route.
 
-After current-task user approval, invoke the protected
-`merge-main-into-current-preserve-dirty` wrapper with all four inline Git
-authority/reason fields, then push the already-current branch. Detached or
-colliding checkout state is a user-direction boundary.
+Parent mode must not invoke `merge-main-into-current*`; it reports the
+workspace-root clone route. Standalone source mode may use its source-branch
+merge route after the standalone source owner is established.
 
 1. After AgentCanon update or PR merge, restore root views from the manifest and verify drift.
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
@@ -335,17 +348,22 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - stale parent gitlink: not latest, even when `vendor/agent-canon` worktree HEAD already equals AgentCanon remote main; commit the parent gitlink pin before treating the parent repo as latest.
 - local-ahead parent gitlink without pushed branch evidence: AgentCanon branch / PR required; do not treat `local_contains_remote` as latest.
 - clean parent gitlink pinned to a pushed non-main AgentCanon branch head: classify as `deferred_branch_pr`, continue local checks, and rerun `make agent-canon-ensure-latest` after the AgentCanon PR merges.
-- local checkout branch: allowed, but PR-ready only after `bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` emits `agent_canon_merge_remote_main_in_post_head=yes` and `agent_canon_merge_remote_main_verified=yes`; these fields prove the branch contains the fetched remote `main`.
+- local checkout branch or dirty vendor source: parent mode refusal. Prepare the
+  managed topic-workspace source clone with owner evidence and return only the
+  clean pin projection after the source PR; standalone source mode has its own
+  source-branch merge route.
 - `blocked_shared_canon_workflow`: do not hide shared-canon edits in a parent-only diff; commit the AgentCanon branch, merge main into it, and open an AgentCanon PR.
 - `skipped_source_canon`: running inside standalone AgentCanon; update parent repos after AgentCanon changes are committed.
-- `missing checklist`: restore or update `vendor/agent-canon/`, then rerun `bash tools/sync_agent_canon.sh link-root`.
+- `missing checklist`: restore or update `vendor/agent-canon/`, then rerun
+  `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root`.
 - missing `agentcanon_structure_followup=pass`: keep the AgentCanon source, pin,
   root-view, shared root-copy, or parent root sync PR open. Run the root-view
   commands from the parent root, then run the parent readiness / structure
   checks selected by the active profile:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 

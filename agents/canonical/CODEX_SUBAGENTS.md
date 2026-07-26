@@ -544,7 +544,7 @@ Activation Conditions:
 | `design_reviewer` | `detailed_design_reviewer` |
 | `document_flow_reviewer` | `document_flow_reviewer` |
 | `test_designer` | `test_designer` |
-| `implementer` | `worker` by default; `spark_worker` only for a bounded slice selected by `--select-agent-type implementer=spark_worker:<evidence>` and recorded in stdout / manifest |
+| `implementer` | `worker` by default; `spark_worker` only for a bounded slice selected by `--select-agent-type implementer=spark_worker:<evidence>` and recorded in stdout / manifest. Both roles may commit/push and return local PR/head/check evidence, but PR create/merge/close and integration finalization remain parent-owned. |
 | `change_reviewer` | `diff_triage_reviewer` by default; `python_reviewer`, `cpp_reviewer`, then `reviewer` only with language or broad-review eligibility evidence |
 | `final_reviewer` | `ship_reviewer` checks final diff traceability to the Abstract Design Frame and approved packet; then `reviewer` / `project_reviewer` when final gate escalation is needed |
 | `verifier` | parent validation runner |
@@ -615,9 +615,9 @@ Activation Conditions:
 - `oop_readability_reviewer`
   - `tools/oop/*/readability.py` の機械 report を読み、判定値を変えずに reader-facing な文書化、false positive 候補、優先度整理を行う
 - `worker`
-  - bounded な実装変更を切り出し、approved design と local precedent の naming に従う
+  - bounded な実装変更を切り出し、approved design と local precedent の naming に従う。commit/push を含む実装・統合境界の実行は可能だが、PR create/merge/close、admin override、base integration 判断、最終統合評価は parent が保持する。
 - `spark_worker`
-  - Abstract Design Frame と approved design packet で完全に切れる低リスク実装、docs sync、test sync、mechanical cleanup を低遅延に処理する
+  - Abstract Design Frame と approved design packet で完全に切れる低リスク実装、docs sync、test sync、mechanical cleanup を低遅延に処理する。実装・commit/push は可だが、PR create/merge/close、admin override、base integration 判断、最終統合評価は parent が保持する。
 - `docs_workflow_steward`
   - agent 文書、workflow、adapter file の整理を行う
 - `prompt_config_reviewer`

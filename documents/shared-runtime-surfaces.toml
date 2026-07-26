@@ -33,7 +33,6 @@ class = "runtime_surface"
 paths = [
   "agents",
   ".agents",
-  ".vscode",
   ".codex/config.toml",
   ".codex/README.md",
   ".codex/agents",
@@ -42,6 +41,26 @@ paths = [
   ".devcontainer",
   ".github/AGENTS.md",
   "tools",
+]
+
+[[surface]]
+path = ".vscode"
+mode = "regular"
+owner = "template-or-derived-repo"
+class = "active_contract"
+local_override_allowed = true
+source = ".vscode"
+
+[[group]]
+mode = "symlink"
+owner = "agent-canon"
+class = "runtime_surface"
+source_prefix = ""
+paths = [
+  ".vscode/c_cpp_properties.json",
+  ".vscode/extensions.json",
+  ".vscode/settings.json",
+  ".vscode/tasks.json",
 ]
 
 [[group]]
@@ -104,7 +123,9 @@ paths = [
   "documents/worktree-lifecycle.md",
   "documents/conventions/README.md",
   "documents/conventions/common/01_principles.md",
-  "documents/conventions/common/02_naming.md",
+  "documents/rule/README.md",
+  "documents/rule/naming.md",
+  "documents/rule/directory-structure.md",
   "documents/conventions/common/03_comments.md",
   "documents/conventions/common/04_operators.md",
   "documents/conventions/common/05_docs.md",

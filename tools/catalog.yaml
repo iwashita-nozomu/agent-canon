@@ -574,6 +574,26 @@ entries:
     tests:
       - tests/agent_tools/test_github_publish.py
 
+  - id: wiki-publish
+    summary: Publishes one markdown wiki page to the dedicated repo.wiki.git sidecar using default-branch-only clone, format gates, source commit binding, and exact readback identity.
+    path: tools/agent_tools/wiki_publish.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/wiki_publish.py --help
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/wiki_publish.md
+      - documents/agent-canon-github-remote.md
+      - agents/skills/wiki-publication.md
+    tests:
+      - tests/agent_tools/test_wiki_publish.py
+
   - id: eval-accumulation-check
     summary: Validates append-only AgentCanon hook results and registered eval-family accumulation.
     path: tools/agent_tools/eval_accumulation_check.py
@@ -1053,6 +1073,27 @@ entries:
     tests:
       - tests/tools/test_container_config.py
 
+  - id: dependency-module-change
+    summary: Prepares, projects, and cleans independent dependency source clones using .gitmodules identity and remote reconstructibility gates.
+    path: tools/agent_tools/dependency_module_change.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/dependency_module_change.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/dependency_module_change.md
+      - documents/rule/dependency-module-changes.md
+    tests:
+      - tests/agent_tools/test_dependency_module_change.py
+
   - id: agent-canon-cli
     summary: Stable wrapper for the AgentCanon Rust CLI, migration audit, migration plan, docs, search, and analysis tools.
     path: tools/bin/agent-canon
@@ -1287,6 +1328,24 @@ entries:
       - agents/canonical/CODEX_WORKFLOW.md
     tests:
       - tests/agent_tools/test_check_agent_runtime_alignment.py
+
+  - id: check-execution-time-aware-orchestration
+    summary: Enforces the canonical execution-time-aware orchestration owner contract and consumer projections.
+    path: tools/agent_tools/check_execution_time_aware_orchestration.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root .
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/skills/agent-orchestration.md
+    tests:
+      - tests/agent_tools/test_execution_time_aware_orchestration_contract.py
 
   - id: check-skill-frontmatter
     summary: Validates runtime skill SKILL.md YAML frontmatter for Codex loading.
