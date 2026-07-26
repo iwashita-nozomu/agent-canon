@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Checks Python log helper function naming.
 # upstream design ../../documents/coding-conventions-logging.md logging helper naming policy
-# upstream design ../../documents/conventions/common/02_naming.md shared naming policy
+# upstream design ../../documents/rule/naming.md shared naming policy
 # downstream implementation ../../tests/agent_tools/test_check_log_helper_names.py tests checker
 # @dependency-end
 """Check that Python log helper functions start with ``_log``."""

@@ -4,6 +4,8 @@
 contract skill
 responsibility Documents change-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../../documents/rule/README.md document rule canon
+upstream design ../../documents/design/README.md design canon reader route
 upstream design ../../issues/README.md durable issue and GitHub mirror policy
 @dependency-end
 -->
@@ -34,6 +36,14 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 ## Core Reference
 
 - `documents/REVIEW_PROCESS.md`
+
+## 文書正本
+
+文書の filename、配置、構成判断は
+[`documents/rule/README.md`](../../documents/rule/README.md) を参照します。
+個別の target state と実装境界は
+[`documents/design/README.md`](../../documents/design/README.md) を参照します。
+詳細規則はこの review skill に複製しません。
 
 ## Expected Outcome
 
