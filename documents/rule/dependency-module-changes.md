@@ -1,9 +1,9 @@
 <!--
 @dependency-start
 contract policy
-responsibility Defines the general dependency-module change contract and source-clone lifecycle.
+responsibility Defines the general dependency-module change contract and source-clone lifecycle without owning VS Code multi-root state.
 upstream design ../dependency-manifest-design.md dependency ownership and header graph model
-upstream design ../SHARED_RUNTIME_SURFACES.md parent projection and shared-surface ownership
+upstream design ../SHARED_RUNTIME_SURFACES.md parent pin and shared-surface ownership
 downstream implementation ../../tools/agent_tools/dependency_module_change.py enforces clone lifecycle and cleanup gates
 downstream implementation ../../tools/update_agent_canon.sh refuses parent vendor source mutation
 downstream design ../../agents/skills/dependency-module-change.md exposes the short skill route
@@ -74,30 +74,22 @@ module path の basename は sibling path の名前になるため、複数 modu
 同じ basename を持つ `.gitmodules` は拒否します。path、URL、branch の
 identity を曖昧にしたまま clone を作ることも拒否します。
 
-## workspace projection
+## VS Code multi-root usage
 
-`tools/agent_tools/dependency_module_change.py workspace` はtopic workspace内の親の
-`.vscode/module-sources.code-workspace` を `.gitmodules` と現在実在する
-managed clone から全量再生成します。folders には parent `..` と、現在条件を
-満たす clone への `../../<module-basename>` だけを含めます。URL mismatch、unknown
-path、vendor checkout、存在しない clone は含めません。
-
-この相対 path は host では topic workspace の同列 cloneへ、container では
-全体 mount下の同じ cloneへ解決します。環境別 workspace JSONを作らないため、
-source visibility は workspace-root mountが一元的に所有します。
-
-matching clone がゼロの場合、生成 workspace file 自体を削除します。空の
-folders や stale entry を残しません。`.vscode` は親が所有する regular
-directory であり、この workspace file は AgentCanon shared surface の
-正本ではなく親ローカルの生成 projection です。
+`prepare` は `PARENT_ROOT`、`SOURCE_CLONE`、`CONTINUE_PATH` だけを返します。
+これらの clone path は VS Code の標準 multi-root 操作
+（`Add Folder to Workspace` または
+`code --add <parent-clone> <dependency-clone>`）に渡します。利用者は必要なら
+標準の `Save Workspace As...` を使えますが、保存場所と JSON は AgentCanon の
+契約外です。source visibility は topic-root mount が所有します。
 
 ## cleanup gate
 
 cleanup は既定で dry-run です。`--apply` による削除は、対象が topic内の
 computed module clone path（または parent clone path）と完全一致し、次の条件を
-すべて満たす場合だけ許可します。module cloneを削除した後はworkspaceを再生成し、
-parent cloneは全module clone削除後に同じgateで削除できます。topic rootが空なら
-topic rootも削除します。未知cloneは削除しません。
+すべて満たす場合だけ許可します。module cloneを削除した後、parent cloneは全module
+clone削除後に同じgateで削除できます。topic rootが空なら topic rootも削除します。
+未知cloneは削除しません。
 
 - `.gitmodules` の URL と clone の `origin` URL が一致する。
 - `git fetch --all --prune` が成功する。
@@ -121,19 +113,16 @@ surface の状態だけを完成形として残します。
 
 ## lifecycle command
 
-一般 tool の責務は次の 4 つです。
+一般 tool の責務は次の 3 つです。
 
 - `status --topic <topic>`: topic membershipと`.gitmodules` identityを読む。
-- `prepare --topic <topic> --module <path> --branch <branch> --owner-evidence <file> [--parent-branch <branch>]`: 条件を検証してtopic parent/module cloneを作成または再利用し、workspace projectionを生成して継続 pathを返す。
-- `workspace --topic <topic>`: topic parentのworkspace projectionを全量再生成する。
+- `prepare --topic <topic> --module <path> --branch <branch> --owner-evidence <file> [--parent-branch <branch>]`: 条件を検証してtopic parent/module cloneを作成または再利用し、`PARENT_ROOT`、`SOURCE_CLONE`、`CONTINUE_PATH` を返す。
 - `cleanup --topic <topic> --module <path> --expected-clone <absolute-path>`: dry-run で
-  判定し、`--apply` のときだけ cleanup gate を満たす clone を削除して
-  workspace を再生成する。
+  判定し、`--apply` のときだけ cleanup gate を満たす clone を削除する。
 - `cleanup --topic <topic> --parent --expected-parent <absolute-path>`: module cloneが
   無い場合だけparent cloneと空topic rootを同じgateで削除する。
 
-clone mapping の別 JSON は作りません。workspace JSON は VS Code の生成
-projection であり、identity mapping の永続的な正本ではありません。
+VS Code multi-root の保存場所と JSON は caller-owned であり、AgentCanon の契約外です。
 
 ## AgentCanon update の具体例
 

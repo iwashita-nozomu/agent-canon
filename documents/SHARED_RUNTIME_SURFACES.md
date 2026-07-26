@@ -90,9 +90,12 @@ Core runtime surfaces include `AGENTS.md`, `agents/`, `.agents/`,
 `.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, and `tools/`.
 `.vscode/` is a parent-owned regular container whose
 `c_cpp_properties.json`, `extensions.json`, `settings.json`, and `tasks.json`
-children are individual AgentCanon symlinks. Its
-`module-sources.code-workspace` is a parent-local generated projection, not a
-shared AgentCanon surface.
+children are the four individual AgentCanon symlink surfaces. VS Code folder
+composition is caller-owned: pass `PARENT_ROOT`, `SOURCE_CLONE`, and
+`CONTINUE_PATH` from `prepare` to standard `Add Folder to Workspace` or
+`code --add <parent-clone> <dependency-clone>`. Optional `Save Workspace As...`
+is user-owned; storage, JSON, and workspace artifacts are outside the
+AgentCanon contract.
 These paths are installed capability. The active profile and required checks
 are selected by `documents/runtime-profiles-and-check-matrix.md`.
 
@@ -164,9 +167,9 @@ parser/writer ownership are defined by
 `.vscode/` is also a shared AgentCanon runtime ergonomics surface. The parent
 owns the real directory container; AgentCanon owns the individual
 `c_cpp_properties.json`, `extensions.json`, `settings.json`, and `tasks.json`
-symlink surfaces. The parent-local `module-sources.code-workspace` is generated
-from current `.gitmodules` and matching topic-workspace managed source clones by
-`dependency_module_change.py` and is not a shared-surface source.
+symlink surfaces. VS Code folder composition remains caller-owned and uses the
+paths returned by `dependency_module_change.py prepare`; it is not a shared
+surface source.
 Do not store personal editor state, host-specific include paths, workspace-local
 secrets, or product-specific commands in the shared `.vscode/` view. Put
 project-specific editor guidance in repo-local docs or project-owned scripts

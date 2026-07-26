@@ -3,8 +3,8 @@
 # contract environment
 # responsibility Renders shared devcontainer compose from repo-local Docker pack.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
-# upstream design ../documents/rule/dependency-module-changes.md workspace-root source visibility contract
-# upstream implementation ../tools/agent_tools/dependency_module_change.py source workspace and projection tool
+# upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract
+# upstream implementation ../tools/agent_tools/dependency_module_change.py topic clone lifecycle tool
 # upstream design ../documents/gpu-admission-r5-source-packet.md exact Compose runtime identity wiring
 # upstream environment devcontainer.json initializeCommand entrypoint
 # @dependency-end

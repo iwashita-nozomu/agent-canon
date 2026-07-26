@@ -142,7 +142,7 @@ id = "dependency-module-change"
 tool = "tools/agent_tools/dependency_module_change.py"
 doc = "documents/tools/dependency_module_change.md"
 language = "python"
-summary = "Independent dependency source clone lifecycle and workspace projection documentation."
+summary = "Independent dependency source clone lifecycle and reconstructibility-gated cleanup documentation."
 
 [[tool]]
 id = "classify-path-risk"

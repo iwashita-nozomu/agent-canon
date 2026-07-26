@@ -3,7 +3,7 @@
 # contract environment
 # responsibility Reports shared devcontainer attach status.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
-# upstream design ../documents/rule/dependency-module-changes.md workspace-root source visibility contract
+# upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract
 # upstream design ../documents/gpu-admission-r5-source-packet.md observational readback receipt contract
 # upstream environment devcontainer.json postAttachCommand entrypoint
 # upstream implementation finalize-shared-runtime.sh publishes the exact readback receipt
@@ -112,7 +112,6 @@ fi
 
 check_dependency_module_runtime() {
   local dependency_tool="${repo_root}/tools/agent_tools/dependency_module_change.py"
-  local workspace_projection="${repo_root}/.vscode/module-sources.code-workspace"
   [ "${AGENT_CANON_WORKSPACE_ROOT:-}" = "/workspace" ] || {
     echo "DEPENDENCY_MODULE_CONTAINER_ERROR=AGENT_CANON_WORKSPACE_ROOT must be /workspace" >&2
     return 1
@@ -125,10 +124,6 @@ check_dependency_module_runtime() {
     echo "DEPENDENCY_MODULE_CONTAINER_ERROR=tool-missing:${dependency_tool}" >&2
     return 1
   }
-  [ ! -L "$workspace_projection" ] || {
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-projection-must-be-regular:${workspace_projection}" >&2
-    return 1
-  }
   if [ -f "${repo_root}/.gitmodules" ]; then
     topic="$(git -C "$repo_root" config --local --get agent-canon.topic.topic || true)"
     [ -n "$topic" ] || {
@@ -136,22 +131,8 @@ check_dependency_module_runtime() {
       return 1
     }
     python3 "$dependency_tool" --root "$repo_root" status --topic "$topic"
-    [ ! -e "$workspace_projection" ] || python3 - "$workspace_projection" <<'PY'
-from __future__ import annotations
-
-import json
-import sys
-from pathlib import Path
-
-workspace = Path(sys.argv[1])
-payload = json.loads(workspace.read_text(encoding="utf-8"))
-for folder in payload.get("folders", []):
-    path = folder.get("path") if isinstance(folder, dict) else None
-    if not isinstance(path, str) or not (workspace.parent / path).is_dir():
-        raise SystemExit(f"DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-folder-missing:{path}")
-PY
   fi
-  echo "DEPENDENCY_MODULE_CONTAINER=pass tool=${dependency_tool} workspace=${workspace_projection}"
+  echo "DEPENDENCY_MODULE_CONTAINER=pass tool=${dependency_tool} repository=${repo_root}"
 }
 
 check_dependency_module_runtime
@@ -160,7 +141,7 @@ echo
 echo "----------------------------------------"
 echo "AgentCanon devcontainer"
 echo "----------------------------------------"
-echo "workspace: ${repo_root}"
+echo "repository: ${repo_root}"
 echo "gpu: ${gpu_status}"
 echo "gpu-notice: ${DEVCONTAINER_GPU_NOTICE:-<unset>}"
 echo "/mnt/git: ${mnt_git_status}"

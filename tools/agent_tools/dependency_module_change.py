@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Manages topic workspaces, independent dependency source clones, and clean projections.
+# responsibility Manages topic source clones and reconstructibility-gated cleanup while retaining topic-root container visibility.
 # upstream design ../../documents/rule/dependency-module-changes.md generic dependency module policy
 # upstream design ../../documents/dependency-manifest-design.md structured dependency ownership model
-# upstream environment ../../.devcontainer/generate-runtime-compose.sh owns the topic workspace mount
+# upstream environment ../../.devcontainer/generate-runtime-compose.sh owns the topic-root mount
 # downstream implementation ../../tests/agent_tools/test_dependency_module_change.py validates lifecycle and refusal semantics
 # downstream design ../../documents/tools/dependency_module_change.md documents the CLI surface
 # @dependency-end
-"""Manage one topic workspace containing one parent and its source clones.
+"""Manage one topic root containing one parent and its source clones.
 
 The selected repository is never used as a vendored source branch.  A prepare
 operation creates or reuses ``<workspace-parent>/workspace-<topic-slug>`` and
@@ -20,7 +20,6 @@ branches.
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import shutil
@@ -36,7 +35,7 @@ MARKER_PREFIX = "agent-canon.topic"
 
 
 class DependencyModuleChangeError(RuntimeError):
-    """Raised when the topic workspace contract cannot be satisfied."""
+    """Raised when the topic-root contract cannot be satisfied."""
 
 
 class GitCommandError(DependencyModuleChangeError):
@@ -426,28 +425,20 @@ def _prepare(
     evidence_value: str,
     parent_branch: str | None,
 ) -> None:
-    evidence = _require_evidence(root, evidence_value)
+    _require_evidence(root, evidence_value)
     parent_root = _ensure_topic_parent(root, topic, parent_branch)
     modules = _parse_gitmodules(parent_root)
     module = _select_module(modules, module_value)
     topic_slug = _slug(topic, "topic")
     topic_root = parent_root.parent
-    _require_workspace_projection_path(parent_root)
     if module.basename == parent_root.name:
         raise DependencyModuleChangeError("module basename collides with topic parent clone name")
     clone_path = topic_root / module.basename
     inspection = _inspect(clone_path, role="module", module=module, topic=topic_slug, branch=branch)
     if inspection.state == "ready":
-        print("DEPENDENCY_MODULE_CHANGE=prepare")
-        print(f"TOPIC={topic_slug}")
         print(f"PARENT_ROOT={parent_root}")
-        print(f"MODULE={module.path}")
-        print(f"BRANCH={branch}")
         print(f"SOURCE_CLONE={clone_path}")
         print(f"CONTINUE_PATH={clone_path}")
-        print(f"OWNER_EVIDENCE={evidence}")
-        _regenerate_workspace(parent_root, modules, topic_slug)
-        print("ACTION=reuse")
         return
     if inspection.state != "absent":
         raise DependencyModuleChangeError(
@@ -465,51 +456,9 @@ def _prepare(
     final = _inspect(clone_path, role="module", module=module, topic=topic_slug, branch=branch)
     if final.state != "ready":
         raise DependencyModuleChangeError(f"new dependency clone failed identity validation: {final.state}")
-    _regenerate_workspace(parent_root, modules, topic_slug)
-    print("DEPENDENCY_MODULE_CHANGE=prepare")
-    print(f"TOPIC={topic_slug}")
     print(f"PARENT_ROOT={parent_root}")
-    print(f"MODULE={module.path}")
-    print(f"BRANCH={branch}")
     print(f"SOURCE_CLONE={clone_path}")
     print(f"CONTINUE_PATH={clone_path}")
-    print(f"OWNER_EVIDENCE={evidence}")
-    print("ACTION=clone")
-
-
-def _workspace_path(parent_root: Path) -> Path:
-    return parent_root / ".vscode" / "module-sources.code-workspace"
-
-
-def _require_workspace_projection_path(parent_root: Path) -> Path:
-    workspace = _workspace_path(parent_root)
-    if workspace.parent.is_symlink():
-        raise DependencyModuleChangeError(
-            f"workspace projection blocked: {workspace.parent} is a directory symlink; "
-            "AgentCanon pin/root-view migration is required, and the symlink target will not be edited"
-        )
-    if workspace.parent.exists() and not workspace.parent.is_dir():
-        raise DependencyModuleChangeError(
-            f"workspace projection blocked: parent is not a directory: {workspace.parent}"
-        )
-    if workspace.is_symlink():
-        raise DependencyModuleChangeError(
-            f"workspace projection blocked: {workspace} is a symlink; refusing to write or remove its target"
-        )
-    return workspace
-
-
-def _managed_module_clones(parent_root: Path, modules: tuple[DependencyModule, ...], topic: str) -> tuple[CloneInspection, ...]:
-    topic_root = parent_root.parent
-    result: list[CloneInspection] = []
-    for module in modules:
-        if module.basename == parent_root.name:
-            raise DependencyModuleChangeError("module basename collides with topic parent clone name")
-        candidate = topic_root / module.basename
-        inspection = _inspect(candidate, role="module", module=module, topic=topic)
-        if inspection.state == "ready":
-            result.append(inspection)
-    return tuple(result)
 
 
 def _module_path_states(
@@ -523,30 +472,6 @@ def _module_path_states(
         if inspection.state != "absent":
             states.append(inspection)
     return tuple(states)
-
-
-def _regenerate_workspace(parent_root: Path, modules: tuple[DependencyModule, ...], topic: str) -> None:
-    workspace = _require_workspace_projection_path(parent_root)
-    clones = _managed_module_clones(parent_root, modules, topic)
-    if not clones:
-        if workspace.is_symlink():
-            raise DependencyModuleChangeError(f"refusing to remove symlink workspace projection: {workspace}")
-        if workspace.exists():
-            workspace.unlink()
-        print("DEPENDENCY_MODULE_CHANGE=workspace")
-        print("ACTION=remove-empty")
-        return
-    workspace.parent.mkdir(parents=True, exist_ok=True)
-    folders: list[dict[str, str]] = [{"name": parent_root.name, "path": ".."}]
-    folders.extend({"name": clone.path.name, "path": f"../../{clone.path.name}"} for clone in clones)
-    rendered = json.dumps({"folders": folders, "settings": {}}, indent=2) + "\n"
-    if not workspace.is_file() or workspace.read_text(encoding="utf-8") != rendered:
-        workspace.write_text(rendered, encoding="utf-8")
-    print("DEPENDENCY_MODULE_CHANGE=workspace")
-    print("ACTION=regenerate")
-    print(f"WORKSPACE={workspace}")
-    print(f"TOPIC_ROOT={parent_root.parent}")
-    print(f"CLONES={len(clones)}")
 
 
 def _cleanup_readiness(path: Path) -> str | None:
@@ -574,18 +499,13 @@ def _require_cleanup_authority() -> None:
     raise DependencyModuleChangeError("cleanup --apply requires same-command authority/reason fields")
 
 
-def _cleanup_module(parent_root: Path, modules: tuple[DependencyModule, ...], topic: str, module: DependencyModule, expected: Path, apply: bool) -> None:
+def _cleanup_module(parent_root: Path, topic: str, module: DependencyModule, expected: Path, apply: bool) -> None:
     clone = parent_root.parent / module.basename
     if not expected.is_absolute() or expected != clone:
         raise DependencyModuleChangeError(f"--expected-clone must exactly equal {clone}")
     inspection = _inspect(clone, role="module", module=module, topic=topic)
     if inspection.state == "absent":
-        if apply:
-            _require_cleanup_authority()
-            _regenerate_workspace(parent_root, modules, topic)
-            print(f"CLEANUP module={module.path} action=absent workspace=regenerated")
-        else:
-            print(f"CLEANUP module={module.path} action=hold reason=absent")
+        print(f"CLEANUP module={module.path} action=hold reason=absent")
         return
     if inspection.state != "ready":
         print(f"CLEANUP module={module.path} action=hold reason={inspection.state}")
@@ -598,10 +518,8 @@ def _cleanup_module(parent_root: Path, modules: tuple[DependencyModule, ...], to
         print(f"CLEANUP module={module.path} action=would-remove path={clone}")
         return
     _require_cleanup_authority()
-    _require_workspace_projection_path(parent_root)
     shutil.rmtree(clone)
     print(f"CLEANUP module={module.path} action=removed path={clone}")
-    _regenerate_workspace(parent_root, modules, topic)
 
 
 def _cleanup_parent(parent_root: Path, modules: tuple[DependencyModule, ...], topic: str, expected: Path, apply: bool) -> None:
@@ -622,7 +540,6 @@ def _cleanup_parent(parent_root: Path, modules: tuple[DependencyModule, ...], to
             "parent clone cleanup refused by unknown topic entries: "
             + ", ".join(str(item) for item in unknown)
         )
-    _require_workspace_projection_path(parent_root)
     inspection = _inspect(parent_root, role="parent", topic=topic)
     if inspection.state != "ready":
         print(f"CLEANUP parent action=hold reason={inspection.state}")
@@ -657,9 +574,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=".", help="Selected repository root.")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for name in ("status", "workspace"):
-        command = subparsers.add_parser(name)
-        command.add_argument("--topic", required=True)
+    status = subparsers.add_parser("status")
+    status.add_argument("--topic", required=True)
     prepare = subparsers.add_parser("prepare")
     prepare.add_argument("--topic", required=True)
     prepare.add_argument("--module", required=True)
@@ -704,8 +620,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         modules = _parse_gitmodules(parent_root)
         if args.command == "status":
             _status(parent_root, modules, topic)
-        elif args.command == "workspace":
-            _regenerate_workspace(parent_root, modules, topic)
         elif args.parent:
             if not args.expected_parent:
                 raise DependencyModuleChangeError("--expected-parent is required with --parent")
@@ -714,7 +628,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if not args.expected_clone:
                 raise DependencyModuleChangeError("--expected-clone is required with --module")
             module = _select_module(modules, args.module)
-            _cleanup_module(parent_root, modules, topic, module, Path(args.expected_clone).absolute(), args.apply)
+            _cleanup_module(parent_root, topic, module, Path(args.expected_clone).absolute(), args.apply)
         return 0
     except (DependencyModuleChangeError, OSError) as exc:
         print(f"DEPENDENCY_MODULE_CHANGE_ERROR={exc}", file=sys.stderr)
