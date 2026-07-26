@@ -1073,6 +1073,27 @@ entries:
     tests:
       - tests/tools/test_container_config.py
 
+  - id: dependency-module-change
+    summary: Prepares, projects, and cleans independent dependency source clones using .gitmodules identity and remote reconstructibility gates.
+    path: tools/agent_tools/dependency_module_change.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/dependency_module_change.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/dependency_module_change.md
+      - documents/rule/dependency-module-changes.md
+    tests:
+      - tests/agent_tools/test_dependency_module_change.py
+
   - id: agent-canon-cli
     summary: Stable wrapper for the AgentCanon Rust CLI, migration audit, migration plan, docs, search, and analysis tools.
     path: tools/bin/agent-canon

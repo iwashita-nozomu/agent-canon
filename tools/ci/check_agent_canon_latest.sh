@@ -78,8 +78,8 @@ case "$route" in
       emit_submodule_worktree_evidence
       echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
       echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest_with_request_evidence"
-      echo "AGENT_CANON_LATEST_MERGE_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty"
-      echo "AgentCanon update surface is dirty; commit the AgentCanon branch, merge GitHub main into it, and open an AgentCanon PR before treating the latest gate as clean." >&2
+      echo "AGENT_CANON_LATEST_DEPENDENCY_ROUTE=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic <topic> --module ${PREFIX} --branch <source-branch> --owner-evidence <owner-evidence>"
+      echo "AgentCanon vendor update surface is dirty; stop parent mode and prepare the topic workspace source clone before treating the latest gate as clean." >&2
       exit 1
     fi
     echo "AGENT_CANON_LATEST=pass"
@@ -100,8 +100,8 @@ case "$route" in
     emit_submodule_worktree_evidence
     echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
     echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest"
-    echo "AGENT_CANON_LATEST_MERGE_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty"
-    echo "AgentCanon parent pin contains local shared-canon commits; route them through an AgentCanon branch and PR before treating the parent repository as latest." >&2
+    echo "AGENT_CANON_LATEST_DEPENDENCY_ROUTE=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic <topic> --module ${PREFIX} --branch <source-branch> --owner-evidence <owner-evidence>"
+    echo "AgentCanon parent pin contains local shared-canon commits; route them through a topic workspace source clone and PR before treating the parent repository as latest." >&2
     exit 1
     ;;
   *)
@@ -130,9 +130,8 @@ case "$route" in
     if [[ "${dirty_update_surface:-${dirty_worktree:-}}" == "yes" && "${prefix_mode:-}" == "submodule" ]]; then
       echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
       echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest_with_request_evidence"
-      echo "AGENT_CANON_LATEST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty"
-      echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest"
-      echo "Route shared-canon local changes through an AgentCanon branch and PR, merge GitHub main into the branch first, then set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and rerun 'make agent-canon-ensure-latest' to bring the pin back." >&2
+      echo "AGENT_CANON_LATEST_DEPENDENCY_ROUTE=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic <topic> --module ${PREFIX} --branch <source-branch> --owner-evidence <owner-evidence>"
+      echo "Route shared-canon local changes through a topic workspace branch and PR, then bring back only the clean pin with 'make agent-canon-ensure-latest'." >&2
     elif [[ "${dirty_worktree:-}" == "yes" && "${prefix_mode:-}" == "submodule" ]]; then
       echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/agent-canon-pr-workflow.md"
       echo "AGENT_CANON_LATEST_NEXT_ACTION=run_make_agent-canon-ensure-latest_parent_dirty_outside_update_surface_ok_with_request_evidence"

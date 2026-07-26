@@ -354,9 +354,10 @@ task.
 
 ## Shared Canon Flow
 
-AgentCanon source changes are made in `vendor/agent-canon/`, reviewed through
-the AgentCanon branch / PR workflow, then reflected in the template through the
-submodule pin and shared root views. Root view repair is owned by:
+AgentCanon source changes are made in the managed dependency clone inside the
+`workspace-<topic-slug>` lifecycle boundary, reviewed through the AgentCanon
+branch / PR workflow, then reflected in the template through the clean
+`vendor/agent-canon` pin and shared root views. Root view repair is owned by:
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \

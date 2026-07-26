@@ -11,6 +11,7 @@ downstream design ./codex-configuration-reference.md Codex configuration referen
 downstream design ./object-oriented-design.md general OOP coding policy
 downstream design ./agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 downstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
+downstream design ./rule/dependency-module-changes.md general dependency source-clone lifecycle policy
 downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 downstream design ./template-agent-canon-audit-resolution.md audit resolution ledger
 downstream design ./tool-skill-routing-refactor.md short tool/skill routing policy
@@ -60,13 +61,13 @@ this file, but derived repositories own their local index.
 
 | Class | Examples | Edit source |
 | --- | --- | --- |
-| AgentCanon-owned shared policy symlink | coding conventions, review process, workflow-supporting policies, shared templates, tool docs | `vendor/agent-canon/documents/` |
+| AgentCanon-owned shared policy symlink | coding conventions, review process, workflow-supporting policies, shared templates, tool docs | managed topic-workspace source clone; `vendor/agent-canon/documents/` is the clean projection |
 | Template-owned active contract | bootstrap, host requirements, server contract, remote execution contract, template remote policy | root `documents/` regular files |
 | Project-owned docs | architecture notes, project-specific design specs, implementation contracts | root `documents/` regular files |
 | Generated or run artifacts | agent reports, experiment outputs, logs | `reports/` or `experiments/`, not `documents/` |
 
-If a file is an AgentCanon-owned symlink, edit the source under
-`vendor/agent-canon/` and repair the root view with the request-evidence-authorized
+If a file is an AgentCanon-owned symlink, read
+`rule/dependency-module-changes.md`, edit the managed source clone, and repair the root view with the request-evidence-authorized
 `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root` command. If a file is a template-owned active
 contract, edit the root regular file.
 

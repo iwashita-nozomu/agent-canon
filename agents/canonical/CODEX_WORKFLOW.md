@@ -58,6 +58,7 @@ Cross-Cutting Packet:
 - `documents/notes-lifecycle.md`
 - `agents/workflows/agent-learning-workflow.md`
 - `documents/runtime-profiles-and-check-matrix.md`
+- `documents/rule/dependency-module-changes.md`
 - `notes/guardrails/README.md`
 - `notes/guardrails/engineering_avoidances.md`
 - `docker/README.md`
@@ -74,8 +75,8 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - AgentCanon update surface は `vendor/agent-canon/` submodule worktree、parent gitlink、`.gitmodules`、および `link-root` が触る AgentCanon-owned root symlink / copy view です。
 - clean な submodule worktree が remote main を指していて parent gitlink だけ古い場合も、preflight は checkout-preserving `approval_required` route を返します。承認後の protected update が parent gitlink の stage / commit を所有します。
 - clean な submodule worktree が non-default branch を指し、その branch head が remote branch に push 済みで fetched remote main を含み、parent gitlink だけが古い場合は `deferred_branch_pr` evidence として記録し、routing / planning / review を続けます。AgentCanon PR merge 後は再度 read-only plan を行い、mutation が必要なら approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route を実行します。
-- `vendor/agent-canon/` に local commit、dirty state、remote main と diverge した history がある場合は current checkout を保存し、current-task user approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得て protected `merge-main-into-current-preserve-dirty` を実行し、AgentCanon PR に出します。
-- local checkout branch は valid な shared-canon work surface です。local checkout に積まれた commit は消して最新化する対象ではなく、GitHub `main` を merge して conflict を解き、通常の AgentCanon PR として review / merge します。機械 evidence として `merge-main-into-current-preserve-dirty` の `agent_canon_merge_source_sha`、`agent_canon_merge_post_head`、`agent_canon_merge_remote_main_in_post_head=yes`、`agent_canon_merge_remote_main_verified=yes` を run bundle、PR body、または work log に残します。
+- `vendor/agent-canon/` に local commit、dirty state、remote main と diverge した history がある場合は親モードの source-work surface として扱わず、直ちに `documents/rule/dependency-module-changes.md` の topic workspace branch clone route を案内して停止します。parent mode は vendor state を stash、保存、移送、再開しません。
+- local source branch は standalone source clone だけが所有します。parent projection は公開済み source の clean pin と root view の投影だけを受け取り、source correctness や dirty source state を vendor checkout で継続しません。
 - update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出します。merge 後も read-only plan を先に行い、必要な approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route の後で root view と parent pin を同期します。
 - AgentCanon source change、parent submodule pin change、`.gitmodules`
   change、AgentCanon-owned root runtime view / root-copy surface change、parent
@@ -100,7 +101,7 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
 - branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に creation authority/reason と destructive authority/reason の全 4 値を置いた場合だけ実行できます。
-- AgentCanon source 変更は current `vendor/agent-canon` branch / AgentCanon PR を優先して継続します。parent repo の `canon-pin` branch は、AgentCanon PR route が確定した後に parent pin だけを隔離する場合に限ります。
+- AgentCanon source 変更は `dependency-module-change` で exact topic workspace clone を prepare/reuse し、その standalone source branch / AgentCanon PR を継続します。parent repo の `canon-pin` branch は source publication 後の clean parent pin projection だけを担います。
 
 ### Runtime Profile And Risk Selection
 

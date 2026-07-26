@@ -152,7 +152,9 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 基本手順:
 
 1. upstream `agent-canon` を最新化する
-1. `vendor/agent-canon/` を source of truth として編集する
+1. `documents/rule/dependency-module-changes.md` を読み、必要なら
+   `dependency_module_change.py prepare --topic <topic> --module <module> --branch <branch> --owner-evidence <file>`
+   で topic workspace の独立 source cloneを作成・再利用してそこで編集する
 1. root surface を再同期する
 1. shared canon 用 check を流す
 1. AgentCanon source PR を merge する
@@ -171,10 +173,10 @@ make agent-canon-pr-check
 derived repo から shared canon だけ更新するときは、必要に応じて次を使います。
 
 ```bash
-bash tools/update_agent_canon.sh plan
-AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
-git -C vendor/agent-canon push origin HEAD
+python3 tools/agent_tools/dependency_module_change.py --root . prepare \
+  --topic <topic> --module vendor/agent-canon --branch <source-branch> \
+  --owner-evidence <owner-evidence>
+git -C <CONTINUE_PATH> push origin HEAD
 ```
 
 ## Convention Compliance Gate

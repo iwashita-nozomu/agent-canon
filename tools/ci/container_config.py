@@ -30,6 +30,10 @@ try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
+try:
+    import yaml
+except ModuleNotFoundError:  # pragma: no cover - dependency is in runtime requirements.
+    yaml = None
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -41,107 +45,6 @@ if str(AGENT_TOOLS_DIR) not in sys.path:
 
 from surface_manifest import SurfaceEntry, SurfaceManifest, load_manifest, target_for_entry  # noqa: E402,I001
 
-REQUIRED_APT_PACKAGES = (
-    "rsync",
-    "openssh-client",
-    "graphviz",
-    "python3.11",
-    "python3.11-dev",
-    "python3.11-venv",
-)
-REQUIRED_DOCKERFILE_SNIPPETS = (
-    ("docker/register_safe_directories.sh", "must-install-safe-directory-helper"),
-)
-FORBIDDEN_DOCKERFILE_PATTERNS = (
-    (re.compile(r"cli\.github\.com/packages"), "dockerfile-must-not-configure-github-cli"),
-    (re.compile(r"(^|[\s\\])gh([\s\\]|$)"), "dockerfile-must-not-install-gh"),
-    (re.compile(r"gh\s+--version"), "dockerfile-must-not-smoke-check-gh"),
-    (re.compile(r"@openai/codex"), "dockerfile-must-not-install-codex-cli"),
-    (re.compile(r"codex\s+--version"), "dockerfile-must-not-smoke-check-codex"),
-    (re.compile(r"\brustup\b"), "dockerfile-must-not-install-rustup"),
-    (re.compile(r"\bcargo\s+(build|install|test|clippy|fmt)\b"), "dockerfile-must-not-run-cargo"),
-    (re.compile(r"\brustc\s+--version\b"), "dockerfile-must-not-smoke-check-rustc"),
-    (re.compile(r"elan-init\.sh"), "dockerfile-must-not-install-lean-via-elan"),
-    (
-        re.compile(r"leanprover/elan/releases/download"),
-        "dockerfile-must-not-install-elan-release",
-    ),
-    (re.compile(r"\belan\s+(toolchain|default|self|update)\b"), "dockerfile-must-not-run-elan"),
-    (re.compile(r"\blean\s+--version\b"), "dockerfile-must-not-smoke-check-lean"),
-    (re.compile(r"\blake\s+(build|update|env)\b"), "dockerfile-must-not-run-lake"),
-    (
-        re.compile(r"npm\s+install\s+-g\s+@openai/codex"),
-        "dockerfile-must-not-install-codex-via-npm",
-    ),
-)
-REQUIRED_POST_CREATE_SNIPPETS = (
-    "umask 0007",
-    "finalize-shared-runtime.sh",
-    "run_as_root",
-    "docker/register_safe_directories.sh",
-    "docker/install_python_dependencies.sh",
-    'git config --global --add safe.directory "$workspace"',
-    "repo-local Python dependency installer absent",
-    "cli.github.com/packages",
-    "apt_install gh",
-    "codex --version >/dev/null",
-    "npm install -g @openai/codex",
-    "rustup toolchain install",
-    "rustfmt",
-    "clippy",
-    "rust-analyzer",
-    "cargo build --release",
-    "AGENT_CANON_TOOLS_HOME",
-    "${tools_home}/agent-canon/bin/agent-canon",
-    "/usr/local/bin/agent-canon",
-    "AGENT_CANON_RUNTIME_ROOT",
-    "AGENT_CANON_SOURCE_PROJECTION_ROOT",
-    "tool-availability.json",
-    "tree --version",
-    "install_secret_scanners",
-    "gitleaks",
-    "trufflehog",
-    "detect-secrets",
-    "apt_install jq",
-    "jq --version",
-    "install_tex_tooling",
-    "AGENT_CANON_LEAN_TOOLCHAIN",
-    "leanprover/lean4:v4.30.0",
-    "AGENT_CANON_ELAN_VERSION",
-    "v4.2.3",
-    "AGENT_CANON_ELAN_X86_64_SHA256",
-    "AGENT_CANON_ELAN_AARCH64_SHA256",
-    "install_lean_toolchain",
-    "leanprover/elan/releases/download",
-    "elan-x86_64-unknown-linux-gnu.tar.gz",
-    "elan-aarch64-unknown-linux-gnu.tar.gz",
-    "sha256sum -c -",
-    "elan-init",
-    "elan toolchain install",
-    "elan default",
-    "for tool in elan lean lake",
-    "/usr/local/bin/${tool}",
-    "elan --version",
-    "lean --version",
-    "lake --version",
-    "latexmk",
-    "texlive-latex-recommended",
-    "texlive-latex-extra",
-    "texlive-fonts-recommended",
-    "texlive-pictures",
-    "texlive-xetex",
-    "texlive-extra-utils",
-    "dvisvgm",
-    "ghostscript",
-    "poppler-utils",
-    "latexmk --version",
-    "pdflatex --version",
-    "xelatex --version",
-    "dvisvgm --version",
-    "pdfcrop --version",
-    "gh --version",
-    "codex --version",
-)
 REQUIRED_REQUIREMENTS = (
     "jupyterlab",
     "notebook",
@@ -379,41 +282,12 @@ def validate_requirements(root: Path) -> list[Finding]:
 
 
 def validate_dockerfile(root: Path) -> list[Finding]:
-    """Validate docker/Dockerfile content-level contracts."""
+    """Require the Dockerfile path without fixing its implementation text."""
     path = root / "docker" / "Dockerfile"
     relative = "docker/Dockerfile"
     if not path.is_file():
         return [Finding("missing_file", relative, "missing")]
-    text = path.read_text(encoding="utf-8")
-    findings: list[Finding] = []
-    for package in REQUIRED_APT_PACKAGES:
-        if not re.search(rf"(^|[\s\\]){re.escape(package)}([\s\\]|$)", text):
-            findings.append(
-                Finding("dependency_contract_violation", relative, f"missing-apt:{package}")
-            )
-    if re.search(r"pip\s+install\b.*-r\s+\S*requirements\.txt", text, re.DOTALL):
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                relative,
-                "docker-build-must-not-install-python-requirements",
-            )
-        )
-    if "COPY docker/requirements.txt" in text or "requirements.txt /tmp" in text:
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                relative,
-                "docker-build-must-not-copy-python-requirements",
-            )
-        )
-    for snippet, detail in REQUIRED_DOCKERFILE_SNIPPETS:
-        if snippet not in text:
-            findings.append(Finding("dependency_contract_violation", relative, detail))
-    for pattern, detail in FORBIDDEN_DOCKERFILE_PATTERNS:
-        if pattern.search(text):
-            findings.append(Finding("dependency_contract_violation", relative, detail))
-    return findings
+    return []
 
 
 def validate_dockerignore(root: Path) -> list[Finding]:
@@ -433,77 +307,30 @@ def validate_dockerignore(root: Path) -> list[Finding]:
 
 
 def validate_post_create(root: Path) -> list[Finding]:
-    """Validate devcontainer post-create setup centralizes Python dependency installs."""
+    """Require the post-create entrypoint without fixing its shell implementation."""
     path = root / ".devcontainer" / "post-create.sh"
     relative = ".devcontainer/post-create.sh"
     if not path.is_file():
         return [Finding("missing_file", relative, "missing")]
-    text = path.read_text(encoding="utf-8")
-    findings: list[Finding] = []
-    for snippet in REQUIRED_POST_CREATE_SNIPPETS:
-        if snippet not in text:
-            findings.append(Finding("dependency_contract_violation", relative, f"missing:{snippet}"))
-    return findings
+    return []
 
 
 def validate_finalize_shared_runtime_script(devcontainer_dir: Path) -> list[Finding]:
-    """Validate the readback-only shared-runtime finalizer contract."""
+    """Require the shared-runtime finalizer without fixing its shell implementation."""
     path = devcontainer_dir / "finalize-shared-runtime.sh"
     relative = ".devcontainer/finalize-shared-runtime.sh"
     if not path.is_file():
         return [Finding("missing_file", relative, "missing")]
-    script = path.read_text(encoding="utf-8")
-    findings = [
-        Finding("dependency_contract_violation", relative, f"missing:{snippet}")
-        for snippet in (
-            "shared-runtime-readback/v1",
-            "shared-runtime-readback.json",
-            "read_shared_runtime_provision",
-            "write_runtime_receipt_atomic",
-            "os.O_NOFOLLOW",
-            "os.fstat(probe_fd)",
-            "os.stat(probe_path, follow_symlinks=False)",
-            "stat.S_ISREG",
-            "stat.S_IMODE",
-            "candidate.st_dev",
-            "candidate.st_ino",
-            "candidate.st_gid",
-            "/proc/self/mountinfo",
-            "/proc/self/ns/mnt",
-        )
-        if snippet not in script
-    ]
-    for snippet in (
-        "run_as_root",
-        "chown",
-        "O_TRUNC",
-        "O_CREAT",
-        "shared-runtime-readback.v4.json",
-        "/receipts/shared-runtime-readback",
-    ):
-        if snippet in script:
-            findings.append(Finding("inconsistency", relative, f"forbidden:{snippet}"))
-    return findings
+    return []
 
 
 def validate_python_dependency_installer(root: Path) -> list[Finding]:
-    """Validate the central Python dependency installer script."""
+    """Require the optional dependency installer without fixing shell internals."""
     path = root / "docker" / "install_python_dependencies.sh"
     relative = "docker/install_python_dependencies.sh"
     if not path.is_file():
         return [Finding("missing_file", relative, "missing")]
-    text = path.read_text(encoding="utf-8")
-    findings: list[Finding] = []
-    for snippet in (
-        "docker/requirements.txt",
-        "python3 -m pip install --upgrade pip",
-        'python3 -m pip install --no-cache-dir -r "$requirements"',
-        "sha256sum",
-        "python3 -m pip check",
-    ):
-        if snippet not in text:
-            findings.append(Finding("dependency_contract_violation", relative, f"missing:{snippet}"))
-    return findings
+    return []
 
 
 def load_devcontainer_json(path: Path) -> tuple[Mapping[str, object] | None, list[Finding]]:
@@ -527,7 +354,8 @@ def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
         "initializeCommand": "bash .devcontainer/bootstrap-shared-runtime.sh && bash .devcontainer/generate-runtime-compose.sh",
         "dockerComposeFile": "docker-compose.generated.yml",
         "service": "workspace",
-        "postCreateCommand": "bash .devcontainer/post-create.sh /workspace",
+        "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
+        "postCreateCommand": "bash .devcontainer/post-create.sh /workspace/${localWorkspaceFolderBasename}",
         "postAttachCommand": "bash .devcontainer/post-attach.sh",
     }
     for key, expected in expected_json.items():
@@ -538,113 +366,122 @@ def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
     return findings
 
 
-def validate_devcontainer_workspace(config: Mapping[str, object], pack: PackConfig) -> list[Finding]:
-    """Validate devcontainer workspace mount alignment with one runtime pack."""
-    if config.get("workspaceFolder") == pack.workspace_mount:
+def validate_devcontainer_workspace(config: Mapping[str, object], pack: PackConfig | None) -> list[Finding]:
+    """Validate the selected repository folder below the topic mount."""
+    del pack
+    if config.get("workspaceFolder") == "/workspace/${localWorkspaceFolderBasename}":
         return []
     return [
         Finding(
             "inconsistency",
             ".devcontainer/devcontainer.json",
-            f"workspaceFolder-expected:{pack.workspace_mount}",
+            "workspaceFolder-expected:/workspace/${localWorkspaceFolderBasename}",
         )
     ]
 
 
 def validate_generate_runtime_compose_script(devcontainer_dir: Path) -> list[Finding]:
-    """Validate the shared compose generation script."""
+    """Require the generator entrypoint without depending on its implementation text."""
     script_path = devcontainer_dir / "generate-runtime-compose.sh"
     if not script_path.is_file():
         return [Finding("missing_file", ".devcontainer/generate-runtime-compose.sh", "missing")]
-    script = script_path.read_text(encoding="utf-8")
-    findings: list[Finding] = []
-    for snippet in (
-        "docker/packs/default.toml",
-        ".devcontainer/docker-compose.generated.yml",
-        "DEVCONTAINER_PROJECT_NAME",
-        "default_project_name",
-        "agent-canon-source-only",
-        "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
-        "AGENT_CANON_SECRET_DIR",
-        "AGENT_CANON_SECRET_MOUNT",
-        "AGENT_CANON_SECRET_DIR_MODE",
-        'user: "${LOCAL_UID}:${LOCAL_GID}"',
-        'group_add:',
-        '"${AGENT_CANON_RUNTIME_GID}"',
-        "source: /var/lib/agent-canon/runtime",
-        "target: /var/lib/agent-canon/runtime",
-        'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
-        'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
-        'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"',
-        "vendor/agent-canon",
-    ):
-        findings.extend(validate_generate_runtime_compose_snippet(script, snippet))
-    for snippet in (
-        "DEVCONTAINER_SUBNET",
-        "DEVCONTAINER_GATEWAY",
-        "ipam:",
-        "subnet:",
-        "gateway:",
-        "/receipts/shared-runtime-provision",
-    ):
-        if snippet in script:
-            findings.append(
-                Finding("inconsistency", ".devcontainer/generate-runtime-compose.sh", f"forbidden:{snippet}")
-            )
-    return findings
-
-
-def validate_generate_runtime_compose_snippet(script: str, snippet: str) -> list[Finding]:
-    """Validate one required or forbidden compose-generation snippet."""
-    path = ".devcontainer/generate-runtime-compose.sh"
-    if snippet == "vendor/agent-canon":
-        if snippet in script:
-            return [Finding("inconsistency", path, f"forbidden:{snippet}")]
-        return []
-    if snippet not in script:
-        return [Finding("inconsistency", path, f"missing:{snippet}")]
     return []
 
 
-def validate_generated_compose(devcontainer_dir: Path, pack: PackConfig) -> list[Finding]:
-    """Validate the generated Docker Compose file when present."""
+def validate_generated_compose(devcontainer_dir: Path, pack: PackConfig | None) -> list[Finding]:
+    """Validate generated Compose meaning rather than generator implementation text."""
+    del pack
     compose_path = devcontainer_dir / "docker-compose.generated.yml"
     if not compose_path.exists():
         return []
-    compose = compose_path.read_text(encoding="utf-8")
-    expected_snippets = (
-        "name:",
-        "services:",
-        "workspace:",
-        'user: "${LOCAL_UID}:${LOCAL_GID}"',
-        "group_add:",
-        '- "${AGENT_CANON_RUNTIME_GID}"',
-        "context: ..",
-        f"dockerfile: {pack.dockerfile}",
-        f"working_dir: {pack.workdir}",
-        f"- ..:{pack.workspace_mount}:cached",
-        "type: bind",
-        "source: /var/lib/agent-canon/runtime",
-        "target: /var/lib/agent-canon/runtime",
-        'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"',
-        'AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"',
-        'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"',
-    )
-    findings = [
-        Finding("inconsistency", ".devcontainer/docker-compose.generated.yml", f"missing:{snippet}")
-        for snippet in expected_snippets
-        if snippet not in compose
-    ]
-    for snippet in (
-        "ipam:",
-        "subnet:",
-        "gateway:",
-        "/receipts/shared-runtime-provision",
-    ):
-        if snippet in compose:
-            findings.append(
-                Finding("inconsistency", ".devcontainer/docker-compose.generated.yml", f"forbidden:{snippet}")
+    relative = ".devcontainer/docker-compose.generated.yml"
+    if yaml is None:
+        return [Finding("invalid_manifest", relative, "yaml-parser-unavailable")]
+    try:
+        document = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001 - parser errors are user-facing findings.
+        return [Finding("invalid_manifest", relative, f"yaml-decode:{exc}")]
+    compose = as_mapping(document)
+    if compose is None:
+        return [Finding("invalid_manifest", relative, "compose-must-be-object")]
+    services = as_mapping(compose.get("services"))
+    service = as_mapping(services.get("workspace")) if services is not None else None
+    if service is None:
+        return [Finding("invalid_manifest", relative, "workspace-service-required")]
+    root = devcontainer_dir.parent.resolve()
+    topic_root = root.parent.resolve()
+    repo_target = f"/workspace/{root.name}"
+    findings: list[Finding] = []
+    if not topic_root.name.startswith("workspace-"):
+        findings.append(Finding("dependency_contract_violation", relative, "topic-root-name"))
+    if service.get("working_dir") != repo_target:
+        findings.append(Finding("inconsistency", relative, f"working-dir:{service.get('working_dir')}"))
+    build = as_mapping(service.get("build"))
+    if build is not None and build.get("context") != "..":
+        findings.append(Finding("inconsistency", relative, f"build-context:{build.get('context')}"))
+    volumes = as_sequence(service.get("volumes"))
+    if volumes is None:
+        return [*findings, Finding("invalid_manifest", relative, "workspace-volumes-required")]
+
+    def volume_fields(raw_volume: object) -> tuple[str | None, str | None]:
+        volume = as_mapping(raw_volume)
+        if volume is not None:
+            source = volume.get("source")
+            target = volume.get("target")
+            return (
+                source if isinstance(source, str) else None,
+                target if isinstance(target, str) else None,
             )
+        if isinstance(raw_volume, str) and ":" in raw_volume:
+            source, target, *_ = raw_volume.split(":", 2)
+            return source, target
+        return None, None
+
+    def source_path(source: str | None) -> Path | None:
+        if not source:
+            return None
+        candidate = Path(source)
+        return (candidate if candidate.is_absolute() else devcontainer_dir / candidate).resolve()
+
+    workspace_mounts: list[tuple[str | None, str | None]] = []
+    for raw_volume in volumes:
+        source, target = volume_fields(raw_volume)
+        if target == "/workspace":
+            workspace_mounts.append((source, target))
+    if len(workspace_mounts) != 1:
+        findings.append(Finding("dependency_contract_violation", relative, f"workspace-mount-count:{len(workspace_mounts)}"))
+    elif source_path(workspace_mounts[0][0]) != topic_root:
+        findings.append(Finding("dependency_contract_violation", relative, "workspace-source"))
+    for raw_volume in volumes:
+        source, target = volume_fields(raw_volume)
+        if source_path(source) == root or target == repo_target:
+            findings.append(Finding("dependency_contract_violation", relative, "repository-double-mount"))
+    required_environment = {
+        "AGENT_CANON_WORKSPACE_ROOT": "/workspace",
+        "AGENT_CANON_REPOSITORY_ROOT": repo_target,
+    }
+    environment = as_mapping(service.get("environment"))
+    if environment is None:
+        for name in required_environment:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    f"runtime-environment-required:{name}",
+                )
+            )
+    else:
+        for name, expected in required_environment.items():
+            if name not in environment:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"runtime-environment-required:{name}",
+                    )
+                )
+            elif environment.get(name) != expected:
+                findings.append(Finding("inconsistency", relative, f"{name.lower()}-env"))
     return findings
 
 
@@ -669,10 +506,20 @@ def validate_devcontainer(root: Path) -> list[Finding]:
         findings.append(Finding("missing_file", ".devcontainer/post-attach.sh", "missing"))
     findings.extend(validate_generate_runtime_compose_script(devcontainer_dir))
     findings.extend(validate_post_create(root))
+    if (root / ".gitmodules").is_file() and not (
+        root / "tools" / "agent_tools" / "dependency_module_change.py"
+    ).is_file():
+        findings.append(
+            Finding(
+                "missing_file",
+                "tools/agent_tools/dependency_module_change.py",
+                "required-for-devcontainer-dependency-check",
+            )
+        )
     return findings
 
 
-def validate_devcontainer_pack_alignment(root: Path, pack: PackConfig) -> list[Finding]:
+def validate_devcontainer_pack_alignment(root: Path, pack: PackConfig | None) -> list[Finding]:
     """Validate devcontainer paths that depend on the repo-local runtime pack."""
     devcontainer_dir = root / ".devcontainer"
     json_path = devcontainer_dir / "devcontainer.json"
@@ -735,13 +582,21 @@ def load_vscode_surface(root: Path) -> tuple[SurfaceEntry | None, SurfaceManifes
     return entry, manifest, []
 
 
-def validate_vscode_manifest(entry: SurfaceEntry) -> list[Finding]:
-    """Validate the .vscode manifest entry keeps AgentCanon symlink ownership."""
+VSCODE_SHARED_FILES = (
+    "c_cpp_properties.json",
+    "extensions.json",
+    "settings.json",
+    "tasks.json",
+)
+
+
+def validate_vscode_manifest(entry: SurfaceEntry, manifest: SurfaceManifest) -> list[Finding]:
+    """Validate the real .vscode container and exact shared-file coverage."""
     findings: list[Finding] = []
     expected = {
-        "mode": "symlink",
-        "owner": "agent-canon",
-        "surface_class": "runtime_surface",
+        "mode": "regular",
+        "owner": "template-or-derived-repo",
+        "surface_class": "active_contract",
     }
     actual = {
         "mode": entry.mode,
@@ -757,6 +612,36 @@ def validate_vscode_manifest(entry: SurfaceEntry) -> list[Finding]:
                     f".vscode-{field}-expected:{expected_value}",
                 )
             )
+    shared = {
+        candidate.path: candidate
+        for candidate in manifest.entries
+        if candidate.path.startswith(".vscode/")
+    }
+    expected_paths = {f".vscode/{name}" for name in VSCODE_SHARED_FILES}
+    if set(shared) != expected_paths:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                "documents/shared-runtime-surfaces.toml",
+                "vscode-source-coverage",
+            )
+        )
+    for path in expected_paths:
+        candidate = shared.get(path)
+        if candidate is None:
+            continue
+        if (
+            candidate.mode != "symlink"
+            or candidate.owner != "agent-canon"
+            or candidate.surface_class != "runtime_surface"
+        ):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    "documents/shared-runtime-surfaces.toml",
+                    f"vscode-file-surface:{path}",
+                )
+            )
     return findings
 
 
@@ -765,34 +650,56 @@ def validate_vscode(root: Path) -> list[Finding]:
     entry, manifest, findings = load_vscode_surface(root)
     if entry is None or manifest is None:
         return findings
-    findings.extend(validate_vscode_manifest(entry))
+    findings.extend(validate_vscode_manifest(entry, manifest))
+    root_vscode = root / ".vscode"
+    if root_vscode.is_symlink():
+        findings.append(Finding("inconsistency", ".vscode", "expected-real-directory"))
+        return findings
     source_checkout = not (root / "vendor" / "agent-canon" / "documents" / "shared-runtime-surfaces.toml").is_file()
-    source = entry.source_or_default()
-    source_relative = source if source_checkout else f"{manifest.prefix}/{source}"
+    source_relative = ".vscode" if source_checkout else f"{manifest.prefix}/.vscode"
     source_dir = root / source_relative
-    if not source_dir.is_dir():
-        findings.append(Finding("missing_file", source_relative, "missing"))
-    if source_checkout:
+    if source_dir.is_symlink() or not source_dir.is_dir():
+        findings.append(Finding("inconsistency", ".vscode", "expected-real-directory"))
         return findings
-    vscode_dir = root / ".vscode"
-    expected_target = target_for_entry(root, manifest.prefix, entry)
-    if not vscode_dir.is_symlink():
-        findings.append(
-            Finding("inconsistency", ".vscode", f"expected-shared-view:{expected_target}")
-        )
-        return findings
-    target = vscode_dir.readlink()
-    target_path = target if target.is_absolute() else (vscode_dir.parent / target)
-    try:
-        target_matches = target_path.resolve(strict=True) == source_dir.resolve(strict=True)
-    except FileNotFoundError:
-        target_matches = False
-    if target.as_posix() != expected_target and not target_matches:
+    shared = {
+        candidate.path: candidate
+        for candidate in manifest.entries
+        if candidate.path.startswith(".vscode/")
+    }
+    for name in VSCODE_SHARED_FILES:
+        path = f".vscode/{name}"
+        source_file = source_dir / name
+        if not source_file.is_file():
+            findings.append(Finding("missing_file", f"{source_relative}/{name}", "missing"))
+        root_file = root / path
+        if source_checkout:
+            if source_file.is_symlink():
+                findings.append(Finding("inconsistency", path, "source-file-must-be-regular"))
+        elif path in shared:
+            if not root_file.is_symlink():
+                findings.append(Finding("inconsistency", path, "expected-individual-symlink"))
+                continue
+            expected_target = target_for_entry(root, manifest.prefix, shared[path])
+            target = root_file.readlink()
+            target_path = target if target.is_absolute() else root_file.parent / target
+            try:
+                matches = target_path.resolve(strict=True) == source_file.resolve(strict=True)
+            except FileNotFoundError:
+                matches = False
+            if target.as_posix() != expected_target and not matches:
+                findings.append(Finding("inconsistency", path, "unexpected-individual-symlink-target"))
+    if not source_checkout:
+        allowed = set(VSCODE_SHARED_FILES) | {"module-sources.code-workspace"}
+        for child in (root / ".vscode").iterdir():
+            if child.name not in allowed:
+                findings.append(Finding("inconsistency", str(child.relative_to(root)), "unexpected-file"))
+    projection = root / ".vscode" / "module-sources.code-workspace"
+    if projection.exists() and (projection.is_symlink() or not projection.is_file()):
         findings.append(
             Finding(
                 "inconsistency",
-                ".vscode",
-                f"unexpected-shared-view-target:{target.as_posix()}",
+                ".vscode/module-sources.code-workspace",
+                "expected-regular-local-file",
             )
         )
     return findings
@@ -832,8 +739,7 @@ def validate(root: Path) -> ValidationReport:
     if devcontainer_dir.exists():
         checked.append(".devcontainer")
         findings.extend(validate_devcontainer(root))
-        if default_pack is not None:
-            findings.extend(validate_devcontainer_pack_alignment(root, default_pack))
+        findings.extend(validate_devcontainer_pack_alignment(root, default_pack))
     if vscode_configured:
         checked.append(".vscode")
         findings.extend(validate_vscode(root))

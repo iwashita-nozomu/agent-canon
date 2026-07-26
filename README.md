@@ -207,12 +207,13 @@ active. The activation and validation policy is
 ## 利用時のディレクトリ / リンク構成
 
 AgentCanon 単体 repo では、この tree 自体を source of truth として扱います。
-Template や派生 repo では `vendor/agent-canon/` を source of truth にし、repo
+Template や派生 repo では `vendor/agent-canon/` を clean pin/runtime projection
+として扱い、source edit は topic workspace の独立 cloneで行います。repo
 root の入口は symlink view または明示的な synced copy にします。Template /
 derived repo に露出する root view は次です。
 
 期待する parent root の top-level shape は次です。`vendor/agent-canon/` が
-AgentCanon source of truth で、root の共有入口は symlink view または GitHub
+clean AgentCanon pin projection で、root の共有入口は symlink view または GitHub
 path constraint のための checked copy に限定します。regular file / directory
 は parent repo が ownership を持つ project surface です。
 
@@ -244,7 +245,11 @@ path constraint のための checked copy に限定します。regular file / di
 │       ├── agent-canon-static-gates.yml
 │       ├── ci.yml
 │       └── docker-build.yml
-├── .vscode -> vendor/agent-canon/.vscode
+├── .vscode/
+│   ├── c_cpp_properties.json -> ../vendor/agent-canon/.vscode/c_cpp_properties.json
+│   ├── extensions.json -> ../vendor/agent-canon/.vscode/extensions.json
+│   ├── settings.json -> ../vendor/agent-canon/.vscode/settings.json
+│   └── tasks.json -> ../vendor/agent-canon/.vscode/tasks.json
 ├── agents -> vendor/agent-canon/agents
 ├── documents/
 │   └── <parent-owned active contracts>
@@ -253,7 +258,17 @@ path constraint のための checked copy に限定します。regular file / di
 ├── tools -> vendor/agent-canon/tools
 └── vendor/
     └── agent-canon/
+
+topic workspace source-edit shape:
+
+```text
+<workspace-parent>/workspace-<topic-slug>/
+├── <parent-repo>/
+└── <module-basename>/
 ```
+
+The devcontainer mounts this topic root once at `/workspace`; it does not expose
+clones from other topics or mount the parent and dependency clones separately.
 
 人間向けの構造確認は `tree` 表示を正本の見方にします。典型的な確認は次です。
 `parent_repo_readiness.py` は同じ ignore pattern と depth を表示し、`tree`
@@ -264,14 +279,14 @@ tree -a -L <depth> -I '.git|__pycache__|.venv|node_modules|target|reports' <pare
 python3 tools/agent_tools/parent_repo_readiness.py --root <parent-root> --tree-depth <depth>
 ```
 
-- `vendor/agent-canon/`: AgentCanon submodule pin。shared workflow、skills、tools、docs の正本。
+- `vendor/agent-canon/`: AgentCanon submodule pin/runtime projection。source edit は topic workspace の独立 cloneで行い、ここは clean projection に保ちます。
 - `AGENTS.md -> vendor/agent-canon/ROOT_AGENTS.md`: Codex 向けの薄い root entrypoint。
 - `agents -> vendor/agent-canon/agents`: workflow、canonical docs、task catalog の root view。
 - `.agents -> vendor/agent-canon/.agents`: Codex skill discovery 用の root view。
 - `.codex/config.toml -> vendor/agent-canon/.codex/config.toml`: Codex runtime config の共有 view。
 - `.codex/agents -> vendor/agent-canon/.codex/agents`: Codex subagent role TOML の共有 view。
 - `.devcontainer -> vendor/agent-canon/.devcontainer`: devcontainer profile の共有 view。
-- `.vscode -> vendor/agent-canon/.vscode`: VS Code workspace defaults と validation tasks の共有 view。
+- `.vscode/`: parent-owned real directory with four individual AgentCanon symlink surfaces; `module-sources.code-workspace` is local generated projection。
 - `tools -> vendor/agent-canon/tools`: shared automation の共有 view。
 - `documents/*`: template / derived repo root では active contract だけを regular file として残し、AgentCanon-owned shared policy docs は `vendor/agent-canon/documents/` から読みます。
 - `memory/*`、`notes/*`、`tests/*`: `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。
@@ -347,12 +362,13 @@ bash tools/sync_agent_canon.sh check
 
 ## upstream sync
 
-template 側で shared canon を直した変更を upstream `agent-canon` repo に戻すときは次を使います。
+template 側で shared canon sourceを直すときは、topic workspace source cloneを使います。
 
 ```bash
-AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/update_agent_canon.sh merge-main-into-current
-git -C vendor/agent-canon push origin HEAD
+python3 tools/agent_tools/dependency_module_change.py --root <parent-repo> prepare \
+  --topic <topic> --module vendor/agent-canon --branch <source-branch> \
+  --owner-evidence <owner-evidence>
+git -C <CONTINUE_PATH> push origin HEAD
 ```
 
 update / branch / PR の詳細は `agents/workflows/agent-canon-pr-workflow.md` を見ます。
