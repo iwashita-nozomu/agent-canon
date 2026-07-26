@@ -46,6 +46,9 @@ from update_lifecycle_contract import (
 MAX_ERROR_CHARS = 4000
 REMOTE_SCP_RE = re.compile(r"^[^@]+@[^:]+:(?P<slug>[^/]+/[^/]+?)(?:\.git)?/?$")
 GITHUB_PUBLICATION_PACKET_SCHEMA = "agent-canon.github-publication-packet.v1"
+ACTIVE_PACKET_MATERIALIZATION_SCHEMA = (
+    "waterfall.active_design_packet_materialization.v1"
+)
 
 
 @dataclass(frozen=True)
@@ -1328,6 +1331,7 @@ def materialize_github_publication_packet(
     candidate_cas_receipt: Mapping[str, object],
     source_main_rebind_receipt: Mapping[str, object],
     upstream_gate_verdicts: Sequence[Mapping[str, object]],
+    predecessor_graph_materialization: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Materialize the sole machine packet consumed by GitHub mutations."""
     checked_lifecycle = validate_pull_request_lifecycle(lifecycle)
@@ -1344,7 +1348,7 @@ def materialize_github_publication_packet(
     gate = materialize_pr_identity_gate(
         checked_lifecycle, checked_cas, checked_rebind, upstream
     )
-    return {
+    packet = {
         "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
         "pull_request_lifecycle": checked_lifecycle,
         "candidate_cas_receipt": checked_cas,
@@ -1352,18 +1356,93 @@ def materialize_github_publication_packet(
         "upstream_gate_verdicts": list(upstream),
         "g3_gate": gate,
     }
+    if predecessor_graph_materialization is not None:
+        packet["predecessor_graph_materialization"] = (
+            validate_predecessor_graph_materialization(
+                predecessor_graph_materialization,
+                expected_source_oid=str(checked_rebind["new_base_identity"]["commit_sha"]),
+            )
+        )
+    return packet
+
+
+def validate_predecessor_graph_materialization(
+    value: Mapping[str, object],
+    *,
+    expected_source_oid: str | None = None,
+) -> dict[str, object]:
+    """Validate one graph/active-packet predecessor identity carried by G3."""
+    required = {
+        "schema",
+        "packet_sha256",
+        "predecessor_source_oid",
+        "source_results",
+        "dependency_results",
+    }
+    if set(value) != required:
+        raise UserVisibleFailure(
+            message="predecessor graph materialization fields are invalid",
+            next_action="materialize_the_closed_active_packet_predecessor_projection",
+        )
+    if value.get("schema") != ACTIVE_PACKET_MATERIALIZATION_SCHEMA:
+        raise UserVisibleFailure(
+            message="predecessor graph materialization schema is invalid",
+            next_action="materialize_the_closed_active_packet_predecessor_projection",
+        )
+    packet_sha = value.get("packet_sha256")
+    predecessor_oid = value.get("predecessor_source_oid")
+    if not isinstance(packet_sha, str) or re.fullmatch(r"[0-9a-f]{64}", packet_sha) is None:
+        raise UserVisibleFailure(
+            message="predecessor graph packet identity is invalid",
+            next_action="materialize_the_closed_active_packet_predecessor_projection",
+        )
+    if not isinstance(predecessor_oid, str) or re.fullmatch(r"[0-9a-f]{40}", predecessor_oid) is None:
+        raise UserVisibleFailure(
+            message="predecessor graph source identity is invalid",
+            next_action="materialize_the_closed_active_packet_predecessor_projection",
+        )
+    if expected_source_oid is not None and predecessor_oid != expected_source_oid:
+        raise UserVisibleFailure(
+            message="predecessor graph source identity does not match the CAS base",
+            next_action="materialize_a_successor_for_the_changed_predecessor_identity",
+        )
+    for field in ("source_results", "dependency_results"):
+        entries = value.get(field)
+        if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)) or not entries:
+            raise UserVisibleFailure(
+                message=f"predecessor graph {field} are invalid",
+                next_action="materialize_the_closed_active_packet_predecessor_projection",
+            )
+        seen: set[str] = set()
+        for item in entries:
+            if not isinstance(item, Mapping) or not isinstance(item.get("declared_ref"), str):
+                raise UserVisibleFailure(
+                    message=f"predecessor graph {field} item is invalid",
+                    next_action="materialize_the_closed_active_packet_predecessor_projection",
+                )
+            declared_ref = str(item["declared_ref"])
+            if declared_ref in seen:
+                raise UserVisibleFailure(
+                    message=f"predecessor graph {field} has duplicate references",
+                    next_action="materialize_the_closed_active_packet_predecessor_projection",
+                )
+            seen.add(declared_ref)
+    return dict(value)
 
 
 def validate_github_publication_packet(value: object) -> dict[str, object]:
     """Validate one immutable publication packet without rebuilding evidence."""
-    if not isinstance(value, Mapping) or set(value) != {
+    allowed_fields = {
         "schema",
         "pull_request_lifecycle",
         "candidate_cas_receipt",
         "source_main_rebind_receipt",
         "upstream_gate_verdicts",
         "g3_gate",
-    }:
+    }
+    if not isinstance(value, Mapping) or set(value).difference(
+        allowed_fields | {"predecessor_graph_materialization"}
+    ) or not allowed_fields.issubset(set(value)):
         raise UserVisibleFailure(
             message="GitHub publication packet fields are invalid",
             next_action="materialize_the_canonical_github_publication_packet",
@@ -1388,15 +1467,16 @@ def validate_github_publication_packet(value: object) -> dict[str, object]:
         cast(Sequence[Mapping[str, object]], upstream_value),
         cast(Mapping[str, object], value["g3_gate"]),
     )
-    return {
+    checked_rebind = validate_source_main_rebind_receipt(
+        value["source_main_rebind_receipt"]
+    )
+    result = {
         "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
         "pull_request_lifecycle": lifecycle,
         "candidate_cas_receipt": validate_candidate_cas_receipt(
             value["candidate_cas_receipt"]
         ),
-        "source_main_rebind_receipt": validate_source_main_rebind_receipt(
-            value["source_main_rebind_receipt"]
-        ),
+        "source_main_rebind_receipt": checked_rebind,
         "upstream_gate_verdicts": list(
             validate_gate_chain(
                 list(upstream_value),
@@ -1406,6 +1486,18 @@ def validate_github_publication_packet(value: object) -> dict[str, object]:
         ),
         "g3_gate": gate,
     }
+    if "predecessor_graph_materialization" in value:
+        result["predecessor_graph_materialization"] = (
+            validate_predecessor_graph_materialization(
+                cast(Mapping[str, object], value["predecessor_graph_materialization"]),
+                expected_source_oid=str(
+                    cast(Mapping[str, object], checked_rebind["new_base_identity"])[
+                        "commit_sha"
+                    ]
+                ),
+            )
+        )
+    return result
 
 
 def base_summary(args: argparse.Namespace, verification: RemoteVerification, branch: str) -> dict[str, object]:

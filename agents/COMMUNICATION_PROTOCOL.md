@@ -203,23 +203,32 @@ returns the task to its owning route.
 ## Active Design Packet Schema
 
 This document owns the artifact-level schema named
-`waterfall.design_packet.v1`. The record is closed and contains exactly these
-fields:
+`waterfall.design_packet.v1`. The record is closed and contains the five
+runtime selection fields plus one clause registry and four typed graph entries:
 
 - `schema`
 - `design_artifact`
 - `design_review_artifact`
 - `document_flow_review_artifact`
 - `document_flow_required`
+- `clause_registry`
+- `abstract_design_frame`
+- `implementation_source_packet`
+- `design_side_effect_map`
+- `design_to_implementation_trace`
 
 `schema` must equal `waterfall.design_packet.v1`. The three artifact fields are
 non-empty relative paths that remain inside one run bundle and do not traverse
 symlinks. `document_flow_required` is a boolean. Missing, unknown, mistyped, or
 outside-bundle fields fail closed with the input boundary's typed field prefix.
 
+Each graph entry is closed to `entry_id`, `responsibility_id`, `clause_refs`,
+`owner_refs`, `source_refs`, `dependency_refs`, `output_refs`, and
+`reviewer_refs`; entry dependencies are validated as a fixed acyclic order.
 `agents/agents_config.json#artifacts.active_design_packet` owns the standard
 record. `agent_team.py` owns the executable schema constants, normalization,
-precedence, and materialization used by task-start and bootstrap. An explicit
+precedence, graph materialization, and source-byte identity used by task-start
+and bootstrap. An explicit
 `--active-design-packet` record overrides a workflow-family record, which
 overrides the standard registry record. The selected record is persisted at
 `team_manifest.yaml#run.active_design_packet`; after publication, that manifest

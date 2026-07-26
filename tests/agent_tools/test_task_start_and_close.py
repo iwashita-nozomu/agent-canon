@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from copy import deepcopy
 from pathlib import Path
 from typing import cast
 from unittest.mock import patch
@@ -52,20 +53,42 @@ TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 WORKTREE_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "worktree_start.py"
 SETUP_WORKTREE_SCRIPT = PROJECT_ROOT / "tools" / "setup_worktree.sh"
-GRAPH_ACTIVE_DESIGN_PACKET: dict[str, object] = {
-    "schema": "waterfall.design_packet.v1",
-    "design_artifact": "graph_design_brief.md",
-    "design_review_artifact": "graph_design_review.md",
-    "document_flow_review_artifact": "graph_document_flow_review.md",
-    "document_flow_required": True,
-}
-U2_ACTIVE_DESIGN_PACKET = {
-    "schema": "waterfall.design_packet.v1",
-    "design_artifact": "u2_design_brief.md",
-    "design_review_artifact": "u2_design_review.md",
-    "document_flow_review_artifact": "u2_document_flow_review.md",
-    "document_flow_required": True,
-}
+def selected_active_design_packet(prefix: str) -> dict[str, object]:
+    """Build a current closed packet while rebinding every selected output."""
+    config = load_team_config()
+    packet = deepcopy(
+        agent_team.active_design_packet_mapping(
+            agent_team.resolve_active_design_packet_config(config)
+        )
+    )
+    selected = {
+        "design_artifact": f"{prefix}_design_brief.md",
+        "design_review_artifact": f"{prefix}_design_review.md",
+        "document_flow_review_artifact": f"{prefix}_document_flow_review.md",
+    }
+    packet.update(selected)
+    default_to_selected = {
+        "artifact:design_brief.md": f"artifact:{selected['design_artifact']}",
+        "artifact:design_review.md": f"artifact:{selected['design_review_artifact']}",
+        "artifact:document_flow_review.md": f"artifact:{selected['document_flow_review_artifact']}",
+    }
+    for entry_name in (
+        "abstract_design_frame",
+        "implementation_source_packet",
+        "design_side_effect_map",
+        "design_to_implementation_trace",
+    ):
+        entry = packet[entry_name]
+        assert isinstance(entry, dict)
+        entry["output_refs"] = [
+            default_to_selected.get(reference, reference)
+            for reference in entry["output_refs"]
+        ]
+    return packet
+
+
+GRAPH_ACTIVE_DESIGN_PACKET = selected_active_design_packet("graph")
+U2_ACTIVE_DESIGN_PACKET = selected_active_design_packet("u2")
 
 
 def update_lifecycle_closeout_fixture() -> dict[str, object]:
@@ -1137,6 +1160,30 @@ class TaskStartAndCloseTest(unittest.TestCase):
         manifest = cast("dict[str, object]", manifest_value)
         run = cast("dict[str, object]", manifest["run"])
         self.assertEqual(run["active_design_packet"], GRAPH_ACTIVE_DESIGN_PACKET)
+        projection = cast(
+            "dict[str, object]",
+            run["active_design_packet_reference_projection"],
+        )
+        self.assertEqual(
+            projection["schema"],
+            "waterfall.active_design_packet_materialization.v1",
+        )
+        self.assertEqual(len(cast("list[object]", projection["clause_results"])), 4)
+        self.assertTrue(cast("list[object]", projection["source_results"]))
+        self.assertTrue(cast("list[object]", projection["dependency_results"]))
+        output_results = cast("list[object]", projection["output_results"])
+        output_refs = {
+            str(cast("dict[str, object]", result)["output_ref"])
+            for result in output_results
+            if isinstance(result, dict)
+        }
+        self.assertTrue(
+            {
+                "artifact:graph_design_brief.md",
+                "artifact:graph_design_review.md",
+                "artifact:graph_document_flow_review.md",
+            }.issubset(output_refs)
+        )
         pre_handoff_status = cast(
             "dict[str, object]",
             run["pre_handoff_gate_status"],
@@ -1152,14 +1199,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             "design_review.md",
             "document_flow_review.md",
         ):
-            stale_reference = re.search(
-                rf"(?m)(?<![A-Za-z0-9_]){re.escape(unselected_basename)}"
-                r"(?=$|[^A-Za-z0-9])",
-                manifest_text,
-            )
-            self.assertIsNone(
-                stale_reference,
-                f"unselected packet basename remains: {unselected_basename}",
+            self.assertNotIn(
+                f"artifact:{unselected_basename}",
+                output_refs,
+                f"unselected packet output remains: {unselected_basename}",
             )
         artifact_inventory = cast("list[object]", manifest["artifacts"])
         for path in selected_paths:
@@ -1246,13 +1289,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             root = Path(tmp_dir)
             for script in (BOOTSTRAP_SCRIPT, TASK_START_SCRIPT):
                 report_root = root / f"reports-{script.stem}"
-                run_id = f"u2-{script.stem}"
+                run_id = f"graph-{script.stem}"
                 result = subprocess.run(
                     [
                         sys.executable,
                         str(script),
                         "--task",
-                        "typed active packet smoke",
+                        "graph active packet smoke",
                         "--owner",
                         "codex",
                         "--run-id",
@@ -1262,7 +1305,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "--report-root",
                         str(report_root),
                         "--active-design-packet",
-                        json.dumps(U2_ACTIVE_DESIGN_PACKET, separators=(",", ":")),
+                        json.dumps(GRAPH_ACTIVE_DESIGN_PACKET, separators=(",", ":")),
                         "--skip-agent-canon-preflight",
                     ],
                     cwd=PROJECT_ROOT,
@@ -1277,16 +1320,17 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 )
                 self.assertEqual(
                     manifest["run"]["active_design_packet"],
-                    U2_ACTIVE_DESIGN_PACKET,
+                    GRAPH_ACTIVE_DESIGN_PACKET,
                 )
-                for artifact in U2_ACTIVE_DESIGN_PACKET.values():
+                for artifact in GRAPH_ACTIVE_DESIGN_PACKET.values():
                     if isinstance(artifact, str) and artifact.endswith(".md"):
                         self.assertTrue((report_dir / artifact).is_file(), artifact)
                         self.assertIn(artifact, result.stdout)
                 self.assertIn(
-                    "run.active_design_packet.design_artifact=u2_design_brief.md;",
+                    "run.active_design_packet.design_artifact=graph_design_brief.md;",
                     (report_dir / "team_manifest.yaml").read_text(encoding="utf-8"),
                 )
+                self.assert_graph_active_packet_bundle(report_dir, result.stdout)
 
     def test_entrypoints_reject_invalid_active_design_packet_before_bundle_creation(
         self,

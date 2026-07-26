@@ -78,8 +78,6 @@ rather than local implementation judgment.
 
 <!-- Packet entry: entry_id=implementation-source-packet. Preserve the exact active-packet references and dependency on entry:abstract-design-frame. -->
 
-<!-- Packet entry: entry_id=implementation-source-packet. Preserve the exact active-packet references and dependency on entry:abstract-design-frame. -->
-
 ## Design Side-Effect Map
 
 <!-- For each major design decision, list downstream implementation, document, workflow, prompt/config, validation, dependency-manifest, and user-facing surfaces it affects. Connect each item to the Abstract Design Frame responsibility, request clause ID, reuse precedent, owner stage, review gate, and validation or test-plan item. -->
@@ -110,7 +108,6 @@ rather than local implementation judgment.
 
 <!-- For each planned edit, map design section, user-request clause ID, source/reuse document or code path, test-plan item, and expected validation evidence. The worker must cite this mapping before editing. -->
 
-<!-- Packet entry: entry_id=design-to-implementation-trace. Preserve dependencies on the other three entries and map every source, generated, and deletion record to one integrated responsibility unit. -->
 <!-- Packet entry: entry_id=design-to-implementation-trace. Preserve dependencies on the other three entries and map every source, generated, and deletion record to one integrated responsibility unit. -->
 
 ## Identifier And Naming Plan

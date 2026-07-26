@@ -15,9 +15,25 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
+import yaml
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+
+import agent_team  # noqa: E402
+from agent_team import (  # noqa: E402
+    ACTIVE_DESIGN_PACKET_SCHEMA,
+    RunBundleSpec,
+    active_design_packet_mapping,
+    active_design_packet_reference_projection,
+    load_team_config,
+    normalize_active_design_packet_config,
+    resolve_active_design_packet_config,
+)
 
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 GATE_CHECK_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "waterfall_gate_check.py"
@@ -38,17 +54,89 @@ def write_active_packet_manifest(
     schema: str = "waterfall.design_packet.v1",
 ) -> None:
     """Write the sole explicit active-design-packet route for a fixture."""
-    write_markdown(
-        report_dir / "team_manifest.yaml",
-        [
-            "run:",
-            "  active_design_packet:",
-            f"    schema: {schema}",
-            f"    design_artifact: {design_artifact}",
-            f"    design_review_artifact: {design_review_artifact}",
-            f"    document_flow_review_artifact: {document_flow_review_artifact}",
-            f"    document_flow_required: {str(document_flow_required).lower()}",
-        ],
+    report_dir.mkdir(parents=True, exist_ok=True)
+    config = load_team_config()
+    packet = deepcopy(
+        active_design_packet_mapping(resolve_active_design_packet_config(config))
+    )
+    packet.update(
+        {
+            "schema": schema,
+            "design_artifact": design_artifact,
+            "design_review_artifact": design_review_artifact,
+            "document_flow_review_artifact": document_flow_review_artifact,
+            "document_flow_required": document_flow_required,
+        }
+    )
+    default_to_selected = {
+        "artifact:design_brief.md": f"artifact:{design_artifact}",
+        "artifact:design_review.md": f"artifact:{design_review_artifact}",
+        "artifact:document_flow_review.md": f"artifact:{document_flow_review_artifact}",
+    }
+    for entry_name in (
+        "abstract_design_frame",
+        "implementation_source_packet",
+        "design_side_effect_map",
+        "design_to_implementation_trace",
+    ):
+        entry = packet[entry_name]
+        assert isinstance(entry, dict)
+        entry["output_refs"] = [
+            default_to_selected.get(reference, reference)
+            for reference in entry["output_refs"]
+        ]
+    packet_for_projection = deepcopy(packet)
+    packet_for_projection["schema"] = ACTIVE_DESIGN_PACKET_SCHEMA
+    normalized_packet = normalize_active_design_packet_config(
+        packet_for_projection,
+        "active_design_packet",
+    )
+    spec = RunBundleSpec(
+        config=config,
+        report_dir=report_dir,
+        run_id="waterfall-fixture",
+        task="waterfall fixture",
+        owner="test",
+        created_at_iso="2026-07-26T00:00:00Z",
+        roles=(),
+        workspace_root=PROJECT_ROOT,
+        active_design_packet=normalized_packet,
+    )
+    projection = active_design_packet_reference_projection(
+        spec,
+        normalized_packet,
+        (design_artifact, design_review_artifact, document_flow_review_artifact),
+    )
+    manifest = {
+        "run": {
+            "active_design_packet": packet,
+            "active_design_packet_reference_projection": projection,
+        }
+    }
+    (report_dir / "team_manifest.yaml").write_text(
+        yaml.safe_dump(manifest, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+def rewrite_active_packet_field(
+    report_dir: Path,
+    field: str,
+    value: object,
+    *,
+    remove: bool = False,
+) -> None:
+    """Rewrite one manifest field while retaining the closed packet fixture."""
+    manifest_path = report_dir / "team_manifest.yaml"
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    packet = manifest["run"]["active_design_packet"]
+    if remove:
+        packet.pop(field, None)
+    else:
+        packet[field] = value
+    manifest_path.write_text(
+        yaml.safe_dump(manifest, sort_keys=False),
+        encoding="utf-8",
     )
 
 
@@ -74,6 +162,7 @@ def write_document_flow_review(
     report_dir: Path,
     review_target_sha256: str | None = None,
     design_artifact_path: str = "design_brief.md",
+    review_artifact: str = "document_flow_review.md",
 ) -> None:
     """Write an approving document flow review fixture."""
     write_markdown(
@@ -354,12 +443,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
             report_dir.mkdir(parents=True, exist_ok=True)
             write_approved_design_bundle(report_dir, design_brief_lines())
             write_active_packet_manifest(report_dir)
-            manifest_path = report_dir / "team_manifest.yaml"
-            manifest_path.write_text(
-                manifest_path.read_text(encoding="utf-8")
-                + "    unexpected_contract: true\n",
-                encoding="utf-8",
-            )
+            rewrite_active_packet_field(report_dir, "unexpected_contract", True)
 
             result = run_gate(report_dir, "design")
 
@@ -381,7 +465,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "team_manifest.yaml:active_design_packet_path_outside_bundle:design_artifact",
+                "team_manifest.yaml:active_design_packet_field_invalid:design_artifact",
                 result.stdout,
             )
 
@@ -1302,7 +1386,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "team_manifest.yaml:active_design_packet_path_outside_bundle:design_artifact",
+                "team_manifest.yaml:active_design_packet_field_invalid:design_artifact",
                 result.stdout,
             )
 
@@ -1324,7 +1408,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "design-link.md:missing",
+                "team_manifest.yaml:active_design_packet_field_invalid:design_artifact",
                 result.stdout,
             )
 
@@ -1350,7 +1434,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "packet-link/design.md:missing",
+                "team_manifest.yaml:active_design_packet_field_invalid:design_artifact",
                 result.stdout,
             )
 
@@ -1384,7 +1468,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "graph_document_flow_review.md:design_artifact_path_missing",
+                "team_manifest.yaml:active_design_packet_field_invalid:document_flow_review_artifact",
                 result.stdout,
             )
 

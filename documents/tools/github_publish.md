@@ -27,7 +27,11 @@ sends that commit with
 and unchanged local branch/HEAD/tree. It does not generate or claim G1/G2/G3 or
 PR lifecycle evidence; summaries use `publication_boundary=branch_transport_only`.
 If a sealed packet is supplied, its candidate identity is additionally checked
-and the summary retains the sealed publication evidence. Any identity mismatch
+and the summary retains the sealed publication evidence. A sealed packet may
+also carry `predecessor_graph_materialization`; when present, the publisher
+requires the closed materialization schema, packet SHA, predecessor source OID,
+unique source/dependency reference rows, and CAS-base OID equality before push.
+Any identity mismatch
 is a typed `UserVisibleFailure`; there is no push API, alternate remote, or
 checkout fallback.
 
@@ -103,7 +107,9 @@ cleanup, and `6` is set inconsistency. Error records expose `code`, `phase`,
 `unit_id`, `path`, `field`, `expected`, `observed`, `command`, `returncode`, and
 `retryable`; no compatibility flags, alternate serializer, partial result, or
 manual record path exists.
-CI fresh-clone fixtures validate clone/bootstrap or update behavior only. They
+The source-branch predecessor graph/materialization record is therefore checked
+before the main publication transport/CAS boundary, while remote readback still
+proves the exact pushed branch SHA. CI fresh-clone fixtures validate clone/bootstrap or update behavior only. They
 are not ordinary publication evidence; publication evidence comes from the
 sealed lifecycle identity, the exact SHA ref push, and the remote readback.
 `publish-pr`, PR mutation, and merge remain packet/G1/G2/G3-bound operations;
