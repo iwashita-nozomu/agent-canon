@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Validates Dockerfile, runtime pack, devcontainer, and VS Code workspace configuration.
+# responsibility Validates Dockerfile, runtime pack, devcontainer, and shared VS Code surface configuration.
 # upstream design ../../documents/coding-conventions-project.md environment configuration policy
 # upstream design ../../documents/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
 # upstream design ../../documents/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
@@ -17,7 +17,7 @@
 # downstream implementation ./run_all_checks.sh runs container configuration validation
 # downstream implementation ../../tests/tools/test_container_config.py tests validator
 # @dependency-end
-"""Validate Dockerfile, runtime pack, devcontainer, and VS Code workspace configuration."""
+"""Validate Dockerfile, runtime pack, devcontainer, and shared VS Code surfaces."""
 
 from __future__ import annotations
 
@@ -646,7 +646,7 @@ def validate_vscode_manifest(entry: SurfaceEntry, manifest: SurfaceManifest) -> 
 
 
 def validate_vscode(root: Path) -> list[Finding]:
-    """Validate shared VS Code workspace surface ownership."""
+    """Validate shared VS Code surface ownership."""
     entry, manifest, findings = load_vscode_surface(root)
     if entry is None or manifest is None:
         return findings
@@ -689,19 +689,10 @@ def validate_vscode(root: Path) -> list[Finding]:
             if target.as_posix() != expected_target and not matches:
                 findings.append(Finding("inconsistency", path, "unexpected-individual-symlink-target"))
     if not source_checkout:
-        allowed = set(VSCODE_SHARED_FILES) | {"module-sources.code-workspace"}
+        allowed = set(VSCODE_SHARED_FILES)
         for child in (root / ".vscode").iterdir():
             if child.name not in allowed:
                 findings.append(Finding("inconsistency", str(child.relative_to(root)), "unexpected-file"))
-    projection = root / ".vscode" / "module-sources.code-workspace"
-    if projection.exists() and (projection.is_symlink() or not projection.is_file()):
-        findings.append(
-            Finding(
-                "inconsistency",
-                ".vscode/module-sources.code-workspace",
-                "expected-regular-local-file",
-            )
-        )
     return findings
 
 def validate(root: Path) -> ValidationReport:

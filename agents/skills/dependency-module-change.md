@@ -13,8 +13,8 @@ downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.
 
 ## 目的
 
-依存 module の source 変更、topic workspace branch clone、親ローカル workspace
-projection、remote 再構成可能性に基づく cleanup を同じ責務境界で扱います。
+依存 module の source 変更、topic branch clone、remote 再構成可能性に基づく
+cleanup を同じ責務境界で扱います。
 
 ## 使う route
 
@@ -22,9 +22,12 @@ projection、remote 再構成可能性に基づく cleanup を同じ責務境界
 
 `prepare --topic <topic> --module <path> --branch <task-branch>
 --owner-evidence <file> [--parent-branch <pin-branch>]` は owner evidence がある source-edit のときだけ使い、pin-only・
-update-only・read-only では clone を作りません。workspace は親と URL 一致
-した実在 clone だけを投影し、cleanup は dry-run を経て remote に全 state が
-ある場合だけ apply します。
+update-only・read-only では clone を作りません。返された `PARENT_ROOT`、
+`SOURCE_CLONE`、`CONTINUE_PATH` は VS Code の標準 multi-root 操作（`Add Folder
+to Workspace` または `code --add <parent-clone> <dependency-clone>`）に渡します。
+必要なら利用者が標準の `Save Workspace As...` を使えますが、保存場所と JSON は
+AgentCanon の契約外です。cleanup は dry-run を経て remote に全 state がある場合
+だけ apply します。
 
 AgentCanon update はこの一般 route の具体例です。parent mode の vendor
 checkout を source branch として保存・継続・fallback する経路は使わず、

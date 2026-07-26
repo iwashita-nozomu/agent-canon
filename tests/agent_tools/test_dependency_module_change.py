@@ -1,24 +1,20 @@
-"""Tests for topic workspace dependency source lifecycle semantics."""
+"""Tests for topic dependency source clone lifecycle semantics."""
 
 # @dependency-start
 # contract test
-# responsibility Verifies topic naming, clone membership, common workspace projection, and cleanup gates.
-# upstream design ../../documents/rule/dependency-module-changes.md topic workspace policy
+# responsibility Verifies topic naming, clone membership, clone handback, and cleanup gates.
+# upstream design ../../documents/rule/dependency-module-changes.md topic-root policy
 # upstream implementation ../../tools/agent_tools/dependency_module_change.py lifecycle tool
 # downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this test header
 # @dependency-end
 
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-
-import pytest
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "dependency_module_change.py"
@@ -60,7 +56,6 @@ def create_parent(
     *,
     paths: tuple[str, ...] = ("vendor/dep",),
     manifest_branch: str | None = "main",
-    legacy_vscode_symlink: bool = False,
 ) -> Path:
     parent_source = tmp_path / "parent-source"
     parent_remote = tmp_path / "parent.git"
@@ -74,17 +69,7 @@ def create_parent(
         lines.append("")
     (parent_source / ".gitmodules").write_text("\n".join(lines), encoding="utf-8")
     (parent_source / "owner-evidence.md").write_text("source edit required\n", encoding="utf-8")
-    if legacy_vscode_symlink:
-        (parent_source / "vendor/agent-canon/.vscode").mkdir(parents=True)
-        (parent_source / "vendor/agent-canon/.vscode/settings.json").write_text(
-            "pin projection\n", encoding="utf-8"
-        )
-        (parent_source / ".vscode").symlink_to(
-            "vendor/agent-canon/.vscode", target_is_directory=True
-        )
     paths_to_stage = [".gitmodules", "owner-evidence.md"]
-    if legacy_vscode_symlink:
-        paths_to_stage.extend([".vscode", "vendor/agent-canon/.vscode"])
     run_git(parent_source, "add", *paths_to_stage)
     subprocess.run(
         [
@@ -162,10 +147,6 @@ def module_clone(parent: Path) -> Path:
     return topic_root(parent) / "dep"
 
 
-def other_module_clone(parent: Path) -> Path:
-    return topic_root(parent) / "other"
-
-
 def test_prepare_creates_topic_parent_and_reuses_matching_branch_clone(tmp_path: Path) -> None:
     remote = create_remote(tmp_path)
     parent = create_parent(tmp_path, remote)
@@ -175,18 +156,20 @@ def test_prepare_creates_topic_parent_and_reuses_matching_branch_clone(tmp_path:
 
     prepared = prepare(parent)
     assert prepared.returncode == 0, prepared.stderr
-    assert "ACTION=clone" in prepared.stdout
     assert topic_parent(parent).is_dir()
     clone = module_clone(parent)
     assert clone.is_dir()
     assert run_git(clone, "symbolic-ref", "--short", "HEAD") == "feature/foo"
     assert run_git(clone, "rev-parse", "--abbrev-ref", "@{upstream}") == "origin/feature/foo"
     assert run_git(clone, "config", "--local", "--get", "agent-canon.topic.module") == "vendor/dep"
-    assert "/workspace-dependency-module-change/dep" in prepared.stdout
+    assert f"PARENT_ROOT={topic_parent(parent)}" in prepared.stdout
+    assert f"SOURCE_CLONE={clone}" in prepared.stdout
+    assert f"CONTINUE_PATH={clone}" in prepared.stdout
+    assert len(prepared.stdout.splitlines()) == 3
 
     reused = prepare(topic_parent(parent))
     assert reused.returncode == 0, reused.stderr
-    assert "ACTION=reuse" in reused.stdout
+    assert reused.stdout == prepared.stdout
 
 
 def test_prepare_creates_task_branch_from_manifest_or_remote_head(tmp_path: Path) -> None:
@@ -218,19 +201,6 @@ def test_prepare_can_create_and_reuse_parent_pin_branch(tmp_path: Path) -> None:
     assert run_git(topic_parent(parent), "config", "--local", "--get", "agent-canon.topic.branch") == "pin/topic"
 
 
-def test_prepare_blocks_legacy_vscode_directory_symlink_without_writing_target(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote, legacy_vscode_symlink=True)
-    target = topic_parent(parent) / "vendor/agent-canon/.vscode/settings.json"
-
-    result = prepare(parent)
-
-    assert result.returncode == 2
-    assert "AgentCanon pin/root-view migration is required" in result.stderr
-    assert not module_clone(parent).exists()
-    assert target.read_text(encoding="utf-8") == "pin projection\n"
-
-
 def test_same_topic_branch_change_is_refused(tmp_path: Path) -> None:
     remote = create_remote(tmp_path)
     parent = create_parent(tmp_path, remote)
@@ -246,41 +216,6 @@ def test_basename_collision_is_refused(tmp_path: Path) -> None:
     result = invoke(parent, "prepare", "--topic", TOPIC, "--module", "one/dep", "--branch", "feature/foo", "--owner-evidence", "owner-evidence.md")
     assert result.returncode == 2
     assert "basename collision" in result.stderr
-
-
-def test_workspace_uses_common_relative_paths_and_removes_stale_projection(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    assert prepare(parent).returncode == 0
-    generated = invoke(topic_parent(parent), "workspace", "--topic", TOPIC)
-    assert generated.returncode == 0, generated.stderr
-    workspace = topic_parent(parent) / ".vscode" / "module-sources.code-workspace"
-    payload = json.loads(workspace.read_text(encoding="utf-8"))
-    assert [folder["path"] for folder in payload["folders"]] == ["..", "../../dep"]
-    generated_from_source = invoke(module_clone(parent), "workspace", "--topic", TOPIC)
-    assert generated_from_source.returncode == 0, generated_from_source.stderr
-    assert json.loads(workspace.read_text(encoding="utf-8")) == payload
-    shutil.rmtree(module_clone(parent))
-    removed = invoke(topic_parent(parent), "workspace", "--topic", TOPIC)
-    assert removed.returncode == 0, removed.stderr
-    assert not workspace.exists()
-
-
-def test_workspace_refuses_symlink_projection_path(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    assert prepare(parent).returncode == 0
-    workspace = topic_parent(parent) / ".vscode" / "module-sources.code-workspace"
-    target = tmp_path / "workspace-target.json"
-    target.write_text("do not touch\n", encoding="utf-8")
-    workspace.unlink()
-    workspace.symlink_to(target)
-
-    result = invoke(topic_parent(parent), "workspace", "--topic", TOPIC)
-
-    assert result.returncode == 2
-    assert "refusing to write or remove its target" in result.stderr
-    assert target.read_text(encoding="utf-8") == "do not touch\n"
 
 
 def test_cleanup_holds_dirty_and_url_mismatch(tmp_path: Path) -> None:
@@ -314,53 +249,12 @@ def test_cleanup_removes_reconstructible_module_then_parent_and_topic(tmp_path: 
     )
     assert removed.returncode == 0, removed.stderr
     assert not clone.exists()
-    assert not (topic_parent(parent) / ".vscode" / "module-sources.code-workspace").exists()
     parent_removed = invoke(
         topic_parent(parent), "cleanup", "--topic", TOPIC, "--parent",
         "--expected-parent", str(topic_parent(parent)), "--apply", env=cleanup_env(),
     )
     assert parent_removed.returncode == 0, parent_removed.stderr
     assert not topic_root(parent).exists()
-
-
-def test_cleanup_apply_regenerates_projection_when_expected_module_is_absent(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote, paths=("vendor/dep", "vendor/other"))
-    assert prepare(parent).returncode == 0
-    prepared_other = invoke(
-        parent,
-        "prepare",
-        "--topic",
-        TOPIC,
-        "--module",
-        "vendor/other",
-        "--branch",
-        "feature/foo",
-        "--owner-evidence",
-        "owner-evidence.md",
-    )
-    assert prepared_other.returncode == 0, prepared_other.stderr
-    workspace = topic_parent(parent) / ".vscode" / "module-sources.code-workspace"
-    shutil.rmtree(module_clone(parent))
-
-    result = invoke(
-        topic_parent(parent),
-        "cleanup",
-        "--topic",
-        TOPIC,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(module_clone(parent)),
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert result.returncode == 0, result.stderr
-    payload = json.loads(workspace.read_text(encoding="utf-8"))
-    assert [folder["path"] for folder in payload["folders"]] == ["..", "../../other"]
-    assert "../../dep" not in workspace.read_text(encoding="utf-8")
-    assert other_module_clone(parent).exists()
 
 
 def test_parent_cleanup_refuses_identity_invalid_expected_module_path(tmp_path: Path) -> None:
@@ -410,11 +304,10 @@ def test_parent_cleanup_refuses_unknown_topic_entry(tmp_path: Path) -> None:
     assert (topic_root(parent) / "unknown-clone").exists()
 
 
-@pytest.mark.parametrize("operation", ["status", "workspace"])
-def test_read_only_operations_do_not_create_topic_or_clone(tmp_path: Path, operation: str) -> None:
+def test_status_does_not_create_topic_or_clone(tmp_path: Path) -> None:
     remote = create_remote(tmp_path)
     parent = create_parent(tmp_path, remote)
-    result = invoke(parent, operation, "--topic", TOPIC)
+    result = invoke(parent, "status", "--topic", TOPIC)
     assert result.returncode == 2
     assert not topic_root(parent).exists()
     assert not module_clone(parent).exists()

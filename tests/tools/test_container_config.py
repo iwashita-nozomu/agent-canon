@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies topic-root Compose mounts, selected repo paths, and VS Code surfaces.
-# upstream design ../../documents/rule/dependency-module-changes.md topic workspace policy
+# upstream design ../../documents/rule/dependency-module-changes.md topic-root mount policy
 # upstream design ../../documents/shared-runtime-surfaces.toml shared VS Code surface ownership
 # upstream implementation ../../tools/ci/container_config.py semantic devcontainer checker
 # upstream implementation ../../.devcontainer/generate-runtime-compose.sh topic-root Compose generator
@@ -210,11 +210,10 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert "/workspace/agent-canon" in compose
 
 
-def test_source_vscode_surface_and_regular_projection_pass(tmp_path: Path) -> None:
-    """Standalone source owns a real .vscode directory and local projection file."""
+def test_source_vscode_surface_and_shared_files_pass(tmp_path: Path) -> None:
+    """Standalone source owns a real .vscode directory and four shared files."""
     write_surface_manifest(tmp_path)
     write_vscode_source(tmp_path)
-    write_file(tmp_path, ".vscode/module-sources.code-workspace", "{}\n")
 
     result = run_validator(tmp_path)
 
@@ -228,7 +227,6 @@ def test_template_vscode_surface_uses_individual_symlinks(tmp_path: Path) -> Non
     (tmp_path / ".vscode").mkdir()
     for name in ("c_cpp_properties.json", "extensions.json", "settings.json", "tasks.json"):
         (tmp_path / ".vscode" / name).symlink_to(f"../vendor/agent-canon/.vscode/{name}")
-    write_file(tmp_path, ".vscode/module-sources.code-workspace", "{}\n")
 
     result = run_validator(tmp_path)
 
@@ -258,17 +256,3 @@ def test_missing_individual_symlink_is_rejected(tmp_path: Path) -> None:
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert "expected-individual-symlink" in result.stdout
-
-
-def test_symlink_workspace_projection_is_rejected(tmp_path: Path) -> None:
-    """The projection path itself cannot redirect writes into a target."""
-    write_surface_manifest(tmp_path)
-    write_vscode_source(tmp_path)
-    target = tmp_path / "outside.code-workspace"
-    target.write_text("{}\n", encoding="utf-8")
-    (tmp_path / ".vscode" / "module-sources.code-workspace").symlink_to(target)
-
-    result = run_validator(tmp_path)
-
-    assert result.returncode == 1, result.stdout + result.stderr
-    assert "expected-regular-local-file" in result.stdout
