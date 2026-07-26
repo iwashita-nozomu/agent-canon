@@ -850,12 +850,23 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     'owner = "agent-canon"',
                     'class = "runtime_surface"',
                     '',
+                    '[[surface]]',
+                    'path = ".vscode"',
+                    'mode = "regular"',
+                    'owner = "template-or-derived-repo"',
+                    'class = "active_contract"',
+                    'source = ".vscode"',
+                    '',
                     '[[group]]',
                     'mode = "symlink"',
                     'owner = "agent-canon"',
                     'class = "runtime_surface"',
+                    'source_prefix = ""',
                     'paths = [',
-                    '  ".vscode",',
+                    '  ".vscode/c_cpp_properties.json",',
+                    '  ".vscode/extensions.json",',
+                    '  ".vscode/settings.json",',
+                    '  ".vscode/tasks.json",',
                     '  ".github/AGENTS.md",',
                     ']',
                     '',
@@ -902,10 +913,16 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         (work_dir / ".github" / "workflows").mkdir(parents=True)
         (work_dir / ".github" / "PULL_REQUEST_TEMPLATE").mkdir(parents=True)
         (work_dir / ".vscode").mkdir()
-        (work_dir / ".vscode" / "settings.json").write_text(
-            '{"agentCanonTest": true}\n',
-            encoding="utf-8",
-        )
+        for vscode_name in (
+            "c_cpp_properties.json",
+            "extensions.json",
+            "settings.json",
+            "tasks.json",
+        ):
+            (work_dir / ".vscode" / vscode_name).write_text(
+                '{"agentCanonTest": true}\n',
+                encoding="utf-8",
+            )
         (work_dir / "documents" / "README.md").write_text(
             "# Derived Documents Seed\n",
             encoding="utf-8",
@@ -1631,8 +1648,8 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
             self.assertFalse((repo / ".github" / "PULL_REQUEST_TEMPLATE.md").exists())
 
-    def test_link_root_replaces_legacy_vscode_directory_with_shared_symlink(self) -> None:
-        """Link-root should migrate VS Code workspace defaults to AgentCanon ownership."""
+    def test_link_root_migrates_legacy_vscode_directory_before_child_links(self) -> None:
+        """Link-root must materialize the real container before child symlinks."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
@@ -1666,8 +1683,21 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue(vscode_dir.is_symlink())
-            self.assertEqual(os.readlink(vscode_dir), "vendor/agent-canon/.vscode")
+            self.assertFalse(vscode_dir.is_symlink())
+            for vscode_name in (
+                "c_cpp_properties.json",
+                "extensions.json",
+                "settings.json",
+                "tasks.json",
+            ):
+                self.assertTrue((vscode_dir / vscode_name).is_symlink())
+                self.assertIn("vendor/agent-canon/.vscode", os.readlink(vscode_dir / vscode_name))
+            self.assertEqual(
+                (repo / "vendor" / "agent-canon" / ".vscode" / "settings.json").read_text(
+                    encoding="utf-8"
+                ),
+                '{"agentCanonTest": true}\n',
+            )
             self.assertEqual(check.returncode, 0, check.stderr)
             subprocess.run(["git", "add", "-A", ".vscode"], cwd=repo, check=True)
             subprocess.run(

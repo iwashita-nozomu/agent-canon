@@ -33,7 +33,7 @@ upstream design README.md workflow catalog
 - `git checkout <file>`、手動 copy、partial cherry-pick で構成変更を戻しません。
 - 構成変更を含む統合では、source branch の tree shape をそのまま持ち帰ることを優先します。
 - `main` への統合は、別 `git worktree` を作らず、current checkout 上の integration branch で一度閉じます。
-- `vendor/agent-canon` が submodule の場合、parent tree で比較するのは gitlink SHA です。submodule 内の conflict / local commit は、parent 側で file 単位に拾い直さず、`bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` と `agents/workflows/derived-agent-canon-diff-workflow.md` で先に分類します。
+- `vendor/agent-canon` が submodule の場合、parent tree で比較するのは clean gitlink SHA です。submodule 内の conflict / local commit / dirty source は parent source surface ではありません。`documents/rule/dependency-module-changes.md` の topic workspace branch clone routeへ停止・移送し、clean pinだけを統合します。
 
 ## 推奨手順
 

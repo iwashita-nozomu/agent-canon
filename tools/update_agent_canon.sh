@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Provides GitHub-first AgentCanon submodule update automation.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
+# upstream design ../documents/rule/dependency-module-changes.md defines independent source-clone and clean projection policy.
 # upstream design ../documents/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
 # upstream implementation ./sync_agent_canon.sh performs low-level submodule freshness and root-view synchronization.
 # upstream implementation ./agent_tools/update_lifecycle_contract.py owns queue/frontier receipt mechanics and guards.
@@ -64,15 +65,13 @@ Commands:
   rebuild-tools
       Rebuild compiled AgentCanon tools from the currently checked-out source.
   merge-main-into-current
-      Inside vendor/agent-canon, fetch AgentCanon main and merge it into the
-      currently checked-out AgentCanon branch. This is the canonical repair path
-      for local AgentCanon branches that need to be brought near GitHub main
-      before pushing an AgentCanon PR branch.
+      Standalone source mode only: fetch AgentCanon main and merge it into the
+      independent AgentCanon source branch. Parent projection mode refuses this
+      route and points source edits to a topic workspace branch clone.
   merge-main-into-current-preserve-dirty
-      Explicitly stash dirty vendor/agent-canon work, run merge-main-into-current,
-      and restore the dirty work after a successful merge. If the merge itself
-      conflicts, the stash is kept and the command reports the stash ref to
-      restore after resolving the main merge.
+      Standalone source mode only. Parent projection mode refuses this command;
+      source changes must use the managed topic workspace clone and return as a
+      clean vendor pin projection.
   status
       Print low-level AgentCanon submodule/root-view status.
 
@@ -86,6 +85,18 @@ EOF
 die() {
   echo "update_agent_canon.sh: $*" >&2
   exit 1
+}
+
+refuse_parent_vendor_source_mutation() {
+  if [ "$AGENT_CANON_SOURCE_MODE" != "parent_projection" ]; then
+    return 0
+  fi
+  echo "AGENT_CANON_PARENT_VENDOR_SOURCE_MUTATION=refused"
+  echo "AGENT_CANON_DEPENDENCY_MODULE_ROUTE=documents/rule/dependency-module-changes.md"
+  echo "AGENT_CANON_DEPENDENCY_MODULE_TOOL=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic <topic> --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
+  echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
+  echo "NEXT_ACTION=prepare_topic_workspace_source_clone_then_project_clean_vendor_pin"
+  die "parent projection mode must not mutate vendor/agent-canon; use the topic workspace source route"
 }
 
 require_protected_git_authority() {
@@ -434,9 +445,14 @@ emit_agentcanon_conflict_workflow_route() {
   echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_required"
   echo "AGENT_CANON_LATEST_BLOCK_REASON=$reason"
   echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-  echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty"
-  echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest"
-  echo "NEXT_ACTION=run_agentcanon_conflict_workflow"
+  if [ "$AGENT_CANON_SOURCE_MODE" = "parent_projection" ]; then
+    echo "AGENT_CANON_LATEST_DEPENDENCY_ROUTE=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic <topic> --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
+    echo "NEXT_ACTION=prepare_topic_workspace_source_clone"
+  else
+    echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty"
+    echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest"
+    echo "NEXT_ACTION=run_agentcanon_conflict_workflow"
+  fi
 }
 
 route_requires_agent_workflow() {
@@ -1074,6 +1090,9 @@ cmd_latest() {
   submodule_worktree_status="$(plan_value agent_canon_plan_submodule_worktree_status "$plan_output")"
 
   if route_requires_agent_workflow "$route" "$prefix_mode" "$dirty_update_surface" "$submodule_worktree_status"; then
+    if [ "$AGENT_CANON_SOURCE_MODE" = "parent_projection" ]; then
+      refuse_parent_vendor_source_mutation
+    fi
     if can_preserve_dirty_agentcanon_latest "$route" "$prefix_mode" "$submodule_worktree_status"; then
       preserve_dirty_agentcanon_latest "$branch" "$route"
       return $?
@@ -1184,6 +1203,7 @@ cmd_merge_main_into_current() {
   local result=""
   local conflict_files=""
 
+  refuse_parent_vendor_source_mutation
   ensure_agent_canon_submodule
   remote_url="$(submodule_remote_url)"
   [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
@@ -1277,6 +1297,7 @@ cmd_merge_main_into_current_preserve_dirty() {
   local restore_log=""
   local restore_rc=0
 
+  refuse_parent_vendor_source_mutation
   ensure_agent_canon_submodule
   current_branch="$(git -C "$AGENT_CANON_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
   submodule_status="$(git -C "$AGENT_CANON_DIR" status --short --untracked-files=all)"

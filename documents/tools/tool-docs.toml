@@ -138,6 +138,13 @@ language = "python"
 summary = "Design-document claim evidence checker documentation."
 
 [[tool]]
+id = "dependency-module-change"
+tool = "tools/agent_tools/dependency_module_change.py"
+doc = "documents/tools/dependency_module_change.md"
+language = "python"
+summary = "Independent dependency source clone lifecycle and workspace projection documentation."
+
+[[tool]]
 id = "classify-path-risk"
 tool = "tools/agent_tools/classify_path_risk.py"
 doc = "documents/tools/classify_path_risk.md"

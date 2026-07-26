@@ -413,7 +413,8 @@ regular_path() {
   local source="${2:-}"
   local abs_path="$ROOT_DIR/$path"
   local abs_source=""
-  if [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+  if [ -e "$abs_path" ] && [ ! -L "$abs_path" ] \
+    && { [ "$path" != ".vscode" ] || [ -d "$abs_path" ]; }; then
     return
   fi
   [ -n "$source" ] || die "regular path '$path' is missing or is a symlink and has no seed source"
@@ -504,6 +505,15 @@ cmd_link_root() {
   ensure_surface_sync_safe "$force"
 
   local spec=""
+  # Materialize regular containers before child links. This converts legacy
+  # whole-directory symlinks first, so child operations cannot delete files in
+  # the AgentCanon source checkout through the old directory link.
+  while IFS= read -r spec; do
+    local path="${spec%%:*}"
+    local source="${spec#*:}"
+    regular_path "$path" "$source"
+  done < <(build_regular_specs)
+
   while IFS= read -r spec; do
     local path="${spec%%:*}"
     local target="${spec#*:}"
@@ -515,12 +525,6 @@ cmd_link_root() {
     local source="${spec#*:}"
     copy_path "$path" "$source"
   done < <(build_copy_specs)
-
-  while IFS= read -r spec; do
-    local path="${spec%%:*}"
-    local source="${spec#*:}"
-    regular_path "$path" "$source"
-  done < <(build_regular_specs)
 
   while IFS= read -r path; do
     [ -n "$path" ] || continue
@@ -577,7 +581,8 @@ cmd_check() {
   while IFS= read -r spec; do
     local path="${spec%%:*}"
     local abs_path="$ROOT_DIR/$path"
-    if [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+    if [ -e "$abs_path" ] && [ ! -L "$abs_path" ] \
+      && { [ "$path" != ".vscode" ] || [ -d "$abs_path" ]; }; then
       continue
     fi
     if [ -L "$abs_path" ]; then

@@ -53,7 +53,11 @@ bash tools/update_agent_canon.sh plan
 If the plan requires mutation, request current-task user approval before
 running protected `apply` with all four inline Git authority/reason fields.
 
-派生 repo 側で shared canon を直した場合は、`vendor/agent-canon/` 内で通常の GitHub branch を作って commit し、main を取り込んでから PR を出します。
+派生 repo 側で shared canon を直す場合は、
+`documents/rule/dependency-module-changes.md` に従って
+`workspace-<topic-slug>/agent-canon/` の managed source clone で
+`--branch` を指定して作業し、そこで通常の GitHub branch / PR を作ります。
+親 repo の `vendor/agent-canon/` は clean pin projection のままです。
 
 Reuse the current AgentCanon branch. If no suitable branch exists, keep the
 checkout unchanged and request user direction; branch creation requires the

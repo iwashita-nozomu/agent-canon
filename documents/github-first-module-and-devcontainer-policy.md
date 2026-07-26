@@ -3,6 +3,7 @@
 contract policy
 responsibility Documents GitHub-first reusable module and devcontainer ownership policy.
 downstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
+upstream design ./rule/dependency-module-changes.md general dependency source-clone rule
 downstream design ./coding-conventions-project.md project environment rules
 upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
 downstream environment ../.devcontainer/devcontainer.json shared devcontainer entrypoint
@@ -15,9 +16,14 @@ downstream implementation ../tools/ci/container_config.py validates Dockerfile a
 AgentCanon-owned reusable modules, skills, tools, and runtime surfaces assume a
 GitHub source-of-truth path.
 
+Source-edit and parent-projection responsibilities are defined by
+[`rule/dependency-module-changes.md`](rule/dependency-module-changes.md). This
+document supplies the GitHub publication example; it does not authorize editing
+`vendor/agent-canon` as a source branch.
+
 The normal route is:
 
-1. Change AgentCanon in a source branch.
+1. Confirm owner evidence and change AgentCanon in the topic workspace branch source clone.
 1. Open an AgentCanon GitHub PR.
 1. Merge to AgentCanon `main` after review and checks.
 1. Update template or derived repos by advancing the `vendor/agent-canon`
@@ -120,10 +126,24 @@ parent repository. The generated Compose file must also set a top-level project
 It must not set fixed subnet, gateway, or IPAM values; Docker Compose should
 allocate the project network automatically.
 
+Dependency source visibility is owned by one topic workspace mount. Host layout is
+`<workspace-parent>/workspace-<topic-slug>/<parent-repo>` plus same-level
+`<module-basename>` clones; generated Compose canonicalizes the topic root from
+the `.devcontainer` location once to `/workspace`. It does not bind the parent
+repository and each clone separately, and it never writes a host absolute path
+into tracked config. `AGENT_CANON_WORKSPACE_ROOT=/workspace` is the fixed
+container contract. The workspace projection uses `..` for the parent and
+`../../<module-basename>` for managed clones, so one JSON resolves in both host
+and container environments. A missing `/workspace` mount or missing
+dependency tool is a startup design error reported by post-attach and
+`tools/ci/container_config.py`.
+
 ## VS Code Workspace Boundary
 
-`.vscode/` is AgentCanon-owned workspace ergonomics. Template and derived repos
-expose it as a root symlink view into `vendor/agent-canon/.vscode`.
+`.vscode/` has a parent-owned regular directory container. Template and derived
+repos expose the four shared AgentCanon files as individual symlinks into
+`vendor/agent-canon/.vscode`; `module-sources.code-workspace` is a parent-local
+generated projection from topic-workspace managed clones.
 
 The shared VS Code surface owns:
 
