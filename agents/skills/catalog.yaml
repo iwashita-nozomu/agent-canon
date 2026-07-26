@@ -496,7 +496,7 @@ skill_families:
         - ["agent-canon", "pr"]
         - ["agentcanon", "更新"]
   - id: dependency-module-change
-    purpose: Manage independent dependency source clones, parent-local workspace projections, and reconstructibility-based cleanup without editing vendored source checkouts.
+    purpose: Manage independent dependency source clones and reconstructibility-based cleanup without editing vendored source checkouts.
     canonical_doc: agents/skills/dependency-module-change.md
     shim: .agents/skills/dependency-module-change/SKILL.md
     related_skills:
@@ -506,12 +506,11 @@ skill_families:
       - task-routing
     routing:
       stage_policy: active
-      reason: dependency source clone, module lifecycle, workspace projection, or reconstructibility cleanup is in scope
+      reason: dependency source clone, module lifecycle, or reconstructibility cleanup is in scope
       triggers:
         - ["dependency", "module", "change"]
         - ["dependency", "source", "clone"]
         - ["source", "clone", "cleanup"]
-        - ["module-sources.code-workspace"]
         - [".gitmodules", "topic", "workspace"]
         - ["依存", "モジュール", "変更"]
         - ["依存", "source", "clone"]
