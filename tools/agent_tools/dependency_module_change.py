@@ -580,7 +580,12 @@ def _cleanup_module(parent_root: Path, modules: tuple[DependencyModule, ...], to
         raise DependencyModuleChangeError(f"--expected-clone must exactly equal {clone}")
     inspection = _inspect(clone, role="module", module=module, topic=topic)
     if inspection.state == "absent":
-        print(f"CLEANUP module={module.path} action=hold reason=absent")
+        if apply:
+            _require_cleanup_authority()
+            _regenerate_workspace(parent_root, modules, topic)
+            print(f"CLEANUP module={module.path} action=absent workspace=regenerated")
+        else:
+            print(f"CLEANUP module={module.path} action=hold reason=absent")
         return
     if inspection.state != "ready":
         print(f"CLEANUP module={module.path} action=hold reason={inspection.state}")

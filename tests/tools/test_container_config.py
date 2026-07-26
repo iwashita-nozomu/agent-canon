@@ -65,7 +65,12 @@ def write_devcontainer(root: Path) -> None:
     write_file(root, ".devcontainer/generate-runtime-compose.sh", "#!/usr/bin/env bash\n")
 
 
-def write_compose(root: Path, *, duplicate_repo_mount: bool = False) -> None:
+def write_compose(
+    root: Path,
+    *,
+    duplicate_repo_mount: bool = False,
+    include_runtime_environment: bool = True,
+) -> None:
     """Write a generated Compose projection with a topic-root bind mount."""
     topic_root = root.parent.resolve()
     repo_target = f"/workspace/{root.name}"
@@ -74,6 +79,11 @@ def write_compose(root: Path, *, duplicate_repo_mount: bool = False) -> None:
     ]
     if duplicate_repo_mount:
         volumes.append({"type": "bind", "source": str(root.resolve()), "target": repo_target})
+    environment_lines = [
+        "    environment:",
+        "      AGENT_CANON_WORKSPACE_ROOT: /workspace",
+        f"      AGENT_CANON_REPOSITORY_ROOT: {repo_target}",
+    ] if include_runtime_environment else []
     write_file(
         root,
         ".devcontainer/docker-compose.generated.yml",
@@ -87,21 +97,28 @@ def write_compose(root: Path, *, duplicate_repo_mount: bool = False) -> None:
                 f"    working_dir: {repo_target}",
                 "    volumes:",
                 *[f"      - {json.dumps(volume)}" for volume in volumes],
-                "    environment:",
-                "      AGENT_CANON_WORKSPACE_ROOT: /workspace",
-                f"      AGENT_CANON_REPOSITORY_ROOT: {repo_target}",
+                *environment_lines,
                 "",
             ]
         ),
     )
 
 
-def write_topic_fixture(tmp_path: Path, *, duplicate_repo_mount: bool = False) -> Path:
+def write_topic_fixture(
+    tmp_path: Path,
+    *,
+    duplicate_repo_mount: bool = False,
+    include_runtime_environment: bool = True,
+) -> Path:
     """Create a parent repo inside one isolated topic workspace."""
     topic_root = tmp_path / "workspace-dependency-module-change"
     repo = topic_root / "agent-canon"
     write_devcontainer(repo)
-    write_compose(repo, duplicate_repo_mount=duplicate_repo_mount)
+    write_compose(
+        repo,
+        duplicate_repo_mount=duplicate_repo_mount,
+        include_runtime_environment=include_runtime_environment,
+    )
     write_file(repo, ".gitmodules", '[submodule "dependency"]\n\tpath = vendor/dependency\n\turl = https://example.invalid/dependency.git\n')
     write_file(repo, "tools/agent_tools/dependency_module_change.py", "#!/usr/bin/env python3\n")
     return repo
@@ -157,6 +174,16 @@ def test_compose_repo_double_mount_is_rejected(tmp_path: Path) -> None:
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert "repository-double-mount" in result.stdout
+
+
+def test_compose_missing_runtime_environment_is_rejected(tmp_path: Path) -> None:
+    """Post-attach runtime roots are required in generated Compose semantics."""
+    repo = write_topic_fixture(tmp_path, include_runtime_environment=False)
+
+    result = run_validator(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "runtime-environment-required:AGENT_CANON_WORKSPACE_ROOT" in result.stdout
 
 
 def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:

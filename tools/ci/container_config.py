@@ -456,12 +456,32 @@ def validate_generated_compose(devcontainer_dir: Path, pack: PackConfig | None) 
         source, target = volume_fields(raw_volume)
         if source_path(source) == root or target == repo_target:
             findings.append(Finding("dependency_contract_violation", relative, "repository-double-mount"))
+    required_environment = {
+        "AGENT_CANON_WORKSPACE_ROOT": "/workspace",
+        "AGENT_CANON_REPOSITORY_ROOT": repo_target,
+    }
     environment = as_mapping(service.get("environment"))
-    if environment is not None:
-        if environment.get("AGENT_CANON_WORKSPACE_ROOT") != "/workspace":
-            findings.append(Finding("inconsistency", relative, "workspace-root-env"))
-        if environment.get("AGENT_CANON_REPOSITORY_ROOT") != repo_target:
-            findings.append(Finding("inconsistency", relative, "repository-root-env"))
+    if environment is None:
+        for name in required_environment:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    f"runtime-environment-required:{name}",
+                )
+            )
+    else:
+        for name, expected in required_environment.items():
+            if name not in environment:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"runtime-environment-required:{name}",
+                    )
+                )
+            elif environment.get(name) != expected:
+                findings.append(Finding("inconsistency", relative, f"{name.lower()}-env"))
     return findings
 
 

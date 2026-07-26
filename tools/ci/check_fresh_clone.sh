@@ -13,8 +13,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP_DIR="$(mktemp -d -t template-fresh-clone-XXXXXX)"
-CLONE_DIR="${TMP_DIR}/clone"
+TOPIC_ROOT="${TMP_DIR}/workspace-fresh-clone"
+CLONE_DIR="${TOPIC_ROOT}/agent-canon"
 trap 'rm -rf "${TMP_DIR}"' EXIT
+
+mkdir -p "${TOPIC_ROOT}"
 
 echo "fresh-clone source: ${ROOT_DIR}"
 echo "fresh-clone target: ${CLONE_DIR}"
@@ -67,8 +70,22 @@ compose_path = Path(".devcontainer/docker-compose.generated.yml")
 data = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
 assert data["name"].endswith("-devcontainer"), "compose project name missing"
 assert "services" in data and "workspace" in data["services"], "workspace service missing"
-assert data["services"]["workspace"]["working_dir"] == "/workspace"
+expected_working_dir = f"/workspace/{Path.cwd().name}"
+assert data["services"]["workspace"]["working_dir"] == expected_working_dir
 PY
+
+parent_projection_mode=false
+if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1 \
+  || [ -d vendor/agent-canon ]; then
+  parent_projection_mode=true
+fi
+if [ "$parent_projection_mode" = false ]; then
+  echo "FRESH_CLONE_AGENT_CANON_MODE=standalone"
+  echo "FRESH_CLONE_PARENT_PROJECTION=not-applicable"
+  echo "FRESH_CLONE_REPOSITORY_CI_OWNER=repository_ci_job"
+  echo "FRESH_CLONE_ACCEPTANCE=pass"
+  exit 0
+fi
 
 bash tools/sync_agent_canon.sh check
 AGENT_CANON_TEST_REMOTE="${TMP_DIR}/agent-canon-upstream.git"

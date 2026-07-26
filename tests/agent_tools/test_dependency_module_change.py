@@ -162,6 +162,10 @@ def module_clone(parent: Path) -> Path:
     return topic_root(parent) / "dep"
 
 
+def other_module_clone(parent: Path) -> Path:
+    return topic_root(parent) / "other"
+
+
 def test_prepare_creates_topic_parent_and_reuses_matching_branch_clone(tmp_path: Path) -> None:
     remote = create_remote(tmp_path)
     parent = create_parent(tmp_path, remote)
@@ -317,6 +321,46 @@ def test_cleanup_removes_reconstructible_module_then_parent_and_topic(tmp_path: 
     )
     assert parent_removed.returncode == 0, parent_removed.stderr
     assert not topic_root(parent).exists()
+
+
+def test_cleanup_apply_regenerates_projection_when_expected_module_is_absent(tmp_path: Path) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote, paths=("vendor/dep", "vendor/other"))
+    assert prepare(parent).returncode == 0
+    prepared_other = invoke(
+        parent,
+        "prepare",
+        "--topic",
+        TOPIC,
+        "--module",
+        "vendor/other",
+        "--branch",
+        "feature/foo",
+        "--owner-evidence",
+        "owner-evidence.md",
+    )
+    assert prepared_other.returncode == 0, prepared_other.stderr
+    workspace = topic_parent(parent) / ".vscode" / "module-sources.code-workspace"
+    shutil.rmtree(module_clone(parent))
+
+    result = invoke(
+        topic_parent(parent),
+        "cleanup",
+        "--topic",
+        TOPIC,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(module_clone(parent)),
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(workspace.read_text(encoding="utf-8"))
+    assert [folder["path"] for folder in payload["folders"]] == ["..", "../../other"]
+    assert "../../dep" not in workspace.read_text(encoding="utf-8")
+    assert other_module_clone(parent).exists()
 
 
 def test_parent_cleanup_refuses_identity_invalid_expected_module_path(tmp_path: Path) -> None:
