@@ -2,7 +2,7 @@
 # contract reference
 # responsibility Defines machine-readable AgentCanon root runtime surface ownership.
 # upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface policy
-# upstream design ./gpu-admission-r5-source-packet.md exact whole-directory devcontainer identity ownership
+# upstream design ./gpu-admission-r5-source-packet.md devcontainer identity ownership
 # downstream implementation ../tools/agent_tools/surface_manifest.py parses this manifest
 # downstream implementation ../tools/sync_agent_canon.sh consumes link and copy specs
 # @dependency-end
@@ -28,20 +28,53 @@ class = "runtime_surface"
 mode = "symlink"
 owner = "agent-canon"
 class = "runtime_surface"
-# .devcontainer remains a whole-directory surface so bootstrap, Compose,
-# finalize, and observational attach identity cannot be overridden separately.
+# .devcontainer は親側の実体ディレクトリです。
+# bootstrap, finalize, compose, attach は親側 wrapper で保持し、
+# AgentCanon 側は個別ファイルで差分管理します。
 paths = [
   "agents",
   ".agents",
-  ".vscode",
   ".codex/config.toml",
   ".codex/README.md",
   ".codex/agents",
   ".codex/hooks.json",
   ".codex/hooks",
-  ".devcontainer",
   ".github/AGENTS.md",
   "tools",
+]
+
+[[surface]]
+path = ".devcontainer"
+mode = "regular"
+owner = "template-or-derived-repo"
+class = "active_contract"
+local_override_allowed = true
+source = ".devcontainer"
+
+[[surface]]
+path = ".devcontainer/devcontainer.json"
+mode = "symlink"
+owner = "agent-canon"
+class = "runtime_surface"
+
+[[surface]]
+path = ".vscode"
+mode = "regular"
+owner = "template-or-derived-repo"
+class = "active_contract"
+local_override_allowed = true
+source = ".vscode"
+
+[[group]]
+mode = "symlink"
+owner = "agent-canon"
+class = "runtime_surface"
+source_prefix = ""
+paths = [
+  ".vscode/c_cpp_properties.json",
+  ".vscode/extensions.json",
+  ".vscode/settings.json",
+  ".vscode/tasks.json",
 ]
 
 [[group]]
@@ -104,7 +137,9 @@ paths = [
   "documents/worktree-lifecycle.md",
   "documents/conventions/README.md",
   "documents/conventions/common/01_principles.md",
-  "documents/conventions/common/02_naming.md",
+  "documents/rule/README.md",
+  "documents/rule/naming.md",
+  "documents/rule/directory-structure.md",
   "documents/conventions/common/03_comments.md",
   "documents/conventions/common/04_operators.md",
   "documents/conventions/common/05_docs.md",

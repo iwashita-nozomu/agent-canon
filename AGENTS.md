@@ -3,6 +3,7 @@
 @dependency-start
 contract agent-runtime
 responsibility Documents AgentCanon Repository Instructions for this repository.
+downstream design documents/rule/README.md document filename, placement, and structure rules.
 downstream design README.md shared canon overview must reflect runtime contract
 downstream design ROOT_AGENTS.md template-root runtime entrypoint owner map
 downstream implementation tools/agent_tools/check_agent_runtime_alignment.py validates runtime owner-map alignment
@@ -64,6 +65,7 @@ surfaces listed below.
 
 - `README.md`
 - `documents/README.md`
+- `documents/rule/README.md`（文書 filename は英語、本文は日本語）
 - `agents/README.md`
 - `agents/workflows/README.md`
 - `agents/canonical/README.md`

@@ -61,7 +61,7 @@ def skill_fixture(skill: str, body: str) -> str:
 MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/README.md": "conventions\n",
     "documents/conventions/common/01_principles.md": "check_hardcoded_numbers.py\n",
-    "documents/conventions/common/02_naming.md": "check_log_helper_names.py\n",
+    "documents/rule/naming.md": "check_log_helper_names.py\n",
     "documents/conventions/common/03_comments.md": "comments\n",
     "documents/conventions/common/04_operators.md": "operators\n",
     "documents/conventions/common/05_docs.md": (

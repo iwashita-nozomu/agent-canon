@@ -4,6 +4,7 @@ contract reference
 responsibility Owns the canonical AgentCanon source-to-parent update transaction and namespace boundaries.
 upstream design ../agents/skills/agent-orchestration.md owns Decision Sufficiency policy.
 upstream design ../agents/skills/structure-refactor.md owns final-structure-first scope formation.
+upstream design ./rule/dependency-module-changes.md owns generic dependency source-clone and clean-projection policy.
 upstream implementation ../tools/agent_tools/update_lifecycle_contract.py owns lifecycle schemas and transition guards.
 downstream implementation ../tools/update_agent_canon.sh executes source rebind, queue/frontier, and parent-projection guards.
 downstream implementation ../tools/agent_tools/publication_integrator.py owns source publication CAS/readback.
@@ -22,9 +23,35 @@ for route meaning and `tools/agent_tools/update_lifecycle_contract.py` for exact
 machine schemas. Skills, README files, CI adapters, and parent views link here;
 they do not restate the transaction.
 
+## Auto-Commit Provenance Boundary
+
+Every mutating route that can stage, checkout, update a submodule, mutate a root
+view, park eval logs, or create an automatic sync commit must validate the
+existing four Git authority/reason fields and the additional
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` input before
+the first mutation. The evidence digest is the SHA-256 of the exact bytes of
+the user request record or canonical workflow authorization packet. Missing,
+uppercase, malformed, or fallback evidence is rejected; there is no actor or
+authority compatibility input.
+
+`tools/sync_agent_canon.sh::commit_sync_paths_if_needed` owns automatic sync
+commits. It always sets Author and Committer to
+`AgentCanon Sync Automation <agent-canon-sync@automation.invalid>` and emits
+formal `AgentCanon-*` trailers for the automation actor, validated authority
+source, destructive authority, request evidence, remote, update method, and
+prefix. The trailers must remain readable by `git interpret-trailers --parse`.
+
 The standalone AgentCanon clone is the source owner. A template or derived
 repository is a parent projection consumer and never becomes a second source
 namespace.
+
+For any dependency source edit, first apply
+`documents/rule/dependency-module-changes.md`: prepare or reuse the exact
+topic workspace branch clone, edit there, publish the source result, and project a
+clean vendor pin. Parent mode is not a source branch. Its
+`merge-main-into-current*` routes refuse vendor mutation in parent mode and
+route source work to the managed topic clone. Standalone source mode remains
+the source-branch route.
 
 ## Owner Namespace
 
@@ -70,6 +97,13 @@ There is no legacy subtree, snapshot, wrapper, or alternate owner route.
    source-main publication readback follows. Push, PR, and checks consume one
    sealed G3 authority; post-publication checks additionally consume sealed,
    same-binding G5 evidence.
+   Standalone `github_publish.py push` without a packet is reversible branch
+   transport only: verified remote identity/permission, named current branch,
+   captured local `HEAD`/tree, exact SHA refspec, remote `ls-remote` readback,
+   and push-spanning local identity invariance. It does not generate or claim
+   G1/G2/G3 or PR lifecycle evidence. Packet-bound push may additionally check
+   its sealed candidate identity; `publish-pr`, PR mutation, and merge remain
+   sealed packet/G1/G2/G3-bound.
 1. Enqueue exactly one accepted `QueueReceipt` keyed by
    `(source_namespace,candidate_sha,tree_sha,input_digest,
    publication_merge_sha,publication_merge_tree)`. Create a pending
@@ -116,7 +150,7 @@ identity and ordering only; they do not rerun the owned check.
 | `tools/update_agent_canon.sh latest` | standalone source-main rebind; after typed publication readback, internal queue/frontier advance; in a parent, accepted-frontier projection |
 | `tools/update_agent_canon.sh apply` | strict clean source rebind or accepted parent projection |
 | `tools/update_agent_canon.sh merge-main-into-current` | clean standalone/source-branch rebind |
-| `tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` | task-dirt-preserving source rebind |
+| `tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` | standalone source-mode merge route; parent mode refuses vendor mutation |
 | `tools/ci/check_agent_canon_pr.sh` | consume G1, run the one source PR gate, then invoke the G2 owner |
 | `tools/ci/check_agent_canon_pr.py` | materialize/replay G2 from the ordered passing generated-completeness checks |
 | `tools/ci/check_agent_canon_latest.sh` | consume G4-G5 without a second source-main check |

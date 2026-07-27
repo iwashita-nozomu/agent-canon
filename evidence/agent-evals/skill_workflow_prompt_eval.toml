@@ -2337,8 +2337,8 @@ required_regex = ["make agent-canon-ensure-latest", "make agent-canon-update-pla
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-2"
 critical = true
-description = "Separates local AgentCanon source commits from parent pin updates."
-required_regex = ["merge-main-into-current", "git -C vendor/agent-canon push origin HEAD", "AgentCanon branch/PR", "\\$agent-update-branch"]
+description = "Separates dirty vendor source work from clean parent pin projection through the managed topic workspace while retaining the standalone source publication route."
+required_regex = ["dirty vendor checkout is a refusal condition", "dependency-module", "prepare --topic", "--module", "--branch", "workspace/<topic-slug>/agent-canon", "clean vendor pin projection", "source branch/PR", "\\$agent-update-branch"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-3"

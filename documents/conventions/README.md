@@ -3,6 +3,7 @@
 contract policy
 responsibility Documents コーディング規約索引 for this repository.
 upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../rule/README.md document rule canon
 @dependency-end
 -->
 
@@ -13,6 +14,8 @@ repo 全体で先に見るのは、言語非依存の規約です。
 
 ## 先に読む
 
+- [文書規約](../rule/README.md)
+  - filename、配置、構成判断の共通規約
 - [coding-conventions-project.md](../coding-conventions-project.md)
   - repo-wide の共通運用、Markdown 書式修正、Bash 配置ルールの正本
 - [coding-conventions-testing.md](../coding-conventions-testing.md)

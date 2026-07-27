@@ -35,6 +35,7 @@ reports/*.patch
 # Local environments
 .venv/
 venv/
+workspace/
 
 # OS/editor noise
 .DS_Store

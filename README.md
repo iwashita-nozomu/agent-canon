@@ -98,7 +98,7 @@ Top-level surface は次のように読む。`Tracked` は `git ls-files`、`Man
 | `.agents/` | 42 | 42 | Codex skill discovery 用の runtime skill entrypoint。 |
 | `.codex/` | 61 | 61 | Codex config、role TOML、hook runtime surface。 |
 | `.devcontainer/` | 4 | 4 | shared devcontainer profile。 |
-| `.vscode/` | 4 | 4 | shared VS Code workspace defaults and validation tasks。 |
+| `.vscode/` | 4 | 4 | shared VS Code defaults and validation tasks。 |
 | `.github/` | 12 | 12 | GitHub workflow、Issue / PR template、GitHub agent entrypoint。 |
 | `agents/` | 143 | 143 | workflow、skill canon、template、task catalog の human-facing hub。`agents/evals/` は旧 manifest path の compatibility stub。 |
 | `evidence/` | 8 | 8 | tracked eval manifest source と evidence contract。run output は `.agent-canon/log-archive/` に置き、legacy `agents/evals/results/` は migration input としてだけ扱う。 |
@@ -207,12 +207,13 @@ active. The activation and validation policy is
 ## 利用時のディレクトリ / リンク構成
 
 AgentCanon 単体 repo では、この tree 自体を source of truth として扱います。
-Template や派生 repo では `vendor/agent-canon/` を source of truth にし、repo
+Template や派生 repo では `vendor/agent-canon/` を clean pin/runtime projection
+として扱い、source edit は topic workspace の独立 cloneで行います。repo
 root の入口は symlink view または明示的な synced copy にします。Template /
 derived repo に露出する root view は次です。
 
 期待する parent root の top-level shape は次です。`vendor/agent-canon/` が
-AgentCanon source of truth で、root の共有入口は symlink view または GitHub
+clean AgentCanon pin projection で、root の共有入口は symlink view または GitHub
 path constraint のための checked copy に限定します。regular file / directory
 は parent repo が ownership を持つ project surface です。
 
@@ -232,7 +233,15 @@ path constraint のための checked copy に限定します。regular file / di
 │   ├── config.toml -> ../vendor/agent-canon/.codex/config.toml
 │   ├── project-config.toml  # optional parent-owned skill overlay
 │   └── project-skills/  # optional parent-owned additions
-├── .devcontainer -> vendor/agent-canon/.devcontainer
+├── .devcontainer/
+│   ├── bootstrap-shared-runtime.sh
+│   ├── finalize-shared-runtime.sh
+│   ├── post-create.sh
+│   ├── post-create-parent.sh  # optional
+│   ├── post-attach.sh
+│   ├── generate-runtime-compose.sh
+│   ├── devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json
+│   └── ...（親固有の wrapper / 設定）
 ├── .github/
 │   ├── AGENTS.md -> ../vendor/agent-canon/.github/AGENTS.md
 │   ├── PULL_REQUEST_TEMPLATE/
@@ -244,7 +253,11 @@ path constraint のための checked copy に限定します。regular file / di
 │       ├── agent-canon-static-gates.yml
 │       ├── ci.yml
 │       └── docker-build.yml
-├── .vscode -> vendor/agent-canon/.vscode
+├── .vscode/
+│   ├── c_cpp_properties.json -> ../vendor/agent-canon/.vscode/c_cpp_properties.json
+│   ├── extensions.json -> ../vendor/agent-canon/.vscode/extensions.json
+│   ├── settings.json -> ../vendor/agent-canon/.vscode/settings.json
+│   └── tasks.json -> ../vendor/agent-canon/.vscode/tasks.json
 ├── agents -> vendor/agent-canon/agents
 ├── documents/
 │   └── <parent-owned active contracts>
@@ -253,7 +266,17 @@ path constraint のための checked copy に限定します。regular file / di
 ├── tools -> vendor/agent-canon/tools
 └── vendor/
     └── agent-canon/
+
+topic workspace source-edit shape:
+
+```text
+<parent-repo-root>/workspace/<topic-slug>/
+├── <parent-repo>/
+└── <module-basename>/
 ```
+
+The devcontainer mounts this topic root once at `/workspace`; it does not expose
+clones from other topics or mount the parent and dependency clones separately.
 
 人間向けの構造確認は `tree` 表示を正本の見方にします。典型的な確認は次です。
 `parent_repo_readiness.py` は同じ ignore pattern と depth を表示し、`tree`
@@ -264,14 +287,17 @@ tree -a -L <depth> -I '.git|__pycache__|.venv|node_modules|target|reports' <pare
 python3 tools/agent_tools/parent_repo_readiness.py --root <parent-root> --tree-depth <depth>
 ```
 
-- `vendor/agent-canon/`: AgentCanon submodule pin。shared workflow、skills、tools、docs の正本。
+- `vendor/agent-canon/`: AgentCanon submodule pin/runtime projection。source edit は topic workspace の独立 cloneで行い、ここは clean projection に保ちます。
 - `AGENTS.md -> vendor/agent-canon/ROOT_AGENTS.md`: Codex 向けの薄い root entrypoint。
 - `agents -> vendor/agent-canon/agents`: workflow、canonical docs、task catalog の root view。
 - `.agents -> vendor/agent-canon/.agents`: Codex skill discovery 用の root view。
 - `.codex/config.toml -> vendor/agent-canon/.codex/config.toml`: Codex runtime config の共有 view。
 - `.codex/agents -> vendor/agent-canon/.codex/agents`: Codex subagent role TOML の共有 view。
-- `.devcontainer -> vendor/agent-canon/.devcontainer`: devcontainer profile の共有 view。
-- `.vscode -> vendor/agent-canon/.vscode`: VS Code workspace defaults と validation tasks の共有 view。
+- `.devcontainer/`: 親-owned の実体ディレクトリ。AgentCanon の共通 `devcontainer.json` は
+  `.devcontainer/devcontainer.json` へ symlink され、その他の runtime スクリプトは
+  親固有 wrapper として配置され、Vendor source 側は `../vendor/agent-canon/.devcontainer/*`
+  を相対参照します。
+- `.vscode/`: parent-owned real directory with the four individual AgentCanon symlink surfaces。
 - `tools -> vendor/agent-canon/tools`: shared automation の共有 view。
 - `documents/*`: template / derived repo root では active contract だけを regular file として残し、AgentCanon-owned shared policy docs は `vendor/agent-canon/documents/` から読みます。
 - `memory/*`、`notes/*`、`tests/*`: `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。
@@ -293,7 +319,8 @@ repo-local の正本として残すもの:
 root view の修復と検証:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
 ```
@@ -339,17 +366,20 @@ packet を絞ったら、以後の保守では正本 surface を直接編集し�
 - root surface を戻すときは次を使います。
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
 ## upstream sync
 
-template 側で shared canon を直した変更を upstream `agent-canon` repo に戻すときは次を使います。
+template 側で shared canon sourceを直すときは、topic workspace source cloneを使います。
 
 ```bash
-bash tools/update_agent_canon.sh merge-main-into-current
-git -C vendor/agent-canon push origin HEAD
+python3 tools/agent_tools/dependency_module_change.py --root <parent-repo> prepare \
+  --topic <topic> --module vendor/agent-canon --branch <source-branch> \
+  --owner-evidence <owner-evidence>
+git -C <CONTINUE_PATH> push origin HEAD
 ```
 
 update / branch / PR の詳細は `agents/workflows/agent-canon-pr-workflow.md` を見ます。

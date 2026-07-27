@@ -71,10 +71,11 @@ In a template or derived repository, the normal adoption path is:
 
 1. Update the `vendor/agent-canon` submodule pin to an AgentCanon commit that
    contains this policy and the Rust CLI.
-1. Repair shared root views with `bash tools/sync_agent_canon.sh link-root` if
+1. Repair shared root views with request-evidence-authorized
+   `bash tools/sync_agent_canon.sh link-root` if
    the root view drifts.
-1. Run `make agent-canon-ensure-latest` or
-   `bash tools/update_agent_canon.sh apply`; this calls
+1. Run request-evidence-authorized `make agent-canon-ensure-latest` or
+   request-evidence-authorized `bash tools/update_agent_canon.sh apply`; this calls
    `tools/rebuild_agent_tools.sh` after the AgentCanon pin is updated. If the
    host has no Rust toolchain, rerun the same target inside the DevContainer or
    recreate the DevContainer so `.devcontainer/post-create.sh` runs again.

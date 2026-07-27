@@ -42,7 +42,7 @@ workflow for changes to shared surfaces.
 
 | Owner class | Root behavior | Edit source | Local override |
 | --- | --- | --- | --- |
-| AgentCanon-owned runtime surface | symlink view into `vendor/agent-canon/` | AgentCanon source | no |
+| AgentCanon-owned runtime surface | individual symlink view into `vendor/agent-canon/` | independent AgentCanon source clone | no |
 | AgentCanon-owned shared policy | standalone under `vendor/agent-canon/documents/` | AgentCanon source | no |
 | Template-owned active contract | regular root file when the template or derived repo creates one | template or derived repo root | yes |
 | Project-owned durable state / content | regular project-local file or directory | project root | yes |
@@ -75,16 +75,26 @@ disagree, update the manifest first and then adjust this reader-facing policy.
 ## AgentCanon-Owned Symlink Views
 
 AgentCanon-owned runtime and policy paths are symlink views in the template root.
-Edit the `vendor/agent-canon/` source, then repair the root view with:
+For a dependency source change, read
+`documents/rule/dependency-module-changes.md` first and edit the independent
+topic-workspace managed source clone. The `vendor/agent-canon/` path is only a
+clean pin/runtime projection. Repair the root view with:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 ```
 
 Core runtime surfaces include `AGENTS.md`, `agents/`, `.agents/`,
 `.codex/config.toml`, `.codex/README.md`, `.codex/agents/`,
-`.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, `.vscode/`, and
-`tools/`.
+`.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, and `tools/`.
+`.vscode/` is a parent-owned regular container whose
+`c_cpp_properties.json`, `extensions.json`, `settings.json`, and `tasks.json`
+children are the four individual AgentCanon symlink surfaces. Work-area
+composition is caller-owned: use `PARENT_ROOT`, `SOURCE_CLONE`, and
+`CONTINUE_PATH` from `prepare` within the editor-independent
+`workspace/<topic-slug>/` contract. Work-area storage and metadata are outside
+the AgentCanon contract.
 These paths are installed capability. The active profile and required checks
 are selected by `documents/runtime-profiles-and-check-matrix.md`.
 
@@ -115,9 +125,10 @@ workflow automation, CI helpers, container runners, document maintenance tools,
 and static-analysis utilities.
 
 Parent repositories call shared tooling through the stable root command path,
-such as `python3 tools/agent_tools/check_convention_compliance.py`, while edits
-to those tools are made in `vendor/agent-canon/tools/...` and routed through
-AgentCanon. Project-local automation must stay in project-owned paths, such as
+such as `python3 tools/agent_tools/check_convention_compliance.py`. Generic
+tool edits use the independent source-clone route in
+`documents/rule/dependency-module-changes.md`; `vendor/agent-canon/tools/...`
+is only the clean pin projection. Project-local automation must stay in project-owned paths, such as
 `scripts/`, package-local modules, project-specific CI files, or another
 repo-owned path. A derived repository must not turn root `tools/` into a mixed
 directory or add project-specific files under that symlink view.
@@ -137,24 +148,35 @@ conventions subtrees, tool docs, reusable templates, `documents/README.md`,
 `documents/github-first-module-and-devcontainer-policy.md`. Parent repositories
 decide which repo-specific documents appear in root `documents/`.
 
-`.devcontainer/` is a shared AgentCanon runtime ergonomics surface. It may
-generate `.devcontainer/docker-compose.generated.yml` locally, but the source
-scripts, `devcontainer.json`, post-create setup, and attach status reporting are
-edited in AgentCanon. The devcontainer consumes repo-local `docker/Dockerfile`,
-`docker/packs/default.toml`, and `docker/install_python_dependencies.sh`; it
-does not make `docker/` AgentCanon-owned.
+`.devcontainer/` is a parent-owned runtime container directory in derived repos.
+It holds wrappers for `bootstrap-shared-runtime.sh`, `post-create.sh`,
+`generate-runtime-compose.sh`, and `post-attach.sh`, while AgentCanon owns only
+`.devcontainer/devcontainer.json` via symlink to keep shared `devcontainer.json`
+contracts stable.
 
-The whole `.devcontainer/` symlink is also the single shared owner surface for
-GPU admission runtime identity. Its bootstrap, Compose generator, post-create,
-finalize, and post-attach scripts must stay together so parent repositories
-cannot replace one identity stage independently. The exact receipt paths and
-parser/writer ownership are defined by
+The devcontainer consumes repo-local `docker/Dockerfile`,
+`docker/packs/default.toml`, and `docker/install_python_dependencies.sh`; it does
+not make `docker/` AgentCanon-owned.
+
+GPU admission runtime identity scripts (`bootstrap-shared-runtime.sh`,
+`finalize-shared-runtime.sh`, `post-attach.sh`) remain in AgentCanon source and are
+invoked from parent wrappers by relative path under `.devcontainer/`. The exact
+receipt paths and parser/writer ownership are defined by
 `documents/gpu-admission-r5-source-packet.md` and
 `agent-canon-environment.toml`.
 
-`.vscode/` is also a shared AgentCanon runtime ergonomics surface. It owns
-workspace settings, recommended extensions, and VS Code task entrypoints that
-should behave the same in AgentCanon, template, and derived repository roots.
+`parent-hook` must not replace AgentCanon shared stages. Parent-specific behavior is
+provided only by wrapper files, and `post-create.sh` in parent ownership runs
+`vendor/agent-canon/.devcontainer/post-create.sh` first, then optionally
+`post-create-parent.sh` in `set -e` mode. If AgentCanon standard `post-create`
+fails, parent hook is not executed.
+
+`.vscode/` is also a shared AgentCanon runtime ergonomics surface. The parent
+owns the real directory container; AgentCanon owns the individual
+`c_cpp_properties.json`, `extensions.json`, `settings.json`, and `tasks.json`
+symlink surfaces. The dependency source work area remains caller-owned and uses
+the paths returned by `dependency_module_change.py prepare`; it is not a shared
+surface source.
 Do not store personal editor state, host-specific include paths, workspace-local
 secrets, or product-specific commands in the shared `.vscode/` view. Put
 project-specific editor guidance in repo-local docs or project-owned scripts
@@ -229,7 +251,8 @@ from AgentCanon:
 - `.github/scripts/checkout_agent_canon_submodule.sh`
 
 Do not edit these root copies as independent truth surfaces. Edit the
-AgentCanon source, then run `bash tools/sync_agent_canon.sh link-root`.
+AgentCanon source, then run the request-evidence-authorized
+`bash tools/sync_agent_canon.sh link-root` command.
 The `.github/scripts/checkout_agent_canon_submodule.sh` root copy is only a
 GitHub-path wrapper; the shared checkout implementation lives in
 `tools/ci/checkout_agent_canon_submodule.sh`.
@@ -289,12 +312,15 @@ implementation.
 
 ## Editing Rule
 
-- Edit AgentCanon-owned symlink views in `vendor/agent-canon/`.
+- Read `documents/rule/dependency-module-changes.md` before any dependency
+  source edit. Edit generic AgentCanon source in the exact topic clone
+  `workspace/<topic-slug>/<module-basename>`; never use a vendored checkout as a
+  source branch.
 - Edit template-owned active contracts at the root after they are regular
   files.
 - Edit project-owned durable state at the root.
-- Repair root symlinks and GitHub copy surfaces with
-  `bash tools/sync_agent_canon.sh link-root`.
+- Repair root symlinks and GitHub copy surfaces with the request-evidence-authorized
+  `bash tools/sync_agent_canon.sh link-root` command.
 - Audit root-view drift with `bash tools/sync_agent_canon.sh check`.
 - Before recreating a missing shared path, check the template root,
   `vendor/agent-canon/`, standalone AgentCanon, the manifest, and

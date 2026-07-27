@@ -3,15 +3,42 @@
 # contract environment
 # responsibility Renders shared devcontainer compose from repo-local Docker pack.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
+# upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract
+# upstream implementation ../tools/agent_tools/dependency_module_change.py topic clone lifecycle tool
 # upstream design ../documents/gpu-admission-r5-source-packet.md exact Compose runtime identity wiring
 # upstream environment devcontainer.json initializeCommand entrypoint
 # @dependency-end
 
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="${AGENT_CANON_DEVCONTAINER_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+repo_root="$(cd "$repo_root" && pwd -P)"
+workspace_root="$(cd "${repo_root}/.." && pwd -P)"
+[ -d "$workspace_root" ] || {
+  printf 'devcontainer workspace root is unavailable: %s\n' "$workspace_root" >&2
+  exit 1
+}
+workspace_parent="$(cd "${workspace_root}/.." && pwd -P)"
+if [ "$(basename "$workspace_parent")" != "workspace" ]; then
+  case "$(basename "$workspace_root")" in
+    workspace-*)
+      printf 'devcontainer rejects legacy workspace-<topic-slug> root: %s\n' "$workspace_root" >&2
+      ;;
+    *)
+      printf 'devcontainer requires a topic workspace root under workspace/<topic-slug>: %s\n' "$workspace_root" >&2
+      ;;
+  esac
+  exit 1
+fi
+repo_basename="$(basename "$repo_root")"
+container_repo_root="/workspace/${repo_basename}"
 pack="${repo_root}/docker/packs/default.toml"
-output="${repo_root}/.devcontainer/docker-compose.generated.yml"
+compose_output_raw="${AGENT_CANON_DOCKER_COMPOSE_OUTPUT:-.devcontainer/docker-compose.generated.yml}"
+if [ "${compose_output_raw#/}" = "$compose_output_raw" ]; then
+  compose_output="${repo_root}/${compose_output_raw}"
+else
+  compose_output="$compose_output_raw"
+fi
 default_project_name="$(
   python3 - "$repo_root" <<'PY'
 from __future__ import annotations
@@ -82,13 +109,24 @@ else
   pack_environment_lines=()
 fi
 
-volume_lines=("      - ..:${workspace_mount}:cached")
+workspace_root_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$workspace_root")"
+volume_lines=(
+  "      - type: bind"
+  "        source: ${workspace_root_yaml}"
+  '        target: "/workspace"'
+)
 volume_lines+=(
   "      - type: bind"
   "        source: /var/lib/agent-canon/runtime"
   "        target: /var/lib/agent-canon/runtime"
 )
 for pack_mount in "${pack_mounts[@]}"; do
+  case "$pack_mount" in
+    *:/workspace|*:/workspace:*)
+      printf 'devcontainer runtime pack duplicates the workspace-root mount: %s\n' "$pack_mount" >&2
+      exit 1
+      ;;
+  esac
   volume_lines+=("      - ${pack_mount}")
 done
 if [ -d /mnt/git ]; then
@@ -193,6 +231,8 @@ environment_lines=(
   "      AGENT_CANON_SECRET_MOUNT: \"${secret_target}\""
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
   '      AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"'
+  '      AGENT_CANON_WORKSPACE_ROOT: "/workspace"'
+  "      AGENT_CANON_REPOSITORY_ROOT: \"${container_repo_root}\""
   '      AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"'
   '      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"'
   "${pack_environment_lines[@]}"
@@ -221,7 +261,7 @@ fi
   else
     printf '    image: mcr.microsoft.com/devcontainers/base:ubuntu-22.04\n'
   fi
-  printf '    working_dir: %s\n' "$workdir"
+  printf '    working_dir: %s\n' "$container_repo_root"
   printf '    volumes:\n'
   printf '%s\n' "${volume_lines[@]}"
   printf '    command: /bin/bash -lc "sleep infinity"\n'
@@ -232,6 +272,7 @@ fi
   fi
   printf '    environment:\n'
   printf '%s\n' "${environment_lines[@]}"
-} > "$output"
+} > "$compose_output"
+
 
 printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s network=auto secret_mount=%s pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$secret_mount_status" "$pack"

@@ -3,6 +3,7 @@
 contract design
 responsibility Documents 設計ドキュメント for this repository.
 upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../rule/README.md document rule canon
 upstream design ../dependency-manifest-design.md dependency evidence contract
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-doc claim evidence
 @dependency-end
@@ -13,20 +14,25 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
 このディレクトリは、設計の正本を集約する入口です。
 存在しない旧パスを経由せず、ここから現在の設計文書へ直接辿れる状態を保ちます。
 
-The approved Target-State-First implementation contract is
-[codex-spark-implementation-routing.md](codex-spark-implementation-routing.md).
-Its digest is immutable for this packet; projections must link to it rather
-than restate or edit the design artifact.
+承認済みの Target-State-First implementation contract は
+[codex-spark-implementation-routing.md](codex-spark-implementation-routing.md) です。
+この packet で digest は不変とし、projection は設計 artifact を複製または編集せず、そこへリンクします。
+
+文書の filename、配置、構成判断は [文書規約](../rule/README.md) を参照します。
+この index は配置規則を複製せず、個別設計の target state と実装境界への reader route を提供します。
 
 ## 現在の正本
 
 - [protocols.md](protocols.md)
   - Protocol 層の責務分割
   - 型パラメータ化の方針
+- [devcontainer/parent-devcontainer-wrapper-policy.md](devcontainer/parent-devcontainer-wrapper-policy.md)
+  - 親root と AgentCanon source の devcontainer 境界、wrapper 順序、compose 出力、
+    親 hook 契約を定義します。
 - [experiment_runner.md](../experiment_runner.md)
   - `experiment_runner` の契約と実行モデル
 - [python-structure-hash.md](python-structure-hash.md)
-  - Python structural duplicate analysis and module-group dependency priority
+  - Python の structural duplicate analysis と module-group dependency priority
 - [../remote-execution-repo-contract.md](../remote-execution-repo-contract.md)
   - remote execution を受ける repo の最小契約
 

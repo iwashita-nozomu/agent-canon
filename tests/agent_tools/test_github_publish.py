@@ -1,4 +1,8 @@
-"""Tests for the gh-backed GitHub publish tool."""
+"""Tests for the gh-backed GitHub publish tool.
+
+CI fresh-clone fixtures cover bootstrap/update behavior; they are not evidence
+of ordinary source-branch publication.
+"""
 
 # @dependency-start
 # contract test
@@ -20,17 +24,17 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from tools.agent_tools import github_publish
-from tools.agent_tools.update_lifecycle_contract import (
+from tools.agent_tools import github_publish  # noqa: E402
+from tools.agent_tools.update_lifecycle_contract import (  # noqa: E402
     materialize_gate_verdict,
     materialize_source_main_rebind_receipt,
     validate_pull_request_lifecycle,
     validate_pull_request_transition,
-)
-from tools.ci.check_agent_canon_pr import (
+)  # noqa: E402
+from tools.ci.check_agent_canon_pr import (  # noqa: E402
     GENERATED_COMPLETENESS_CHECK_IDS,
     materialize_generated_completeness_receipt,
-)
+)  # noqa: E402
 
 CANDIDATE_SHA = "a" * 40
 CANDIDATE_TREE = "b" * 40
@@ -47,6 +51,7 @@ class FakeRunner:
         """Initialize empty command fixtures."""
         self.commands: list[tuple[str, ...]] = []
         self.outputs: dict[tuple[str, ...], github_publish.CommandResult] = {}
+        self.sequences: dict[tuple[str, ...], list[github_publish.CommandResult]] = {}
 
     def add(self, command: Sequence[str], stdout: str = "", stderr: str = "", returncode: int = 0) -> None:
         """Register a command result."""
@@ -58,10 +63,24 @@ class FakeRunner:
             stderr=stderr,
         )
 
+    def add_sequence(
+        self,
+        command: Sequence[str],
+        results: Sequence[github_publish.CommandResult],
+    ) -> None:
+        """Register successive results for a command used before and after push."""
+        self.sequences[tuple(command)] = list(results)
+
     def __call__(self, command: Sequence[str]) -> github_publish.CommandResult:
         """Return the registered result for a command."""
         key = tuple(command)
         self.commands.append(key)
+        sequence = self.sequences.get(key)
+        if sequence:
+            result = sequence.pop(0)
+            if not sequence:
+                self.sequences.pop(key)
+            return result
         if key not in self.outputs:
             return github_publish.CommandResult(
                 args=key,
@@ -89,6 +108,24 @@ class FakeRunner:
         self.add(
             ["gh", "api", "user", "--jq", "{id: .id, login: .login, name: .name}"],
             stdout='{"id":7,"login":"owner","name":"Owner"}',
+        )
+
+    def add_local_identity(
+        self,
+        *,
+        branch: str = "topic",
+        commit_sha: str = CANDIDATE_SHA,
+        tree_sha: str = CANDIDATE_TREE,
+    ) -> None:
+        """Register the local branch, HEAD, and tree readback."""
+        self.add(
+            ["git", "symbolic-ref", "--quiet", "--short", "HEAD"],
+            stdout=branch + "\n",
+        )
+        self.add(["git", "rev-parse", "HEAD"], stdout=commit_sha + "\n")
+        self.add(
+            ["git", "rev-parse", "HEAD^{tree}"],
+            stdout=tree_sha + "\n",
         )
 
 
@@ -283,8 +320,8 @@ class GithubPublishTest(unittest.TestCase):
             "materialize_the_typed_multiple_remotes_or_contributor_lifecycle",
         )
 
-    def test_push_allows_dirty_worktree_and_uses_verified_origin(self) -> None:
-        """Dirty worktree is warning evidence, not a push blocker."""
+    def test_push_uses_sealed_sha_ref_and_exact_remote_readback(self) -> None:
+        """Push preserves the sealed local identity and reads back the exact SHA."""
         runner = FakeRunner()
         runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
         runner.add(
@@ -294,8 +331,23 @@ class GithubPublishTest(unittest.TestCase):
         runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
         runner.add_verified_actor()
         runner.add_publication_identity()
+        runner.add_local_identity()
         runner.add(["git", "status", "--short", "--untracked-files=all"], stdout=" M file.py\n")
-        runner.add(["git", "push", "-u", "origin", "topic"], stderr="pushed\n")
+        runner.add(
+            [
+                "git",
+                "push",
+                "-u",
+                "--force-with-lease",
+                "origin",
+                f"{CANDIDATE_SHA}:refs/heads/topic",
+            ],
+            stderr="pushed\n",
+        )
+        runner.add(
+            ["git", "ls-remote", "origin", "refs/heads/topic"],
+            stdout=f"{CANDIDATE_SHA}\trefs/heads/topic\n",
+        )
         args = argparse.Namespace(
             action="push",
             root=".",
@@ -312,7 +364,391 @@ class GithubPublishTest(unittest.TestCase):
 
         self.assertEqual(summary["status"], "ok")
         self.assertTrue(summary["worktree_dirty"])
-        self.assertIn(("git", "push", "-u", "origin", "topic"), runner.commands)
+        self.assertEqual(summary["local_commit_sha"], CANDIDATE_SHA)
+        self.assertEqual(summary["local_tree_sha"], CANDIDATE_TREE)
+        self.assertEqual(summary["remote_readback_sha"], CANDIDATE_SHA)
+        self.assertIn(
+            (
+                "git",
+                "push",
+                "-u",
+                "--force-with-lease",
+                "origin",
+                f"{CANDIDATE_SHA}:refs/heads/topic",
+            ),
+            runner.commands,
+        )
+        self.assertIn(
+            ("git", "ls-remote", "origin", "refs/heads/topic"),
+            runner.commands,
+        )
+
+    def test_cli_push_is_transport_only_when_packet_file_is_absent(self) -> None:
+        """Standalone push uses transport identity without fake publication gates."""
+        runner = FakeRunner()
+        runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
+        runner.add(
+            [
+                "gh",
+                "repo",
+                "view",
+                "owner/repo",
+                "--json",
+                "nameWithOwner,url,sshUrl,viewerPermission",
+            ],
+            stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
+        )
+        runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+        runner.add_verified_actor()
+        runner.add(["git", "status", "--short", "--untracked-files=all"], stdout="")
+        runner.add_local_identity()
+        runner.add(
+            [
+                "git",
+                "push",
+                "-u",
+                "--force-with-lease",
+                "origin",
+                f"{CANDIDATE_SHA}:refs/heads/topic",
+            ],
+            stderr="pushed\n",
+        )
+        runner.add(
+            ["git", "ls-remote", "origin", "refs/heads/topic"],
+            stdout=f"{CANDIDATE_SHA}\trefs/heads/topic\n",
+        )
+        args = argparse.Namespace(
+            action="push",
+            root=".",
+            user_task="publish topic branch",
+            repo="owner/repo",
+            remote="origin",
+            branch=None,
+            allow_main=False,
+            summary_out=None,
+        )
+
+        summary = github_publish.run(args, runner)
+
+        self.assertEqual(summary["status"], "ok")
+        self.assertEqual(summary["local_commit_sha"], CANDIDATE_SHA)
+        self.assertEqual(summary["local_tree_sha"], CANDIDATE_TREE)
+        self.assertEqual(summary["remote_readback_sha"], CANDIDATE_SHA)
+        self.assertEqual(summary["publication_boundary"], "branch_transport_only")
+        self.assertNotIn("pull_request_lifecycle", summary)
+        self.assertNotIn("g3_gate", summary)
+        self.assertIn(
+            [
+                "git",
+                "push",
+                "-u",
+                "--force-with-lease",
+                "origin",
+                f"{CANDIDATE_SHA}:refs/heads/topic",
+            ],
+            [list(command) for command in runner.commands],
+        )
+
+    def test_publish_pr_rejects_missing_packet(self) -> None:
+        """PR mutation retains the sealed publication packet requirement."""
+        runner = FakeRunner()
+        runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
+        runner.add(
+            [
+                "gh",
+                "repo",
+                "view",
+                "owner/repo",
+                "--json",
+                "nameWithOwner,url,sshUrl,viewerPermission",
+            ],
+            stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
+        )
+        runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+        runner.add_verified_actor()
+        args = argparse.Namespace(
+            action="publish-pr",
+            root=".",
+            user_task="publish topic branch",
+            repo="owner/repo",
+            remote="origin",
+            branch=None,
+            base="main",
+            title="Title",
+            body_file="missing-body.md",
+            draft=False,
+            update_existing=False,
+            allow_main=False,
+            summary_out=None,
+        )
+
+        with self.assertRaises(github_publish.UserVisibleFailure) as raised:
+            github_publish.run(args, runner)
+
+        self.assertIn("publication packet is missing", raised.exception.message)
+        self.assertFalse(any(command[1] == "push" for command in runner.commands))
+
+    def test_push_rejects_local_candidate_mismatch_without_push_fallback(self) -> None:
+        """A local HEAD/tree mismatch is typed and cannot trigger another route."""
+        runner = FakeRunner()
+        runner.add(
+            [
+                "gh",
+                "repo",
+                "view",
+                "owner/repo",
+                "--json",
+                "nameWithOwner,url,sshUrl,viewerPermission",
+            ],
+            stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
+        )
+        runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+        runner.add_verified_actor()
+        runner.add_publication_identity()
+        args = argparse.Namespace(
+            action="push",
+            root=".",
+            user_task="publish topic branch",
+            repo="owner/repo",
+            remote="origin",
+            branch="topic",
+            allow_main=False,
+            summary_out=None,
+        )
+        packet = self.publication_packet(args, runner)
+        authority = github_publish.GithubPublicationAuthority.from_packet(packet)
+        runner.add(["git", "status", "--short", "--untracked-files=all"], stdout="")
+        runner.add_local_identity(commit_sha="e" * 40, tree_sha="f" * 40)
+        verification = github_publish.RemoteVerification(
+            repo="owner/repo",
+            remote="origin",
+            remote_url="git@github.com:owner/repo.git",
+            remote_slug="owner/repo",
+        )
+
+        with self.assertRaises(github_publish.UserVisibleFailure) as raised:
+            github_publish.perform_push(
+                args,
+                runner,
+                verification,
+                "topic",
+                authority=authority,
+            )
+
+        self.assertIn("differs from the sealed lifecycle", raised.exception.message)
+        self.assertFalse(any(command[1] == "push" for command in runner.commands))
+        self.assertFalse(any(command[1] == "ls-remote" for command in runner.commands))
+
+    def test_push_rejects_remote_readback_mismatch(self) -> None:
+        """A different remote SHA is a typed failure after the one exact push."""
+        runner = FakeRunner()
+        runner.add_local_identity()
+        runner.add(["git", "status", "--short", "--untracked-files=all"], stdout="")
+        lifecycle = self.lifecycle_fixture()
+        rebind, cas, upstream = self.publication_components(lifecycle)
+        packet = github_publish.materialize_github_publication_packet(
+            lifecycle=lifecycle,
+            candidate_cas_receipt=cas,
+            source_main_rebind_receipt=rebind,
+            upstream_gate_verdicts=upstream,
+        )
+        authority = github_publish.GithubPublicationAuthority.from_packet(packet)
+        args = argparse.Namespace(
+            action="push",
+            root=".",
+            user_task="publish topic branch",
+            repo="owner/repo",
+            remote="origin",
+            branch="topic",
+            allow_main=False,
+            summary_out=None,
+        )
+        verification = github_publish.RemoteVerification(
+            repo="owner/repo",
+            remote="origin",
+            remote_url="git@github.com:owner/repo.git",
+            remote_slug="owner/repo",
+        )
+        runner.add(
+            [
+                "git",
+                "push",
+                "-u",
+                "--force-with-lease",
+                "origin",
+                f"{CANDIDATE_SHA}:refs/heads/topic",
+            ],
+            stderr="pushed\n",
+        )
+        runner.add(
+            ["git", "ls-remote", "origin", "refs/heads/topic"],
+            stdout=f"{'e' * 40}\trefs/heads/topic\n",
+        )
+
+        with self.assertRaises(github_publish.UserVisibleFailure) as raised:
+            github_publish.perform_push(
+                args,
+                runner,
+                verification,
+                "topic",
+                authority=authority,
+            )
+
+        self.assertIn("readback SHA differs", raised.exception.message)
+        self.assertIn(
+            ("git", "ls-remote", "origin", "refs/heads/topic"),
+            runner.commands,
+        )
+
+    def test_push_rejects_branch_ref_mismatch_without_push(self) -> None:
+        """The selected branch must equal the sealed lifecycle ref."""
+        runner = FakeRunner()
+        runner.add_publication_identity()
+        args = argparse.Namespace(
+            action="push",
+            root=".",
+            user_task="publish topic branch",
+            repo="owner/repo",
+            remote="origin",
+            branch="topic",
+            allow_main=False,
+            summary_out=None,
+        )
+        lifecycle = self.lifecycle_fixture()
+        rebind, cas, upstream = self.publication_components(lifecycle)
+        packet = github_publish.materialize_github_publication_packet(
+            lifecycle=lifecycle,
+            candidate_cas_receipt=cas,
+            source_main_rebind_receipt=rebind,
+            upstream_gate_verdicts=upstream,
+        )
+        authority = github_publish.GithubPublicationAuthority.from_packet(packet)
+        verification = github_publish.RemoteVerification(
+            repo="owner/repo",
+            remote="origin",
+            remote_url="git@github.com:owner/repo.git",
+            remote_slug="owner/repo",
+        )
+
+        with self.assertRaises(github_publish.UserVisibleFailure) as raised:
+            github_publish.perform_push(
+                args,
+                runner,
+                verification,
+                "other",
+                authority=authority,
+            )
+
+        self.assertIn("sealed lifecycle head identity", raised.exception.message)
+        self.assertFalse(any(command[1] == "push" for command in runner.commands))
+
+    def test_push_rejects_post_push_local_identity_change(self) -> None:
+        """A local branch/HEAD/tree change across push is a typed failure."""
+        runner = FakeRunner()
+        runner.add_publication_identity()
+        lifecycle = self.lifecycle_fixture()
+        rebind, cas, upstream = self.publication_components(lifecycle)
+        packet = github_publish.materialize_github_publication_packet(
+            lifecycle=lifecycle,
+            candidate_cas_receipt=cas,
+            source_main_rebind_receipt=rebind,
+            upstream_gate_verdicts=upstream,
+        )
+        authority = github_publish.GithubPublicationAuthority.from_packet(packet)
+        args = argparse.Namespace(
+            action="push",
+            root=".",
+            user_task="publish topic branch",
+            repo="owner/repo",
+            remote="origin",
+            branch="topic",
+            allow_main=False,
+            summary_out=None,
+        )
+        verification = github_publish.RemoteVerification(
+            repo="owner/repo",
+            remote="origin",
+            remote_url="git@github.com:owner/repo.git",
+            remote_slug="owner/repo",
+        )
+        runner.add(["git", "status", "--short", "--untracked-files=all"], stdout="")
+        runner.add_sequence(
+            ["git", "symbolic-ref", "--quiet", "--short", "HEAD"],
+            [
+                github_publish.CommandResult(
+                    args=("git", "symbolic-ref", "--quiet", "--short", "HEAD"),
+                    returncode=0,
+                    stdout="topic\n",
+                    stderr="",
+                ),
+                github_publish.CommandResult(
+                    args=("git", "symbolic-ref", "--quiet", "--short", "HEAD"),
+                    returncode=0,
+                    stdout="other\n",
+                    stderr="",
+                ),
+            ],
+        )
+        runner.add_sequence(
+            ["git", "rev-parse", "HEAD"],
+            [
+                github_publish.CommandResult(
+                    args=("git", "rev-parse", "HEAD"),
+                    returncode=0,
+                    stdout=CANDIDATE_SHA + "\n",
+                    stderr="",
+                ),
+                github_publish.CommandResult(
+                    args=("git", "rev-parse", "HEAD"),
+                    returncode=0,
+                    stdout=CANDIDATE_SHA + "\n",
+                    stderr="",
+                ),
+            ],
+        )
+        runner.add_sequence(
+            ["git", "rev-parse", "HEAD^{tree}"],
+            [
+                github_publish.CommandResult(
+                    args=("git", "rev-parse", "HEAD^{tree}"),
+                    returncode=0,
+                    stdout=CANDIDATE_TREE + "\n",
+                    stderr="",
+                ),
+                github_publish.CommandResult(
+                    args=("git", "rev-parse", "HEAD^{tree}"),
+                    returncode=0,
+                    stdout=CANDIDATE_TREE + "\n",
+                    stderr="",
+                ),
+            ],
+        )
+        runner.add(
+            [
+                "git",
+                "push",
+                "-u",
+                "--force-with-lease",
+                "origin",
+                f"{CANDIDATE_SHA}:refs/heads/topic",
+            ],
+            stderr="pushed\n",
+        )
+        runner.add(
+            ["git", "ls-remote", "origin", "refs/heads/topic"],
+            stdout=f"{CANDIDATE_SHA}\trefs/heads/topic\n",
+        )
+
+        with self.assertRaises(github_publish.UserVisibleFailure) as raised:
+            github_publish.perform_push(
+                args,
+                runner,
+                verification,
+                "topic",
+                authority=authority,
+            )
+
+        self.assertIn("changed across the push", raised.exception.message)
 
     def test_pr_create_uses_gh_after_branch_pr_check(self) -> None:
         """PR creation should use gh with explicit repo, base, head, and body file."""

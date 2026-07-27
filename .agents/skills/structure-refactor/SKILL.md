@@ -12,6 +12,8 @@ upstream design ../../../agents/skills/dependency-analysis.md defines change-imp
 upstream design ../../../agents/skills/prose-reasoning-graph.md defines directory README graph evidence
 upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md documents Codex runtime surface ownership
 upstream design ../../../documents/SHARED_RUNTIME_SURFACES.md defines shared runtime views
+upstream design ../../../documents/rule/README.md defines document rule canon
+upstream design ../../../documents/design/README.md defines design canon reader route
 upstream implementation ../../../tools/agent_tools/responsibility_scope.py validates responsibility scopes
 upstream implementation ../../../tools/agent_tools/import_responsibility.py validates import boundaries
 upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py validates structure-related design evidence claims
@@ -21,6 +23,14 @@ downstream implementation ../../../tests/agent_tools/test_check_dependency_heade
 -->
 
 # Structure Refactor
+
+## 文書正本
+
+文書の filename、配置、構成判断は
+[`documents/rule/README.md`](../../../documents/rule/README.md) を参照します。
+個別の target state と実装境界は
+[`documents/design/README.md`](../../../documents/design/README.md) を参照します。
+詳細規則はこの runtime skill に複製しません。
 
 ## Visualization Adapter Boundary
 

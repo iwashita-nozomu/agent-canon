@@ -29,6 +29,27 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits
 
 大きめの refactor を、feature 追加ではなく挙動保存つきの再編として扱います。
 
+## 共有構造 refactor の実行順
+
+共有 module、canonical tool、親 repository、consumer projection が同じ
+topology を構成する refactor は、次の順序を正本とします。
+
+1. user-facing consumer / parent で完成形を先に確定する。責務、パス、所有境界を
+   明示し、その完成構造を materialize する。
+2. shared module / canonical source/tool を、完成形を生成・維持するように一括実装する。
+3. 他の consumer projection を完成形へ移行する。
+4. checker / CI を完成形の観測可能な意味的性質へ更新し、旧 topology の固定を削除する。
+5. consumer、canonical tool、projection、checker / CI を含む最終 topology をまとめて検証する。
+
+設計文書、CI、source module を先に完成扱いにして consumer 実装を後回しに
+する経路は禁止します。consumer が完成形を materialize できない間は、共有
+module の追従、projection 移行、checker の更新を完了扱いにしません。中間状態を
+通す互換経路は追加せず、各段階に過剰な操作検証を要求せず、最後の return gate
+で完成した全体を検証します。
+この実行順の所有者は `refactor-loop` であり、`structure-refactor` は構造
+surface / runtime boundary の分類を、`agent-canon-update` は AgentCanon 固有の
+source / pin routing を参照として担当します。
+
 ## Use When
 
 - file 分割、rename、module 境界整理

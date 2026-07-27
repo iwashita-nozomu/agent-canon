@@ -4,6 +4,8 @@
     "contract environment",
     "responsibility Defines the shared VS Code devcontainer runtime entrypoint.",
     "upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer ownership policy",
+    "upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract",
+    "upstream implementation ../tools/agent_tools/dependency_module_change.py source clone and workspace lifecycle",
     "downstream implementation post-create.sh runs workspace-mounted setup and agent CLI setup",
     "downstream implementation post-attach.sh reports attach-time runtime status",
     "downstream implementation generate-runtime-compose.sh renders devcontainer compose from repo-local docker pack",
@@ -13,8 +15,8 @@
   "initializeCommand": "bash .devcontainer/bootstrap-shared-runtime.sh && bash .devcontainer/generate-runtime-compose.sh",
   "dockerComposeFile": "docker-compose.generated.yml",
   "service": "workspace",
-  "workspaceFolder": "/workspace",
-  "postCreateCommand": "bash .devcontainer/post-create.sh /workspace",
+  "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
+  "postCreateCommand": "bash .devcontainer/post-create.sh /workspace/${localWorkspaceFolderBasename}",
   "postAttachCommand": "bash .devcontainer/post-attach.sh",
   "shutdownAction": "stopCompose",
   "overrideCommand": false,
@@ -31,9 +33,9 @@
         "ms-vscode.cmake-tools"
       ],
       "settings": {
-        "jupyter.notebookFileRoot": "/workspace",
+        "jupyter.notebookFileRoot": "${workspaceFolder}",
         "python.analysis.extraPaths": [
-          "/workspace/python"
+          "${workspaceFolder}/python"
         ],
         "python.defaultInterpreterPath": "/usr/local/bin/python3",
         "python.terminal.activateEnvironment": false

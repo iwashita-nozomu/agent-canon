@@ -130,6 +130,26 @@ kind = "dir"
 category = "documents"
 
 [[profile.required]]
+path = "documents/rule"
+kind = "dir"
+category = "document_rules"
+
+[[profile.required]]
+path = "documents/rule/README.md"
+kind = "file"
+category = "document_rules"
+
+[[profile.required]]
+path = "documents/rule/naming.md"
+kind = "file"
+category = "document_rules"
+
+[[profile.required]]
+path = "documents/rule/directory-structure.md"
+kind = "file"
+category = "document_rules"
+
+[[profile.required]]
 path = "documents/tools"
 kind = "dir"
 category = "documents"

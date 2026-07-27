@@ -40,7 +40,9 @@ downstream implementation ../tools/update_agent_canon.sh derived repo update hel
 - root 側の shared runtime surface:
   - `documents/shared-runtime-surfaces.toml` に載っている symlink view、synced copy、regular active contract、repo-local state
 - root 側の shared devcontainer:
-  - `.devcontainer/` は AgentCanon-owned symlink view とし、repo-local Dockerfile / runtime pack を消費する
+  - `.devcontainer/` は親-owned の実体ディレクトリ。`bootstrap-shared-runtime.sh` や
+    `finalize-shared-runtime.sh` などは親 wrapper で管理し、`devcontainer.json` だけを
+    AgentCanon source (`vendor/agent-canon/.devcontainer/devcontainer.json`) へ symlink します。
 - root 側の template entrypoint:
   - `README.md`
   - `QUICK_START.md`
@@ -78,7 +80,10 @@ downstream implementation ../tools/update_agent_canon.sh derived repo update hel
 template repo 側では submodule-first の入口を使います。
 
 Run `make agent-canon-update-plan` first. A mutating latest route requires
-current-task user approval and all four inline Git authority/reason fields.
+current-task user approval, all four inline Git authority/reason fields, and
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` in the same
+command segment. The digest is the SHA-256 of the exact bytes of the user
+request record or canonical workflow authorization packet.
 After an approved update, repair and check root views.
 
 - `plan`:
@@ -88,7 +93,7 @@ After an approved update, repair and check root views.
 - `merge-main-into-current`:
   - 通常 sequence ではなく、`vendor/agent-canon/` に local AgentCanon source commit がある場合の AgentCanon PR route で使う
 - `merge-main-into-current-preserve-dirty`:
-  - `vendor/agent-canon/` の dirty state を明示的に stash 退避し、GitHub main 取り込み後に戻す AgentCanon PR route 用入口
+  - standalone source mode only。parent modeでは vendor mutationを拒否し、topic workspace branch clone routeを案内する入口
 - `link-root`:
   - root の symlink view と synced copy を vendor 正本から再構成する
 - `check`:
@@ -112,7 +117,9 @@ remote 名や一台の host path に合わせて変えません。
 - shared canon 変更は repo-local implementation change と同じ PR に混ぜません。
 - PR 前の機械 gate は `make agent-canon-pr-check` を使います。
 - dirty shared-canon 差分は pin 更新で消さず、AgentCanon branch と PR で upstream に取り込みます。
-- AgentCanon PR merge 後は template / derived repo 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、parent pin commit を作ります。
+- AgentCanon PR merge 後は template / derived repo 側で request-evidence-authorized
+  `make agent-canon-ensure-latest`、request-evidence-authorized
+  `bash tools/sync_agent_canon.sh link-root`、parent pin commit を作ります。
 - `bash tools/sync_agent_canon.sh push` は maintainer が direct upstream push を明示した例外だけにします。
 - GitHub 管理では、template PR と AgentCanon PR / commit の対応、submodule pin、GitHub `main` SHA、security check 状態を PR 本文に残します。
 
@@ -191,7 +198,8 @@ root 側は owner class ごとに薄い wrapper、symlink view、copy surface、
 ### 7.1 root symlink surface を修復
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
@@ -200,7 +208,8 @@ bash tools/sync_agent_canon.sh check
 既存の `snapshot` command は後方互換のため `link-root` の alias として残します。
 
 ```bash
-bash tools/sync_agent_canon.sh snapshot
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh snapshot
 ```
 
 ### 7.3 初回 clone / recovery
@@ -222,12 +231,16 @@ derived repo で `agent-canon` だけ更新したい場合の既定入口は `up
 通常の動線は high-level `plan -> latest` です。
 `sync_agent_canon.sh ensure-latest` は task 開始時の freshness gate、`link-root` は root view drift 修復、`push` は shared canon を直接 upstream に戻す保守者向け低レベル入口です。
 通常の派生 repo update で `sync_agent_canon.sh pull` を直接選びません。
-derived repo の `vendor/agent-canon/` に local commit または source dirty state がある場合は、current-task user approval と全 4 inline Git authority/reason field を得て protected merge route で dirty state を保護しながら GitHub `main` を current branch に取り込み、validation 後にその branch を GitHub へ push して AgentCanon PR を開きます。
+derived repo の `vendor/agent-canon/` に local commit または source dirty state がある場合は、parent source surfaceとして扱わず、topic workspace branch cloneへowner-evidence付きで移送してから GitHub PRを開きます。parent modeでdirty stateを保護・stash・再開しません。
 `plan` は read-only で route を示します。
 submodule repo では `already_current_submodule` / `submodule_update` を通常 route として扱います。legacy subtree metadata がある branch での `subtree_pull` や `snapshot_import_no_subtree*` 系 route は compatibility appendix だけの扱いです。
 
 `ensure-latest` は task 開始時の入口です。
 submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、upstream `agent-canon` と local submodule pin / worktree を比較します。
+provenance and existing authority validation run before eval-log parking,
+checkout, submodule update, root-view mutation, and staging. Automatic sync
+commits use the fixed AgentCanon Sync Automation identity and formal
+`AgentCanon-*` trailers.
 clean な submodule worktree が remote main を指していて parent gitlink だけ古い場合は、parent pin を更新対象として扱います。
 `agent-canon` remote が未設定の場合は、GitHub canonical remote
 `https://github.com/iwashita-nozomu/agent-canon.git` を自動追加します。
@@ -239,18 +252,22 @@ unsafe な AgentCanon update surface で stale が見つかった場合は、作
 
 ### 7.4.1 local submodule branch の main 追従
 
-親 repo の tree diff だけで AgentCanon 差分を判断しません。`vendor/agent-canon/` の current branch を明示し、GitHub main を取り込んでから PR にします。
+親 repo の tree diff だけで AgentCanon 差分を判断しません。source の
+current branch は topic workspace の managed clone で明示し、GitHub main を
+取り込んでから PR にします。`vendor/agent-canon/` は clean pin の readback
+対象であり、source branch ではありません。
 
-Invoke protected `merge-main-into-current-preserve-dirty` only after
-current-task user approval and with all four inline Git authority/reason fields.
+Invoke protected `merge-main-into-current-preserve-dirty` only in standalone
+source mode after current-task user approval and with all four inline Git
+authority/reason fields. Parent mode refuses it and routes to the workspace-root
+branch clone.
 
-- `blocked_dirty`: uncommitted AgentCanon work があるため、commit / stash 後に再実行します。
+- `blocked_dirty`: parent mode では vendor source を保存・stash・継続せず、owner evidence 付きの topic workspace source clone routeへ移送します。standalone source mode はその source checkout の責務で処理します。
 - `blocked_detached_head`: named branch が無いため、AgentCanon PR branch を作ってから再実行します。
 - `already_current` / `already_contains_main`: validation 後に branch push または parent pin update へ進みます。
 - `fast_forwarded` / `merged`: validation 後に current AgentCanon branch を GitHub へ push し、AgentCanon PR を開くか更新します。
-- `conflict`: `vendor/agent-canon/` 内で conflict を解消し、commit してから validation と push に進みます。
-- `merge-main-into-current` は clean worktree を要求する strict 入口です。dirty state がある通常運用では、手作業 stash ではなく `merge-main-into-current-preserve-dirty` を使います。
-- `merge-main-into-current-preserve-dirty` は merge が成功した場合だけ stash を戻して drop します。main merge が conflict した場合は stash を保持し、conflict 解消後に出力された stash ref を適用します。
+- `conflict`: parent mode では vendor checkout 内で conflict を解消せず、独立 topic cloneへ source state を移送してから validation と push に進みます。
+- `merge-main-into-current` と `merge-main-into-current-preserve-dirty` は standalone source modeだけの入口です。parent modeでは vendorをsource branchとして変更せず、topic workspace branch cloneへ停止・移送します。
 
 ### 7.5 subtree から submodule への移行
 
@@ -259,7 +276,8 @@ commit message には `AgentCanon subtree-to-submodule migration` と、local wo
 
 標準 pin は `vendor/agent-canon` の submodule URL
 `https://github.com/iwashita-nozomu/agent-canon.git`、branch `main` です。
-親 repo の root symlink view は維持し、`bash tools/sync_agent_canon.sh link-root` と `bash tools/sync_agent_canon.sh check` で検証します。
+親 repo の root symlink view は維持し、request-evidence-authorized
+`bash tools/sync_agent_canon.sh link-root` と `bash tools/sync_agent_canon.sh check` で検証します。
 
 ### 7.6 template / 派生 repo 側の shared canon 変更を upstream へ戻す
 
@@ -268,7 +286,7 @@ returns to the user; it never triggers an implicit branch creation or switch.
 After approval, invoke the protected merge wrapper with all four inline Git
 authority/reason fields, then push the already-current branch.
 
-通常は AgentCanon branch と AgentCanon PR 経由で戻します。AgentCanon main に取り込まれた後、template / 派生 repo 側で `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` を再実行して差分を持ち帰ります。`sync_agent_canon.sh push` は maintainer が direct upstream push を選ぶ場合だけ使います。
+通常は AgentCanon branch と AgentCanon PR 経由で戻します。AgentCanon main に取り込まれた後、template / 派生 repo 側で request-evidence-authorized `make agent-canon-ensure-latest` と request-evidence-authorized `bash tools/sync_agent_canon.sh link-root` を再実行して差分を持ち帰ります。`sync_agent_canon.sh push` は maintainer が direct upstream push を選ぶ場合だけ使います。
 
 ### 7.6 現在の設定確認
 
@@ -281,8 +299,9 @@ bash tools/sync_agent_canon.sh status
 Project-local remotes are not a user-facing AgentCanon update path. Existing
 repos must migrate `.gitmodules` back to the canonical GitHub URL before normal
 AgentCanon PR work. New AgentCanon changes go through GitHub branches and PRs,
-with `merge-main-into-current-preserve-dirty` used before push when the branch
-was created from a derived repo.
+with the standalone source-branch merge route used before push. A branch created
+from a derived repo must first be materialized as the workspace-root source clone;
+parent vendor dirt is not a supported topology.
 
 ## 8. 移行フェーズ
 
@@ -344,9 +363,9 @@ exit 条件:
 
 legacy subtree repo は移行完了まで次を互換 path として使えます。
 
-- `bash tools/sync_agent_canon.sh pull`
+- `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh pull`
 - `bash tools/sync_agent_canon.sh push` (maintainer direct-push exception only)
-- `git subtree pull --prefix=vendor/agent-canon`
+- `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> git subtree pull --prefix=vendor/agent-canon`
 - `git subtree push --prefix=vendor/agent-canon`
 - `snapshot_import_no_subtree*` alternate route
 

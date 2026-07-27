@@ -13,8 +13,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP_DIR="$(mktemp -d -t template-fresh-clone-XXXXXX)"
-CLONE_DIR="${TMP_DIR}/clone"
+TOPIC_ROOT="${TMP_DIR}/workspace/fresh-clone"
+CLONE_DIR="${TOPIC_ROOT}/agent-canon"
 trap 'rm -rf "${TMP_DIR}"' EXIT
+
+mkdir -p "${TOPIC_ROOT}"
 
 echo "fresh-clone source: ${ROOT_DIR}"
 echo "fresh-clone target: ${CLONE_DIR}"
@@ -51,6 +54,10 @@ for path in AGENTS.md agents .agents .codex/config.toml .codex/hooks.json agents
   fi
 done
 
+COMMIT_REQUEST_EVIDENCE_DIGEST="$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')"
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:${COMMIT_REQUEST_EVIDENCE_DIGEST}"
+echo "fresh-clone commit request evidence: ${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}"
+
 python3 -m json.tool .devcontainer/devcontainer.json >/dev/null
 bash .devcontainer/generate-runtime-compose.sh >/dev/null
 python3 - <<'PY'
@@ -63,8 +70,22 @@ compose_path = Path(".devcontainer/docker-compose.generated.yml")
 data = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
 assert data["name"].endswith("-devcontainer"), "compose project name missing"
 assert "services" in data and "workspace" in data["services"], "workspace service missing"
-assert data["services"]["workspace"]["working_dir"] == "/workspace"
+expected_working_dir = f"/workspace/{Path.cwd().name}"
+assert data["services"]["workspace"]["working_dir"] == expected_working_dir
 PY
+
+parent_projection_mode=false
+if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1 \
+  || [ -d vendor/agent-canon ]; then
+  parent_projection_mode=true
+fi
+if [ "$parent_projection_mode" = false ]; then
+  echo "FRESH_CLONE_AGENT_CANON_MODE=standalone"
+  echo "FRESH_CLONE_PARENT_PROJECTION=not-applicable"
+  echo "FRESH_CLONE_REPOSITORY_CI_OWNER=repository_ci_job"
+  echo "FRESH_CLONE_ACCEPTANCE=pass"
+  exit 0
+fi
 
 bash tools/sync_agent_canon.sh check
 AGENT_CANON_TEST_REMOTE="${TMP_DIR}/agent-canon-upstream.git"
@@ -151,6 +172,7 @@ PY
   AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance materializes the canonical source lifecycle" \
   AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
   AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
     bash tools/update_agent_canon.sh latest
 )
 
@@ -218,6 +240,7 @@ AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
 AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
 AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
 AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
   bash tools/update_agent_canon.sh apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 (
@@ -234,6 +257,7 @@ AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
 AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
 AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
 AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
 GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" \
   bash tools/update_agent_canon.sh apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-no-subtree-marker

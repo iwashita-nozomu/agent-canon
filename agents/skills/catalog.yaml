@@ -316,6 +316,35 @@ skill_families:
         - ["run bundle", "evidence"]
         - ["蓄積分析", "レポート"]
         - ["ログ", "レポート", "残"]
+  - id: result-visualize
+    purpose: Design reusable result visualizations by binding each figure to explicit calculations, coverage rules, denominators, and chart geometry.
+    canonical_doc: agents/skills/result-visualize.md
+    shim: .agents/skills/result-visualize/SKILL.md
+    related_skills:
+      - structure-planning
+      - report-writing
+      - html-output
+      - html-experiment-report
+      - result-artifact-writeout
+      - experiment-review
+      - experiment-lifecycle
+    routing:
+      stage_policy: active
+      reason: result figure design, metric calculation, coverage denominator handling, or reusable visualization planning is in scope
+      triggers:
+        - ["result", "visualization"]
+        - ["result", "visualise"]
+        - ["result", "aggregation"]
+        - ["result", "figure", "calculation"]
+        - ["計算方法", "可視化"]
+        - ["図", "可視化"]
+        - ["図", "集約"]
+        - ["結果", "可視化"]
+        - ["可視化", "集計"]
+        - ["figure", "pooling"]
+        - ["visualize", "results"]
+        - ["figure", "inventory"]
+        - ["result", "figure", "inventory"]
   - id: tool-finding-report
     purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
     canonical_doc: agents/skills/tool-finding-report.md
@@ -467,6 +496,7 @@ skill_families:
     canonical_doc: agents/skills/agent-canon-update.md
     shim: .agents/skills/agent-canon-update/SKILL.md
     related_skills:
+      - dependency-module-change
       - pr-processing
       - agent-update-branch
       - structure-refactor
@@ -494,6 +524,27 @@ skill_families:
         - ["sync_agent_canon.sh"]
         - ["agent-canon", "pr"]
         - ["agentcanon", "更新"]
+  - id: dependency-module-change
+    purpose: Manage independent dependency source clones and reconstructibility-based cleanup without editing vendored source checkouts.
+    canonical_doc: agents/skills/dependency-module-change.md
+    shim: .agents/skills/dependency-module-change/SKILL.md
+    related_skills:
+      - agent-canon-update
+      - dependency-analysis
+      - structure-refactor
+      - task-routing
+    routing:
+      stage_policy: active
+      reason: dependency source clone, module lifecycle, or reconstructibility cleanup is in scope
+      triggers:
+        - ["dependency", "module", "change"]
+        - ["dependency", "source", "clone"]
+        - ["source", "clone", "cleanup"]
+        - [".gitmodules", "topic", "workspace"]
+        - ["依存", "モジュール", "変更"]
+        - ["依存", "source", "clone"]
+        - ["独立", "source", "clone"]
+        - ["モジュール", "cleanup"]
   - id: pr-processing
     purpose: Process GitHub pull request and issue queues by inventorying state, preserving PR Essence in bodies and run bundles, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
     canonical_doc: agents/skills/pr-processing.md

@@ -21,7 +21,11 @@ umask 0007
   exit 1
 }
 
-workspace="${1:-/workspace}"
+workspace="${1:-}"
+[ -n "$workspace" ] || {
+  echo "post-create requires the selected repository root argument" >&2
+  exit 1
+}
 devcontainer_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "${devcontainer_dir}/finalize-shared-runtime.sh"
 node_version="${NODE_VERSION:-22.14.0}"
