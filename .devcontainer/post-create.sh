@@ -152,6 +152,13 @@ install_structure_inspection_tools() {
   apt_install tree
 }
 
+install_cpp_formatting_tools() {
+  if command -v clang-format >/dev/null 2>&1; then
+    return
+  fi
+  apt_install clang-format
+}
+
 install_tex_tooling() {
   if command -v latexmk >/dev/null 2>&1 \
     && command -v pdflatex >/dev/null 2>&1 \
@@ -469,7 +476,7 @@ publish_container_local_runtime() {
   local tool_status
 
   install -d -m 755 "$runtime_root" "$runtime_root/runs" "$runtime_root/logs" "$source_projection_root"
-  tool_status="$(for tool in agent-canon codex gh jq tree; do
+  tool_status="$(for tool in agent-canon clang-format codex gh jq tree; do
     if command -v "$tool" >/dev/null 2>&1; then
       printf '    "%s": {"available": true, "source": "cataloged"},\n' "$tool"
     else
@@ -507,6 +514,7 @@ install_codex_cli
 install_browser_validation_tooling
 install_json_cli_tools
 install_structure_inspection_tools
+install_cpp_formatting_tools
 install_tex_tooling
 install_lean_toolchain
 install_secret_scanners
@@ -515,6 +523,7 @@ build_structured_analysis_cache
 publish_container_local_runtime
 jq --version
 tree --version
+clang-format --version
 latexmk --version | sed -n '1p'
 pdflatex --version | sed -n '1p'
 xelatex --version | sed -n '1p'
