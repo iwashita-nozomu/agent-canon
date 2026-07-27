@@ -944,7 +944,7 @@ description = "The human test-design skill must require numerical trigger, alter
 id = "TEST-DESIGN-NUMERICAL-GATE-DOC-1"
 critical = true
 description = "Routes numerical test admission to the canonical testing convention after activation."
-required_regex = ["activation=required", "documents/coding-conventions-testing\\.md", "Numerical Test Admission Gate", "数値 trigger", "non-numerical alternative", "oracle", "budget"]
+required_regex = ["activation=required", "documents/conventions/coding-conventions-testing\\.md", "Numerical Test Admission Gate", "数値 trigger", "non-numerical alternative", "oracle", "budget"]
 
 [[evals]]
 id = "test-design-validation-failure-response-doc"
