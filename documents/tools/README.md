@@ -2,8 +2,8 @@
 @dependency-start
 contract reference
 responsibility Documents ツール入口 for this repository.
-upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
-upstream design ../runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
+upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../runtime/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 upstream design ../prose-reasoning-graph/dsl-spec.md graph visualization projection contract
 upstream design ../../agents/skills/code-visualization.md sole public visualization owner and closeout boundary
@@ -46,8 +46,8 @@ downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JI
 root 側からよく使う実行導線だけを整理します。
 
 agent/worktree helper、review / validation runner、docs-check helper、container runtime helper、experiment scaffold / registry helper のうち shared canon に属するものは `vendor/agent-canon/` が正本です。
-ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURFACES.md) を参照し、この文書では root 側の実行入口だけを案内します。
-実行する tool は [Runtime Profiles And Check Matrix](../runtime-profiles-and-check-matrix.md) の active profile と changed path で選びます。
+ownership と validation は [SHARED_RUNTIME_SURFACES.md](../runtime/SHARED_RUNTIME_SURFACES.md) を参照し、この文書では root 側の実行入口だけを案内します。
+実行する tool は [Runtime Profiles And Check Matrix](../runtime/runtime-profiles-and-check-matrix.md) の active profile と changed path で選びます。
 
 ## この文書の読み方
 
@@ -68,7 +68,7 @@ first and then return here only for reader-facing context.
 | Validate visualization coverage and post-format readback | [Visualization Contract](visualization_contract.md), then `$code-visualization` | Producers retain native domain validation; the sole public owner has final projection coverage/readback authority, and renderers are adapters. |
 | Understand dependency tool purpose and license evidence | [Dependency Tools And Licenses](dependency-tools-and-licenses.md) | Human-facing summary of external tools and license evidence. |
 | Check design-document claims against code and dependency evidence | [check_design_doc_claims.py](check_design_doc_claims.md) | Use before accepting implementation-backed design prose or structure-refactor handoff claims. |
-| Materialize source-bound runtime evidence or consume its graph snapshot | [Runtime Log Archive](../runtime-log-archive.md), then Source-Bound Runtime and Graph Consumers below | The materializer owns prepared artifact/outcome receipts; graph status/query/context are consume-only. |
+| Materialize source-bound runtime evidence or consume its graph snapshot | [Runtime Log Archive](../runtime/runtime-log-archive.md), then Source-Bound Runtime and Graph Consumers below | The materializer owns prepared artifact/outcome receipts; graph status/query/context are consume-only. |
 | Understand root `tools/` execution behavior | `tools/README.md` | Execution-facing hub for the symlink view and common commands. |
 | Understand graph visualization outputs | `documents/prose-reasoning-graph/dsl-spec.md`, then the same-named tool doc | Graph HTML, DOT, Mermaid, and dashboard diagrams are DSL projection or adapter artifacts. |
 
@@ -147,7 +147,7 @@ second command manual.
 - repo-local bootstrap の実装は `scripts/` に置きます。
 - agent helper、CI、review、validation、container runner、experiment helper、Markdown helper は `tools/` に置きます。
 - template 固有の slug 置換や bare remote 初期化だけを `scripts/` に置きます。
-- 過去の `tools/legacy/` 配置は廃止済みです。派生 repo 由来の tool は repo-neutral に昇格するか、元 repo 側に残すか、削除判断を `documents/repo-local-tool-imports.md` に記録します。
+- 過去の `tools/legacy/` 配置は廃止済みです。派生 repo 由来の tool は repo-neutral に昇格するか、元 repo 側に残すか、削除判断を `documents/tools/repo-local-tool-imports.md` に記録します。
 
 ## よく使うもの
 
@@ -248,7 +248,7 @@ second command manual.
   - AgentCanon PR merge 後に `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。この target は `make agent-canon-latest` と同じ high-level route です。
   - GitHub 管理では `iwashita-nozomu/agent-canon` と template GitHub repo の `main` SHA、AgentCanon PR URL、submodule pin を PR 本文に残します。
 - `tools/agent_tools/agent_canon_update_todos.py`
-  - AgentCanon pin 更新後に、親 repo の agent が先に消化する TODO を `vendor/agent-canon/documents/agent-canon-update-tasks.toml` から抽出します。
+  - AgentCanon pin 更新後に、親 repo の agent が先に消化する TODO を `vendor/agent-canon/documents/agent-canon/agent-canon-update-tasks.toml` から抽出します。
   - 親 repo の進捗は `.agent-canon/update-state.toml` にだけ残し、生成された pending view は `.agent-canon/.gitignore` で ignored にします。
   - `pending` は停止ではなくルーティングです。`plan --write` で TODO view を出し、`complete` または `defer` で解決記録を残してから `acknowledge` で `tasks_applied_through` を進めます。
 - `tools/rebuild_agent_tools.sh`
@@ -369,7 +369,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - `.codex/config.toml` で有効化する session goal view です。repo-owned durable state は `goal.md`、機械 gate は `goal_loop.py status` に置き、使い方は `agents/workflows/codex-goals-workflow.md` を正本にします。`/goal <objective>` を指定した task では、`goal_loop.py plan` の work breakdown と `/plan` の Goal Contract / evidence map を固定してから実装します。
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
   - skill / workflow prompt surface を `evidence/agent-evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細結果を蓄積します。agent が読む場合は `--compact-out <path>.json` を併用し、stdout ではなく compact JSON の統計を読んでから必要な artifact へ drill down します。
-  - hook event は PostToolUse で source repo の `.agent-canon/runtime-event-spool/` へ atomic no-replace publish し、archive Git や `ensure` を呼びません。明示 `runtime_log_archive_git.py sync` が nonblocking lock、1 回の ensure、snapshot/ingest/dedup/projection、commit/push/readback、verified finalize を所有します。hot path は `check-hook-hot-path` で archive context 構築前に検査します。eval report、Codex runtime summary、`reports/agents/` の agent run report と checkpoint 済み hook JSONL は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にします。
+  - hook event は PostToolUse で source repo の `.agent-canon/runtime-event-spool/` へ atomic no-replace publish し、archive Git や `ensure` を呼びません。明示 `runtime_log_archive_git.py sync` が nonblocking lock、1 回の ensure、snapshot/ingest/dedup/projection、commit/push/readback、verified finalize を所有します。hot path は `check-hook-hot-path` で archive context 構築前に検査します。eval report、Codex runtime summary、`reports/agents/` の agent run report と checkpoint 済み hook JSONL は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime/runtime-log-archive.md` を正本にします。
   - `generate_agent_improvement_guide.py` は `memory/`、mounted `.agent-canon/log-archive/eval-results/skill-workflow-prompt/`、mounted hook archive、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、skill usage、hook event、tool name、checker target、protocol feedback token の不足をまとめ、実修正は local Codex に渡します。
   - `generate_agent_runtime_dashboard.py` は同じ evidence tree を人間が見るための dashboard にします。正本ログの場所、hook namespace、entry 数、skill usage、prompt route 候補、human feedback、eval report family、issue 数を Markdown に出し、GitHub Actions では AgentCanon repo の Step Summary と artifact にだけ出します。agent がログ分析するときは `--compact-out` で token-light summary、generated drilldown、prompt/token rolling trend を生成し、通常分析では raw JSONL を開かずそれを読みます。token 利用は lifetime total だけではなく recent moving average と coverage status で判断します。足りない詳細は raw log 検索ではなく dashboard tool の追加 summary として生成し、raw JSONL は tool 実装、schema debugging、corruption audit の explicit rationale がある場合だけ使います。
   - `run_accumulated_agent_evals.py` は同じ evidence tree の required eval family を機械的に追記する入口です。role、skill/workflow prompt、workflow-selection、report-quality の各 eval を `--accumulate` で実行し、標準出力は log file に捕捉します。
@@ -454,7 +454,7 @@ readback. Graph status/query/context do not trigger this checkpoint.
 ## 結果ログと可視化
 
 保存先、summary、可視化 artifact、retention decision は
-[result-log-retention-and-visualization.md](../result-log-retention-and-visualization.md)
+[result-log-retention-and-visualization.md](../experiments/result-log-retention-and-visualization.md)
 を正本にします。
 
 よく使う変換:
@@ -477,4 +477,4 @@ closeout では raw log だけでなく、summary/report path と可視化 path�
 
 - Template-derived repositories may add a root-local `scripts/README.md` for
   repo bootstrap scripts that are not AgentCanon-owned tools.
-- [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURFACES.md)
+- [SHARED_RUNTIME_SURFACES.md](../runtime/SHARED_RUNTIME_SURFACES.md)

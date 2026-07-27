@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Checks whether a parent repository satisfies AgentCanon runtime expectations.
-# upstream design ../../documents/shared-runtime-surfaces.toml root surface ownership manifest
-# upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md parent update checklist
-# upstream design ../../documents/gpu-admission-r5-source-packet.md runtime identity receipt consumer boundary
+# upstream design ../../documents/runtime/shared-runtime-surfaces.toml root surface ownership manifest
+# upstream design ../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent update checklist
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md runtime identity receipt consumer boundary
 # upstream implementation ./surface_manifest.py parses shared runtime surface manifests
 # upstream implementation ../ci/container_config.py validates parent Docker/devcontainer surfaces
 # upstream implementation ../../.devcontainer/bootstrap-shared-runtime.sh publishes the provision receipt
@@ -31,7 +31,7 @@ from typing import Protocol, cast
 from surface_manifest import SurfaceEntry, load_manifest, target_for_entry
 
 DEFAULT_PREFIX = "vendor/agent-canon"
-DEFAULT_MANIFEST = "documents/shared-runtime-surfaces.toml"
+DEFAULT_MANIFEST = "documents/runtime/shared-runtime-surfaces.toml"
 DEFAULT_TREE_DEPTH = 3
 DEFAULT_TREE_IGNORE = ".git|__pycache__|.venv|node_modules|target|reports"
 ERROR = "error"

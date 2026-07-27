@@ -2,8 +2,8 @@
 @dependency-start
 contract design
 responsibility Documents the jax_util algorithm module contract checked by AgentCanon tools.
-upstream design ../../algorithm-implementation-boundary.md algorithm boundary policy
-upstream design ../../coding-conventions-python.md Python implementation policy
+upstream design ../algorithm-implementation-boundary.md algorithm boundary policy
+upstream design ../../conventions/coding-conventions-python.md Python implementation policy
 downstream implementation ../../../tools/agent_tools/check_algorithm_config_partition.py checks config ownership
 downstream implementation ../../../rust/agent-canon/src/python_algorithm_contract.rs checks algorithm module AST contracts
 downstream implementation ../../../tools/catalog.yaml records the checker documentation surface

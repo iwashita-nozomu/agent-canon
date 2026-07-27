@@ -9,7 +9,7 @@
 # upstream design ../../.agents/skills/owner-bounded-routing/SKILL.md exposes owner-bounded preflight routing
 # upstream design ../../agents/skills/experiment-lifecycle.md owns experiment execution lifecycle routing
 # upstream design ../../.agents/skills/experiment-lifecycle/SKILL.md exposes experiment execution lifecycle routing
-# upstream design ../../documents/experiment-registry.md defines managed experiment registry contract
+# upstream design ../../documents/experiments/experiment-registry.md defines managed experiment registry contract
 # upstream design ../../tools/README.md documents tool entrypoints
 # upstream design ../../documents/tools/README.md documents user-facing tool routes
 # upstream implementation ./log_surface_inventory.py checks hook/tool/skill log-surface drift
@@ -125,8 +125,8 @@ EXPERIMENT_EXECUTION_SURFACE_PATHS = frozenset(
         ".agents/skills/experiment-lifecycle/SKILL.md",
         "agents/skills/experiment-lifecycle.md",
         "agents/workflows/experiment-workflow.md",
-        "documents/experiment-registry.md",
-        "documents/experiment_runner.md",
+        "documents/experiments/experiment-registry.md",
+        "documents/design/experiment_runner.md",
         "experiments/registry.toml",
         "tools/ci/check_experiment_registry.py",
         "tools/experiments/publish_result_branch.py",
@@ -314,7 +314,7 @@ LOG_SURFACE_GATE_TEMPLATES = (
         gate="log_surface_inventory_guard",
         command_template=(
             "python3 tools/agent_tools/log_surface_inventory.py --root . "
-            "--check --baseline documents/log-surface-inventory.json"
+            "--check --baseline documents/runtime/log-surface-inventory.json"
         ),
         handoff=(
             "state whether emitted hook/tool/skill fields changed and regenerate "
@@ -381,7 +381,7 @@ AGENT_CANON_LOG_SURFACE_GATE_TEMPLATES = (
         command_template=(
             "cd vendor/agent-canon && "
             "python3 tools/agent_tools/log_surface_inventory.py --root . "
-            "--check --baseline documents/log-surface-inventory.json"
+            "--check --baseline documents/runtime/log-surface-inventory.json"
         ),
         handoff=(
             "validate AgentCanon source log-surface inventory from "

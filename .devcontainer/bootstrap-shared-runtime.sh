@@ -3,8 +3,8 @@
 # contract environment
 # responsibility Provisions the host-side shared AgentCanon runtime namespace before Compose creation.
 # upstream design ../CONTAINER_OPERATIONS.md exact shared-runtime identity and namespace contract
-# upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
-# upstream design ../documents/gpu-admission-r5-source-packet.md exact provision receipt path and owner boundary
+# upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
+# upstream design ../documents/experiments/gpu-admission-r5-source-packet.md exact provision receipt path and owner boundary
 # upstream implementation ../tools/experiments/execution_resource_plan.py owns atomic runtime receipt publication
 # downstream implementation finalize-shared-runtime.sh proves the container readback
 # downstream implementation generate-runtime-compose.sh renders the matching bind and identity

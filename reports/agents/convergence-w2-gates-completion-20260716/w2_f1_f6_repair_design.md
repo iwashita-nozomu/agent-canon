@@ -4,8 +4,8 @@
 @dependency-start
 contract design
 responsibility Defines the implementation-ready design for the W2 completion-coverage gate repair.
-upstream design ../../../documents/runtime-profiles-and-check-matrix.md owns validation profile and failure-response routing.
-upstream design ../../../documents/object-oriented-design.md owns replaceable responsibility and typed-boundary design vocabulary.
+upstream design ../../../documents/runtime/runtime-profiles-and-check-matrix.md owns validation profile and failure-response routing.
+upstream design ../../../documents/conventions/object-oriented-design.md owns replaceable responsibility and typed-boundary design vocabulary.
 upstream implementation ../../../tools/agent_tools/work_log.py owns the canonical semantic ledger.
 upstream implementation ../../../tools/agent_tools/report_artifact_checks.py owns the completion-coverage projection and predicates.
 downstream implementation ../../../tools/agent_tools/task_close.py consumes the checked completion projection.
@@ -165,10 +165,10 @@ order before editing:
    around 150–245; and `tests/agent_tools/test_work_log.py` run-log boundary
    tests.
 8. Design and validation authorities:
-   `documents/runtime-profiles-and-check-matrix.json` and its Markdown
-   projection, `documents/object-oriented-design.md`,
+   `documents/runtime/runtime-profiles-and-check-matrix.json` and its Markdown
+   projection, `documents/conventions/object-oriented-design.md`,
    `documents/tools/agent-canon.md`,
-   `documents/dependency-contract-kinds.toml`, and the dependency headers of
+   `documents/design/dependency-contract-kinds.toml`, and the dependency headers of
    every path in the side-effect map.
 
 No Python execution, test execution, CI, dynamic graph, or source mutation was

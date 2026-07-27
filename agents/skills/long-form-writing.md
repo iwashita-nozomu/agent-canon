@@ -51,7 +51,7 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 ## Core References
 
 - `agents/workflows/long-form-writing-workflow.md`
-- `documents/REVIEW_PROCESS.md`
+- `documents/conventions/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 
 ## Mandatory Checklist

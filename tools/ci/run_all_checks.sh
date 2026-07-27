@@ -59,7 +59,7 @@ set -euo pipefail
 #
 # 関連ドキュメント:
 #   - documents/tools/README.md: repo-wide tool entrypoints
-#   - documents/REVIEW_PROCESS.md: review と validation の正本
+#   - documents/conventions/REVIEW_PROCESS.md: review と validation の正本
 #   - .github/workflows/ci.yml: GitHub Actions ワークフロー
 #
 # ═══════════════════════════════════════════════════════════════════════════

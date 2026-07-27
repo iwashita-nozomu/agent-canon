@@ -23,12 +23,12 @@ AgentCanon の source of truth は GitHub remote です。
 
 ## Core References
 
-- `documents/template-bootstrap.md`
+- `documents/contracts/template-bootstrap.md`
 - `scripts/README.md`
 - `scripts/start_repository.sh`
 - `scripts/init_from_template.sh`
-- AgentCanon document `documents/runtime-profiles-and-check-matrix.md`; from a template or derived repo root, resolve it as `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md`
-- AgentCanon document `documents/agent-canon-github-remote.md`; from a template or derived repo root, resolve it as `vendor/agent-canon/documents/agent-canon-github-remote.md`
+- AgentCanon document `documents/runtime/runtime-profiles-and-check-matrix.md`; from a template or derived repo root, resolve it as `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md`
+- AgentCanon document `documents/agent-canon/agent-canon-github-remote.md`; from a template or derived repo root, resolve it as `vendor/agent-canon/documents/agent-canon/agent-canon-github-remote.md`
 - `tools/sync_agent_canon.sh`
 
 ## Default Sequence

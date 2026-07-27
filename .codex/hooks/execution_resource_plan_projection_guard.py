@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Validates and forwards the exact R5 PostToolUse projection only.
-# upstream design ../../documents/gpu-admission-r5-source-packet.md U-14/U-15 projection consumer contract and composition graph
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md U-14/U-15 projection consumer contract and composition graph
 # downstream implementation hook_dispatcher.py PostToolUse child registration and selective forwarding
 # @dependency-end
 

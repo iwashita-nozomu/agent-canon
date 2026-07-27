@@ -944,7 +944,7 @@ description = "The human test-design skill must require numerical trigger, alter
 id = "TEST-DESIGN-NUMERICAL-GATE-DOC-1"
 critical = true
 description = "Routes numerical test admission to the canonical testing convention after activation."
-required_regex = ["activation=required", "documents/coding-conventions-testing\\.md", "Numerical Test Admission Gate", "数値 trigger", "non-numerical alternative", "oracle", "budget"]
+required_regex = ["activation=required", "documents/conventions/coding-conventions-testing\\.md", "Numerical Test Admission Gate", "数値 trigger", "non-numerical alternative", "oracle", "budget"]
 
 [[evals]]
 id = "test-design-validation-failure-response-doc"
@@ -957,11 +957,11 @@ description = "The human test-design skill must classify validation failures bef
 id = "TEST-DESIGN-VALIDATION-FAILURE-DOC-1"
 critical = true
 description = "Requires validation/check failure response evidence before weakening intended behavior and avoids blocking implementation bugs behind extra test planning."
-required_regex = ["failing_contract", "observation_level", "cause_classification", "intent_preservation", "documents/runtime-profiles-and-check-matrix\\.json", "owning code", "intent を弱めません"]
+required_regex = ["failing_contract", "observation_level", "cause_classification", "intent_preservation", "documents/runtime/runtime-profiles-and-check-matrix\\.json", "owning code", "intent を弱めません"]
 
 [[evals]]
 id = "testing-conventions-numerical-admission-gate"
-target = "documents/coding-conventions-testing.md"
+target = "documents/conventions/coding-conventions-testing.md"
 kind = "document"
 description = "The common testing convention must forbid numerical tests without a numerical behavior contract."
 
@@ -1928,7 +1928,7 @@ required_regex = ["reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oo
 
 [[evals]]
 id = "oop-readability-tool-docs"
-target = "documents/object-oriented-design.md"
+target = "documents/conventions/object-oriented-design.md"
 kind = "docs"
 description = "The OOP design document must explain analyzer reports and external snapshot exclusions."
 
@@ -2356,7 +2356,7 @@ description = "The AgentCanon update consumer must point to the canonical transa
 id = "AGENT-CANON-UPDATE-DOC-1"
 critical = true
 description = "Consumes the canonical front door and append-only source transaction receipts."
-required_regex = ["documents/agent-canon-update-route\\.md", "tools/update_agent_canon\\.sh", "SourceMainRebindReceipt", "PullRequestLifecycle", "source-main readback", "G1-G6"]
+required_regex = ["documents/agent-canon/agent-canon-update-route\\.md", "tools/update_agent_canon\\.sh", "SourceMainRebindReceipt", "PullRequestLifecycle", "source-main readback", "G1-G6"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-DOC-2"

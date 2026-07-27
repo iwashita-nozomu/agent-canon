@@ -1,9 +1,9 @@
 // @dependency-start
 // contract implementation
 // responsibility Provides Rust-native test design resilience diagnostics.
-// upstream design ../../../documents/coding-conventions-testing.md shared testing policy
+// upstream design ../../../documents/conventions/coding-conventions-testing.md shared testing policy
 // upstream design ../../../references/test-design-flexibility.md research basis for resilient test design
-// upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
+// upstream design ../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // downstream design ../../../agents/skills/test-design.md human-facing test design skill
 // downstream design ../../../tools/catalog.yaml catalogs this Rust CLI surface
 // downstream design ../../../tools/README.md documents root tool entrypoints

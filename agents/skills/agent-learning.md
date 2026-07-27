@@ -50,7 +50,7 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - `memory/AGENT_PHILOSOPHY.md`
 - `memory/USER_PREFERENCES.md`
 - `notes/guardrails/engineering_avoidances.md`
-- `documents/notes-lifecycle.md`
+- `documents/operations/notes-lifecycle.md`
 - `agents/workflows/workflow-references.md`
 - `tools/agent_tools/log_agent_learning.py`
 - `tools/agent_tools/evaluate_agent_run.py`

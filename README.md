@@ -6,10 +6,10 @@ responsibility Documents agent-canon for this repository.
 upstream design PHILOSOPHY.md AgentCanon design-time philosophy.
 upstream design AGENTS.md shared canon runtime contract
 upstream design responsibility-scope.toml AgentCanon path responsibility scope map.
-upstream design documents/semantic_index.md semantic-index command and result contract.
+upstream design documents/tools/semantic_index.md semantic-index command and result contract.
 upstream implementation rust/agent-canon/src/structured_analysis.rs structured document and responsibility analysis.
 upstream design LICENSE AgentCanon license text
-upstream design documents/agent-canon-licensing-policy.md AgentCanon license boundary
+upstream design documents/agent-canon/agent-canon-licensing-policy.md AgentCanon license boundary
 downstream design CONTAINER_OPERATIONS.md top-level container and devcontainer operation rulebook.
 @dependency-end
 -->
@@ -159,9 +159,9 @@ tool / skill の個別一覧は、それぞれの hub と machine-readable sourc
 | 文書の所在を探す | `documents/README.md` | policy、runtime、tool docs、template contract の責務 owner |
 | agent workflow を選ぶ | `agents/README.md` | workflow、skill、subagent、runtime entrypoint の入口 |
 | workflow family を選ぶ | `agents/workflows/README.md` | task family、stage、review route |
-| shared surface を修復する | `documents/SHARED_RUNTIME_SURFACES.md` | root view、symlink/copy、submodule source の扱い |
-| AgentCanon 更新を進める | `documents/agent-canon-update-route.md` | source transaction、PR/readback、projection frontier の唯一の入口 |
-| runtime profile と validation を選ぶ | `documents/runtime-profiles-and-check-matrix.md` | changed path と risk class から実行 gate を選ぶ |
+| shared surface を修復する | `documents/runtime/SHARED_RUNTIME_SURFACES.md` | root view、symlink/copy、submodule source の扱い |
+| AgentCanon 更新を進める | `documents/agent-canon/agent-canon-update-route.md` | source transaction、PR/readback、projection frontier の唯一の入口 |
+| runtime profile と validation を選ぶ | `documents/runtime/runtime-profiles-and-check-matrix.md` | changed path と risk class から実行 gate を選ぶ |
 | shared tool を使う | `tools/README.md` | root `tools/` view から呼ぶ実行入口 |
 
 読み進めるときは、この表から 1 行だけ選びます。複数行を横断する必要が出た場合は、
@@ -178,7 +178,7 @@ decision artifact だけを残す。
 - workflow / bibliography policy:
   `agents/workflows/workflow-references.md`
 - Codex runtime configuration:
-  `documents/codex-configuration-reference.md`
+  `documents/codex/codex-configuration-reference.md`
 - implementation / runtime source record:
   `references/agent-canon-technology-bibliography.md`
 - skill discovery rule:
@@ -194,7 +194,7 @@ bibliography、configuration guide に OpenAI docs の alternate route copy を�
 AgentCanon exposes shared runtime surfaces so template and derived repositories
 can opt into them without copying implementation. Exposed does not mean always
 active. The activation and validation policy is
-[Runtime Profiles And Check Matrix](documents/runtime-profiles-and-check-matrix.md).
+[Runtime Profiles And Check Matrix](documents/runtime/runtime-profiles-and-check-matrix.md).
 
 - Agent runtime surfaces are active when an agent performs or reviews work.
 - GitHub automation, devcontainer, Docker, experiment, C++, memory, and
@@ -202,7 +202,7 @@ active. The activation and validation policy is
 - Full repo validation is still available, but day-to-day checks should be
   selected by changed path and risk class.
 - The 2026-05-16 500-item audit is resolved in
-  [Template / AgentCanon Audit Resolution](documents/template-agent-canon-audit-resolution.md).
+  [Template / AgentCanon Audit Resolution](documents/agent-canon/template-agent-canon-audit-resolution.md).
 
 ## 利用時のディレクトリ / リンク構成
 
@@ -224,8 +224,8 @@ bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
 
 remote の正本:
 
-- AgentCanon canonical remote は `documents/agent-canon-github-remote.md` を見ます。
-- Template canonical remote は `documents/template-github-remote.md` を見ます。
+- AgentCanon canonical remote は `documents/agent-canon/agent-canon-github-remote.md` を見ます。
+- Template canonical remote は `documents/contracts/template-github-remote.md` を見ます。
 - reusable module distribution は GitHub PR / main SHA を正本にします。repo-specific local Git repair は shared module architecture から分離します。
 
 ## 検索導線
@@ -234,7 +234,7 @@ remote の正本:
 広い概念、長い query、近い tool、既存 helper の再利用候補、編集 surface
 選定では、`rg` より先に responsibility-based search を走らせます。
 この導線は `ROOT_AGENTS.md` の Default Search And Routing と
-`documents/semantic_index.md` の command / result contract に従う。
+`documents/tools/semantic_index.md` の command / result contract に従う。
 
 ```bash
 tools/bin/agent-canon semantic-index context-pack --root . \
@@ -252,7 +252,7 @@ tools/bin/agent-canon semantic-index build --root .
 ```
 
 JSON 出力や旧 `vector_search.py` 互換 helper の扱いは、`ROOT_AGENTS.md` と
-`documents/semantic_index.md` を正本にします。検索で対象 path と source
+`documents/tools/semantic_index.md` を正本にします。検索で対象 path と source
 packet を絞ったら、以後の保守では正本 surface を直接編集し、root view や
 生成物を別の truth surface にしない。
 
@@ -280,12 +280,12 @@ git -C <CONTINUE_PATH> push origin HEAD
 ```
 
 update / branch / PR の詳細は `agents/workflows/agent-canon-pr-workflow.md` を見ます。
-canonical remote の詳細は `documents/agent-canon-github-remote.md` を見ます。
+canonical remote の詳細は `documents/agent-canon/agent-canon-github-remote.md` を見ます。
 
 ## License
 
 AgentCanon is licensed under Apache License 2.0. See [LICENSE](LICENSE) and
-[documents/agent-canon-licensing-policy.md](documents/agent-canon-licensing-policy.md).
+[documents/agent-canon/agent-canon-licensing-policy.md](documents/agent-canon/agent-canon-licensing-policy.md).
 
 Parent repositories may use a different root project license, but AgentCanon
 submodule content and root views into AgentCanon retain the AgentCanon license.

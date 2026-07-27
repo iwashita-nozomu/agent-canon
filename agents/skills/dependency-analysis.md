@@ -4,7 +4,7 @@
 @dependency-start
 contract skill
 responsibility Documents dependency-analysis for this repository.
-upstream design ../../documents/dependency-manifest-design.md defines dependency manifest format and tools
+upstream design ../../documents/design/dependency-manifest-design.md defines dependency manifest format and tools
 upstream design ../canonical/CODEX_WORKFLOW.md defines workflow gate usage
 upstream design ./catalog.yaml registers this public skill
 upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts file-level code dependency evidence
@@ -213,7 +213,7 @@ agent-canon python-structure-hash-scope-plan \
 
 ## Core References
 
-- `documents/dependency-manifest-design.md`
+- `documents/design/dependency-manifest-design.md`
 - `agents/workflows/hypothesis-validation-workflow.md`
 - `agents/canonical/CODEX_WORKFLOW.md`
 - `agents/templates/closeout_gate.md`

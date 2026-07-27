@@ -3,7 +3,7 @@
 # contract agent-runtime
 # responsibility Blocks user prompts that appear to contain high-confidence secrets.
 # upstream implementation ../hooks.json invokes this hook for UserPromptSubmit.
-# upstream design ../../documents/codex-configuration-reference.md documents Codex hook events.
+# upstream design ../../documents/codex/codex-configuration-reference.md documents Codex hook events.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates guard decisions.
 # @dependency-end
 

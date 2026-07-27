@@ -5,8 +5,8 @@
 # responsibility Tests AgentCanon parent repository readiness checks.
 # upstream implementation ../../tools/agent_tools/parent_repo_readiness.py checks parent repo surfaces
 # upstream implementation ../../tools/agent_tools/surface_manifest.py parses shared surface manifest
-# upstream design ../../documents/shared-runtime-surfaces.toml shared runtime surface manifest
-# upstream design ../../documents/gpu-admission-r5-source-packet.md runtime identity receipt and shared-surface test contract
+# upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared runtime surface manifest
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md runtime identity receipt and shared-surface test contract
 # @dependency-end
 
 from __future__ import annotations
@@ -94,7 +94,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
         manifest = load_manifest(
             PROJECT_ROOT,
             ".",
-            "documents/shared-runtime-surfaces.toml",
+            "documents/runtime/shared-runtime-surfaces.toml",
         )
         devcontainer = next(
             entry for entry in manifest.entries if entry.path == ".devcontainer"
@@ -266,7 +266,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
         manifest = load_manifest(
             PROJECT_ROOT,
             ".",
-            "documents/shared-runtime-surfaces.toml",
+            "documents/runtime/shared-runtime-surfaces.toml",
         )
 
         regular_specs = render_regular_specs(manifest.entries, manifest.prefix)
@@ -348,7 +348,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
                 "PARENT_REPO_READINESS_FINDING=error:active_contract:"
-                "documents/server-host-contract.md:missing-regular-file",
+                "documents/contracts/server-host-contract.md:missing-regular-file",
                 result.stdout,
             )
 
@@ -380,7 +380,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
             self.write_file(
-                root, "documents/SHARED_RUNTIME_SURFACES.md", "stale root copy\n"
+                root, "documents/runtime/SHARED_RUNTIME_SURFACES.md", "stale root copy\n"
             )
 
             result = self.run_checker(root)
@@ -388,7 +388,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
                 "PARENT_REPO_READINESS_FINDING=error:standalone_only_leak:"
-                "documents/SHARED_RUNTIME_SURFACES.md:must-not-exist-in-parent-root",
+                "documents/runtime/SHARED_RUNTIME_SURFACES.md:must-not-exist-in-parent-root",
                 result.stdout,
             )
 
@@ -399,7 +399,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
         os.symlink(PROJECT_ROOT, agent_canon, target_is_directory=True)
         self.write_required_parent_files(root)
         manifest = load_manifest(
-            root, "vendor/agent-canon", "documents/shared-runtime-surfaces.toml"
+            root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml"
         )
         for entry in manifest.entries:
             target = root / entry.path

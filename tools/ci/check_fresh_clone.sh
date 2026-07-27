@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Checks fresh-clone bootstrap, AgentCanon update, and runtime surfaces.
 # upstream design ../README.md shared automation index
-# upstream environment ../../documents/linux-wsl-host-requirements.md documents host tool requirements for fresh clone checks
+# upstream environment ../../documents/contracts/linux-wsl-host-requirements.md documents host tool requirements for fresh clone checks
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns source projection aggregation and validation.
 # upstream implementation ./check_agent_canon_pr.py owns the authoritative G2 materializer API.
 # upstream implementation ../agent_tools/github_publish.py owns the authoritative G3 materializer API.

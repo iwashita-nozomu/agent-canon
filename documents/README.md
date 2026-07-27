@@ -1,134 +1,72 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents documents/ for this repository.
-upstream design ./SHARED_RUNTIME_SURFACES.md documents ownership policy
-upstream design ./shared-runtime-surfaces.toml machine-readable ownership manifest
-downstream design ./rule/README.md document filename, placement, and structure rules
-downstream design ./design/README.md target-state and implementation-boundary index
-downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy
-downstream design ./codex-configuration-reference.md Codex configuration reference
-downstream design ./object-oriented-design.md general OOP coding policy
-downstream design ./agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
-downstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
-downstream design ./rule/dependency-module-changes.md general dependency source-clone lifecycle policy
-downstream design ./parent-repository/README.md parent repository structure, ownership, and projection boundary
-downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
-downstream design ./template-agent-canon-audit-resolution.md audit resolution ledger
-downstream design ./tool-skill-routing-refactor.md short tool/skill routing policy
-downstream design ./rust-agent-tool-migration.md Rust tool migration policy
-downstream design ./structured-analysis/README.md structured prose and dependency analysis package boundary
-downstream design ./prose-reasoning-graph/dsl-spec.md prose graph DSL contract
+responsibility Documents の索引と正本境界。
+upstream design ./rule/README.md filename、配置、分割規約。
+upstream design ./design/README.md target state と実装境界。
+upstream design ./runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface policy。
+upstream design ./runtime/shared-runtime-surfaces.toml machine-readable ownership manifest。
+downstream design ./parent-repository/README.md parent repository structure and projection boundary。
+downstream implementation ../rust/agent-canon/src/structured_analysis.rs document inventory。
 @dependency-end
 -->
 
-Runtime policy projections are owned by
-[agents/COMMUNICATION_PROTOCOL.md](../agents/COMMUNICATION_PROTOCOL.md),
-[agents/canonical/CODEX_WORKFLOW.md](../agents/canonical/CODEX_WORKFLOW.md), and
-[agents/canonical/CODEX_SUBAGENTS.md](../agents/canonical/CODEX_SUBAGENTS.md).
-Document adapters link to those owners and do not duplicate Target-State-First,
-Decision Sufficiency, ToolCall, capacity, or lifecycle rules.
-
 # documents/
 
-`documents/README.md` is the root `documents/` index. Read it after the top-level
-`README.md` when you need the root-owned document map. Use `agents/README.md`
-for workflow / skill / runtime routing rather than treating this file as a
-second agent hub.
+`documents/README.md` は、この directory の唯一の直下ファイルであり、文書の入口です。
+個別文書は責務 directory に置き、直下へ戻しません。各 directory の README が、その
+配下の役割、構造、読者入口を所有します。
 
-`documents/` is still a mixed documentation directory. The root
-`documents/README.md` stays repo-local after template clone. AgentCanon may seed
-this file, but derived repositories own their local index.
+## 読み方
 
-## 文書規約と設計正本
+- 配置・分割・命名の判断は [文書規約](./rule/README.md) から始めます。
+- target state と実装境界は [設計](./design/README.md) を読みます。
+- root view、Symlink、checked copy は [Runtime Surface](./runtime/SHARED_RUNTIME_SURFACES.md)
+  と [親レポ構造](./parent-repository/README.md) を読みます。
+- 機械可読の構造契約は [structure](./structure/) にあります。
+- workflow、skill、subagent の正本は `agents/` であり、この directory に複製しません。
 
-- [文書規約](./rule/README.md): filename、配置、構成判断の共通規約。
-- [設計正本](./design/README.md): target state、実装境界、設計上の前提。
-- [親レポ構造](./parent-repository/README.md): 親レポの directory 構成、役割、
-  Symlink / checked copy / regular surface の意味。
+## Directory Map
 
-配置や分割の理由は文書規約を読み、個別の target state と実装境界は設計正本を読みます。
+| Directory | 役割 |
+| --- | --- |
+| `agent-canon/` | AgentCanon source、branch、remote、submodule、親レポ投影 |
+| `codex/` | Codex 設定、エージェント運用、skill、prompt 評価 |
+| `contracts/` | 親レポの bootstrap、host、remote、devcontainer、license 契約 |
+| `conventions/` | 言語、レビュー、logging、OOP、docstring の共通規約 |
+| `design/` | 数理・API・依存・build・tooling の設計境界 |
+| `experiments/` | 実験、GPU admission、ExperimentRunner、結果保持 |
+| `operations/` | branch、checklist、troubleshooting、legacy cleanup |
+| `parent-repository/` | AgentCanon をvendorする親レポのroot構造 |
+| `prose-reasoning-graph/` | 文書推論グラフのDSLと分析 |
+| `rule/` | 文書配置、命名、依存変更の抽象規約 |
+| `runtime/` | runtime surface、profile、log archive の契約 |
+| `structure/` | repository structure の機械可読契約 |
+| `structured-analysis/` | 構造化文書・依存・DB分析 |
+| `templates/` | 契約や設定の生成テンプレート |
+| `tools/` | 文書・依存・証明・可視化toolの読者向け説明 |
 
-## Reader Map
+各 directory の詳細は、その directory の README を読みます。root index は内容を
+再掲せず、正本と読者経路だけを示します。
 
-- Owns the root `documents/` index and the split between AgentCanon-owned,
-  template-owned, project-owned, and generated documentation.
-- Main path: Ownership Matrix, Reader Routes, Coding Policy References,
-  Template-Owned Active Contracts, and Tooling And Artifact References.
-- Read this after the top-level `README.md` when deciding which document owns a
-  repository policy or guide.
-- Boundary: workflow, skill, and runtime routing belong to `agents/README.md`,
-  not this document index.
+## 所有権
 
-## Ownership Matrix
+- AgentCanon の共有文書は、この source tree の責任 directory が正本です。
+- template / derived repo の active contract は、親レポの `documents/` が所有します。
+- reports、logs、raw evidence、experiment result は `reports/` または `experiments/`
+  に保存し、文書正本の代替にしません。
+- 文書を移動するときは、dependency header、参照元、checker、root view を同じ変更で
+  更新します。直下に互換Symlinkやchecked copyを残しません。
 
-| Class | Examples | Edit source |
-| --- | --- | --- |
-| AgentCanon-owned shared policy symlink | coding conventions, review process, workflow-supporting policies, shared templates, tool docs | managed topic-workspace source clone; `vendor/agent-canon/documents/` is the clean projection |
-| Template-owned active contract | bootstrap, host requirements, server contract, remote execution contract, template remote policy | root `documents/` regular files |
-| Project-owned docs | architecture notes, project-specific design specs, implementation contracts | root `documents/` regular files |
-| Generated or run artifacts | agent reports, experiment outputs, logs | `reports/` or `experiments/`, not `documents/` |
+## 代表的な経路
 
-If a file is an AgentCanon-owned symlink, read
-`rule/dependency-module-changes.md`, edit the managed source clone, and repair the root view with the request-evidence-authorized
-`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root` command. If a file is a template-owned active
-contract, edit the root regular file.
+- AgentCanon の更新: [agent-canon](./agent-canon/)
+- Codex の runtime 設定: [codex](./codex/)
+- 親レポの導入・環境: [contracts](./contracts/)
+- 共有runtimeの所有境界: [runtime](./runtime/)
+- 構造の機械検証: [structure](./structure/)
+- 文書の分割判断: [rule](./rule/)
 
-## Reader Routes
-
-This file is an index, but it should not force a reader through every link.
-Choose the row that matches the current problem, then open only the listed
-entrypoint and its directly referenced source packet.
-
-| Problem | Start Here | Why |
-| --- | --- | --- |
-| Root view, symlink, copy, or template ownership is unclear | [Shared Runtime Surfaces](./SHARED_RUNTIME_SURFACES.md) | Defines owner classes and root-view repair rules; the TOML manifest is the machine-readable companion. |
-| 親レポの directory 構造、Symlink、実体 directory の理由を確認する | [親レポ構造](./parent-repository/README.md) | 親 root の期待形状と各 directory の owner / purpose を定義する。 |
-| A vendored AgentCanon checkout, parent pin, or update branch is stale | [AgentCanon Update Route](./agent-canon-update-route.md) | Routes latest, branch / PR, TODO, rollback, and parent pin flows without reading every update doc. |
-| Validation scope is unclear | [Runtime Profiles And Check Matrix](./runtime-profiles-and-check-matrix.md) | Maps changed path and risk class to the active checks. |
-| Tool / skill routing, tool placement, or Rust migration is unclear | [Tool And Skill Routing Refactor](./tool-skill-routing-refactor.md) | Leads to tool catalog, short command names, and Rust CLI migration boundaries. |
-| Structured prose, dependency graph, or document-canon analysis is needed | [Structured Analysis](./structured-analysis/) | Entry for document inventory, prose graph, report contracts, and SQLite-backed analysis. |
-| Codex CLI, hooks, MCP, skills, or subagents need runtime configuration context | [Codex Configuration Reference](./codex-configuration-reference.md) | Keeps runtime config detail in one place instead of spreading copies across README files. |
-| A derived repo is being bootstrapped or repaired | [Derived Repository Bootstrap Runbook](./derived-repo-bootstrap-runbook.md) | Shortest safe onboarding path for repos that vendor AgentCanon. |
-| Maintenance issue labels or prompt / skill eval policy are needed | [Issue Label Taxonomy](./issue-label-taxonomy.md), [Prompt And Skill Evaluation Checklist](./prompt-skill-evaluation-checklist.md) | Operational governance entrypoints, not general first-read docs. |
-| A negative public API or capability claim needs evidence | [API Surface Traversal Policy](./api-surface-traversal-policy.md) | Defines traversal evidence before saying a surface is absent. |
-
-Compatibility and evidence appendices remain available, but they are not part of
-the first-read path: `agent-canon-parent-repo-latest-checklist.md`,
-`agent-canon-submodule-rollback.md`,
-`template-agent-canon-audit-resolution.md`,
-`github-first-module-and-devcontainer-policy.md`,
-`agent-canon-github-remote.md`, `rust-agent-tool-migration.md`,
-`prose-reasoning-graph/`, and `runtime-profiles-and-check-matrix.json`.
-
-## Coding Policy References
-
-- [Algorithm Implementation Boundary Policy](./algorithm-implementation-boundary.md):
-  math/specification boundary, implementation boundary, change classes, and
-  review gates.
-- [Object-Oriented Design Policy](./object-oriented-design.md): class,
-  dataclass, Protocol, composition, and inheritance policy.
-- [Python Coding Conventions](./coding-conventions-python.md): Python-specific
-  implementation rules.
-- [Project Coding Conventions](./coding-conventions-project.md): project-wide
-  environment, dependency, and runtime rules.
-
-## Template-Owned Active Contracts
-
-These files should be regular files in the template or derived repo root:
-
-- [Template Bootstrap](./template-bootstrap.md)
-- [Template GitHub Remote](./template-github-remote.md)
-- [Linux / WSL Host Requirements](./linux-wsl-host-requirements.md)
-- [Server Host Contract](./server-host-contract.md)
-- [Remote Execution Repo Contract](./remote-execution-repo-contract.md)
-
-AgentCanon provides reusable contract templates under [templates/](./templates/),
-but the active contract for a derived repo belongs to that repo.
-
-## Tooling And Artifact References
-
-- [Result Log Retention And Visualization](./result-log-retention-and-visualization.md):
-  run result, summary, visualization artifact, and retention rules.
-- [Repo-Local Tool Imports](./repo-local-tool-imports.md): disposition ledger for
-  tools that grow in derived repos before AgentCanon promotion.
+構造確認は `tree` と `repo_structure_contract.py` を使います。直下ファイルが
+`README.md` 以外に増えた場合は、責務を分類して適切な directory owner document を
+更新します。

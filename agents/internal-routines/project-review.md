@@ -23,9 +23,9 @@ repo 全体を横断して、構成、文書、skills、ツール、静的健全
 
 - `agents/internal-routines/comprehensive-review.md`
 - `agents/internal-routines/project-health.md`
-- `documents/REVIEW_PROCESS.md`
-- `documents/AGENTS_COORDINATION.md`
-- `documents/coding-conventions-project.md`
+- `documents/conventions/REVIEW_PROCESS.md`
+- `documents/codex/AGENTS_COORDINATION.md`
+- `documents/conventions/coding-conventions-project.md`
 
 ## Expected Outcome
 

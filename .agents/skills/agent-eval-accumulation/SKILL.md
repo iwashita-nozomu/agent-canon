@@ -8,7 +8,7 @@ contract skill
 responsibility Documents Agent Eval Accumulation for this repository.
 upstream design ../../../agents/skills/agent-eval-accumulation.md documents the human-facing skill
 upstream design ../../../evidence/agent-evals/README.md defines eval family contracts
-upstream design ../../../documents/runtime-log-archive.md defines the archive boundary
+upstream design ../../../documents/runtime/runtime-log-archive.md defines the archive boundary
 upstream implementation ../../../tools/agent_tools/run_accumulated_agent_evals.py runs registered producers
 upstream implementation ../../../tools/agent_tools/eval_accumulation_check.py validates accumulated reports
 @dependency-end

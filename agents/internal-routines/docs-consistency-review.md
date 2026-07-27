@@ -21,7 +21,7 @@ upstream design ../canonical/skills.md skill canon registry
 ## Core References
 
 - `documents/README.md`
-- `documents/AGENTS_COORDINATION.md`
+- `documents/codex/AGENTS_COORDINATION.md`
 - `agents/README.md`
 
 ## Expected Outcome

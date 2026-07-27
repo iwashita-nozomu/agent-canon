@@ -4,7 +4,7 @@ contract reference
 responsibility Defines code dependency analysis scope for the structured analysis package.
 upstream design README.md structured analysis package index
 upstream design database-design.md defines SQLite tables and DB artifact placement
-upstream design ../dependency-manifest-design.md separates code dependency evidence from manifest graph evidence
+upstream design ../design/dependency-manifest-design.md separates code dependency evidence from manifest graph evidence
 upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependency evidence
 downstream design dependency-header-analysis.md joins code evidence with report trace without merging edge semantics
 @dependency-end

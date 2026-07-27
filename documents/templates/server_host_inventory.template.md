@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents Server Host Inventory Template for this repository.
-upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 @dependency-end
 -->
 

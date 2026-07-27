@@ -1,13 +1,13 @@
 # @dependency-start
 # contract test
 # responsibility Tests test run managed experiment behavior.
-# upstream design ../../documents/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 managed-route test frame
-# upstream design ../../documents/experiment_runner.md ExperimentRunner owner boundary
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 managed-route test frame
+# upstream design ../../documents/design/experiment_runner.md ExperimentRunner owner boundary
 # upstream implementation ../../tools/experiments/execution_resource_plan.py canonical resource-plan/admission owner
 # upstream implementation ../../tools/experiments/run_managed_experiment.py canonical managed CLI owner
 # upstream implementation ./resource_plan_test_evidence.py deterministic test-only injection boundary
 # upstream implementation ../../tools/ci/check_experiment_registry.py checker under test
-# downstream implementation ../../documents/gpu-admission-r5-ordered-integration-interface.json W1 public selectors
+# downstream implementation ../../documents/experiments/gpu-admission-r5-ordered-integration-interface.json W1 public selectors
 # @dependency-end
 
 """Tests for the managed experiment run helper."""
@@ -583,7 +583,7 @@ def test_public_gpu_plan_excludes_compute_and_graphics_contexts_with_fresh_readb
         container_id="container-contract",
         structure_tool={
             "available": "true",
-            "structure_contract_ref": "documents/repo-structure-contract.toml",
+            "structure_contract_ref": "documents/structure/repo-structure-contract.toml",
         },
         tool_availability={
             "tree": {"available": True},

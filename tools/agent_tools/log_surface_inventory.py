@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Inventories machine-readable log and hook output fields from hooks, skills, Python tools, shell tools, and Rust CLI tools.
-# upstream design ../../documents/runtime-log-archive.md hook result accumulation contract
+# upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
 # downstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks stale inventory drift
 # downstream implementation ../../tests/agent_tools/test_log_surface_inventory.py validates field extraction and baseline checks
 # @dependency-end
@@ -371,7 +371,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--baseline",
         default=str(DEFAULT_BASELINE),
-        help="Baseline JSON path for --check. Defaults to documents/log-surface-inventory.json.",
+        help="Baseline JSON path for --check. Defaults to documents/runtime/log-surface-inventory.json.",
     )
     parser.add_argument(
         "--check",

@@ -22,7 +22,7 @@ upstream design ../canonical/skills.md skill canon registry
 ## Core References
 
 - `documents/tools/README.md`
-- `documents/REVIEW_PROCESS.md`
+- `documents/conventions/REVIEW_PROCESS.md`
 - `tools/run_comprehensive_review.sh`
 - `tools/docker_dependency_validator.sh`
 

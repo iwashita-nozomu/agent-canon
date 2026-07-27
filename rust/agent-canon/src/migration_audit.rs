@@ -1,7 +1,7 @@
 // @dependency-start
 // contract implementation
 // responsibility Validates AgentCanon Rust migration boundaries.
-// upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
+// upstream design ../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // upstream environment ../../../.devcontainer/post-create.sh installs Rust tooling outside Dockerfile
 // downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
 // @dependency-end
@@ -10,7 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const REQUIRED_PATHS: &[&str] = &[
-    "documents/rust-agent-tool-migration.md",
+    "documents/design/rust-agent-tool-migration.md",
     "agent-canon-environment.toml",
     "rust/agent-canon/Cargo.toml",
     "rust/agent-canon/src/main.rs",

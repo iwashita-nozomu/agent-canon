@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Provides GitHub-first AgentCanon submodule update automation.
-# upstream design ../documents/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
+# upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
 # upstream design ../documents/rule/dependency-module-changes.md defines independent source-clone and clean projection policy.
-# upstream design ../documents/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
+# upstream design ../documents/agent-canon/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
 # upstream implementation ./sync_agent_canon.sh performs low-level submodule freshness and root-view synchronization.
 # upstream implementation ./agent_tools/update_lifecycle_contract.py owns queue/frontier receipt mechanics and guards.
 # upstream implementation ./rebuild_agent_tools.sh rebuilds compiled AgentCanon tools after safe updates.

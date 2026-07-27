@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Renders semantic-index provider comparison JSON as a self-contained HTML report.
-# upstream design ../../documents/semantic_index.md defines provider comparison and candidate authority boundaries
+# upstream design ../../documents/tools/semantic_index.md defines provider comparison and candidate authority boundaries
 # upstream design ../../agents/skills/html-experiment-report.md defines the HTML experiment report workflow
 # upstream design ../../agents/skills/report-writing.md defines reader-facing report quality criteria
 # downstream implementation ../../tests/agent_tools/test_semantic_provider_html_report.py tests semantic provider HTML rendering

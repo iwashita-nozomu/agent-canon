@@ -5,7 +5,7 @@ contract skill
 responsibility Documents result-artifact-writeout for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../canonical/ARTIFACT_PLACEMENT.md run-local and durable artifact placement
-upstream design ../../documents/experiment-report-style.md experiment report artifact policy
+upstream design ../../documents/experiments/experiment-report-style.md experiment report artifact policy
 upstream design prose-reasoning-graph.md prose graph output artifact contract
 downstream implementation ../../.agents/skills/result-artifact-writeout/SKILL.md exposes this workflow as a runtime skill
 @dependency-end

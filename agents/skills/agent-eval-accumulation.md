@@ -6,7 +6,7 @@ contract skill
 responsibility Documents accumulated AgentCanon eval evidence repair and validation.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../evidence/agent-evals/README.md accumulated eval family contract
-upstream design ../../documents/runtime-log-archive.md external log archive boundary
+upstream design ../../documents/runtime/runtime-log-archive.md external log archive boundary
 upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py runs registered eval producers
 upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated eval families
 downstream implementation ../../.agents/skills/agent-eval-accumulation/SKILL.md exposes this workflow as a runtime skill

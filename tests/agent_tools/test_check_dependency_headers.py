@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests changed-file dependency header detection.
-# upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
+# upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream implementation ../../tools/agent_tools/check_dependency_headers.py changed-file checks
 # upstream implementation ../../tools/agent_tools/graph_client.py validates persisted graph responses
 # upstream implementation ../../tools/agent_tools/visualization_contract.py canonical visualization contract dependency target
@@ -186,7 +186,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("exactly one contract line", result.stdout)
             self.assertIn("fix: add 'contract <registered-kind>'", result.stdout)
-            self.assertIn("documents/dependency-contract-kinds.toml", result.stdout)
+            self.assertIn("documents/design/dependency-contract-kinds.toml", result.stdout)
             self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
     def test_rejects_unregistered_contract_kind(self) -> None:
@@ -221,7 +221,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("unregistered dependency contract kind", result.stdout)
             self.assertIn("fix: use an existing allowed_kinds entry", result.stdout)
-            self.assertIn("documents/dependency-contract-kinds.toml", result.stdout)
+            self.assertIn("documents/design/dependency-contract-kinds.toml", result.stdout)
             self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
     def test_rejects_missing_dependency_manifest(self) -> None:

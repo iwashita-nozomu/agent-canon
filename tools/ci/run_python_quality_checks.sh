@@ -133,7 +133,7 @@ if [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
 elif "$PYTHON_BIN" -m pydocstyle "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
   echo "✅ pydocstyle 成功"
 else
-  echo "❌ pydocstyle 失敗（詳細: documents/DOCSTRING_GUIDE.md を参照）"
+  echo "❌ pydocstyle 失敗（詳細: documents/conventions/DOCSTRING_GUIDE.md を参照）"
   EXIT_CODE=1
 fi
 echo ""

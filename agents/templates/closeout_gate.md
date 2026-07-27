@@ -6,7 +6,7 @@ contract template
 responsibility Documents Closeout Gate for this repository.
 downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
 downstream design workflow_monitoring.md records in-workflow monitoring and self-improvement decisions
-downstream design ../../documents/dependency-manifest-design.md defines dependency manifest evidence
+downstream design ../../documents/design/dependency-manifest-design.md defines dependency manifest evidence
 @dependency-end
 -->
 
@@ -127,8 +127,8 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - completion_coverage_artifact:
 - completion_coverage_consumer:
 - validation_failure_response_status:
-- validation_failure_taxonomy_owner: documents/runtime-profiles-and-check-matrix.json
-- validation_failure_taxonomy_reader: documents/runtime-profiles-and-check-matrix.md
+- validation_failure_taxonomy_owner: documents/runtime/runtime-profiles-and-check-matrix.json
+- validation_failure_taxonomy_reader: documents/runtime/runtime-profiles-and-check-matrix.md
 
 ## AgentCanon Latest Evidence
 

@@ -3,9 +3,9 @@
 contract skill
 responsibility Documents pre-implementation OOP and type-boundary design for this repository.
 upstream design ../canonical/skills.md public skill registry and visibility contract
-upstream design ../../documents/object-oriented-design.md shared OOP boundary policy
+upstream design ../../documents/conventions/object-oriented-design.md shared OOP boundary policy
 upstream design ../../documents/design/protocols.md Protocol and dependency-direction policy
-upstream design ../../documents/dependency-manifest-design.md dependency-header DSL
+upstream design ../../documents/design/dependency-manifest-design.md dependency-header DSL
 downstream implementation ../../.agents/skills/oop-type-design/SKILL.md runtime discovery shim
 downstream implementation ../../agents/skills/catalog.yaml public skill and capability metadata
 downstream implementation ../../tools/agent_tools/route.py explicit capability route

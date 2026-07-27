@@ -5,7 +5,7 @@ contract reference
 responsibility Documents Python OOP readability checker behavior in Japanese.
 upstream implementation ../../../../tools/oop/python/readability.py Python OOP readability checker
 upstream implementation ../../../../tools/oop/shared/readability_core.py shared typed-boundary evidence
-upstream design ../../../object-oriented-design.md OOP policy source
+upstream design ../../../conventions/object-oriented-design.md OOP policy source
 downstream design ../../tool-docs.toml one-to-one tool/document manifest
 @dependency-end
 -->

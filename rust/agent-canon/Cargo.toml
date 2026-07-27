@@ -1,7 +1,7 @@
 # @dependency-start
 # contract implementation
 # responsibility Defines the AgentCanon Rust CLI crate.
-# upstream design ../../documents/rust-agent-tool-migration.md Rust tool migration policy
+# upstream design ../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 # downstream implementation src/main.rs CLI entrypoint
 # downstream implementation src/migration_audit.rs Rust migration audit command
 # downstream implementation src/python_algorithm_contract.rs Python algorithm contract checker

@@ -4,7 +4,7 @@
 contract workflow
 responsibility Documents 実験の標準手順 for this repository.
 upstream design README.md workflow catalog
-upstream design ../../documents/gpu-admission-r5-source-packet.md fixes the ff97 managed lifecycle binding
+upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md fixes the ff97 managed lifecycle binding
 @dependency-end
 -->
 
@@ -38,11 +38,11 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 - 問い、定式化、比較設計、claim の更新
   - [research-workflow.md](research-workflow.md)
 - 実験コードと生成物の運用規約
-  - [coding-conventions-experiments.md](../../documents/coding-conventions-experiments.md)
+  - [coding-conventions-experiments.md](../../documents/conventions/coding-conventions-experiments.md)
 - レポート本文の構成と figure / table の書き方
-  - [experiment-report-style.md](../../documents/experiment-report-style.md)
+  - [experiment-report-style.md](../../documents/experiments/experiment-report-style.md)
 - 批判的レビューの観点と手順
-  - [experiment-critical-review.md](../../documents/experiment-critical-review.md)
+  - [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md)
 - エージェントごとの task workflow
   - [TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md)
 
@@ -350,8 +350,8 @@ host 側で worker 状態や GPU 利用状況を見たい場合は、`RuntimeMon
 ### 5. 結果レポート
 
 run 後は、必ず結果を report と note に整理します。
-批判的レビューの観点は [experiment-critical-review.md](../../documents/experiment-critical-review.md) を正本にします。
-user-facing report の体裁と根拠導線は [experiment-report-style.md](../../documents/experiment-report-style.md) を正本にし、`report_reviewer` の独立レビューを必須にします。
+批判的レビューの観点は [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md) を正本にします。
+user-facing report の体裁と根拠導線は [experiment-report-style.md](../../documents/experiments/experiment-report-style.md) を正本にし、`report_reviewer` の独立レビューを必須にします。
 
 最低限残すものは次です。
 
@@ -440,7 +440,7 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
    - コード変更を入れる。
 1. `change_reviewer`
    - code diff を批判的にレビューする。
-   - 数学的妥当性や報告内容も確認する場合は [experiment-critical-review.md](../../documents/experiment-critical-review.md) の `Mathematical Validity` と `As Reported` を使う。
+   - 数学的妥当性や報告内容も確認する場合は [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md) の `Mathematical Validity` と `As Reported` を使う。
 1. `implementer`
    - review を反映し、静的チェックを通す。
 1. `experimenter`
@@ -449,7 +449,7 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
    - `summary.json`、`cases.jsonl`、draft report を生成する。`notes/` を使う場合は対応する experiment note も生成する。
 1. `experiment_reviewer`
    - report と結果の読み方を批判的にレビューする。
-   - [experiment-critical-review.md](../../documents/experiment-critical-review.md) を使って、math validity、evidence sufficiency、figure validity、overclaim を確認する。
+   - [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md) を使って、math validity、evidence sufficiency、figure validity、overclaim を確認する。
 1. `report_reviewer`
    - user-facing report を独立にレビューする。
    - 実験の概要、主要数値、figure / table、結論と根拠の対応、limitations を確認する。

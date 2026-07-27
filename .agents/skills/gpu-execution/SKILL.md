@@ -8,8 +8,8 @@ contract skill
 responsibility Documents GPU Execution for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/gpu-execution.md human-facing GPU execution contract
-upstream design ../../../documents/experiment_runner.md ExperimentRunner responsibility boundary
-upstream design ../../../documents/gpu-admission-r5-source-packet.md exact R5 admission owner and fallback boundary
+upstream design ../../../documents/design/experiment_runner.md ExperimentRunner responsibility boundary
+upstream design ../../../documents/experiments/gpu-admission-r5-source-packet.md exact R5 admission owner and fallback boundary
 upstream design ../../../documents/conventions/python/15_jax_rules.md JAX GPU preallocation and CPU fallback policy
 upstream design ../../../agents/workflows/experiment-workflow.md managed experiment execution workflow
 @dependency-end

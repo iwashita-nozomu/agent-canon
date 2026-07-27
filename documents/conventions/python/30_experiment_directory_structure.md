@@ -112,4 +112,4 @@ experiments/report/
 ## 更新手順
 
 - benchmark の置き場と境界を変えた場合は [20_benchmark_policy.md](./20_benchmark_policy.md) を同時に更新します。
-- worktree 運用や result / report の配置を変えた場合は [documents/coding-conventions-experiments.md](../../coding-conventions-experiments.md) も更新します。
+- worktree 運用や result / report の配置を変えた場合は [documents/conventions/coding-conventions-experiments.md](../coding-conventions-experiments.md) も更新します。

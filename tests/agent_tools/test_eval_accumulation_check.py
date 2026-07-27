@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests eval accumulation validation.
 # upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result evidence
-# upstream design ../../documents/runtime-log-archive.md eval result storage contract
+# upstream design ../../documents/runtime/runtime-log-archive.md eval result storage contract
 # @dependency-end
 
 from __future__ import annotations

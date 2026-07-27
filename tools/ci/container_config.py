@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Validates Dockerfile, runtime pack, devcontainer, and shared VS Code surface configuration.
-# upstream design ../../documents/coding-conventions-project.md environment configuration policy
-# upstream design ../../documents/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
-# upstream design ../../documents/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
-# upstream design ../../documents/gpu-admission-r5-source-packet.md exact runtime identity validation contract
-# upstream design ../../documents/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
+# upstream design ../../documents/conventions/coding-conventions-project.md environment configuration policy
+# upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
+# upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact runtime identity validation contract
+# upstream design ../../documents/design/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
 # upstream design ../../documents/tools/lean_proof_env.md Lean proof environment toolchain boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
@@ -553,12 +553,12 @@ def has_vscode_contract(root: Path) -> bool:
 def load_shared_surface_manifest(root: Path) -> tuple[SurfaceManifest | None, list[Finding]]:
     """Load the shared runtime surface manifest through its canonical parser."""
     try:
-        return load_manifest(root, "vendor/agent-canon", "documents/shared-runtime-surfaces.toml"), []
+        return load_manifest(root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml"), []
     except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
         return None, [
             Finding(
                 "invalid_manifest",
-                "documents/shared-runtime-surfaces.toml",
+                "documents/runtime/shared-runtime-surfaces.toml",
                 f"load-failed:{exc}",
             )
         ]
@@ -577,7 +577,7 @@ def load_vscode_surface(root: Path) -> tuple[SurfaceEntry | None, SurfaceManifes
             [
                 Finding(
                     "dependency_contract_violation",
-                    "documents/shared-runtime-surfaces.toml",
+                    "documents/runtime/shared-runtime-surfaces.toml",
                     "missing-surface:.vscode",
                 )
             ],
@@ -611,7 +611,7 @@ def validate_vscode_manifest(entry: SurfaceEntry, manifest: SurfaceManifest) -> 
             findings.append(
                 Finding(
                     "dependency_contract_violation",
-                    "documents/shared-runtime-surfaces.toml",
+                    "documents/runtime/shared-runtime-surfaces.toml",
                     f".vscode-{field}-expected:{expected_value}",
                 )
             )
@@ -625,7 +625,7 @@ def validate_vscode_manifest(entry: SurfaceEntry, manifest: SurfaceManifest) -> 
         findings.append(
             Finding(
                 "dependency_contract_violation",
-                "documents/shared-runtime-surfaces.toml",
+                "documents/runtime/shared-runtime-surfaces.toml",
                 "vscode-source-coverage",
             )
         )
@@ -641,7 +641,7 @@ def validate_vscode_manifest(entry: SurfaceEntry, manifest: SurfaceManifest) -> 
             findings.append(
                 Finding(
                     "dependency_contract_violation",
-                    "documents/shared-runtime-surfaces.toml",
+                    "documents/runtime/shared-runtime-surfaces.toml",
                     f"vscode-file-surface:{path}",
                 )
             )

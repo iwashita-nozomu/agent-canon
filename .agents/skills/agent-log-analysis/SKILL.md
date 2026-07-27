@@ -9,7 +9,7 @@ responsibility Documents Agent Log Analysis for this repository.
 upstream design ../../../agents/skills/agent-log-analysis.md documents the human-facing skill
 upstream design ../../../agents/skills/agent-eval-accumulation.md repairs missing accumulated eval evidence
 downstream design ../../../agents/skills/issue-finding-report.md converts compact log findings into durable issues
-upstream design ../../../documents/runtime-log-archive.md defines the external log archive mount
+upstream design ../../../documents/runtime/runtime-log-archive.md defines the external log archive mount
 upstream implementation ../../../tools/agent_tools/generate_agent_runtime_dashboard.py owns structured dashboard API fields
 upstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
 @dependency-end

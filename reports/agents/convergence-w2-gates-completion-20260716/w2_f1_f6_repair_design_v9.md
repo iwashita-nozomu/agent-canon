@@ -802,7 +802,7 @@ Every row is future implementation scope only.
 | `workflow_monitor.py` | record each durable stage and exact blocked/crash-resume state | V9-R1 | monitor tests |
 | `github_publish.py`, future `publication_integrator.py` | use GitHub external binding variant before PR/publication pointer or CAS use | V9-R2 | publication tests |
 | `report_artifact_checks.py`, `task_close.py` | reject partial/cyclic chains, invalid source kind, unbound external receipt, or early pointer | both | report/closeout tests |
-| `documents/REVIEW_PROCESS.md`, review/closeout templates | review DAG order, external null rules, and all v8 non-regressions | both | independent review |
+| `documents/conventions/REVIEW_PROCESS.md`, review/closeout templates | review DAG order, external null rules, and all v8 non-regressions | both | independent review |
 
 OOP/SOLID and implementation/test execution remain pending.
 

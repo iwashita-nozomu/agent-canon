@@ -10,7 +10,7 @@ upstream design report-writing.md reader-facing report quality criteria
 upstream design html-output.md browser-readable HTML layout and publication skill
 upstream design result-artifact-writeout.md raw result artifact placement skill
 upstream design experiment-lifecycle.md experiment run protocol
-upstream design ../../documents/semantic_index.md semantic provider comparison and candidate authority boundary
+upstream design ../../documents/tools/semantic_index.md semantic provider comparison and candidate authority boundary
 downstream implementation ../../.agents/skills/html-experiment-report/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../tools/agent_tools/semantic_provider_html_report.py renders semantic provider comparison HTML reports
 @dependency-end

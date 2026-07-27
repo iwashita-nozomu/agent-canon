@@ -2,7 +2,7 @@
 @dependency-start
 contract policy
 responsibility Documents 文書および識別子の命名規約。
-upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./README.md document rule canon index
 downstream implementation ../../tools/agent_tools/check_convention_compliance.py convention validation
 downstream implementation ../../tools/agent_tools/check_log_helper_names.py log helper naming validation
@@ -34,7 +34,7 @@ downstream implementation ../../tools/agent_tools/check_log_helper_names.py log 
 - 関数、tool、theorem、artifact、branch、run、report の名前は、対象概念と責務が検索できる粒度にします。
 - proof や generated artifact は探索手順ではなく、対象 theorem profile、public root、projection などの安定した対象を表します。
 - Python helper / local function は、`helper_function_inventory.py` が推定する role と整合する action token を含めます。
-- Python のログ用 helper 関数は `documents/coding-conventions-logging.md` に従い、`_log` から始めます。
+- Python のログ用 helper 関数は `documents/conventions/coding-conventions-logging.md` に従い、`_log` から始めます。
 
 ## 命名計画
 

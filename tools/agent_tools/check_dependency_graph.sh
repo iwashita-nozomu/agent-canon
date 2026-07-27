@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Builds and validates dependency manifest graph semantics.
-# upstream design ../../documents/dependency-manifest-design.md dependency graph semantics
-# upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
+# upstream design ../../documents/design/dependency-manifest-design.md dependency graph semantics
+# upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream implementation ./check_dependency_header_format.sh validates source manifests
 # downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies graph behavior
 # @dependency-end

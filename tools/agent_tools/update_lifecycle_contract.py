@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Owns the machine-readable AgentCanon update lifecycle schemas, identity guards, receipts, and close token mechanics.
 # upstream design ../../agents/skills/agent-orchestration.md owns Decision Sufficiency meaning and validation.
-# upstream design ../../documents/agent-canon-update-route.md owns the source update and projection transaction.
+# upstream design ../../documents/agent-canon/agent-canon-update-route.md owns the source update and projection transaction.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md owns the source PR sequence.
 # upstream implementation ./artifact_identity.py provides canonical JSON serialization.
 # upstream implementation ../../tools/ci/check_agent_canon_pr.py provides the authoritative G2 owner API consumed through SourceProjectionGateOwnerApis.

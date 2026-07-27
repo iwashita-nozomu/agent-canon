@@ -2,7 +2,7 @@
 @dependency-start
 contract policy
 responsibility Documents Python の配置と定義順 for this repository.
-upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 @dependency-end
 -->
 
@@ -20,8 +20,8 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
 ## 文書動線
 
 - すべての言語に共通する書き方は
-  [ハウススタイル規約](../../coding-conventions-house-style.md) を見ます。
-- Python 全体の規約は [Python コーディング規約](../../coding-conventions-python.md) を見ます。
+  [ハウススタイル規約](../coding-conventions-house-style.md) を見ます。
+- Python 全体の規約は [Python コーディング規約](../coding-conventions-python.md) を見ます。
 - Python 差分の確認手順は [python-review](../../../agents/skills/python-review.md) を見ます。
 - この章は、配置先と定義順だけを判断する入口です。
 

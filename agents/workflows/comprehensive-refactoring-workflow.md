@@ -6,8 +6,8 @@ upstream design README.md workflow catalog
 upstream design ../TASK_WORKFLOWS.md workflow family routing contract
 upstream design implementation-waterfall-workflow.md staged implementation gate
 upstream design ../skills/refactor-loop.md refactor loop contract
-upstream design ../../documents/object-oriented-design.md OOP boundary policy
-upstream design ../../documents/algorithm-implementation-boundary.md algorithm boundary policy
+upstream design ../../documents/conventions/object-oriented-design.md OOP boundary policy
+upstream design ../../documents/design/algorithm-implementation-boundary.md algorithm boundary policy
 downstream implementation ../../tools/agent_tools/analyze_refactor_surface.py static refactor surface analyzer
 downstream implementation ../../tools/oop/python/readability.py Python OOP readability analyzer
 downstream implementation ../../tools/oop/cpp/readability.py C++ OOP readability analyzer
@@ -64,7 +64,7 @@ primary family は `Large Delivery` または `Comprehensive Development` とし
 ## Gate B. OOP 的な責務境界方針
 
 OOP は、実装行数を増やすためではなく、責務を短く保つために使います。
-[object-oriented-design.md](../../documents/object-oriented-design.md) を正本とし、次を design artifact に書きます。
+[object-oriented-design.md](../../documents/conventions/object-oriented-design.md) を正本とし、次を design artifact に書きます。
 
 - `Value Objects:` immutable data、validated input、result、config。
 - `State Owners:` mutable state を保持する object と lifecycle。

@@ -7,7 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design agent-orchestration.md execution-time-aware work-conservation contract
 upstream design ../workflows/pr-queue-cleanup-workflow.md AgentCanon source and parent pin PR cleanup workflow
 upstream design ../workflows/agent-canon-pr-workflow.md AgentCanon source PR workflow
-upstream design ../../documents/agent-canon-update-route.md AgentCanon source PR versus parent pin route
+upstream design ../../documents/agent-canon/agent-canon-update-route.md AgentCanon source PR versus parent pin route
 upstream design result-artifact-writeout.md run-local result artifact writeout contract
 upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py creates run-local report bundles
 upstream implementation ../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
@@ -221,7 +221,7 @@ route を短く書きます。
    - required checks pass
    - blocking review なし
    - PR Essence と validation evidence が PR body、comment、または run bundle にある
-   - `documents/BRANCH_SCOPE.md` の範囲分割契約に従い、PR が一つのレビュー単位であること、または複数の差分単位の範囲表と分割判断が PR body、comment、または run bundle にある
+   - `documents/operations/BRANCH_SCOPE.md` の範囲分割契約に従い、PR が一つのレビュー単位であること、または複数の差分単位の範囲表と分割判断が PR body、comment、または run bundle にある
    - repo の GitHub automation authority fields が必要なら visible になっている
 1. Issue を処理します。
    - resolved: merge PR / commit / policy reference を書いて close

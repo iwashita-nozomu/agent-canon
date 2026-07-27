@@ -92,7 +92,7 @@ static structure selected for this design-only task.
 | validation result and artifact checks | `tools/agent_tools/report_artifact_checks.py` | validation projection resolver | review resolver |
 | review eligibility and dispatch state | retained future `tools/agent_tools/review_dispatch.py` | review projection resolver | publication resolver |
 | publication eligibility and CAS ingress | retained future `tools/agent_tools/publication_integrator.py` | publication projection resolver | local/remote publication authority |
-| registered validation route | `documents/runtime-profiles-and-check-matrix.json` and retained generated reader | route record v2 | materializer |
+| registered validation route | `documents/runtime/runtime-profiles-and-check-matrix.json` and retained generated reader | route record v2 | materializer |
 | result attempt, stable lock, artifact bytes, and command outcomes | `tools/agent_tools/work_log.py` | canonical result materializer | artifact checker |
 | canonical run locator | `tools/agent_tools/task_authority.py` | workspace-only locator | every materializer/resolver |
 | monitor and closeout ingress | `workflow_monitor.py`, `task_close.py` | no-path public consumers | regenerated projections |
@@ -883,7 +883,7 @@ Selected unchanged owner evidence:
 | `agents/COMMUNICATION_PROTOCOL.md` | projection/outcome/context schema owner | `74b04f3cd6ca274eb2ef36f558a2b33859613379` |
 | `agents/canonical/ARTIFACT_PLACEMENT.md` | run-local artifact placement | `5a51fba8b84604a27fc22e650c2fa1059b110a7b` |
 | `agents/skills/result-artifact-writeout.md` | raw/manifest artifact contract | `ffc7e73552653e71d793933582145805898083e8` |
-| `documents/runtime-profiles-and-check-matrix.json` | registered route/profile authority | retained predecessor object |
+| `documents/runtime/runtime-profiles-and-check-matrix.json` | registered route/profile authority | retained predecessor object |
 | `tools/agent_tools/task_authority.py` | canonical run locator | `294a5074e572f460a22e3ac726b4f17db25d1982` |
 | `tools/agent_tools/work_log.py` | begin/settle/lock/artifact/command owner | `16324873f42c409b4181f2e5897e8d423133cb1d` |
 | `tools/agent_tools/workflow_monitor.py` | no-path materializer ingress | `da00ebc90f89839f7c1a11f4fb734175c63cfbfb` |
@@ -923,7 +923,7 @@ existing pairs rather than adding a second owner:
 
 | Forward owner edge | Reciprocal consumer edge |
 | --- | --- |
-| runtime profile JSON: downstream implementation `../tools/agent_tools/work_log.py` owns route v2 command selection | `work_log.py`: upstream design `../../documents/runtime-profiles-and-check-matrix.json` owns registered route/argv |
+| runtime profile JSON: downstream implementation `../tools/agent_tools/work_log.py` owns route v2 command selection | `work_log.py`: upstream design `../../documents/runtime/runtime-profiles-and-check-matrix.json` owns registered route/argv |
 | `COMMUNICATION_PROTOCOL.md`: downstream implementation `../tools/agent_tools/report_artifact_checks.py` owns projection schemas/tables | `report_artifact_checks.py`: upstream design `../../agents/COMMUNICATION_PROTOCOL.md` owns resolver contract |
 | `work_log.py`: downstream implementation `./report_artifact_checks.py` verifies materializer root and CommandOutcome v3 | `report_artifact_checks.py`: upstream implementation `./work_log.py` owns artifact/outcome bytes |
 | `report_artifact_checks.py`: downstream implementation future `./review_dispatch.py` supplies validation projection | future `review_dispatch.py`: upstream implementation `./report_artifact_checks.py` owns validation resolution |

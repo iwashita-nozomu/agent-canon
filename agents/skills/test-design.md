@@ -52,7 +52,7 @@ placement の evidence であり、最初に tests を書き換える根拠で�
 - contract source、behavior contract、observation level、observable outcome、oracle、input space、adequacy evidence、Do Not Freeze を分ける
 - malformed input、boundary value、empty / null-ish input、error path、state transition、再発しやすい regression を、安定した観測レベルで列挙する
 - parser / formatter / graph / router / mapping では property または metamorphic relation を検討するが、checker-owned property は test oracle に昇格させない
-- numerical、randomized、tolerance、solver、convergence、residual、benchmark、experiment-style test は、`documents/coding-conventions-testing.md` の Numerical Test Admission Gate を owner とし、`activation=required` かつ数値 trigger、non-numerical alternative、oracle、budget が approved route にある場合だけ提案する
+- numerical、randomized、tolerance、solver、convergence、residual、benchmark、experiment-style test は、`documents/conventions/coding-conventions-testing.md` の Numerical Test Admission Gate を owner とし、`activation=required` かつ数値 trigger、non-numerical alternative、oracle、budget が approved route にある場合だけ提案する
 - existing test style、fixture layout、naming を mirror し、test の追加・編集は concrete behavior regression oracle に限定する
 
 ## Validation Failure Response
@@ -61,8 +61,8 @@ test / check が失敗した場合、単純化、revert、feature / test deletio
 weakening、intended behavior の削除、validation downscope に進む前に、
 `failing_contract`、`observation_level`、`cause_classification`、
 `intent_preservation`、`evidence` を記録します。slug set と route semantics は
-`documents/runtime-profiles-and-check-matrix.json` が所有し、
-`documents/runtime-profiles-and-check-matrix.md` は generated reader projection
+`documents/runtime/runtime-profiles-and-check-matrix.json` が所有し、
+`documents/runtime/runtime-profiles-and-check-matrix.md` は generated reader projection
 として参照します。
 
 `cause_classification=implementation_bug` で contract と oracle が安定している

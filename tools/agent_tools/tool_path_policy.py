@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Defines shared tool-path hygiene rules for retired legacy surfaces.
-# upstream design ../../documents/repo-local-tool-imports.md legacy tool disposition policy
+# upstream design ../../documents/tools/repo-local-tool-imports.md legacy tool disposition policy
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 # downstream implementation ./tool_catalog.py rejects retired legacy catalog paths
 # downstream implementation ./tool_drift.py detects orphaned retired legacy tool files
