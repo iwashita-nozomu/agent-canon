@@ -501,7 +501,7 @@ def check_visualization_contract_entry(
 def validate_catalog(root: Path) -> CatalogReport:
     """Run catalog validation."""
     root = root.resolve()
-    data, findings = load_catalog(root / CATALOG_PATH)
+    data, findings = load_catalog(resolve_repo_path(root, CATALOG_PATH))
     if data is None:
         return CatalogReport(tuple(findings), ())
 

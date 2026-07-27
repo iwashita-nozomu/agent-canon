@@ -122,6 +122,8 @@ def load_catalog_paths(root: Path) -> tuple[set[str], list[Finding]]:
     """Return paths listed in the structured tool catalog."""
     path = root / CATALOG_PATH
     if not path.is_file():
+        path = root / "vendor" / "agent-canon" / CATALOG_PATH
+    if not path.is_file():
         return set(), [Finding("catalog", CATALOG_PATH, "missing-file")]
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, Mapping):
@@ -130,11 +132,18 @@ def load_catalog_paths(root: Path) -> tuple[set[str], list[Finding]]:
     if not isinstance(entries, list):
         return set(), [Finding("catalog", CATALOG_PATH, "missing-entries")]
     paths = {
-        entry.get("path")
+        logical_tool_path(entry.get("path"))
         for entry in cast(list[object], entries)
         if isinstance(entry, Mapping) and isinstance(entry.get("path"), str)
     }
     return {cast(str, path) for path in paths}, []
+
+
+def logical_tool_path(path: object) -> object:
+    """Normalize a parent projection path to AgentCanon's logical tool path."""
+    if isinstance(path, str) and path.startswith("tools/agent-canon/"):
+        return "tools/" + path.removeprefix("tools/agent-canon/")
+    return path
 
 
 def scope_from_mapping(raw_scope: Mapping[str, object]) -> Scope:
