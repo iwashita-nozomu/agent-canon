@@ -25,6 +25,9 @@ formatter、dependency review、type checker、lint、docs check、targeted
 validation が所有しない具体的な oracle / specification / regression /
 failure-mode risk を分類します。既存 tests は contract、symptom、regression
 placement の evidence であり、最初に tests を書き換える根拠ではありません。
+`activation=required` の場合は、owning design / contract の文書と code-side
+implementation mechanism の実装を双方読み、設計条項と実装の分岐・状態遷移が
+同じ behavior claim を指すことを確認します。
 
 ## Activation Decision
 
@@ -40,6 +43,7 @@ placement の evidence であり、最初に tests を書き換える根拠で�
 - 常に `Activation Decision`、根拠、次の owner route を返す
 - `activation=not_needed` または `activation=deferred` では `test_plan.md` と test-design tool run を必須にしない
 - `activation=required` の場合だけ、static path survey、contract source、observation level、observable outcome、oracle、input space、adequacy evidence、nasty case、regression case、placement notes を具体化する
+- `activation=required` の各 nasty / regression case は、`Design Clause -> Code Mechanism -> Breaking Input/Sequence -> Observation Level / Observable Outcome -> Oracle` の trace を持つ。設計条項、実装機構、破綻入力または状態列、安定した観測、判定可能な oracle のいずれかが欠ける case は test-design の evidence として受理しない
 - checker-owned property は canonical static validation evidence に戻す
 - tests は concrete behavior regression oracle がある場合だけ作成または編集する
 
@@ -48,9 +52,12 @@ placement の evidence であり、最初に tests を書き換える根拠で�
 `activation=required` の場合だけ実行します。
 
 - code path と関連 test path を survey / placement evidence として記録し、API shape、private helper、return shape、error prose、mock order、internal call sequence を勝手に固定しない
+- owning design / contract の該当条項と code-side implementation mechanism（public entrypoint、分岐、parser、error path、state transition、return projection）を同じ調査記録に結び付ける。tests だけから contract や oracle を推測しない
 - 関連 tests がある場合、既存の test-design checker を必要な範囲で実行し、finding を behavior contract と照合する。activation が false の場合は実行しない
 - contract source、behavior contract、observation level、observable outcome、oracle、input space、adequacy evidence、Do Not Freeze を分ける
 - malformed input、boundary value、empty / null-ish input、error path、state transition、再発しやすい regression を、安定した観測レベルで列挙する
+- 実装機構が暗黙に置くが contract が保証していない弱い仮定を、明示的な反例探索の対象にする。少なくとも、要素数が同じでも shape / axis / layout が異なる入力、順序や aliasing、空・singleton、境界値、履歴依存の state sequence、失敗後の再試行を確認し、仮定を破る具体的な input / sequence と観測可能な差を記録する
+- 各 nasty / regression case は、設計条項、実装機構、破綻入力または状態列、観測レベル、observable outcome、oracle、`Do Not Freeze`、およびなぜその case が実装の弱い仮定を突くかを一つの trace として先に固定する。テスト件数や coverage を増やすこと自体を adequacy としない
 - parser / formatter / graph / router / mapping では property または metamorphic relation を検討するが、checker-owned property は test oracle に昇格させない
 - numerical、randomized、tolerance、solver、convergence、residual、benchmark、experiment-style test は、`documents/conventions/coding-conventions-testing.md` の Numerical Test Admission Gate を owner とし、`activation=required` かつ数値 trigger、non-numerical alternative、oracle、budget が approved route にある場合だけ提案する
 - existing test style、fixture layout、naming を mirror し、test の追加・編集は concrete behavior regression oracle に限定する

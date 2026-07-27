@@ -30,7 +30,9 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Confirm that the owning production design / algorithm contract and implementation mechanism are established or repaired. If not, return `activation=deferred` with the owning repair route; do not run tools or require `test_plan.md`.
 1. Confirm a concrete unresolved oracle, specification, regression, or failure-mode risk remains outside static analysis, existing checkers, and targeted validation. Ordinary code changes, bug fixes, parser changes, and validation failures alone do not activate this skill.
 1. If the risk is absent or checker-owned, return `activation=not_needed` with the canonical validation route; do not run test-design tools or require `test_plan.md`.
-1. Only for `activation=required`, record code paths and related test paths as survey and placement evidence, inspect branches/parsing/error/state transitions, and design a concrete behavior-regression oracle.
+1. Only for `activation=required`, read both the owning design / contract document and the code-side implementation mechanism. Record the design clause, public entrypoint, branches, parsing and error paths, state transitions, and return projection that implement the claim; do not infer the contract from tests alone.
+1. For every nasty or regression case under `activation=required`, require one complete trace: `Design Clause -> Code Mechanism -> Breaking Input/Sequence -> Observation Level / Observable Outcome -> Oracle`. A case is not evidence until the design clause, mechanism, concrete breaking input or state sequence, stable observation, and decidable oracle are all explicit.
+1. During the mechanism survey, actively search for implementation assumptions that the contract does not guarantee. Include cases where inputs have the same element count but different shape, axis, or layout, as well as ordering or aliasing differences, empty or singleton values, boundary values, history-dependent state sequences, and retry-after-failure paths. Record the assumption challenged, the concrete input or sequence, and the observable divergence.
 1. For algorithm fixes, enter through the algorithm contract and code-side
    repair route before changing tests. Read the public entrypoint, recurrence or
    state transition, invariant, stopping or acceptance rule, failure semantics,
@@ -60,5 +62,5 @@ Execute the required and task-matching conditional commands that the packet prin
    fallback for numerical validation.
 1. Prefer behavior examples for concrete regressions, property tests for broad input spaces, metamorphic tests when exact expected output is hard, and mutation testing when oracle strength is doubtful.
 1. Record nasty edge cases and regression cases in `test_plan.md` only when `activation=required`.
-1. Keep cases concrete at the stable observation level: contract source, input, observable outcome, oracle, `Do Not Freeze`, and why the case is nasty.
+1. Keep cases concrete at the stable observation level: `Design Clause`, `Code Mechanism`, `Breaking Input/Sequence`, `Observation Level`, `Observable Outcome`, `Oracle`, `Input Space`, `Adequacy Evidence`, `Do Not Freeze`, and why the case is nasty. Do not add tests merely to increase test count or coverage without this trace.
 1. Mirror existing test style, fixture layout, and naming before suggesting anything new.
