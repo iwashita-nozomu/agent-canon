@@ -2,7 +2,7 @@
 # contract tool
 # responsibility Summarizes HLO JSONL records into compact JSON metrics.
 # upstream design ../README.md shared tool index
-# downstream design ../../documents/result-log-retention-and-visualization.md result policy
+# downstream design ../../documents/experiments/result-log-retention-and-visualization.md result policy
 # @dependency-end
 """Summarize HLO JSONL records."""
 from __future__ import annotations

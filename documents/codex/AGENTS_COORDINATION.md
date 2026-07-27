@@ -1,0 +1,159 @@
+# エージェント運用の入口
+<!--
+@dependency-start
+contract reference
+responsibility Documents エージェント運用の入口 for this repository.
+upstream design README.md durable document index
+upstream design ../ROOT_AGENTS.md template-root Codex runtime instruction surface
+upstream design ../../AGENTS.md standalone AgentCanon Codex runtime instruction surface
+@dependency-end
+-->
+
+
+この文書は repo 運用から見た agent 運用の薄い入口です。
+
+## この文書の読み方
+
+- この文書は、repo 運用から現在の agent 正本 surface へ誘導する入口です。
+- 主な順路は、正本、Runtime Entry Points、Skills、実行入口、repo 側の運用ルールです。
+- 古い `documents/codex/AGENTS_COORDINATION.md` 参照を見つけたときや、
+  runtime entrypoint の正本を確認するときに読みます。
+- 境界: 新しい stage rule や skill policy はここではなく、リンク先の
+  runtime instruction surface、`agents/`、skill owner surface が所有します。
+
+## Codex Loading Priority
+
+Codex loading-priority policy is owned by `ROOT_AGENTS.md` and `AGENTS.md`;
+this file only maps legacy references to the current owner surfaces. Codex の
+自動 instruction 読み込みは Codex home の global guidance から始まり、その後
+project root から current working directory へ進む runtime chain で決まります。
+各 directory では `AGENTS.override.md`、`AGENTS.md`、
+`project_doc_fallback_filenames` の順に最大 1 file だけが入ります。current working
+directory に近い file ほど後に結合され、広い guidance を局所的に上書きします。
+この文書は legacy adapter であり、Codex が常に自動で読む runtime instruction
+surface ではありません。
+
+Template / derived repo root から Codex を開始した場合、`/AGENTS.md` runtime
+view が `vendor/agent-canon/ROOT_AGENTS.md` を読み込みます。AgentCanon source
+checkout 内を current working directory として開始した場合、この tree の
+`AGENTS.md` が standalone source-tree entrypoint になります。`.github/AGENTS.md`
+は `.github/` subtree に入ったときの overlay です。
+
+Skills は repository instruction chain とは別 surface です。Codex は skill
+metadata で候補を選び、選択後に該当 `SKILL.md` を読みます。hook、rules、MCP、
+plugin、`.codex/config.toml` も runtime behavior の owner surface であり、この
+legacy adapter に重複 policy を置きません。
+
+## Runtime Instruction Surfaces
+
+The executable policy projection is owned by the canonical workflow,
+subagent, communication, model/profile, implementation-route, capacity, and
+closeout owners. This adapter only links to those surfaces; it does not
+restate Target-State-First, Decision Sufficiency, ToolCall, capacity, or
+lifecycle policy.
+
+- [ROOT_AGENTS.md](../../ROOT_AGENTS.md)
+- [AGENTS.md](../../AGENTS.md)
+- [.github/AGENTS.md](../../.github/AGENTS.md)
+- [.codex/README.md](../../.codex/README.md)
+
+## Workflow And Skill Canon
+
+- [agents/README.md](../../agents/README.md)
+- [agents/canonical/README.md](../../agents/canonical/README.md)
+- [agents/agents_config.json](../../agents/agents_config.json)
+- [agents/TASK_WORKFLOWS.md](../../agents/TASK_WORKFLOWS.md)
+- [agents/COMMUNICATION_PROTOCOL.md](../../agents/COMMUNICATION_PROTOCOL.md)
+- [agents/canonical/ARTIFACT_PLACEMENT.md](../../agents/canonical/ARTIFACT_PLACEMENT.md)
+- [agents/canonical/CLI_ENTRYPOINTS.md](../../agents/canonical/CLI_ENTRYPOINTS.md)
+- [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md)
+- [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md)
+- [agents/skills/README.md](../../agents/skills/README.md)
+- [agents/skills/catalog.yaml](../../agents/skills/catalog.yaml)
+
+## Skills
+
+- Canonical path: `.agents/skills/`
+
+## 実行入口
+
+標準の run bundle を作るときは次を使います。
+
+    python3 tools/agent_tools/bootstrap_agent_run.py \
+      --task "short task summary" \
+      --task-id T1 \
+      --owner "codex-or-human" \
+      --workspace-root "$PWD"
+
+研究・実験つき変更:
+
+    python3 tools/agent_tools/bootstrap_agent_run.py \
+      --task "research-backed change" \
+      --task-id T4 \
+      --owner "codex" \
+      --workspace-root "$PWD"
+
+環境変更:
+
+    python3 tools/agent_tools/bootstrap_agent_run.py \
+      --task "platform or environment change" \
+      --task-id T8 \
+      --owner "codex" \
+      --workspace-root "$PWD"
+
+学術文章:
+
+    python3 tools/agent_tools/bootstrap_agent_run.py \
+      --task "academic writing task" \
+      --task-id T10 \
+      --owner "codex" \
+      --workspace-root "$PWD"
+
+包括的開発:
+
+    python3 tools/agent_tools/bootstrap_agent_run.py \
+      --task "comprehensive development pass" \
+      --task-id T12 \
+      --owner "codex" \
+      --workspace-root "$PWD"
+
+`experimenter` が有効な run では `experiment_change_loop.md`、`infra_steward` が有効な run では `environment_change_proposal.md` も bundle に含めます。
+環境変更 run では `infra_steward` が requirements/plan/design の前に `triggering code requirement`、`blocked command`、`source-of-truth surface` を proposal に固定してから handoff します。
+`notation_definition_reviewer` と `logic_gap_reviewer` が有効な run では、学術文章の記号定義と論理飛躍を別 reviewer で閉じます。
+`citation_evidence_reviewer` が有効な run では、論文 draft の major claim が citation、figure、table、derivation、appendix、result に辿れるかを別 reviewer で閉じます。
+code change を含む run では `test_designer` が `test_plan.md` を作り、worker はそれを test 実装へ落とします。
+T12 の default-active specialists は `scheduler`、`schedule_reviewer`、`project_reviewer`、`docs_workflow_steward`、`prompt_config_reviewer` の 5 role だけです。post-implementation change review は `diff_triage_reviewer` が既定で、`python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet evidence、または明示 review-pack activation がある場合だけ追加します。
+`--task-id` は task catalog の default specialist と default review pack をそのまま bundle に反映します。
+
+Codex parent session では、planning を含む場合に plan-mode command を使って構いません。official Codex CLI では `/plan` です。
+runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない runtime では `.codex/agents/*.toml` を正本にします。
+
+artifact-only role や review role の write scope を確認するときは、`validate_role_write_scope.py` を使います。
+
+    python3 tools/agent_tools/validate_role_write_scope.py \
+      --report-dir reports/agents/<run-id> \
+      --workspace-root "$PWD" \
+      --report-snapshot-out /tmp/agent-report-before.json \
+      --workspace-snapshot-out /tmp/agent-workspace-before.json
+
+    python3 tools/agent_tools/validate_role_write_scope.py \
+      --role change_reviewer \
+      --report-dir reports/agents/<run-id> \
+      --report-snapshot-in /tmp/agent-report-before.json \
+      --workspace-snapshot-in /tmp/agent-workspace-before.json \
+      --workspace-root "$PWD"
+
+## repo 側の運用ルール
+
+- role 定義と write policy は `agents/agents_config.json` を正本にします。
+- handoff、review、response、escalation の書式は `agents/COMMUNICATION_PROTOCOL.md` を正本にします。
+- 共通 workflow と skill routing は `agents/` 側で保守し、runtime entrypoint へ role 一覧を重複記載しません。
+- 会話だけを根拠に実装へ進めず、`documents/`、`notes/`、`references/` と local library の sweep を先に行います。
+- 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します。
+- review feedback は、直前の execution role が反映してから次段へ handoff します。
+- 学術文章では `document_flow_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、completeness reviewer を兼務させません。
+- 論文 draft では `citation_evidence_reviewer` も兼務させません。
+- repo ファイルを直接編集する role は parent-assigned write policy を持つ write-capable role に限ります。
+- 包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。
+- scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
+- run 固有の artifact は `reports/agents/<run-id>/` に寄せ、repo-wide の正本と混ぜません。

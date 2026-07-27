@@ -4,8 +4,8 @@
 # responsibility Validates Docker dependency declarations in repository tooling.
 # upstream design README.md shared automation index
 # upstream design ../CONTAINER_OPERATIONS.md canonical Docker and devcontainer ownership boundary
-# upstream design ../documents/rust-agent-tool-migration.md Rust toolchain and AgentCanon CLI migration boundary
-# upstream environment ../documents/linux-wsl-host-requirements.md documents canonical host tool inventory
+# upstream design ../documents/design/rust-agent-tool-migration.md Rust toolchain and AgentCanon CLI migration boundary
+# upstream environment ../documents/contracts/linux-wsl-host-requirements.md documents canonical host tool inventory
 # @dependency-end
 
 set -euo pipefail
@@ -373,7 +373,7 @@ check_pythonpath_documentation() {
     printf '   docker/ absent; skipping repo-local Docker documentation checks\n'
     return
   fi
-  for file in README.md QUICK_START.md documents/coding-conventions-project.md; do
+  for file in README.md QUICK_START.md documents/conventions/coding-conventions-project.md; do
     [ -f "$file" ] || continue
     if grep -q 'PYTHONPATH' "$file" && grep -q '=/workspace/python' "$file"; then
       documented=1

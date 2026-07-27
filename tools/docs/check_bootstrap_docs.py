@@ -24,8 +24,8 @@ BOOTSTRAP_DOCS = (
     Path("QUICK_START.md"),
     Path("docker/README.md"),
     Path("scripts/README.md"),
-    Path("documents/template-bootstrap.md"),
-    Path("documents/linux-wsl-host-requirements.md"),
+    Path("documents/contracts/template-bootstrap.md"),
+    Path("documents/contracts/linux-wsl-host-requirements.md"),
 )
 ABSOLUTE_WORKSPACE_LINK = re.compile(r"\]\(/mnt/l/workspace/[^)]+\)")
 DERIVED_REPO_STALE_STRINGS = (
@@ -37,7 +37,7 @@ DERIVED_REPO_STALE_STRINGS = (
 
 def is_shared_template_bootstrap_doc(relative_path: Path, path: Path) -> bool:
     """Return whether ``path`` is still a legacy shared bootstrap symlink view."""
-    if relative_path != Path("documents/template-bootstrap.md") or not path.is_symlink():
+    if relative_path != Path("documents/contracts/template-bootstrap.md") or not path.is_symlink():
         return False
     try:
         resolved_parts = path.resolve(strict=True).parts

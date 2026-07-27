@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Provides sync agent canon repository automation.
-# upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
-# upstream design ../documents/shared-runtime-surfaces.toml machine-readable surface manifest
+# upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
+# upstream design ../documents/runtime/shared-runtime-surfaces.toml machine-readable surface manifest
 # upstream implementation ./agent_tools/surface_manifest.py renders link, copy, regular, and root-absent specs
 # downstream implementation ../tests/tools/test_update_agent_canon.py verifies sync/update behavior
 # @dependency-end
@@ -23,7 +23,7 @@ DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 FORCE_RELINK="${AGENT_CANON_FORCE_RELINK:-0}"
 PLAN_REMOTE_OVERRIDE_URL="${AGENT_CANON_PLAN_REMOTE_URL:-}"
 CANONICAL_AGENT_CANON_REMOTE_URL="${AGENT_CANON_GITHUB_REMOTE_URL:-https://github.com/iwashita-nozomu/agent-canon.git}"
-SURFACE_MANIFEST="${AGENT_CANON_SURFACE_MANIFEST:-documents/shared-runtime-surfaces.toml}"
+SURFACE_MANIFEST="${AGENT_CANON_SURFACE_MANIFEST:-documents/runtime/shared-runtime-surfaces.toml}"
 PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
 COMMIT_AUTOMATION_AUTHOR_NAME="AgentCanon Sync Automation"
 COMMIT_AUTOMATION_AUTHOR_EMAIL="agent-canon-sync@automation.invalid"

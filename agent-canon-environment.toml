@@ -2,8 +2,8 @@
 # contract configuration
 # responsibility Defines machine-readable AgentCanon development environment expectations.
 # upstream design CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-# upstream design documents/gpu-admission-r5-source-packet.md exact shared runtime artifact identity
-# upstream design documents/rust-agent-tool-migration.md Rust tool migration policy
+# upstream design documents/experiments/gpu-admission-r5-source-packet.md exact shared runtime artifact identity
+# upstream design documents/design/rust-agent-tool-migration.md Rust tool migration policy
 # upstream implementation .devcontainer/post-create.sh installs shared development tooling
 # downstream implementation tools/rebuild_agent_tools.sh rebuilds compiled AgentCanon tools
 # downstream implementation rust/agent-canon/src/structured_analysis.rs implements structured-analysis cache build tooling

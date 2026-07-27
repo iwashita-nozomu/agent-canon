@@ -4,7 +4,7 @@
 // upstream design ../../../documents/structured-analysis/README.md structured analysis package boundary
 // upstream design ../../../documents/structured-analysis/database-design.md structured analysis DB contract
 // upstream design ../../../documents/prose-reasoning-graph/dsl-spec.md document responsibility diagnostic boundary
-// upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
+// upstream design ../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // downstream implementation ../../../tests/agent_tools/test_structured_document_inventory_cli.py tests the canonical CLI
 // downstream implementation ../../../rust/agent-canon/src/main.rs routes structured-analysis commands
 // @dependency-end

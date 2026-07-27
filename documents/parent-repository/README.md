@@ -2,8 +2,8 @@
 @dependency-start
 contract reference
 responsibility Defines the expected structure and ownership boundaries of a parent repository that vendors AgentCanon.
-upstream design ../SHARED_RUNTIME_SURFACES.md shared surface ownership and projection policy
-upstream design ../repo-structure-contract.toml machine-readable expected path contract
+upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership and projection policy
+upstream design ../structure/repo-structure-contract.toml machine-readable expected path contract
 upstream design ../rule/directory-structure.md directory documentation and responsibility rule
 upstream implementation ../../tools/agent_tools/parent_repo_readiness.py parent repository structure readiness checker
 upstream implementation ../../tools/agent_tools/surface_manifest.py shared surface materialization and check
@@ -37,12 +37,12 @@ downstream design ../../README.md AgentCanon source reader route
 ├── README.md                         # parent-owned regular file
 ├── .agents -> vendor/agent-canon/.agents
 ├── .codex/                           # parent-owned regular directory
-│   ├── agents -> ../vendor/agent-canon/.codex/agents
-│   ├── config.toml -> ../vendor/agent-canon/.codex/config.toml
+│   ├── agents -> ../../vendor/agent-canon/.codex/agents
+│   ├── config.toml -> ../../vendor/agent-canon/.codex/config.toml
 │   ├── project-config.toml           # optional parent-owned file
 │   └── project-skills/               # optional parent-owned directory
 ├── .devcontainer/                    # parent-owned regular directory
-│   ├── devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json
+│   ├── devcontainer.json -> ../../vendor/agent-canon/.devcontainer/devcontainer.json
 │   ├── bootstrap-shared-runtime.sh   # parent-owned wrapper
 │   ├── finalize-shared-runtime.sh    # parent-owned wrapper
 │   ├── generate-runtime-compose.sh   # parent-owned wrapper

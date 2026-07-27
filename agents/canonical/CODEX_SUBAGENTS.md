@@ -4,7 +4,7 @@ contract agent-runtime
 responsibility Documents Codex Subagents for this repository.
 upstream design ../task_catalog.yaml task routing catalog
 upstream design ../agents_config.json permanent team role ownership and artifact policy
-upstream design ../../documents/prompt-skill-evaluation-checklist.md empirical evaluation packet and report contract
+upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md empirical evaluation packet and report contract
 downstream design CODEX_WORKFLOW.md workflow consumes subagent routing contract
 downstream implementation ../../.codex/config.toml Codex runtime config consumes subagent routing
 downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP readability report reviewer role
@@ -193,8 +193,8 @@ validation just to pass. The packet records `failing_contract`, `observation_lev
 implementation intent changes.
 
 The canonical token-safe `cause_classification` and `intent_preservation` slug
-lists are owned by `documents/runtime-profiles-and-check-matrix.json` and
-projected into `documents/runtime-profiles-and-check-matrix.md`. This section is
+lists are owned by `documents/runtime/runtime-profiles-and-check-matrix.json` and
+projected into `documents/runtime/runtime-profiles-and-check-matrix.md`. This section is
 only the subagent handoff projection: handoffs must carry those five fields and
 must cite the runtime profile taxonomy rather than defining a separate slug
 list. Implementation bugs, test-oracle/spec mismatches, fixture or environment

@@ -24,7 +24,7 @@ upstream design ../skills/prose-reasoning-graph.md prose graph citation/evidence
 
 - `agents/workflows/paper-writing-workflow.md`
 - `agents/workflows/academic-writing-workflow.md`
-- `documents/REVIEW_PROCESS.md`
+- `documents/conventions/REVIEW_PROCESS.md`
 - `agents/templates/citation_evidence_review.md`
 
 ## Checklist

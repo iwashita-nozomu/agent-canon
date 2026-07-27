@@ -76,7 +76,7 @@ prompt routing trigger は `agents/skills/catalog.yaml` が唯一の列挙正本
 ## Internal Review And Runtime Routines
 
 - docs completeness、docs consistency、notation、logic gap、citation/evidence、critical/report、research perspective review は public skill ではなく、workflow が自動で要求する review pass として扱います。
-- artifact placement、CLI adapter、static validation は `agents/internal-routines/`、`agents/canonical/`、`documents/REVIEW_PROCESS.md` の責務に寄せます。
+- artifact placement、CLI adapter、static validation は `agents/internal-routines/`、`agents/canonical/`、`documents/conventions/REVIEW_PROCESS.md` の責務に寄せます。
 - `.agents/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。AgentCanon public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim、AgentCanon-owned `.codex/config.toml` の `[[skills.config]]` を同じ変更で追加します。parent-owned skill は `.codex/project-config.toml` で有効化します。
 - agent orchestration は public skill として先頭に出し、task 開始時に runtime が拾えるようにします。
 - subagent bootstrap は public skill として出し、repo-changing task の stage separation で使います。

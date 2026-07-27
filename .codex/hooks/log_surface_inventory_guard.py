@@ -4,7 +4,7 @@
 # responsibility Blocks hook/tool/skill log-surface drift not reflected in the generated inventory baseline.
 # upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
 # upstream implementation ../../tools/agent_tools/log_surface_inventory.py inventories emitted log fields.
-# upstream design ../../documents/runtime-log-archive.md defines durable hook result fields.
+# upstream design ../../documents/runtime/runtime-log-archive.md defines durable hook result fields.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates hook wiring and quiet pass behavior.
 # @dependency-end
 """Guard hook/tool/skill log-surface inventory drift."""
@@ -162,7 +162,7 @@ def block(reason: str) -> None:
             "next_action": "regenerate_log_surface_inventory_then_retry",
             "remediation": [
                 "Review the added or removed hook/tool/skill output fields.",
-                "Run `python3 tools/agent_tools/log_surface_inventory.py --root . --output documents/log-surface-inventory.json` from AgentCanon.",
+                "Run `python3 tools/agent_tools/log_surface_inventory.py --root . --output documents/runtime/log-surface-inventory.json` from AgentCanon.",
                 "Re-run the blocked command after committing the regenerated inventory with the field change.",
             ],
         },
@@ -201,7 +201,7 @@ def main() -> int:
 
     reason = (
         "Log surface inventory guard found hook/tool/skill output field drift. "
-        "Regenerate documents/log-surface-inventory.json after reviewing the "
+        "Regenerate documents/runtime/log-surface-inventory.json after reviewing the "
         "field change.\n"
         f"{result.stdout.strip() or result.stderr.strip()}"
     )

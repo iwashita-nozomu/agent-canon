@@ -237,7 +237,7 @@ class SkillToolCommandsTest(unittest.TestCase):
             self.write_skill(
                 root,
                 "start-repository",
-                "Read `documents/agent-canon-github-remote.md`.\n",
+                "Read `documents/agent-canon/agent-canon-github-remote.md`.\n",
             )
             sync = self.run_tool(root, "sync")
 

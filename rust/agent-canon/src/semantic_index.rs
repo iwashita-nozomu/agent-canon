@@ -1,9 +1,9 @@
 // @dependency-start
 // contract implementation
 // responsibility Provides Rust-native semantic vector indexing, search, similarity, natural/discourse-relation, thin-doc, and eval CLI support.
-// upstream design ../../../documents/semantic_index.md semantic index responsibility and generated-cache policy
-// upstream design ../../../documents/search-coordination.md coordinated search boundary and advisory search policy
-// upstream design ../../../documents/rust-agent-tool-migration.md Rust CLI migration policy
+// upstream design ../../../documents/tools/semantic_index.md semantic index responsibility and generated-cache policy
+// upstream design ../../../documents/tools/search-coordination.md coordinated search boundary and advisory search policy
+// upstream design ../../../documents/design/rust-agent-tool-migration.md Rust CLI migration policy
 // downstream design ../../../tools/README.md documents root tool entrypoints
 // downstream design ../../../documents/tools/README.md documents reader-facing tool entrypoints
 // downstream design ../../../tools/catalog.yaml catalogs this Rust CLI surface
@@ -6888,7 +6888,7 @@ mod tests {
             "eval-and-hook-evidence"
         );
         assert_eq!(
-            responsibility_scope_bucket("documents/search-coordination.md"),
+            responsibility_scope_bucket("documents/tools/search-coordination.md"),
             "shared-policy-documents"
         );
         assert_eq!(
@@ -7426,7 +7426,7 @@ mod tests {
         fs::write(
             &search_path,
             r#"{"semantic_index_search":"ok","query_chars":42,"result_count":1}
-{"rank":1,"score":0.61,"path":"documents/semantic_index.md","node_kind":"block","line_start":10,"line_end":12}
+{"rank":1,"score":0.61,"path":"documents/tools/semantic_index.md","node_kind":"block","line_start":10,"line_end":12}
 "#,
         )
         .unwrap();

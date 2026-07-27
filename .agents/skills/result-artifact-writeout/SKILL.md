@@ -8,7 +8,7 @@ contract skill
 responsibility Documents Result Artifact Writeout for this repository.
 upstream design ../../../agents/skills/result-artifact-writeout.md documents the human-facing skill
 upstream design ../../../agents/canonical/ARTIFACT_PLACEMENT.md defines run-local and durable artifact placement
-upstream design ../../../documents/experiment-report-style.md defines experiment report artifact policy
+upstream design ../../../documents/experiments/experiment-report-style.md defines experiment report artifact policy
 upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose graph output artifacts
 @dependency-end
 -->

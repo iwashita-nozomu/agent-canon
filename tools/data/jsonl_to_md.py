@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Converts JSONL result records into a compact Markdown report.
 # upstream design ../README.md shared tool index
-# downstream design ../../documents/result-log-retention-and-visualization.md result policy
+# downstream design ../../documents/experiments/result-log-retention-and-visualization.md result policy
 # @dependency-end
 """Convert JSONL records into a compact Markdown report."""
 

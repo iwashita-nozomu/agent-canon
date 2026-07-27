@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Checks design-document claims against implementation-backed evidence.
-# upstream design ../../documents/dependency-manifest-design.md dependency manifest graph semantics
+# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest graph semantics
 # upstream design ../../documents/design/README.md design-document evidence policy
 # downstream design ../../documents/tools/check_design_doc_claims.md tool contract
 # downstream implementation ../../tests/agent_tools/test_check_design_doc_claims.py validates checker behavior

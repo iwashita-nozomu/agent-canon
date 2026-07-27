@@ -6,7 +6,7 @@ upstream implementation ../../tools/agent_tools/cpp_template_to_lean.py expands 
 upstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts the C++ source envelope.
 upstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders complete operational IR.
 downstream implementation ../../tests/agent_tools/test_cpp_template_to_lean.py validates the single CLI route.
-downstream design ../tools/README.md lists proof and algorithm tool routes.
+downstream design ../../tools/README.md lists proof and algorithm tool routes.
 @dependency-end
 -->
 

@@ -27,7 +27,7 @@ Execute the required and task-matching conditional commands that the packet prin
 
 
 1. Use this skill after `git clone <template> <new-project>` when the user is turning the clone into a new repository.
-1. Read `documents/template-bootstrap.md`, `scripts/README.md`, and the AgentCanon documents `documents/agent-canon-github-remote.md` and `documents/runtime-profiles-and-check-matrix.md`. From a template or derived repo root, resolve the AgentCanon documents as `vendor/agent-canon/documents/agent-canon-github-remote.md` and `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md`.
+1. Read `documents/contracts/template-bootstrap.md`, `scripts/README.md`, and the AgentCanon documents `documents/agent-canon/agent-canon-github-remote.md` and `documents/runtime/runtime-profiles-and-check-matrix.md`. From a template or derived repo root, resolve the AgentCanon documents as `vendor/agent-canon/documents/agent-canon/agent-canon-github-remote.md` and `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md`.
 1. Prefer `bash scripts/start_repository.sh --project-slug <slug> --display-name "<name>"` for clone-time setup.
 1. Treat GitHub `https://github.com/iwashita-nozomu/agent-canon.git` as the AgentCanon source of truth.
 1. Treat local bare repositories only as compatibility mirrors documented by the parent repo, never as new bootstrap defaults.

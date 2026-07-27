@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Renders the runtime profile and check matrix doc from a machine-readable inventory.
-# upstream design ../../documents/runtime-profiles-and-check-matrix.json runtime profile inventory machine mirror
+# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json runtime profile inventory machine mirror
 # downstream implementation ../../tools/agent_tools/check_runtime_profile_inventory.py drift checker compares rendered doc
-# downstream implementation ../../documents/runtime-profiles-and-check-matrix.md rendered documentation
+# downstream implementation ../../documents/runtime/runtime-profiles-and-check-matrix.md rendered documentation
 # @dependency-end
-"""Render `documents/runtime-profiles-and-check-matrix.md` from JSON inventory."""
+"""Render `documents/runtime/runtime-profiles-and-check-matrix.md` from JSON inventory."""
 
 from __future__ import annotations
 
@@ -15,20 +15,20 @@ import json
 from pathlib import Path
 from typing import cast
 
-DEFAULT_INVENTORY = Path("documents/runtime-profiles-and-check-matrix.json")
-DEFAULT_DOC = Path("documents/runtime-profiles-and-check-matrix.md")
+DEFAULT_INVENTORY = Path("documents/runtime/runtime-profiles-and-check-matrix.json")
+DEFAULT_DOC = Path("documents/runtime/runtime-profiles-and-check-matrix.md")
 
 
 DEPENDENCY_HEADER = """<!--
 @dependency-start
 contract reference
 responsibility Defines AgentCanon runtime profiles and risk-based validation routing.
-upstream design ../ROOT_AGENTS.md root runtime entrypoint and closeout model
-upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
-downstream design ../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
-downstream design ./agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
-downstream implementation ../tools/ci/run_all_checks.sh repo check runner
-downstream implementation ../tools/catalog.yaml structured tool catalog
+upstream design ../../ROOT_AGENTS.md root runtime entrypoint and closeout model
+upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
+downstream design ../../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
+downstream design ../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
+downstream implementation ../ci/run_all_checks.sh repo check runner
+downstream implementation ../catalog.yaml structured tool catalog
 @dependency-end
 -->
 """

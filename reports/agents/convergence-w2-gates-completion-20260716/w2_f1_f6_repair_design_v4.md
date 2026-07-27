@@ -56,7 +56,7 @@
   producer, source, order, hash, status, and disposition equality.
 - `V4-R3-CONVENTION-CONSISTENCY`: add
   `tools/check_convention_consistency.py` as a direct
-  `documents/REVIEW_PROCESS.md` consumer with exact forward/reverse headers,
+  `documents/conventions/REVIEW_PROCESS.md` consumer with exact forward/reverse headers,
   owner paths, test path, documentation path, and call edge.
 - `PRESERVE-V3`: retain v3 canonical Git tree-delta bytes, exact B tree shape,
   topology truth tables, repair/reset rules, branch reason, group equality,
@@ -73,8 +73,8 @@
 | --- | --- | --- |
 | `agents/COMMUNICATION_PROTOCOL.md` | Aggregate/evidence event schemas, review packet identity fields, source correspondence | Owns immutable aggregate identity fields and `canonical_evidence_event.v1`. |
 | `agents/canonical/CODEX_WORKFLOW.md` | State/intent transition policy, branch reason, integration stage | Owns same-key intent-version transitions and publication phase order. |
-| `documents/REVIEW_PROCESS.md` | Review target identity, reviewer separation, post-fix refresh, publication review | Owns independent B review and integration-result review requirements plus R3 direct consumer edges. |
-| `documents/dependency-manifest-design.md` | Edge kind, relative path, bidirectional consistency, cycle rules | Owns the added convention-consistency closure. |
+| `documents/conventions/REVIEW_PROCESS.md` | Review target identity, reviewer separation, post-fix refresh, publication review | Owns independent B review and integration-result review requirements plus R3 direct consumer edges. |
+| `documents/design/dependency-manifest-design.md` | Edge kind, relative path, bidirectional consistency, cycle rules | Owns the added convention-consistency closure. |
 | `tools/agent_tools/work_log.py` | Canonical event validation, append, snapshot, authority-head resolution | Sole durable run-ledger writer and validator for aggregate/evidence records. |
 | `tools/agent_tools/workflow_monitor.py` | Structured monitor-to-ledger append boundary | Sole public structured ingress for `canonical_evidence_event`; it preserves the payload unchanged. |
 | `tools/agent_tools/report_artifact_checks.py` | Pure projection, Git observations, publication selection and result verification | Derives B from the frozen tuple, performs HEAD/target/mode/TOCTOU checks, and validates evidence-event references. |
@@ -700,9 +700,9 @@ Stable publication-selection/TOCTOU failures:
 
 The exact new durable pair is:
 
-| Owner-side line in `documents/REVIEW_PROCESS.md` | Consumer reverse line |
+| Owner-side line in `documents/conventions/REVIEW_PROCESS.md` | Consumer reverse line |
 | --- | --- |
-| `downstream implementation ../tools/check_convention_consistency.py parses review-policy rules for convention contradiction checks` | `upstream design ../documents/REVIEW_PROCESS.md review-policy rule source` |
+| `downstream implementation ../tools/check_convention_consistency.py parses review-policy rules for convention contradiction checks` | `upstream design ../documents/conventions/REVIEW_PROCESS.md review-policy rule source` |
 
 The path from `tools/check_convention_consistency.py` to the owner uses one
 `..`, not two.
@@ -711,7 +711,7 @@ The complete owner/caller/test/document closure for this checker is:
 
 | Owner/path | Exact edge/responsibility |
 | --- | --- |
-| `documents/REVIEW_PROCESS.md` | Canonical review-rule owner; downstream implementation edge above. |
+| `documents/conventions/REVIEW_PROCESS.md` | Canonical review-rule owner; downstream implementation edge above. |
 | `tools/README.md` | Tool navigation owner; adds `downstream implementation ./check_convention_consistency.py convention consistency checker`. |
 | `tools/check_convention_consistency.py` | Adds upstream REVIEW_PROCESS, retains `upstream design README.md`, adds `downstream implementation ./run_comprehensive_review.sh invokes checker`, and adds `downstream implementation ../tests/agent_tools/test_check_convention_compliance.py verifies convention consistency behavior and wiring`. |
 | `tools/run_comprehensive_review.sh` | Adds `upstream implementation ./check_convention_consistency.py convention consistency check`; both parallel and sequential calls remain the same implementation edge. |
@@ -864,8 +864,8 @@ frozen.
 | --- | --- | --- | --- |
 | `agents/COMMUNICATION_PROTOCOL.md` | Add aggregate identity/intent fields and canonical evidence-event schema/serializer. | V3-R2, V3-R3 | Schema-owner review |
 | `agents/canonical/CODEX_WORKFLOW.md` | Replace new-key changed-intent route with same-key intent versioning; add publication phase and mode rules. | V3-R1, V3-R2 | Workflow-owner review |
-| `documents/REVIEW_PROCESS.md` | Require independent B review, frozen publication selection/result review, and convention-consistency downstream edge. | V3-R1, V3-R4 | Review/dependency review |
-| `documents/dependency-manifest-design.md` | No semantic change; apply existing exact bidirectional rules to the new pair/call closure. | V3-R4 | Dependency review |
+| `documents/conventions/REVIEW_PROCESS.md` | Require independent B review, frozen publication selection/result review, and convention-consistency downstream edge. | V3-R1, V3-R4 | Review/dependency review |
+| `documents/design/dependency-manifest-design.md` | No semantic change; apply existing exact bidirectional rules to the new pair/call closure. | V3-R4 | Dependency review |
 | `tools/README.md` | Document convention-consistency checker owner/caller/test route and add downstream edge. | V3-R4 | Docs review |
 | `tools/agent_tools/work_log.py` | Validate aggregate/intent history, canonical evidence payload/hash/order, publication tuple/signature/freeze. | V3-R1-R3 | Ledger tests/review |
 | `tools/agent_tools/workflow_monitor.py` | Add exact `canonical_evidence_event` passthrough and public round trip. | V3-R3 | Monitor tests |
@@ -896,7 +896,7 @@ Required forward/reverse lines:
 - REVIEW_PROCESS:
   `downstream implementation ../tools/check_convention_consistency.py parses review-policy rules for convention contradiction checks`
 - convention checker:
-  `upstream design ../documents/REVIEW_PROCESS.md review-policy rule source`
+  `upstream design ../documents/conventions/REVIEW_PROCESS.md review-policy rule source`
 - tools README:
   `downstream implementation ./check_convention_consistency.py convention consistency checker`
 - convention checker retained reverse:

@@ -4,8 +4,8 @@
 # upstream implementation ../../tools/ci/run_codex_in_repo_container.py runs Codex inside the repo container
 # upstream implementation ../../.devcontainer/post-create.sh invokes runtime identity finalization before nested Codex
 # upstream implementation ../../.devcontainer/finalize-shared-runtime.sh publishes the runtime readback receipt
-# upstream design ../../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
-# upstream design ../../documents/gpu-admission-r5-source-packet.md exact in-container runtime identity oracle
+# upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer boundary
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact in-container runtime identity oracle
 # @dependency-end
 
 """Tests for the nested Codex container runner."""

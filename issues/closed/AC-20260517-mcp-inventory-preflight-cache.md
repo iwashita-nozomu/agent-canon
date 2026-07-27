@@ -6,8 +6,8 @@ contract issue
 responsibility Records the operational finding that MCP inventory checks are too noisy when repeated for every repository task.
 upstream design ../README.md defines AgentCanon operational issue conventions.
 upstream design ../../.codex/README.md documents MCP inventory preflight.
-upstream design ../../documents/codex-configuration-reference.md documents MCP configuration boundaries.
-upstream design ../../documents/template-agent-canon-audit-resolution.md records repo-local MCP inventory retirement.
+upstream design ../../documents/codex/codex-configuration-reference.md documents MCP configuration boundaries.
+upstream design ../../documents/agent-canon/template-agent-canon-audit-resolution.md records repo-local MCP inventory retirement.
 upstream design ../../agents/skills/codex-task-workflow.md routes MCP preflight for repository tasks.
 @dependency-end
 -->
@@ -18,7 +18,7 @@ source: user
 severity: S2
 evidence: .codex/hooks/mcp_session_context.sh
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/256
-affected_surfaces: agent-canon-environment.toml, .codex/README.md, agents/skills/codex-task-workflow.md, agents/canonical/CODEX_WORKFLOW.md, documents/codex-configuration-reference.md, documents/template-agent-canon-audit-resolution.md
+affected_surfaces: agent-canon-environment.toml, .codex/README.md, agents/skills/codex-task-workflow.md, agents/canonical/CODEX_WORKFLOW.md, documents/codex/codex-configuration-reference.md, documents/agent-canon/template-agent-canon-audit-resolution.md
 edit_scope: reports/dependency-review/mcp-inventory-preflight-20260517/dependency_edit_scope.txt
 required_action: Replace per-message MCP inventory repetition with Rust session-scoped or run-scoped evidence while preserving fail-closed repair behavior when MCP configuration is missing or stale.
 close_condition: Rust MCP preflight docs, hook context, checker behavior, environment TOML, and tests define when cached evidence is valid, when revalidation is required, and how run bundles record the evidence.

@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests file surface inventory scope classification.
 # upstream implementation ../../tools/agent_tools/file_surface_inventory.py builds inventory reports
-# upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface model
+# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface model
 # @dependency-end
 
 from __future__ import annotations
@@ -173,7 +173,7 @@ class FileSurfaceInventoryTest(unittest.TestCase):
                 root,
                 ".github/workflows/agent-coordination.yml",
                 "tests/tools/test_check_bootstrap_docs.py",
-                "vendor/agent-canon/documents/shared-runtime-surfaces.toml",
+                "vendor/agent-canon/documents/runtime/shared-runtime-surfaces.toml",
                 "vendor/agent-canon/tests/tools/test_check_bootstrap_docs.py",
             )
             json_out = root / "inventory.json"

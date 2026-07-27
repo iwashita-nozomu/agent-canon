@@ -9,7 +9,7 @@ responsibility Documents PR Processing runtime skill for this repository.
 upstream design ../../../agents/skills/pr-processing.md documents the human-facing workflow
 upstream design ../../../agents/workflows/pr-queue-cleanup-workflow.md defines AgentCanon source and parent pin queue cleanup
 upstream design ../../../agents/workflows/agent-canon-pr-workflow.md defines AgentCanon source PR gates
-upstream design ../../../documents/agent-canon-update-route.md defines source PR versus parent pin update routing
+upstream design ../../../documents/agent-canon/agent-canon-update-route.md defines source PR versus parent pin update routing
 upstream design ../../../agents/skills/result-artifact-writeout.md defines run-local result artifact writeout
 upstream implementation ../../../tools/agent_tools/bootstrap_agent_run.py creates run-local report bundles
 upstream implementation ../../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
@@ -116,7 +116,7 @@ Execute the required and task-matching conditional commands that the packet prin
    - PR body, comment, or run bundle includes `PR Essence`, validation
      evidence, and any automation authority lines required by the repo.
    - PR body, comment, or run bundle shows that the
-     `documents/BRANCH_SCOPE.md` scope-split contract was applied: the PR is one
+     `documents/operations/BRANCH_SCOPE.md` scope-split contract was applied: the PR is one
      review unit, or it has a scope table plus the split/group decision for
      every slice.
 1. For AgentCanon source PRs, merge source first, then update parent repos with

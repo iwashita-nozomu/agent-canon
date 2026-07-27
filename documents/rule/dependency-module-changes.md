@@ -2,8 +2,8 @@
 @dependency-start
 contract policy
 responsibility Defines the general dependency-module change contract and source-clone lifecycle without owning editor state.
-upstream design ../dependency-manifest-design.md dependency ownership and header graph model
-upstream design ../SHARED_RUNTIME_SURFACES.md parent pin and shared-surface ownership
+upstream design ../design/dependency-manifest-design.md dependency ownership and header graph model
+upstream design ../runtime/SHARED_RUNTIME_SURFACES.md parent pin and shared-surface ownership
 downstream implementation ../../tools/agent_tools/dependency_module_change.py enforces clone lifecycle and cleanup gates
 downstream implementation ../../tools/update_agent_canon.sh refuses parent vendor source mutation
 downstream design ../../agents/skills/dependency-module-change.md exposes the short skill route

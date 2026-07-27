@@ -3,8 +3,8 @@
 # contract environment
 # responsibility Reads back the container shared AgentCanon runtime namespace after Compose bind.
 # upstream design ../CONTAINER_OPERATIONS.md exact shared-runtime identity and namespace contract
-# upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
-# upstream design ../documents/gpu-admission-r5-source-packet.md exact readback receipt path and owner boundary
+# upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
+# upstream design ../documents/experiments/gpu-admission-r5-source-packet.md exact readback receipt path and owner boundary
 # upstream implementation bootstrap-shared-runtime.sh publishes the host provision receipt
 # upstream implementation ../tools/experiments/execution_resource_plan.py owns exact receipt parsing and atomic publication
 # downstream implementation post-attach.sh reports the readback receipt observationally

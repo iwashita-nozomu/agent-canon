@@ -3,8 +3,8 @@
 # contract tool
 # responsibility Checks Python imports for unused aliases and responsibility-scope boundary violations.
 # upstream design ../../responsibility-scope.toml declares scope ownership and import rules
-# upstream design ../../documents/responsibility-scope-management.md explains scope ownership policy
-# upstream design ../../documents/coding-conventions-python.md defines Python import boundary policy
+# upstream design ../../documents/design/responsibility-scope-management.md explains scope ownership policy
+# upstream design ../../documents/conventions/coding-conventions-python.md defines Python import boundary policy
 # upstream design ../../tools/catalog.yaml registers this tool
 # upstream design ../../tools/README.md documents shared tool entrypoints
 # upstream design ../../documents/tools/README.md documents user-facing tool usage

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests result-log conversion and summary tools.
-# upstream design ../../documents/result-log-retention-and-visualization.md result policy
+# upstream design ../../documents/experiments/result-log-retention-and-visualization.md result policy
 # upstream implementation ../../tools/data/jsonl_to_md.py converter under test
 # upstream implementation ../../tools/hlo/summarize_hlo_jsonl.py HLO summary under test
 # @dependency-end

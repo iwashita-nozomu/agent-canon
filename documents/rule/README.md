@@ -4,7 +4,7 @@ contract policy
 responsibility Documents 文書規約正本の入口。
 upstream design ../README.md documents index
 upstream design ../design/README.md design canon reader route
-upstream design ../repo-structure-contract.toml machine validator companion
+upstream design ../structure/repo-structure-contract.toml machine validator companion
 downstream implementation ../../tools/agent_tools/check_convention_compliance.py convention validation
 downstream implementation ../../tools/agent_tools/repo_structure_contract.py structure validation
 @dependency-end
@@ -26,7 +26,7 @@ downstream implementation ../../tools/agent_tools/repo_structure_contract.py str
 
 `documents/rule/` は命名・配置・構成判断の一般規約を持ちます。
 `documents/design/` は個別の target state、実装境界、設計上の前提を持ちます。
-machine validator の期待値は `documents/repo-structure-contract.toml` に置きます。
+machine validator の期待値は `documents/structure/repo-structure-contract.toml` に置きます。
 生成された report、log、raw evidence、generated artifact、issue は evidence または運用の owner に属し、設計正本にはしません。
 
 規約の本文は日本語で書き、path、identifier、ToolCall、external fixed name は原表記を保ちます。

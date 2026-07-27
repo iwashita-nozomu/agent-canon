@@ -4,7 +4,7 @@
 contract template
 responsibility Documents Detailed Design Review for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
-upstream design ../../documents/dependency-manifest-design.md dependency evidence contract
+upstream design ../../documents/design/dependency-manifest-design.md dependency evidence contract
 upstream implementation ../../tools/agent_tools/check_design_doc_claims.py verifies design-doc evidence claims
 @dependency-end
 -->

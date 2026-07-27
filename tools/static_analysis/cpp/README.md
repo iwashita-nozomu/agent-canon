@@ -4,7 +4,7 @@
 contract tool
 responsibility Documents C and C++ static analysis entrypoints.
 upstream design ../README.md language-organized static analysis index
-upstream design ../../../documents/coding-conventions-cpp.md C++ coding conventions
+upstream design ../../../documents/conventions/coding-conventions-cpp.md C++ coding conventions
 upstream implementation ../../oop/cpp/readability.py scores C and C++ readability
 @dependency-end
 -->

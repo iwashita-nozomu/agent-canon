@@ -18,8 +18,8 @@ source: user
 severity: S1
 evidence: reports/hooks/oop_readability_guard.jsonl, vendor/agent-canon/agents/evals/results/hook-runs/oop_readability_guard.jsonl, reports/agents/20260514-012429-oop-readability-report/oop_readability_report.md
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/250
-affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, documents/runtime-log-archive.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, .agents/skills/oop-readability-check/SKILL.md
-edit_scope: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, documents/runtime-log-archive.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, agents/templates/workflow_monitoring.md, agents/skills/catalog.yaml, agents/skills/README.md, .agents/skills/oop-readability-check/SKILL.md
+affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, documents/runtime/runtime-log-archive.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, .agents/skills/oop-readability-check/SKILL.md
+edit_scope: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, documents/runtime/runtime-log-archive.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, agents/templates/workflow_monitoring.md, agents/skills/catalog.yaml, agents/skills/README.md, .agents/skills/oop-readability-check/SKILL.md
 required_action: Keep OOP tool execution and agent analysis in one public skill while preventing hook evidence writes from making simple tool checks look like broad repo-changing work.
 close_condition: A simple user request for OOP checking can invoke one narrow skill, choose mechanical-only/analyze-existing/run-and-analyze mode, record duration tokens when a run bundle exists, and append hook evidence to the AgentCanon-owned hook result chronology.
 resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/31

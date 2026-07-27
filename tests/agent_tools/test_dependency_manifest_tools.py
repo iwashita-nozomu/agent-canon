@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests dependency manifest shell tool behavior.
-# upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
-# upstream design ../../documents/dependency-manifest-design.md manifest design
+# upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
+# upstream design ../../documents/design/dependency-manifest-design.md manifest design
 # upstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans
 # upstream implementation ../../tools/agent_tools/check_dependency_header_format.sh format checks
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh graph checks
@@ -871,7 +871,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("exactly one contract line", result.stdout)
             self.assertIn("fix: add 'contract <registered-kind>'", result.stdout)
-            self.assertIn("documents/dependency-contract-kinds.toml", result.stdout)
+            self.assertIn("documents/design/dependency-contract-kinds.toml", result.stdout)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
 
     def test_format_rejects_unregistered_contract_kind(self) -> None:
@@ -909,7 +909,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("unregistered contract kind", result.stdout)
             self.assertIn("fix: use an existing allowed_kinds entry", result.stdout)
-            self.assertIn("documents/dependency-contract-kinds.toml", result.stdout)
+            self.assertIn("documents/design/dependency-contract-kinds.toml", result.stdout)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
 
     def test_format_accepts_skill_frontmatter_before_html_manifest(self) -> None:
@@ -1733,15 +1733,15 @@ class DependencyManifestToolTest(unittest.TestCase):
             "agents/workflows/agent-learning-workflow.md",
             "agents/workflows/experiment-workflow.md",
             "agents/workflows/implementation-waterfall-workflow.md",
-            "documents/BRANCH_SCOPE.md",
-            "documents/algorithm-implementation-boundary.md",
-            "documents/codex-configuration-reference.md",
-            "documents/coding-conventions-project.md",
-            "documents/coding-conventions-reviews.md",
+            "documents/operations/BRANCH_SCOPE.md",
+            "documents/design/algorithm-implementation-boundary.md",
+            "documents/codex/codex-configuration-reference.md",
+            "documents/conventions/coding-conventions-project.md",
+            "documents/conventions/coding-conventions-reviews.md",
             "documents/conventions/python/20_benchmark_policy.md",
-            "documents/experiment-critical-review.md",
+            "documents/experiments/experiment-critical-review.md",
             "documents/tools/README.md",
-            "documents/worktree-lifecycle.md",
+            "documents/operations/worktree-lifecycle.md",
             "memory/AGENT_PHILOSOPHY.md",
             "memory/USER_PREFERENCES.md",
             "notes/README.md",

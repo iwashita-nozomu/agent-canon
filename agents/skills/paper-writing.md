@@ -42,7 +42,7 @@ section contract と citation/evidence trace を先に固定し、複数 reviewe
 - `agents/workflows/paper-writing-workflow.md`
 - `agents/workflows/academic-writing-workflow.md`
 - `agents/workflows/long-form-writing-workflow.md`
-- `documents/REVIEW_PROCESS.md`
+- `documents/conventions/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/skills/academic-writing.md`
 

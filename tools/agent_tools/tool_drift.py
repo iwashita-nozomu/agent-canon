@@ -2,14 +2,14 @@
 # @dependency-start
 # contract tool
 # responsibility Detects drift between tool contracts, convention docs, and dependency manifests.
-# upstream design ../../documents/dependency-manifest-design.md dependency manifest graph semantics
+# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest graph semantics
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR validation contract
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
 # upstream design ../../agents/TASK_WORKFLOWS.md workflow routing contract
 # upstream design ../../agents/skills/agent-orchestration.md orchestration routing contract
 # upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill prompt
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt routing eval contract
-# upstream design ../../documents/REVIEW_PROCESS.md closeout validation policy
+# upstream design ../../documents/conventions/REVIEW_PROCESS.md closeout validation policy
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
 # upstream implementation ./tool_catalog.py validates catalog structure
@@ -126,7 +126,7 @@ CONTRACTS = (
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("documents/tools/tool-docs.toml"),
-            LinkCheck("documents/repo-local-tool-imports.md"),
+            LinkCheck("documents/tools/repo-local-tool-imports.md"),
             LinkCheck("tools/ci/run_all_checks.sh"),
             LinkCheck("tests/agent_tools/test_tool_catalog.py"),
         ),
@@ -147,7 +147,7 @@ CONTRACTS = (
                 "missing-tool-docs-pointer",
             ),
             TextCheck(
-                "documents/repo-local-tool-imports.md",
+                "documents/tools/repo-local-tool-imports.md",
                 "tools/catalog.yaml",
                 "missing-tool-catalog-pointer",
             ),
@@ -159,7 +159,7 @@ CONTRACTS = (
         links=(
             LinkCheck("responsibility-scope.toml"),
             LinkCheck("documents/templates/responsibility-scope.template.toml"),
-            LinkCheck("documents/responsibility-scope-management.md"),
+            LinkCheck("documents/design/responsibility-scope-management.md"),
             LinkCheck("tools/catalog.yaml"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
@@ -172,8 +172,8 @@ CONTRACTS = (
         tool="tools/agent_tools/import_responsibility.py",
         links=(
             LinkCheck("responsibility-scope.toml"),
-            LinkCheck("documents/responsibility-scope-management.md"),
-            LinkCheck("documents/coding-conventions-python.md"),
+            LinkCheck("documents/design/responsibility-scope-management.md"),
+            LinkCheck("documents/conventions/coding-conventions-python.md"),
             LinkCheck("tools/catalog.yaml"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
@@ -218,7 +218,7 @@ CONTRACTS = (
         tool="tools/agent_tools/issue_sync.py",
         links=(
             LinkCheck("issues/README.md"),
-            LinkCheck("documents/responsibility-scope-management.md"),
+            LinkCheck("documents/design/responsibility-scope-management.md"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("tools/ci/run_all_checks.sh"),
@@ -230,8 +230,8 @@ CONTRACTS = (
         tool="tools/agent_tools/eval_accumulation_check.py",
         links=(
             LinkCheck("evidence/agent-evals/README.md"),
-            LinkCheck("documents/runtime-log-archive.md"),
-            LinkCheck("documents/runtime-log-archive-migration.md"),
+            LinkCheck("documents/runtime/runtime-log-archive.md"),
+            LinkCheck("documents/runtime/runtime-log-archive-migration.md"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("tools/ci/run_all_checks.sh"),
@@ -243,7 +243,7 @@ CONTRACTS = (
         tool="tools/agent_tools/run_accumulated_agent_evals.py",
         links=(
             LinkCheck("evidence/agent-evals/README.md"),
-            LinkCheck("documents/runtime-log-archive.md"),
+            LinkCheck("documents/runtime/runtime-log-archive.md"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("tools/catalog.yaml"),
@@ -403,7 +403,7 @@ CONTRACTS = (
         name="repo_dependency_review",
         tool="tools/agent_tools/run_repo_dependency_review.sh",
         links=(
-            LinkCheck("documents/dependency-manifest-design.md"),
+            LinkCheck("documents/design/dependency-manifest-design.md"),
             LinkCheck("agents/canonical/CODEX_WORKFLOW.md"),
             LinkCheck("agents/templates/closeout_gate.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
@@ -415,7 +415,7 @@ CONTRACTS = (
         name="container_config",
         tool="tools/ci/container_config.py",
         links=(
-            LinkCheck("documents/coding-conventions-project.md"),
+            LinkCheck("documents/conventions/coding-conventions-project.md"),
             LinkCheck("agents/skills/environment-maintenance.md"),
             LinkCheck("tools/docker_dependency_validator.sh"),
             LinkCheck("tools/ci/container_runtime.py"),

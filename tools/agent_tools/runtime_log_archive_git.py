@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Manages the ignored Git clone used for AgentCanon runtime log and report archives.
-# upstream design ../../documents/runtime-log-archive.md runtime log archive ownership and branch policy
+# upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
 # upstream implementation ./runtime_log_paths.py resolves archive paths and source repo keys
-# downstream design ../../documents/runtime-log-archive.md documents this tool as the normal Git workflow
+# downstream design ../../documents/runtime/runtime-log-archive.md documents this tool as the normal Git workflow
 # downstream implementation ../../tests/agent_tools/test_runtime_log_archive_git.py validates clone, branch, status, and push behavior
 # @dependency-end
 """Manage the external AgentCanon runtime log archive Git repository."""
@@ -779,7 +779,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Delete imported source eval result files after copying. AgentCanon source "
-            "keeps runtime-log policy in documents/runtime-log-archive.md, not under agents/evals/results."
+            "keeps runtime-log policy in documents/runtime/runtime-log-archive.md, not under agents/evals/results."
         ),
     )
 

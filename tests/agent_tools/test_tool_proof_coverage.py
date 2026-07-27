@@ -168,7 +168,7 @@ class ToolProofCoverageTest(unittest.TestCase):
         for doc in [
             "tools/README.md",
             "documents/tools/README.md",
-            "documents/repo-local-tool-imports.md",
+            "documents/tools/repo-local-tool-imports.md",
             "documents/tools/tool_catalog.md",
             "tools/ci/check_agent_canon_pr.sh",
             "agents/workflows/agent-canon-pr-workflow.md",

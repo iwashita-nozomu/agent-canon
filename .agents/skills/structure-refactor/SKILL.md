@@ -11,7 +11,7 @@ upstream design ../../../agents/skills/refactor-loop.md defines behavior-preserv
 upstream design ../../../agents/skills/dependency-analysis.md defines change-impact packets
 upstream design ../../../agents/skills/prose-reasoning-graph.md defines directory README graph evidence
 upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md documents Codex runtime surface ownership
-upstream design ../../../documents/SHARED_RUNTIME_SURFACES.md defines shared runtime views
+upstream design ../../../documents/runtime/SHARED_RUNTIME_SURFACES.md defines shared runtime views
 upstream design ../../../documents/rule/README.md defines document rule canon
 upstream design ../../../documents/design/README.md defines design canon reader route
 upstream implementation ../../../tools/agent_tools/responsibility_scope.py validates responsibility scopes
@@ -60,7 +60,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Route before reading broad prose. Use `python3 tools/agent_tools/route.py --prompt "<request>" --format json` for prompt-derived skill routing and `python3 tools/agent_tools/route.py --name <candidate>` for proposed route names. If repo-refactor, structure-review, or `~/.codex` boundary prompts do not route here, fix the deterministic router instead of adding prose-only workarounds.
 1. Pair with `$refactor-loop`, `$dependency-analysis`, `$prose-reasoning-graph`, and `$document-canon-cleanup` when the evidence shows a real source-layout refactor, directory README/prose ownership change, or stale document-canon cleanup. For pre-task expected-layout drift, start with the compact structure repair checks below and add those paired skills only after the repair action requires them.
 1. For pre-task structure repair, classify the checkout before reading broad packets or recreating missing paths:
-   - run `python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json > <run>/repo_structure_contract.json`; in template or derived roots where the contract is not a root view, add `--contract vendor/agent-canon/documents/repo-structure-contract.toml`
+   - run `python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json > <run>/repo_structure_contract.json`; in template or derived roots where the contract is not a root view, add `--contract vendor/agent-canon/documents/structure/repo-structure-contract.toml`
    - run `python3 tools/agent_tools/responsibility_scope.py --root <root> --format json > <run>/responsibility_scope.json`
    - run `python3 tools/agent_tools/import_responsibility.py --root <root> --format json > <run>/import_responsibility.json` when import boundaries are implicated
    - follow `agents/canonical/CODEX_WORKFLOW.md` `Missing File Or Path Triage` before creating or ignoring any missing path

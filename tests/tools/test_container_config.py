@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies topic-root Compose mounts, selected repo paths, and VS Code surfaces.
 # upstream design ../../documents/rule/dependency-module-changes.md topic-root mount policy
-# upstream design ../../documents/shared-runtime-surfaces.toml shared VS Code surface ownership
+# upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared VS Code surface ownership
 # upstream implementation ../../tools/ci/container_config.py semantic devcontainer checker
 # upstream implementation ../../.devcontainer/generate-runtime-compose.sh topic-root Compose generator
 # @dependency-end
@@ -165,9 +165,9 @@ def write_surface_manifest(root: Path, prefix: str = "") -> None:
         ]
     )
     path = root / (
-        "documents/shared-runtime-surfaces.toml"
+        "documents/runtime/shared-runtime-surfaces.toml"
         if not prefix
-        else f"{prefix}/documents/shared-runtime-surfaces.toml"
+        else f"{prefix}/documents/runtime/shared-runtime-surfaces.toml"
     )
     write_file(root, str(path.relative_to(root)), manifest)
 

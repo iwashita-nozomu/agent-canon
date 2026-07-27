@@ -329,7 +329,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
                 "json",
                 "tools/experiments/run_managed_experiment.py",
                 "tools/ci/check_experiment_registry.py",
-                "documents/experiment-registry.md",
+                "documents/experiments/experiment-registry.md",
                 "experiments/registry.toml",
             ],
             check=True,
@@ -348,7 +348,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             {
                 "tools/experiments/run_managed_experiment.py",
                 "tools/ci/check_experiment_registry.py",
-                "documents/experiment-registry.md",
+                "documents/experiments/experiment-registry.md",
                 "experiments/registry.toml",
             },
         )

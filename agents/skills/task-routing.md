@@ -4,7 +4,7 @@
 contract skill
 responsibility Documents task-routing skill.
 upstream design ../canonical/skills.md skill canon registry
-upstream design ../../documents/tool-skill-routing-refactor.md short tool and skill naming policy
+upstream design ../../documents/design/tool-skill-routing-refactor.md short tool and skill naming policy
 upstream design ./agent-orchestration.md owns Decision Sufficiency policy and verdict validation
 downstream implementation ../../tools/agent_tools/route.py selects short routing areas
 downstream implementation ../../tools/agent_tools/agent_team.py materializes route ToolCall tokens

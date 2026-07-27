@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Validates dependency manifest syntax, contract kind metadata, and responsibility metadata.
-# upstream design ../../documents/dependency-manifest-design.md dependency manifest DSL design
-# upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
+# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL design
+# upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream implementation ./scan_dependency_headers.sh finds files with manifests
 # downstream implementation ./check_dependency_graph.sh consumes validated manifest lines
 # @dependency-end
@@ -65,18 +65,18 @@ contract_kind_registry_path() {
     printf '%s\n' "$CONTRACT_KIND_REGISTRY"
     return
   fi
-  if [[ -f "$ROOT_DIR/documents/dependency-contract-kinds.toml" ]]; then
-    printf '%s\n' "$ROOT_DIR/documents/dependency-contract-kinds.toml"
+  if [[ -f "$ROOT_DIR/documents/design/dependency-contract-kinds.toml" ]]; then
+    printf '%s\n' "$ROOT_DIR/documents/design/dependency-contract-kinds.toml"
     return
   fi
-  if [[ -f "$ROOT_DIR/vendor/agent-canon/documents/dependency-contract-kinds.toml" ]]; then
-    printf '%s\n' "$ROOT_DIR/vendor/agent-canon/documents/dependency-contract-kinds.toml"
+  if [[ -f "$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml" ]]; then
+    printf '%s\n' "$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml"
     return
   fi
   local script_path script_dir
   script_path="$(readlink -f "${BASH_SOURCE[0]}")"
   script_dir="$(cd "$(dirname "$script_path")" && pwd)"
-  printf '%s\n' "$(realpath -m "$script_dir/../../documents/dependency-contract-kinds.toml")"
+  printf '%s\n' "$(realpath -m "$script_dir/../../documents/design/dependency-contract-kinds.toml")"
 }
 
 load_contract_kinds() {
@@ -345,7 +345,7 @@ check_file() {
 }
 
 if [[ "${#ALLOWED_CONTRACT_KINDS[@]}" -eq 0 ]]; then
-  echo "missing dependency contract kind registry: $CONTRACT_KIND_REGISTRY_PATH; fix: restore documents/dependency-contract-kinds.toml or set DEPENDENCY_CONTRACT_KIND_REGISTRY to the canonical registry"
+  echo "missing dependency contract kind registry: $CONTRACT_KIND_REGISTRY_PATH; fix: restore documents/design/dependency-contract-kinds.toml or set DEPENDENCY_CONTRACT_KIND_REGISTRY to the canonical registry"
   echo "DEPENDENCY_HEADER_FORMAT=fail"
   exit 1
 fi

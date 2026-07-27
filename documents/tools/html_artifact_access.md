@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents local-browser access for remote HTML artifacts.
-upstream design ../result-log-retention-and-visualization.md defines visual artifact retention.
+upstream design ../experiments/result-log-retention-and-visualization.md defines visual artifact retention.
 upstream design ../experiment-report-style.md defines experiment report artifact layout.
 upstream design ../server-host-contract.md defines SSH/HPC/container host assumptions.
 upstream implementation ../../tools/experiments/html_artifact_access.py prints access commands.

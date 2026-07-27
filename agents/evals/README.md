@@ -22,4 +22,4 @@ resolve them to `evidence/agent-evals/*.toml`.
 
 Legacy `agents/evals/results/` paths remain migration inputs for old accumulated
 run artifacts. New accumulated run output belongs in the mounted runtime log
-archive documented by `documents/runtime-log-archive.md`.
+archive documented by `documents/runtime/runtime-log-archive.md`.

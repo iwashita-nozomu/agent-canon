@@ -2,13 +2,13 @@
 # @dependency-start
 # contract tool
 # responsibility Owns the immutable ExecutionResourcePlan transaction, canonical GPU allocation, ExperimentRunner handoff, and completion coverage.
-# upstream design ../../documents/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 U-18 implementation frame and exact packet identity
-# upstream design ../../documents/experiment_runner.md ExperimentRunner lifecycle and scheduler boundary
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 U-18 implementation frame and exact packet identity
+# upstream design ../../documents/design/experiment_runner.md ExperimentRunner lifecycle and scheduler boundary
 # upstream design ../../agents/skills/gpu-execution.md UUID GPU and readback contract
-# upstream design ../../documents/repo-structure-contract.toml tree capability authority
-# upstream design ../../documents/runtime-profiles-and-check-matrix.json validation failure taxonomy authority
-# upstream design ../../documents/runtime-profiles-and-check-matrix.md validation failure reader projection
-# upstream design ../../documents/gpu-admission-r5-nvidia-visibility.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
+# upstream design ../../documents/structure/repo-structure-contract.toml tree capability authority
+# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json validation failure taxonomy authority
+# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md validation failure reader projection
+# upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
 # downstream implementation ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
 # downstream implementation ../../experiments/_template/run.py direct GPU launch is statically prohibited
@@ -65,9 +65,9 @@ CONTAINER_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
 RUNTIME_ROOT = Path(HOST_RUNTIME_ROOT)
 LOCK_ROOT = RUNTIME_ROOT / "locks"
 SOURCE_PROJECTION_TEMPLATE = "/workspace/reports/agents/{run_id}/runtime"
-STRUCTURE_CONTRACT_REF = "documents/repo-structure-contract.toml"
-VALIDATION_TAXONOMY_REF = "documents/runtime-profiles-and-check-matrix.json"
-VALIDATION_TAXONOMY_READER_REF = "documents/runtime-profiles-and-check-matrix.md"
+STRUCTURE_CONTRACT_REF = "documents/structure/repo-structure-contract.toml"
+VALIDATION_TAXONOMY_REF = "documents/runtime/runtime-profiles-and-check-matrix.json"
+VALIDATION_TAXONOMY_READER_REF = "documents/runtime/runtime-profiles-and-check-matrix.md"
 DESIGN_MANAGER_ARTIFACT = "reports/agents/w1-tool-env-routing-20260716/design_partition.json"
 DESIGN_AUTHORITY_ARTIFACT = "reports/agents/w1-tool-env-routing-20260716/design_brief.md"
 DESIGN_REVIEW_AUTHORITY_ARTIFACT = "reports/agents/w1-tool-env-routing-20260716/design_review.md"

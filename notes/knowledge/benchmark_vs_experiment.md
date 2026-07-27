@@ -46,6 +46,6 @@ Experiment でも canonical な運用は resume ではなく fresh run です。
 - `documents/conventions/python/30_experiment_directory_structure.md` in standalone
   AgentCanon; `vendor/agent-canon/documents/conventions/python/30_experiment_directory_structure.md`
   in template roots
-- `documents/coding-conventions-experiments.md` in standalone AgentCanon;
-  `vendor/agent-canon/documents/coding-conventions-experiments.md` in
+- `documents/conventions/coding-conventions-experiments.md` in standalone AgentCanon;
+  `vendor/agent-canon/documents/conventions/coding-conventions-experiments.md` in
   template roots

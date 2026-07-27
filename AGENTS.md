@@ -102,16 +102,16 @@ branch/worktree and requests user direction.
 
 | Contract | Owner Surface | Validation |
 | -------- | ------------- | ---------- |
-| root runtime entrypoint | `ROOT_AGENTS.md`; `documents/shared-runtime-surfaces.toml` | `bash tools/sync_agent_canon.sh check` |
+| root runtime entrypoint | `ROOT_AGENTS.md`; `documents/runtime/shared-runtime-surfaces.toml` | `bash tools/sync_agent_canon.sh check` |
 | workflow family, spawn budget, role topology | `agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |
 | role behavior and stage conditions | `.codex/agents/*.toml`; `agents/agents_config.json` | `check_agent_runtime_alignment.py` |
 | public skill registry | `agents/skills/catalog.yaml`; `.agents/skills/*/SKILL.md` | `check_agent_runtime_alignment.py` |
-| internal routine placement | `agents/internal-routines/README.md`; `documents/repo-structure-contract.toml` | `repo_structure_contract.py` |
+| internal routine placement | `agents/internal-routines/README.md`; `documents/structure/repo-structure-contract.toml` | `repo_structure_contract.py` |
 | implementation flow and handoff packet | `agents/workflows/implementation-waterfall-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md` | task run bundle review |
 | shared-checkout Git mutation and branch/worktree creation route | `agents/canonical/CODEX_WORKFLOW.md`; `.codex/hooks/branch_worktree_guard.py`; `agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
-| runtime profile and validation routing | `documents/runtime-profiles-and-check-matrix.md` | profile-specific checks |
+| runtime profile and validation routing | `documents/runtime/runtime-profiles-and-check-matrix.md` | profile-specific checks |
 | closeout evidence | `tools/agent_tools/task_close.py`; `tools/agent_tools/report_artifact_checks.py` | closeout artifact gate |
-| AgentCanon update transaction | `documents/agent-canon-update-route.md`; `tools/agent_tools/update_lifecycle_contract.py` | boundary-owned G1-G6 receipts; `tools/agent_tools/task_close.py` |
+| AgentCanon update transaction | `documents/agent-canon/agent-canon-update-route.md`; `tools/agent_tools/update_lifecycle_contract.py` | boundary-owned G1-G6 receipts; `tools/agent_tools/task_close.py` |
 
 Update the owner surface first, then adjust this entrypoint when reader routing
 changes. `AGENTS.md` is a repository-local map; it is not the policy source for
@@ -120,7 +120,7 @@ workflow stages, skill routing, role behavior, or closeout gates.
 ## Task Entry
 
 AgentCanon source updates enter only through
-`documents/agent-canon-update-route.md`. Its machine-readable transaction and
+`documents/agent-canon/agent-canon-update-route.md`. Its machine-readable transaction and
 ToolCall records are owned by `tools/agent_tools/update_lifecycle_contract.py`;
 the Decision Sufficiency policy remains owned by
 `agents/skills/agent-orchestration.md#Decision Sufficiency Packet`.
@@ -150,7 +150,7 @@ validation route are the task packet for downstream agents.
 ## Validation
 
 - runtime alignment: `python3 tools/agent_tools/check_agent_runtime_alignment.py`
-- structure contract: `python3 tools/agent_tools/repo_structure_contract.py --root . --contract documents/repo-structure-contract.toml`
+- structure contract: `python3 tools/agent_tools/repo_structure_contract.py --root . --contract documents/structure/repo-structure-contract.toml`
 - responsibility scope: `python3 tools/agent_tools/responsibility_scope.py --root .`
 - shared runtime views: `bash tools/sync_agent_canon.sh check`
 - closeout: `python3 tools/agent_tools/task_close.py ...`

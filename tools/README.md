@@ -167,7 +167,7 @@ the expected AgentCanon submodule shape, shared root views, parent-owned
 document contracts, update state, MCP launcher, and Docker/devcontainer
 environment surfaces before an agent treats the repo as ready.
 `repo_structure_contract.py` runs `tree -a -J` and compares the observed
-directory / file layout with `documents/repo-structure-contract.toml`.
+directory / file layout with `documents/structure/repo-structure-contract.toml`.
 The TOML contract owns profiles, ignored generated paths, required paths, and
 unexpected top-level severity.
 `render_dependency_manifest_graph.py` turns a dependency graph TSV from
@@ -327,7 +327,7 @@ findings for resilient test planning.
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。
-  - `agent_canon_update_todos.py` は AgentCanon pin 更新後に親 repo の agent が先に消化する TODO を `documents/agent-canon-update-tasks.toml` から読み、親 repo ローカルの `.agent-canon/update-state.toml` で適用済み boundary を管理します。pending は停止理由ではなく、task-start の `AGENT_CANON_UPDATE_TODO_NEXT=apply_agent_canon_update_todos` として最初の作業に route します。
+  - `agent_canon_update_todos.py` は AgentCanon pin 更新後に親 repo の agent が先に消化する TODO を `documents/agent-canon/agent-canon-update-tasks.toml` から読み、親 repo ローカルの `.agent-canon/update-state.toml` で適用済み boundary を管理します。pending は停止理由ではなく、task-start の `AGENT_CANON_UPDATE_TODO_NEXT=apply_agent_canon_update_todos` として最初の作業に route します。
 - `search.py` は `--purpose` から text / deterministic semantic card / vector / tool catalog / dependency header / Python code facts をまとめて検索し、candidate path と provider evidence を返します。semantic だけを使うときは `--providers semantic` を指定します。
 - `search_index.py` は semantic provider 向けの `semantic-cards.jsonl` を `.agent-canon/search-index/semantic-cards.jsonl` に生成します。生成 index は repo-local ignored state で、commit しません。
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索では deterministic coordinated search を先に走らせた後の比較 evidence として併用します。
@@ -346,7 +346,7 @@ findings for resilient test planning.
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
   - `responsibility_scope.py` は top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub surface、vendor skill の owner class と protecting tool を固定します。
   - `parent_repo_readiness.py` は template / derived parent repo に AgentCanon が期待する submodule shape、root view、parent-owned document contract、update state、MCP launcher、Docker/devcontainer environment surface が揃っているかをまとめて検査します。
-  - `repo_structure_contract.py` は top-level から `tree -a -J` で取得した構成を `documents/repo-structure-contract.toml` の profile と比較し、想定 repo 構成、ignore、unexpected top-level を source-code hardcode なしで検査します。
+  - `repo_structure_contract.py` は top-level から `tree -a -J` で取得した構成を `documents/structure/repo-structure-contract.toml` の profile と比較し、想定 repo 構成、ignore、unexpected top-level を source-code hardcode なしで検査します。
   - `import_responsibility.py` は Python import を AST で読み、未使用 alias、wildcard import、local file に解決できる import の responsibility-scope 越境を検査します。`responsibility-scope.toml` の `[[import_rule]]` が source scope から import 可能な target scope の正本です。repo 全体 scan では Git の `--exclude-standard` view を優先し、`.agent-canon/`、`reports/`、`target/` などの runtime / cache state は検査対象から外します。
   - `issue_sync.py` は `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by`、任意の `github_issue:` mirror field を検査し、GitHub Issue 作成 plan を出します。
   - `eval_accumulation_check.py` は mounted runtime log archive の hook JSONL と登録済み eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。agent-facing run では `--compact-out` の JSON summary を読み、stdout の finding 全件列挙を避けます。
@@ -358,7 +358,7 @@ findings for resilient test planning.
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `agent-canon structured-analysis document-inventory --root .` は Markdown / text 文書棚卸しの canonical entrypoint です。
   - `helper_function_inventory.py` は Python helper 関数 / クラスを AST/call graph/side effect facts と domain 別の機能ベース rule から列挙し、`auto_helper`、`needs_user_judgment`、`redundant_helper` を分けて JSON / Markdown / text で出します。`redundant_helper` は identity return、pass-through call wrapper、normalized body が重複する helper 実装を表し、`redundancy_rule` と `redundant_with` を出します。
-  - `log_surface_inventory.py` は `.codex/hooks/`、`.agents/skills/`、`agents/skills/`、`tools/` から hook / skill / tool が出力する machine-readable field を静的に棚卸しし、`documents/log-surface-inventory.json` との差分を検査します。
+  - `log_surface_inventory.py` は `.codex/hooks/`、`.agents/skills/`、`agents/skills/`、`tools/` から hook / skill / tool が出力する machine-readable field を静的に棚卸しし、`documents/runtime/log-surface-inventory.json` との差分を検査します。
   - `tool_rejection_preflight.py` は planned edit path から responsibility_scope、cause investigation、OOP readability、module boundary、library implementation、helper-first、helper inventory、dependency review、GitHub workflow、hook runtime alignment、AgentCanon tool source route、tool catalog、agent protocol convention、log-surface inventory などの予測 reject gate を出し、parent 直編集または write-capable subagent handoff に渡す `TOOL_REJECTION_PREDICTED_GATE` 行を生成します。`responsibility_scope` は `responsibility-scope.toml` の owner scope、class、protecting tools を返します。親 repo の `tools/` symlink view が `vendor/agent-canon/tools/` に解決される場合も、AgentCanon branch / PR と source-root validation へ誘導します。
   - `review_backlog_scan.sh` は file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans、semantic-index review artifacts、任意の provider-comparison artifact を run bundle へ集約します。
   - `vendor_skill_adapters.py` は `vendor/skills/manifest.toml` を検査し、enabled third-party skill を `.agents/skills/` の runtime adapter symlink として露出します。GitHub 由来の skill は `provider`、`upstream` owner、`vendor/skills/<provider>/<skill-id>/` source path の一致も検査します。
@@ -462,7 +462,7 @@ AgentCanon implementations blindly. Use this order:
    `experiments/`, `oop/`, or `validation/`.
 1. Keep project-specific or stale tools in the source repository, or delete
    them after review. Do not add new `tools/legacy/` paths to AgentCanon.
-1. Record the disposition in `documents/repo-local-tool-imports.md`.
+1. Record the disposition in `documents/tools/repo-local-tool-imports.md`.
 1. Add or update the corresponding `tools/catalog.yaml` entry.
 
 Current promoted helpers:
@@ -479,7 +479,7 @@ Current promoted helpers:
 - `tools/docs/tfidf_similar_docs.py`
 
 Legacy tool imports are retired in AgentCanon. Historical disposition remains
-in `documents/repo-local-tool-imports.md`; live tooling must be represented as
+in `documents/tools/repo-local-tool-imports.md`; live tooling must be represented as
 canonical or compatibility entries in `tools/catalog.yaml`, with reader-facing
 docs registered in `documents/tools/tool-docs.toml` when the tool needs a
 one-to-one explanation page.
@@ -487,7 +487,7 @@ one-to-one explanation page.
 ## Result Log And Visualization Tools
 
 Result-log retention is governed by
-`documents/result-log-retention-and-visualization.md`.
+`documents/experiments/result-log-retention-and-visualization.md`.
 
 Canonical helper commands:
 
@@ -536,7 +536,7 @@ plus `.agent-canon/log-archive/codex-runtime/<repo-key>/index.jsonl`, and agent 
 reports use `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` by
 default. The archive remote is
 `git@github.com:iwashita-nozomu/agent-canon-log.git`; mount, branch, and push
-rules live in `documents/runtime-log-archive.md`, and
+rules live in `documents/runtime/runtime-log-archive.md`, and
 `tools/agent_tools/runtime_log_archive_git.py` is the normal helper for
 `ensure`, `status`, `import-legacy`, `import-eval-results`,
 `archive-agent-report`, `archive-agent-reports`, `sync`, and `push`. The Codex Stop hook calls `sync`
@@ -984,6 +984,6 @@ For OOP readability, keep the mechanical report as the source of truth and use `
 
 ## 関連文書
 
-- `documents/SHARED_RUNTIME_SURFACES.md`
+- `documents/runtime/SHARED_RUNTIME_SURFACES.md`
 - `agents/workflows/agent-canon-pr-workflow.md`
-- `documents/agent-canon-subtree-migration.md`
+- `documents/agent-canon/agent-canon-subtree-migration.md`

@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Generates read-only dashboards for AgentCanon runtime logs and eval results.
 # upstream design ../../evidence/agent-evals/README.md eval evidence contract
-# upstream design ../../documents/runtime-log-archive.md eval and hook result storage contract
+# upstream design ../../documents/runtime/runtime-log-archive.md eval and hook result storage contract
 # upstream design ../../references/README.md external-source capture and Markdown retention contract
 # upstream implementation ./generate_agent_improvement_guide.py summarizes hook, memory, eval, and issue evidence
 # upstream implementation ./runtime_log_paths.py resolves mounted archive result paths

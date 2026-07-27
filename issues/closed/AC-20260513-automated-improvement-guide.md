@@ -6,7 +6,7 @@ contract issue
 responsibility Records the workflow defect where memory, eval, hook, and issue evidence was not summarized on PR or branch push.
 upstream design ../README.md defines durable issue storage
 upstream design ../../agents/evals/README.md defines eval and behavior evidence
-upstream design ../../documents/runtime-log-archive.md defines hook result evidence
+upstream design ../../documents/runtime/runtime-log-archive.md defines hook result evidence
 downstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py generates the guide
 downstream implementation ../../.github/workflows/agent-improvement-guide.yml runs the guide on PR and push
 @dependency-end
@@ -18,8 +18,8 @@ source: user
 severity: S1
 evidence: .github/workflows/agent-improvement-guide.yml
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/245
-affected_surfaces: .github/workflows/agent-improvement-guide.yml, tools/agent_tools/generate_agent_improvement_guide.py, documents/runtime-log-archive.md, agents/workflows/agent-canon-pr-workflow.md, tools/README.md, tools/catalog.yaml
-edit_scope: .github/workflows/agent-improvement-guide.yml, tools/agent_tools/generate_agent_improvement_guide.py, tests/agent_tools/test_generate_agent_improvement_guide.py, documents/runtime-log-archive.md, tools/README.md, tools/catalog.yaml, tools/ci/check_github_workflows.py, tests/tools/test_check_github_workflows.py
+affected_surfaces: .github/workflows/agent-improvement-guide.yml, tools/agent_tools/generate_agent_improvement_guide.py, documents/runtime/runtime-log-archive.md, agents/workflows/agent-canon-pr-workflow.md, tools/README.md, tools/catalog.yaml
+edit_scope: .github/workflows/agent-improvement-guide.yml, tools/agent_tools/generate_agent_improvement_guide.py, tests/agent_tools/test_generate_agent_improvement_guide.py, documents/runtime/runtime-log-archive.md, tools/README.md, tools/catalog.yaml, tools/ci/check_github_workflows.py, tests/tools/test_check_github_workflows.py
 required_action: Generate a deterministic memory/eval/hook/issues improvement guide on PR and branch push without mutating repository state.
 close_condition: GitHub Actions runs the guide on pull_request, push, and manual dispatch, uploads the report artifact, and checker/tests enforce the workflow contract.
 resolved_by: canon-pr/richer-hook-skill-eval-guide-20260514

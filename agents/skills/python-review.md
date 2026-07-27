@@ -46,10 +46,10 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
 
 ## 参照正本
 
-- `documents/coding-conventions-python.md`
-- `documents/object-oriented-design.md`
+- `documents/conventions/coding-conventions-python.md`
+- `documents/conventions/object-oriented-design.md`
 - `documents/conventions/python/07_type_checker.md`
-- `documents/REVIEW_PROCESS.md`
+- `documents/conventions/REVIEW_PROCESS.md`
 
 ## 期待される結果
 

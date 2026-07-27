@@ -50,7 +50,7 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 ## Core References
 
 - `agents/TASK_WORKFLOWS.md`
-- `documents/runtime-profiles-and-check-matrix.md`
+- `documents/runtime/runtime-profiles-and-check-matrix.md`
 - `agents/COMMUNICATION_PROTOCOL.md`
 - `agents/canonical/ARTIFACT_PLACEMENT.md`
 - `agents/canonical/CLI_ENTRYPOINTS.md`

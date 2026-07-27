@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Summarizes Git diffs together with existing dependency expansion tools.
-# upstream design ../../documents/dependency-manifest-design.md defines dependency graph and code dependency separation.
+# upstream design ../../documents/design/dependency-manifest-design.md defines dependency graph and code dependency separation.
 # upstream implementation ./scan_code_dependencies.sh extracts code dependency edges.
 # upstream implementation ./run_repo_dependency_review.sh expands dependency-header graph evidence.
 # downstream implementation ../../tests/agent_tools/test_git_dependency_diff_summary.py tests summary behavior.

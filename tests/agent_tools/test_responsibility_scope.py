@@ -103,8 +103,8 @@ class ResponsibilityScopeTest(unittest.TestCase):
 
         self.assertIn("evidence", paths)
         self.assertIn("evidence/**", paths)
-        self.assertIn("documents/runtime-log-archive.md", paths)
-        self.assertIn("documents/runtime-log-archive-migration.md", paths)
+        self.assertIn("documents/runtime/runtime-log-archive.md", paths)
+        self.assertIn("documents/runtime/runtime-log-archive-migration.md", paths)
         self.assertIn("tools/agent_tools/runtime_log_paths.py", paths)
         self.assertIn("tools/agent_tools/runtime_log_archive_git.py", paths)
         self.assertIn(".codex/hooks/log_archive_mount_warning.py", paths)
@@ -114,7 +114,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             scopes["shared-tooling"]["exclude_paths"],
         )
         self.assertIn(
-            "documents/runtime-log-archive.md",
+            "documents/runtime/runtime-log-archive.md",
             scopes["shared-policy-documents"]["exclude_paths"],
         )
         self.assertIn(".vscode/**", runtime_paths)

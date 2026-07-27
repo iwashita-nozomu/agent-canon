@@ -51,7 +51,7 @@
   `repair_return_state`, formatter/static records, descendant disposition,
   typed failures, and public negatives without non-empty-text fallbacks.
 - `R3-REVIEW-POLICY-DEPENDENCY-CLOSURE`: define exact durable
-  `documents/REVIEW_PROCESS.md` owner-to-consumer edges and matching reverse
+  `documents/conventions/REVIEW_PROCESS.md` owner-to-consumer edges and matching reverse
   edges, including direct consumers found by static enumeration, without any
   durable edge to run-local reports.
 - `D1-CANONICAL-AUTHORITY`: retain one full-snapshot
@@ -78,8 +78,8 @@
 | --- | --- | --- |
 | `agents/COMMUNICATION_PROTOCOL.md` `CompletionCoverage v1 Schema Contract` | Ledger event, authority payload, source correspondence, and review packet semantics | Retains the aggregate `completion_authority` schema, exact member correspondence, and exact formatter/descendant record schemas. |
 | `agents/canonical/CODEX_WORKFLOW.md` `CompletionCoverage Applicability And State Contract` | Applicability, state transitions, topology truth, and W2 branch reason | Owns the normal-state truth tables, repair/escalation transition rules, and the sole branch reason. |
-| `documents/REVIEW_PROCESS.md` | Review lifecycle, exact target identity, post-fix refresh, merge evidence, and non-self-reference | Owns D→DR→S→IR→B→post-binding-review lifecycle and the R3 downstream dependency declarations. |
-| `documents/dependency-manifest-design.md` `Bidirectional Consistency` | Durable dependency edge direction, kind, relative path, reverse matching, and cycle policy | Owns the exact R3 edge pairs. |
+| `documents/conventions/REVIEW_PROCESS.md` | Review lifecycle, exact target identity, post-fix refresh, merge evidence, and non-self-reference | Owns D→DR→S→IR→B→post-binding-review lifecycle and the R3 downstream dependency declarations. |
+| `documents/design/dependency-manifest-design.md` `Bidirectional Consistency` | Durable dependency edge direction, kind, relative path, reverse matching, and cycle policy | Owns the exact R3 edge pairs. |
 | `tools/agent_tools/work_log.py` | Append-only ledger, canonical snapshot, aggregate head resolution | Owns event validation, full-snapshot selection, revision/supersession, and typed authority failures. |
 | `tools/agent_tools/workflow_monitor.py` | Public structured event append boundary | Preserves exact aggregate, group, formatter/static, and descendant fields; it never synthesizes success. |
 | `tools/agent_tools/report_artifact_checks.py` | Pure projection, boundary checks, topology checks, Git identity checks, ordered integration verifier | Owns the R1 serializer/observer, R2 exact predicates, and full publication verification. |
@@ -1167,8 +1167,8 @@ that will contain it. Those identities are returned only by external readback.
 2. The bound v2 recheck and v2 design above.
 3. `agents/COMMUNICATION_PROTOCOL.md` CompletionCoverage schema owner.
 4. `agents/canonical/CODEX_WORKFLOW.md` state/branch owner.
-5. `documents/REVIEW_PROCESS.md` review lifecycle owner.
-6. `documents/dependency-manifest-design.md` bidirectional/cycle rules.
+5. `documents/conventions/REVIEW_PROCESS.md` review lifecycle owner.
+6. `documents/design/dependency-manifest-design.md` bidirectional/cycle rules.
 7. `work_log.py`, `workflow_monitor.py`, `report_artifact_checks.py`,
    `task_close.py`, and `waterfall_gate_check.py`.
 8. The exact selected projections, checkers, headers, interface, and tests in
@@ -1188,7 +1188,7 @@ decision-binding commit `B`.
 | --- | --- | --- | --- |
 | `agents/COMMUNICATION_PROTOCOL.md` | Add exact authority topology v2, formatter/static records, descendant records, source/review/binding identity fields, and typed errors. | R2; D1/D3 | Schema-owner and document-flow review |
 | `agents/canonical/CODEX_WORKFLOW.md` | Add the complete normal/special truth tables, repair mapping, branch value, and transition rules. | R2; D2 | Workflow-owner review |
-| `documents/REVIEW_PROCESS.md` | Add canonical tree-delta review identity, direct-parent interface-only binding, no-self-hash lifecycle, post-binding authority revision, and exact R3 downstream headers. | R1, R3; D5 | Review-policy and dependency review |
+| `documents/conventions/REVIEW_PROCESS.md` | Add canonical tree-delta review identity, direct-parent interface-only binding, no-self-hash lifecycle, post-binding authority revision, and exact R3 downstream headers. | R1, R3; D5 | Review-policy and dependency review |
 | `agents/workflows/implementation-waterfall-workflow.md` | Gate D approval, source freeze, IR, exact B shape, post-binding authority, and closeout in order. | R1-R3 | Workflow review |
 | `agents/templates/design_review.md` | Require exact D tuple, reviewer separation, approval, and no self identity. | R3; D5 | Template review |
 | `agents/templates/change_review.md` | Require S commit/tree, canonical diff schema/SHA, changed paths, reviewer separation, and no self identity. | R1, R3 | Template review |
@@ -1233,24 +1233,24 @@ ordered interface, and their tests must each encode all of these predicates:
 
 ### R3 exact durable dependency-header closure
 
-`documents/REVIEW_PROCESS.md` must carry these exact owner-side edges, and each
+`documents/conventions/REVIEW_PROCESS.md` must carry these exact owner-side edges, and each
 consumer must carry the matching exact reverse:
 
-| Owner-side line in `documents/REVIEW_PROCESS.md` | Exact consumer reverse line |
+| Owner-side line in `documents/conventions/REVIEW_PROCESS.md` | Exact consumer reverse line |
 | --- | --- |
-| `downstream design ../agents/templates/design_review.md exact detailed-design review identity projection` | `upstream design ../../documents/REVIEW_PROCESS.md exact detailed-design review identity policy` |
-| `downstream design ../agents/templates/change_review.md exact source-review identity projection` | `upstream design ../../documents/REVIEW_PROCESS.md exact source-review identity policy` |
-| `downstream design ../agents/templates/final_review.md final publication-chain review projection` | `upstream design ../../documents/REVIEW_PROCESS.md final publication-chain review policy` |
-| `downstream design ../agents/templates/closeout_gate.md external decision-binding receipt projection` | `upstream design ../../documents/REVIEW_PROCESS.md external decision-binding receipt policy` |
-| `downstream design ../agents/workflows/implementation-waterfall-workflow.md review and publication stage ordering` | `upstream design ../../documents/REVIEW_PROCESS.md review and publication stage policy` |
-| `downstream implementation ../tools/agent_tools/waterfall_gate_check.py verifies current review target identity` | `upstream design ../../documents/REVIEW_PROCESS.md current review target identity policy` |
-| `downstream implementation ../tools/agent_tools/report_artifact_checks.py verifies review and publication identities` | `upstream design ../../documents/REVIEW_PROCESS.md review and publication identity policy` |
-| `downstream implementation ../tools/agent_tools/task_close.py consumes verified review and decision-binding evidence` | `upstream design ../../documents/REVIEW_PROCESS.md closeout review and binding policy` |
-| `downstream implementation ../tools/agent_tools/evaluate_agent_run.py evaluates refreshed review artifacts` | `upstream design ../../documents/REVIEW_PROCESS.md refreshed review artifact policy` |
-| `downstream implementation ../tools/agent_tools/agent_team.py materializes review role document packets` | `upstream design ../../documents/REVIEW_PROCESS.md review role document packet policy` |
-| `downstream implementation ../tools/agent_tools/check_convention_compliance.py validates review-policy markers and wiring` | `upstream design ../../documents/REVIEW_PROCESS.md review-policy marker contract` |
-| `downstream implementation ../tools/agent_tools/tool_drift.py validates review-policy dependency drift` | `upstream design ../../documents/REVIEW_PROCESS.md closeout validation policy` |
-| `downstream implementation ../.codex/agents/ship_reviewer.toml final review and closeout runtime projection` | `upstream design ../../documents/REVIEW_PROCESS.md final review and closeout policy` |
+| `downstream design ../agents/templates/design_review.md exact detailed-design review identity projection` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md exact detailed-design review identity policy` |
+| `downstream design ../agents/templates/change_review.md exact source-review identity projection` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md exact source-review identity policy` |
+| `downstream design ../agents/templates/final_review.md final publication-chain review projection` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md final publication-chain review policy` |
+| `downstream design ../agents/templates/closeout_gate.md external decision-binding receipt projection` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md external decision-binding receipt policy` |
+| `downstream design ../agents/workflows/implementation-waterfall-workflow.md review and publication stage ordering` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md review and publication stage policy` |
+| `downstream implementation ../tools/agent_tools/waterfall_gate_check.py verifies current review target identity` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md current review target identity policy` |
+| `downstream implementation ../tools/agent_tools/report_artifact_checks.py verifies review and publication identities` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md review and publication identity policy` |
+| `downstream implementation ../tools/agent_tools/task_close.py consumes verified review and decision-binding evidence` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md closeout review and binding policy` |
+| `downstream implementation ../tools/agent_tools/evaluate_agent_run.py evaluates refreshed review artifacts` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md refreshed review artifact policy` |
+| `downstream implementation ../tools/agent_tools/agent_team.py materializes review role document packets` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md review role document packet policy` |
+| `downstream implementation ../tools/agent_tools/check_convention_compliance.py validates review-policy markers and wiring` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md review-policy marker contract` |
+| `downstream implementation ../tools/agent_tools/tool_drift.py validates review-policy dependency drift` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md closeout validation policy` |
+| `downstream implementation ../.codex/agents/ship_reviewer.toml final review and closeout runtime projection` | `upstream design ../../documents/conventions/REVIEW_PROCESS.md final review and closeout policy` |
 | `downstream design ./algorithm-implementation-boundary.md algorithm equation/spec alignment review` | `upstream design ./REVIEW_PROCESS.md review gate for equation/spec alignment` |
 
 The final two reverse lines already exist and therefore require matching owner
@@ -1271,7 +1271,7 @@ Static enumeration disposition:
 - Skills, internal routines, reader maps, runtime-profile projections, and
   body-only “Core References” mentions remain indirect navigation consumers
   unless their implementation behavior is selected above.
-- `documents/runtime-profiles-and-check-matrix.json` remains the upstream
+- `documents/runtime/runtime-profiles-and-check-matrix.json` remains the upstream
   taxonomy owner for validation-failure slugs. R3 does not reverse that
   authority.
 - No durable dependency header may name

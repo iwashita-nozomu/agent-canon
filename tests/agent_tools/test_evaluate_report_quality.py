@@ -3,7 +3,7 @@
 # responsibility Tests report quality eval automation.
 # upstream implementation ../../tools/agent_tools/evaluate_report_quality.py report quality eval helper
 # upstream design ../../evidence/agent-evals/report_quality_eval.toml report quality eval manifest
-# upstream design ../../documents/runtime-log-archive.md accumulated result archive contract
+# upstream design ../../documents/runtime/runtime-log-archive.md accumulated result archive contract
 # @dependency-end
 """Tests for report quality evals."""
 

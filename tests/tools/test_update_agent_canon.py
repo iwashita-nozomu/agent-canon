@@ -896,7 +896,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     'class = "standalone_only"',
                     'local_override_allowed = false',
                     'paths = [',
-                    '  "documents/SHARED_RUNTIME_SURFACES.md",',
+                    '  "documents/runtime/SHARED_RUNTIME_SURFACES.md",',
                     ']',
                     '',
                     '[[surface]]',
@@ -932,13 +932,13 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 [
                     "# Standalone Surface Policy",
                     "",
-                    "documents/shared-runtime-surfaces.toml",
+                    "documents/runtime/shared-runtime-surfaces.toml",
                     ".codex/hooks.json",
                     ".codex/hooks",
                     ".devcontainer/",
                     "documents/README.md",
-                    "documents/template-bootstrap.md",
-                    "documents/github-first-module-and-devcontainer-policy.md",
+                    "documents/contracts/template-bootstrap.md",
+                    "documents/contracts/github-first-module-and-devcontainer-policy.md",
                     "memory/USER_PREFERENCES.md",
                     "tests/agent_tools/",
                     "Root `tools/` is a symlink view",
@@ -1772,7 +1772,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             documents_dir.mkdir()
             policy_path = documents_dir / "SHARED_RUNTIME_SURFACES.md"
             os.symlink(
-                "../vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md",
+                "../vendor/agent-canon/documents/runtime/SHARED_RUNTIME_SURFACES.md",
                 policy_path,
             )
 
@@ -1785,7 +1785,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
             self.assertNotEqual(check_before.returncode, 0)
             self.assertIn(
-                "absent[documents/SHARED_RUNTIME_SURFACES.md]=present",
+                "absent[documents/runtime/SHARED_RUNTIME_SURFACES.md]=present",
                 check_before.stderr,
             )
 

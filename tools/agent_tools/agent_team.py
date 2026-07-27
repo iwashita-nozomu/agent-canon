@@ -5,7 +5,7 @@
 # upstream design ../README.md shared automation index
 # upstream design ../../agents/task_catalog.yaml workflow topology and isolated skill-evaluation route
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md active design packet schema contract
-# upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy
+# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy
 # upstream implementation ./skill_tool_commands.py builds selected skill command packets.
 # upstream implementation ./implementation_route.py owns fixed-packet Spark eligibility
 # upstream implementation ./model_profile_registry.py owns profile prompt/token materialization
@@ -226,7 +226,7 @@ PRE_HANDOFF_GATE_STATUS_REQUIRED_EVIDENCE = (
     "document_flow_review_when_active",
 )
 VALIDATION_FAILURE_TRIAGE_TRIGGER = "validation_failure_requires_parallel_triage"
-VALIDATION_FAILURE_TAXONOMY_SOURCE = "documents/runtime-profiles-and-check-matrix.json"
+VALIDATION_FAILURE_TAXONOMY_SOURCE = "documents/runtime/runtime-profiles-and-check-matrix.json"
 RUNTIME_PROFILE_INVENTORY_PATH = ROOT / VALIDATION_FAILURE_TAXONOMY_SOURCE
 _validation_failure_response_policy_cache: dict[str, object] | None = None
 CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX = 6
@@ -394,7 +394,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
     },
     "design_reviewer": {
         "artifact_keys": ["user_request_contract", "schedule", "design_brief"],
-        "workspace_paths": ["documents/REVIEW_PROCESS.md"],
+        "workspace_paths": ["documents/conventions/REVIEW_PROCESS.md"],
         "notes": "Design review checks the same upstream packet and the resulting design brief.",
     },
     "test_designer": {
@@ -434,7 +434,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "design_review",
             "change_review",
         ],
-        "workspace_paths": ["documents/REVIEW_PROCESS.md"],
+        "workspace_paths": ["documents/conventions/REVIEW_PROCESS.md"],
         "notes": (
             "Checkpoint review is the selected owning gate; test_plan is read only when "
             "post-implementation test design was activated."
@@ -448,7 +448,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "design_review",
             "final_review",
         ],
-        "workspace_paths": ["documents/REVIEW_PROCESS.md"],
+        "workspace_paths": ["documents/conventions/REVIEW_PROCESS.md"],
         "notes": (
             "Final review is a selected escalation gate; test_plan is read only when "
             "post-implementation test design was activated."
@@ -488,12 +488,12 @@ ROLE_DOCUMENT_PACKET_SECTION_SPECS: dict[str, dict[str, tuple[str, ...]]] = {
     },
 }
 COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
-    "documents/REVIEW_PROCESS.md",
-    "documents/AGENTS_COORDINATION.md",
-    "documents/coding-conventions-python.md",
-    "documents/notes-lifecycle.md",
+    "documents/conventions/REVIEW_PROCESS.md",
+    "documents/codex/AGENTS_COORDINATION.md",
+    "documents/conventions/coding-conventions-python.md",
+    "documents/operations/notes-lifecycle.md",
     "agents/workflows/agent-learning-workflow.md",
-    "documents/agent-canon-subtree-migration.md",
+    "documents/agent-canon/agent-canon-subtree-migration.md",
     "notes/guardrails/README.md",
     "notes/guardrails/engineering_avoidances.md",
     "memory/USER_PREFERENCES.md",

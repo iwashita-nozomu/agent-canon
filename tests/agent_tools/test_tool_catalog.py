@@ -6,7 +6,7 @@
 # upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog
 # upstream implementation ../../tools/agent_tools/visualization_contract.py owns the canonical visualization contract tool.
 # upstream design ../../tools/catalog.yaml structured tool catalog fixture
-# upstream design ../../documents/gpu-admission-r5-source-packet.md canonical managed GPU admission route
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md canonical managed GPU admission route
 # @dependency-end
 
 from __future__ import annotations
@@ -562,7 +562,7 @@ class CheckToolCatalogTest(unittest.TestCase):
         for doc in [
             "tools/README.md",
             "documents/tools/README.md",
-            "documents/repo-local-tool-imports.md",
+            "documents/tools/repo-local-tool-imports.md",
             "documents/tools/tool_catalog.md",
             "tools/ci/check_agent_canon_pr.sh",
             "agents/workflows/agent-canon-pr-workflow.md",

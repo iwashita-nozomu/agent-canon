@@ -2,8 +2,8 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Provides Canon-owned append-only hook event log paths and IDs.
-# upstream design ../../documents/runtime-log-archive.md runtime log archive contract
-# upstream design ../../documents/runtime-log-archive.md hook result accumulation contract
+# upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive contract
+# upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
 # upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves archive paths
 # downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py checkpoints immutable per-event spool files
 # downstream implementation ./oop_readability_guard.py records OOP hook outcomes

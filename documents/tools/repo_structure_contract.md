@@ -3,8 +3,8 @@
 contract reference
 responsibility Documents the repository structure contract checker.
 upstream implementation ../../tools/agent_tools/repo_structure_contract.py compares repo trees with the structure contract
-upstream design ../repo-structure-contract.toml defines expected repository structure profiles
-upstream design ../SHARED_RUNTIME_SURFACES.md shared root surface policy
+upstream design ../structure/repo-structure-contract.toml defines expected repository structure profiles
+upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared root surface policy
 downstream implementation ../../tools/catalog.yaml catalogs this checker
 @dependency-end
 -->
@@ -12,7 +12,7 @@ downstream implementation ../../tools/catalog.yaml catalogs this checker
 # Repo Structure Contract
 
 `tools/agent_tools/repo_structure_contract.py` compares an observed repository
-tree with `documents/repo-structure-contract.toml`.
+tree with `documents/structure/repo-structure-contract.toml`.
 
 Use it when a template or derived repository needs to prove that its top-level
 layout still matches an AgentCanon-supported profile.

@@ -14,11 +14,11 @@ upstream design ../README.md notes lifecycle index
 研究の問い、比較設計、claim 更新は [agents/workflows/research-workflow.md](../../agents/workflows/research-workflow.md) を参照してください。
 準備、実装、静的チェック、実行、結果レポートの標準手順は [agents/workflows/experiment-workflow.md](../../agents/workflows/experiment-workflow.md) を参照してください。
 批判的レビューの観点は AgentCanon standalone では
-`documents/experiment-critical-review.md`、template roots では
-`vendor/agent-canon/documents/experiment-critical-review.md` を参照してください。
+`documents/experiments/experiment-critical-review.md`、template roots では
+`vendor/agent-canon/documents/experiments/experiment-critical-review.md` を参照してください。
 実験レポートの構成と体裁は AgentCanon standalone では
-`documents/experiment-report-style.md`、template roots では
-`vendor/agent-canon/documents/experiment-report-style.md` を参照してください。
+`documents/experiments/experiment-report-style.md`、template roots では
+`vendor/agent-canon/documents/experiments/experiment-report-style.md` を参照してください。
 
 ## 基本ルール
 

@@ -2,10 +2,10 @@
 @dependency-start
 contract design
 responsibility Documents test_design Rust CLI usage and output contract.
-upstream design ../../references/test-design-flexibility.md source basis for resilient test design
-upstream design ../coding-conventions-testing.md shared testing policy
+upstream design ../../../references/test-design-flexibility.md source basis for resilient test design
+upstream design ../conventions/coding-conventions-testing.md shared testing policy
 upstream implementation ../../rust/agent-canon/src/test_design.rs implements the command
-downstream design ../tools/tool-docs.toml one-to-one tool/document manifest
+downstream design ../../tools/tool-docs.toml one-to-one tool/document manifest
 downstream design ../../agents/skills/test-design.md uses this command before test planning
 @dependency-end
 -->

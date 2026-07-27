@@ -4,9 +4,9 @@
 contract skill
 responsibility Documents agent-log-analysis for this repository.
 upstream design ../canonical/skills.md skill canon registry
-upstream design ../../documents/runtime-log-archive.md accumulated eval and hook result storage
-upstream design ../../documents/search-coordination.md coordinated search policy
-upstream design ../../documents/runtime-log-archive.md defines the external log archive mount and branch policy
+upstream design ../../documents/runtime/runtime-log-archive.md accumulated eval and hook result storage
+upstream design ../../documents/tools/search-coordination.md coordinated search policy
+upstream design ../../documents/runtime/runtime-log-archive.md defines the external log archive mount and branch policy
 downstream design issue-finding-report.md converts compact log findings into durable issues
 upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py owns structured dashboard API fields
 upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive

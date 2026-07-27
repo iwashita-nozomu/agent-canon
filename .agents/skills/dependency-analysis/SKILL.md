@@ -7,7 +7,7 @@ description: Use when checking, validating, or diagnosing repository dependency 
 @dependency-start
 contract skill
 responsibility Documents Dependency Analysis for this repository.
-upstream design ../../../documents/dependency-manifest-design.md defines manifest format and graph semantics
+upstream design ../../../documents/design/dependency-manifest-design.md defines manifest format and graph semantics
 upstream design ../../../agents/canonical/CODEX_WORKFLOW.md defines workflow gate usage
 upstream design ../../../agents/skills/dependency-analysis.md documents the human-facing skill
 upstream design ../../../agents/workflows/hypothesis-validation-workflow.md separates code and header dependency evidence
@@ -56,7 +56,7 @@ Execute the required and task-matching conditional commands that the packet prin
 <!-- skill-tool-commands:end -->
 
 
-1. Read `documents/dependency-manifest-design.md`.
+1. Read `documents/design/dependency-manifest-design.md`.
 1. If the task selects or justifies a fix surface, read `agents/workflows/hypothesis-validation-workflow.md`.
 1. For code-improvement work, do not implement until the artifact records `Observation`, `Hypothesis`, `Expected Mechanism`, `Candidate Comparison`, `Disconfirming Evidence`, `Support Evidence`, and `fix_surface_validated=yes`.
 1. After the change, record `Post-Change Evidence` and `Hypothesis Decision: supported|rejected|inconclusive`. If the decision is `rejected` or `inconclusive`, return to hypothesis selection instead of expanding the implementation pass.

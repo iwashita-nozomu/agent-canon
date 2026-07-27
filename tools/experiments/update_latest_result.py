@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Updates latest experiment result pointers.
-# upstream design ../../documents/result-log-retention-and-visualization.md defines latest-result pointer policy.
-# upstream design ../../documents/experiment-report-style.md defines experiment report artifact layout.
+# upstream design ../../documents/experiments/result-log-retention-and-visualization.md defines latest-result pointer policy.
+# upstream design ../../documents/experiments/experiment-report-style.md defines experiment report artifact layout.
 # downstream implementation ../../tests/tools/test_update_latest_result.py validates latest result pointer updates.
 # @dependency-end
 """Update LATEST.json and LATEST.md for experiment result roots."""

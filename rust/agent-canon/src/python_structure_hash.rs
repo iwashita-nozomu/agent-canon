@@ -1,7 +1,7 @@
 // @dependency-start
 // contract implementation
 // responsibility Finds duplicate Python function and class structures by normalized AST hash.
-// upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
+// upstream design ../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
 // @dependency-end
 

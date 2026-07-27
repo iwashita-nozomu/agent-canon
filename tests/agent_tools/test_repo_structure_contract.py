@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests repo structure contract comparison from filesystem and tree JSON input.
 # upstream implementation ../../tools/agent_tools/repo_structure_contract.py compares repo trees with contract profiles
-# upstream design ../../documents/repo-structure-contract.toml defines expected repository structure profiles
+# upstream design ../../documents/structure/repo-structure-contract.toml defines expected repository structure profiles
 # @dependency-end
 
 from __future__ import annotations
@@ -159,8 +159,8 @@ class RepoStructureContractTest(unittest.TestCase):
             "documents/rule/README.md",
             "documents/rule/naming.md",
             "documents/rule/directory-structure.md",
-            "documents/shared-runtime-surfaces.toml",
-            "documents/repo-structure-contract.toml",
+            "documents/runtime/shared-runtime-surfaces.toml",
+            "documents/structure/repo-structure-contract.toml",
             "tools/catalog.yaml",
             "rust/agent-canon/Cargo.toml",
             "tools/agent_tools/update_lifecycle_contract.py",

@@ -3,7 +3,7 @@
 contract workflow
 responsibility Documents Derived Agent-Canon Diff Workflow for this repository.
 upstream design ./agent-canon-pr-workflow.md defines shared canon PR gates
-upstream design ../../documents/agent-canon-subtree-migration.md defines submodule migration and legacy subtree compatibility
+upstream design ../../documents/agent-canon/agent-canon-subtree-migration.md defines submodule migration and legacy subtree compatibility
 upstream implementation ../../tools/sync_agent_canon.sh synchronizes shared canon submodule pins and root views
 upstream implementation ../../tools/update_agent_canon.sh merges GitHub main into derived AgentCanon branches
 downstream design ../canonical/CODEX_WORKFLOW.md routes diverged canon workflows
@@ -77,7 +77,7 @@ git diff --stat -- vendor/agent-canon .github/workflows .github/PULL_REQUEST_TEM
 - derived-repo local wrapper: project 固有 README、implementation、environment、experiment、repo-local note に留めるべき変更
 - accidental drift: root symlink view の直接編集、生成物、backup、dated snapshot、旧 path、copy surface の不一致
 
-判断に迷う場合は、`documents/agent-canon-subtree-migration.md` と `documents/SHARED_RUNTIME_SURFACES.md` の ownership を優先します。
+判断に迷う場合は、`documents/agent-canon/agent-canon-subtree-migration.md` と `documents/runtime/SHARED_RUNTIME_SURFACES.md` の ownership を優先します。
 accidental drift は
 `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root`
 で復元し、shared-canon candidate と local wrapper を同じ commit に混ぜません。

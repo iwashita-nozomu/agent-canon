@@ -143,8 +143,8 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 `agent-canon` 自体を保守する場合は、次を追加で見ます。
 
 - `ROOT_AGENTS.md`
-- `documents/SHARED_RUNTIME_SURFACES.md`
-- `documents/agent-canon-subtree-migration.md`
+- `documents/runtime/SHARED_RUNTIME_SURFACES.md`
+- `documents/agent-canon/agent-canon-subtree-migration.md`
 - `agents/workflows/agent-canon-pr-workflow.md`
 - `agents/workflows/pr-queue-cleanup-workflow.md`
 - `agents/workflows/derived-agent-canon-diff-workflow.md`

@@ -4,7 +4,7 @@ contract reference
 responsibility Documents formal_proof.py operator usage and proof-status boundary.
 upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts.
 upstream design ../../agents/skills/formal-proof-workflow.md defines the natural-language to formal-proof workflow.
-upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant source evidence.
+upstream design ../../../references/agent-canon-technology-bibliography.md records proof-assistant source evidence.
 downstream implementation ../../tests/agent_tools/test_formal_proof.py tests CLI output.
 @dependency-end
 -->

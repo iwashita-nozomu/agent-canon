@@ -4,7 +4,7 @@
 # contract tool
 # responsibility Inventories Python OOP policy, tool, document, and test surfaces.
 # upstream design ../../../documents/tools/README.md tool documentation placement policy
-# upstream design ../../../documents/object-oriented-design.md OOP policy source
+# upstream design ../../../documents/conventions/object-oriented-design.md OOP policy source
 # upstream implementation ../shared/rule_inventory_core.py shared OOP inventory behavior
 # downstream implementation ../../../tests/agent_tools/test_oop_rule_inventory.py tests inventory entrypoint
 # @dependency-end
@@ -26,12 +26,12 @@ from tools.oop.shared.rule_inventory_core import InventoryEntry, run_inventory_c
 ENTRIES = (
     InventoryEntry(
         "policy",
-        "documents/object-oriented-design.md",
+        "documents/conventions/object-oriented-design.md",
         "OOP boundary, responsibility, and mechanical-evaluation policy.",
     ),
     InventoryEntry(
         "policy",
-        "documents/coding-conventions-python.md",
+        "documents/conventions/coding-conventions-python.md",
         "Python type-boundary and readability policy entrypoint.",
     ),
     InventoryEntry(

@@ -35,7 +35,7 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 
 ## Core Reference
 
-- `documents/REVIEW_PROCESS.md`
+- `documents/conventions/REVIEW_PROCESS.md`
 
 ## 文書正本
 

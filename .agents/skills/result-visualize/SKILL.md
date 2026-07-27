@@ -7,8 +7,8 @@ description: Use when designing reusable result visualizations that bind each fi
 contract skill
 responsibility Documents result visualization design for this repository.
 upstream design ../../../agents/skills/result-visualize.md defines reusable figure contracts and required calculation patterns
-upstream design ../../../documents/SHARED_RUNTIME_SURFACES.md documents runtime boundary policy
-upstream design ../../../documents/experiment-report-style.md defines reader-facing evidence expectations
+upstream design ../../../documents/runtime/SHARED_RUNTIME_SURFACES.md documents runtime boundary policy
+upstream design ../../../documents/experiments/experiment-report-style.md defines reader-facing evidence expectations
 upstream design ../../../agents/skills/structure-planning.md defines first-figure planning for non-trivial results
 upstream design ../../../agents/skills/report-writing.md receives interpretation prose from figure inventories
 upstream design ../../../agents/skills/html-experiment-report.md reuses figure-first contracts for browser reports

@@ -3,7 +3,7 @@
 contract reference
 responsibility Documents path-risk classifier usage.
 upstream implementation ../../tools/agent_tools/classify_path_risk.py classifies changed paths into runtime profiles.
-upstream design ../runtime-profiles-and-check-matrix.md defines profile-based validation routing.
+upstream design ../runtime/runtime-profiles-and-check-matrix.md defines profile-based validation routing.
 downstream implementation ../../.github/workflows/path-risk-check-matrix-smoke.yml runs manual smoke classification.
 downstream implementation ../../tests/agent_tools/test_classify_path_risk.py tests representative profiles.
 @dependency-end

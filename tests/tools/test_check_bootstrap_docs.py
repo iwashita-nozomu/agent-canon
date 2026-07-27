@@ -2,8 +2,8 @@
 # contract test
 # responsibility Tests bootstrap docs checker behavior.
 # upstream implementation ../../tools/docs/check_bootstrap_docs.py bootstrap docs checker under test
-# upstream design ../../documents/template-bootstrap.md bootstrap documentation contract
-# upstream design ../../documents/gpu-admission-r5-source-packet.md post-create runtime identity documentation boundary
+# upstream design ../../documents/contracts/template-bootstrap.md bootstrap documentation contract
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md post-create runtime identity documentation boundary
 # @dependency-end
 """Tests for the bootstrap-facing doc validator."""
 
@@ -44,8 +44,8 @@ class CheckBootstrapDocsTest(unittest.TestCase):
             "QUICK_START.md",
             "docker/README.md",
             "scripts/README.md",
-            "documents/template-bootstrap.md",
-            "documents/linux-wsl-host-requirements.md",
+            "documents/contracts/template-bootstrap.md",
+            "documents/contracts/linux-wsl-host-requirements.md",
         ):
             self.write_file(root / relative_path, "# Doc\n")
 
@@ -94,7 +94,7 @@ class CheckBootstrapDocsTest(unittest.TestCase):
             )
             (root / "documents" / "template-bootstrap.md").unlink()
             (root / "documents" / "template-bootstrap.md").symlink_to(
-                Path("../vendor/agent-canon/documents/template-bootstrap.md")
+                Path("../vendor/agent-canon/documents/contracts/template-bootstrap.md")
             )
 
             result = self.run_cli(root)

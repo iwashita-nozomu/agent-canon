@@ -5,7 +5,7 @@
 # responsibility Tests SOLID-sensitive Python evidence coverage checks.
 # upstream implementation ../../tools/agent_tools/check_solid_evidence.py evidence coverage checker
 # upstream implementation ../../tools/oop/shared/readability_core.py emits scanned_paths in OOP reports
-# upstream design ../../documents/coding-conventions-python.md SOLID evidence route policy
+# upstream design ../../documents/conventions/coding-conventions-python.md SOLID evidence route policy
 # @dependency-end
 
 from __future__ import annotations

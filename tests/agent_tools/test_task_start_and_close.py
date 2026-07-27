@@ -1134,7 +1134,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "AGENT_CANON_PREFLIGHT_STATUS=skipped_source_canon", result.stdout
             )
             self.assertIn(
-                "AGENT_CANON_PREFLIGHT_CHECKLIST=documents/agent-canon-parent-repo-latest-checklist.md",
+                "AGENT_CANON_PREFLIGHT_CHECKLIST=documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
                 result.stdout,
             )
             self.assertIn(
@@ -1343,7 +1343,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(
-                "AGENT_CANON_PREFLIGHT_CHECKLIST=vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md",
+                "AGENT_CANON_PREFLIGHT_CHECKLIST=vendor/agent-canon/documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
                 result.stdout,
             )
             self.assertIn(
@@ -1383,7 +1383,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     "add",
                     "Makefile",
                     "tools/sync_agent_canon.sh",
-                    "vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md",
+                    "vendor/agent-canon/documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
                 ],
                 cwd=workspace_root,
                 check=True,
@@ -1481,7 +1481,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     "add",
                     "Makefile",
                     "tools/sync_agent_canon.sh",
-                    "vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md",
+                    "vendor/agent-canon/documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
                 ],
                 cwd=workspace_root,
                 check=True,
@@ -1824,7 +1824,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("ROLE_MODEL_MATRIX=", result.stdout)
             self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
-            self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
+            self.assertIn("/documents/conventions/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)
             self.assertNotIn("/docker/README.md", result.stdout)
             self.assertIn(
@@ -2686,7 +2686,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 (workspace_root / "reports" / "agents" / ".active_run.sha256").is_file()
             )
             self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
-            self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
+            self.assertIn("/documents/conventions/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)
             self.assertNotIn("/docker/README.md", result.stdout)
             self.assertIn(
@@ -2702,7 +2702,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertNotIn("subagent_prompt_packet:", manifest_text)
             self.assertIn("must_cite_before_edit: true", manifest_text)
             self.assertIn(str(report_dir / "design_brief.md"), manifest_text)
-            self.assertIn("/documents/REVIEW_PROCESS.md", manifest_text)
+            self.assertIn("/documents/conventions/REVIEW_PROCESS.md", manifest_text)
             self.assertIn("/notes/guardrails/README.md", manifest_text)
             self.assertNotIn("/docker/README.md", manifest_text)
             self.assertIn(
@@ -3022,7 +3022,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             ]
             self.assertEqual(
                 validation_failure_policy["taxonomy_source"],
-                "documents/runtime-profiles-and-check-matrix.json",
+                "documents/runtime/runtime-profiles-and-check-matrix.json",
             )
             self.assertEqual(
                 validation_failure_policy["repair_required_fields"],
