@@ -69,7 +69,7 @@ dockerfile_policy = "forbidden for agent-only JSON inspection helpers; use share
 
 [cpp_formatting_tools]
 owner = "agent-canon"
-install_surface = ".devcontainer/post-create.sh"
+install_surface = "vendor/agent-canon/.devcontainer/post-create.sh"
 install_function = "install_cpp_formatting_tools"
 required_binaries = [
   "clang-format",

@@ -121,6 +121,7 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 | --- | --- | --- | --- |
 | `agent-canon` Rust CLI | docs check、semantic index、structured analysis などの統一 CLI。 | `rust/agent-canon/Cargo.toml`, `tools/bin/agent-canon` | local: Apache-2.0 |
 | Rust toolchain: `rustup`, `cargo`, `rustc`, `rustfmt`, `clippy`, `rust-analyzer` | AgentCanon Rust CLI の build、format、lint、editor support。 | `agent-canon-environment.toml`, `.devcontainer/post-create.sh` | upstream: Apache-2.0 OR MIT for official Rust projects; verify component repository |
+| `clang-format` (Ubuntu 22.04 meta-package `1:14.0-55~exp2` -> `clang-format-14`) | Shared C/C++ source formatting. | `agent-canon-environment.toml`, `.devcontainer/post-create.sh`; distro copyright: `/usr/share/doc/clang-format/copyright`, `/usr/share/doc/clang-format-14/copyright`; package: <https://packages.ubuntu.com/jammy/clang-format>; upstream license: <https://llvm.org/LICENSE.txt> | distro: Ubuntu 22.04 package copyright files; upstream: Apache-2.0 WITH LLVM-exception |
 | `jq` | JSON / JSONL の compact extraction と CI evidence 整形。 | `agent-canon-environment.toml`, `.devcontainer/post-create.sh` | upstream: MIT for `jq`; docs are CC BY 3.0 |
 | Node.js | `npm` と Codex CLI install の runtime。 | `.devcontainer/post-create.sh` | upstream: MIT for Node.js core, with bundled third-party notices |
 | `npm` CLI | `@openai/codex` の install に使う JavaScript package manager。 | `.devcontainer/post-create.sh` | upstream: Artistic-2.0 |
@@ -178,6 +179,8 @@ a binary distribution or container image.
 - Rust license policy: <https://www.rust-lang.org/policies/licenses/>
 - rustfmt license: <https://github.com/rust-lang/rustfmt>
 - rust-analyzer license: <https://github.com/rust-lang/rust-analyzer>
+- clang-format Ubuntu 22.04 package: <https://packages.ubuntu.com/jammy/clang-format>
+- LLVM license: <https://llvm.org/LICENSE.txt>
 - jq license: <https://github.com/jqlang/jq>
 - Node.js license: <https://github.com/nodejs/node/blob/main/LICENSE>
 - npm CLI package metadata: <https://github.com/npm/cli/blob/latest/package.json>

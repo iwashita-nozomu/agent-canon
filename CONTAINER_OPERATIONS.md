@@ -144,6 +144,10 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - Rust, cargo, rustfmt, clippy, rust-analyzer, and the AgentCanon Rust CLI
   belong in `.devcontainer/post-create.sh` when they are only needed for shared
   AgentCanon tooling.
+- Shared C/C++ formatting tooling, including `clang-format`, belongs in
+  `.devcontainer/post-create.sh` and `agent-canon-environment.toml` when it is
+  only needed for shared AgentCanon tooling. It is agent-side formatting
+  infrastructure, not a project runtime dependency.
 - Lean theorem-proving tooling used by formal-proof skills, including
   `elan`, Lean, Lake, and the default `AGENT_CANON_LEAN_TOOLCHAIN`, belongs
   in `.devcontainer/post-create.sh` when it is only needed for AgentCanon

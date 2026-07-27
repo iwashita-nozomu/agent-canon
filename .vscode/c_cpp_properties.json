@@ -18,9 +18,7 @@
         "${workspaceFolder}/include",
         "${workspaceFolder}/src",
         "/usr/include",
-        "/usr/local/include",
-        "/opt/kokkos/include",
-        "/usr/local/cuda/include"
+        "/usr/local/include"
       ],
       "forcedInclude": []
     }
