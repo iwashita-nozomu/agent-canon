@@ -316,6 +316,35 @@ skill_families:
         - ["run bundle", "evidence"]
         - ["蓄積分析", "レポート"]
         - ["ログ", "レポート", "残"]
+  - id: result-visualize
+    purpose: Design reusable result visualizations by binding each figure to explicit calculations, coverage rules, denominators, and chart geometry.
+    canonical_doc: agents/skills/result-visualize.md
+    shim: .agents/skills/result-visualize/SKILL.md
+    related_skills:
+      - structure-planning
+      - report-writing
+      - html-output
+      - html-experiment-report
+      - result-artifact-writeout
+      - experiment-review
+      - experiment-lifecycle
+    routing:
+      stage_policy: active
+      reason: result figure design, metric calculation, coverage denominator handling, or reusable visualization planning is in scope
+      triggers:
+        - ["result", "visualization"]
+        - ["result", "visualise"]
+        - ["result", "aggregation"]
+        - ["result", "figure", "calculation"]
+        - ["計算方法", "可視化"]
+        - ["図", "可視化"]
+        - ["図", "集約"]
+        - ["結果", "可視化"]
+        - ["可視化", "集計"]
+        - ["figure", "pooling"]
+        - ["visualize", "results"]
+        - ["figure", "inventory"]
+        - ["result", "figure", "inventory"]
   - id: tool-finding-report
     purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
     canonical_doc: agents/skills/tool-finding-report.md
