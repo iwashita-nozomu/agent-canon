@@ -266,7 +266,7 @@ AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
 GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" \
   bash "${CANON_TOOLS_ROOT}/update_agent_canon.sh" apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-no-subtree-marker
-make agent-checks
+make -C "${CLONE_DIR}" agent-checks
 echo "FRESH_CLONE_REPOSITORY_CI_OWNER=repository_ci_job"
 
 echo "FRESH_CLONE_ACCEPTANCE=pass"
