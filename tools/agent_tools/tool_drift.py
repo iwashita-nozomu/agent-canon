@@ -521,6 +521,9 @@ def repo_relative(root: Path, path: Path) -> str:
     vendor_prefix = "vendor/agent-canon/"
     if relative.startswith(vendor_prefix):
         return relative[len(vendor_prefix) :]
+    projected_prefix = "tools/agent-canon/"
+    if relative.startswith(projected_prefix):
+        return "tools/" + relative.removeprefix(projected_prefix)
     return relative
 
 
