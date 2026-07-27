@@ -473,6 +473,10 @@ def resolve_repo_path(root: Path, relative_path: str) -> Path:
     root_path = root / relative_path
     if root_path.exists():
         return root_path
+    if relative_path.startswith("tools/"):
+        projected_path = root / "tools" / "agent-canon" / relative_path.removeprefix("tools/")
+        if projected_path.exists():
+            return projected_path
     vendor_path = root / "vendor" / "agent-canon" / relative_path
     if vendor_path.exists():
         return vendor_path
