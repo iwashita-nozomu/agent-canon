@@ -137,6 +137,16 @@ implementation source remains `vendor/agent-canon/tools/`.
 Inventory and review tooling must distinguish these roles: standalone
 `tools/` is the AgentCanon source, parent `tools/` is a local container, and
 `tools/agent-canon` is the only shared-tool projection in that container.
+### Parent Copy Projection
+
+The AgentCanon source keeps `.github/` copy surfaces executable in the
+standalone source layout. When `sync_agent_canon.sh` runs through a vendored
+submodule, it deterministically projects those copies to the parent layout:
+root shared-tool paths use `tools/agent-canon/`, and AgentCanon-only relative
+paths use `vendor/agent-canon/documents/` or `vendor/agent-canon/issues/`.
+`link-root` writes this projection and `check` compares against the same
+projection. Parent repositories must not hand-edit the generated copies or
+add compatibility links under the root `tools/` container.
 
 GitHub-facing AgentCanon symlink views include `.github/AGENTS.md`.
 
