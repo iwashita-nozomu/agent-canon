@@ -136,7 +136,7 @@ def prepare(
 
 
 def topic_root(parent: Path) -> Path:
-    return parent.parent.parent / "workspace-dependency-module-change"
+    return parent / "workspace" / "dependency-module-change"
 
 
 def topic_parent(parent: Path) -> Path:

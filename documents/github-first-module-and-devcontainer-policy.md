@@ -127,7 +127,7 @@ It must not set fixed subnet, gateway, or IPAM values; Docker Compose should
 allocate the project network automatically.
 
 Dependency source visibility is owned by one topic-root mount. Host layout is
-`<workspace-parent>/workspace-<topic-slug>/<parent-repo>` plus same-level
+`<parent-repo-root>/workspace/<topic-slug>/<parent-repo>` plus same-level
 `<module-basename>` clones; generated Compose canonicalizes the topic root from
 the `.devcontainer` location once to `/workspace`. It does not bind the parent
 repository and each clone separately, and it never writes a host absolute path
@@ -140,11 +140,9 @@ dependency tool is a startup design error reported by post-attach and
 
 `.vscode/` has a parent-owned regular directory container. Template and derived
 repos expose the four shared AgentCanon files as individual symlinks into
-`vendor/agent-canon/.vscode`. Pass the paths returned by `prepare` to VS Code
-standard `Add Folder to Workspace` or
-`code --add <parent-clone> <dependency-clone>`. Optional `Save Workspace As...`
-is user-owned; storage, JSON, and workspace artifacts are outside the
-AgentCanon contract.
+`vendor/agent-canon/.vscode`. Dependency source work-area composition is
+caller-owned and uses the paths returned by `prepare`; work-area storage,
+metadata, and editor state are outside the AgentCanon contract.
 
 The shared VS Code surface owns:
 

@@ -109,9 +109,10 @@ def write_topic_fixture(
     *,
     duplicate_repo_mount: bool = False,
     include_runtime_environment: bool = True,
+    topic_root: Path | None = None,
 ) -> Path:
     """Create a parent repo inside one isolated topic workspace."""
-    topic_root = tmp_path / "workspace-dependency-module-change"
+    topic_root = topic_root or tmp_path / "workspace" / "workspace-topic"
     repo = topic_root / "agent-canon"
     write_devcontainer(repo)
     write_compose(
@@ -166,6 +167,16 @@ def test_topic_compose_semantics_pass(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_legacy_topic_compose_root_is_rejected(tmp_path: Path) -> None:
+    """The checker rejects the removed workspace-<topic-slug> root."""
+    repo = write_topic_fixture(tmp_path, topic_root=tmp_path / "workspace-topic")
+
+    result = run_validator(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "legacy-topic-root-name" in result.stdout
+
+
 def test_compose_repo_double_mount_is_rejected(tmp_path: Path) -> None:
     """The selected repository is not mounted a second time below /workspace."""
     repo = write_topic_fixture(tmp_path, duplicate_repo_mount=True)
@@ -188,7 +199,7 @@ def test_compose_missing_runtime_environment_is_rejected(tmp_path: Path) -> None
 
 def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     """The generator writes the host topic root only into generated Compose."""
-    repo = tmp_path / "workspace-topic" / "agent-canon"
+    repo = tmp_path / "workspace" / "workspace-topic" / "agent-canon"
     write_devcontainer(repo)
     write_file(repo, ".devcontainer/generate-runtime-compose.sh", GENERATOR.read_text(encoding="utf-8"))
     (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
@@ -208,6 +219,27 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert compose.count('target: "/workspace"') == 1
     assert str(repo.parent.resolve()) in compose
     assert "/workspace/agent-canon" in compose
+
+
+def test_generator_rejects_legacy_topic_root(tmp_path: Path) -> None:
+    """The generator rejects the removed workspace-<topic-slug> root."""
+    repo = tmp_path / "workspace-topic" / "agent-canon"
+    write_devcontainer(repo)
+    write_file(repo, ".devcontainer/generate-runtime-compose.sh", GENERATOR.read_text(encoding="utf-8"))
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    home = tmp_path / "home"
+    home.mkdir()
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "HOME": str(home)},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "legacy workspace-<topic-slug> root" in result.stderr
 
 
 def test_source_vscode_surface_and_shared_files_pass(tmp_path: Path) -> None:

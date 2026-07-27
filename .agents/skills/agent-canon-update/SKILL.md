@@ -85,7 +85,7 @@ with all four inline Git authority/reason fields in the same command segment.
    or resume that vendor state. Run the generic dependency-module tool from the
    parent with owner evidence:
    `prepare --topic <topic> --module vendor/agent-canon --branch <source-branch>`.
-   Make the source branch/PR in `workspace-<topic-slug>/agent-canon`; only the
+   Make the source branch/PR in `workspace/<topic-slug>/agent-canon`; only the
    resulting clean pin is projected into the parent. Standalone source clones retain the source-mode merge/publication
    route.
 
