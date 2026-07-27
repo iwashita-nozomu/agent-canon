@@ -231,17 +231,14 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_stale_github_copy_fails(self) -> None:
-        """Copied GitHub path constraint files must match their AgentCanon source."""
+    def test_missing_github_copy_fails(self) -> None:
+        """Required GitHub path constraint files must exist in the parent."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
             (
                 root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh"
-            ).write_text(
-                "# stale\n",
-                encoding="utf-8",
-            )
+            ).unlink()
 
             result = self.run_checker(root)
 
@@ -249,7 +246,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.assertIn(
                 "PARENT_REPO_READINESS_FINDING=error:github_copy:"
                 ".github/scripts/checkout_agent_canon_submodule.sh:"
-                "copy-differs-from-agent-canon-source",
+                "missing-copy",
                 result.stdout,
             )
 

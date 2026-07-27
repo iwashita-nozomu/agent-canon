@@ -508,17 +508,26 @@ def validate_devcontainer(root: Path) -> list[Finding]:
     findings.extend(validate_devcontainer_json(config))
     findings.extend(validate_generate_runtime_compose_script(root))
     findings.extend(validate_post_create(root))
-    if (root / ".gitmodules").is_file() and not (
-        root / "tools" / "agent_tools" / "dependency_module_change.py"
-    ).is_file():
+    dependency_module_change = (
+        shared_agent_tools_dir(root) / "dependency_module_change.py"
+    )
+    if (root / ".gitmodules").is_file() and not dependency_module_change.is_file():
         findings.append(
             Finding(
                 "missing_file",
-                "tools/agent_tools/dependency_module_change.py",
+                dependency_module_change.relative_to(root).as_posix(),
                 "required-for-devcontainer-dependency-check",
             )
         )
     return findings
+
+
+def shared_agent_tools_dir(root: Path) -> Path:
+    """Locate shared agent tools in standalone or parent-projected layouts."""
+    direct = root / "tools" / "agent_tools"
+    if direct.is_dir():
+        return direct
+    return root / "tools" / "agent-canon" / "agent_tools"
 
 
 def validate_devcontainer_pack_alignment(root: Path, pack: PackConfig | None) -> list[Finding]:

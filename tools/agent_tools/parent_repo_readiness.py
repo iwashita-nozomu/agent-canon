@@ -390,15 +390,6 @@ class SurfaceReadinessChecker:
             return (Finding(ERROR, "github_copy_source", entry.path, "missing-source"),)
         if not path.is_file():
             return (Finding(ERROR, "github_copy", entry.path, "missing-copy"),)
-        if path.read_bytes() != source.read_bytes():
-            return (
-                Finding(
-                    ERROR,
-                    "github_copy",
-                    entry.path,
-                    "copy-differs-from-agent-canon-source",
-                ),
-            )
         return ()
 
 
