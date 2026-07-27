@@ -14,7 +14,11 @@ agent_canon_repo_root() {
   local superproject_root=""
 
   script_dir="$(cd "$(dirname "$script_path")" && pwd -P)"
-  source_root="$(cd "$script_dir/../.." && pwd -P)"
+  if [ "$(basename "$script_dir")" = "tools" ]; then
+    source_root="$(cd "$script_dir/.." && pwd -P)"
+  else
+    source_root="$(cd "$script_dir/../.." && pwd -P)"
+  fi
   superproject_root="$(git -C "$source_root" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
   if [ -n "$superproject_root" ]; then
     printf '%s\n' "$superproject_root"
