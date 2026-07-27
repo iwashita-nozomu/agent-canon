@@ -12,6 +12,7 @@ downstream design ./object-oriented-design.md general OOP coding policy
 downstream design ./agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 downstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
 downstream design ./rule/dependency-module-changes.md general dependency source-clone lifecycle policy
+downstream design ./parent-repository/README.md parent repository structure, ownership, and projection boundary
 downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 downstream design ./template-agent-canon-audit-resolution.md audit resolution ledger
 downstream design ./tool-skill-routing-refactor.md short tool/skill routing policy
@@ -43,6 +44,8 @@ this file, but derived repositories own their local index.
 
 - [文書規約](./rule/README.md): filename、配置、構成判断の共通規約。
 - [設計正本](./design/README.md): target state、実装境界、設計上の前提。
+- [親レポ構造](./parent-repository/README.md): 親レポの directory 構成、役割、
+  Symlink / checked copy / regular surface の意味。
 
 配置や分割の理由は文書規約を読み、個別の target state と実装境界は設計正本を読みます。
 
@@ -80,6 +83,7 @@ entrypoint and its directly referenced source packet.
 | Problem | Start Here | Why |
 | --- | --- | --- |
 | Root view, symlink, copy, or template ownership is unclear | [Shared Runtime Surfaces](./SHARED_RUNTIME_SURFACES.md) | Defines owner classes and root-view repair rules; the TOML manifest is the machine-readable companion. |
+| 親レポの directory 構造、Symlink、実体 directory の理由を確認する | [親レポ構造](./parent-repository/README.md) | 親 root の期待形状と各 directory の owner / purpose を定義する。 |
 | A vendored AgentCanon checkout, parent pin, or update branch is stale | [AgentCanon Update Route](./agent-canon-update-route.md) | Routes latest, branch / PR, TODO, rollback, and parent pin flows without reading every update doc. |
 | Validation scope is unclear | [Runtime Profiles And Check Matrix](./runtime-profiles-and-check-matrix.md) | Maps changed path and risk class to the active checks. |
 | Tool / skill routing, tool placement, or Rust migration is unclear | [Tool And Skill Routing Refactor](./tool-skill-routing-refactor.md) | Leads to tool catalog, short command names, and Rust CLI migration boundaries. |

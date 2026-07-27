@@ -97,7 +97,7 @@ Top-level surface は次のように読む。`Tracked` は `git ls-files`、`Man
 | root files | 9 | 7 | `README.md`、`PHILOSOPHY.md`、`ROOT_AGENTS.md`、`responsibility-scope.toml` などの root entrypoint と root policy。 |
 | `.agents/` | 42 | 42 | Codex skill discovery 用の runtime skill entrypoint。 |
 | `.codex/` | 61 | 61 | Codex config、role TOML、hook runtime surface。 |
-| `.devcontainer/` | 4 | 4 | shared devcontainer profile。 |
+| `.devcontainer/` | 6 | 6 | shared devcontainer source と parent wrapper の境界を定義する surface。 |
 | `.vscode/` | 4 | 4 | shared VS Code defaults and validation tasks。 |
 | `.github/` | 12 | 12 | GitHub workflow、Issue / PR template、GitHub agent entrypoint。 |
 | `agents/` | 143 | 143 | workflow、skill canon、template、task catalog の human-facing hub。`agents/evals/` は旧 manifest path の compatibility stub。 |
@@ -208,113 +208,10 @@ active. The activation and validation policy is
 
 AgentCanon 単体 repo では、この tree 自体を source of truth として扱います。
 Template や派生 repo では `vendor/agent-canon/` を clean pin/runtime projection
-として扱い、source edit は topic workspace の独立 cloneで行います。repo
-root の入口は symlink view または明示的な synced copy にします。Template /
-derived repo に露出する root view は次です。
-
-期待する parent root の top-level shape は次です。`vendor/agent-canon/` が
-clean AgentCanon pin projection で、root の共有入口は symlink view または GitHub
-path constraint のための checked copy に限定します。regular file / directory
-は parent repo が ownership を持つ project surface です。
-
-```text
-<parent-root>/
-├── AGENTS.md -> vendor/agent-canon/ROOT_AGENTS.md
-├── README.md
-├── QUICK_START.md
-├── Makefile
-├── goal.md
-├── responsibility-scope.toml
-├── .agent-canon/
-│   └── update-state.toml
-├── .agents -> vendor/agent-canon/.agents
-├── .codex/
-│   ├── agents -> ../vendor/agent-canon/.codex/agents
-│   ├── config.toml -> ../vendor/agent-canon/.codex/config.toml
-│   ├── project-config.toml  # optional parent-owned skill overlay
-│   └── project-skills/  # optional parent-owned additions
-├── .devcontainer/
-│   ├── bootstrap-shared-runtime.sh
-│   ├── finalize-shared-runtime.sh
-│   ├── post-create.sh
-│   ├── post-create-parent.sh  # optional
-│   ├── post-attach.sh
-│   ├── generate-runtime-compose.sh
-│   ├── devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json
-│   └── ...（親固有の wrapper / 設定）
-├── .github/
-│   ├── AGENTS.md -> ../vendor/agent-canon/.github/AGENTS.md
-│   ├── PULL_REQUEST_TEMPLATE/
-│   │   └── agent_canon.md  # GitHub path-constrained copy
-│   ├── scripts/
-│   │   └── checkout_agent_canon_submodule.sh  # GitHub path-constrained copy
-│   └── workflows/
-│       ├── agent-coordination.yml  # GitHub path-constrained copy
-│       ├── agent-canon-static-gates.yml
-│       ├── ci.yml
-│       └── docker-build.yml
-├── .vscode/
-│   ├── c_cpp_properties.json -> ../vendor/agent-canon/.vscode/c_cpp_properties.json
-│   ├── extensions.json -> ../vendor/agent-canon/.vscode/extensions.json
-│   ├── settings.json -> ../vendor/agent-canon/.vscode/settings.json
-│   └── tasks.json -> ../vendor/agent-canon/.vscode/tasks.json
-├── agents -> vendor/agent-canon/agents
-├── documents/
-│   └── <parent-owned active contracts>
-├── docker/
-├── scripts/
-├── tools -> vendor/agent-canon/tools
-└── vendor/
-    └── agent-canon/
-
-topic workspace source-edit shape:
-
-```text
-<parent-repo-root>/workspace/<topic-slug>/
-├── <parent-repo>/
-└── <module-basename>/
-```
-
-The devcontainer mounts this topic root once at `/workspace`; it does not expose
-clones from other topics or mount the parent and dependency clones separately.
-
-人間向けの構造確認は `tree` 表示を正本の見方にします。典型的な確認は次です。
-`parent_repo_readiness.py` は同じ ignore pattern と depth を表示し、`tree`
-がない環境では warning として扱います。
-
-```bash
-tree -a -L <depth> -I '.git|__pycache__|.venv|node_modules|target|reports' <parent-root>
-python3 tools/agent_tools/parent_repo_readiness.py --root <parent-root> --tree-depth <depth>
-```
-
-- `vendor/agent-canon/`: AgentCanon submodule pin/runtime projection。source edit は topic workspace の独立 cloneで行い、ここは clean projection に保ちます。
-- `AGENTS.md -> vendor/agent-canon/ROOT_AGENTS.md`: Codex 向けの薄い root entrypoint。
-- `agents -> vendor/agent-canon/agents`: workflow、canonical docs、task catalog の root view。
-- `.agents -> vendor/agent-canon/.agents`: Codex skill discovery 用の root view。
-- `.codex/config.toml -> vendor/agent-canon/.codex/config.toml`: Codex runtime config の共有 view。
-- `.codex/agents -> vendor/agent-canon/.codex/agents`: Codex subagent role TOML の共有 view。
-- `.devcontainer/`: 親-owned の実体ディレクトリ。AgentCanon の共通 `devcontainer.json` は
-  `.devcontainer/devcontainer.json` へ symlink され、その他の runtime スクリプトは
-  親固有 wrapper として配置され、Vendor source 側は `../vendor/agent-canon/.devcontainer/*`
-  を相対参照します。
-- `.vscode/`: parent-owned real directory with the four individual AgentCanon symlink surfaces。
-- `tools -> vendor/agent-canon/tools`: shared automation の共有 view。
-- `documents/*`: template / derived repo root では active contract だけを regular file として残し、AgentCanon-owned shared policy docs は `vendor/agent-canon/documents/` から読みます。
-- `memory/*`、`notes/*`、`tests/*`: `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。
-- `.github/AGENTS.md`: root `.github/AGENTS.md` から symlink される GitHub agent entrypoint。
-- `.github/workflows/agent-coordination.yml`: root `.github/workflows/agent-coordination.yml` へ同期される workflow source。
-- `.github/workflows/agent-canon-static-gates.yml`: standalone AgentCanon PR / push で tool catalog、tool drift、dependency review、workflow convention、container config の軽量 gate を走らせる workflow。
-- `.github/PULL_REQUEST_TEMPLATE.md`: standalone AgentCanon repository 用の独立 PR checklist。template root へ同期しません。
-- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: template 側で `vendor/agent-canon/` を変える PR 用 checklist。root `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` へ同期されます。
-- `.codex/project-config.toml`: optional な parent-owned skill overlay。repo 固有 skill はここで `[[skills.config]] path = "project-skills/<skill>/SKILL.md"` として有効化します。
-- `.codex/project-skills/`: optional な parent-owned skill 追加置き場。AgentCanon shared skill discovery の正本にはしません。
-
-repo-local の正本として残すもの:
-
-- `docker/`: Template / project の Docker runtime profile と dependency pack。Codex、agent 用 npm / Node、GitHub CLI / `gh`、auth、mount 方針は Dockerfile に焼かず、shared `.devcontainer/` の post-create と host mount convention で管理します。
-- `scripts/`: Template / project 固有の bootstrap と slug 置換。
-- `python/`、`src/`、`include/`、`lib/`: project implementation。
-- `experiments/`、`reports/`、`goal.md`: repo-local state。shared symlink には戻しません。
+として扱い、source edit は topic workspace の独立 cloneで行います。親レポの
+期待構造、Symlink / checked copy / regular surface の使い分け、各 directory の
+役割は [親レポ構造](documents/parent-repository/README.md) に集約します。
+この README は入口だけを示し、親レポの directory 構造を複製しません。
 
 root view の修復と検証:
 
