@@ -197,7 +197,7 @@ normalize_path() {
 source_context_file() {
   local source_file="$1"
   case "$source_file" in
-    .github/workflows/agent-coordination.yml|.github/PULL_REQUEST_TEMPLATE/agent_canon.md)
+    .github/workflows/agent-coordination.yml|.github/workflows/agent-improvement-guide.yml|.github/PULL_REQUEST_TEMPLATE/agent_canon.md)
       if [[ -f "vendor/agent-canon/$source_file" ]]; then
         printf 'vendor/agent-canon/%s\n' "$source_file"
         return
