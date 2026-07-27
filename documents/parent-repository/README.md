@@ -58,7 +58,8 @@ downstream design ../../README.md AgentCanon source reader route
 ├── experiments/                      # parent-owned regular directory
 ├── notes/                            # parent-owned regular directory
 ├── reports/                          # parent-owned generated/evidence directory
-├── tools -> vendor/agent-canon/tools
+├── tools/                            # parent-owned regular container
+│   └── agent-canon -> ../vendor/agent-canon/tools
 └── vendor/
     └── agent-canon/                  # clean submodule pin
 ```
@@ -76,7 +77,7 @@ AgentCanon source の topic branch と PR から行います。
 - `.codex/agents/`: shared subagent role の view。
 - `.codex/config.toml`: shared Codex runtime config の view。
 - `agents/`: workflow / canonical document の view。
-- `tools/`: shared automation の view。
+- `tools/agent-canon`: shared automation の唯一のAgentCanon view。
 - `.vscode/` の個別ファイル: shared editor defaults の view。
 - `.devcontainer/devcontainer.json`: shared devcontainer profile の view。
 
@@ -95,6 +96,7 @@ Regular surface は親レポが ownership を持ち、親固有の責務や stat
 - `notes/`: 親レポ固有の運用・知識・失敗記録。
 - `reports/`: generated report と raw evidence の置き場。
 - `vendor/agent-canon/`: source を編集しない clean submodule checkout。
+- `tools/`: 親固有toolを置ける実体directory。AgentCanon toolは直下へ複製しない。
 - `scripts/`: 親レポ固有の bootstrap と project slug 置換。
 - `python/`、`src/`、`include/`、`lib/`: 親レポの production implementation。
 - `goal.md`: 親レポ固有の current task state。AgentCanon view に戻さない。

@@ -40,8 +40,21 @@ paths = [
   ".codex/hooks.json",
   ".codex/hooks",
   ".github/AGENTS.md",
-  "tools",
 ]
+
+[[surface]]
+path = "tools"
+mode = "regular"
+owner = "template-or-derived-repo"
+class = "active_contract"
+local_override_allowed = true
+
+[[surface]]
+path = "tools/agent-canon"
+mode = "symlink"
+source = "tools"
+owner = "agent-canon"
+class = "runtime_surface"
 
 [[surface]]
 path = ".devcontainer"
