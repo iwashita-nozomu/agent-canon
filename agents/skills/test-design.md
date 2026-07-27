@@ -44,6 +44,8 @@ implementation mechanism の実装を双方読み、設計条項と実装の分�
 - `activation=not_needed` または `activation=deferred` では `test_plan.md` と test-design tool run を必須にしない
 - `activation=required` の場合だけ、static path survey、contract source、observation level、observable outcome、oracle、input space、adequacy evidence、nasty case、regression case、placement notes を具体化する
 - `activation=required` の各 nasty / regression case は、`Design Clause -> Code Mechanism -> Breaking Input/Sequence -> Observation Level / Observable Outcome -> Oracle` の trace を持つ。設計条項、実装機構、破綻入力または状態列、安定した観測、判定可能な oracle のいずれかが欠ける case は test-design の evidence として受理しない
+- `activation=required` の各候補 case は、実装または handoff 前に「その case は起きない」という non-occurrence claim / null hypothesis を明記し、契約・型制約・checker を根拠に検証する
+- 公開入力または公開 state sequence から reachability witness を探索する。到達不能なら test case にせず、checker / static validation / owning design の境界へ戻す。到達可能なら null hypothesis を崩す witness と観測可能な oracle を記録し、このゲートを通った case だけを実装または handoff する
 - checker-owned property は canonical static validation evidence に戻す
 - tests は concrete behavior regression oracle がある場合だけ作成または編集する
 
@@ -58,6 +60,7 @@ implementation mechanism の実装を双方読み、設計条項と実装の分�
 - malformed input、boundary value、empty / null-ish input、error path、state transition、再発しやすい regression を、安定した観測レベルで列挙する
 - 実装機構が暗黙に置くが contract が保証していない弱い仮定を、明示的な反例探索の対象にする。少なくとも、要素数が同じでも shape / axis / layout が異なる入力、順序や aliasing、空・singleton、境界値、履歴依存の state sequence、失敗後の再試行を確認し、仮定を破る具体的な input / sequence と観測可能な差を記録する
 - 各 nasty / regression case は、設計条項、実装機構、破綻入力または状態列、観測レベル、observable outcome、oracle、`Do Not Freeze`、およびなぜその case が実装の弱い仮定を突くかを一つの trace として先に固定する。テスト件数や coverage を増やすこと自体を adequacy としない
+- 各候補 case について、まず non-occurrence claim / null hypothesis を契約・型制約・checker の根拠付きで記録し、公開 entrypoint から到達可能な input / state sequence の witness を探す。witness がない場合は test 化せず checker / static validation / owning design route に返し、witness がある場合だけ反論を崩す根拠と observable oracle を trace に追加して実装 / handoff を許可する
 - parser / formatter / graph / router / mapping では property または metamorphic relation を検討するが、checker-owned property は test oracle に昇格させない
 - numerical、randomized、tolerance、solver、convergence、residual、benchmark、experiment-style test は、`documents/conventions/coding-conventions-testing.md` の Numerical Test Admission Gate を owner とし、`activation=required` かつ数値 trigger、non-numerical alternative、oracle、budget が approved route にある場合だけ提案する
 - existing test style、fixture layout、naming を mirror し、test の追加・編集は concrete behavior regression oracle に限定する
