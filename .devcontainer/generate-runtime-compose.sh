@@ -11,7 +11,8 @@
 
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="${AGENT_CANON_DEVCONTAINER_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+repo_root="$(cd "$repo_root" && pwd -P)"
 workspace_root="$(cd "${repo_root}/.." && pwd -P)"
 [ -d "$workspace_root" ] || {
   printf 'devcontainer workspace root is unavailable: %s\n' "$workspace_root" >&2
