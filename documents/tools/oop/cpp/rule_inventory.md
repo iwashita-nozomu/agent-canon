@@ -4,7 +4,7 @@
 contract reference
 responsibility Documents C++ OOP rule inventory behavior in Japanese.
 upstream implementation ../../../../tools/oop/cpp/rule_inventory.py C++ OOP inventory checker
-upstream design ../../../object-oriented-design.md OOP policy source
+upstream design ../../../conventions/object-oriented-design.md OOP policy source
 downstream design ../../tool-docs.toml one-to-one tool/document manifest
 @dependency-end
 -->
@@ -17,8 +17,8 @@ downstream design ../../tool-docs.toml one-to-one tool/document manifest
 C++ OOP の規約、tool、説明文書、test が現在の canonical path に揃っているかを確認します。
 root view に存在しない AgentCanon-owned shared docs は、`vendor/agent-canon/` 側の正本を解決して確認します。
 
-- `documents/object-oriented-design.md` が存在すること。
-- `documents/coding-conventions-cpp.md` が存在すること。
+- `documents/conventions/object-oriented-design.md` が存在すること。
+- `documents/conventions/coding-conventions-cpp.md` が存在すること。
 - `tools/oop/cpp/readability.py` が存在すること。
 - `tools/oop/cpp/rule_inventory.py` が存在すること。
 - `documents/tools/oop/cpp/readability.md` が存在すること。

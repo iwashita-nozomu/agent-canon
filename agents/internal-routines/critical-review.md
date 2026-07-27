@@ -20,7 +20,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Core Reference
 
-- `documents/experiment-critical-review.md`
+- `documents/experiments/experiment-critical-review.md`
 
 ## Expected Outcome
 

@@ -4,9 +4,9 @@ contract agent-runtime
 responsibility Documents Agent Instructions for this repository.
 upstream design README.md repository entrypoint and clone/update guidance.
 upstream design documents/rule/README.md document filename, placement, and structure rules.
-upstream design documents/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy.
-upstream design documents/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy.
-upstream design documents/template-agent-canon-audit-resolution.md audit resolution ledger for profile and gate simplification.
+upstream design documents/runtime/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy.
+upstream design documents/runtime/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy.
+upstream design documents/agent-canon/template-agent-canon-audit-resolution.md audit resolution ledger for profile and gate simplification.
 upstream design issues/README.md durable AgentCanon operational finding storage.
 downstream implementation tools/sync_agent_canon.sh updates AgentCanon submodule pins and shared root views.
 downstream implementation tools/agent_tools/task_start.py emits task workflow packets.
@@ -131,7 +131,7 @@ path ownership, directory responsibility, submodule state, `.codex` / `.agents`
 views, or missing canonical paths affect where the task belongs. The reference
 route is `vendor/agent-canon/agents/skills/structure-refactor.md`
 `Pre-Task Structure Repair Contract`, backed by
-`vendor/agent-canon/documents/repo-structure-contract.toml`,
+`vendor/agent-canon/documents/structure/repo-structure-contract.toml`,
 `vendor/agent-canon/tools/agent_tools/repo_structure_contract.py`,
 `vendor/agent-canon/tools/agent_tools/responsibility_scope.py`, and
 `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md` `Missing File Or Path
@@ -285,9 +285,9 @@ proof obligation, or replacement unit together even when the chunk is long.
 | internal workflow routines | `vendor/agent-canon/agents/internal-routines/README.md` | `repo_structure_contract.py`; runtime alignment |
 | implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
 | search, read scope, and reuse survey | semantic-index, deterministic `search.py` / `search_index.py`, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
-| repo structure and root views | `vendor/agent-canon/documents/repo-structure-contract.toml`; `responsibility-scope.toml`; `documents/shared-runtime-surfaces.toml` | structure/scope/import tools; `sync_agent_canon.sh` |
+| repo structure and root views | `vendor/agent-canon/documents/structure/repo-structure-contract.toml`; `responsibility-scope.toml`; `documents/runtime/shared-runtime-surfaces.toml` | structure/scope/import tools; `sync_agent_canon.sh` |
 | shared-checkout Git mutation and branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/.codex/hooks/branch_worktree_guard.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
-| runtime profile and validation route | `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md` | profile-selected validation |
+| runtime profile and validation route | `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md` | profile-selected validation |
 | report and closeout structure | `task_close.py`; `report_artifact_checks.py`; run bundle `closeout_gate.md` | profile-selected closeout gate |
 | shared AgentCanon update | `vendor/agent-canon/tools/update_agent_canon.sh`; `tools/sync_agent_canon.sh`; AgentCanon PR workflow | submodule pin and PR evidence |
 
@@ -315,8 +315,8 @@ short owner/design/validation note.
 - `vendor/agent-canon/agents/TASK_WORKFLOWS.md`
 - `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`
 - `vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md`
-- `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md`
-- `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md`
+- `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md`
+- `vendor/agent-canon/documents/runtime/SHARED_RUNTIME_SURFACES.md`
 
 Task-specific packet expansion is owned by the generated task packet,
 semantic-index/deterministic search, and dependency review artifacts when those
@@ -419,7 +419,7 @@ that validates the changed responsibility unit, active profile, or blocking
 finding.
 
 - `python3 vendor/agent-canon/tools/agent_tools/check_agent_runtime_alignment.py`
-- `python3 vendor/agent-canon/tools/agent_tools/repo_structure_contract.py --root vendor/agent-canon --contract vendor/agent-canon/documents/repo-structure-contract.toml`
+- `python3 vendor/agent-canon/tools/agent_tools/repo_structure_contract.py --root vendor/agent-canon --contract vendor/agent-canon/documents/structure/repo-structure-contract.toml`
 - `python3 vendor/agent-canon/tools/agent_tools/responsibility_scope.py --root .`
 - `bash tools/sync_agent_canon.sh check`
 - `python3 vendor/agent-canon/tools/agent_tools/task_close.py ...`

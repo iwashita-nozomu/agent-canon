@@ -81,7 +81,7 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Use `issues/README.md` for required issue fields and
    `python3 tools/agent_tools/issue_sync.py --root .` for local validation or
    GitHub mirror planning.
-1. Use `documents/REVIEW_PROCESS.md` for repo review expectations.
+1. Use `documents/conventions/REVIEW_PROCESS.md` for repo review expectations.
    In template or derived repo roots, `documents/...` is a logical AgentCanon
    path: resolve it under `vendor/agent-canon/documents/` unless
    `documents/README.md` lists the path as a template-owned active contract.

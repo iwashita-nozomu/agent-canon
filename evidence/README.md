@@ -21,5 +21,5 @@ while generated run output is append-only runtime evidence.
 
 Runtime result accumulation does not live here. Append-only run output belongs
 in the mounted runtime log archive documented by
-`documents/runtime-log-archive.md`; legacy `agents/evals/results/` paths are
+`documents/runtime/runtime-log-archive.md`; legacy `agents/evals/results/` paths are
 only migration inputs.

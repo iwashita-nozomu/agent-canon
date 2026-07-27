@@ -1,10 +1,10 @@
 # @dependency-start
 # contract configuration
 # responsibility Defines top-level machine-readable responsibility scopes and protecting tools.
-# upstream design documents/SHARED_RUNTIME_SURFACES.md shared runtime ownership policy
-# upstream design documents/shared-runtime-surfaces.toml shared surface manifest
+# upstream design documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime ownership policy
+# upstream design documents/runtime/shared-runtime-surfaces.toml shared surface manifest
 # upstream design tools/catalog.yaml structured tool ownership
-# downstream design documents/responsibility-scope-management.md explains the scope model
+# downstream design documents/design/responsibility-scope-management.md explains the scope model
 # downstream implementation tools/agent_tools/responsibility_scope.py validates this manifest
 # downstream implementation tests/agent_tools/test_responsibility_scope.py tests scope validation
 # @dependency-end
@@ -170,8 +170,8 @@ paths = [
   "evidence",
   "evidence/**",
   ".codex/hooks/log_archive_mount_warning.py",
-  "documents/runtime-log-archive.md",
-  "documents/runtime-log-archive-migration.md",
+  "documents/runtime/runtime-log-archive.md",
+  "documents/runtime/runtime-log-archive-migration.md",
   "tools/agent_tools/runtime_log_paths.py",
   "tools/agent_tools/runtime_log_archive_git.py",
 ]
@@ -244,8 +244,8 @@ paths = [
   "references/**",
 ]
 exclude_paths = [
-  "documents/runtime-log-archive.md",
-  "documents/runtime-log-archive-migration.md",
+  "documents/runtime/runtime-log-archive.md",
+  "documents/runtime/runtime-log-archive-migration.md",
 ]
 protecting_tools = [
   "tools/agent_tools/run_repo_dependency_review.sh",

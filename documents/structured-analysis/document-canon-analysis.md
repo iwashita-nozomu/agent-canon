@@ -4,7 +4,7 @@ contract reference
 responsibility Defines document canon and duplicate-document analysis for structured analysis.
 upstream design README.md structured analysis package index
 upstream design database-design.md defines document-canon DB layer placement
-upstream design ../rust-agent-tool-migration.md Rust tool migration policy
+upstream design ../design/rust-agent-tool-migration.md Rust tool migration policy
 upstream design ../../agents/skills/document-canon-cleanup.md document cleanup workflow
 upstream implementation ../../rust/agent-canon/src/structured_analysis.rs Rust structured-analysis CLI
 @dependency-end

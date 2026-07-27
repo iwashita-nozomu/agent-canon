@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Compares observed repository trees with the AgentCanon structure contract.
-# upstream design ../../documents/repo-structure-contract.toml expected repository structure profiles
-# upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared root surface policy
+# upstream design ../../documents/structure/repo-structure-contract.toml expected repository structure profiles
+# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared root surface policy
 # upstream design ../../documents/tools/README.md tool entrypoint policy
 # downstream implementation ../../tests/agent_tools/test_repo_structure_contract.py tests tree and contract comparison
 # @dependency-end
@@ -26,7 +26,7 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
-DEFAULT_CONTRACT = "documents/repo-structure-contract.toml"
+DEFAULT_CONTRACT = "documents/structure/repo-structure-contract.toml"
 ERROR = "error"
 WARN = "warn"
 TREE_KIND_MAP = {

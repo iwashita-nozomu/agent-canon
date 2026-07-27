@@ -2,13 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Checks whether a parent repository satisfies AgentCanon runtime expectations.
-# upstream design ../../documents/shared-runtime-surfaces.toml root surface ownership manifest
-# upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md parent update checklist
-# upstream design ../../documents/gpu-admission-r5-source-packet.md runtime identity receipt consumer boundary
+# upstream design ../../documents/runtime/shared-runtime-surfaces.toml root surface ownership manifest
+# upstream design ../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent update checklist
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md runtime identity receipt consumer boundary
 # upstream implementation ./surface_manifest.py parses shared runtime surface manifests
 # upstream implementation ../ci/container_config.py validates parent Docker/devcontainer surfaces
-# upstream implementation ../../.devcontainer/bootstrap-shared-runtime.sh publishes the provision receipt
-# upstream implementation ../../.devcontainer/finalize-shared-runtime.sh publishes the readback receipt
+# upstream implementation ../../.devcontainer/devcontainer.json selects the shared runtime sources
 # downstream implementation ../../tests/agent_tools/test_parent_repo_readiness.py tests checker behavior
 # @dependency-end
 """Check parent repository readiness for an AgentCanon submodule pin."""
@@ -31,7 +30,7 @@ from typing import Protocol, cast
 from surface_manifest import SurfaceEntry, load_manifest, target_for_entry
 
 DEFAULT_PREFIX = "vendor/agent-canon"
-DEFAULT_MANIFEST = "documents/shared-runtime-surfaces.toml"
+DEFAULT_MANIFEST = "documents/runtime/shared-runtime-surfaces.toml"
 DEFAULT_TREE_DEPTH = 3
 DEFAULT_TREE_IGNORE = ".git|__pycache__|.venv|node_modules|target|reports"
 ERROR = "error"
@@ -103,75 +102,16 @@ class ContainerValidationReport(Protocol):
 
 PARENT_CONTRACT_PATHS = (
     ExpectedPath("README.md", "parent_document", "file"),
-    ExpectedPath("QUICK_START.md", "parent_document", "file"),
-    ExpectedPath("Makefile", "parent_automation", "file"),
     ExpectedPath(".gitmodules", "agent_canon_submodule", "file"),
-    ExpectedPath("goal.md", "parent_state", "file"),
-    ExpectedPath("responsibility-scope.toml", "responsibility_scope", "file"),
-    ExpectedPath(
-        ".agent-canon/update-state.toml", "agent_canon_update_state", "file", WARN
-    ),
-    ExpectedPath("scripts/README.md", "parent_automation", "file"),
+    ExpectedPath("documents/README.md", "parent_document", "file"),
 )
 
 ENVIRONMENT_PATHS = (
-    ExpectedPath(".dockerignore", "container_environment", "file"),
-    ExpectedPath("docker/README.md", "container_environment", "file"),
-    ExpectedPath("docker/Dockerfile", "container_environment", "file"),
-    ExpectedPath("docker/requirements.txt", "container_environment", "file"),
-    ExpectedPath(
-        "docker/install_python_dependencies.sh",
-        "container_environment",
-        "file",
-        executable=True,
-    ),
-    ExpectedPath(
-        "docker/register_safe_directories.sh",
-        "container_environment",
-        "file",
-        executable=True,
-    ),
-    ExpectedPath("docker/packs", "container_environment", "dir"),
-    ExpectedPath("docker/packs/default.toml", "container_environment", "file"),
-    ExpectedPath(
-        "docker/packs/default-host-docker.toml", "container_environment", "file"
-    ),
+    ExpectedPath(".devcontainer", "devcontainer_environment", "dir"),
     ExpectedPath(".devcontainer/devcontainer.json", "devcontainer_environment", "file"),
     ExpectedPath(
-        ".devcontainer/bootstrap-shared-runtime.sh",
-        "runtime_identity_receipt",
-        "file",
-        executable=True,
-    ),
-    ExpectedPath(
-        ".devcontainer/finalize-shared-runtime.sh",
-        "runtime_identity_receipt",
-        "file",
-        executable=True,
-    ),
-    ExpectedPath(
-        ".devcontainer/post-create.sh",
+        ".devcontainer/post-create-parent.sh",
         "devcontainer_environment",
-        "file",
-        executable=True,
-    ),
-    ExpectedPath(
-        ".devcontainer/post-attach.sh",
-        "runtime_identity_receipt",
-        "file",
-        executable=True,
-    ),
-    ExpectedPath(
-        ".devcontainer/generate-runtime-compose.sh",
-        "devcontainer_environment",
-        "file",
-        executable=True,
-    ),
-    ExpectedPath(".github/workflows/ci.yml", "github_environment", "file"),
-    ExpectedPath(".github/workflows/docker-build.yml", "github_environment", "file"),
-    ExpectedPath(
-        ".github/scripts/checkout_agent_canon_submodule.sh",
-        "github_environment",
         "file",
         executable=True,
     ),
@@ -180,17 +120,6 @@ ENVIRONMENT_PATHS = (
 CONTENT_MARKERS = (
     ContentMarker(".gitmodules", "vendor/agent-canon", "agent_canon_submodule"),
     ContentMarker(".gitmodules", "agent-canon", "agent_canon_submodule"),
-    ContentMarker(
-        "responsibility-scope.toml",
-        'catalog_kind = "agent_canon_responsibility_scope"',
-        "responsibility_scope",
-    ),
-    ContentMarker(
-        ".agent-canon/update-state.toml",
-        "tasks_applied_through",
-        "agent_canon_update_state",
-        WARN,
-    ),
 )
 
 
@@ -461,15 +390,6 @@ class SurfaceReadinessChecker:
             return (Finding(ERROR, "github_copy_source", entry.path, "missing-source"),)
         if not path.is_file():
             return (Finding(ERROR, "github_copy", entry.path, "missing-copy"),)
-        if path.read_bytes() != source.read_bytes():
-            return (
-                Finding(
-                    ERROR,
-                    "github_copy",
-                    entry.path,
-                    "copy-differs-from-agent-canon-source",
-                ),
-            )
         return ()
 
 

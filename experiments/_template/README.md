@@ -4,7 +4,7 @@
 @dependency-start
 contract reference
 responsibility Documents the experiment topic scaffold.
-upstream design ../../documents/experiment-registry.md defines experiment command protocol.
+upstream design ../../documents/experiments/experiment-registry.md defines experiment command protocol.
 upstream implementation ../../tools/experiments/create_experiment_topic.py copies this template into project topics.
 upstream implementation ../../tools/ci/check_experiment_registry.py validates project-owned registry entries that reference copied topics.
 downstream implementation run.py provides the topic entrypoint.

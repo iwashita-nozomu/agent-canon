@@ -6,7 +6,7 @@ contract skill
 responsibility Documents owner-bounded-routing for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../task_catalog.yaml owns Owner-Bounded Change workflow identity
-upstream design ../../documents/runtime-profiles-and-check-matrix.md owns Routine docs and Focused code validation profiles
+upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md owns Routine docs and Focused code validation profiles
 downstream implementation ../../tools/agent_tools/convention_compliance_contracts.toml declares owner-bounded marker contract
 downstream implementation ../../.agents/skills/owner-bounded-routing/SKILL.md exposes this route as a runtime skill
 @dependency-end
@@ -22,7 +22,7 @@ closeout evidence を固定します。
 この skill は `Owner-Bounded Change`、Routine docs、Focused code、
 typo / link / format-only の薄い実行面を担当します。workflow family、
 spawn budget、risk profile は `agents/task_catalog.yaml` と
-`documents/runtime-profiles-and-check-matrix.md` に委譲します。
+`documents/runtime/runtime-profiles-and-check-matrix.md` に委譲します。
 
 ## Use When
 

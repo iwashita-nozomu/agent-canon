@@ -3,7 +3,7 @@
 @dependency-start
 contract workflow
 responsibility Owns exact AgentCanon source candidate review, GitHub PR CAS, merge, and publication readback.
-upstream design ../../documents/agent-canon-update-route.md owns the end-to-end source-to-parent transaction.
+upstream design ../../documents/agent-canon/agent-canon-update-route.md owns the end-to-end source-to-parent transaction.
 upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns lifecycle and PR topology schemas.
 upstream implementation ../../tools/agent_tools/publication_integrator.py owns candidate CAS and publication authority.
 upstream implementation ../../tools/agent_tools/github_publish.py adapts verified GitHub remote and PR operations.
@@ -18,7 +18,7 @@ downstream implementation ../../tests/agent_tools/test_check_dependency_headers.
 
 This document owns the source PR lane only. The front door and full transaction
 are `tools/update_agent_canon.sh` and
-`documents/agent-canon-update-route.md`. Parent pin/root projection is a later
+`documents/agent-canon/agent-canon-update-route.md`. Parent pin/root projection is a later
 consumer and cannot begin here.
 
 ## Reader Map

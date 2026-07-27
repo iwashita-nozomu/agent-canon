@@ -3,8 +3,8 @@
     "@dependency-start",
     "contract reference",
     "responsibility Configures shared VS Code C and C++ language defaults without host-specific include paths.",
-    "upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared runtime surface policy",
-    "upstream design ../documents/cpp-build-layout.md C++ build layout guidance",
+    "upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface policy",
+    "upstream design ../documents/design/cpp-build-layout.md C++ build layout guidance",
     "@dependency-end"
   ],
   "version": 4,

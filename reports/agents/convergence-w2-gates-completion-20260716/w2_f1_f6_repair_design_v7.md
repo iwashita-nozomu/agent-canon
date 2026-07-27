@@ -87,15 +87,15 @@ explicitly prohibited for this revision.
 
 | Responsibility | Canonical owner | Replaceable implementation unit | Public consumers |
 | --- | --- | --- | --- |
-| active-W2 publication policy and selected authority | `agents/canonical/CODEX_WORKFLOW.md`, `documents/BRANCH_SCOPE.md` | future `tools/agent_tools/publication_integrator.py` | branch/main/PR workflows, publish/update/sync helpers, hook, closeout |
+| active-W2 publication policy and selected authority | `agents/canonical/CODEX_WORKFLOW.md`, `documents/operations/BRANCH_SCOPE.md` | future `tools/agent_tools/publication_integrator.py` | branch/main/PR workflows, publish/update/sync helpers, hook, closeout |
 | automatic review state and candidate/receipt schema | `agents/canonical/CODEX_WORKFLOW.md`, `agents/COMMUNICATION_PROTOCOL.md` | future `tools/agent_tools/review_dispatch.py` plus canonical ledger writer | publication integrator, workflow monitor, GitHub projection, closeout |
 | task/team review routing and instance separation | `agents/task_catalog.yaml`, `agents/agents_config.json`, `agents/canonical/CODEX_SUBAGENTS.md`, `.codex/config.toml`, `.codex/agents/*.toml` | `tools/agent_tools/agent_team.py`, `task_start.py`, `bootstrap_agent_run.py`, `workflow_monitor.py` | parent orchestrator, writer, independent reviewer |
 | AgentCanon source publication entrypoint | `agents/workflows/agent-canon-pr-workflow.md`, `documents/tools/github_publish.md` | `tools/agent_tools/github_publish.py` delegating active W2 | root `README.md`, workflow index, derived workflow, update skill/shim |
 | runtime update prompt contract | `agents/skills/agent-canon-update.md`, `.agents/skills/agent-canon-update/SKILL.md` | existing update/sync helpers plus canonical publish entrypoint | `AGENT-CANON-UPDATE-SHIM-2`, prompt evaluator, convention/drift checks |
-| bidirectional dependency semantics | `documents/dependency-manifest-design.md` | dependency header checker/review route | every newly touched caller, owner, document, eval, checker, and test |
+| bidirectional dependency semantics | `documents/design/dependency-manifest-design.md` | dependency header checker/review route | every newly touched caller, owner, document, eval, checker, and test |
 | ledger transaction and recovery schema | `agents/COMMUNICATION_PROTOCOL.md` | `tools/agent_tools/work_log.py` | workflow monitor, report checks, waterfall gate, task close |
 | completion projection | canonical ledger L | pure projection P = f(L plus canonical Git/artifact readback) | topology, gate, formatter, publication, and closeout consumers |
-| independent design approval | `documents/REVIEW_PROCESS.md` and review templates | external reviewer over fixed bytes | implementation source-freeze gate |
+| independent design approval | `documents/conventions/REVIEW_PROCESS.md` and review templates | external reviewer over fixed bytes | implementation source-freeze gate |
 
 No run-local design or review report becomes an upstream dependency of durable
 canon.
@@ -1761,7 +1761,7 @@ The automatic-review design is bound to these v6-tree owner facts:
 | `agents/internal-routines/subagent-startup.md` | startup route is the structural path `agents/internal-routines/subagent-startup.md`; it is not a public keyword/alias. |
 | `agents/skills/subagent-bootstrap.md` | launch mechanics, fresh context, reviewer/implementer separation, same-task packet updates, and durable wave evidence belong to the repo route. |
 | `agents/skills/change-review.md` | reviewer returns explicit approve/revise/escalate, preserves intent on rejection, and reruns review on the latest repaired diff. |
-| `documents/REVIEW_PROCESS.md` | final acceptance uses an independent read-only reviewer; any fix requires latest-diff rerun; prior approval cannot be reused. |
+| `documents/conventions/REVIEW_PROCESS.md` | final acceptance uses an independent read-only reviewer; any fix requires latest-diff rerun; prior approval cannot be reused. |
 | `.codex/agents/worker.toml`, `.codex/agents/spark_worker.toml` | writer roles are workspace-write and must repair until review approves. |
 | `.codex/agents/diff_triage_reviewer.toml`, `.codex/agents/reviewer.toml`, `.codex/agents/ship_reviewer.toml` | review roles are read-only, return explicit decisions, and do not implement or self-approve. |
 | `.codex/config.toml` | runtime registers the exact writer/reviewer agent types and owns `max_threads=24`, `max_depth=2`. |
@@ -1781,7 +1781,7 @@ Publication owner and callers:
 
 1. `README.md`
 2. `agents/canonical/CODEX_WORKFLOW.md`
-3. `documents/BRANCH_SCOPE.md`
+3. `documents/operations/BRANCH_SCOPE.md`
 4. `agents/workflows/main-integration-workflow.md`
 5. `agents/workflows/agent-canon-pr-workflow.md`
 6. `agents/workflows/README.md`
@@ -1817,7 +1817,7 @@ Automatic review owner and routing packet:
 12. `.agents/skills/change-review/SKILL.md`
 13. `agents/skills/pr-processing.md`
 14. `.agents/skills/pr-processing/SKILL.md`
-15. `documents/REVIEW_PROCESS.md`
+15. `documents/conventions/REVIEW_PROCESS.md`
 16. `.codex/config.toml`
 17. `.codex/agents/worker.toml`
 18. `.codex/agents/spark_worker.toml`
@@ -1872,7 +1872,7 @@ Every row below is future implementation scope only. No row is edited in v7.
 | --- | --- | --- | --- |
 | `README.md` | replace line 352 raw push with exact verified publish command; add active-W2 delegate-or-fail text and reciprocal tool/workflow headers | V6-R1 | root-reference review plus raw-literal checker |
 | `agents/canonical/CODEX_WORKFLOW.md` | retain one authority/resolver and add exact reciprocal integrator edge | V6-R1 | workflow-owner review |
-| `documents/BRANCH_SCOPE.md` | retain active-W2 direct-mutation prohibition and add exact reciprocal integrator edge | V6-R1 | Git-owner review |
+| `documents/operations/BRANCH_SCOPE.md` | retain active-W2 direct-mutation prohibition and add exact reciprocal integrator edge | V6-R1 | Git-owner review |
 | `agents/workflows/main-integration-workflow.md` | retain checked-out refusal/CAS and add exact reciprocal integrator edge | V6-R1 | main-integration review |
 | `agents/workflows/agent-canon-pr-workflow.md` | own verified publication route, exact PR CAS tuple, README/workflow reverse edges, and integrator reverse edge | V6-R1 | PR workflow review |
 | `agents/workflows/README.md` | replace raw push with exact verified command and canonical PR-workflow route | V6-R1 | workflow-index review |
@@ -1881,8 +1881,8 @@ Every row below is future implementation scope only. No row is edited in v7.
 | `.agents/skills/agent-canon-update/SKILL.md` | replace raw command; name integrator and typed refusal; add eval and github-publish reciprocal edges | V6-R1 | runtime-skill review |
 | `evidence/agent-evals/skill_workflow_prompt_eval.toml` | replace `AGENT-CANON-UPDATE-SHIM-2` required regex, add forbidden regex, and complete evaluator/checker/test reverse edges | V6-R1 | critical eval |
 | `documents/tools/github_publish.md` | document exact active-W2 delegation and no ordinary push fallback | V6-R1 | docs review |
-| `documents/dependency-manifest-design.md` | no semantic change; apply existing same-kind inverse rule | V6-R1 | strict dependency review |
-| `documents/REVIEW_PROCESS.md` | review five-hit route closure, seven direct pairs, temp recovery, and retained contracts | both | review-owner gate |
+| `documents/design/dependency-manifest-design.md` | no semantic change; apply existing same-kind inverse rule | V6-R1 | strict dependency review |
+| `documents/conventions/REVIEW_PROCESS.md` | review five-hit route closure, seven direct pairs, temp recovery, and retained contracts | both | review-owner gate |
 | `agents/templates/change_review.md` | require route/eval/header and temp-classification evidence | both | change-review gate |
 | `agents/templates/final_review.md` | independently recompute route literal count, reverse pairs, crash matrix, and readback | both | final-review gate |
 | `agents/templates/closeout_gate.md` | reject raw route, one-way edge, unresolved temp, or non-canonical success evidence | both | closeout review |
@@ -1918,7 +1918,7 @@ Every row below is future implementation scope only. No row is edited in v7.
 | `agents/skills/subagent-bootstrap.md`, `.agents/skills/subagent-bootstrap/SKILL.md` | launch/resume exact role instance from frame and resume locator; no duplicated capsule schema | V7-A1 | launch skill review |
 | `agents/skills/change-review.md`, `.agents/skills/change-review/SKILL.md` | require explicit decision body bound to current candidate and preserve REVISE intent | V7-A1 | review skill gate |
 | `agents/skills/pr-processing.md`, `.agents/skills/pr-processing/SKILL.md` | project canonical PR-head review state and block merge on stale/non-APPROVE receipt | V7-A1 | PR skill review |
-| `documents/REVIEW_PROCESS.md` | require automatic review on every candidate/head, same-context rerun, no old-candidate rollback, and latest-diff approval | V7-A1 | review-owner gate |
+| `documents/conventions/REVIEW_PROCESS.md` | require automatic review on every candidate/head, same-context rerun, no old-candidate rollback, and latest-diff approval | V7-A1 | review-owner gate |
 | `agents/workflows/agent-canon-pr-workflow.md` | create PR-head trigger after readback and project exact review IDs/state/receipt | V7-A1 | PR workflow review |
 | `agents/workflows/pr-queue-cleanup-workflow.md` | treat REVISE/dispatch blocker as head-repair state; no merge/bypass | V7-A1 | queue review |
 | `.codex/config.toml` | retain registered worker/reviewer types and runtime limits; no second auto-review agent alias | V7-A1 | runtime alignment |
@@ -1987,7 +1987,7 @@ kind, and relative path must match exactly.
 
 | Surface line | Exact inverse line |
 | --- | --- |
-| `documents/BRANCH_SCOPE.md`: `downstream implementation ../tools/agent_tools/publication_integrator.py enforces active-W2 local, remote, and PR publication CAS` | `tools/agent_tools/publication_integrator.py`: `upstream implementation ../../documents/BRANCH_SCOPE.md owns active-W2 branch, push, merge, and main publication policy` |
+| `documents/operations/BRANCH_SCOPE.md`: `downstream implementation ../tools/agent_tools/publication_integrator.py enforces active-W2 local, remote, and PR publication CAS` | `tools/agent_tools/publication_integrator.py`: `upstream implementation ../../documents/operations/BRANCH_SCOPE.md owns active-W2 branch, push, merge, and main publication policy` |
 | `agents/canonical/CODEX_WORKFLOW.md`: `downstream implementation ../../tools/agent_tools/publication_integrator.py executes canonical completion-authority publication` | `tools/agent_tools/publication_integrator.py`: `upstream implementation ../../agents/canonical/CODEX_WORKFLOW.md owns active-W2 publication authority and route state` |
 | `agents/workflows/main-integration-workflow.md`: `downstream implementation ../../tools/agent_tools/publication_integrator.py executes active-W2 un-checked-out target CAS` | `tools/agent_tools/publication_integrator.py`: `upstream implementation ../../agents/workflows/main-integration-workflow.md defines active-W2 main integration order` |
 | `agents/workflows/agent-canon-pr-workflow.md`: `upstream implementation ../../tools/agent_tools/publication_integrator.py executes active-W2 remote and PR CAS` | `tools/agent_tools/publication_integrator.py`: `downstream implementation ../../agents/workflows/agent-canon-pr-workflow.md documents and reviews active-W2 remote and PR CAS` |
@@ -2046,7 +2046,7 @@ The existing design pair between
 | `agents/canonical/CODEX_WORKFLOW.md`: `downstream implementation ../../tools/agent_tools/review_dispatch.py advances canonical completion review state` | `tools/agent_tools/review_dispatch.py`: `upstream implementation ../../agents/canonical/CODEX_WORKFLOW.md owns automatic-review and publication-unlock state` |
 | `agents/canonical/CODEX_SUBAGENTS.md`: `downstream implementation ../../tools/agent_tools/review_dispatch.py resolves independent reviewer instances and resume locators` | `tools/agent_tools/review_dispatch.py`: `upstream implementation ../../agents/canonical/CODEX_SUBAGENTS.md owns reviewer separation and resume routing` |
 | `agents/internal-routines/subagent-startup.md`: `downstream implementation ../../tools/agent_tools/review_dispatch.py carries the private structural startup route` | `tools/agent_tools/review_dispatch.py`: `upstream implementation ../../agents/internal-routines/subagent-startup.md owns the private structural startup route` |
-| `documents/REVIEW_PROCESS.md`: `downstream implementation ../tools/agent_tools/review_dispatch.py enforces latest-candidate independent review and rerun` | `tools/agent_tools/review_dispatch.py`: `upstream implementation ../../documents/REVIEW_PROCESS.md owns independent review and rerun policy` |
+| `documents/conventions/REVIEW_PROCESS.md`: `downstream implementation ../tools/agent_tools/review_dispatch.py enforces latest-candidate independent review and rerun` | `tools/agent_tools/review_dispatch.py`: `upstream implementation ../../documents/conventions/REVIEW_PROCESS.md owns independent review and rerun policy` |
 | `agents/workflows/agent-canon-pr-workflow.md`: `downstream implementation ../../tools/agent_tools/review_dispatch.py dispatches review for verified PR-head updates` | `tools/agent_tools/review_dispatch.py`: `upstream implementation ../../agents/workflows/agent-canon-pr-workflow.md owns AgentCanon PR-head review projection` |
 | `agents/skills/agent-orchestration.md`: `downstream implementation ../../tools/agent_tools/review_dispatch.py routes canonical review state through task and team owners` | `tools/agent_tools/review_dispatch.py`: `upstream implementation ../../agents/skills/agent-orchestration.md owns automatic review workflow routing` |
 | `agents/skills/subagent-bootstrap.md`: `downstream implementation ../../tools/agent_tools/review_dispatch.py launches or resumes the exact review frame` | `tools/agent_tools/review_dispatch.py`: `upstream implementation ../../agents/skills/subagent-bootstrap.md owns review launch and resume mechanics` |

@@ -3,8 +3,8 @@
 # contract tool
 # responsibility Checks changed-file dependency headers and registered contract kind metadata.
 # upstream design ../../agents/templates/closeout_gate.md closeout requires dependency evidence
-# upstream design ../../documents/dependency-manifest-design.md dependency manifest DSL design
-# upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
+# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL design
+# upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # downstream implementation ./check_dependency_header_format.sh validates manifest syntax
 # downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies changed-file checker
 # @dependency-end
@@ -46,7 +46,7 @@ SKIP_PREFIXES = (
 RAW_NVIDIA_FIXTURE_PREFIX = "tests/fixtures/nvidia/"
 HEADER_SCAN_LINES = 80
 BINARY_SNIFF_BYTES = 4096
-CONTRACT_REGISTRY = Path("documents/dependency-contract-kinds.toml")
+CONTRACT_REGISTRY = Path("documents/design/dependency-contract-kinds.toml")
 CONTRACT_LINE_RE = re.compile(r"^contract\s+(?P<kind>[a-z0-9][a-z0-9-]*)$")
 TOML_STRING_RE = re.compile(r'"(?P<value>[a-z0-9][a-z0-9-]*)"')
 
@@ -326,7 +326,7 @@ def main() -> int:
         print(
             f"- missing dependency contract kind registry: "
             f"{contract_registry_path(root).as_posix()}; "
-            "fix: restore documents/dependency-contract-kinds.toml"
+            "fix: restore documents/design/dependency-contract-kinds.toml"
         )
         return 1
 

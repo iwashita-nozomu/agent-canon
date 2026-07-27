@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Validates local AgentCanon issue files and mirrors them to GitHub Issues.
 # upstream design ../../issues/README.md durable local issue convention
-# upstream design ../../documents/responsibility-scope-management.md local/GitHub issue sync policy
+# upstream design ../../documents/design/responsibility-scope-management.md local/GitHub issue sync policy
 # upstream design ../../tools/README.md tool entrypoint index
 # upstream design ../../documents/tools/README.md user-facing tool index
 # downstream implementation ../../tools/ci/run_all_checks.sh runs offline issue validation

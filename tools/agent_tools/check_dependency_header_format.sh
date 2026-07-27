@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Validates dependency manifest syntax, contract kind metadata, and responsibility metadata.
-# upstream design ../../documents/dependency-manifest-design.md dependency manifest DSL design
-# upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
+# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL design
+# upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream implementation ./scan_dependency_headers.sh finds files with manifests
 # downstream implementation ./check_dependency_graph.sh consumes validated manifest lines
 # @dependency-end
@@ -65,18 +65,18 @@ contract_kind_registry_path() {
     printf '%s\n' "$CONTRACT_KIND_REGISTRY"
     return
   fi
-  if [[ -f "$ROOT_DIR/documents/dependency-contract-kinds.toml" ]]; then
-    printf '%s\n' "$ROOT_DIR/documents/dependency-contract-kinds.toml"
+  if [[ -f "$ROOT_DIR/documents/design/dependency-contract-kinds.toml" ]]; then
+    printf '%s\n' "$ROOT_DIR/documents/design/dependency-contract-kinds.toml"
     return
   fi
-  if [[ -f "$ROOT_DIR/vendor/agent-canon/documents/dependency-contract-kinds.toml" ]]; then
-    printf '%s\n' "$ROOT_DIR/vendor/agent-canon/documents/dependency-contract-kinds.toml"
+  if [[ -f "$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml" ]]; then
+    printf '%s\n' "$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml"
     return
   fi
   local script_path script_dir
   script_path="$(readlink -f "${BASH_SOURCE[0]}")"
   script_dir="$(cd "$(dirname "$script_path")" && pwd)"
-  printf '%s\n' "$(realpath -m "$script_dir/../../documents/dependency-contract-kinds.toml")"
+  printf '%s\n' "$(realpath -m "$script_dir/../../documents/design/dependency-contract-kinds.toml")"
 }
 
 load_contract_kinds() {
@@ -122,6 +122,17 @@ is_checkable_suffix() {
 is_skip_path() {
   case "$1" in
     .git/*|.pytest_cache/*|.ruff_cache/*|reports/*|tests/fixtures/nvidia/*.txt|LICENSE|LICENSE.*|NOTICE|NOTICE.*|COPYING|COPYING.*|vendor/agent-canon/LICENSE|vendor/agent-canon/LICENSE.*|vendor/agent-canon/NOTICE|vendor/agent-canon/NOTICE.*|vendor/agent-canon/COPYING|vendor/agent-canon/COPYING.*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_historical_issue_path() {
+  case "$1" in
+    issues/*)
       return 0
       ;;
     *)
@@ -186,7 +197,7 @@ normalize_path() {
 source_context_file() {
   local source_file="$1"
   case "$source_file" in
-    .github/workflows/agent-coordination.yml|.github/PULL_REQUEST_TEMPLATE/agent_canon.md)
+    .github/workflows/agent-coordination.yml|.github/workflows/agent-improvement-guide.yml|.github/PULL_REQUEST_TEMPLATE/agent_canon.md)
       if [[ -f "vendor/agent-canon/$source_file" ]]; then
         printf 'vendor/agent-canon/%s\n' "$source_file"
         return
@@ -325,6 +336,12 @@ check_file() {
     fi
     target="$(normalize_path "$file" "$rel_path")"
     if [[ ! -e "$target" ]]; then
+      # Issue files are durable mirrors. Their dependency paths describe the
+      # historical repository state and must not be rewritten as part of a
+      # current document relocation.
+      if is_historical_issue_path "$file"; then
+        continue
+      fi
       echo "$file:$line_no: dependency target does not exist: $rel_path"
       return 1
     fi
@@ -345,7 +362,7 @@ check_file() {
 }
 
 if [[ "${#ALLOWED_CONTRACT_KINDS[@]}" -eq 0 ]]; then
-  echo "missing dependency contract kind registry: $CONTRACT_KIND_REGISTRY_PATH; fix: restore documents/dependency-contract-kinds.toml or set DEPENDENCY_CONTRACT_KIND_REGISTRY to the canonical registry"
+  echo "missing dependency contract kind registry: $CONTRACT_KIND_REGISTRY_PATH; fix: restore documents/design/dependency-contract-kinds.toml or set DEPENDENCY_CONTRACT_KIND_REGISTRY to the canonical registry"
   echo "DEPENDENCY_HEADER_FORMAT=fail"
   exit 1
 fi

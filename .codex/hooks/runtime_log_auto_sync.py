@@ -4,7 +4,7 @@
 # responsibility Runs best-effort unattended runtime log archive sync at Stop.
 # upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py owns archive sync, report copy, commit, and push behavior
 # upstream implementation ./hook_dispatcher.py invokes this hook from Stop
-# upstream design ../../documents/runtime-log-archive.md runtime log archive ownership and automation policy
+# upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and automation policy
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates quiet fail-open behavior
 # @dependency-end
 """Best-effort runtime log archive sync hook."""

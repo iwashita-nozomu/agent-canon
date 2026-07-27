@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Publishes experiment result artifacts to a dedicated Git branch.
 # upstream design ../../agents/workflows/experiment-workflow.md defines experiment execution and result publication flow.
-# upstream design ../../documents/result-log-retention-and-visualization.md defines experiment result retention policy.
+# upstream design ../../documents/experiments/result-log-retention-and-visualization.md defines experiment result retention policy.
 # upstream implementation run_managed_experiment.py records experiment source branch and commit manifests.
 # downstream implementation ../../tests/tools/test_publish_result_branch.py validates result branch publication.
 # @dependency-end

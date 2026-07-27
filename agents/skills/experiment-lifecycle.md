@@ -26,7 +26,7 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 ## Core References
 
 - `agents/workflows/experiment-workflow.md`
-- `documents/experiment-registry.md`
+- `documents/experiments/experiment-registry.md`
 - `tools/experiments/create_experiment_topic.py`
 - `agents/workflows/research-workflow.md`
 
@@ -40,7 +40,7 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 
 - この repo の実験運用正本は `agents/workflows/experiment-workflow.md` です。
 - 実験結果を見ながら code change、調査、チューニングまで含めた loop を回す場合は `adaptive-improvement-loop` を追加します。
-- topic の entrypoint と formal command は project-root `experiments/registry.toml` を project-owned 正本にします。AgentCanon source は registry 契約を `documents/experiment-registry.md` で定義します。template / derived repo root からは `vendor/agent-canon/documents/experiment-registry.md` として読みます。
+- topic の entrypoint と formal command は project-root `experiments/registry.toml` を project-owned 正本にします。AgentCanon source は registry 契約を `documents/experiments/experiment-registry.md` で定義します。template / derived repo root からは `vendor/agent-canon/documents/experiments/experiment-registry.md` として読みます。
 - 新規 topic は最初に実験名を固定し、`python3 tools/experiments/create_experiment_topic.py <topic>` を実行して AgentCanon template path `vendor/agent-canon/experiments/_template/` から project-root `experiments/<topic>/` を作成し、project registry へ topic entry を追加します。
 - topic 作成後は `run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
 - project registry がある場合は、formal 実行前に `python3 tools/ci/check_experiment_registry.py` で registry schema と registered command placeholder を確認します。
@@ -63,7 +63,7 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 - experiment execution surface を変更する task は、patch 前に
   `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>`
   を実行し、`experiment_execution_surface_guard` の handoff を解決します。
-  対象 surface は `tools/ci/check_experiment_registry.py`、`documents/experiment-registry.md`、
+  対象 surface は `tools/ci/check_experiment_registry.py`、`documents/experiments/experiment-registry.md`、
   `agents/workflows/experiment-workflow.md`、`experiments/registry.toml`、topic
   `run.py` entrypoint です。
   この場合は `test-design` を併用します。project `experiments/registry.toml`

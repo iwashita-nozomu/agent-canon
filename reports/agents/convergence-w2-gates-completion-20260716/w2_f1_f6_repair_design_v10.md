@@ -90,7 +90,7 @@ docs formatting/checking only.
 | reviewer lifecycle and independent assignment | `agents/canonical/CODEX_SUBAGENTS.md`, `agents/task_catalog.yaml`, `agents/agents_config.json` | `agent_team.py` and runtime adapter | parent monitor/integrator and reviewer |
 | canonical local review state | `agents/canonical/CODEX_WORKFLOW.md`, ledger L | immutable event append plus current-pointer CAS | review dispatcher, task close, publication lock |
 | provider projection acknowledgement | `agents/COMMUNICATION_PROTOCOL.md` | future `external_artifact_binding.py` renamed or replaced by projection owner | Codex adapter, GitHub publish, publication integrator |
-| validation requirement selection | `documents/runtime-profiles-and-check-matrix.json` with Markdown reader projection | exact required-check set | validation runner, review dispatcher, closeout |
+| validation requirement selection | `documents/runtime/runtime-profiles-and-check-matrix.json` with Markdown reader projection | exact required-check set | validation runner, review dispatcher, closeout |
 | validation command execution and receipt | future `tools/agent_tools/validation_runner.py` | one candidate-bound execution transaction | workflow monitor, reviewer, publication integrator |
 | Python quality caller surface | `tools/ci/run_python_quality_checks.sh` | registered validation-route delegation | pre-review, full checks, reviewer |
 | automatic review/publication consumption | future `review_dispatch.py`, future `publication_integrator.py`, `github_publish.py` | receipt-set resolver | decision binding, ref/PR CAS, report/closeout |
@@ -692,7 +692,7 @@ The exact schema is:
   "environment_profile": {
     "profile_id": "<registered runtime/check profile ID>",
     "profile_version": 1,
-    "profile_source_path": "documents/runtime-profiles-and-check-matrix.json",
+    "profile_source_path": "documents/runtime/runtime-profiles-and-check-matrix.json",
     "profile_source_sha256": "<profile source bytes SHA256>",
     "runtime_kind": "host",
     "container_image_digest": null,
@@ -1144,9 +1144,9 @@ invented.
 3. `agents/canonical/CODEX_SUBAGENTS.md`
 4. `agents/task_catalog.yaml`
 5. `agents/agents_config.json`
-6. `documents/runtime-profiles-and-check-matrix.json`
-7. `documents/runtime-profiles-and-check-matrix.md`
-8. `documents/REVIEW_PROCESS.md`
+6. `documents/runtime/runtime-profiles-and-check-matrix.json`
+7. `documents/runtime/runtime-profiles-and-check-matrix.md`
+8. `documents/conventions/REVIEW_PROCESS.md`
 9. `.codex/agents/diff_triage_reviewer.toml`
 10. `.codex/agents/ship_reviewer.toml`
 11. future `tools/agent_tools/review_dispatch.py`
@@ -1167,7 +1167,7 @@ invented.
 25. `agents/templates/closeout_gate.md`
 26. `.github/PULL_REQUEST_TEMPLATE.md`
 27. `tools/ci/PRE_REVIEW_GUIDE.md`
-28. `documents/FILE_CHECKLIST_OPERATIONS.md`
+28. `documents/operations/FILE_CHECKLIST_OPERATIONS.md`
 29. future `tests/agent_tools/test_review_dispatch.py`
 30. future `tests/agent_tools/test_external_artifact_binding.py`
 31. future `tests/agent_tools/test_validation_runner.py`
@@ -1190,9 +1190,9 @@ Every row is future implementation scope only.
 | `agents/canonical/CODEX_WORKFLOW.md` | derive local state from event; gate pointer/publication on projection/receipts without authority inversion | all | workflow-owner review |
 | `agents/canonical/CODEX_SUBAGENTS.md` | retain same reviewer lineage and terminal algebra; remove receipt-byte authority | V10-L1/X1 | lifecycle review |
 | `agents/task_catalog.yaml`, `agents/agents_config.json`, reviewer TOMLs | preserve reviewer/validation owner roles and writer separation | V10-V1 | runtime alignment |
-| `documents/runtime-profiles-and-check-matrix.json` | assign stable validation requirement IDs, exact route/profile source, and review/publication requirement class | V10-V1 | profile-schema tests |
-| `documents/runtime-profiles-and-check-matrix.md` | project receipt-based evidence; remove free-text pass interpretation | V10-V1 | docs/profile review |
-| `documents/REVIEW_PROCESS.md` | require canonical receipts and independent current-candidate rerun for approval/publication | V10-V1 | review-owner gate |
+| `documents/runtime/runtime-profiles-and-check-matrix.json` | assign stable validation requirement IDs, exact route/profile source, and review/publication requirement class | V10-V1 | profile-schema tests |
+| `documents/runtime/runtime-profiles-and-check-matrix.md` | project receipt-based evidence; remove free-text pass interpretation | V10-V1 | docs/profile review |
+| `documents/conventions/REVIEW_PROCESS.md` | require canonical receipts and independent current-candidate rerun for approval/publication | V10-V1 | review-owner gate |
 | future `review_dispatch.py` | emit event v3; resolve ack and current validation receipt set; reject pass prose | all | review dispatch tests |
 | future projection owner | normalize Codex/GitHub readback and emit acknowledgement with no raw receipt equality | V10-X1 | projection tests |
 | future `validation_runner.py` | execute registered route in clean clone, capture exact result, emit receipt | V10-V1 | validation runner tests |
@@ -1217,7 +1217,7 @@ updates these exact reciprocal pairs:
 | --- | --- |
 | `agents/COMMUNICATION_PROTOCOL.md`: `downstream implementation ../tools/agent_tools/external_artifact_binding.py materializes typed provider projection acknowledgements for canonical local events` | `tools/agent_tools/external_artifact_binding.py`: `upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns external projection acknowledgement schemas` |
 | `agents/COMMUNICATION_PROTOCOL.md`: `downstream implementation ../tools/agent_tools/validation_runner.py materializes candidate-bound validation execution receipts` | `tools/agent_tools/validation_runner.py`: `upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns validation receipt schemas` |
-| `documents/runtime-profiles-and-check-matrix.md`: `downstream implementation ../tools/agent_tools/validation_runner.py resolves registered validation requirement routes` | `tools/agent_tools/validation_runner.py`: `upstream design ../../documents/runtime-profiles-and-check-matrix.md owns validation route/profile selection` |
+| `documents/runtime/runtime-profiles-and-check-matrix.md`: `downstream implementation ../tools/agent_tools/validation_runner.py resolves registered validation requirement routes` | `tools/agent_tools/validation_runner.py`: `upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md owns validation route/profile selection` |
 | `tools/agent_tools/review_dispatch.py`: `upstream implementation ./external_artifact_binding.py verifies external reviewer projection acknowledgements` | `tools/agent_tools/external_artifact_binding.py`: `downstream implementation ./review_dispatch.py consumes reviewer projection acknowledgements` |
 | `tools/agent_tools/review_dispatch.py`: `upstream implementation ./validation_runner.py resolves current candidate validation receipts` | `tools/agent_tools/validation_runner.py`: `downstream implementation ./review_dispatch.py consumes validation receipts for automatic review decisions` |
 | `tools/agent_tools/github_publish.py`: `upstream implementation ./external_artifact_binding.py verifies GitHub projection acknowledgements` | `tools/agent_tools/external_artifact_binding.py`: `downstream implementation ./github_publish.py consumes GitHub projection acknowledgements` |

@@ -23,8 +23,8 @@ upstream design ../canonical/skills.md skill canon registry
 
 - `agents/workflows/research-workflow.md`
 - `agents/workflows/experiment-workflow.md`
-- `documents/experiment-critical-review.md`
-- `documents/REVIEW_PROCESS.md`
+- `documents/experiments/experiment-critical-review.md`
+- `documents/conventions/REVIEW_PROCESS.md`
 
 ## Default Perspective Pack
 

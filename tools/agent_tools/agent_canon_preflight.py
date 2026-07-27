@@ -6,7 +6,7 @@
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md defines task-entry freshness routing
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines PR-first shared-canon propagation
 # upstream design ../../agents/workflows/derived-agent-canon-diff-workflow.md defines derived AgentCanon branch routing
-# upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md defines parent update TODO routing
+# upstream design ../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md defines parent update TODO routing
 # upstream implementation agent_canon_update_todos.py reports AgentCanon update TODO state
 # upstream implementation ./report_artifact_checks.py classifies eval transient captures
 # downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests preflight
@@ -37,12 +37,12 @@ SHARED_CANON_DIRTY_PATH_PREFIXES = (
     "AGENTS.md",
     "ROOT_AGENTS.md",
     "agents/",
-    "documents/SHARED_RUNTIME_SURFACES.md",
+    "documents/runtime/SHARED_RUNTIME_SURFACES.md",
     "mcp/",
     "tools/sync_agent_canon.sh",
     "vendor/agent-canon",
 )
-LATEST_CHECKLIST = Path("documents/agent-canon-parent-repo-latest-checklist.md")
+LATEST_CHECKLIST = Path("documents/agent-canon/agent-canon-parent-repo-latest-checklist.md")
 UPDATE_TODO_TOOL = Path("tools/agent_tools/agent_canon_update_todos.py")
 SURFACE_MANIFEST = Path("tools/agent_tools/surface_manifest.py")
 SURFACE_SPEC_COMMANDS = ("link-specs", "copy-specs", "removed-legacy-paths")
@@ -65,7 +65,7 @@ class AgentCanonPreflightResult:
     update_todo_tasks: str = ""
     update_todo_resolved_tasks: str = ""
     update_todo_state: str = ".agent-canon/update-state.toml"
-    update_todo_manifest: str = "vendor/agent-canon/documents/agent-canon-update-tasks.toml"
+    update_todo_manifest: str = "vendor/agent-canon/documents/agent-canon/agent-canon-update-tasks.toml"
     update_todo_generated: str = ".agent-canon/update-todos.generated.md"
     update_todo_pending_json: str = ".agent-canon/update-todos.pending.json"
     update_todo_first_task: str = ""
@@ -307,7 +307,7 @@ def successful_preflight_result(
         ),
         update_todo_manifest=todo_result.get(
             "AGENT_CANON_UPDATE_TODO_MANIFEST",
-            "vendor/agent-canon/documents/agent-canon-update-tasks.toml",
+            "vendor/agent-canon/documents/agent-canon/agent-canon-update-tasks.toml",
         ),
         update_todo_generated=todo_result.get(
             "AGENT_CANON_UPDATE_TODO_GENERATED",

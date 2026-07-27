@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Tracks AgentCanon update TODOs that parent-repo agents must apply.
-# upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md parent repo latest-state workflow
-# upstream design ../../documents/agent-canon-update-tasks.toml shared update TODO manifest
+# upstream design ../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state workflow
+# upstream design ../../documents/agent-canon/agent-canon-update-tasks.toml shared update TODO manifest
 # downstream implementation ../../tools/agent_tools/agent_canon_preflight.py routes task-start agents through pending TODOs
 # downstream implementation ../../tests/agent_tools/test_agent_canon_update_todos.py tests update TODO state transitions
 # @dependency-end
@@ -27,7 +27,7 @@ UTC = timezone.utc
 from pathlib import Path
 from typing import cast
 
-DEFAULT_MANIFEST = Path("documents/agent-canon-update-tasks.toml")
+DEFAULT_MANIFEST = Path("documents/agent-canon/agent-canon-update-tasks.toml")
 DEFAULT_STATE_PATH = Path(".agent-canon/update-state.toml")
 DEFAULT_GENERATED_PATH = Path(".agent-canon/update-todos.generated.md")
 DEFAULT_PENDING_JSON_PATH = Path(".agent-canon/update-todos.pending.json")
@@ -587,8 +587,8 @@ def render_state(state: UpdateState) -> str:
         "# @dependency-start",
         "# contract data",
         "# responsibility Tracks this parent repo's applied AgentCanon update TODO boundary.",
-        "# upstream design ../vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md parent update workflow",
-        "# upstream design ../vendor/agent-canon/documents/agent-canon-update-tasks.toml shared update TODO manifest",
+        "# upstream design ../vendor/agent-canon/documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent update workflow",
+        "# upstream design ../vendor/agent-canon/documents/agent-canon/agent-canon-update-tasks.toml shared update TODO manifest",
         "# downstream implementation ../tools/agent_tools/agent_canon_update_todos.py advances this state",
         "# @dependency-end",
         "",

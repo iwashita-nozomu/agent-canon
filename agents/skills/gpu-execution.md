@@ -4,8 +4,8 @@
 contract skill
 responsibility Documents GPU execution routing, ExperimentRunner delegation, and GPU validation evidence.
 upstream design ../canonical/skills.md skill canon registry
-upstream design ../../documents/experiment_runner.md ExperimentRunner responsibility boundary
-upstream design ../../documents/gpu-admission-r5-source-packet.md exact R5 admission owner and fallback boundary
+upstream design ../../documents/design/experiment_runner.md ExperimentRunner responsibility boundary
+upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact R5 admission owner and fallback boundary
 upstream design ../../documents/conventions/python/15_jax_rules.md JAX GPU preallocation and CPU fallback policy
 upstream design ../workflows/experiment-workflow.md managed experiment workflow
 upstream design experiment-lifecycle.md experiment protocol and result artifact boundary

@@ -34,9 +34,9 @@ downstream design ../../.agents/skills/worktree-start/SKILL.md runtime skill shi
 
 ## Core References
 
-- `documents/worktree-lifecycle.md`
-- `documents/WORKTREE_SCOPE_TEMPLATE.md`
-- `documents/BRANCH_SCOPE.md`
+- `documents/operations/worktree-lifecycle.md`
+- `documents/operations/WORKTREE_SCOPE_TEMPLATE.md`
+- `documents/operations/BRANCH_SCOPE.md`
 - `notes/guardrails/README.md`
 - `notes/failures/README.md`
 - `notes/worktrees/README.md`
@@ -80,7 +80,7 @@ downstream design ../../.agents/skills/worktree-start/SKILL.md runtime skill shi
 ## Default Kickoff Sequence
 
 1. `python3 tools/agent_tools/worktree_scope_lint.py --current` で legacy `WORKTREE_SCOPE.md` と action log の不足を診断します。新しい `git worktree` は作成しません。
-1. `documents/WORKTREE_SCOPE_TEMPLATE.md` は legacy scope の照合用としてだけ読み、current checkout の作業 scope は run-local handoff packet と `work_log.md` で管理します。
+1. `documents/operations/WORKTREE_SCOPE_TEMPLATE.md` は legacy scope の照合用としてだけ読み、current checkout の作業 scope は run-local handoff packet と `work_log.md` で管理します。
 1. experiment topic を持つ branch なら `experiments/registry.toml` の entry を見て、stale `active_worktree` と `scope_file` を cleanup 対象として記録します。
 1. `notes/worktrees/WORKTREE_LOG_TEMPLATE.md` 由来の action log は legacy evidence として読み、current checkout の run-local `work_log.md` に carry-over 判断を書きます。
 1. 以後の継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にし、entry に `request_clause_ids=` を残します。

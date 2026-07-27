@@ -4,7 +4,7 @@
 contract tool
 responsibility Documents Python static analysis entrypoints.
 upstream design ../README.md language-organized static analysis index
-upstream design ../../../documents/coding-conventions-python.md Python coding conventions
+upstream design ../../../documents/conventions/coding-conventions-python.md Python coding conventions
 upstream implementation ../../agent_tools/check_static_any.py rejects explicit Any usage
 upstream implementation ../../agent_tools/check_log_helper_names.py checks log helper names
 upstream implementation ../../oop/python/readability.py scores Python OOP readability

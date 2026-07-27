@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Checks SOLID-sensitive Python changes have path-covered OOP readability evidence.
-# upstream design ../../documents/coding-conventions-python.md SOLID evidence route policy
+# upstream design ../../documents/conventions/coding-conventions-python.md SOLID evidence route policy
 # upstream design ../../agents/skills/oop-readability-check.md SOLID route owner skill
 # upstream implementation ../oop/python/readability.py emits OOP readability evidence reports
 # upstream implementation ../oop/shared/readability_core.py emits scanned_paths and SOLID counts

@@ -22,7 +22,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 - `AGENTS.md`
 - `memory/USER_PREFERENCES.md`
-- `documents/notes-lifecycle.md`
+- `documents/operations/notes-lifecycle.md`
 - `agents/canonical/CODEX_WORKFLOW.md`
 
 ## Sync Rules

@@ -38,7 +38,7 @@ Execute the required and task-matching conditional commands that the packet prin
 
 
 1. Read `agents/skills/md-style-check.md`.
-1. Check `documents/coding-conventions-project.md` and
+1. Check `documents/conventions/coding-conventions-project.md` and
    `documents/conventions/common/05_docs.md`.
 1. Treat plain `md-style-check` or `$md-style-check` in a user request as an explicit skill invocation, not only a candidate signal.
 1. Select this skill when a repo-changing task edits Markdown files or routes docs lint, link, heading, Mermaid, markdown math, docs-check, formatter, or `agent-canon docs` failures.

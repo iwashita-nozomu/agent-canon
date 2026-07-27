@@ -2,9 +2,9 @@
 # @dependency-start
 # contract environment
 # responsibility Reports shared devcontainer attach status.
-# upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
+# upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer boundary
 # upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract
-# upstream design ../documents/gpu-admission-r5-source-packet.md observational readback receipt contract
+# upstream design ../documents/experiments/gpu-admission-r5-source-packet.md observational readback receipt contract
 # upstream environment devcontainer.json postAttachCommand entrypoint
 # upstream implementation finalize-shared-runtime.sh publishes the exact readback receipt
 # @dependency-end

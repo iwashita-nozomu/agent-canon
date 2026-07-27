@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Parses and validates AgentCanon shared runtime surface ownership.
-# upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
-# upstream design ../../documents/shared-runtime-surfaces.toml machine-readable surface manifest
+# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
+# upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable surface manifest
 # downstream implementation ../sync_agent_canon.sh consumes sync specs from this manifest
 # downstream implementation ./check_convention_compliance.py validates manifest wiring
 # @dependency-end
@@ -24,8 +24,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-DEFAULT_MANIFEST = Path("documents/shared-runtime-surfaces.toml")
-DEFAULT_DOC = Path("documents/SHARED_RUNTIME_SURFACES.md")
+DEFAULT_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
+DEFAULT_DOC = Path("documents/runtime/SHARED_RUNTIME_SURFACES.md")
 ALLOWED_MODES = frozenset(
     {
         "symlink",
@@ -67,16 +67,17 @@ ALLOWED_CLASSES = frozenset(
     }
 )
 DOC_ALWAYS_REQUIRED_MARKERS = (
-    "documents/shared-runtime-surfaces.toml",
+    "documents/runtime/shared-runtime-surfaces.toml",
     ".codex/hooks.json",
     ".codex/hooks",
     ".devcontainer/",
     "documents/README.md",
-    "documents/template-bootstrap.md",
-    "documents/github-first-module-and-devcontainer-policy.md",
+    "documents/contracts/template-bootstrap.md",
+    "documents/contracts/github-first-module-and-devcontainer-policy.md",
     "memory/USER_PREFERENCES.md",
     "tests/agent_tools/",
-    "Root `tools/` is a symlink view",
+    "Root `tools/` is a parent-owned regular container",
+    "tools/agent-canon -> ../vendor/agent-canon/tools",
     "vendor/agent-canon/tools/",
     "Project-local automation must stay in project-owned paths",
 )
@@ -351,7 +352,7 @@ def check_doc(root: Path, prefix: str, manifest: SurfaceManifest) -> list[str]:
     if "surface_manifest.py" not in sync_text:
         findings.append("SURFACE_MANIFEST_FINDING=tools/sync_agent_canon.sh:missing-manifest-call")
     if not manifest.entries:
-        findings.append("SURFACE_MANIFEST_FINDING=documents/shared-runtime-surfaces.toml:empty-manifest")
+        findings.append("SURFACE_MANIFEST_FINDING=documents/runtime/shared-runtime-surfaces.toml:empty-manifest")
     return findings
 
 

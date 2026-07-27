@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Builds machine-readable file surface inventories for repo review.
-# upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface model
+# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface model
 # downstream implementation ./review_backlog_scan.sh includes inventory reports
 # downstream implementation ../../tests/agent_tools/test_file_surface_inventory.py tests inventory
 # @dependency-end
@@ -127,7 +127,7 @@ def build_parser() -> argparse.ArgumentParser:
 def load_surface_lookup(root: Path) -> SurfaceLookup:
     """Load shared surface metadata when the manifest is available."""
     try:
-        manifest = load_manifest(root, "vendor/agent-canon", "documents/shared-runtime-surfaces.toml")
+        manifest = load_manifest(root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml")
     except (OSError, ValueError):
         return SurfaceLookup(by_path={}, prefix="vendor/agent-canon")
     return SurfaceLookup(by_path=surface_entries(manifest), prefix=manifest.prefix)

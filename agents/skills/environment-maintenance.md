@@ -36,14 +36,14 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 ## Core References
 
 - `CONTAINER_OPERATIONS.md`
-- `documents/coding-conventions-project.md`
-- `documents/github-first-module-and-devcontainer-policy.md`
+- `documents/conventions/coding-conventions-project.md`
+- `documents/contracts/github-first-module-and-devcontainer-policy.md`
 - `documents/tools/README.md`
 - `docker/README.md`
 - `docker/packs/`
 - `docker/codex-container-profiles.toml`
 - `docker/python-execution-rules.toml`
-- `documents/server-host-contract.md`
+- `documents/contracts/server-host-contract.md`
 - `documents/templates/server_runtime_layout.template.toml`
 - `docker/`
 - `.devcontainer/`

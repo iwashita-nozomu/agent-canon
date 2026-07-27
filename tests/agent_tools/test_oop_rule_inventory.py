@@ -6,7 +6,7 @@
 # upstream implementation ../../tools/oop/python/rule_inventory.py Python inventory CLI
 # upstream implementation ../../tools/oop/cpp/rule_inventory.py C++ inventory CLI
 # upstream implementation ../../tools/oop/shared/rule_inventory_core.py shared inventory behavior
-# upstream design ../../documents/object-oriented-design.md OOP policy source
+# upstream design ../../documents/conventions/object-oriented-design.md OOP policy source
 # @dependency-end
 
 from __future__ import annotations
@@ -84,16 +84,16 @@ class OopRuleInventoryTest(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "pass")
         paths = {entry["path"] for entry in payload["entries"]}
-        self.assertIn("documents/coding-conventions-cpp.md", paths)
+        self.assertIn("documents/conventions/coding-conventions-cpp.md", paths)
         self.assertIn("tools/oop/cpp/rule_inventory.py", paths)
         resolved_paths = {
             entry["path"]: entry["resolved_path"] for entry in payload["entries"]
         }
         self.assertIn(
-            resolved_paths["documents/coding-conventions-cpp.md"],
+            resolved_paths["documents/conventions/coding-conventions-cpp.md"],
             {
-                "documents/coding-conventions-cpp.md",
-                "vendor/agent-canon/documents/coding-conventions-cpp.md",
+                "documents/conventions/coding-conventions-cpp.md",
+                "vendor/agent-canon/documents/conventions/coding-conventions-cpp.md",
             },
         )
 
@@ -112,7 +112,7 @@ class OopRuleInventoryTest(unittest.TestCase):
             vendor_doc.write_text("# OOP\n", encoding="utf-8")
             entry = InventoryEntry(
                 "policy",
-                "documents/object-oriented-design.md",
+                "documents/conventions/object-oriented-design.md",
                 "OOP policy",
             )
 

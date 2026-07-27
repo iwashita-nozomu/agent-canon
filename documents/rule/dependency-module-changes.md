@@ -2,8 +2,8 @@
 @dependency-start
 contract policy
 responsibility Defines the general dependency-module change contract and source-clone lifecycle without owning editor state.
-upstream design ../dependency-manifest-design.md dependency ownership and header graph model
-upstream design ../SHARED_RUNTIME_SURFACES.md parent pin and shared-surface ownership
+upstream design ../design/dependency-manifest-design.md dependency ownership and header graph model
+upstream design ../runtime/SHARED_RUNTIME_SURFACES.md parent pin and shared-surface ownership
 downstream implementation ../../tools/agent_tools/dependency_module_change.py enforces clone lifecycle and cleanup gates
 downstream implementation ../../tools/update_agent_canon.sh refuses parent vendor source mutation
 downstream design ../../agents/skills/dependency-module-change.md exposes the short skill route
@@ -43,7 +43,7 @@ rootを越える検索・編集はこの tool の責務外です。
 
 mount target と選択 repo の作業 directory は別の devcontainer 契約です。
 通常の runtime pack の既存 `workdir` schema は変更せず、
-`.devcontainer/generate-runtime-compose.sh` だけが選択 clone の親である topic
+`vendor/agent-canon/.devcontainer/generate-runtime-compose.sh` だけが選択 clone の親である topic
 root (`..`) を一度だけ source にし、選択 repo の working directory を
 `/workspace/<clone-basename>` に materialize します。build context は repo (`..`)
 のままです。通常 Docker/CI runner の `/workspace` 意味はこの devcontainer

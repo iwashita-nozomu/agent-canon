@@ -8,9 +8,9 @@ upstream design ../workflows/derived-agent-canon-diff-workflow.md shared canon d
 upstream design ../../issues/README.md durable AgentCanon operational finding storage
 downstream design ../workflows/token-efficient-codex-workflow.md token-aware runtime mode overlay
 downstream design ../templates/closeout_gate.md closeout gate contract
-upstream design ../../documents/dependency-manifest-design.md dependency manifest design
-upstream design ../../documents/runtime-profiles-and-check-matrix.md runtime profile and risk-based validation routing
-upstream design ../../documents/BRANCH_SCOPE.md commit correctness and push contract
+upstream design ../../documents/design/dependency-manifest-design.md dependency manifest design
+upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md runtime profile and risk-based validation routing
+upstream design ../../documents/operations/BRANCH_SCOPE.md commit correctness and push contract
 upstream design ../skills/tool-finding-report.md tool finding packet and prompt feedback workflow
 downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
 @dependency-end
@@ -52,12 +52,12 @@ Base Runtime Packet:
 
 Cross-Cutting Packet:
 
-- `documents/REVIEW_PROCESS.md`
-- `documents/AGENTS_COORDINATION.md`
-- `documents/coding-conventions-python.md`
-- `documents/notes-lifecycle.md`
+- `documents/conventions/REVIEW_PROCESS.md`
+- `documents/codex/AGENTS_COORDINATION.md`
+- `documents/conventions/coding-conventions-python.md`
+- `documents/operations/notes-lifecycle.md`
 - `agents/workflows/agent-learning-workflow.md`
-- `documents/runtime-profiles-and-check-matrix.md`
+- `documents/runtime/runtime-profiles-and-check-matrix.md`
 - `documents/rule/dependency-module-changes.md`
 - `notes/guardrails/README.md`
 - `notes/guardrails/engineering_avoidances.md`
@@ -107,7 +107,7 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 
 Establish structure, owner, and touched-surface evidence before selecting a
 runtime profile. Use
-`documents/runtime-profiles-and-check-matrix.md` only after that evidence fixes
+`documents/runtime/runtime-profiles-and-check-matrix.md` only after that evidence fixes
 the applicable validation and checker obligations.
 
 - A runtime profile selects validation and checker obligations only. It does
@@ -171,7 +171,7 @@ file や path の欠落を見つけたときは、再作成、削除済み判定
 1. current repo で、欠落している path が root symlink view、synced root copy、shared workflow / skill / tool / memory surface、または template 由来の scaffold かを確認する
 1. template root または登録された template remote / current template main で同じ path の有無と現在の正本形を確認する
 1. `vendor/agent-canon/` と standalone `agent-canon` で同じ path の有無、rename、移動、sync 対象からの除外理由を確認する
-1. canon-owned surface なら `documents/shared-runtime-surfaces.toml`、`documents/SHARED_RUNTIME_SURFACES.md`、`tools/sync_agent_canon.sh` の manifest-backed ownership に従い、`link-root`、vendor update、standalone canon update、または意図的削除のどれかに分類する
+1. canon-owned surface なら `documents/runtime/shared-runtime-surfaces.toml`、`documents/runtime/SHARED_RUNTIME_SURFACES.md`、`tools/sync_agent_canon.sh` の manifest-backed ownership に従い、`link-root`、vendor update、standalone canon update、または意図的削除のどれかに分類する
 1. template と canon のどちらにも無く、task 固有に必要な file だけを新規作成候補にし、既存実装・文書で足りない理由を run bundle に残す
 
 欠落を見つけた agent は、handoff や review artifact に `missing_file_triage` として確認した template path、canon path、分類、次 action を記録します。
@@ -336,7 +336,7 @@ dependency surface は task に応じて次を見ます。
 ### File Dependency Manifest
 
 新規作成・編集する canonical design / workflow / tool / policy / template text file では、ファイル冒頭に `@dependency-start` / `@dependency-end` marker を持つ dependency manifest block を置きます。Routine notes、generated reports、closed issue records、archive / compatibility records は scanner の classification に従います。
-設計正本は `documents/dependency-manifest-design.md` です。
+設計正本は `documents/design/dependency-manifest-design.md` です。
 旧 `Dependency Files:` block は新規・変更 file では使いません。
 
 - manifest の内部 DSL は `<direction> <kind> <relative-path> <reason...>` です
@@ -445,7 +445,7 @@ canonical formatter/dispatcher、validation-response、review integration が
 
 Codex では、まず `$agent-orchestration` を起点にし、`agents/skills/README.md` から current stage と contract に必要な skill を選びます。
 user が skill を明示したい場合は `$skill-name` を使います。例: `$repo-onboarding`、`$research-workflow`、`$paper-writing`
-細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、`documents/REVIEW_PROCESS.md` と `agents/canonical/` に寄せます。
+細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、`documents/conventions/REVIEW_PROCESS.md` と `agents/canonical/` に寄せます。
 repo-changing task では `python3 tools/agent_tools/route.py --prompt "<request>" --format json` の `ACTIVE_SKILLS` を routing declaration に使い、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は implementation / patch / doc-edit handoff が current stage に入った時点で active にします。
 `task_start.py` と `bootstrap_agent_run.py` は `--task` 文面から prompt-derived
 skill を追加し、選択済み skill ごとの repo tool route を
@@ -458,7 +458,7 @@ handoff に入ります。
 
 Before a capability gap claim about an existing API, dependency, config,
 or extension point, the implementation plan includes the
-`documents/api-surface-traversal-policy.md` evidence trail. Helper wrappers,
+`documents/design/api-surface-traversal-policy.md` evidence trail. Helper wrappers,
 native reusable API patches, and vendor/library edit proposals follow
 after the public import/export/signature/nested-config/example path has been
 checked and cited.
@@ -795,8 +795,8 @@ environment, produce resources, or duplicate tests/gates.
 - After any validation failure, record `failing_contract`,
   `observation_level`, `cause_classification`, `intent_preservation`, and
   `evidence`. The canonical token-safe slug lists are owned by
-  `documents/runtime-profiles-and-check-matrix.json` and projected into
-  `documents/runtime-profiles-and-check-matrix.md`; this workflow only points
+  `documents/runtime/runtime-profiles-and-check-matrix.json` and projected into
+  `documents/runtime/runtime-profiles-and-check-matrix.md`; this workflow only points
   to that taxonomy. Completion advances after response resolution through the
   owning repair route or recorded escalation.
 - Shared canon、Large delivery、高 risk 変更では差分限定ではなく全 repo 対象で `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。Routine docs / Focused code は changed-file dependency checks と relevant downstream review を evidence にできる
@@ -808,7 +808,7 @@ environment, produce resources, or duplicate tests/gates.
 - agent runtime / skill 変更では active profile に応じて `make agent-checks` または relevant subchecks を使う
 - 文書変更では canonical formatter/check path が Markdown、math、Mermaid の
   format/check を一つの証跡として記録する。
-- report を閉じる前には `documents/experiment-report-style.md` を確認する
+- report を閉じる前には `documents/experiments/experiment-report-style.md` を確認する
 - 研究系 task では `critical-review` と `report-review` の decision state を確認し、必要なら `research-perspective-review` を追加する
 
 ### 7. Closeout
@@ -816,8 +816,8 @@ environment, produce resources, or duplicate tests/gates.
 #### Completion Readiness
 
 - repo に残す差分がある task では、validation 後に commit を作る
-- commit は `documents/BRANCH_SCOPE.md` の Git 上の runnable unit として作る。validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を evidence に残す
-- commit / PR の切り方は `documents/BRANCH_SCOPE.md` の範囲分割契約に従う。commit は実行単位、PR はレビュー単位として扱い、複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作ってから merge 前に別 PR または別 commit へ分ける
+- commit は `documents/operations/BRANCH_SCOPE.md` の Git 上の runnable unit として作る。validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を evidence に残す
+- commit / PR の切り方は `documents/operations/BRANCH_SCOPE.md` の範囲分割契約に従う。commit は実行単位、PR はレビュー単位として扱い、複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作ってから merge 前に別 PR または別 commit へ分ける
 - final report の前に branch push を行い、user が明示的に停止を指定した場合は停止理由を final report に残す
 - user-facing final report は、`verification.txt` が `status=pass`、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked`、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` の状態で出す
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃ったら、chunk completion を全体 completion evidence に統合する

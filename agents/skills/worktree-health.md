@@ -22,9 +22,9 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Core References
 
-- `documents/worktree-lifecycle.md`
-- `documents/WORKTREE_SCOPE_TEMPLATE.md`
-- `documents/BRANCH_SCOPE.md`
+- `documents/operations/worktree-lifecycle.md`
+- `documents/operations/WORKTREE_SCOPE_TEMPLATE.md`
+- `documents/operations/BRANCH_SCOPE.md`
 - `notes/guardrails/README.md`
 - `notes/failures/README.md`
 - `notes/worktrees/README.md`

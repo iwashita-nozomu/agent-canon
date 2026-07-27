@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests AgentCanon runtime log archive path resolution.
 # upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves active and legacy log archive paths
-# upstream design ../../documents/runtime-log-archive.md runtime log archive ownership and branch policy
+# upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
 # @dependency-end
 
 from __future__ import annotations

@@ -22,7 +22,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 - `agents/workflows/academic-writing-workflow.md`
 - `agents/workflows/long-form-writing-workflow.md`
-- `documents/REVIEW_PROCESS.md`
+- `documents/conventions/REVIEW_PROCESS.md`
 
 ## Mandatory Checklist
 

@@ -3,8 +3,8 @@
 contract reference
 responsibility Documents AgentCanon dependency-related tools, external runtime tools, and license evidence.
 upstream design README.md tool documentation placement policy
-upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
-upstream design ../runtime-profiles-and-check-matrix.md runtime profile and validation routing
+upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../runtime/runtime-profiles-and-check-matrix.md runtime profile and validation routing
 upstream design ../../CONTAINER_OPERATIONS.md devcontainer and Docker ownership boundary
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 upstream environment ../../agent-canon-environment.toml machine-readable environment and compiled tool contract

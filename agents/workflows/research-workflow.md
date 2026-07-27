@@ -3,7 +3,7 @@
 contract workflow
 responsibility Documents 研究・実験改造ワークフロー for this repository.
 upstream design README.md workflow catalog
-downstream design ../../documents/algorithm-implementation-boundary.md equation-to-code boundary policy
+downstream design ../../documents/design/algorithm-implementation-boundary.md equation-to-code boundary policy
 @dependency-end
 -->
 
@@ -13,8 +13,8 @@ downstream design ../../documents/algorithm-implementation-boundary.md equation-
 対象は、`python/` 配下の実装改造、`experiments/` 配下の比較実験、`notes/` への知見整理を含みます。
 準備、実装、静的チェック、実行、結果レポートを通した実務上の統合入口は [experiment-workflow.md](experiment-workflow.md) を参照してください。
 この文書は、とくに問い、定式化、比較設計、段階的改造、claim 更新の正本を担います。
-批判的レビューの具体的な観点は [experiment-critical-review.md](../../documents/experiment-critical-review.md) を参照してください。
-数理境界と実装境界の対応表は [algorithm-implementation-boundary.md](../../documents/algorithm-implementation-boundary.md) を正本にします。
+批判的レビューの具体的な観点は [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md) を参照してください。
+数理境界と実装境界の対応表は [algorithm-implementation-boundary.md](../../documents/design/algorithm-implementation-boundary.md) を正本にします。
 
 ## この文書の読み方
 
@@ -36,7 +36,7 @@ downstream design ../../documents/algorithm-implementation-boundary.md equation-
 - 実装前に定式化を明文化します。対象の数式、制約、近似、数値法の前提を明記し、どの条件で成り立つかを書きます。
 - 比較対象を先に決めます。新手法だけを良く見せる比較ではなく、baseline、広く使われる方法、現時点の有力法を並べます。
 - 比較は 1 つの勝者探しより trade-off の把握を重視します。精度、時間、メモリ、頑健性、使いやすさを分けて見ます。
-- 実験後の report は、結果の列挙ではなく判断文書として書きます。`Results` と `Discussion` を混同せず、体裁の正本は `documents/experiment-report-style.md` に従います。
+- 実験後の report は、結果の列挙ではなく判断文書として書きます。`Results` と `Discussion` を混同せず、体裁の正本は `documents/experiments/experiment-report-style.md` に従います。
 - 実装は prototype から始め、少しずつ変更します。大きな改造を 1 回で入れず、各段で test と観測を残します。
 - 各結果の provenance を残します。使った code、commit、branch、command、seed、environment、入力条件を追えるようにします。
 - run は fresh 実行で完走させます。途中停止 run を resume の正本にせず、停止理由を記録して 0 からやり直します。
@@ -136,7 +136,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 - `Equation:` に、対象の式、目的関数、制約、離散化、近似、前処理、停止条件を書きます。
 - `Assumptions:` に、成り立ちを支える前提を書きます。
 - `Numerical Risks:` に、不安定化、オーバーフロー、近似誤差、conditioning、dtype 依存性を書きます。
-- `Equation-to-Code Mapping:` に、どの式、項、constraint、assumption、state boundary がどの実装 path / function / helper に対応するかを書きます。形式は [algorithm-implementation-boundary.md](../../documents/algorithm-implementation-boundary.md) の Boundary Map に合わせます。
+- `Equation-to-Code Mapping:` に、どの式、項、constraint、assumption、state boundary がどの実装 path / function / helper に対応するかを書きます。形式は [algorithm-implementation-boundary.md](../../documents/design/algorithm-implementation-boundary.md) の Boundary Map に合わせます。
 
 ### Step 3. 比較設計を固定する
 
@@ -378,7 +378,7 @@ spot run は次の用途での使用を禁止します。
 
 `experiment_reviewer` は、数字そのものだけでなく、数字の読み方を批判的に見ます。
 `change_reviewer` と `experiment_reviewer` は、run 完走や metric 改善があっても、数式 / 仕様 / method contract と code がずれていれば accept しません。
-最低限の review 観点は [experiment-critical-review.md](../../documents/experiment-critical-review.md) に従います。
+最低限の review 観点は [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md) に従います。
 
 最低でも次を確認します。
 
@@ -433,9 +433,9 @@ review artifact では、次のラベルで切り分けます。
 ## 12. 推奨ファイル配置
 
 - workflow の正本: `agents/workflows/research-workflow.md`
-- report 体裁の正本: `documents/experiment-report-style.md`
-- 実験運用規約: `documents/coding-conventions-experiments.md`
-- worktree 規約: `documents/worktree-lifecycle.md`
+- report 体裁の正本: `documents/experiments/experiment-report-style.md`
+- 実験運用規約: `documents/conventions/coding-conventions-experiments.md`
+- worktree 規約: `documents/operations/worktree-lifecycle.md`
 - 1 run の report: `experiments/report/<run_name>.md`
 - 実験 note: `notes/experiments/<topic>.md`
 - supporting notes: `notes/experiments/<topic>.md` または `notes/themes/<topic>.md`

@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Builds local-browser access commands for remote HTML artifacts.
-# upstream design ../../documents/result-log-retention-and-visualization.md defines visual artifact retention.
-# upstream design ../../documents/experiment-report-style.md defines experiment report artifact layout.
+# upstream design ../../documents/experiments/result-log-retention-and-visualization.md defines visual artifact retention.
+# upstream design ../../documents/experiments/experiment-report-style.md defines experiment report artifact layout.
 # downstream design ../../documents/tools/html_artifact_access.md documents command usage.
 # downstream implementation ../../tests/tools/test_html_artifact_access.py covers command rendering.
 # downstream design ../catalog.yaml catalogs this experiment helper.

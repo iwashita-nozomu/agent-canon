@@ -150,7 +150,7 @@ Run `document-inventory` when document, README, generated report, stale-doc,
 or reader-navigation surfaces are implicated. Run `import_responsibility.py`
 when import boundaries or package layout are implicated. In parent repos where
 the structure contract is not a root view, pass
-`--contract vendor/agent-canon/documents/repo-structure-contract.toml`.
+`--contract vendor/agent-canon/documents/structure/repo-structure-contract.toml`.
 
 ## Handoff Packet
 
@@ -414,7 +414,7 @@ a second dispatcher or child-check path.
 
 Validation failures record `failing_contract`, `observation_level`,
 `cause_classification`, `intent_preservation`, `evidence`, the two taxonomy
-references (`documents/runtime-profiles-and-check-matrix.json` and its
+references (`documents/runtime/runtime-profiles-and-check-matrix.json` and its
 generated Markdown reader), same-intent repair or escalation, its owner and
 result, and result artifact references. The taxonomy text is not copied into
 this schema.
@@ -426,7 +426,7 @@ this schema.
 - `severity`
 - `required_change`
 - `intent_preservation`: validation-failure response values are the canonical
-  slugs from `documents/runtime-profiles-and-check-matrix.json`; reviewer
+  slugs from `documents/runtime/runtime-profiles-and-check-matrix.json`; reviewer
   withdrawal, supersession, owner-boundary, or unsafe-replacement rationale
   belongs in `revert_or_discard_authority` instead of extending this field
 - `revert_or_discard_authority`: rollback、revert、または slice discard を求める

@@ -2,8 +2,8 @@
 # contract configuration
 # responsibility Defines machine-readable AgentCanon development environment expectations.
 # upstream design CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-# upstream design documents/gpu-admission-r5-source-packet.md exact shared runtime artifact identity
-# upstream design documents/rust-agent-tool-migration.md Rust tool migration policy
+# upstream design documents/experiments/gpu-admission-r5-source-packet.md exact shared runtime artifact identity
+# upstream design documents/design/rust-agent-tool-migration.md Rust tool migration policy
 # upstream implementation .devcontainer/post-create.sh installs shared development tooling
 # downstream implementation tools/rebuild_agent_tools.sh rebuilds compiled AgentCanon tools
 # downstream implementation rust/agent-canon/src/structured_analysis.rs implements structured-analysis cache build tooling
@@ -15,7 +15,7 @@ version = 1
 
 [toolchain.rust]
 owner = "agent-canon"
-install_surface = ".devcontainer/post-create.sh"
+install_surface = "vendor/agent-canon/.devcontainer/post-create.sh"
 manual_install_summary = "Install rustup minimal profile, then rustfmt, clippy, and rust-analyzer."
 manual_install_commands = [
   "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal",
@@ -56,7 +56,7 @@ validation_commands = [
 
 [json_cli_tools]
 owner = "agent-canon"
-install_surface = ".devcontainer/post-create.sh"
+install_surface = "vendor/agent-canon/.devcontainer/post-create.sh"
 install_function = "install_json_cli_tools"
 required_binaries = [
   "jq",
@@ -106,7 +106,7 @@ compose_bind_target = "/var/lib/agent-canon/runtime"
 
 [structured_analysis_cache]
 owner = "agent-canon"
-install_surface = ".devcontainer/post-create.sh"
+install_surface = "vendor/agent-canon/.devcontainer/post-create.sh"
 primary_cli = "agent-canon structured-analysis build"
 post_create_command = "agent-canon structured-analysis build --root <workspace> --profile devcontainer"
 cache_root = "${AGENT_CANON_STRUCTURED_ANALYSIS_HOME:-$HOME/.cache/agent-canon/structured-analysis}"

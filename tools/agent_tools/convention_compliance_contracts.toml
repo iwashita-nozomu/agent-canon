@@ -59,7 +59,7 @@ path = "agents/canonical/CODEX_WORKFLOW.md"
 markers = ["静的解析、読み取り確認、docs / targeted tests / agent checks", "Runtime evidence", "distinct unresolved claim/risk"]
 
 [[contracts.surfaces]]
-path = "documents/runtime-profiles-and-check-matrix.md"
+path = "documents/runtime/runtime-profiles-and-check-matrix.md"
 markers = ["Static analysis and reading evidence", "primary validation evidence", "operation checks", "supplemental evidence", "unresolved static/read findings"]
 
 [[contracts]]
@@ -203,7 +203,7 @@ path = "agents/skills/experiment-lifecycle.md"
 markers = ["experiment_execution_surface_guard", "tool_rejection_preflight.py", "test-design", "check_experiment_registry.py", "tests/tools/test_run_managed_experiment.py"]
 
 [[contracts.surfaces]]
-path = "documents/experiment-registry.md"
+path = "documents/experiments/experiment-registry.md"
 markers = ["experiment_execution_surface_guard", "tool_rejection_preflight.py", "check_experiment_registry.py", "tests/tools/test_run_managed_experiment.py"]
 
 [[contracts]]
@@ -247,15 +247,15 @@ id = "solid_coding_contract"
 description = "SOLID guidance stays routed to OOP readability checker evidence instead of prose-only review."
 
 [[contracts.surfaces]]
-path = "documents/coding-conventions-python.md"
+path = "documents/conventions/coding-conventions-python.md"
 markers = ["SOLID 設計契約", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/oop/python/readability.py", "tools/oop/shared/readability_core.py", "tools/agent_tools/check_solid_evidence.py", "SOLID principle signal", "SOLID_PRINCIPLES_BY_KIND", "scanned_paths"]
 
 [[contracts.surfaces]]
-path = "documents/object-oriented-design.md"
+path = "documents/conventions/object-oriented-design.md"
 markers = ["SOLID との対応", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/oop/shared/readability_core.py", "SOLID_PRINCIPLES_BY_KIND", "import_responsibility.py"]
 
 [[contracts.surfaces]]
-path = "documents/coding-conventions-testing.md"
+path = "documents/conventions/coding-conventions-testing.md"
 markers = ["SOLID / OOP boundary assertion", "$oop-readability-check", "tools/oop/python/readability.py", "tools/oop/cpp/readability.py", "import_responsibility.py"]
 
 [[contracts.surfaces]]
@@ -319,7 +319,7 @@ path = "documents/conventions/python/09_file_roles.md"
 markers = ["読者順序", "依存順序", "公開契約", "公開入口", "内部補助関数", "check_convention_compliance.py"]
 
 [[contracts.surfaces]]
-path = "documents/coding-conventions-house-style.md"
+path = "documents/conventions/coding-conventions-house-style.md"
 markers = ["読者順序", "公開契約", "公開入口", "内部補助関数", "単一公開入口"]
 
 [[contracts.surfaces]]

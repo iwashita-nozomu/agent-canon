@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Runs all registered AgentCanon eval producers in append-only accumulation mode.
 # upstream design ../../evidence/agent-evals/README.md eval family and accumulation contract
-# upstream design ../../documents/runtime-log-archive.md external runtime log archive contract
+# upstream design ../../documents/runtime/runtime-log-archive.md external runtime log archive contract
 # upstream design ../../tools/README.md shared tool index
 # upstream design ../../documents/tools/README.md user-facing tool index
 # upstream design ../../tools/catalog.yaml structured tool catalog

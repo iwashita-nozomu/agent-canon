@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Provides stable shell entrypoint for the AgentCanon Rust CLI.
-# upstream design ../../documents/rust-agent-tool-migration.md Rust tool migration policy
+# upstream design ../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 # upstream implementation ../../rust/agent-canon/src/main.rs Rust CLI entrypoint
 # @dependency-end
 

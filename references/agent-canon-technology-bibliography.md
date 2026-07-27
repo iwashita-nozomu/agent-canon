@@ -4,9 +4,9 @@ contract reference
 responsibility Catalogs external technical references for AgentCanon implementation and runtime surfaces.
 upstream design README.md reference capture and source-record requirements.
 upstream design ../agents/workflows/workflow-references.md workflow-level bibliography index.
-upstream design ../documents/semantic_index.md semantic-index tool design and generated-cache policy.
-upstream design ../documents/search-coordination.md coordinated search and bounded context-pack policy.
-upstream design ../documents/dependency-manifest-design.md dependency header and dependency graph policy.
+upstream design ../documents/tools/semantic_index.md semantic-index tool design and generated-cache policy.
+upstream design ../documents/tools/search-coordination.md coordinated search and bounded context-pack policy.
+upstream design ../documents/design/dependency-manifest-design.md dependency header and dependency graph policy.
 downstream design ../documents/tools/README.md documents operator-facing tool entrypoints.
 downstream design ../documents/tools/lean_capability_matrix.md records Lean feature routing adopted from bibliography sources.
 downstream design ../tools/README.md documents root tool inventory.

@@ -17,12 +17,12 @@ from pathlib import Path
 
 CORE_REF_GROUPS = (
     (
-        "documents/worktree-lifecycle.md",
-        "vendor/agent-canon/documents/worktree-lifecycle.md",
+        "documents/operations/worktree-lifecycle.md",
+        "vendor/agent-canon/documents/operations/worktree-lifecycle.md",
     ),
     (
-        "documents/BRANCH_SCOPE.md",
-        "vendor/agent-canon/documents/BRANCH_SCOPE.md",
+        "documents/operations/BRANCH_SCOPE.md",
+        "vendor/agent-canon/documents/operations/BRANCH_SCOPE.md",
     ),
     (
         "notes/worktrees/README.md",

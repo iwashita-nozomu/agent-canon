@@ -167,7 +167,7 @@ OpenAI / Codex の current product evidence をこの文書へ source-by-source 
   - 研究・実験改造の正本です。
 - [agents/workflows/implementation-waterfall-workflow.md](implementation-waterfall-workflow.md)
   - 実装パスのウォーターフォール正本です。
-- [documents/experiment-critical-review.md](../../documents/experiment-critical-review.md)
+- [documents/experiments/experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md)
   - 批判的レビュー観点の正本です。
 - [references/workflow/implementation-waterfall.md](../../references/workflow/implementation-waterfall.md)
   - 実装ウォーターフォール化の文献メモです。

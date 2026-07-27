@@ -6,7 +6,7 @@
 # upstream implementation ../../tools/agent_tools/search.py coordinates search providers
 # upstream implementation ../../tools/agent_tools/search_index.py supplies deterministic semantic cards
 # upstream implementation ../../tools/agent_tools/vector_search.py supplies dependency and code facts
-# upstream design ../../documents/search-coordination.md coordinated search provider contract
+# upstream design ../../documents/tools/search-coordination.md coordinated search provider contract
 # @dependency-end
 
 from __future__ import annotations

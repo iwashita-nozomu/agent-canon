@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Validates Dockerfile, runtime pack, devcontainer, and shared VS Code surface configuration.
-# upstream design ../../documents/coding-conventions-project.md environment configuration policy
-# upstream design ../../documents/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
-# upstream design ../../documents/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
-# upstream design ../../documents/gpu-admission-r5-source-packet.md exact runtime identity validation contract
-# upstream design ../../documents/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
+# upstream design ../../documents/conventions/coding-conventions-project.md environment configuration policy
+# upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
+# upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact runtime identity validation contract
+# upstream design ../../documents/design/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
 # upstream design ../../documents/tools/lean_proof_env.md Lean proof environment toolchain boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
@@ -306,19 +306,18 @@ def validate_dockerignore(root: Path) -> list[Finding]:
     return findings
 
 
+def shared_devcontainer_dir(root: Path) -> Path:
+    """Return the shared devcontainer source for a parent or source checkout."""
+    vendored = root / "vendor" / "agent-canon" / ".devcontainer"
+    if vendored.is_dir():
+        return vendored
+    return root / ".devcontainer"
+
+
 def validate_post_create(root: Path) -> list[Finding]:
-    """Require the post-create entrypoint without fixing its shell implementation."""
-    path = root / ".devcontainer" / "post-create.sh"
-    relative = ".devcontainer/post-create.sh"
-    if not path.is_file():
-        return [Finding("missing_file", relative, "missing")]
-    return []
-
-
-def validate_finalize_shared_runtime_script(devcontainer_dir: Path) -> list[Finding]:
-    """Require the shared-runtime finalizer without fixing its shell implementation."""
-    path = devcontainer_dir / "finalize-shared-runtime.sh"
-    relative = ".devcontainer/finalize-shared-runtime.sh"
+    """Require the shared post-create source at its owning path."""
+    path = shared_devcontainer_dir(root) / "post-create.sh"
+    relative = f"{path.relative_to(root)}"
     if not path.is_file():
         return [Finding("missing_file", relative, "missing")]
     return []
@@ -351,12 +350,12 @@ def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
     findings: list[Finding] = []
     expected_json = {
         "name": "${localWorkspaceFolderBasename}-devcontainer",
-        "initializeCommand": "bash .devcontainer/bootstrap-shared-runtime.sh && bash .devcontainer/generate-runtime-compose.sh",
-        "dockerComposeFile": "docker-compose.generated.yml",
+        "initializeCommand": "bash vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh && AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
+        "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
         "service": "workspace",
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-        "postCreateCommand": "bash .devcontainer/post-create.sh /workspace/${localWorkspaceFolderBasename}",
-        "postAttachCommand": "bash .devcontainer/post-attach.sh",
+        "postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace/${localWorkspaceFolderBasename} && bash .devcontainer/post-create-parent.sh /workspace/${localWorkspaceFolderBasename}",
+        "postAttachCommand": "bash vendor/agent-canon/.devcontainer/post-attach.sh",
     }
     for key, expected in expected_json.items():
         if config.get(key) != expected:
@@ -380,21 +379,25 @@ def validate_devcontainer_workspace(config: Mapping[str, object], pack: PackConf
     ]
 
 
-def validate_generate_runtime_compose_script(devcontainer_dir: Path) -> list[Finding]:
-    """Require the generator entrypoint without depending on its implementation text."""
-    script_path = devcontainer_dir / "generate-runtime-compose.sh"
+def validate_generate_runtime_compose_script(root: Path) -> list[Finding]:
+    """Require the generator at its AgentCanon source path."""
+    script_path = shared_devcontainer_dir(root) / "generate-runtime-compose.sh"
     if not script_path.is_file():
-        return [Finding("missing_file", ".devcontainer/generate-runtime-compose.sh", "missing")]
+        return [Finding("missing_file", f"{script_path.relative_to(root)}", "missing")]
     return []
 
 
-def validate_generated_compose(devcontainer_dir: Path, pack: PackConfig | None) -> list[Finding]:
+def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Finding]:
     """Validate generated Compose meaning rather than generator implementation text."""
     del pack
-    compose_path = devcontainer_dir / "docker-compose.generated.yml"
+    if (root / "vendor" / "agent-canon").is_dir():
+        compose_path = root / ".agent-canon" / "docker-compose.generated.yml"
+        relative = ".agent-canon/docker-compose.generated.yml"
+    else:
+        compose_path = root / ".devcontainer" / "docker-compose.generated.yml"
+        relative = ".devcontainer/docker-compose.generated.yml"
     if not compose_path.exists():
         return []
-    relative = ".devcontainer/docker-compose.generated.yml"
     if yaml is None:
         return [Finding("invalid_manifest", relative, "yaml-parser-unavailable")]
     try:
@@ -408,7 +411,7 @@ def validate_generated_compose(devcontainer_dir: Path, pack: PackConfig | None) 
     service = as_mapping(services.get("workspace")) if services is not None else None
     if service is None:
         return [Finding("invalid_manifest", relative, "workspace-service-required")]
-    root = devcontainer_dir.parent.resolve()
+    root = root.resolve()
     topic_root = root.parent.resolve()
     repo_target = f"/workspace/{root.name}"
     findings: list[Finding] = []
@@ -444,7 +447,7 @@ def validate_generated_compose(devcontainer_dir: Path, pack: PackConfig | None) 
         if not source:
             return None
         candidate = Path(source)
-        return (candidate if candidate.is_absolute() else devcontainer_dir / candidate).resolve()
+        return (candidate if candidate.is_absolute() else root / candidate).resolve()
 
     workspace_mounts: list[tuple[str | None, str | None]] = []
     for raw_volume in volumes:
@@ -503,23 +506,28 @@ def validate_devcontainer(root: Path) -> list[Finding]:
         return findings
 
     findings.extend(validate_devcontainer_json(config))
-    findings.extend(validate_finalize_shared_runtime_script(devcontainer_dir))
-    post_attach = devcontainer_dir / "post-attach.sh"
-    if not post_attach.is_file():
-        findings.append(Finding("missing_file", ".devcontainer/post-attach.sh", "missing"))
-    findings.extend(validate_generate_runtime_compose_script(devcontainer_dir))
+    findings.extend(validate_generate_runtime_compose_script(root))
     findings.extend(validate_post_create(root))
-    if (root / ".gitmodules").is_file() and not (
-        root / "tools" / "agent_tools" / "dependency_module_change.py"
-    ).is_file():
+    dependency_module_change = (
+        shared_agent_tools_dir(root) / "dependency_module_change.py"
+    )
+    if (root / ".gitmodules").is_file() and not dependency_module_change.is_file():
         findings.append(
             Finding(
                 "missing_file",
-                "tools/agent_tools/dependency_module_change.py",
+                dependency_module_change.relative_to(root).as_posix(),
                 "required-for-devcontainer-dependency-check",
             )
         )
     return findings
+
+
+def shared_agent_tools_dir(root: Path) -> Path:
+    """Locate shared agent tools in standalone or parent-projected layouts."""
+    direct = root / "tools" / "agent_tools"
+    if direct.is_dir():
+        return direct
+    return root / "tools" / "agent-canon" / "agent_tools"
 
 
 def validate_devcontainer_pack_alignment(root: Path, pack: PackConfig | None) -> list[Finding]:
@@ -534,7 +542,7 @@ def validate_devcontainer_pack_alignment(root: Path, pack: PackConfig | None) ->
     return [
         *json_findings,
         *validate_devcontainer_workspace(config, pack),
-        *validate_generated_compose(devcontainer_dir, pack),
+        *validate_generated_compose(root, pack),
     ]
 
 
@@ -553,12 +561,12 @@ def has_vscode_contract(root: Path) -> bool:
 def load_shared_surface_manifest(root: Path) -> tuple[SurfaceManifest | None, list[Finding]]:
     """Load the shared runtime surface manifest through its canonical parser."""
     try:
-        return load_manifest(root, "vendor/agent-canon", "documents/shared-runtime-surfaces.toml"), []
+        return load_manifest(root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml"), []
     except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
         return None, [
             Finding(
                 "invalid_manifest",
-                "documents/shared-runtime-surfaces.toml",
+                "documents/runtime/shared-runtime-surfaces.toml",
                 f"load-failed:{exc}",
             )
         ]
@@ -577,7 +585,7 @@ def load_vscode_surface(root: Path) -> tuple[SurfaceEntry | None, SurfaceManifes
             [
                 Finding(
                     "dependency_contract_violation",
-                    "documents/shared-runtime-surfaces.toml",
+                    "documents/runtime/shared-runtime-surfaces.toml",
                     "missing-surface:.vscode",
                 )
             ],
@@ -611,7 +619,7 @@ def validate_vscode_manifest(entry: SurfaceEntry, manifest: SurfaceManifest) -> 
             findings.append(
                 Finding(
                     "dependency_contract_violation",
-                    "documents/shared-runtime-surfaces.toml",
+                    "documents/runtime/shared-runtime-surfaces.toml",
                     f".vscode-{field}-expected:{expected_value}",
                 )
             )
@@ -625,7 +633,7 @@ def validate_vscode_manifest(entry: SurfaceEntry, manifest: SurfaceManifest) -> 
         findings.append(
             Finding(
                 "dependency_contract_violation",
-                "documents/shared-runtime-surfaces.toml",
+                "documents/runtime/shared-runtime-surfaces.toml",
                 "vscode-source-coverage",
             )
         )
@@ -641,7 +649,7 @@ def validate_vscode_manifest(entry: SurfaceEntry, manifest: SurfaceManifest) -> 
             findings.append(
                 Finding(
                     "dependency_contract_violation",
-                    "documents/shared-runtime-surfaces.toml",
+                    "documents/runtime/shared-runtime-surfaces.toml",
                     f"vscode-file-surface:{path}",
                 )
             )
@@ -658,7 +666,14 @@ def validate_vscode(root: Path) -> list[Finding]:
     if root_vscode.is_symlink():
         findings.append(Finding("inconsistency", ".vscode", "expected-real-directory"))
         return findings
-    source_checkout = not (root / "vendor" / "agent-canon" / "documents" / "shared-runtime-surfaces.toml").is_file()
+    source_checkout = not (
+        root
+        / "vendor"
+        / "agent-canon"
+        / "documents"
+        / "runtime"
+        / "shared-runtime-surfaces.toml"
+    ).is_file()
     source_relative = ".vscode" if source_checkout else f"{manifest.prefix}/.vscode"
     source_dir = root / source_relative
     if source_dir.is_symlink() or not source_dir.is_dir():

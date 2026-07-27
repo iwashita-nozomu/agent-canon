@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests tool/convention drift checker behavior.
 # upstream implementation ../../tools/agent_tools/tool_drift.py checker
-# upstream design ../../documents/dependency-manifest-design.md manifest trace map
+# upstream design ../../documents/design/dependency-manifest-design.md manifest trace map
 # @dependency-end
 
 from __future__ import annotations
@@ -603,7 +603,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../tools/README.md tool docs",
                     "# upstream design ../../documents/tools/README.md root docs",
                     "# upstream design ../../documents/tools/tool-docs.toml docs map",
-                    "# upstream design ../../documents/repo-local-tool-imports.md imports",
+                    "# upstream design ../../documents/tools/repo-local-tool-imports.md imports",
                     "# downstream implementation ../../tools/ci/run_all_checks.sh ci",
                     "# downstream implementation ../../tests/agent_tools/test_tool_catalog.py tests",
                     "# @dependency-end",
@@ -634,7 +634,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "tools/README.md",
             "documents/tools/README.md",
             "documents/tools/tool-docs.toml",
-            "documents/repo-local-tool-imports.md",
+            "documents/tools/repo-local-tool-imports.md",
             "tools/ci/run_all_checks.sh",
             "tests/agent_tools/test_tool_catalog.py",
         ]:

@@ -105,8 +105,8 @@ Issue / edit-scope evidence:
 
 ## Copilot Configuration Impact
 
-- [ ] `vendor/agent-canon/documents/github-copilot-configuration.md` was
-  reviewed in template roots, or `documents/github-copilot-configuration.md`
+- [ ] `vendor/agent-canon/documents/codex/github-copilot-configuration.md` was
+  reviewed in template roots, or `documents/codex/github-copilot-configuration.md`
   was reviewed in standalone AgentCanon.
 - [ ] Existing Copilot instruction surfaces changed / reviewed / not affected.
 - [ ] Optional future `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, or `.github/agents/*.md` surfaces were not introduced accidentally.
@@ -117,7 +117,7 @@ Impact notes:
 
 ## Validation
 
-- [ ] Validation failure response, if any, cites `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.json` as the canonical taxonomy owner; `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md` is the generated reader projection. PR evidence records the required evidence and same-intent repair / escalation result.
+- [ ] Validation failure response, if any, cites `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.json` as the canonical taxonomy owner; `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md` is the generated reader projection. PR evidence records the required evidence and same-intent repair / escalation result.
 - [ ] `bash tools/sync_agent_canon.sh link-root`
 - [ ] `bash tools/sync_agent_canon.sh check`
 - [ ] `make agent-canon-pr-check`

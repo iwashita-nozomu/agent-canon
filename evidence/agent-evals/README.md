@@ -148,7 +148,7 @@ required behavior-event fields.
 | Archive identity | unique `hook_run_id` values under `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`. |
 | Legacy source-tree result path | `agents/evals/results/` is not a normal read or write location; old results must be imported into the archive and deleted from source. |
 
-The archive boundary is documented in `documents/runtime-log-archive.md`.
+The archive boundary is documented in `documents/runtime/runtime-log-archive.md`.
 Run the mechanical producer before using accumulated evidence in a PR or guide:
 
 ```bash

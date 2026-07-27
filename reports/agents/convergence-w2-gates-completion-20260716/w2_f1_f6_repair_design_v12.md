@@ -1263,7 +1263,7 @@ implementation_authorization=blocked
 | `agents/COMMUNICATION_PROTOCOL.md` | one-ledger/context schema owner | `74b04f3cd6ca274eb2ef36f558a2b33859613379` |
 | `agents/canonical/ARTIFACT_PLACEMENT.md` | run-local placement owner | `5a51fba8b84604a27fc22e650c2fa1059b110a7b` |
 | `agents/skills/result-artifact-writeout.md` | raw/manifest output contract | `ffc7e73552653e71d793933582145805898083e8` |
-| `documents/runtime-profiles-and-check-matrix.json` | active validation route owner | `c0d8c64b8df5d58ab7ac1c3adca2dfa3de42ec98` |
+| `documents/runtime/runtime-profiles-and-check-matrix.json` | active validation route owner | `c0d8c64b8df5d58ab7ac1c3adca2dfa3de42ec98` |
 | `tools/ci/run_python_quality_checks.sh` | exact Ruff command source | `be0715a0a771b0571f394f1756df55593c8a5f78` |
 | `tools/agent_tools/github_publish.py` | GitHub publication consumer | `28238720838e645cadf342612cf81f6810426634` |
 

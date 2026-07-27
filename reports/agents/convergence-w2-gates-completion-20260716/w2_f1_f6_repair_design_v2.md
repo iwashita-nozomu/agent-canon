@@ -74,8 +74,8 @@
 | --- | --- | --- |
 | `agents/COMMUNICATION_PROTOCOL.md` `CompletionCoverage v1 Schema Contract` | CompletionCoverage event/schema and group semantics | Owns the new `completion_authority` event payload, per-member correspondence, and cross-member equality rule. |
 | `agents/canonical/CODEX_WORKFLOW.md` `CompletionCoverage Applicability And State Contract` | Applicability, transition order, topology state, W2 branch reason | Owns the single branch-reason value and the allowed state-transition graph. |
-| `documents/dependency-manifest-design.md` `Bidirectional Consistency` | Durable dependency edges and reverse-edge matching | Owns the header closure enumerated in the Side-Effect Map. |
-| `documents/REVIEW_PROCESS.md` | Review artifact lifecycle and merge evidence | Owns external review identity, decision refresh, and latest-source review rules. |
+| `documents/design/dependency-manifest-design.md` `Bidirectional Consistency` | Durable dependency edges and reverse-edge matching | Owns the header closure enumerated in the Side-Effect Map. |
+| `documents/conventions/REVIEW_PROCESS.md` | Review artifact lifecycle and merge evidence | Owns external review identity, decision refresh, and latest-source review rules. |
 | `tools/agent_tools/work_log.py` | Append-only ledger, snapshot, authority resolution | Owns event validation, deterministic snapshot identity, and unique authority-head selection. |
 | `tools/agent_tools/workflow_monitor.py` | Public semantic-event append surface | Preserves the dedicated `completion_authority` object without flattening or synthesizing success. |
 | `tools/agent_tools/report_artifact_checks.py` | Projection, typed checks, boundary derivation, artifact identity checks | Removes caller-owned completion inputs and recomputes only from the ledger snapshot. |
@@ -669,9 +669,9 @@ readback after commit.
 3. `agents/COMMUNICATION_PROTOCOL.md` `CompletionCoverage v1 Schema Contract`.
 4. `agents/canonical/CODEX_WORKFLOW.md`
    `CompletionCoverage Applicability And State Contract`.
-5. `documents/dependency-manifest-design.md` `Bidirectional Consistency`,
+5. `documents/design/dependency-manifest-design.md` `Bidirectional Consistency`,
    `Isolated Manifests`, and cycle rules.
-6. `documents/REVIEW_PROCESS.md` review artifact, post-fix rerun, merge, and
+6. `documents/conventions/REVIEW_PROCESS.md` review artifact, post-fix rerun, merge, and
    evidence sections.
 7. `tools/agent_tools/work_log.py` event validation, append, snapshot, digest.
 8. `tools/agent_tools/workflow_monitor.py` semantic event parser and append
@@ -699,7 +699,7 @@ the later decision-binding commit.
 | --- | --- | --- | --- |
 | `agents/COMMUNICATION_PROTOCOL.md` | Define `completion_authority.v1`, participating-event binding, aggregate selection contract, two-phase group predicate, typed errors, and review identity packet fields. | Schema owner; detailed-design and document-flow review. | D1, D3, D4, D5 |
 | `agents/canonical/CODEX_WORKFLOW.md` | Replace split non-routing inputs with the selected authority event, retain the transition graph, define topology-state predicates, and declare the sole branch reason. | State owner; detailed-design and workflow review. | D1, D2, D4, D5 |
-| `documents/REVIEW_PROCESS.md` | Require design and implementation review artifacts to bind exact prior tuples; prohibit self-byte hashes; require refreshed review on changed tuples. | Review-policy owner. | D4, D5 |
+| `documents/conventions/REVIEW_PROCESS.md` | Require design and implementation review artifacts to bind exact prior tuples; prohibit self-byte hashes; require refreshed review on changed tuples. | Review-policy owner. | D4, D5 |
 | `agents/skills/codex-task-workflow.md` | Project the aggregate authority event/resolver and decision-binding consumer without restating schema. | Skill projection review. | D1, D4, D5 |
 | `agents/skills/report-writing.md` | Report selected authority event/revision and recomputed gates; never report stored values as authority. | Report projection review. | D1, D4 |
 | `agents/workflows/implementation-waterfall-workflow.md` | Gate implementation on v2 design approval, source freeze before external review, and decision binding before integration. | Workflow review. | D4, D5 |
@@ -734,13 +734,13 @@ implementation must add or normalize these durable pairs:
 | `agents/COMMUNICATION_PROTOCOL.md` | `tools/agent_tools/workflow_monitor.py` | `workflow_monitor.py` adds the same canonical upstream. |
 | `agents/COMMUNICATION_PROTOCOL.md` | `tools/agent_tools/report_artifact_checks.py` | `report_artifact_checks.py` adds the same canonical upstream. |
 | `agents/COMMUNICATION_PROTOCOL.md` | `tools/agent_tools/task_close.py` | `task_close.py` adds the same canonical upstream. |
-| `agents/COMMUNICATION_PROTOCOL.md` | `documents/REVIEW_PROCESS.md` | `REVIEW_PROCESS.md` adds `upstream design ../agents/COMMUNICATION_PROTOCOL.md`. |
+| `agents/COMMUNICATION_PROTOCOL.md` | `documents/conventions/REVIEW_PROCESS.md` | `REVIEW_PROCESS.md` adds `upstream design ../agents/COMMUNICATION_PROTOCOL.md`. |
 | `agents/COMMUNICATION_PROTOCOL.md` | `agents/templates/work_log.md`, `workflow_monitoring.md`, `closeout_gate.md`, `design_review.md`, `change_review.md`, `final_review.md` | Each template adds `upstream design ../COMMUNICATION_PROTOCOL.md`. |
 | `agents/COMMUNICATION_PROTOCOL.md` | `agents/workflows/implementation-waterfall-workflow.md`, `agents/skills/report-writing.md` | Each projection adds the matching canonical upstream. |
 | `agents/canonical/CODEX_WORKFLOW.md` | `tools/agent_tools/work_log.py`, `workflow_monitor.py`, `report_artifact_checks.py`, `task_close.py` | Each code header adds or retains `upstream design ../../agents/canonical/CODEX_WORKFLOW.md`. |
 | `agents/canonical/CODEX_WORKFLOW.md` | `agents/templates/work_log.md`, `workflow_monitoring.md`, `schedule.md`, `closeout_gate.md` | Each template adds or retains `upstream design ../canonical/CODEX_WORKFLOW.md`. |
 | `agents/canonical/CODEX_WORKFLOW.md` | `agents/skills/codex-task-workflow.md`, `agents/skills/report-writing.md`, `agents/workflows/implementation-waterfall-workflow.md` | Each projection adds or retains the matching canonical upstream. |
-| `agents/canonical/CODEX_WORKFLOW.md` | `documents/REVIEW_PROCESS.md`, `agents/agents_config.json` | The document and JSON manifest add the matching canonical upstream. |
+| `agents/canonical/CODEX_WORKFLOW.md` | `documents/conventions/REVIEW_PROCESS.md`, `agents/agents_config.json` | The document and JSON manifest add the matching canonical upstream. |
 | `tools/agent_tools/work_log.py` | `workflow_monitor.py`, `report_artifact_checks.py`, `test_work_log.py`, `test_task_start_and_close.py` | Each consumer has one matching `upstream implementation` edge; duplicate current work-log/monitor edges are normalized to one pair. |
 | `tools/agent_tools/report_artifact_checks.py` | `task_close.py`, `test_task_start_and_close.py` | Both consumers carry matching `upstream implementation` edges. |
 | `tools/agent_tools/task_close.py` | `test_task_start_and_close.py` | The test retains/adds the matching reverse edge. |

@@ -6,8 +6,8 @@ contract skill
 responsibility Documents codex-task-workflow for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md defines the executable Codex workflow
 upstream design ../COMMUNICATION_PROTOCOL.md defines pre-edit investigation and context capsule handoff packets
-upstream design ../../documents/dependency-manifest-design.md defines dependency manifest requirements
-upstream design ../../documents/BRANCH_SCOPE.md defines Git commit correctness and push evidence
+upstream design ../../documents/design/dependency-manifest-design.md defines dependency manifest requirements
+upstream design ../../documents/operations/BRANCH_SCOPE.md defines Git commit correctness and push evidence
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback workflow
 downstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
@@ -122,7 +122,7 @@ route are ready.
   parent root で `bash tools/sync_agent_canon.sh link-root` と
   `bash tools/sync_agent_canon.sh check` が pass した後にだけ
   `agentcanon_structure_followup=pass` を記録して closeout evidence に使う。
-- commit / push の前に `documents/BRANCH_SCOPE.md` の commit correctness contract と範囲分割契約を満たす。commit は Git 上の実行単位、PR はレビュー単位として扱い、validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作り、merge 前に別 PR または別 commit へ分ける。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。evidence には branch、commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を残す
+- commit / push の前に `documents/operations/BRANCH_SCOPE.md` の commit correctness contract と範囲分割契約を満たす。commit は Git 上の実行単位、PR はレビュー単位として扱い、validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作り、merge 前に別 PR または別 commit へ分ける。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。evidence には branch、commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を残す
 - 普通の相談、壁打ち、routing-only advice、説明だけの turn はこの skill の実行対象ではありません。その場合は shell / GitHub checks を走らせず、会話だけで応答します。
 - GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させない
 - request clauses から `requested_scope` を先に固定し、その後に owner boundary、dependency evidence、validation route から `work_scope` を導く。限定された `work_scope` は実装段階の packet としてだけ使えます。broader request を閉じるには `covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` を明示し、要求された surface を勝手に外していないことを示します。

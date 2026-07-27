@@ -3,7 +3,7 @@
 contract workflow
 responsibility Documents 実装ウォーターフォールワークフロー for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md defines canonical Codex task gates
-upstream design ../../documents/dependency-manifest-design.md defines dependency manifest gates
+upstream design ../../documents/design/dependency-manifest-design.md defines dependency manifest gates
 downstream design ../templates/closeout_gate.md records closeout evidence required by this workflow
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py verifies design-doc evidence claims
 upstream design ../skills/code-visualization.md sole public visualization owner and canonical projection gate
@@ -451,7 +451,7 @@ exit 条件:
 - `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、selected の場合の `design_review.md`、active な場合の `document_flow_review.md`、repo docs、dependency surface、code path、test path、外部 reference を列挙します。`test_plan.md` は Gate 8.5 が active になった後の review packet にだけ加えます
 - `Design Side-Effect Map` には、主要設計判断ごとに影響する implementation、document、workflow、prompt/config、validation、dependency manifest、user-facing surface を列挙し、各 item を `Abstract Design Frame`、request clause ID、reuse precedent、owner stage、review gate、canonical validation evidence に接続します。test-design route が active な場合だけ test-plan item も接続します
 - `Dependency Manifest Plan` には、編集対象 file ごとに追加・維持する `upstream` / `downstream` edge、kind、相対 path、reason、編集前に読む upstream context、編集後に確認する downstream context を列挙します
-- 新規・変更する human-authored text file では旧 `Dependency Files:` block を使わず、`documents/dependency-manifest-design.md` の `@dependency-start` / `@dependency-end` 形式に統一します
+- 新規・変更する human-authored text file では旧 `Dependency Files:` block を使わず、`documents/design/dependency-manifest-design.md` の `@dependency-start` / `@dependency-end` 形式に統一します
 - 新しい dependency edge を足す場合は reverse edge も同じ pass の file plan に入れます。移行中で reverse edge 追加を同じ pass に含められない場合は、design review に blocker か明示 escalation として出します
 - `Canonical Tree-Head Plan` では、task 完了後に tracked tree に残してよい canonical design path と canonical implementation path を固定し、parallel design doc、implementation copy、dated snapshot、backup file、duplicate directory を作らないことを明示します
 - `bootstrap_agent_run.py` と `task_start.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま渡します
@@ -628,7 +628,7 @@ exit 条件:
 - 設計を変えたくなったら Gate 5-6 を開き直します
 - 実装中に設計上の問題を見つけた場合は、勝手に実装で吸収せず `design_issue_blocker` と evidence を残して Gate 5-6 へ戻します。対象は API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾です。local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで解決した扱いにしてはいけません
 - 同じ implementation pass で直せるのは、承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従だけです。判断が必要なら設計問題として扱います
-- validation の test / check failure を見た場合は、implementation intent の変更、behavior / test の削除、revert、oracle weakening、pass 目的の単純化へ進む前に、`failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録します。`cause_classification` と `intent_preservation` の slug set と route semantics は `documents/runtime-profiles-and-check-matrix.json` を canonical taxonomy owner として cite し、`documents/runtime-profiles-and-check-matrix.md` を generated reader projection として扱います。workflow、subagent、review surface は required evidence と same-intent repair / escalation result だけを記録します。`cause_classification=implementation_bug` で contract と oracle が安定している場合は、approved intent を保ち、追加 test planning で止めずに owning code / config / docs / workflow repair へ進めます
+- validation の test / check failure を見た場合は、implementation intent の変更、behavior / test の削除、revert、oracle weakening、pass 目的の単純化へ進む前に、`failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録します。`cause_classification` と `intent_preservation` の slug set と route semantics は `documents/runtime/runtime-profiles-and-check-matrix.json` を canonical taxonomy owner として cite し、`documents/runtime/runtime-profiles-and-check-matrix.md` を generated reader projection として扱います。workflow、subagent、review surface は required evidence と same-intent repair / escalation result だけを記録します。`cause_classification=implementation_bug` で contract と oracle が安定している場合は、approved intent を保ち、追加 test planning で止めずに owning code / config / docs / workflow repair へ進めます
 - design section、request clause ID に trace できない変更は実装しません。test-design route が activate された場合だけ、その evidence を test-plan item に trace します
 - dependency manifest edge、reverse edge、または comment wrapping を設計と違う形で実装しません。必要なら Gate 5-6 へ戻します
 - 非自明な変更では、selected owning review gate を final polish 前に adjudicate します。別 checkpoint review は distinct unresolved claim/risk が owning gate で判定できない場合だけ追加します
@@ -821,7 +821,7 @@ exit 条件:
 - 設計不整合、file plan の見直し、rollback 方針の欠落:
   - Gate 4-5 へ戻す
 - 実装ミスや test failure だが設計は維持できる:
-  - `failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録し、`cause_classification=implementation_bug` なら Gate 8 の owning implementation repair に戻す。slug set と route semantics は `documents/runtime-profiles-and-check-matrix.json` を canonical taxonomy owner として cite し、`documents/runtime-profiles-and-check-matrix.md` を generated reader projection として扱う
+  - `failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録し、`cause_classification=implementation_bug` なら Gate 8 の owning implementation repair に戻す。slug set と route semantics は `documents/runtime/runtime-profiles-and-check-matrix.json` を canonical taxonomy owner として cite し、`documents/runtime/runtime-profiles-and-check-matrix.md` を generated reader projection として扱う
 - 実験結果やユーザー要望で別仮説になった:
   - 既存 pass を閉じ、新しい change request として Gate 0 からやり直す
 

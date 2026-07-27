@@ -73,8 +73,8 @@ because Python and dynamic-graph execution are explicitly out of scope.
 | --- | --- |
 | `agents/COMMUNICATION_PROTOCOL.md` | Ledger transaction, canonical event, formatter record, and artifact evidence schemas. |
 | `agents/canonical/CODEX_WORKFLOW.md` | Active-W2 detection, publication owner, route state, mutation prohibition, and typed recovery. |
-| `documents/BRANCH_SCOPE.md` | Durable branch, push, merge, main-integration, and scope-split contract. |
-| `documents/REVIEW_PROCESS.md` | Independent candidate review and publication-result review policy. |
+| `documents/operations/BRANCH_SCOPE.md` | Durable branch, push, merge, main-integration, and scope-split contract. |
+| `documents/conventions/REVIEW_PROCESS.md` | Independent candidate review and publication-result review policy. |
 | `agents/workflows/main-integration-workflow.md` | Main-target route and structural integration sequence. |
 | `agents/workflows/agent-canon-pr-workflow.md` | AgentCanon branch publication, PR creation, automation, and merge route. |
 | `agents/workflows/pr-queue-cleanup-workflow.md` | Ordered PR merge and dependent pin queue route. |
@@ -463,7 +463,7 @@ below.
 
 | Route surface | Existing mutation | Active W2 v6 contract |
 | --- | --- | --- |
-| `documents/BRANCH_SCOPE.md` | ordinary branch push, merge, fast-forward | owner text delegates active W2 to the integrator and forbids direct commands |
+| `documents/operations/BRANCH_SCOPE.md` | ordinary branch push, merge, fast-forward | owner text delegates active W2 to the integrator and forbids direct commands |
 | `agents/workflows/main-integration-workflow.md` | `git merge --no-ff`, later main fast-forward | active W2 constructs I directly and CAS-updates an un-checked-out target; ordinary commands are non-W2 only |
 | `agents/workflows/agent-canon-pr-workflow.md` | branch push, PR automation merge, current-checkout merge | active W2 uses route-plan steps and exact automation fields |
 | `agents/workflows/pr-queue-cleanup-workflow.md` | source/dependent PR merge | active W2 merge delegates to PR CAS or remains blocked |
@@ -1189,7 +1189,7 @@ self-reference, immutable B, compatibility, and test-only API checks pass.
 Mandatory primary owner/implementation reads:
 
 1. `agents/canonical/CODEX_WORKFLOW.md`
-2. `documents/BRANCH_SCOPE.md`
+2. `documents/operations/BRANCH_SCOPE.md`
 3. `agents/workflows/main-integration-workflow.md`
 4. `agents/workflows/agent-canon-pr-workflow.md`
 5. `agents/workflows/pr-queue-cleanup-workflow.md`
@@ -1225,9 +1225,9 @@ No source begins from this design commit merely because it exists.
 | --- | --- | --- | --- |
 | `agents/COMMUNICATION_PROTOCOL.md` | Add ledger transaction, fixed formatter union, authority-artifact, and within-transaction reference schemas. | R2/R3 | Schema-owner review |
 | `agents/canonical/CODEX_WORKFLOW.md` | Add one authority/resolver, route plans, active-W2 mutation prohibition, checked-out refusal, partial route state, and recovery. | R1/R2 | Workflow-owner review |
-| `documents/BRANCH_SCOPE.md` | Replace active-W2 ordinary push/merge/ff with mandatory integrator delegation and typed refusal. | R1 | Git owner review |
-| `documents/REVIEW_PROCESS.md` | Review publication route plan, PR tuple, atomic transaction evidence, and complete formatter variants. | all | Review-owner review |
-| `documents/dependency-manifest-design.md` | Apply existing exact bidirectional closure rules; no new semantics. | all | Dependency review |
+| `documents/operations/BRANCH_SCOPE.md` | Replace active-W2 ordinary push/merge/ff with mandatory integrator delegation and typed refusal. | R1 | Git owner review |
+| `documents/conventions/REVIEW_PROCESS.md` | Review publication route plan, PR tuple, atomic transaction evidence, and complete formatter variants. | all | Review-owner review |
+| `documents/design/dependency-manifest-design.md` | Apply existing exact bidirectional closure rules; no new semantics. | all | Dependency review |
 | `agents/workflows/main-integration-workflow.md` | Use un-checked-out target CAS for active W2; retain ordinary workflow only for non-W2. | R1 | Main integration review |
 | `agents/workflows/agent-canon-pr-workflow.md` | Bind push/PR/automation to selection hash, expected OIDs, receipt, and readback. | R1 | PR workflow review |
 | `agents/workflows/pr-queue-cleanup-workflow.md` | Delegate active-W2 PR merges; preserve queue order and authority. | R1 | Queue workflow review |
@@ -1283,13 +1283,13 @@ No source begins from this design commit merely because it exists.
 | `documents/tools/README.md` | Route GitHub, AgentCanon update, sync, and retired shim through one authority. | R1 | Docs check |
 | `tools/README.md` | Document publication integrator and guarded helpers. | R1 | Docs check |
 | `tools/catalog.yaml` | Register publication integrator and link github-publish docs/tests/dependency. | R1 | Catalog check |
-| `documents/FILE_CHECKLIST_OPERATIONS.md` | Replace active-W2 direct push closeout example with canonical route. | R1 | Docs review |
-| `documents/agent-canon-github-remote.md` | Require exact lease/PR tuple for active W2. | R1 | Docs review |
-| `documents/agent-canon-subtree-migration.md` | Bound merge/push wrappers by active W2 gate. | R1 | Docs review |
-| `documents/agent-canon-parent-repo-latest-checklist.md` | Record delegate-or-fail requirement. | R1 | Docs review |
-| `documents/agent-canon-update-route.md` | Add publication authority dependency for merge/push actions. | R1 | Docs review |
-| `documents/server-host-contract.md` | Canonical GitHub publish statement gains active-W2 CAS boundary. | R1 | Docs review |
-| `documents/worktree-lifecycle.md` | Main return route states target must not be checked out for W2 CAS. | R1 | Docs review |
+| `documents/operations/FILE_CHECKLIST_OPERATIONS.md` | Replace active-W2 direct push closeout example with canonical route. | R1 | Docs review |
+| `documents/agent-canon/agent-canon-github-remote.md` | Require exact lease/PR tuple for active W2. | R1 | Docs review |
+| `documents/agent-canon/agent-canon-subtree-migration.md` | Bound merge/push wrappers by active W2 gate. | R1 | Docs review |
+| `documents/agent-canon/agent-canon-parent-repo-latest-checklist.md` | Record delegate-or-fail requirement. | R1 | Docs review |
+| `documents/agent-canon/agent-canon-update-route.md` | Add publication authority dependency for merge/push actions. | R1 | Docs review |
+| `documents/contracts/server-host-contract.md` | Canonical GitHub publish statement gains active-W2 CAS boundary. | R1 | Docs review |
+| `documents/operations/worktree-lifecycle.md` | Main return route states target must not be checked out for W2 CAS. | R1 | Docs review |
 | `.codex/README.md` | Hook boundary no longer says every simple push skips the critical active-W2 guard. | R1 | Docs/hook review |
 | `agents/workflows/README.md` | Main/PR/update route index points to publication authority. | R1 | Workflow docs review |
 
@@ -1319,7 +1319,7 @@ Core owner/implementation pairs:
 
 | Forward owner line | Reverse consumer line |
 | --- | --- |
-| `documents/BRANCH_SCOPE.md`: `downstream implementation ../tools/agent_tools/publication_integrator.py enforces active-W2 local, remote, and PR publication CAS` | `publication_integrator.py`: `upstream design ../../documents/BRANCH_SCOPE.md owns branch, push, merge, and main publication policy` |
+| `documents/operations/BRANCH_SCOPE.md`: `downstream implementation ../tools/agent_tools/publication_integrator.py enforces active-W2 local, remote, and PR publication CAS` | `publication_integrator.py`: `upstream design ../../documents/operations/BRANCH_SCOPE.md owns branch, push, merge, and main publication policy` |
 | `agents/canonical/CODEX_WORKFLOW.md`: `downstream implementation ../../tools/agent_tools/publication_integrator.py executes canonical completion-authority publication` | `publication_integrator.py`: `upstream design ../../agents/canonical/CODEX_WORKFLOW.md owns active-W2 publication authority and route state` |
 | `agents/COMMUNICATION_PROTOCOL.md`: `downstream implementation ../tools/agent_tools/work_log.py stores atomic ledger transactions and formatter records` | `work_log.py`: `upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns ledger transaction and formatter schemas` |
 | `agents/workflows/agent-canon-pr-workflow.md`: retained github-publish upstream plus new publication-integrator upstream | `publication_integrator.py`: downstream caller/review edge to AgentCanon PR workflow |
@@ -1345,7 +1345,7 @@ Direct caller/reverse pairs:
 
 Skill closure:
 
-- `documents/BRANCH_SCOPE.md` retains and strengthens downstream edges to
+- `documents/operations/BRANCH_SCOPE.md` retains and strengthens downstream edges to
   `agents/skills/pr-processing.md` and
   `.agents/skills/pr-processing/SKILL.md`.
 - `agents/skills/pr-processing.md` retains canonical registry upstream and adds

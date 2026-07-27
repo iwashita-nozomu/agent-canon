@@ -5,7 +5,7 @@ responsibility Defines SQLite database design for structured prose, report, and 
 upstream design README.md structured analysis package index
 upstream design graph-dsl.md Graph DSL Core storage contract
 upstream design ../prose-reasoning-graph/dsl-spec.md prose graph DSL and projection contract
-upstream design ../dependency-manifest-design.md dependency manifest DSL and validation model
+upstream design ../design/dependency-manifest-design.md dependency manifest DSL and validation model
 upstream implementation ../../tools/agent_tools/prose_reasoning_graph.py current prose graph SQLite implementation
 upstream implementation ../../rust/agent-canon/src/structured_analysis.rs Rust structured-analysis CLI implementation
 upstream implementation ../../tools/agent_tools/check_dependency_graph.sh emits dependency manifest graph artifacts

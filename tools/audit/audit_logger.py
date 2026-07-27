@@ -3,7 +3,7 @@
 # responsibility Writes JSONL audit logs for agent and repository automation events.
 # upstream design ../README.md shared tool index
 # upstream implementation audit_log_schema.py defines the entry schema
-# downstream design ../../documents/result-log-retention-and-visualization.md result policy
+# downstream design ../../documents/experiments/result-log-retention-and-visualization.md result policy
 # @dependency-end
 """
 Audit Logger — 監査ログシステム

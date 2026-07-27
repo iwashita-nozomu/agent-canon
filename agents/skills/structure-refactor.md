@@ -10,7 +10,7 @@ upstream design ../workflows/README.md workflow catalog routing guide
 upstream design ../workflows/implementation-waterfall-workflow.md implementation gate contract
 upstream design ../../AGENTS.md bounded handoff and subagent packet rules
 upstream design ../canonical/CODEX_SUBAGENTS.md Codex runtime surface and subagent config ownership
-upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared root runtime surface policy
+upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared root runtime surface policy
 upstream design ../../documents/rule/README.md document rule canon
 upstream design ../../documents/design/README.md design canon reader route
 upstream design refactor-loop.md behavior-preserving refactor loop
@@ -97,7 +97,7 @@ source packet:
   the packet shows a real layout, scope, view, or responsibility refactor.
 - `responsibility-scope.toml` and `responsibility_scope.py` show primary scope
   ownership, `exclude_paths`, required coverage, and overlap findings.
-- `documents/repo-structure-contract.toml` and
+- `documents/structure/repo-structure-contract.toml` and
   `repo_structure_contract.py` show whether the checkout still satisfies the
   expected standalone, template, or derived-repository layout before a task
   creates, moves, or ignores paths.
@@ -270,7 +270,7 @@ python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json
 
 ```bash
 python3 tools/agent_tools/repo_structure_contract.py --root <root> \
-  --contract vendor/agent-canon/documents/repo-structure-contract.toml \
+  --contract vendor/agent-canon/documents/structure/repo-structure-contract.toml \
   --format json > <run>/repo_structure_contract.json
 ```
 

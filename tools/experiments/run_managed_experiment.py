@@ -3,14 +3,14 @@
 # contract tool
 # responsibility Provides run managed experiment experiment workflow tooling.
 # upstream design ../README.md shared automation index
-# upstream design ../../documents/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 composition and terminal frame
-# upstream design ../../documents/experiment_runner.md external ExperimentRunner ownership and task boundary
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 composition and terminal frame
+# upstream design ../../documents/design/experiment_runner.md external ExperimentRunner ownership and task boundary
 # upstream implementation ./execution_resource_plan.py canonical admission planning and terminal owner
-# upstream implementation ../../documents/experiment-runner-ff97-lifecycle.md fixed ff97 StandardRunner lifecycle and scheduler source identity
-# downstream implementation ../../documents/gpu-admission-r5-ordered-integration-interface.json ordered W2-W4 interface
+# upstream implementation ../../documents/experiments/experiment-runner-ff97-lifecycle.md fixed ff97 StandardRunner lifecycle and scheduler source identity
+# downstream implementation ../../documents/experiments/gpu-admission-r5-ordered-integration-interface.json ordered W2-W4 interface
 # downstream implementation ../../experiments/_template/run.py exposes the topic main adapted from the frozen snapshot
 # downstream implementation ../../tests/tools/test_run_managed_experiment.py validates the sole composition and frozen topic adapter
-# upstream design ../../documents/gpu-admission-r5-nvidia-visibility.md NVIDIA process/PID/MIG/UUID visibility gate
+# upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA process/PID/MIG/UUID visibility gate
 # @dependency-end
 
 # Static route evidence: run_cli -> execute_managed_run ->

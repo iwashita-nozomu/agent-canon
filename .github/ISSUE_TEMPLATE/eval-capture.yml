@@ -1,7 +1,7 @@
 # @dependency-start
 # contract configuration
 # responsibility Defines issue form for converting agent failures into eval cases.
-# upstream design ../../documents/prompt-skill-evaluation-checklist.md eval capture checklist.
+# upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md eval capture checklist.
 # upstream design ../../agents/evals/README.md eval evidence storage contract.
 # downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
 # @dependency-end

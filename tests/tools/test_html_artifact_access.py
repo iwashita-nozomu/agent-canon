@@ -2,7 +2,7 @@
 # contract test
 # responsibility Tests remote HTML artifact access command rendering.
 # upstream design ../../documents/tools/html_artifact_access.md user-facing helper contract
-# upstream design ../../documents/result-log-retention-and-visualization.md visual artifact policy
+# upstream design ../../documents/experiments/result-log-retention-and-visualization.md visual artifact policy
 # upstream implementation ../../tools/experiments/html_artifact_access.py helper under test
 # @dependency-end
 

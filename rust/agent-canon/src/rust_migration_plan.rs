@@ -1,8 +1,8 @@
 // @dependency-start
 // contract implementation
 // responsibility Prints sequential Rust migration candidates for AgentCanon tools.
-// upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
-// upstream design ../../../documents/runtime-log-archive.md hook and skill usage log archive policy
+// upstream design ../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
+// upstream design ../../../documents/runtime/runtime-log-archive.md hook and skill usage log archive policy
 // downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
 // @dependency-end
 
@@ -249,7 +249,7 @@ fn build_plan(root: &Path, limit: usize) -> Plan {
 fn inspect_foundation(root: &Path) -> FoundationStatus {
     let mut missing = Vec::new();
     for relative in [
-        "documents/rust-agent-tool-migration.md",
+        "documents/design/rust-agent-tool-migration.md",
         "rust/agent-canon/Cargo.toml",
         "tools/bin/agent-canon",
     ] {
@@ -575,7 +575,11 @@ mod tests {
     #[test]
     fn foundation_reports_missing_post_create() {
         let root = make_fixture_root();
-        write(&root, "documents/rust-agent-tool-migration.md", "fixture\n");
+        write(
+            &root,
+            "documents/design/rust-agent-tool-migration.md",
+            "fixture\n",
+        );
         write(&root, "rust/agent-canon/Cargo.toml", "fixture\n");
         write(&root, "tools/bin/agent-canon", "fixture\n");
 
@@ -597,7 +601,11 @@ mod tests {
     }
 
     fn write_foundation(root: &Path) {
-        write(root, "documents/rust-agent-tool-migration.md", "fixture\n");
+        write(
+            root,
+            "documents/design/rust-agent-tool-migration.md",
+            "fixture\n",
+        );
         write(root, "rust/agent-canon/Cargo.toml", "fixture\n");
         write(root, "tools/bin/agent-canon", "fixture\n");
         write(
