@@ -7,8 +7,20 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable document structure contract
 upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite handoff overlay
 upstream design formal-proof-workflow.md mathematical claim proof-obligation routing
+upstream design code-visualization.md sole public visualization owner and typed projection contract
+downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
+
+## Visualization Adapter Boundary
+
+Explanatory-document source maps and structure contracts remain native writing
+facts. Every Mermaid, README, workflow, guide, wiki, or browser graph embedding
+hands the complete selected facts to `code-visualization` and consumes its
+`VisualizationSourceUniverse`, canonical `ToolCall`,
+`ProjectionCoverageManifest`, mandatory post-format readback, and final
+coverage status. This skill owns prose placement and layout only and does not
+duplicate the canonical omission or granularity policy.
 
 
 ## Reader Map

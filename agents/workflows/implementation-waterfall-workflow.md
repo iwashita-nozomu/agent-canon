@@ -6,8 +6,27 @@ upstream design ../canonical/CODEX_WORKFLOW.md defines canonical Codex task gate
 upstream design ../../documents/dependency-manifest-design.md defines dependency manifest gates
 downstream design ../templates/closeout_gate.md records closeout evidence required by this workflow
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py verifies design-doc evidence claims
+upstream design ../skills/code-visualization.md sole public visualization owner and canonical projection gate
+upstream implementation ../../tools/agent_tools/visualization_contract.py typed visualization coverage checker
+downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py validates workflow gate dependency edges
 @dependency-end
 -->
+
+## Canonical Visualization Gate
+
+When an implementation slice changes a visualization contract, owner route,
+producer adapter, renderer, or formatter, Gate 5-6 design approval must exist
+before the first contract edit. After the edit, route through the sole public
+`code-visualization` owner and run its canonical ToolCall, projection coverage,
+post-format readback, formatter, route, and producer-checker gates. Reference
+the typed contract owned by `tools/agent_tools/visualization_contract.py`;
+workflow prose must not copy its schema or omission/granularity policy.
+
+Any failed gate returns the existing typed validation failure packet with
+`failing_contract`, `observation_level`, `cause_classification`,
+`intent_preservation`, and `evidence` before repair. A visualization slice
+cannot enter implementation closeout while its canonical final coverage status
+is not `pass`.
 
 # 実装ウォーターフォールワークフロー
 
@@ -28,7 +47,7 @@ README、workflow、guide、migration、specification など file responsibility
 
 ## 1. 目的
 
-- stage ごとに適切な subagent / specialist を explicit に立てる
+- selected stage に必要な subagent / specialist だけを explicit に立てる
 - context sweep と library sweep を済ませる前に stage を始めない
 - 要件が固まる前に code を書き始めない
 - 計画が固まる前に詳細設計へ進まない
@@ -36,8 +55,11 @@ README、workflow、guide、migration、specification など file responsibility
 - 実装は承認済みの設計文書 packet を読んでから始める
 - 設計文書と実装の正本を 1 本に固定し、tracked tree に parallel truth を残さない
 - 実装、review、verification を段階ゲートで区切る
-- 各 pass で複数回の独立レビューを必須にする
-- `設計 -> レビュー`、`詳細設計 -> レビュー`、`実装 -> レビュー` を完了条件充足まで反復する
+- review は候補であり、同じ replaceable responsibility の claims は一つの owning
+  review gate で判定する。distinct unresolved claim/risk がその gate の判断範囲を
+  超える場合だけ specialist review を追加する
+- selected review の output が accepted finding を生む場合だけ、同じ owner の repair
+  と selected gate の rerun を行う
 - 変更要求 1 件につき 1 回の実装パスを閉じる
 - 差し戻しが必要な場合は、どの段へ戻すかを明示する
 - 新規実装より前に、既存コードと既存の書き方を徹底的に再利用する
@@ -72,23 +94,19 @@ README、workflow、guide、migration、specification など file responsibility
 
 この workflow では、契約完全性を満たす標準 stage として次を順に通します。
 
-1. subagent bootstrap
-1. 要件整理
-1. 調査
-1. 実行計画立案
-1. 計画レビュー
-1. 詳細設計
-1. 詳細設計レビュー
-1. 文書通読レビュー
-1. 実装
-1. 条件付きテストケース設計
-1. 実装 checkpoint review
-1. 最終受け入れ review
+1. subagent bootstrap (when delegation or lifecycle coordination is selected)
+1. owner / responsibility / mechanism / validation sufficiency
+1. requirements, research, plan, and design only when their unresolved decision can change the next owner or edit
+1. implementation
+1. conditional post-implementation test design only for an explicit unresolved oracle or failure risk
+1. one selected owning review gate, with a specialist only for a distinct unresolved claim/risk
 1. audit / gate close
 
-`Scoped Change` のような bounded 差分でも、実行計画、計画レビュー、詳細設計、詳細設計レビューを省略しません。
-文書通読レビューは reader-facing docs、新用語、公開 API、workflow surface がある場合の active gate として扱います。
-また、`計画レビュー`、`詳細設計レビュー`、active な `文書通読レビュー` は別エージェントで行います。とくに `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします。
+`Scoped Change` の bounded 差分は、semantic sufficiency が owner、replaceable unit、
+mechanism、validation route を閉じた場合、未選択の計画・設計・review stage を
+materialize しません。reader-facing docs、新用語、公開 API、workflow surface の
+unresolved claim が owning gate で判定できない場合だけ document-flow specialist を
+選択します。
 `test_designer` は default の実装前 gate ではありません。実装が owning mechanism を確立または修復した後、static analysis、既存 checker、targeted validation が所有しない具体的な oracle / specification / regression / failure-mode risk が残る場合だけ、条件付きの post-implementation route として起動します。ordinary code change、bug fix、parser change、validation failure だけでは起動しません。
 `cause_classification=implementation_bug` の validation failure は、
 `failing_contract`、`observation_level`、`cause_classification`、
@@ -99,7 +117,9 @@ contract-only wrapper pass では、static contract validation と canonical che
 
 ## 4A. 反復サイクル
 
-この workflow は gate を 1 回通過して終わりではありません。次の 3 つの cycle を持ち、各 cycle は review decision が `approve` になるまで反復します。
+この workflow は selected gate の decision が次の owner/edit/validation decision を
+変える場合だけ repair cycle を持ちます。review not-needed は adjudicated decision
+として closeout に記録し、固定 cycle や review artifact を作りません。
 次段へ進む前の機械チェックは次を使います。
 
 ```bash
@@ -108,7 +128,27 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 
 `WATERFALL_GATE_READY=no` の場合は、`NEXT_ACTION` に出た owner stage へ戻し、空テンプレート、未承認 review、未記入 artifact を直してから再実行します。
 
-### Cycle A. 実行計画 -> 計画レビュー
+### Active design packet
+
+Design gate は `run.active_design_packet` に宣言された packet だけを読みます。
+packet は `waterfall.design_packet.v1` で、`design_artifact`、
+`design_review_artifact`、`document_flow_review_artifact`、
+`document_flow_required` を必須とします。generator の ownership precedence は
+entrypoint の explicit `--active-design-packet`、workflow-specific record、config
+registry の standard record の順です。explicit input は complete JSON record として
+一度に検証し、選択された record を新しい run manifest へコピーします。role の
+`required_outputs`、write scope、reader packet は同じ選択 record を参照し、生成後は
+manifest record が run authority になります。
+
+gate は manifest-declared path だけを active artifact route として消費します。
+active packet set は historical artifact、sibling run、undeclared basename を除外します。
+path acceptance は lexical component の non-symlink、run bundle containment、regular
+file の三条件を要求します。schema、unknown field、必須 field、outside-bundle path、missing artifact
+は typed design-owner blocker です。technical review と required な document-flow review
+は、それぞれ `Design artifact path:` が manifest の `design_artifact` と一致し、最終
+decision が `approve` の場合に approval evidence になります。
+
+### Cycle A. 条件付き計画・レビュー
 
 - 対象:
   - Gate 3 実行計画立案
@@ -116,35 +156,39 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 - owner:
   - `scheduler`
 - reviewer:
-  - `schedule_reviewer`
+  - selected owning review gate only
 - 反復規則:
-  - `schedule_review.md` の decision が `approve` でない限り Gate 3 に戻します
+  - selected review の decision が accepted repair を要求する場合だけ owning stage に戻します
   - `revise` は Gate 3 へ戻します
   - `escalate` は Gate 1 または Gate 2 へ戻して scope / research を修正します
 - 完了条件:
   - stage 順序、handoff、rollback、validation sequence が hidden step なしで実行できる
-  - review 分離と parent-managed write-scope discipline が崩れていない
+  - selected review gate と parent-managed write-scope discipline が崩れていない
 
-### Cycle B. 詳細設計 -> 設計そのもののレビュー -> 文書通読レビュー
+### Cycle B. 条件付き詳細設計・レビュー -> 文書通読レビュー
 
 - 対象:
   - Gate 5 詳細設計
-  - Gate 6 詳細設計レビュー
-  - Gate 7 文書通読レビュー
+  - Gate 6 詳細設計レビュー (selected only for an unresolved owner/design claim)
+  - Gate 7 文書通読レビュー (selected only for a reader-facing unresolved claim)
 - owner:
   - `designer`
 - reviewers:
   - `design_reviewer`
   - active gate の場合は `document_flow_reviewer`
 - 反復規則:
-  - Gate 5 で詳細設計を作成した直後に Gate 6 を通します。設計文書は
-    書かれただけでは承認済みではありません
+  - Gate 5 で詳細設計を作成した後、Gate 6 は owner/design boundary、API shape、
+    仕様解釈、または別の unresolved claim が owning review gate で判定できない
+    場合だけ選択します。設計文書は review artifact の存在だけで別 wave を作りません
   - Gate 6 は実装 diff ではなく、Gate 5 で作られた同一の詳細設計文書
     そのものを review 対象にし、`design_review.md` に design artifact path
     と対象 revision / section を記録します
-  - `design_review.md` の decision が `approve` でない限り Gate 5 に戻します
+  - selected Gate 6 の decision が `approve` でない場合だけ Gate 5 に戻します。reviewer
+    output は hypothesis であり、parent / integration owner が current snapshot、
+    reachable path、contract、witness/static proof を確認して adjudicate します
   - 文書通読レビューが active gate の場合は、`document_flow_review.md` の decision が `approve` でない限り Gate 5 に戻します
-  - `revise` は Gate 5 へ戻します
+  - accepted finding が behavior、owner/design boundary、correctness、validation、
+    または publication state を変える場合だけ `revise` は Gate 5 へ戻します
   - `escalate` は Gate 3 へ戻して設計方針を組み替えます
 - 完了条件:
 - 実装者が文書だけ読んで着手できる
@@ -163,13 +207,13 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 - owner:
   - `implementer`
 - reviewer:
-  - `change_reviewer`
+  - selected owning review gate (`change_reviewer` when activated)
 - 反復規則:
-  - `change_review.md` の decision が `approve` でない限り Gate 8 に戻します
-  - `revise` は Gate 8 へ戻します
-  - `revise`、`required_change`、または rejected slice への応答は、同じ
+  - selected owning review gate がある場合、その decision が `approve` でない限り Gate 8 に戻します
+  - selected gate の `revise` は Gate 8 へ戻します
+  - selected gate の accepted `required_change`、または rejected slice への応答は、同じ
     request clause と approved design intent を保つ修正として行います
-  - `escalate` は Gate 5 へ戻して詳細設計を修正し、test-design route が
+  - selected gate の `escalate` は Gate 5 へ戻して詳細設計を修正し、test-design route が
     active な場合だけ Gate 8.5 の evidence も更新します
 - 完了条件:
 - diff が approved design と canonical validation evidence に一致する
@@ -181,29 +225,25 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 ### Gate 0. Subagent Bootstrap
 
 目的:
-- run bundle と review artifact を先に固定する
-- 要件 reviewer、計画 reviewer、詳細設計 reviewer、文書通読 reviewer を別 agent instance として割り当てる
+- semantic handoff を先に固定し、coordination、resumption、または selected
+  lifecycle route が必要な場合だけ run bundle と review artifact を materialize する
+- reviewer は候補として扱い、one owning review gate を選択し、distinct unresolved
+  claim/risk の場合だけ別 agent instance を割り当てる
 
 最低限の記録:
-- `team_manifest.yaml`
-- `intent_brief.md`
-- `user_request_contract.md`
-- `schedule.md`
-- `work_log.md`
-- `decision_log.md`
+- structured handoff の owner、replaceable unit、mechanism、validation route、unresolved branch
+- durable coordination/resumption が選択された場合だけ、その route が要求する run-bundle files
 
 条件付き追加 subagent:
 - repo 内調査が要る場合は `explorer`
 - 文書主体の整理が要る場合は `docs_workflow_steward`
 
 必須ルール:
-- Gate 0 の前に `documents/`、`notes/`、`references/` と local library の sweep を済ませます
-- Gate 0 の前に `user_request_contract.md` へ must-do、must-not-do、completion-evidence clause を書きます
-- Gate 0 の直後から `schedule.md` を task TODO の正本として更新し、repo-changing task では `work_log.md` を kickoff から closeout まで残します
-- repo-changing task では explicit subagent activation を省略しません
-- active runtime が explicit user request なしの subagent spawn を禁止する場合は、actual spawn の代わりに `SUBAGENT_AUTHORIZATION=required`、role、input packet、expected output、review gate を run bundle に固定し、許可が出るまでその specialist review を完了扱いにしません
-- `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 agent instance で行います
-- `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします
+- 選択された route が必要とする場合だけ、`documents/`、`notes/`、`references/` と local library の sweep を行います
+- durable artifact route が選択された場合だけ、`user_request_contract.md`、`schedule.md`、`work_log.md` をその route の正本として更新します
+- repo-changing task の subagent は owner-critical operation、coordination/resumption、または selected unresolved risk がある場合だけ activate します
+- active runtime が explicit user request なしの subagent spawn を禁止する場合は、actual spawn の代わりに `SUBAGENT_AUTHORIZATION=required`、role、input packet、expected output、review gate を structured handoff message/tool result に固定します。coordination/resumption が既に durable bundle を選択している場合だけ、その bundle を使います。許可が出るまでその specialist review を完了扱いにしません
+- selected review claims が同じ owner、responsibility、context、write authority、validation route を共有する場合は active instance を再利用します。独立 review、disjoint authority、incompatible context、または owning gate で判定できない distinct unresolved claim/risk の場合だけ別 instance にします
 - 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します
 - 包括的開発では、same directory / same public API surface の parallel write を許可しません
 - 独立 workstream が複数ある場合は、同じ parent wave に全 role を詰めず、stage owner ごとの vertical dynamic wave として schedule / workflow monitoring に記録します
@@ -233,7 +273,7 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 条件付き追加 subagent:
 - repo survey が要る場合は `explorer`
 
-必須レビュー:
+選択レビュー (owner-critical decision または distinct unresolved claim/risk):
 - `manager_reviewer`
   - scope、non-goals、acceptance criteria、validation plan の粗さを確認する
   - 各 clause の source bucket が妥当か確認する
@@ -314,11 +354,11 @@ exit 条件:
 条件付き追加 subagent:
 - 文書主体なら `docs_workflow_steward`
 
-必須レビュー:
+選択レビュー (owner-critical decision または distinct unresolved claim/risk):
 - ここでは plan review は行いません。次 gate で独立 reviewer に渡します。
 
 ルール:
-- 実行計画は詳細設計の前に必ず確定させます
+  - 実行計画を選択した場合は、詳細設計の前にその owner、validation route、次 gate を確定させます
 - どの subagent / role がどの stage を担当するか明記します
 - 包括的開発では、`Write Scope Ledger:` と `Integration Order:` を書きます
 - 複数 writer が必要な場合は、writer ごとの disjoint path と current checkout 内の wave 順序を明記します。separate worktree は使いません
@@ -327,7 +367,7 @@ exit 条件:
 - `schedule.md` に stage 順序、担当 agent、exit criteria、validation が書かれている
 - `schedule.md` に clause coverage が書かれている
 - `schedule.md` の `Planned Work Units` が TODO として具体化されている
-- 実装へ進む前に必要な review agent がすべて割り当てられている
+  - 実装へ進む前に selected review gate の owner と evidence が割り当てられている、または not-needed が adjudicated されている
 
 ### Gate 4. 計画レビュー
 
@@ -346,15 +386,17 @@ exit 条件:
 条件付き追加 subagent:
 - `reviewer`
 
-必須レビュー:
+選択レビュー (owner-critical decision または distinct unresolved claim/risk):
 - `schedule_reviewer`
-  - stage 順序、依存関係、review agent の分離、rollback point を確認する
+  - stage 順序、依存関係、selected review gate、rollback point を確認する
 - 必要に応じて `infra_reviewer`
   - runtime、CI、Docker、dependency 影響が計画に反映されているか確認する
 
 ルール:
-- 計画レビュー agent を詳細設計レビュー agent と兼務させません
-- stage の飛ばしや merge は認めません
+- one owning review gate で判定できる計画・設計 claims は同じ compatible instance を再利用します。別 instance は独立 review、disjoint authority、incompatible context、または distinct unresolved claim/risk の場合だけ選択します
+- candidate stage は飛ばしや merge ができます。owner-critical decision、distinct
+  unresolved claim/risk、または selected validation route が要求した stage だけを
+  schedule し、selected stage の順序と gate evidence は保持します
 - `schedule_review.md` の decision は `approve`、`revise`、`escalate` のいずれかに固定します
 - `revise` または `escalate` のまま Gate 5 へ進みません
 
@@ -406,7 +448,7 @@ exit 条件:
 - `Upstream Requirement Packet` には、designer が詳細設計前に読んだ `user_request_contract.md`、`schedule.md`、`intent_brief.md`、waterfall 正本、governing doc の path を列挙します
 - `Abstract Design Frame` には、実装対象 file や直近 finding へ絞る前の抽象責務、概念 graph または layer model、非対象、将来拡張 layer、評価軸、既存正本との関係を列挙します。`File-By-File Design`、`Design-To-Implementation Trace`、validation はこの frame から導きます
 - `Installed Libraries And Existing Implementation Survey` には、designer が見た dependency surface、導入済みライブラリ候補、既存実装候補、reuse / extend / replace / add-new の判断、既存では足りない理由を列挙します
-- `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、active な場合の `document_flow_review.md`、repo docs、dependency surface、code path、test path、外部 reference を列挙します。`test_plan.md` は Gate 8.5 が active になった後の review packet にだけ加えます
+- `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、selected の場合の `design_review.md`、active な場合の `document_flow_review.md`、repo docs、dependency surface、code path、test path、外部 reference を列挙します。`test_plan.md` は Gate 8.5 が active になった後の review packet にだけ加えます
 - `Design Side-Effect Map` には、主要設計判断ごとに影響する implementation、document、workflow、prompt/config、validation、dependency manifest、user-facing surface を列挙し、各 item を `Abstract Design Frame`、request clause ID、reuse precedent、owner stage、review gate、canonical validation evidence に接続します。test-design route が active な場合だけ test-plan item も接続します
 - `Dependency Manifest Plan` には、編集対象 file ごとに追加・維持する `upstream` / `downstream` edge、kind、相対 path、reason、編集前に読む upstream context、編集後に確認する downstream context を列挙します
 - 新規・変更する human-authored text file では旧 `Dependency Files:` block を使わず、`documents/dependency-manifest-design.md` の `@dependency-start` / `@dependency-end` 形式に統一します
@@ -421,13 +463,16 @@ exit 条件:
 - worker が naming、API shape、path layout、boundary choice を発明しなくてよい状態まで詳細設計を詰めます
 - worker が会話文脈や記憶を実装入力にしなくてよい状態まで、必要な判断を設計文書内に再掲します
 - worker が chat 要約ではなく packet path を実際に読めるよう、document packet は absolute path で明示します
-- Gate 5 が詳細設計を作成したら、designer は実装や worker handoff へ進まず
-  `design_review_required=yes` として Gate 6 に渡します
+- Gate 5 が詳細設計を作成したら、designer は unresolved claim がある場合だけ
+  `design_review_required=yes` として Gate 6 に渡します。その他は selected owning
+  gate へ直接 handoff します
 - refactor pass では semantic delta を feature 追加として混ぜません
 - refactor pass では path mapping と remove list を実装前に固定します
 - structure refactor では recursive directory README graph と dependency / responsibility-scope evidence から path mapping を作り、README 更新だけで構造矛盾を隠しません
 - 包括 refactor では、必要に応じて `tools/agent_tools/analyze_refactor_surface.py` または task 固有解析 tool の score を design gate に入れます。score pass は behavior evidence の代替ではなく、責務境界の補助 evidence として扱います
-- Gate 6 または Gate 7 が `revise` / `escalate` を返したら Gate 5 へ戻ります
+- Gate 6 または Gate 7 の accepted finding が design / reader-facing decision を
+  変える場合だけ Gate 5 へ戻ります。rejected finding は `reason_code` と
+  `evidence_ref` を残し、wave / rollback を起こしません
 
 exit 条件:
 - 実装者が文書だけ読んで着手できる
@@ -458,7 +503,7 @@ exit 条件:
 - C / C++ 差分が中心なら追加で `cpp_reviewer`
 - repo-wide 影響が大きければ `project_reviewer`
 
-必須レビュー:
+選択レビュー (owner-critical decision または distinct unresolved claim/risk):
 - `design_reviewer`
   - `design_review.md` の `Design Artifact Under Review` に、対象の
     `design_brief.md` path、対象 revision / section、review した source packet
@@ -483,13 +528,13 @@ exit 条件:
   - refactor pass では stale path、cross-module drift、delete 漏れを確認する
 
 ルール:
-- `詳細設計レビュー` は計画レビューより重い gate とします
-- `design_review.md` の decision が `approve` になるまで、実装、worker
-  handoff、implementation checkpoint review、または設計を前提にした
-  follow-up task へ進みません
+- `詳細設計レビュー` は candidate gate です。one owning review gate が判断できない
+  distinct unresolved claim のときだけ有効化します
+- selected `design_review.md` の decision が `approve` になるまで、その design claim
+  を前提にした実装へ進みません。candidate artifact の不在だけでは停止しません
 - 承認は latest design artifact にだけ有効です。Gate 5 で設計を修正したら、
   旧 `approve` を流用せず Gate 6 を再実行します
-- design reviewer が未解消の懸念を残したまま実装へ進みません
+- parent が accepted と adjudicate した design concern を解消しないまま実装へ進みません
 - naming plan、API shape、path layout、boundary choice の不足は `revise` blocker とします
 - `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design Side-Effect Map`、または `Design-To-Implementation Trace` の不足は `revise` blocker とします
 - `Dependency Manifest Plan` の不足、reverse edge 欠落、旧形式温存は `revise` blocker とします
@@ -504,8 +549,8 @@ exit 条件:
 - dependency manifest plan と graph validation plan の懸念が解消している
 - canonical tree-head plan の懸念が解消している
 - naming plan の懸念が解消している
-- decision が `approve` になっている
-- `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate design"` が pass している
+- selected design review がある場合は decision が `approve` になっている
+- selected design review がある場合は `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate design"` が pass している。未選択の場合は semantic decision sufficiency と owner validation evidence を記録する
 
 ### Gate 7. 文書通読レビュー
 
@@ -519,17 +564,17 @@ exit 条件:
 - `reviewer`
 - 文書差分が大きいなら追加で `project_reviewer`
 
-必須レビュー:
+選択レビュー (owner-critical decision または distinct unresolved claim/risk):
 - `document_flow_reviewer`
   - section 順序、用語の先出し、前提の提示順、結論までの reader path を確認する
   - 「途中で前提が出る」「定義前の語が出る」「どこを読めば判断できるか分からない」を blocker として扱う
 
 ルール:
-- `document_flow_reviewer` は `design_reviewer` と兼務させません
-- 文書主体の成果物では、top-down readthrough で major rewrite が必要なまま実装へ進みません
+- selected `document_flow_reviewer` は、owning gate と同じ context / validation route で判定できる場合はその gate の instance を再利用し、distinct unresolved reader-path claim の場合だけ別 instance にします
+- 文書主体の成果物で document-flow review が selected の場合、top-down readthrough で major rewrite が必要なまま実装へ進みません
 
 exit 条件:
-- `document_flow_review.md` が `resolved` になっている
+- selected の場合は `document_flow_review.md` が `resolved` になっている。未選択の場合は not-needed の adjudication がある
 - 上から順に読んだときの意味の飛び、定義不足、section order の問題が解消している
 
 ### Gate 8. 実装
@@ -557,9 +602,11 @@ exit 条件:
   `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` and
   `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` are
   recorded.
-- Gate 8 cannot start from a detailed design until `pre_handoff_gate_status`
-  records the current design artifact, `design_review.md decision=approve`, and
-  `waterfall-gate-check --gate design` pass evidence.
+- Gate 8 cannot start from a detailed design when a selected design review is
+  unresolved. In that case `pre_handoff_gate_status` records the current design
+  artifact, `design_review.md decision=approve`, and
+  `waterfall-gate-check --gate design` pass evidence. A candidate review does not
+  block the handoff.
 - Parent-Direct Context Note is a routing / handoff artifact, not edit
   authorization. Once edit scope is known, launch or schedule the selected
   write-capable implementer. If the selected candidate is blocked, record
@@ -584,7 +631,7 @@ exit 条件:
 - validation の test / check failure を見た場合は、implementation intent の変更、behavior / test の削除、revert、oracle weakening、pass 目的の単純化へ進む前に、`failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録します。`cause_classification` と `intent_preservation` の slug set と route semantics は `documents/runtime-profiles-and-check-matrix.json` を canonical taxonomy owner として cite し、`documents/runtime-profiles-and-check-matrix.md` を generated reader projection として扱います。workflow、subagent、review surface は required evidence と same-intent repair / escalation result だけを記録します。`cause_classification=implementation_bug` で contract と oracle が安定している場合は、approved intent を保ち、追加 test planning で止めずに owning code / config / docs / workflow repair へ進めます
 - design section、request clause ID に trace できない変更は実装しません。test-design route が activate された場合だけ、その evidence を test-plan item に trace します
 - dependency manifest edge、reverse edge、または comment wrapping を設計と違う形で実装しません。必要なら Gate 5-6 へ戻します
-- 非自明な変更では、final polish 前に checkpoint review を必ず 1 回挟みます
+- 非自明な変更では、selected owning review gate を final polish 前に adjudicate します。別 checkpoint review は distinct unresolved claim/risk が owning gate で判定できない場合だけ追加します
 - 既存コード、既存 helper、既存 naming、既存 test style、既存 docs style を優先します
 - 完全な新規実装より、既存実装の拡張、既存 pattern の模倣、既存 file layout の踏襲を優先します
 - approved design または局所 precedent にない variable、function、class、file、CLI flag、config key、public API identifier を worker が作りません
@@ -592,9 +639,14 @@ exit 条件:
 - naming gap を見つけたら、実装で埋めずに Gate 5-6 へ戻します
 - 実装 slice が終わったら、changed files、clause coverage、remaining planned work units、next required gate を記録して次段へ進みます
 - 予定 work unit や active clause が残っている場合は、実装完了ではなく次の work unit へ進みます
-- review artifact の指摘を受けて修正したら、その修正が tiny fix でも Gate 8 から required review family を最新 diff でやり直します。前の approve は失効します
+- reviewer output は hypothesis です。accepted finding が behavior、owner/design
+  boundary、correctness、validation、または publication state を変える場合だけ Gate
+  8 の same-owner repair と selected owning gate の rerun を行います。duplicate、
+  stylistic、already-covered、evidence-free、unreachable、stale、private/incidental、
+  out-of-scope、または unproven design-conflict finding は `reason_code` と
+  `evidence_ref` を残して wave / rollback を起こしません
 
-必須レビュー:
+選択レビュー (owner-critical decision または distinct unresolved claim/risk):
 - `change_reviewer`
   - 各 changed slice が `Abstract Design Frame`、approved design section、`Implementation Source Packet` entry、request clause ID を引用し、test-design route が active な場合だけ test plan item も引用しているか確認する
   - changed slice と関連 docs / workflow / prompt/config / validation / dependency-manifest update が approved `Design Side-Effect Map` に trace できるか確認する
@@ -605,9 +657,8 @@ exit 条件:
   - non-canonical design doc、implementation copy、snapshot、backup path が tracked tree に残っていないか確認する
   - chunk / slice の checkpoint approve を user request 全体の完了として扱っていないか確認する
   - remaining planned work units と next required gate が実装 handoff に残っているか確認する
-  - implementation checkpoint review として、構造、境界、明白な回帰、設計逸脱を早期に確認する
-  - `Large Delivery` では chunk ごとに最低 1 回
-  - `Platform And Environment` では rollout 影響が見える時点で最低 1 回
+  - selected owning review gate として、構造、境界、明白な回帰、設計逸脱を確認する
+  - `Large Delivery` または `Platform And Environment` の追加 review は、distinct unresolved claim/risk が必要な場合だけ選択する
 
 exit 条件:
 - 差分が requirements / plan / design に一致している
@@ -617,7 +668,7 @@ exit 条件:
 - canonical path 以外の design / implementation truth surface が残っていない
 - remaining planned work units がない、または次の work unit と gate が明記されている
 - planned checks を実行できる状態になっている
-- implementation checkpoint review が `resolved` になっている
+- selected owning review gate が `resolved`、または review not-needed が adjudicated されている
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate implementation"` が pass している
 
 ### Gate 8.5. 実装後の条件付きテストケース設計
@@ -652,13 +703,14 @@ exit 条件:
 - `activation=required` の場合だけ、具体的な behavior regression oracle とその test-plan evidence が記録されている
 - `activation=not_needed` または `activation=deferred` の場合、不要な test-plan artifact や tool run を要求していない
 
-### Gate 9. 最終受け入れ review
+### Gate 9. 条件付き受け入れ review
 
 目的:
 - 差分が設計どおりで、回帰やリスクが許容範囲に収まっているか確認する
 
 主担当:
-- `final_reviewer`
+- selected owning review gate
+- `final_reviewer` は final escalation または owning gate が判定できない distinct unresolved claim の場合だけ
 - 必要に応じて `python-review`
 - 必要に応じて `cpp-review`
 - 必要に応じて `md-style-check`
@@ -669,8 +721,9 @@ exit 条件:
 - validation plan の実行
 - security / safety / provenance の確認
 
-必須レビュー:
-- `final_reviewer`
+選択レビュー:
+- `final_reviewer` は final escalation または owning gate が判定できない distinct
+  unresolved claim の場合だけ起動します
   - 変更全体、docs 同期、受け入れ条件達成、不要な新規 pattern の混入有無を確認する
   - final diff が Abstract Design Frame、approved design section、Implementation Source Packet、request clause ID、canonical validation evidence に trace でき、test-design route が active な場合だけ test plan item にも trace できるか確認する
   - final diff の side-effect coverage が approved Design Side-Effect Map と一致しているか確認する
@@ -686,7 +739,11 @@ exit 条件:
   - claim、evidence、overclaim を確認する
 
 ルール:
-- review で戻されたあとに入れる修正は、設計を変えない tiny fix でもこの gate 内だけで閉じません。Gate 8 に戻して差分を更新し、Gate 8 と Gate 9 の required review を最新 diff に対してやり直します
+- reviewer output は hypothesis です。current snapshot、reachable path、contract、
+  witness/static proof があり、behavior、owner/design boundary、correctness、validation、
+  または publication state を変える accepted finding だけ Gate 8 の same-owner repair
+  に戻します。rejected finding は `reason_code` と `evidence_ref` を記録し、rollback / wave
+  を起こしません
 - review の `revise`、`required_change`、`rejected`、または requested-change は、
   user request や approved design intent を戻す権限ではありません。実装担当は
   同じ意図を保つ修正、同じ意図を保つ再設計、または design / scope conflict の
@@ -698,11 +755,12 @@ exit 条件:
 - 設計変更が必要なら Gate 5 に戻します
 
 exit 条件:
-- `required_change` が解消している
+- accepted `required_change` が解消している。rejected hypotheses は `reason_code` と `evidence_ref` を持ち、修復 wave を開かない
 - 実行した checks と未実行理由が説明できる
 - dependency manifest checks と graph validation の実行結果または移行中 baseline 理由が説明できる
-- final acceptance review が `resolved` になっている
-- `final_review.md` に post-fix review rerun review が記録され、review-driven fix の後に risk class と changed surface に対する active required review set を rerun したことが追える
+- selected owning review gate が `resolved`、または review not-needed が adjudicated されている
+- selected review gate の artifact に accepted repair 後の rerun evidence が記録され、
+  review-driven fix の後に changed surface に対する active gate を rerun したことが追える
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate final"` が pass している
 
 ### Gate 10. Audit And Gate Closure
@@ -723,18 +781,18 @@ exit 条件:
 - `verification.txt` の `status=pass`
 - `closeout_gate.md` の `auditor_status=resolved` と `user_completion_report=unlocked`
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
-- `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes`
-- `closeout_gate.md` の `post_fix_full_review_complete=yes`
+- `closeout_gate.md` の `completion_coverage_consumer=yes`、`coverage_check.ok=true`、および `completion_boundary.topology_errors=[]`
+- selected review gate の post-fix evidence (full review は touched contract が要求する final candidate の場合だけ)
 - `closeout_gate.md` の `mechanical_completion_loop_complete=yes` と構造化 loop evidence
-- `closeout_gate.md` の `diff_check_agent_complete=yes` と run-local diff-check artifact evidence
+- selected diff-check review がある場合だけ `closeout_gate.md` の `diff_check_agent_complete=yes` と run-local artifact evidence
 - `closeout_gate.md` の `canonical_tree_head_complete=yes`
 - `user_request_contract.md` の `all_clauses_resolved=yes` と `forbidden_drift_detected=no`
 - `schedule.md` の TODO 行が空ではない
 - `work_log.md` に meaningful step が記録されている
 
-必須レビュー:
+選択レビュー (owner-critical decision または distinct unresolved claim/risk):
 - `auditor`
-  - required reviews が揃っているか、artifact と closeout evidence が欠けていないか確認する
+  - selected reviews が揃っているか、activated artifact と closeout evidence が欠けていないか確認する
 
 exit 条件:
 - auditor review が `resolved` になっている
@@ -742,13 +800,13 @@ exit 条件:
 - user-facing completion report の unlock 条件が `closeout_gate.md` に記録されている
 - chunk、slice、checkpoint、subpass ではなく、user request 全体の完了であることが `Completion Boundary Evidence` に記録されている
 - 仕様と product surface の gap が残っていないことが `Spec-To-Product Coverage Evidence` に記録されている
-- required review の fix-now findings が反映済み、再レビュー済み、または escalated であることが `Review Finding Integration Evidence` に記録されている
+- accepted review findings のみが反映済み、再レビュー済み、または escalated であることを `Review Finding Integration Evidence` に記録し、rejected findings は `reason_code` と `evidence_ref` を残す
 - review reject / requested-change への応答が user-requested behavior の blanket
   revert ではなく、intent-preserving repair / redesign / escalation として
   証跡化されていることが `Review Finding Integration Evidence` に記録されている
-- review-driven fix が入った場合、latest diff に対する full review rerun artifact が `Post-Fix Full Review Evidence` に記録されている
+- review-driven fix が入った場合、changed behavior / owner / correctness / validation / publication を変えた accepted finding に限り selected gate の latest diff rerun evidence を記録する。full review rerun は final candidate が要求した場合だけ行う
 - planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙した loop evidence が `Mechanical Completion Loop Evidence` に記録されている
-- read-only diff-check agent の decision、latest diff ref、run-local artifact、findings disposition が `Diff-Check Agent Evidence` に記録され、artifact が `approve` を示している
+- selected owning review gate の decision、latest diff ref、findings disposition が記録される。read-only diff-check artifact はその gate が選択した場合だけ要求する
 - canonical design path と implementation path だけが tracked tree に残っていることが `Canonical Tree-Head Evidence` に記録されている
 - user request clause の未解決がない
 
@@ -784,7 +842,8 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 - Gate 0 から Gate 10 をそのまま 1 pass で通します
 - artifact は軽くて構いませんが、要件整理、計画、詳細設計、各 review の区別は崩しません
-- `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer` を軽量版として必ず有効化します
+- `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer` は候補です。owner-critical
+  decision または distinct unresolved claim/risk が選択した role だけ有効化します
 - `document_flow_reviewer` は reader-facing docs、新用語、公開 API、workflow surface がある場合に有効化します
 
 ### Research-Driven Change
@@ -799,7 +858,7 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 - 各 chunk は checkpoint review までを独立 subpass として閉じます
 - chunk completion は user-facing completion ではありません
 - chunk 間の横断変更は、umbrella pass の completion boundary に残し、必要なら次 chunk の Gate 1 に持ち越します
-- 各 chunk の前に詳細設計文書を起こし、詳細設計レビューを通します
+- 各 chunk の前に必要な詳細設計を起こし、owning gate が判定できない distinct unresolved design claim がある場合だけ詳細設計レビューを選択します
 - 各 chunk で checkpoint review を複数回に増やして構いません
 
 ### Platform And Environment
@@ -817,7 +876,9 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 - Gate 0-1 では `project_reviewer` を intake gate として使い、repo-wide completeness と collision risk を確認します
 - Gate 3 では `Write Scope Ledger:`、`Writer Wave Order:`、`Integration Order:` を必ず固定します
 - Gate 5-7 では `docs_workflow_steward` を canon docs 整理に使いますが、実装 worker と兼務させません
-- Gate 8-9 の post-implementation change review は `diff_triage_reviewer` が既定です。`python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet evidence、または明示 review-pack activation がある場合だけ追加し、T12 default-active の `project_reviewer` と全体整合を見ます
+- Gate 8-9 の post-implementation change review は一つの owning review gate を選択します。
+  `diff_triage_reviewer`、`python_reviewer` / `cpp_reviewer`、`project_reviewer` は changed
+  path または distinct unresolved claim/risk が owning gate で判定できない場合だけ追加します
 - parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します
 - write scope が重なる場合は、writer ごとに current checkout 内の後続 wave へ serialize してから統合します
 

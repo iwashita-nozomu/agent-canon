@@ -11,17 +11,22 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from pathlib import Path
 
 from agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
 from agent_team import (
+    ACTIVE_DESIGN_PACKET_SCHEMA,
+    ActiveDesignPacketConfig,
     AgentTypeSelection,
     Role,
     RunBundleSpec,
     TaskCatalog,
     TeamConfig,
-    auto_language_specialists,
+    language_review_candidates,
+    capacity_start_output_lines,
     codex_agent_model_matrix_for_roles,
     codex_runtime_max_depth,
     codex_runtime_max_threads,
@@ -41,6 +46,7 @@ from agent_team import (
     load_task_catalog,
     load_team_config,
     make_run_id,
+    parse_active_design_packet_input,
     parse_agent_type_selections,
     pre_handoff_gate_status_output_lines,
     pre_handoff_scope_policy_output_lines,
@@ -53,6 +59,7 @@ from agent_team import (
     resolve_role_document_packet,
     resolve_task_spec,
     resolve_workflow_family,
+    run_active_design_packet,
     same_role_subagent_policy_output_lines,
     select_roles,
     standard_agent_wave_sequence_output_lines,
@@ -78,7 +85,7 @@ class TaskStartContext:
     manual_specialists: tuple[str, ...]
     enabled_specialists: tuple[str, ...]
     task_default_specialists: tuple[str, ...]
-    auto_specialists: tuple[str, ...]
+    language_review_candidates: tuple[str, ...]
     default_review_pack_ids: tuple[str, ...]
     workflow_family_id: str | None
     workflow_family_name: str | None
@@ -94,6 +101,7 @@ class TaskStartRuntime:
     created_files: tuple[str, ...]
     active_pointer: Path
     agent_type_selections: tuple[AgentTypeSelection, ...]
+    active_design_packet: ActiveDesignPacketConfig
 
 
 def codex_agents_for_role(config: TeamConfig, role_id: str) -> tuple[str, ...]:
@@ -109,6 +117,7 @@ def document_packet_output(
     role_id: str,
     report_dir: Path,
     workspace_root: Path,
+    active_design_packet: ActiveDesignPacketConfig | None = None,
 ) -> str:
     """Render one role's explicit document packet as a CSV-like path list."""
     role = next(
@@ -116,7 +125,13 @@ def document_packet_output(
         for role in config.always_on_roles + config.specialist_roles
         if role.id == role_id
     )
-    packet = resolve_role_document_packet(config, role, report_dir, workspace_root)
+    packet = resolve_role_document_packet(
+        config,
+        role,
+        report_dir,
+        workspace_root,
+        active_design_packet,
+    )
     return ",".join(str(entry.path) for entry in packet.read_before_work)
 
 
@@ -161,6 +176,14 @@ def build_parser(
         help="Optional explicit run id. Defaults to a timestamped slug.",
     )
     parser.add_argument(
+        "--active-design-packet",
+        metavar="JSON",
+        help=(
+            f"Atomic {ACTIVE_DESIGN_PACKET_SCHEMA} JSON object. All schema, path, "
+            "and document_flow_required fields are required."
+        ),
+    )
+    parser.add_argument(
         "--enable",
         action="append",
         choices=enable_names,
@@ -185,8 +208,8 @@ def build_parser(
         action="append",
         default=[],
         help=(
-            "Optional changed path hint. Repeat to drive automatic language-specific "
-            "reviewer selection."
+            "Optional changed path hint. Repeat to populate explicit language-review "
+            "candidates."
         ),
     )
     parser.add_argument(
@@ -200,11 +223,10 @@ def build_parser(
         ),
     )
     parser.add_argument(
-        "--no-auto-language-reviewers",
+        "--no-language-review-candidates",
         action="store_true",
         help=(
-            "Disable automatic language-specific reviewer selection from changed paths "
-            "or git status."
+            "Disable language-review candidate discovery from changed paths or git status."
         ),
     )
     parser.add_argument(
@@ -278,18 +300,15 @@ def resolve_task_start_context(
             )
     manual_specialists = expand_enabled_specialists(config, catalog, tuple(args.enable))
     enabled_specialists = list(manual_specialists)
-    for role_id in task_default_specialists:
-        if role_id not in enabled_specialists:
-            enabled_specialists.append(role_id)
-    auto_specialists: tuple[str, ...] = ()
-    if not args.no_auto_language_reviewers:
-        auto_specialists = auto_language_specialists(
+    # Task-catalog specialists and default review packs are routing candidates.
+    # They become active only through explicit enablement or an owner-critical
+    # activation path selected by the current route.
+    language_candidates: tuple[str, ...] = ()
+    if not args.no_language_review_candidates:
+        language_candidates = language_review_candidates(
             workspace_root=workspace_root,
             changed_paths=tuple(args.changed_path),
         )
-        for role_id in auto_specialists:
-            if role_id not in enabled_specialists:
-                enabled_specialists.append(role_id)
     return TaskStartContext(
         created_at_iso=created_at_iso,
         report_root=report_root,
@@ -298,7 +317,7 @@ def resolve_task_start_context(
         manual_specialists=tuple(manual_specialists),
         enabled_specialists=tuple(enabled_specialists),
         task_default_specialists=task_default_specialists,
-        auto_specialists=auto_specialists,
+        language_review_candidates=language_candidates,
         default_review_pack_ids=default_review_pack_ids,
         workflow_family_id=workflow_family_id,
         workflow_family_name=workflow_family_name,
@@ -357,6 +376,8 @@ def emit_task_start_output(
     print(f"REPORT_DIR={context.report_dir}")
     print(f"TASK_AUTHORITY={context.report_dir / 'task_authority.yaml'}")
     print(f"WORKSPACE_ROOT={workspace_root}")
+    for line in capacity_start_output_lines(catalog, workspace_root, context.run_id):
+        print(line)
     print(f"REQUEST_CONTRACT={request_contract_path}")
     print("REQUEST_CONTRACT_REQUIRED=yes")
     print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
@@ -441,15 +462,16 @@ def emit_task_start_output(
         runtime.roles,
         manual_specialists=context.manual_specialists,
         task_default_specialists=context.task_default_specialists,
-        auto_specialists=context.auto_specialists,
-        default_review_packs_enabled=bool(
-            args.task_id is not None and not args.no_default_review_packs
-        ),
+        language_review_candidates=context.language_review_candidates,
+        default_review_packs_enabled=False,
         default_review_pack_ids=context.default_review_pack_ids,
     ):
         print(line)
-    if not args.no_auto_language_reviewers:
-        print(f"AUTO_SPECIALISTS={','.join(context.auto_specialists)}")
+    if not args.no_language_review_candidates:
+        print(
+            "LANGUAGE_REVIEW_CANDIDATES="
+            f"{','.join(context.language_review_candidates)}"
+        )
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
     print(f"ACTIVE_SKILLS={','.join(active_skills)}")
     print(f"DEFERRED_SKILLS={','.join(deferred_skills) or '-'}")
@@ -467,11 +489,11 @@ def emit_task_start_output(
     )
     print(
         "DESIGN_DOCUMENT_PACKET="
-        f"{document_packet_output(config, 'designer', context.report_dir, workspace_root)}"
+        f"{document_packet_output(config, 'designer', context.report_dir, workspace_root, runtime.active_design_packet)}"
     )
     print(
         "IMPLEMENTATION_DOCUMENT_PACKET="
-        f"{document_packet_output(config, 'implementer', context.report_dir, workspace_root)}"
+        f"{document_packet_output(config, 'implementer', context.report_dir, workspace_root, runtime.active_design_packet)}"
     )
     print(f"ACTIVE_ROLES={','.join(role.id for role in runtime.roles)}")
     print(f"CREATED_FILES={','.join(runtime.created_files)}")
@@ -506,6 +528,13 @@ def main() -> int:
     config = load_team_config()
     catalog = load_task_catalog(config)
     args = build_parser(enable_choices(config, catalog), task_ids(catalog)).parse_args()
+    try:
+        explicit_active_design_packet = parse_active_design_packet_input(
+            args.active_design_packet
+        )
+    except RuntimeError as exc:
+        print(str(exc), flush=True)
+        return 2
     workspace_root = Path(args.workspace_root).resolve()
     try:
         preflight = run_agent_canon_preflight(
@@ -537,8 +566,7 @@ def main() -> int:
         context.workflow_family_id,
         args.task,
     )
-    created_files = create_run_bundle(
-        RunBundleSpec(
+    run_spec = RunBundleSpec(
             config=config,
             report_dir=context.report_dir,
             run_id=context.run_id,
@@ -547,19 +575,19 @@ def main() -> int:
             created_at_iso=context.created_at_iso,
             roles=roles,
             workspace_root=workspace_root,
+            active_design_packet=explicit_active_design_packet,
             workflow_family_id=context.workflow_family_id or "",
             manual_specialists=context.manual_specialists,
             task_default_specialists=context.task_default_specialists,
-            auto_specialists=context.auto_specialists,
-            default_review_packs_enabled=bool(
-                args.task_id is not None and not args.no_default_review_packs
-            ),
+            language_review_candidates=context.language_review_candidates,
+            default_review_packs_enabled=False,
             default_review_pack_ids=context.default_review_pack_ids,
             selected_skills=selected_skills,
             task_catalog=catalog,
             agent_type_selections=agent_type_selections,
         )
-    )
+    active_design_packet = run_active_design_packet(run_spec)
+    created_files = create_run_bundle(run_spec)
     active_pointer = context.report_root / ".active_run"
     active_pointer.write_text(
         str(context.report_dir.resolve()) + "\n", encoding="utf-8"
@@ -570,6 +598,7 @@ def main() -> int:
         created_files=created_files,
         active_pointer=active_pointer,
         agent_type_selections=agent_type_selections,
+        active_design_packet=active_design_packet,
     )
     _, _, start_declaration = emit_task_start_output(
         args=args,

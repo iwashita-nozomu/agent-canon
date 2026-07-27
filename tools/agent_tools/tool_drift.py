@@ -214,36 +214,6 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
-        name="local_llm_eval",
-        tool="tools/agent_tools/local_llm_eval.py",
-        links=(
-            LinkCheck("evidence/agent-evals/README.md"),
-            LinkCheck("evidence/agent-evals/local_llm_responsibility_eval.toml"),
-            LinkCheck("documents/runtime-log-archive.md"),
-            LinkCheck("documents/local-llm-responsibility-analysis.md"),
-            LinkCheck("tools/catalog.yaml"),
-            LinkCheck("tools/README.md"),
-            LinkCheck("documents/tools/README.md"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
-            LinkCheck("tests/agent_tools/test_local_llm_eval.py"),
-        ),
-    ),
-    ToolContract(
-        name="agent_canon_local_llm",
-        tool="rust/agent-canon/src/local_llm.rs",
-        links=(
-            LinkCheck("agent-canon-environment.toml"),
-            LinkCheck("documents/local-llm-responsibility-analysis.md"),
-            LinkCheck("documents/search-coordination.md"),
-            LinkCheck("documents/rust-agent-tool-migration.md"),
-            LinkCheck("tools/catalog.yaml"),
-            LinkCheck("tools/README.md"),
-            LinkCheck("documents/tools/README.md"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
-            LinkCheck(".github/workflows/agent-canon-static-gates.yml"),
-        ),
-    ),
-    ToolContract(
         name="issue_sync",
         tool="tools/agent_tools/issue_sync.py",
         links=(
@@ -404,13 +374,13 @@ CONTRACTS = (
             ),
             TextCheck(
                 ".agents/skills/agent-orchestration/SKILL.md",
-                "vertical dynamic wave",
-                "missing-runtime-orchestration-vertical-wave-policy",
+                "agents/skills/agent-orchestration.md",
+                "missing-runtime-orchestration-owner-pointer",
             ),
             TextCheck(
                 ".agents/skills/agent-orchestration/SKILL.md",
-                "write-capable handoff",
-                "missing-runtime-orchestration-write-capable-handoff-policy",
+                "machine-readable ToolCall tokens",
+                "missing-runtime-orchestration-toolcall-consumer",
             ),
             TextCheck(
                 "evidence/agent-evals/skill_workflow_prompt_eval.toml",
@@ -419,8 +389,13 @@ CONTRACTS = (
             ),
             TextCheck(
                 "evidence/agent-evals/skill_workflow_prompt_eval.toml",
-                "write-capable handoff",
-                "missing-write-capable-handoff-prompt-eval",
+                "ORCH-SHIM-POINTER-1",
+                "missing-orchestration-owner-pointer-eval",
+            ),
+            TextCheck(
+                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "ORCH-SHIM-TOOLCALL-1",
+                "missing-orchestration-toolcall-eval",
             ),
         ),
     ),

@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -50,15 +51,37 @@ SAFE_GIT_GLOBAL_OPTION_PREFIXES = (
     "--namespace=",
 )
 SHELL_COMPOUND_MARKERS = ("\n", "&&", "||", ";", "|", "`", "$(", ">", "<")
-READ_ONLY_COMMANDS = {"cat", "head", "tail", "wc", "ls", "pwd", "nl", "stat", "rg", "grep"}
+READ_ONLY_COMMANDS = {
+    "cat",
+    "head",
+    "tail",
+    "wc",
+    "ls",
+    "pwd",
+    "nl",
+    "stat",
+    "rg",
+    "grep",
+}
 SAFE_GH_PR_SUBCOMMANDS = {"checks", "comment", "create", "edit", "list", "view"}
 STRICT_BLOCKS_ENV = "AGENT_CANON_HOOK_STRICT_BLOCKS"
 STRICT_FAILURES_ENV = "AGENT_CANON_HOOK_STRICT_FAILURES"
 # Most policy hooks are advisory by default so a bad guardrail cannot freeze
 # ordinary shell/read/validation work. CI and hook development can opt into
 # strict blocking with AGENT_CANON_HOOK_STRICT_BLOCKS=1.
-CRITICAL_BLOCKING_CHILD_HOOKS = frozenset({"prompt_secret_guard.py", "branch_worktree_guard.py"})
-ADDITIONAL_CONTEXT_EVENTS = frozenset({"UserPromptSubmit", "PreToolUse", "PostToolUse"})
+CRITICAL_BLOCKING_CHILD_HOOKS = frozenset(
+    {
+        "prompt_secret_guard.py",
+        "branch_worktree_guard.py",
+        "completion_review_guard.py",
+    }
+)
+OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
+POST_TOOL_USE_INPUT_SCHEMA = "agent-canon-post-tool-use-input/v1"
+PROJECTION_GUARD_SCRIPT = "execution_resource_plan_projection_guard.py"
+ADDITIONAL_CONTEXT_EVENTS = frozenset(
+    {"UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"}
+)
 SAFE_GIT_READ_SUBCOMMANDS = {"log", "ls-files", "rev-parse", "show", "status"}
 SAFE_GIT_BRANCH_LIST_OPTIONS = {
     "--all",
@@ -198,47 +221,62 @@ EVENT_COMMANDS: dict[str, tuple[HookCommandSpec, ...]] = {
         HookCommandSpec("log_archive_mount_warning.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("branch_worktree_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("direct_rg_context_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec("cause_investigation_guard.py", CAUSE_INVESTIGATION_TIMEOUT_SECONDS),
+        HookCommandSpec(
+            "cause_investigation_guard.py", CAUSE_INVESTIGATION_TIMEOUT_SECONDS
+        ),
     ),
     "PostToolUse": (
-        HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec("reference_capture_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS),
         HookCommandSpec("task_authority_schema_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec(PROJECTION_GUARD_SCRIPT, FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec(
+            "reference_capture_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS
+        ),
         HookCommandSpec("role_write_policy_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("oop_readability_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("module_boundary_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("library_implementation_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec(
+            "library_implementation_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS
+        ),
         HookCommandSpec("first_party_library_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("helper_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("helper_first_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("style_checker_guard.py", STYLE_CHECKER_TIMEOUT_SECONDS),
-        HookCommandSpec("log_surface_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec(
+            "log_surface_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS
+        ),
         HookCommandSpec("notebook_quality_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
     ),
     "Stop": (
+        HookCommandSpec(
+            "completion_review_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS
+        ),
         HookCommandSpec("goal_completion_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS),
         HookCommandSpec("task_authority_schema_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("role_write_policy_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("oop_readability_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("module_boundary_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("library_implementation_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec(
+            "library_implementation_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS
+        ),
         HookCommandSpec("first_party_library_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("helper_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("helper_first_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("style_checker_guard.py", STYLE_CHECKER_TIMEOUT_SECONDS),
-        HookCommandSpec("log_surface_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec(
+            "log_surface_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS
+        ),
         HookCommandSpec("notebook_quality_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("reference_capture_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS),
+        HookCommandSpec(
+            "reference_capture_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS
+        ),
         HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("codex_runtime_summary_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("runtime_log_auto_sync.py", STANDARD_GUARD_TIMEOUT_SECONDS),
     ),
 }
 
-EVENT_ALIASES = {
-    event.casefold(): event
-    for event in EVENT_COMMANDS
-} | {
+EVENT_ALIASES = {event.casefold(): event for event in EVENT_COMMANDS} | {
     "user-prompt-submit": "UserPromptSubmit",
     "pre-tool-use": "PreToolUse",
     "post-tool-use": "PostToolUse",
@@ -249,6 +287,85 @@ EVENT_ALIASES = {
 def load_raw_payload() -> bytes:
     """Read the hook payload once so every child receives identical stdin."""
     return sys.stdin.buffer.read()
+
+
+def unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate keys while decoding a Hook payload."""
+    value: dict[str, object] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON key: {key}")
+        value[key] = item
+    return value
+
+
+def reject_json_constant(value: str) -> None:
+    """Reject non-finite JSON constants in normalized Hook input."""
+    raise ValueError(f"non-finite JSON constant: {value}")
+
+
+def canonical_json_bytes(value: object) -> bytes:
+    """Serialize one JSON value in the exact Hook canonical form."""
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Hook JSON value is not canonicalizable") from exc
+
+
+def _normalize_post_tool_use_input(raw_payload: bytes) -> bytes:
+    """Convert raw runtime keys to the exact six-field projection-guard input."""
+    try:
+        loaded = json.loads(
+            raw_payload.decode("utf-8"),
+            object_pairs_hook=unique_json_object,
+            parse_constant=reject_json_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("raw PostToolUse payload is not valid JSON") from exc
+    if not isinstance(loaded, dict) or set(loaded) != {
+        "hookEventName",
+        "tool_name",
+        "tool_input",
+        "tool_response",
+    }:
+        raise ValueError("raw PostToolUse keys are not exact")
+    if loaded["hookEventName"] != "PostToolUse":
+        raise ValueError("raw Hook event is not PostToolUse")
+    tool_name = loaded["tool_name"]
+    tool_input = loaded["tool_input"]
+    tool_response = loaded["tool_response"]
+    if not isinstance(tool_name, str) or not isinstance(tool_input, dict):
+        raise ValueError("raw PostToolUse tool fields have invalid types")
+    if not isinstance(tool_response, dict) or set(tool_response) != {
+        "exit_code",
+        "stderr",
+        "stdout",
+    }:
+        raise ValueError("raw PostToolUse response keys are not exact")
+    if (
+        isinstance(tool_response["exit_code"], bool)
+        or not isinstance(tool_response["exit_code"], int)
+        or not isinstance(tool_response["stderr"], str)
+        or not isinstance(tool_response["stdout"], str)
+    ):
+        raise ValueError("raw PostToolUse response fields have invalid types")
+    normalized = {
+        "hook_event_name": "PostToolUse",
+        "schema_version": POST_TOOL_USE_INPUT_SCHEMA,
+        "tool_input_fingerprint": hashlib.sha256(
+            canonical_json_bytes(tool_input)
+        ).hexdigest(),
+        "tool_name": tool_name,
+        "tool_input": tool_input,
+        "tool_response": tool_response,
+    }
+    return canonical_json_bytes(normalized) + b"\n"
 
 
 def json_payload(raw_payload: bytes) -> dict[str, object]:
@@ -391,17 +508,26 @@ def read_only_git_branch_arguments(arguments: tuple[str, ...]) -> bool:
         return True
     if arguments[0] == "--list":
         return all(git_branch_list_argument(argument) for argument in arguments)
-    return all(argument in SAFE_GIT_BRANCH_LIST_OPTIONS or argument.startswith("--format=") for argument in arguments)
+    return all(
+        argument in SAFE_GIT_BRANCH_LIST_OPTIONS or argument.startswith("--format=")
+        for argument in arguments
+    )
 
 
 def git_branch_mutating_argument(argument: str) -> bool:
     """Return whether a `git branch` argument mutates branch metadata."""
-    return argument in GIT_BRANCH_MUTATING_OPTIONS or argument.startswith(GIT_BRANCH_MUTATING_OPTION_PREFIXES)
+    return argument in GIT_BRANCH_MUTATING_OPTIONS or argument.startswith(
+        GIT_BRANCH_MUTATING_OPTION_PREFIXES
+    )
 
 
 def git_branch_list_argument(argument: str) -> bool:
     """Return whether a `git branch --list` argument is list-only."""
-    return argument in SAFE_GIT_BRANCH_LIST_OPTIONS or argument.startswith("--format=") or not argument.startswith("-")
+    return (
+        argument in SAFE_GIT_BRANCH_LIST_OPTIONS
+        or argument.startswith("--format=")
+        or not argument.startswith("-")
+    )
 
 
 def read_only_git_remote_arguments(arguments: tuple[str, ...]) -> bool:
@@ -458,14 +584,20 @@ def read_only_sed_arguments(arguments: tuple[str, ...]) -> bool:
         for argument in arguments
         if argument not in {"-n", "--quiet", "--silent", "--"}
     ]
-    return bool(script_candidates) and bool(SAFE_SED_PRINT_SCRIPT.fullmatch(script_candidates[0]))
+    return bool(script_candidates) and bool(
+        SAFE_SED_PRINT_SCRIPT.fullmatch(script_candidates[0])
+    )
 
 
 def sed_in_place_argument(argument: str) -> bool:
     """Return whether a sed argument enables in-place writes."""
     if argument == "--in-place" or argument.startswith("--in-place="):
         return True
-    return argument.startswith("-") and not argument.startswith("--") and "i" in argument[1:]
+    return (
+        argument.startswith("-")
+        and not argument.startswith("--")
+        and "i" in argument[1:]
+    )
 
 
 def safe_python_validation(tokens: tuple[str, ...]) -> bool:
@@ -497,15 +629,13 @@ def safe_bash_validation(tokens: tuple[str, ...]) -> bool:
         return False
     script = Path(tokens[SCRIPT_PATH_INDEX])
     if script.as_posix() == "tools/sync_agent_canon.sh":
-        return (
-            len(tokens) >= SCRIPT_SUBCOMMAND_MIN_TOKENS
-            and tokens[SCRIPT_SUBCOMMAND_INDEX] in {"check", "plan", "status"}
-        )
+        return len(tokens) >= SCRIPT_SUBCOMMAND_MIN_TOKENS and tokens[
+            SCRIPT_SUBCOMMAND_INDEX
+        ] in {"check", "plan", "status"}
     if script.as_posix() == "tools/update_agent_canon.sh":
-        return (
-            len(tokens) >= SCRIPT_SUBCOMMAND_MIN_TOKENS
-            and tokens[SCRIPT_SUBCOMMAND_INDEX] in {"plan", "status"}
-        )
+        return len(tokens) >= SCRIPT_SUBCOMMAND_MIN_TOKENS and tokens[
+            SCRIPT_SUBCOMMAND_INDEX
+        ] in {"plan", "status"}
     if safe_tool_script_subcommand(script, tokens[SCRIPT_SUBCOMMAND_INDEX:]):
         return True
     if script.parts[:2] == ("tools", "agent_tools"):
@@ -556,7 +686,9 @@ def validation_command(command: str) -> bool:
     if tokens[0] == "bash":
         return safe_bash_validation(tokens)
     if tokens[0] == "make":
-        return bool(tokens[1:]) and all(token in SAFE_MAKE_VALIDATION_TARGETS for token in tokens[1:])
+        return bool(tokens[1:]) and all(
+            token in SAFE_MAKE_VALIDATION_TARGETS for token in tokens[1:]
+        )
     return False
 
 
@@ -567,7 +699,11 @@ def bypass_child_guards_payload(raw_payload: bytes) -> bool:
     if compact_name in READ_ONLY_TOOL_NAMES or compact_name in PUBLISH_TOOL_NAMES:
         return True
     command = tool_command(payload)
-    return read_only_shell_command(command) or validation_command(command) or publish_shell_command(command)
+    return (
+        read_only_shell_command(command)
+        or validation_command(command)
+        or publish_shell_command(command)
+    )
 
 
 def env_truthy(name: str) -> bool:
@@ -614,7 +750,7 @@ def run_hook_command(
     hooks_dir: Path,
     env: dict[str, str],
 ) -> HookResult:
-    """Run one child hook script with the original payload."""
+    """Run one child hook script with its selected canonical payload."""
     script = hooks_dir / spec.script
     try:
         result = subprocess.run(
@@ -662,6 +798,7 @@ def failure_payload(result: HookResult) -> dict[str, object]:
     ][:MAX_REASON_LINES]
     detail = "\n".join(detail_lines)
     return {
+        "schema": OFFICIAL_HOOK_SCHEMA,
         "decision": "block",
         "reason": (
             "Hook dispatcher child command failed. Fix the child hook or rerun "
@@ -690,6 +827,7 @@ def visible_context_payload(
             "Remediation:\n" + "\n".join(f"- {item}" for item in remediation)
         )
     payload: dict[str, object] = {
+        "schema": OFFICIAL_HOOK_SCHEMA,
         "systemMessage": reason.strip(),
     }
     if event in ADDITIONAL_CONTEXT_EVENTS:
@@ -728,9 +866,23 @@ def failure_warning_payload(event: str, result: HookResult) -> dict[str, object]
     )
 
 
+def official_event_payload(event: str, payload: dict[str, object]) -> dict[str, object]:
+    """Normalize one dispatcher-owned payload to the official wire schema."""
+    normalized = dict(payload)
+    normalized["schema"] = OFFICIAL_HOOK_SCHEMA
+    reason = normalized.get("reason") or normalized.get("systemMessage") or ""
+    normalized["hookSpecificOutput"] = {
+        "hookEventName": event,
+        "additionalContext": str(reason),
+    }
+    return normalized
+
+
 def should_preserve_block(result: HookResult) -> bool:
     """Return whether a child block is critical enough to keep blocking."""
-    return result.spec.script in CRITICAL_BLOCKING_CHILD_HOOKS or env_truthy(STRICT_BLOCKS_ENV)
+    return result.spec.script in CRITICAL_BLOCKING_CHILD_HOOKS or env_truthy(
+        STRICT_BLOCKS_ENV
+    )
 
 
 def critical_child_invalid(result: HookResult) -> bool:
@@ -747,6 +899,7 @@ def critical_child_failure_payload(result: HookResult) -> dict[str, object]:
     if result.failed():
         return failure_payload(result)
     return {
+        "schema": OFFICIAL_HOOK_SCHEMA,
         "decision": "block",
         "reason": (
             "Critical hook child emitted nonempty output other than a valid "
@@ -765,7 +918,9 @@ def downgraded_block_payload(event: str, result: HookResult) -> dict[str, object
     """Return a non-blocking warning for a non-critical child block."""
     payload = result.json_stdout() or {}
     reason = payload.get("reason")
-    reason_text = reason if isinstance(reason, str) and reason.strip() else result.stdout.strip()
+    reason_text = (
+        reason if isinstance(reason, str) and reason.strip() else result.stdout.strip()
+    )
     remediation_raw = payload.get("remediation")
     remediation = (
         [str(item) for item in remediation_raw]
@@ -800,7 +955,9 @@ def non_block_payload(result: HookResult) -> dict[str, object] | None:
     return payload
 
 
-def visible_output_payload(event: str, results: list[HookResult]) -> dict[str, object] | None:
+def visible_output_payload(
+    event: str, results: list[HookResult]
+) -> dict[str, object] | None:
     """Combine non-blocking child outputs into one visible approve payload."""
     visible_results = [result for result in results if result.visible()]
     if not visible_results:
@@ -862,37 +1019,72 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
     child_env = child_hook_environment(payload)
     root = repo_root()
     hooks_dir = hook_directory()
-    results = [
-        run_hook_command(
-            spec,
-            raw_payload=raw_payload,
-            root=root,
-            hooks_dir=hooks_dir,
-            env=child_env,
-        )
-        for spec in EVENT_COMMANDS[event]
-    ]
+    normalized_projection_payload: bytes | None = None
     if event == "PostToolUse":
+        try:
+            normalized_projection_payload = _normalize_post_tool_use_input(raw_payload)
+        except ValueError as exc:
+            print(f"hook_dispatcher: {exc}", file=sys.stderr)
+    results: list[HookResult] = []
+    for spec in EVENT_COMMANDS[event]:
+        if spec.script == PROJECTION_GUARD_SCRIPT:
+            if normalized_projection_payload is None:
+                continue
+            child_payload = normalized_projection_payload
+        else:
+            child_payload = raw_payload
+        results.append(
+            run_hook_command(
+                spec,
+                raw_payload=child_payload,
+                root=root,
+                hooks_dir=hooks_dir,
+                env=child_env,
+            )
+        )
+    if event == "PostToolUse":
+        projection_result = next(
+            (
+                result
+                for result in results
+                if result.spec.script == PROJECTION_GUARD_SCRIPT
+            ),
+            None,
+        )
+        if (
+            projection_result is not None
+            and projection_result.returncode == 0
+            and projection_result.stdout
+        ):
+            sys.stdout.write(projection_result.stdout)
         return 0
-    critical_failure = next((result for result in results if critical_child_invalid(result)), None)
+    critical_failure = next(
+        (result for result in results if critical_child_invalid(result)), None
+    )
     blocking = next((result for result in results if result.blocks()), None)
     failure = next((result for result in results if result.failed()), None)
     visible_payload = visible_output_payload(event, results)
 
     if critical_failure is not None:
-        emit_json_payload(critical_child_failure_payload(critical_failure))
+        emit_json_payload(
+            official_event_payload(
+                event,
+                critical_child_failure_payload(critical_failure),
+            )
+        )
         return 0
     if blocking is not None:
         if should_preserve_block(blocking):
-            sys.stdout.write(blocking.stdout)
-            if not blocking.stdout.endswith("\n"):
-                sys.stdout.write("\n")
+            blocking_payload = blocking.json_stdout() or failure_payload(blocking)
+            emit_json_payload(official_event_payload(event, blocking_payload))
         else:
             emit_json_payload(downgraded_block_payload(event, blocking))
         return 0
     if failure is not None:
+        if event == "PostToolUse" and not env_truthy(STRICT_FAILURES_ENV):
+            return 0
         if env_truthy(STRICT_FAILURES_ENV):
-            emit_json_payload(failure_payload(failure))
+            emit_json_payload(official_event_payload(event, failure_payload(failure)))
         else:
             emit_json_payload(failure_warning_payload(event, failure))
         return 0
@@ -922,7 +1114,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("event", nargs="?", help="Codex hook event to dispatch")
     parser.add_argument("--group", dest="group", help="Alias for the event argument")
-    parser.add_argument("--list", action="store_true", help="Print the child hook matrix")
+    parser.add_argument(
+        "--list", action="store_true", help="Print the child hook matrix"
+    )
     return parser.parse_args(argv)
 
 

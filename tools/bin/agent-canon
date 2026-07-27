@@ -27,10 +27,6 @@ if [ ! -x "$installed_binary" ] && [ -x "$legacy_binary" ]; then
   installed_binary="$legacy_binary"
 fi
 
-if [ "${1:-}" = "local-llm" ] && command -v cargo >/dev/null 2>&1; then
-  exec cargo run --manifest-path "$manifest" -- "$@"
-fi
-
 if [ -x "$installed_binary" ]; then
   source_newer=""
   if [ -d "${canon_root}/rust/agent-canon/src" ] && command -v find >/dev/null 2>&1; then

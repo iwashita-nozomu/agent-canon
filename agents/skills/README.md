@@ -7,11 +7,22 @@ responsibility Documents Shared Skill Canon for this repository.
 upstream design ./catalog.yaml enumerates public skill families
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
 downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates public and official skill boundaries
+upstream design code-visualization.md sole public visualization owner and typed projection contract
+downstream implementation ../../tools/agent_tools/skill_route_catalog.py validates visualization owner and adapter metadata
 @dependency-end
 -->
 
 このディレクトリは、public Codex skill 文書の人間向け正本です。
 機械 discovery 用の `SKILL.md` は `.agents/skills/` を正本にします。
+
+## Visualization Ownership
+
+`code-visualization` is the sole public visualization skill. Visualization-
+producing skills remain native fact producers or renderer/formatter adapters
+and route through its canonical `VisualizationSourceUniverse`, schema-bearing
+`ToolCall`, `ProjectionCoverageManifest`, post-format readback, and final
+coverage status. The public catalog must not add a second visualization owner
+or copy the universal omission/granularity policy into adapter entries.
 
 ## Reader Map
 
@@ -97,7 +108,7 @@ in the Codex host runtime.
   shared canon.
 - AgentCanon-owned public skills appear in `catalog.yaml`; official system skills stay in the host-provided lane above.
 - Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
-- task ごとの skill 選択は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。
+- task ごとの skill 選択は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。依存 module の source clone、lifecycle、cleanup が scope の場合は `$dependency-module-change` を先に通し、AgentCanon 固有の pin/update route はその一般規約を参照する具体例として扱います。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。
 - template clone から新 repo を始めるときは `start-repository` を使います。
 - 長い tool / skill 候補名を短い command に落とすときは `task-routing` を使います。

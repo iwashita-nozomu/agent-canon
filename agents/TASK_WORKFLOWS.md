@@ -37,7 +37,7 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | run bundle, declared workflow / skills / review, and dynamic wave ledger | `task_start.py`; `bootstrap_agent_run.py`; `workflow_monitor.py` |
 | skill selection | `agents/skills/catalog.yaml`; `.agents/skills/*/SKILL.md`; `python3 tools/agent_tools/route.py --prompt` |
 | implementation stage gate | `agents/workflows/implementation-waterfall-workflow.md` |
-| implementation packet schema | `agents/COMMUNICATION_PROTOCOL.md`; run bundle design packet |
+| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; `agents/agents_config.json#artifacts.active_design_packet` |
 | closeout authority | `task_close.py`; `report_artifact_checks.py` |
 | validation failure response taxonomy | `documents/runtime-profiles-and-check-matrix.json`; generated reader projection: `documents/runtime-profiles-and-check-matrix.md` |
 | validation failure response workflow projections | `agents/canonical/CODEX_WORKFLOW.md`; `agents/canonical/CODEX_SUBAGENTS.md`; `documents/REVIEW_PROCESS.md` |
@@ -71,8 +71,12 @@ packet is regenerated for that skill before the handoff proceeds.
 
 ## Design Artifact Shape
 
-Implementation design is owned by the run bundle design packet and the
-implementation-waterfall workflow. The required reader-facing anchors are:
+Implementation design is owned by the neutral closed active design packet
+`waterfall.design_packet.v1`, persisted at
+`team_manifest.yaml#run.active_design_packet`. Its selected artifact paths,
+review paths, and `document_flow_required` flag are typed runtime authority;
+chat, schedule prose, history, and inferred headings are not packet authority.
+The required reader-facing anchors are:
 
 - `Abstract Design Frame`
 - `Implementation Flow Graph`

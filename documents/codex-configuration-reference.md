@@ -97,7 +97,7 @@ path = "../.agents/skills/agent-orchestration/SKILL.md"
 enabled = true
 
 [agents]
-max_threads = 24
+max_threads = 26
 max_depth = 2
 job_max_runtime_seconds = 3600
 
@@ -109,9 +109,11 @@ config_file = "agents/worker.toml"
 Operational interpretation:
 
 - `approval_policy="never"` and `sandbox_mode="danger-full-access"` assume the surrounding environment already provides the safety boundary.
-- `model="gpt-5.6-sol"` with `model_reasoning_effort="high"` owns the parent
-  orchestrator default. Child model and effort settings remain in
-  `.codex/agents/*.toml`; `review_model` does not replace those role files.
+- `model="gpt-5.6-sol"` with `model_reasoning_effort="high"` is the parent
+  orchestrator projection. `agents/model_profiles.toml` owns child model,
+  reasoning, capability, context, return-schema, checkpoint, continuation, and
+  digest policy; `.codex/agents/*.toml` and `agents/agents_config.json` are
+  generated projections rather than manual model-authority surfaces.
 - `tool_output_token_limit=4096` bounds individual tool output admitted to
   context; it is not a task token cap or a reason to omit decision-relevant
   evidence.
@@ -140,7 +142,7 @@ They are an explicit inventory of settings that Codex can accept but this templa
 | `approval_policy` | Non-interactive execution policy; currently `never` because this template assumes an externally controlled workspace. |
 | `sandbox_mode` | Filesystem/runtime sandbox mode; currently `danger-full-access` for externally sandboxed runs. |
 | `model`, `model_reasoning_effort` | Parent orchestrator default: `gpt-5.6-sol/high`. |
-| `review_model` | Project review default: `gpt-5.6-luna`; named child roles still use their own TOML. |
+| `review_model` | Parent review projection; named child role settings are generated from `agents/model_profiles.toml`. |
 | `model_context_window` | Explicit parent context-window declaration. |
 | `tool_output_token_limit` | Per-tool output context boundary. |
 | `features` | Hooks, goals, and multi-agent runtime are enabled. |
@@ -482,13 +484,13 @@ Network permission config supports:
 
 | Field | Purpose |
 | ----- | ------- |
-| `max_threads` | Maximum concurrent agent threads. |
+| `max_threads` | Topology-derived requested/configured readback (`20 + 6 = 26` currently); platform-effective and current-available capacity may be lower and cause queueing. |
 | `max_depth` | Maximum nested spawned-agent depth. |
 | `job_max_runtime_seconds` | Default worker timeout in seconds. |
 
 Custom agents live in `~/.codex/agents/` or `.codex/agents/` as standalone TOML. They can override many normal config keys, including model, reasoning, sandbox, MCP servers, skills, and instructions. The important policy boundary is:
 
-- Use `.codex/agents/*.toml` to define role behavior.
+- Use `agents/model_profiles.toml` as profile authority and regenerate `.codex/agents/*.toml` role views.
 - Use `AGENTS.md` and workflow docs to define when roles may be used.
 - Do not rely on high `max_threads` alone to improve work quality; fan-out still needs owner, input packet, write scope, and review gate.
 
@@ -807,7 +809,10 @@ Before changing Codex config in this repo:
 1. Identify the target surface: user config, repo config, custom agent, hook, skill, MCP, or AGENTS.md.
 2. Check this reference and the official schema for the exact key name.
 3. Prefer repo policy in `AGENTS.md` and runtime mechanics in `.codex/config.toml`.
-4. If changing shared canon, edit `vendor/agent-canon/` and run `bash tools/sync_agent_canon.sh link-root`.
+4. If changing shared canon, read `documents/rule/dependency-module-changes.md`,
+   edit the managed topic-workspace source clone, and use the request-evidence-authorized
+   `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root`
+   command only when projecting the clean pin back into a parent repo.
 5. If adding a new document or script, add a dependency header first.
 6. Run dependency header scan, dependency graph validation, docs checks, and relevant static checks before closeout.
 

@@ -38,35 +38,70 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 
 - `agents/canonical/CODEX_WORKFLOW.md`
 
+## CompletionCoverage Reader Projection
+
+Closeout reporting consumes the generated `agent-canon.completion-coverage.v1`
+projection from the existing run-bundle logical ledger. This skill is a reader
+and routing projection; `COMMUNICATION_PROTOCOL` owns the schema,
+`CODEX_WORKFLOW` owns applicability/state, and `report_artifact_checks` plus
+`task_close` own checking/consumption. Preserve the five mapping error sets,
+typed owner/state/API/dependency evidence, W1 certificate references, and both
+independent predicates `all_planned_chunks_complete` and
+`overall_delivery_complete`. Do not aggregate a second coverage map or turn a
+chunk/checkpoint into delivery.
+
+Use `tools/bin/agent-canon docs check <changed-markdown-paths>` as the single
+Markdown/math/Mermaid route and consume the single official
+`agent-canon.posttooluse-stop.v1` PostToolUse/Stop dispatcher output. The
+CompletionCoverage route has no scalar OOP score, line/length, test-count,
+coverage, mutation, private-helper, or checker-retest completion gate.
+
 ## Stages
 
-1. intake
-1. required context and library sweep
-1. workflow selection
-1. artifact placement
-1. explicit subagent bootstrap
-1. execution plan and plan review for full staged routes
-1. detailed design and detailed design review for full staged routes
-1. document flow review for reader-facing docs, new terms, public APIs, or full staged routes
-1. implementation
-1. validation
+1. intake and semantic decision sufficiency
+1. owner-critical context and validation route
+1. workflow and skill selection
+1. optional durable artifact placement when coordination or resumption needs it
+1. optional subagent bootstrap for a launchable wave
+1. selected implementation
+1. selected validation and review
 1. closeout
+
+The stages are conditional route points, not a fixed plan-review-edit sequence.
+Task-catalog roles, default review packs, and related skills are candidates;
+they become work only when an owner-critical operation, unresolved branch, or
+selected validation route activates them. A wave is launchable only when its
+owner, replaceable responsibility, context, write authority, and validation
+route are ready.
 
 ## Required Output
 
 - 着手時の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
-- `task_start.py` / `bootstrap_agent_run.py` が出す `REPO_TOOL_ROUTING_SEQUENCE`、
-  `REPO_TOOL_ROUTING_NEXT_COMMAND`、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` を
-  run-local packet として扱い、`team_manifest.yaml` の
-  `run.repo_tool_routing_policy` を handoff に渡す
-- Shared canon / Large delivery / high-risk / multi-step task では `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` から始める
+- `task_start.py` / `bootstrap_agent_run.py` が出す
+  `REPO_TOOL_ROUTING_SEQUENCE`、`REPO_TOOL_ROUTING_NEXT_COMMAND`、
+  `REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` は、選択された route が必要と
+  する場合にだけ handoff または durable packet へ渡す。構造化された
+  handoff message/tool result が意味上十分なら、それを packet として扱い、
+  file-backed run-local packet は coordination または resumption のために
+  必要な場合だけ作る
+- Shared canon / Large delivery / high-risk / multi-step task でも、
+  `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` は
+  coordination、resumption、または選択された launchable wave が必要と
+  する場合にだけ実行する。作業が repo を変更することだけでは bundle の
+  根拠にならない
 - owner-bounded route では boundary-evidenced local route を使い、document-flow / broad design review は escalation 条件がある場合だけ起動する
-- repo-changing implementation / patch / doc-edit work では、実装前に
-  selected write-capable implementer handoff を bootstrap または schedule
-  する。Routine docs / Focused code でも targeted validation は使うが、
-  parent-direct repo edit は `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` と
-  `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を
-  記録した場合だけ使う
+- repo-changing implementation / patch / doc-edit work では、別の writer
+  が必要なときだけ selected write-capable implementer handoff を bootstrap
+  または schedule する。owner、責務、context、write authority、validation
+  route が互換な active agent は revised scope でも再利用する。独立 review、
+  disjoint write authority、互換性のない owner/context、または context
+  integrity failure の場合だけ fresh agent を起動する。parent-direct repo
+  edit は、別 writer が不要な場合でも明示承認または spawn/tool gate blocker
+  の例外証拠を記録する既存ルートに従う
+- Routine docs / Focused code でも targeted validation は使うが、
+  task-catalog の role や default review pack は候補であり、selected
+  owner-critical operation または unresolved branch が有効化した場合だけ
+  handoff、review、wave を作る
 - repo-changing execution の編集では、既存 tool の実行や owner-bounded patching の前提として runtime `SKILL.md` 読了を要求しません。対象 property を正本として持つ既存 tool または command packet を先に使い、結果の解釈や修正に必要な owner surface だけを開きます。owner boundary、差し替え可能な単位、targeted validation route、public impact boundary が evidence で閉じた修正は `$owner-bounded-routing` に流し、owner boundary、existing-tool route、targeted validation を evidence に残す。外形的な作業量や file 数だけでは route を固定しません。実装 behavior は契約完全実装ポリシーから導く
 - research-backed implementation、benchmark、external research、prior art、
   公式 docs、文献由来の design decision によって code、protocol、report claim、
@@ -80,7 +115,7 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - repo-changing implementation / patch / doc-edit task では `$agent-orchestration` を先頭に置き、`$subagent-bootstrap` を併用して selected write-capable implementer handoff を既定 route にする。parent-direct は明示承認または subagent spawn / tool gate blocker を記録した例外 route としてだけ使う
 - workflow family、public skill set、review stack は `agent-orchestration` の出力を入力として受け取り、この skill で routing matrix を重複定義しない
 - ユーザー向けの作業報告、最終報告、レビュー要約、handoff guidance、reader-facing docs は日本語で書きます。内部の項目名、列挙値、役割名、補助関数風の語は、コマンド、パス、表、正確な根拠の引用に閉じます。専門語が必要な場合は、既存のリポジトリ用語または外部標準の用語を使い、自然文で説明します。
-- AgentCanon update surface が repairable なら `make agent-canon-ensure-latest` を実行する。submodule repo では親 repo の無関係な dirty state はこの実行を block しない。update surface 自体が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon PR / proposal merge 後に `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` で template / derived repo へ持ち帰る
+- AgentCanon update surface が repairable なら `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest` を実行する。submodule repo では親 repo の無関係な dirty state はこの実行を block しない。update surface 自体が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon PR / proposal merge 後に `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` で template / derived repo へ持ち帰る
 - AgentCanon source、submodule pin、`.gitmodules`、AgentCanon-owned root
   runtime view、root-copy surface、または parent root sync を変更した場合は
   `agentcanon_structure_followup=required` を記録する。template / derived
@@ -103,7 +138,7 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
   場合の supplemental evidence としてだけ使います。広い実行を予定する前に、
   静的解析・読み取りで何が未確認として残ったかを記録します。
 - 詳細設計が編集対象 path に絞る前に、責務 model、概念 graph または layer model、非対象、将来拡張 layer、評価軸、canonical surface 関係を含む `Abstract Design Frame` を書くか引用する。実装 scope、file list、validation は nearest editable path や current finding ではなく、この frame から導く
-- 実装 path を選ぶ前に、承認済み design packet が owner、canonical paths、forbidden paths、required checks をすでに固定していない限り、`agent-canon local-llm route-implementation-surface --request-file <request-or-design-question.txt> --format text` を走らせるか引用する。code、tool、skill、workflow、document、runtime instruction のどこに置くかは、この structured route を source packet seed にして決める。LocalLLM が無い場合は deterministic router recovery の `PRIMARY_PATHS` / `FORBIDDEN_PATHS` を local provisional source-packet evidence として使うか `router_unavailable_blocker` として記録し、responsibility search と dependency scope で owner と edit scope を確定する
+- 実装 path を選ぶ前に、承認済み design packet が owner、canonical paths、forbidden paths、required checks をすでに固定していない限り、`python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json` を走らせるか引用する。bounded candidate path を source packet seed にし、responsibility search と dependency scope で owner、edit scope、forbidden path を確定する。deterministic search が失敗した場合は path selection を `router_unavailable_blocker` へ遷移させ、owner、responsibility、dependency evidence が一つの canonical route を示した時点で継続する
 - 編集前の repo 調査は `agents/COMMUNICATION_PROTOCOL.md` が所有する `Pre-Edit Repository Investigation Packet` として固定する。既存 repo 調査が甘いまま実装へ進んだ場合は、差分を広げる前にこの packet を作り直す
 - `Pre-Edit Repository Investigation Packet` は、次に進む具体的な作業と担当者を 1 つ書いて閉じます。別の探索へ広げる前に、その作業を実装、検証、Issue 処理のいずれかへ進めます。
 - 検証経路は、primary validation evidence として使った静的解析・読み取り、

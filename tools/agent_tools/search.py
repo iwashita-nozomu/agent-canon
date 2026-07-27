@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Coordinates purpose-based search across text, local LLM cards, tool catalog, dependency headers, and Python code facts.
+# responsibility Coordinates purpose-based search across text, deterministic semantic cards, tool catalog, dependency headers, and Python code facts.
 # upstream design ../../documents/search-coordination.md coordinated search provider contract
 # upstream implementation ./vector_search.py provides text surfaces, TF-IDF search, dependency headers, and Python code facts
-# upstream implementation ./search_index.py builds repo-local local-LLM semantic search cards
+# upstream implementation ./search_index.py builds repo-local deterministic semantic cards
 # downstream implementation ../../tests/agent_tools/test_search.py validates coordinated search providers
 # @dependency-end
 """Coordinate AgentCanon search providers from one purpose string."""
@@ -25,7 +25,7 @@ if __package__ in (None, ""):
 import search_index  # noqa: E402
 import vector_search  # noqa: E402
 
-DEFAULT_PROVIDERS = ("text", "llm", "vector", "tool", "header-deps", "code-deps")
+DEFAULT_PROVIDERS = ("text", "semantic", "vector", "tool", "header-deps", "code-deps")
 DEFAULT_INDEX_DIR = search_index.DEFAULT_INDEX_DIR
 DEFAULT_TOP = 12
 PROVIDER_BONUS = 0.15
@@ -65,11 +65,6 @@ class SearchRequest:
     index_dir: Path
     top: int
     refresh_index: bool
-    run_llm: bool
-    llama_cli: str
-    model: str
-    max_llm_files: int
-    max_bytes: int
 
 
 @dataclass(frozen=True)
@@ -160,11 +155,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--index-dir", default=DEFAULT_INDEX_DIR)
     parser.add_argument("--top", type=int, default=DEFAULT_TOP)
     parser.add_argument("--refresh-index", action="store_true")
-    parser.add_argument("--run-llm", action="store_true")
-    parser.add_argument("--llama-cli", default="")
-    parser.add_argument("--model", default=search_index.DEFAULT_MODEL)
-    parser.add_argument("--max-llm-files", type=int, default=search_index.DEFAULT_LLM_FILES)
-    parser.add_argument("--max-bytes", type=int, default=search_index.DEFAULT_MAX_BYTES)
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -190,20 +180,14 @@ def snippet(text: str, limit: int = SNIPPET_LIMIT) -> str:
 
 
 def load_index_cards(request: SearchRequest) -> tuple[search_index.SearchCard, ...]:
-    """Load or build local LLM search cards."""
+    """Load or build deterministic semantic search cards."""
     card_file = request.index_dir / search_index.DEFAULT_CARD_FILE
     if request.refresh_index:
-        cards, llm_used, llm_unavailable = search_index.build_cards(
+        cards = search_index.build_cards(
             search_index.BuildOptions(
                 root=request.root,
                 surfaces=request.surfaces,
                 excludes=request.excludes,
-                run_llm=request.run_llm,
-                require_llm=False,
-                llama_cli_arg=request.llama_cli,
-                model=request.model,
-                max_llm_files=request.max_llm_files,
-                max_bytes=request.max_bytes,
             )
         )
         report = search_index.BuildReport(
@@ -211,27 +195,18 @@ def load_index_cards(request: SearchRequest) -> tuple[search_index.SearchCard, .
             card_file=card_file,
             state_file=request.index_dir / search_index.DEFAULT_STATE_FILE,
             cards=cards,
-            llm_requested=request.run_llm,
-            llm_used=llm_used,
-            llm_unavailable=llm_unavailable,
         )
         search_index.write_jsonl(report.card_file, cards)
-        search_index.write_state(report.state_file, report, request.root, request.model)
+        search_index.write_state(report.state_file, report, request.root)
         return cards
     loaded_cards = search_index.load_cards(card_file)
     if loaded_cards:
         return loaded_cards
-    cards, _, _ = search_index.build_cards(
+    cards = search_index.build_cards(
         search_index.BuildOptions(
             root=request.root,
             surfaces=request.surfaces,
             excludes=request.excludes,
-            run_llm=False,
-            require_llm=False,
-            llama_cli_arg="",
-            model=request.model,
-            max_llm_files=0,
-            max_bytes=request.max_bytes,
         )
     )
     return cards
@@ -295,8 +270,8 @@ def vector_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderH
     )
 
 
-def llm_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
-    """Return local LLM semantic card hits."""
+def semantic_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
+    """Return deterministic semantic card hits."""
     hits: list[ProviderHit] = []
     for card in corpus.cards:
         score = request.query.score_text(card.searchable_text())
@@ -304,7 +279,7 @@ def llm_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit,
             continue
         hits.append(
             ProviderHit(
-                provider="llm",
+                provider="semantic",
                 path=card.path,
                 score=score,
                 reason=f"semantic-card:{card.generated_by}",
@@ -428,7 +403,7 @@ def provider_registry() -> Mapping[str, ProviderFunction]:
     return {
         "text": text_hits,
         "vector": vector_hits,
-        "llm": llm_hits,
+        "semantic": semantic_hits,
         "tool": tool_hits,
         "header-deps": header_dependency_hits,
         "code-deps": code_dependency_hits,
@@ -503,11 +478,6 @@ def build_request(args: argparse.Namespace) -> SearchRequest:
         index_dir=(root / str(args.index_dir)).resolve(),
         top=max(int(args.top), 1),
         refresh_index=bool(args.refresh_index),
-        run_llm=bool(args.run_llm),
-        llama_cli=str(args.llama_cli),
-        model=str(args.model),
-        max_llm_files=int(args.max_llm_files),
-        max_bytes=int(args.max_bytes),
     )
 
 

@@ -9,7 +9,7 @@ downstream implementation ../tools/agent_tools/runtime_log_archive_git.py manage
 downstream design runtime-log-archive-migration.md documents in-tree hook JSONL migration into the archive
 downstream implementation ../.codex/hooks/log_archive_mount_warning.py warns when the archive mount is absent
 downstream implementation ../.codex/hooks/runtime_log_auto_sync.py runs best-effort Stop-time archive sync
-downstream implementation ../.codex/hooks/hook_event_log.py writes hook JSONL into the archive
+downstream implementation ../.codex/hooks/hook_event_log.py writes atomic per-event files into the repository-owned spool
 downstream implementation ../tools/agent_tools/eval_accumulation_check.py validates archive JSONL and eval reports when mounted
 downstream implementation ../tools/agent_tools/generate_agent_improvement_guide.py reads mounted archive JSONL and eval reports
 downstream implementation ../tools/agent_tools/generate_agent_runtime_dashboard.py displays mounted archive evidence
@@ -42,9 +42,92 @@ repo AgentCanon pins.
 
 Use this document to answer where runtime hook logs, accumulated evals, Codex
 summaries, and archived agent run bundles are retained outside the source tree.
-Read Layout first for path selection, then Branch Policy, Mount, and Push for
-operational handling. The final sections cover legacy in-tree migration and
-agent report archiving boundaries.
+Read Source-Bound Runtime Event Materialization for the prepared-artifact and
+outcome-receipt boundary, then Layout for path selection and Branch Policy,
+Mount, and Push for operational handling. The final sections cover legacy
+in-tree migration and agent report archiving boundaries.
+
+## Source-Bound Runtime Event Materialization
+
+`tools/agent_tools/runtime_log_archive_git.py` owns the complete source-bound
+runtime-evidence handoff. First, the explicit checkpoint command
+`append-context-discovery` reads native `session_meta` and selected
+`event_msg` / `task_complete` records from the finite Codex rollout source and
+publishes exactly one immutable
+`context_discovery.<certificate-id>.json` certificate in the active run bundle.
+Then `materialize-runtime-event` reads exactly one certificate, selects one
+fixed result family (`requirements`, `design`, `review`, `validation`, or
+`lifecycle`), verifies the certificate's repository, rollout, native-record,
+and hash identities, and prepares one canonical `runtime_event.<unit-id>.json`
+artifact. Neither command modifies hook serializers, runtime summaries,
+accumulated-family registries, or pull-request adapters.
+
+The prepared artifact has schema `agent_canon.runtime_event.v1`. Its ordered top-level
+fields are `schema`, `materialization_id`, `result_family`, `gate`,
+`source_event`, `result_artifact`, `target_identities`, `source_snapshot`,
+`publication_intent`, and `artifact_sha256`. The nested record preserves the rollout
+path and bytes, certified native byte range, source record hash, exact result-artifact
+path/schema/hash/blob, target content/blob identities, source `HEAD`/base OIDs,
+and porcelain-v1 status lines. `publication_intent` contains the deterministic
+attempt ID, exact target path, and only `prepared_state=prepared`; it never
+predicts an outcome.
+
+Publication is no-replace and source-bound. Post-target evidence is first
+appended as a canonical
+`agent_canon.runtime_event.publication_outcome_observation.v1` file beneath
+`.agent-canon/runtime-event-spool/publication-outcome/<attempt-id>/`, then
+published as an immutable hash-linked
+`agent_canon.runtime_event.publication_outcome_receipt.v1` sibling of the
+artifact. Receipt basenames are
+`runtime_event.<unit-id>.outcome.<attempt-id>.<sequence>.json`, where sequence
+is `000001` or `000002`. Consumers accept only the latest confirmed
+`committed` receipt.
+
+A pre-existing identical artifact, observation, or receipt is read back
+idempotently; different bytes, malformed chains, or symlink/non-regular
+targets fail closed. Every pre-artifact-rename failure preserves the old
+destination and emits no outcome. A post-rename fsync/readback gap appends an
+`uncertain` observation and receipt when possible. If a matching artifact is
+recovered without an observation, recovery first appends sequence-1
+`uncertain` with `causal_gap=true`; only a later verified recovery observation
+may append sequence-2 `committed`. Existing artifacts, observations, and
+receipts are never rewritten during recovery.
+
+The public transaction codes distinguish artifact preparation
+(`publication_failure`, `record_collision`, `schema_invalid`,
+`publication_uncertain`), observation append/confirmation
+(`publication_observation_failed`, `publication_observation_uncertain`,
+`publication_observation_collision`, `publication_observation_invalid`),
+receipt append/confirmation (`publication_receipt_failed`,
+`publication_receipt_uncertain`, `publication_receipt_collision`,
+`publication_receipt_invalid`), and attempt synchronization
+(`publication_attempt_busy`, `publication_attempt_lock_invalid`,
+`publication_attempt_lock_release_failed`, `publication_attempt_collision`).
+For a typed failure the command prints only the exact error code and
+`RUNTIME_EVENT_MATERIALIZE=fail`, writes no stderr, and exits `1`.
+
+The producer requires a matching `reports/agents/.active_run`,
+`--agent-context-id`, and `--turn-id`; the materializer requires the resulting
+single context certificate, the fixed result artifact, and a valid
+`--base-ref`. Example:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py append-context-discovery \
+  --run-id <run-id> --agent-context-id <agent-context-id> --turn-id <turn-id>
+python3 tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
+  --result-family review --run-id <run-id> --gate-id change-review \
+  --base-ref <base-ref>
+```
+
+The Rust graph command consumes the prepared artifact plus the latest confirmed
+committed receipt during one `graph build`. Its v2 persisted runtime-evidence
+snapshot retains the exact artifact/receipt bytes, their hashes, the live
+source identity fingerprint, and the validated observation. `graph status`,
+`graph query`, `graph context`, and dependency-review consumers reuse that one
+snapshot and perform only one bounded freshness probe per command. They never
+rerun the runtime producer. Missing, uncertain, invalid, stale, or mismatched
+runtime evidence makes the graph unavailable or stale instead of regenerating
+an event.
 
 ## Layout
 
@@ -55,7 +138,7 @@ Use this table first when deciding where a report is kept:
 | Current task run bundle | `<source-repo>/reports/agents/<run-id>/` | none until archived | `bootstrap_agent_run.py` / task tools create it |
 | Normal accumulated agent reports | `<source-repo>/reports/agents/` | `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` on branch `logs/<environment-key>-<chat-key>` | `python3 tools/agent_tools/runtime_log_archive_git.py sync` |
 | Immutable run-bundle snapshot | `<source-repo>/reports/agents/<run-id>/` | `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/` plus `index.jsonl` on branch `logs/<environment-key>-<chat-key>` | `archive-agent-report --report-dir reports/agents/<run-id>` then `push` |
-| Hook chronology | hook runtime | `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl` on branch `logs/<environment-key>-<chat-key>` | hooks write it; `push` or `sync` commits it |
+| Hook chronology | `<source-repo>/.agent-canon/runtime-event-spool/hook-events/<repo-key>/` | `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl` on branch `logs/<environment-key>-<chat-key>` | hooks publish per-event files; explicit `sync` checkpoints them |
 | Accumulated eval reports | eval producer output | `.agent-canon/log-archive/eval-results/<family>/<eval-run-id>-<status>*.md` | `run_accumulated_agent_evals.py --run-id <run-id>` |
 | Codex runtime summaries | local Codex runtime state | `.agent-canon/log-archive/codex-runtime/<repo-key>/chats/<conversation-id>/summary-<agent-canon-commit>.jsonl` | `export_codex_runtime_summary.py` then `sync` |
 
@@ -75,19 +158,36 @@ explicit fallback `no-chat-<repo-key>`. The source isolation key remains
 `<repo-key>` inside the branch tree, so one chat branch can still separate
 parent repo and standalone AgentCanon evidence by path.
 
-Hook JSONL filenames and Codex runtime summary filenames carry the AgentCanon
-checkout commit key, not the source repo commit. Hook JSONL, Codex runtime
-summaries, and immutable run-bundle manifests record `agent_canon_git_head`
-when the AgentCanon checkout has a readable HEAD. Existing source provenance
-metadata remains: records also carry `codex_trace_key` when the Codex trace
-environment is available, and `source_git_head` when the source repository has a
-readable HEAD.
+Projected hook JSONL filenames and Codex runtime summary filenames carry the
+AgentCanon checkout commit key, not the source repo commit. Hot-path event bytes
+do not inspect or claim a Git head; the explicit checkpoint uses the AgentCanon
+commit key only in publication placement. Codex runtime summaries and immutable
+run-bundle manifests continue to record `agent_canon_git_head` when readable.
+Existing trace metadata remains available through `codex_trace_key` and
+`codex_thread_id` when the Codex runtime exposes it.
 
-Normal hook writers use:
+Normal hook writers use one independent file per event:
+
+```text
+<source-repo>/.agent-canon/runtime-event-spool/hook-events/<repo-key>/<runtime-namespace>/<hook-name>/<hook-run-id>.json
+```
+
+The explicit checkpoint projects those immutable event bytes to:
 
 ```text
 .agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl
+.agent-canon/log-archive/hook-runs/<repo-key>/.spool-index.jsonl
+.agent-canon/log-archive/hook-runs/<repo-key>/.spool-cursor.json
 ```
+
+`event_id` is exactly `hook_run_id`; `event_sha256` is the SHA-256 of canonical
+sorted compact JSON plus one terminal LF. The dedup preimage is canonical
+sorted compact JSON over `event_id` and `event_sha256` without that LF.
+`HookLogContext.append` returns a `HookAppendResult` whose transport `status` is
+exactly `spooled`, `duplicate`, or `failed`; this is separate from the hook
+event's semantic `status` field. The append path writes no stdout or stderr.
+Consequently, spool failure is represented only by the returned result and the
+dispatcher's JSON output remains valid.
 
 Normal eval writers use:
 
@@ -169,23 +269,21 @@ legacy-import/eval-results/
 python3 tools/agent_tools/runtime_log_archive_git.py ensure
 ```
 
-Hook log writers run this branch selection before durable archive writes. When
-the archive clone is on a different `logs/<environment-key>-<chat-key>` branch,
-`ensure` preserves managed runtime artifacts in the current branch with a local
-commit, then switches to the current source repo branch. Managed runtime
-artifacts are `hook-runs/`, `codex-runtime/`, `agent-reports/`,
-`eval-results/`, and `legacy-import/`. Archive-level policy/tool paths remain
-blockers and require a direct archive review.
+`ensure` is an explicit administrative operation. PostToolUse does not invoke
+it or inspect the archive. Hook writers publish only to the fixed-depth local
+spool under the source repository, so an absent archive, a different archive
+branch, or a held Git index cannot block hook completion.
 
-If the mount is absent, hooks use a local state directory outside the
-repository tree. Set `AGENT_CANON_HOOK_ARCHIVE_DIR` to route logs to another
-archive root. Existing `AGENT_CANON_HOOK_RESULTS_DIR` and per-hook
-`*_HOOK_LOG_PATH` variables remain explicit test/debug overrides.
+Set `AGENT_CANON_HOOK_EVENT_SPOOL_DIR` to select another container-visible
+spool root. `AGENT_CANON_HOOK_RESULTS_DIR` maps to its `.event-spool/` child.
+An explicit legacy `*.jsonl` hook override maps to sibling directory
+`<override>.events/`; the hot path never appends a shared JSONL file and never
+falls back to host `~/.codex` state.
 
 `hooks/log_archive_mount_warning.py` runs at prompt and pre-tool boundaries. It
-does not block; it emits a visible warning that asks the agent to run the
-`ensure` command before accumulating hook or eval logs when the mount is missing
-or not a Git clone.
+does not block; it emits a visible warning that asks the agent to prepare the
+archive before an explicit checkpoint or accumulated eval write when the mount
+is missing or not a Git clone. Local hook spooling remains available.
 
 ## Push
 
@@ -215,15 +313,33 @@ Normal unattended operation uses one command:
 python3 tools/agent_tools/runtime_log_archive_git.py sync
 ```
 
-`sync` ensures the archive clone, copies current `reports/agents/` run bundles
-to `agent-reports/<repo-key>/`, stages hook JSONL, eval reports, Codex runtime
-summaries, and agent reports, then commits and pushes the source repository's
-current `logs/<environment-key>-<chat-key>` branch. Its pull/rebase step uses
-Git autostash because hooks can append log lines while the sync command itself
-is running. It skips
+`sync` acquires the nonblocking source lock, ensures the archive exactly once,
+snapshots the fixed spool set, validates canonical bytes, updates the hook
+projection, dedup index, and cursor, copies requested agent reports, and then
+stages/commits/pulls/pushes once. It reads back the exact commit, tree, index,
+cursor, and projection identities before deleting only the covered spool
+files. Concurrent hook writers publish independent files and events outside
+the captured snapshot remain for the next checkpoint. It skips
 `.active_run`, cache files, Python cache directories, and oversized single
 files. The source repo's ignored `reports/agents/` directory remains run-local
 working evidence; the log archive is the durable accumulated store.
+
+The lock is
+`<source-repo>/.agent-canon/runtime-event-spool/.archive-transaction.lock`.
+A held lock fails immediately as `archive_transaction_busy`. `sync --no-push`
+reports `partial_retained`; malformed input, archive failure, failed or
+uncertain publication, and readback mismatch retain every source event.
+
+The static hot-path contract is checked without resolving repository or archive
+context:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py check-hook-hot-path
+```
+
+Its AST graph closes over hook-local calls and the imported `repo_log_key`,
+`hook_event_spool_root`, and `codex_trace_key` definitions in
+`runtime_log_paths.py`; those helpers are not trusted as opaque leaves.
 For current task closeout, prefer the immutable snapshot path:
 `archive-agent-report --report-dir reports/agents/<run-id>` followed by `push`.
 Use broad `sync` when intentionally collecting accumulated runtime families,

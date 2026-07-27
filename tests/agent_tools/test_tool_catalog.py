@@ -4,7 +4,9 @@
 # contract test
 # responsibility Tests structured AgentCanon tool catalog validation.
 # upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog
+# upstream implementation ../../tools/agent_tools/visualization_contract.py owns the canonical visualization contract tool.
 # upstream design ../../tools/catalog.yaml structured tool catalog fixture
+# upstream design ../../documents/gpu-admission-r5-source-packet.md canonical managed GPU admission route
 # @dependency-end
 
 from __future__ import annotations
@@ -53,6 +55,69 @@ class CheckToolCatalogTest(unittest.TestCase):
             renderer["command"],
             "python3 tools/agent_tools/render_dependency_manifest_graph.py "
             "--root . --scope full --bundle-dir reports/dependency-graph --format json",
+        )
+        visualization_entries = [
+            entry
+            for entry in catalog["entries"]
+            if entry["id"] == "visualization-contract"
+            or entry["path"] == "tools/agent_tools/visualization_contract.py"
+        ]
+        self.assertEqual(len(visualization_entries), 1)
+        visualization = visualization_entries[0]
+        self.assertEqual(visualization["status"], "canonical")
+        self.assertEqual(visualization["audience"], "skill")
+        self.assertIn(
+            visualization["placement"],
+            {"support_library", "validation_checker"},
+        )
+        self.assertEqual(
+            visualization["docs"],
+            [
+                "tools/README.md",
+                "documents/tools/README.md",
+                "documents/tools/visualization_contract.md",
+            ],
+        )
+        tool_docs = (
+            PROJECT_ROOT / "documents" / "tools" / "tool-docs.toml"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(
+            tool_docs.count('tool = "tools/agent_tools/visualization_contract.py"'),
+            1,
+        )
+        self.assertEqual(
+            tool_docs.count('doc = "documents/tools/visualization_contract.md"'),
+            1,
+        )
+
+    def test_gpu_admission_route(self) -> None:
+        """The catalog exposes only the canonical managed GPU admission entrypoint."""
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
+        )
+        managed = next(
+            entry
+            for entry in catalog["entries"]
+            if entry["id"] == "run-managed-experiment"
+        )
+
+        self.assertEqual(
+            managed["path"],
+            "tools/experiments/run_managed_experiment.py",
+        )
+        self.assertEqual(
+            managed["command"],
+            "python3 tools/experiments/run_managed_experiment.py",
+        )
+        self.assertIn(
+            "tests/tools/test_run_managed_experiment.py",
+            managed["tests"],
+        )
+        self.assertFalse(
+            any(
+                entry["path"] == "tools/experiments/execution_resource_plan.py"
+                for entry in catalog["entries"]
+            )
         )
 
     def test_stale_catalog_entry_fails(self) -> None:

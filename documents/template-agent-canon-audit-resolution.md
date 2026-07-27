@@ -23,8 +23,8 @@ Resolution means one of:
   risk class.
 - `compatibility_only`: legacy wording remains only in compatibility docs or
   tool output.
-- `canon_source`: edits must be made in `vendor/agent-canon/` or standalone
-  AgentCanon, not in root views.
+- `canon_source`: edits must be made in the managed topic-workspace source clone
+  (or standalone AgentCanon source mode), not in root views or a vendored pin.
 - `higher_priority_override`: the audit recommendation conflicts with current
   repository runtime requirements and is intentionally not applied.
 

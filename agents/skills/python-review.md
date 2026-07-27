@@ -35,7 +35,8 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
 
 - `pyright`
 - `pytest tests/`
-- `ruff check python tests --select D,E,F,I,UP --ignore E501`
+- `bash tools/ci/run_python_quality_checks.sh` が選択する canonical Python owner path の Ruff
+  結果
 - 差分が定義順、公開入口の配置、内部補助関数の配置を変える場合は
   `python3 tools/agent_tools/check_convention_compliance.py`
 - Python 差分が class、`Protocol`、継承、公開 API、型境界、依存方向の根拠を持つ場合は
@@ -61,7 +62,8 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
 
 - `pyright` の結果を確認し、型エラーや警告を見逃していない
 - `pytest tests/` の対象範囲が今回の変更に対して妥当である
-- `ruff check python tests --select D,E,F,I,UP --ignore E501` の違反を確認している
+- `bash tools/ci/run_python_quality_checks.sh` が選択する canonical Python owner path の
+  Ruff 違反を確認している
 - 公開関数、CLI、設定、直列化の境界を触った場合は呼び出し側への影響を見ている
 - Python ファイル内の読者順序が、公開契約、公開入口、共有の内部補助関数、単一公開入口に
   従う内部補助関数の順で追えることを確認している
@@ -81,7 +83,7 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
 1. class、dataclass、`Protocol`、継承、公開 API、型境界、依存方向が変わる Python 差分では `$oop-readability-check` か `tools/oop/python/readability.py` を下流根拠として使い、Single responsibility、Open/closed、Liskov substitution、Interface segregation、Dependency inversion のシグナルを確認します。
 1. 同じ変更パスに対して `check_solid_evidence.py` を走らせ、OOP 可読性レポートの `scanned_paths` が review 対象を覆っていることを確認します。
 1. `pytest tests/` で挙動を確認します。
-1. `ruff check python tests --select D,E,F,I,UP --ignore E501` で style / import / docstring / upgrade の逸脱を見ます。
+1. `bash tools/ci/run_python_quality_checks.sh` で style / import / docstring / upgrade の逸脱を見ます。
 1. 指摘を API 挙動、型安全性、テスト網羅、文書ずれに分けて返します。
 
 ## よくある失敗

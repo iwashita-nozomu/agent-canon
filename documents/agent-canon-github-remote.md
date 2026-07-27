@@ -46,8 +46,10 @@ git submodule sync vendor/agent-canon
 git -C vendor/agent-canon remote set-url origin \
   https://github.com/iwashita-nozomu/agent-canon.git
 make agent-canon-update-plan
-make agent-canon-latest
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  make agent-canon-latest
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
@@ -57,9 +59,10 @@ normal parent repo updates use the high-level `latest` route.
 
 ## Local Branches From Derived Repos
 
-Derived repos that discover AgentCanon changes should commit them inside
-`vendor/agent-canon/`, merge GitHub `main` into that branch, push the branch to
-`iwashita-nozomu/agent-canon`, and open or update the AgentCanon PR. Do not
+Derived repos that discover AgentCanon changes should prepare a workspace-root
+branch clone with `dependency-module-change`, commit there, push the branch to
+`iwashita-nozomu/agent-canon`, and open or update the AgentCanon PR. Parent
+`vendor/agent-canon` is a clean pin projection, not a source branch; do not
 route new work through project-local compatibility remotes.
 
 Use the gh-backed publish tool for the branch push and PR operation:
@@ -77,9 +80,8 @@ If verification fails, fix the remote or the explicit `--repo` and rerun the
 same tool. Do not infer the destination repository from PR context, branch
 naming, template repository names, `.git/config` alternate route, or literal URL push.
 
-```bash
-bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty
-```
+Parent mode `tools/update_agent_canon.sh merge-main-into-current*` refuses vendor
+source mutation. Standalone source mode retains its source-branch merge route.
 
 ## Commit Message Note
 
@@ -147,13 +149,8 @@ The checkout helper prefers `AGENT_CANON_REPO_TOKEN` when present, then falls
 back to `AGENT_CANON_REPO_SSH_KEY`.
 
 When `AGENT_CANON_REPO_TOKEN` or `AGENT_CANON_REPO_SSH_KEY` is used inside
-GitHub Actions, the checkout helper persists AgentCanon-specific auth for later
-steps in the same job. The token path adds an exact AgentCanon URL rewrite. The
-deploy-key path persists a job-local `GIT_SSH_COMMAND` through `$GITHUB_ENV`
-and adds an AgentCanon-specific HTTPS-to-SSH rewrite for the submodule URL.
-This is intentional: later steps such as `make ci`, `make fresh-clone-check`,
-and `make agent-canon-pr-check` may fetch `vendor/agent-canon` again after the
-initial checkout helper has exited. The rewrite must stay scoped to the
-AgentCanon URL, not all of `https://github.com/`, so the job does not
-accidentally route unrelated repository access through the AgentCanon
-credential.
+GitHub Actions, pass it only to the checkout-helper step. The helper unsets the
+credential variables in its process, does not write them to `$GITHUB_ENV`, and
+does not leave a global URL rewrite behind. Later validation steps consume the
+initialized submodule checkout without receiving the secret. A later step that
+must fetch AgentCanon again invokes the helper with the same step-local secret.

@@ -22,7 +22,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from route import load_skill_related_map
+from route import load_skill_related_map, load_skill_required_tool_commands
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_SKILL_ROOT = Path(".agents/skills")
@@ -208,7 +208,8 @@ def iter_command_lines(text: str) -> Iterable[str]:
             yield candidate
         for inline in INLINE_CODE_RE.findall(raw_line):
             command = inline.strip()
-            if is_command_candidate(command):
+            is_bare_tool_reference = command.startswith("tools/") and len(command.split()) == 1
+            if is_command_candidate(command) and not is_bare_tool_reference:
                 yield command
 
 
@@ -245,7 +246,7 @@ def packet_for_skill(root: Path, skill: str) -> SkillCommandPacket:
     discovered = unique_preserve_order(
         command for text in texts for command in iter_command_lines(text)
     )
-    required: tuple[str, ...] = ()
+    required = load_skill_required_tool_commands(root).get(skill, ())
     validation = (
         "python3 tools/agent_tools/check_skill_frontmatter.py --root .",
         "python3 tools/agent_tools/skill_tool_commands.py check",

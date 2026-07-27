@@ -35,9 +35,9 @@ def sample_compare_report() -> dict[str, object]:
             "merge_candidates": 4,
         },
         "right": {
-            "provider": "llama-server-embedding",
-            "model": "embeddinggemma",
-            "dim": 768,
+            "provider": "deterministic-sparse-v1",
+            "model": "hash-token-char-v1",
+            "dim": 128,
             "nodes": 20,
             "merge_candidates": 5,
         },
@@ -116,7 +116,7 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
             html = output.read_text(encoding="utf-8")
             self.assertIn("Provider Delta To Shared Candidate Logic", html)
             self.assertIn("deterministic-dense-v1", html)
-            self.assertIn("llama-server-embedding", html)
+            self.assertIn("deterministic-sparse-v1", html)
             self.assertIn("candidate_logic_authority=shared_responsibility_bucket", html)
             self.assertIn("documents/&lt;script&gt;.md", html)
             self.assertNotIn("documents/<script>.md", html)

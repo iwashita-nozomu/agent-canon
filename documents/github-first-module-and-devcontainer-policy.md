@@ -3,6 +3,7 @@
 contract policy
 responsibility Documents GitHub-first reusable module and devcontainer ownership policy.
 downstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
+upstream design ./rule/dependency-module-changes.md general dependency source-clone rule
 downstream design ./coding-conventions-project.md project environment rules
 upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
 downstream environment ../.devcontainer/devcontainer.json shared devcontainer entrypoint
@@ -15,14 +16,20 @@ downstream implementation ../tools/ci/container_config.py validates Dockerfile a
 AgentCanon-owned reusable modules, skills, tools, and runtime surfaces assume a
 GitHub source-of-truth path.
 
+Source-edit and parent-projection responsibilities are defined by
+[`rule/dependency-module-changes.md`](rule/dependency-module-changes.md). This
+document supplies the GitHub publication example; it does not authorize editing
+`vendor/agent-canon` as a source branch.
+
 The normal route is:
 
-1. Change AgentCanon in a source branch.
+1. Confirm owner evidence and change AgentCanon in the topic workspace branch source clone.
 1. Open an AgentCanon GitHub PR.
 1. Merge to AgentCanon `main` after review and checks.
 1. Update template or derived repos by advancing the `vendor/agent-canon`
    submodule pin.
-1. Repair root views with `bash tools/sync_agent_canon.sh link-root`.
+1. Repair root views with the request-evidence-authorized
+   `bash tools/sync_agent_canon.sh link-root` route.
 
 Local Git remotes must not define the normal distribution path for
 self-authored reusable modules.
@@ -32,7 +39,7 @@ self-authored reusable modules.
 Use this policy to answer why reusable AgentCanon modules and devcontainer
 surfaces use GitHub as the source-of-truth path. Read the opening route first,
 then Local Git Boundary, Dockerfile Boundary, Devcontainer Boundary, VS Code
-Workspace Boundary, and Validation in order when changing shared runtime or
+Surface Boundary, and Validation in order when changing shared runtime or
 environment surfaces. Host-only local remotes are treated as repo-specific
 problems, not shared architecture.
 
@@ -119,10 +126,23 @@ parent repository. The generated Compose file must also set a top-level project
 It must not set fixed subnet, gateway, or IPAM values; Docker Compose should
 allocate the project network automatically.
 
-## VS Code Workspace Boundary
+Dependency source visibility is owned by one topic-root mount. Host layout is
+`<parent-repo-root>/workspace/<topic-slug>/<parent-repo>` plus same-level
+`<module-basename>` clones; generated Compose canonicalizes the topic root from
+the `.devcontainer` location once to `/workspace`. It does not bind the parent
+repository and each clone separately, and it never writes a host absolute path
+into tracked config. `AGENT_CANON_WORKSPACE_ROOT=/workspace` is the fixed
+container contract. A missing `/workspace` mount or missing
+dependency tool is a startup design error reported by post-attach and
+`tools/ci/container_config.py`.
 
-`.vscode/` is AgentCanon-owned workspace ergonomics. Template and derived repos
-expose it as a root symlink view into `vendor/agent-canon/.vscode`.
+## VS Code Surface Boundary
+
+`.vscode/` has a parent-owned regular directory container. Template and derived
+repos expose the four shared AgentCanon files as individual symlinks into
+`vendor/agent-canon/.vscode`. Dependency source work-area composition is
+caller-owned and uses the paths returned by `prepare`; work-area storage,
+metadata, and editor state are outside the AgentCanon contract.
 
 The shared VS Code surface owns:
 
@@ -154,7 +174,8 @@ Template or derived repos that consume a new AgentCanon devcontainer pin must
 also run:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 make agent-canon-pr-check
 make ci

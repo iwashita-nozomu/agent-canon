@@ -94,13 +94,13 @@ The 2026-05-25 migration imported the old AgentCanon hook JSONL into:
 ```
 
 The migrated set contains the former repo/runtime directories for
-`docomo_bt_management`, `jax_solver_util`, `localllm_dev`, `project_template`,
+`docomo_bt_management`, `jax_solver_util`, a retired model-development workspace, `project_template`,
 `workspace`, plus the old top-level hook JSONL files. AgentCanon now stages
 those old JSONL files for deletion and keeps the migration notice README.
 
-The same migration imported the former accumulated eval result families
-`skill-workflow-prompt`, `local-llm-responsibility`, `workflow-selection`, and
-`report-quality` into `legacy-import/eval-results/`. AgentCanon source no
+The same migration imported the former accumulated eval result families for
+skill/workflow prompts, retired responsibility analysis, workflow selection,
+and report quality into `legacy-import/eval-results/`. AgentCanon source no
 longer keeps `agents/evals/results/`.
 
 `reports/broken_links.txt` is local docs-check output, not a runtime hook JSONL

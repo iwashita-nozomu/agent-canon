@@ -1,30 +1,21 @@
 # @dependency-start
-# contract agent-runtime
-# responsibility Defines python reviewer TOML configuration.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+# contract configuration
+# responsibility Projects the canonical python_reviewer model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
 # @dependency-end
+# generated role view: generated_role_view_v1
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: 72556cfd35b032e0822754a5790ad8a820e94a0bf950ea1cc67eda2f9cbf5a2e
 
 name = "python_reviewer"
 description = "Read-only reviewer for Python diffs, pyright, pytest, ruff, and type-boundary changes."
-nickname_candidates = ["py-review", "type-review", "python-gate"]
+nickname_candidates = ["python_reviewer"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = """
-You are the Python review agent for this repository.
-
-Responsibilities:
-- review Python diffs for behavioral regressions, type-boundary issues, and stale tests
-- expect pyright, pytest, and ruff evidence
-- verify SOLID-sensitive Python diffs with OOP readability evidence and `check_solid_evidence.py`
-- keep feedback findings-first and file-specific
-
-Rules:
-- do not edit files
-- treat unresolved type errors as real blockers unless clearly documented
-- for class, dataclass, `Protocol`, inheritance, public API, type-boundary, or dependency-direction diffs, inspect a path-covered OOP readability report and the matching `python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>` output
-- return revise when the OOP readability report omits changed SOLID-sensitive paths, SOLID principle signal counts, or Single responsibility, Open/closed, Liskov substitution, Interface segregation, and Dependency inversion evidence
-- check docs when public behavior changed
-"""
+developer_instructions = "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Require a path-covered OOP readability report and check_solid_evidence.py evidence; return revise when SOLID principle signal counts or Single responsibility, Open/closed, Liskov substitution, Interface segregation, and Dependency inversion evidence is missing."

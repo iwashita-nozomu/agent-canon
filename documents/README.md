@@ -4,11 +4,14 @@ contract reference
 responsibility Documents documents/ for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md documents ownership policy
 upstream design ./shared-runtime-surfaces.toml machine-readable ownership manifest
+downstream design ./rule/README.md document filename, placement, and structure rules
+downstream design ./design/README.md target-state and implementation-boundary index
 downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy
 downstream design ./codex-configuration-reference.md Codex configuration reference
 downstream design ./object-oriented-design.md general OOP coding policy
 downstream design ./agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 downstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
+downstream design ./rule/dependency-module-changes.md general dependency source-clone lifecycle policy
 downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 downstream design ./template-agent-canon-audit-resolution.md audit resolution ledger
 downstream design ./tool-skill-routing-refactor.md short tool/skill routing policy
@@ -17,6 +20,13 @@ downstream design ./structured-analysis/README.md structured prose and dependenc
 downstream design ./prose-reasoning-graph/dsl-spec.md prose graph DSL contract
 @dependency-end
 -->
+
+Runtime policy projections are owned by
+[agents/COMMUNICATION_PROTOCOL.md](../agents/COMMUNICATION_PROTOCOL.md),
+[agents/canonical/CODEX_WORKFLOW.md](../agents/canonical/CODEX_WORKFLOW.md), and
+[agents/canonical/CODEX_SUBAGENTS.md](../agents/canonical/CODEX_SUBAGENTS.md).
+Document adapters link to those owners and do not duplicate Target-State-First,
+Decision Sufficiency, ToolCall, capacity, or lifecycle rules.
 
 # documents/
 
@@ -28,6 +38,13 @@ second agent hub.
 `documents/` is still a mixed documentation directory. The root
 `documents/README.md` stays repo-local after template clone. AgentCanon may seed
 this file, but derived repositories own their local index.
+
+## 文書規約と設計正本
+
+- [文書規約](./rule/README.md): filename、配置、構成判断の共通規約。
+- [設計正本](./design/README.md): target state、実装境界、設計上の前提。
+
+配置や分割の理由は文書規約を読み、個別の target state と実装境界は設計正本を読みます。
 
 ## Reader Map
 
@@ -44,14 +61,14 @@ this file, but derived repositories own their local index.
 
 | Class | Examples | Edit source |
 | --- | --- | --- |
-| AgentCanon-owned shared policy symlink | coding conventions, review process, workflow-supporting policies, shared templates, tool docs | `vendor/agent-canon/documents/` |
+| AgentCanon-owned shared policy symlink | coding conventions, review process, workflow-supporting policies, shared templates, tool docs | managed topic-workspace source clone; `vendor/agent-canon/documents/` is the clean projection |
 | Template-owned active contract | bootstrap, host requirements, server contract, remote execution contract, template remote policy | root `documents/` regular files |
 | Project-owned docs | architecture notes, project-specific design specs, implementation contracts | root `documents/` regular files |
 | Generated or run artifacts | agent reports, experiment outputs, logs | `reports/` or `experiments/`, not `documents/` |
 
-If a file is an AgentCanon-owned symlink, edit the source under
-`vendor/agent-canon/` and repair the root view with
-`bash tools/sync_agent_canon.sh link-root`. If a file is a template-owned active
+If a file is an AgentCanon-owned symlink, read
+`rule/dependency-module-changes.md`, edit the managed source clone, and repair the root view with the request-evidence-authorized
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root` command. If a file is a template-owned active
 contract, edit the root regular file.
 
 ## Reader Routes

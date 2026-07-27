@@ -19,7 +19,9 @@ import sys
 import tempfile
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from pathlib import Path
 from typing import TypeAlias, cast
 

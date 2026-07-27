@@ -3,7 +3,9 @@
 # responsibility Maps canonical tools to same-named explanatory documents.
 # upstream design README.md tool documentation placement policy
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
+# upstream design visualization_contract.md canonical visualization contract/checker documentation
 # downstream implementation ../../tools/agent_tools/tool_catalog.py validates one-to-one tool docs
+# downstream implementation ../../tests/agent_tools/test_tool_catalog.py validates visualization tool-doc registration
 # @dependency-end
 
 catalog_kind = "agent_canon_tool_docs"
@@ -101,6 +103,20 @@ language = "python"
 summary = "gh-backed GitHub branch and PR publish tool documentation."
 
 [[tool]]
+id = "wiki-publish"
+tool = "tools/agent_tools/wiki_publish.py"
+doc = "documents/tools/wiki_publish.md"
+language = "python"
+summary = "Deterministic AgentCanon wiki publication to repo.wiki.git with default-branch-only and source-commit binding."
+
+[[tool]]
+id = "visualization-contract"
+tool = "tools/agent_tools/visualization_contract.py"
+doc = "documents/tools/visualization_contract.md"
+language = "python"
+summary = "Typed visualization universe, ToolCall, projection coverage, and post-format readback checker documentation."
+
+[[tool]]
 id = "render-dependency-manifest-graph"
 tool = "tools/agent_tools/render_dependency_manifest_graph.py"
 doc = "documents/tools/render_dependency_manifest_graph.md"
@@ -120,6 +136,13 @@ tool = "tools/agent_tools/check_design_doc_claims.py"
 doc = "documents/tools/check_design_doc_claims.md"
 language = "python"
 summary = "Design-document claim evidence checker documentation."
+
+[[tool]]
+id = "dependency-module-change"
+tool = "tools/agent_tools/dependency_module_change.py"
+doc = "documents/tools/dependency_module_change.md"
+language = "python"
+summary = "Independent dependency source clone lifecycle and reconstructibility-gated cleanup documentation."
 
 [[tool]]
 id = "classify-path-risk"

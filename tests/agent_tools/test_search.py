@@ -2,9 +2,9 @@
 
 # @dependency-start
 # contract test
-# responsibility Tests purpose-based search across tool, local LLM card, header dependency, and code dependency providers.
+# responsibility Tests purpose-based search across tool, deterministic semantic card, header dependency, and code dependency providers.
 # upstream implementation ../../tools/agent_tools/search.py coordinates search providers
-# upstream implementation ../../tools/agent_tools/search_index.py supplies local LLM semantic cards
+# upstream implementation ../../tools/agent_tools/search_index.py supplies deterministic semantic cards
 # upstream implementation ../../tools/agent_tools/vector_search.py supplies dependency and code facts
 # upstream design ../../documents/search-coordination.md coordinated search provider contract
 # @dependency-end
@@ -114,7 +114,7 @@ def run_search_with_input(
 class CoordinatedSearchTest(unittest.TestCase):
     """Verify purpose-based candidate generation."""
 
-    def test_purpose_returns_tool_and_llm_card_candidate(self) -> None:
+    def test_purpose_returns_tool_and_semantic_card_candidate(self) -> None:
         """Tool search and semantic cards should agree on a cataloged tool."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -125,7 +125,7 @@ class CoordinatedSearchTest(unittest.TestCase):
                 "--purpose",
                 "find tool for dependency graph edit scope validation",
                 "--providers",
-                "llm,tool",
+                "semantic,tool",
                 "--surface",
                 ".",
                 "--format",
@@ -137,7 +137,7 @@ class CoordinatedSearchTest(unittest.TestCase):
             candidates = {item["path"]: item for item in payload["candidates"]}
             self.assertIn("tools/dependency_graph.py", candidates)
             self.assertIn("tool", candidates["tools/dependency_graph.py"]["providers"])
-            self.assertIn("llm", candidates["tools/dependency_graph.py"]["providers"])
+            self.assertIn("semantic", candidates["tools/dependency_graph.py"]["providers"])
 
     def test_query_file_returns_tool_candidate(self) -> None:
         """File-backed long queries should use the same search pipeline."""

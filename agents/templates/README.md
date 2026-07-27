@@ -31,3 +31,16 @@ Use partials only for repeated structure whose generated meaning must stay the
 same across artifacts, such as common findings tables or decision sections.
 Do not use partials to hide role-specific review focus, required evidence, or
 approval criteria.
+
+## Active Design Packet Projection
+
+`agents_config.json#artifacts.active_design_packet` defines one neutral
+`waterfall.design_packet.v1` record. Its selected design, technical review, and
+document-flow review paths are projected into one run bundle and persisted at
+`team_manifest.yaml#run.active_design_packet`.
+
+Templates do not parse or infer packet authority. `create_run_bundle` resolves
+the packet, validates its closed field set and relative artifact paths, renders the selected
+templates, and publishes one complete bundle for task-start and bootstrap.
+Review templates record evidence only; they cannot write or advance the active
+run pointer.

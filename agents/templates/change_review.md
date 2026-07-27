@@ -18,6 +18,13 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 | Chunk | Finding | Severity | Status |
 | ----- | ------- | -------- | ------ |
 
+## Hypothesis Adjudication
+
+| Hypothesis | Snapshot Ref | Reachable Input / Control Path | Contract Ref | Witness / Static Proof | Adjudication | Reason Code | Evidence Ref | Opens Rework Wave |
+| ---------- | ------------ | ----------------------------- | ------------ | ---------------------- | ------------ | ----------- | ------------ | ----------------- |
+
+<!-- Reviewer output is hypothesis input. Parent / integration owner accepts only a current-snapshot, reachable-path, contract, and witness/static-proof-backed hypothesis that changes behavior, owner/design boundary, correctness, validation, or publication state. Rejected rows use reason_code and evidence_ref and do not authorize edit, revert, rollback, publication, or a new wave. -->
+
 ## Reuse And Style Findings
 
 <!-- Record whether the implementation follows the detailed design document and mirrors existing code, naming, tests, and docs style. -->
@@ -32,7 +39,7 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Design-Base Implementation Review
 
-<!-- Check whether each changed slice traces to the Abstract Design Frame, approved design section, Implementation Source Packet entry, Design Side-Effect Map item, user-request clause ID, source/reuse document or code path, and test-plan item. Return revise when a slice is justified only by the nearest file, helper, current finding, or chat context instead of the abstract responsibility model. Return escalate for design drift or design gaps. -->
+<!-- Check the one integrated responsibility-unit diff against all four active-packet entries, including the Abstract Design Frame and Implementation Source Packet. Confirm that every changed slice traces to the approved design section, Design Side-Effect Map item, user-request clause ID, source/reuse document or code path, and test-plan item only when test design was activated. Confirm that scope came from the approved responsibility model rather than the nearest file, helper, or current finding. Every source and deletion record must trace to the approved artifact, clause, owner, source/reuse path, dependency order, and validation evidence. Return revise for duplicate parser/writer paths, partial file-sized completion, or test-first production behavior; return escalate for design drift or design gaps. -->
 
 ## Canonical Tree-Head Review
 
@@ -48,11 +55,11 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Repo-Wide Dependency Review
 
-<!-- Run `bash tools/agent_tools/run_repo_dependency_review.sh` against the full repository, not only changed files. Record REPO_DEPENDENCY_REVIEW=pass or list fix-now findings for missing headers, invalid manifests, self references, isolated manifests, or graph cycles. -->
+<!-- Run static and targeted checks first. Run `bash tools/agent_tools/run_repo_dependency_review.sh` against the full repository only when the selected final candidate contract requires it; otherwise record the targeted route and why the broad check was not selected. -->
 
 ## Revision Loop
 
-<!-- Record what the implementer must revise before the next checkpoint review. Any fix made from these findings, however small, must return through the active required review set for the risk class and changed surface on the refreshed diff. -->
+<!-- Record only accepted findings that change behavior, owner/design boundary, correctness, validation, or publication state. Rejected hypotheses retain reason_code/evidence_ref and do not create a new review wave. -->
 
 ## Review Rejection Response Review
 
@@ -60,7 +67,7 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Post-Review Fix Rerun Requirement
 
-<!-- If this review requires any fix, state that every required review family must rerun on the updated diff before closeout, even when the implementer believes the fix is tiny. List the review artifacts that must be refreshed. -->
+<!-- If the parent adjudicates an accepted finding that changes behavior, owner/design boundary, correctness, validation, or publication state, record the selected owning gate rerun on the updated diff. Duplicate, stylistic, already-covered, evidence-free, unreachable, stale, private/incidental, out-of-scope, or unproven design-conflict hypotheses receive reason_code and evidence_ref and do not open a wave or rollback. -->
 
 ## Follow-Up
 

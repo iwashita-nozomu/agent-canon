@@ -3,6 +3,7 @@
 contract agent-runtime
 responsibility Documents Agent Instructions for this repository.
 upstream design README.md repository entrypoint and clone/update guidance.
+upstream design documents/rule/README.md document filename, placement, and structure rules.
 upstream design documents/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy.
 upstream design documents/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy.
 upstream design documents/template-agent-canon-audit-resolution.md audit resolution ledger for profile and gate simplification.
@@ -63,8 +64,17 @@ navigation unless this file or an owner surface explicitly routes to them.
 
 ## Reader Map
 
+Target-State-First, Decision Sufficiency, model/profile, ToolCall, capacity,
+and lifecycle behavior is projected from the canonical owners:
+[workflow](agents/canonical/CODEX_WORKFLOW.md),
+[subagents](agents/canonical/CODEX_SUBAGENTS.md),
+[communication](agents/COMMUNICATION_PROTOCOL.md), and the approved
+[implementation contract](documents/design/codex-spark-implementation-routing.md).
+This entrypoint does not create a second policy source.
+
 - This file owns the template-root runtime entrypoint for Codex and points each
   runtime contract to its owner surface and checker.
+- 文書 filename は英語、本文は日本語とし、詳細は `documents/rule/README.md` を参照します。
 - Start with Scope Discipline and Structure-First Scope Formation, then use the
   runtime owner map only to find the surface that owns the next decision. Task
   entry, base runtime packet, shared canon flow, closeout evidence, and
@@ -187,9 +197,14 @@ record a concrete deferral.
 
 Before implementation or write-capable handoff, prove that the work is derived
 from an owning responsibility model rather than from a nearby file, current
-finding, or chat impression. Full staged and subagent-implemented work uses the
-`Abstract Design Frame`, `Implementation Source Packet`,
-`Design Side-Effect Map`, and `Design-To-Implementation Trace`. A
+finding, or chat impression. Semantic decision sufficiency is the universal
+gate: owner, replaceable unit, implementation mechanism, validation route, and
+each unresolved branch that could change one of those decisions must be explicit.
+When the active workflow or touched surface selects a full design route, or
+coordination/resumption needs durable transport, use the `Abstract Design
+Frame`, `Implementation Source Packet`, `Design Side-Effect Map`, and
+`Design-To-Implementation Trace`. A structured handoff, approved source packet,
+or tool result is sufficient when those file artifacts are not selected. A
 parent-direct write exception may use the short owner/path/design-boundary note
 only after the exception route is recorded; the note is exception evidence and
 not authorization to bypass `spark_worker` or `worker`.
@@ -269,7 +284,7 @@ proof obligation, or replacement unit together even when the chunk is long.
 | skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml`; `vendor/agent-canon/.agents/skills/*/SKILL.md` | `python3 tools/agent_tools/route.py --prompt`; `check_agent_runtime_alignment.py` |
 | internal workflow routines | `vendor/agent-canon/agents/internal-routines/README.md` | `repo_structure_contract.py`; runtime alignment |
 | implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
-| search, read scope, and reuse survey | semantic-index, local-llm search, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
+| search, read scope, and reuse survey | semantic-index, deterministic `search.py` / `search_index.py`, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
 | repo structure and root views | `vendor/agent-canon/documents/repo-structure-contract.toml`; `responsibility-scope.toml`; `documents/shared-runtime-surfaces.toml` | structure/scope/import tools; `sync_agent_canon.sh` |
 | shared-checkout Git mutation and branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/.codex/hooks/branch_worktree_guard.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation route | `vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md` | profile-selected validation |
@@ -304,7 +319,7 @@ short owner/design/validation note.
 - `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md`
 
 Task-specific packet expansion is owned by the generated task packet,
-semantic-index/local-llm search, and dependency review artifacts when those
+semantic-index/deterministic search, and dependency review artifacts when those
 routes are selected. The base packet is not a required reading list for every
 task.
 
@@ -339,12 +354,15 @@ task.
 
 ## Shared Canon Flow
 
-AgentCanon source changes are made in `vendor/agent-canon/`, reviewed through
-the AgentCanon branch / PR workflow, then reflected in the template through the
-submodule pin and shared root views. Root view repair is owned by:
+AgentCanon source changes are made in the managed dependency clone inside the
+`workspace/<topic-slug>/` lifecycle boundary directly below the parent repository,
+reviewed through the AgentCanon
+branch / PR workflow, then reflected in the template through the clean
+`vendor/agent-canon` pin and shared root views. Root view repair is owned by:
 
 ```bash
-bash tools/sync_agent_canon.sh link-root
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
@@ -373,7 +391,7 @@ For AgentCanon source, submodule pin, `.gitmodules`, root runtime view,
 root-copy surface, or parent root sync changes, closeout also cites
 `agentcanon_structure_followup=required` and
 `agentcanon_structure_followup=pass`, including the parent-root
-`bash tools/sync_agent_canon.sh link-root` and
+request-evidence-authorized `bash tools/sync_agent_canon.sh link-root` and
 `bash tools/sync_agent_canon.sh check` evidence.
 
 A no-subagents closeout is valid only for routing-only/advisory tasks, read-only

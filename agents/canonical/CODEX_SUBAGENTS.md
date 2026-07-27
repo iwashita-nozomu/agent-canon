@@ -16,7 +16,9 @@ downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP 
 この文書は、Codex を primary runtime とする場合の subagent routing と inventory の正本です。
 shared workflow は `agents/canonical/CODEX_WORKFLOW.md` に置き、この文書は inventory、mapping、activation に寄せます。
 permanent team role ownership、required output、write policy は `agents/agents_config.json` を正本にします。
-role ごとの実行条件、handoff 条件、review separation は `.codex/agents/*.toml` を正本にします。
+role profile/instruction authority は `agents/model_profiles.toml` と
+`tools/agent_tools/model_profile_registry.py` が所有し、`.codex/agents/*.toml`
+は closed generated readback view です。
 project-level subagent registration と runtime budget は `.codex/config.toml` の `[agents]` と `[agents.<name>]` を正本にします。
 prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` を先に通し、
 この file は inventory と activation の入口に保ちます。
@@ -26,27 +28,34 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - この文書は、Codex runtime の subagent inventory、activation、handoff、budget、role mapping を所有します。
 - 前半は principles、budget、handoff context、wave plan、language / completeness / quality policy を扱い、後半は activation timing、command surface、role mapping、write safety、model settings、smoke test を扱います。
 - parent agent は `## Wave Plan Contract` と `## Handoff Context Contract` を先に読み、writer / reviewer は `## Permanent Team To Codex Mapping` と `## Recommended Routing` を参照します。
-- この文書の `parent Sol` は `.codex/config.toml` の
-  `gpt-5.6-sol/high` parent を、`Luna child` は該当 role TOML が選ぶ
-  `gpt-5.6-luna` child を指します。正確な model / effort は config と role
-  TOML が所有します。
-- chunked reading では、実行中の wave に関係する policy 節だけを開き、role behavior の詳細は `.codex/agents/*.toml` へ戻します。
+- この文書の `parent Sol` は `.codex/config.toml` の parent projection を指し、
+  child profile authority は `agents/model_profiles.toml` が所有します。
+  `.codex/agents/*.toml` と `agents/agents_config.json` の profile fields は
+  canonical materializer が生成する readback view です。
+- chunked reading では、実行中の wave に関係する policy 節だけを開き、
+  profile/instruction authority は `agents/model_profiles.toml`、生成済みの
+  runtime readback は `.codex/agents/*.toml` で確認します。
 
 ## Principles
 
-- role behavior は docs より `.codex/agents/*.toml` を優先します
+- role profile/instruction は `agents/model_profiles.toml` を優先し、
+  `.codex/agents/*.toml` は generated readback として扱います
 - permanent team ownership、artifact output、write policy は `agents/agents_config.json` を優先します
-- subagent registration と runtime budget は `.codex/config.toml` を優先し、role model / reasoning は `.codex/agents/*.toml` を優先します
-- prompt / config drift を見つけたら、親がその場で policy prose を増やす前に `prompt_config_reviewer` の監査結果を要求します
+- subagent registration と runtime budget は `.codex/config.toml` を優先し、
+  role model / reasoning は `agents/model_profiles.toml` を優先します
+- prompt / config drift の reviewer output は hypothesis です。parent が current snapshot、reachable path、contract、witness/static proof を確認して adjudicate し、distinct unresolved risk のときだけ specialist を追加します
 - parent agent は最終責任を持つ orchestrator / integrator です。repo-changing
   implementation / patch / doc-edit work では、親は handoff packet、agent
   起動、追加指示、統合、review / validation gate 判定に集中し、既定の
   implementer にはなりません
-- routing と required review を決めてから subagent wave を起動する
-- Agent Wave の標準順序は `計画 -> レビュー -> 編集` です。各 wave は
-  plan artifact、review gate decision、edit handoff evidence を
-  `team_manifest.yaml`、`schedule.md`、`workflow_monitoring.md` に残します。
-- repo-changing task では、stage ごとに適切な subagent を explicit に立てる
+- routing と owner-critical な review を決めてから、必要な subagent wave
+  だけを起動する
+- Agent Wave の `計画 -> レビュー -> 編集` は候補 stage です。各 wave は
+  選択した stage の plan artifact、review gate decision、edit handoff
+  evidence だけを `team_manifest.yaml`、`schedule.md`、
+  `workflow_monitoring.md` に残します。
+- repo-changing task では、owner、責務、context、write authority、validation
+  route が揃った launchable wave だけを立てる
 - repo-changing implementation / patch / doc-edit work の既定 route は
   write-capable implementer handoff first です。parent-direct は
   spawn authorization、tool gate、または explicit parent-direct approval がある
@@ -62,28 +71,41 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse `branch_worktree_guard.py` に従います。
 - subagent handoff の input packet は role ごとに owned scope を固定し、route seed と調査結果から展開した対象 path list、context artifacts、allowed / forbidden paths を渡します。
 - reviewer には対象 path list、checker summary、structured dashboard / drilldown、該当 canon 節を先に渡します。
-- fresh subagent は launch ごとに `agents/COMMUNICATION_PROTOCOL.md` の `Fresh Subagent Context Capsule` を受け取ります。`context_artifacts`、`allowed_paths`、`do_not_read`、`return_contract` などの protocol-owned capsule key は同文書を正本にし、schema の定義は同文書だけに置きます。
+- fresh subagent は必要な launch ごとに `agents/COMMUNICATION_PROTOCOL.md`
+  の `Fresh Subagent Context Capsule` を受け取ります。active agent を再利用
+  できる場合は、同じ protocol-owned context を compatible な revised scope
+  として更新します。`context_artifacts`、`allowed_paths`、`do_not_read`、
+  `return_contract` などの capsule key は同文書を正本にし、schema の定義は
+  同文書だけに置きます。
 - theorem-driven、algorithm、implementation handoff では、protocol-owned capsule に `Target Binding Packet` が必須です。packet が complete になってから spawn し、unchecked output は親が同じ public root に対して checker / validation を通した後だけ採用対象へ進みます。
-- `計画レビュー` と `詳細設計レビュー` は別の subagent で行う
-- `文書通読レビュー` は `詳細設計レビュー` と別の subagent で行う
-- 論文 draft では `citation_evidence_reviewer` も別の subagent で行う
-- 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別の subagent で行う
-- `詳細設計レビュー` を、実装前でもっとも重要な gate とみなす
+- `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー`、論文 draft の
+  reviewer、学術文章の notation/logic reviewer は、owner-critical な
+  validation または unresolved branch が選択した場合だけ起動する。必要な
+  独立 review は同じ active agent に再利用せず、別の責務単位として切り出す
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
-- Codex の role ごとの model / reasoning 設定は `.codex/agents/*.toml` を正本にする
-- `implementer.codex_agents` は `worker,spark_worker` の順で、`worker` が既定です。`spark_worker` は Abstract Design Frame と approved packet で完全に切れる低リスク slice に対し、parent packet が `--select-agent-type implementer=spark_worker:<evidence>` を明示した場合だけ選択します。選択は `SUBAGENT_AGENT_TYPE_SELECTIONS` と `team_manifest.yaml` に記録します
+- Codex の role ごとの model / reasoning 設定は `agents/model_profiles.toml` を正本にし、`.codex/agents/*.toml` は registry-generated view とする
+- `implementer.codex_agents` は canonical model/profile registry の generated view です。implementation-executable fixed packet は Decision Sufficiency の `execute_spark` から `spark_worker` 一体を直接 materialize し、同じ packet の post-completion owning gate だけを続けます。Luna は ambiguous design、causal repair、graph-owned cross-owner integration、review を所有します。
 - repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切る。coding / implementation / patch / doc-edit work が scope にある task では、write-capable handoff を既定 route として説明する。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff packet が揃い次第、選択済み write-capable implementer の handoff を schedule し、parent は handoff packet、統合順序、review gate、最終責任に集中する
 - user が coding / implementation / patch / doc-edit work を求めた task では、read-only wave は setup evidence です。requirements、surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff scope を作ったら、選択済み write-capable implementer を起動または schedule します。parent-direct completion は既定 route ではなく、blocked subagent route または explicit approval を記録した例外です。
 - 分割境界は差し替え可能性で判断します。別実装、別証明、別 validation oracle、別 review decision に置き換えられる単位なら worker scope にできます。数理的に差し替えが起きない境界、記法だけの境界、固定 context、同じ oracle を共有する連続導出は、過剰な subagent 分割を避けて同じ input packet に残します。
-- 選択済み candidate が起動できない場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録します。candidate を変える場合は parent packet と wave の改訂を必須にし、非既定 candidate には新しい explicit selection evidence を付けます
+- 固定 packet の candidate replacement は行いません。capacity/model failure は typed event として同じ immutable packet を queue し、exact target contradiction だけを一度の `StructuralDesignGap` として修復後、同じ Spark を再開します。
 - 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution は
-  `gpt-5.6-luna` child の findings と `gpt-5.6-sol/high` parent の統合判断に
-  分け、ship decision は parent が持つ
+  registry-selected reasoning child の findings と parent の統合判断に分け、
+  ship decision は parent が持つ
 - plan mode や permissions のような mode は session 単位の設定として parent session 側で切り替える
 
-## Activation Budget
+## Activation Capacity Projection
 
-- runtime hard ceiling は [.codex/config.toml](../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `24` です
+- Handoff は owner-produced semantic decision-sufficiency record を消費します。
+  owner、replaceable unit、implementation mechanism、validation route が明示され、
+  design、path、failure semantics が固定された handoff は selected owner gate
+  へ直接 route できます。追加の読み取り、packet、review、wave は次の決定を
+  変える場合だけ追加します。DSV policy の意味論は
+  `agents/skills/agent-orchestration.md#Decision Sufficiency Packet` だけが所有します。
+- `.codex/config.toml` の `max_threads` は capacity topology の生成値を
+  loader/readback した configured value です。現在は direct frontier `20` と
+  nested reservation `6` から生成された `26` で、universal hard ceiling では
+  ありません。
 - `.codex/config.toml` の `[agents].max_depth` は `2` を正本にし、one bounded child-subagent layer を許可します
 - cap は同時実行数の上限として扱います
 - `.codex/config.toml` の `[agents]` は budget と runtime timeout の設定であり、subagent spawn 許可は上位 runtime / developer instruction に従います
@@ -97,29 +119,47 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
   boundary に縮約された時点で closeout 条件を満たします。
 - multi-agent family で予定 stage wave を絞る場合は、rate limit、blocked role、irrelevant role、または parent-direct exception rationale を `schedule.md` / `workflow_monitoring.md` に残します
 - `role` は permanent responsibility id であり、実行単位は `role_id+instance_id+agent_type` です。同じ role を複数起動する場合は、各 instance に distinct `input_packet`、`allowed_paths` / `do_not_read`、`expected_output`、`validation_route`、`review_gate` を与えます。read-only role は review focus や input packet が分離される場合に同一 wave で複数起動できます。write-capable role は disjoint write scope と parent integration order がある場合だけ同一 wave で複数起動できます。
-- role topology と same-role instance policy は `agents/task_catalog.yaml` の `workflow_families[].role_topology` を source にし、`team_manifest.yaml` の `run.spawn_wave_recommendation.role_topology` に mirror します。`.codex/config.toml` の `max_threads` は runtime cap として扱います。
-- repo-changing workflow family の既定 budget は同時 active 4 体、
-  write-capable 2 体までです。各 decision wave は、その decision が選んだ
-  specialist だけを起動します
+- role topology と same-role instance policy は `agents/task_catalog.yaml` の `workflow_families[].role_topology` を source にし、`team_manifest.yaml` の `run.spawn_wave_recommendation.role_topology` に mirror します。`.codex/config.toml` の `max_threads` は topology-derived requested/configured readback であり、platform-effective / current-available capacity は handshake の別入力です。
+- workflow demand、write-cap、nested reservation、available capacity は
+  [capacity handshake](#capacity-and-lifecycle) の generated projection です。
+  固定 active/write 数、task-size/count/time budget、または disposable probe は
+  認可根拠になりません。saturation は同じ immutable packet を queue します。
 - `Skill Evaluation` は evaluator-only の同時 active 1 体、write-capable
   1 体上限です。評価 role 自体は read-only です
 - budget 超過は例外扱いにし、parent が owner、理由、input packet、expected output、write scope、review gate を `schedule.md` と `work_log.md` に残します
 - write-capable subagent instance は既定 1 体から始めます。複数 writer は dependency order、wave plan、disjoint write scope、integration order、review gate を明示してから同一 wave に置きます。衝突する target は順序制約として先行 / 後続 wave に分け、同じ file / canonical surface / shared root contract から分離できる複数 writer instance を同一 wave で並列化できます。同じ `spark_worker` や `worker` role を複数起動する場合も、instance ごとの `role_id+instance_id+agent_type` と disjoint write scope を必須にします。
 - current checkout 内の wave plan で安全に分離できる writer は同一 wave、分離に追加判断が要る writer は後続 wave に直列化します
-- parent は requirements / planning / design / review / implementation を wave で切り替えます
+- parent は owner-critical な requirements / planning / design / review / implementation stage だけを選択して切り替えます。固定 plan-review-edit sequence はありません
 - delegated stage owner が child subagents を起動する場合も、active spawn budget、max write budget、fresh lifecycle policy、current-checkout write-scope policy を継承します
-- role 数が budget を超える review pack は batch に分け、前段の output を parent が束ねて次 batch へ渡します
+- activated review role 数が budget を超える場合だけ batch に分け、前段の output を parent が束ねて次 batch へ渡します。candidate pack は materialize しません
 - running 中の write-capable subagent の write scope が parent の次作業または後続 writer と重なる場合、parent は同期を優先します。同期では `wait_agent`、workspace 上の成果物確認、または `interrupt=false` の status request で、完了済み変更、未完了点、判断理由を回収します。timeout、empty status、final response 未着は `resolution_decision=await_new_state|continue_disjoint_parent_work` と `termination_action=preserve_running_instance` に写像します。parent は status と回収済み evidence を記録して control を戻します。同種の wait を続けるには new state evidence または explicit revised packet を必須にします。scope 変更後も非終端 subagent の write scope は保持し、`overlapping_writer=blocked` とします。`close_agent` の authority は runtime status `completed|errored|shutdown` または user の明示取消です。
 - parent は stage gate を通過したら完了した instance を閉じます
-- 新規 user request では新しい run bundle と fresh subagent を起こします
-- 前 task の文脈は run bundle と artifact path で渡し、新規 task は fresh subagent で開始します
-- 作業中の user 追加指示は、parent が `same_active_task_delta`、`scope_or_contract_change`、`new_task` に分類してから処理します。`same_active_task_delta` は `python3 tools/agent_tools/workflow_monitor.py --mid-task-user-input ...` で現在の run bundle、`schedule.md` Agent Wave Ledger、`workflow_monitoring.md` に checkpoint と updated packet path を追記し、unchanged role scope がある場合に run-local active subagent へ `send_input` できます。scope、allowed paths、review gate、または owner が変わる場合は fresh follow-up wave を起こします。`new_task` は fresh run-local subagent と新しい run bundle に切り替えます。
-- `team_manifest.yaml` の `run.subagent_lifecycle_policy` を subagent handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を実行時の機械契約にします
-- closeout 前に終端 status の run-local subagent を lifecycle cleanup として閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を user-facing completion の readiness evidence にします。非終端の no-return instance は `subagents_closed=no`、`termination_action=preserve_running_instance`、`lifecycle_gate=pending` とします
+- 各 user input は `same_active_task_delta`、`scope_or_contract_change`、または
+  `new_task` として分類しますが、新しい turn、名前を変えた packet、または scope の
+  改訂だけでは fresh agent の理由になりません。owner、responsibility、context、write
+  authority、validation route が互換なら active agent を再利用し、同じ責任単位へ
+  revised scope を配送します。独立 review、disjoint write authority、incompatible
+  owner/context、または failed context integrity の場合だけ fresh agent / wave を
+  起こします。coordination または resumption が必要な場合だけ checkpoint と updated
+  packet path を durable に残し、それ以外は structured handoff message/tool result を
+  使います。
+- `run.subagent_lifecycle_policy` はこの判断と fresh-agent 条件を handoff prompt へ渡し
+  ますが、`fresh_subagents_required: true` や `reuse_for_new_task: forbidden` を一律の
+  機械契約にはしません
+- 各 source/reviewer/PR/pin agent は durable handback の直後に全 descendants
+  を閉じ、reservation release receipt を ledger に残します。
+  `completed-but-open`、unknown descendant、reservation leak は G6 failure です。
+  closeout は `DurableHandback -> descendants_closed -> reservations_released ->
+  CleanupProof -> G6 -> terminal CloseAgentToolCall` の machine sequence を受理し、
+  terminal CloseAgentToolCall を唯一の close operation とします。
+  非終端の no-return instance は `termination_action=preserve_running_instance`
+  として terminal token materialization を block します。
 
 ## Handoff Context Contract
 
-Subagent の context は correctness gate です。parent は handoff prompt ごとに次を run bundle evidence から導出します。
+Subagent の context は correctness gate です。parent は handoff prompt ごとに次を
+structured handoff または、coordination/resumption が必要な場合の durable evidence
+から導出します。
 
 - `role_scope`: その role が判断する subdomain、stage、risk class。
 - `allowed_paths`: 対象 file / directory / glob の bounded list。repo root や `/workspace` は workspace identity として扱い、編集候補、検索 hit、checker finding、changed path を seed にし、responsibility search、reuse survey、stale-surface scan、dependency header graph の再帰展開結果である `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。
@@ -128,9 +168,14 @@ Subagent の context は correctness gate です。parent は handoff prompt ご
 - `do_not_read`: unrelated modules、generated raw logs、historical reports、他 role の scope など、読まない surface。
 - `expected_output`: findings schema、decision vocabulary、uncertainty / residual risk、test gaps。
 - `implementation_surface_route`: implementation handoff では `PRIMARY_PATHS` を `allowed_paths` の seed、`FORBIDDEN_PATHS` を `do_not_read` の seed にします。router が unavailable なら、その blocker または deterministic router recovery output を local provisional route evidence として渡し、path selection を packet output に基づけます。
+- `decision_sufficiency_packet_ref`: coordination/resumption が必要な場合だけ使う
+  durable decision-sufficiency record の参照。意味上は owner、replaceable unit、
+  implementation mechanism、validation route、そこに影響する unresolved branch を
+  handoff に含めます。`H`、digest、count、固定 envelope は実行の必須条件ではありません。
 - `tool_route`: `run.repo_tool_routing_policy` への参照。
-- `tool_commands`: 選択済み skill ごとの `show_skill_packet`、`required_commands`、
-  `task_matching_conditional_commands`、`validation_commands`。
+- `tool_call_tokens`: 選択済み skill 専属 tool の canonical `tool_id`、argument
+  schema、typed arguments、intent、typed failure semantics を持つ machine token。
+  machine token のまま実行し、typed failure semantics を保持します。
 - `tool_evidence`: `dynamic_skill_routing` の候補、`tool_catalog_matches`、実行済み
   tool packet の結果。
 - `tool_reuse_ledger` と `pre_edit_rejection_prediction`: selected write-capable implementer には、既存 tool を使うか拒否した理由と `tool_rejection_preflight.py` の結果または pending blocker を渡します。
@@ -171,10 +216,10 @@ is the deterministic same-role identity ledger; each entry uses
 `role_id:instance_id:agent_type`, with manifest rows also carrying the input
 packet reference. Repeated `role_id` entries must have distinct `instance_id`
 and bounded packet/scope evidence.
-Active roles are selected by always-on workflow roles, task default
-specialists, explicit parent-packet activation, changed-path evidence, or
-review-pack evidence. Family specialists and `codex_agents` candidates are not
-active by being listed. Materialization selects at most one executable
+Task-catalog role families, task default specialists, review packs, changed-path
+roles, and `codex_agents` entries are candidate evidence. Materialization
+activates only owner-critical roles or roles selected by an unresolved branch or
+validation route, and selects at most one executable
 `agent_type` for one active `role_id`; the first `codex_agents` entry is the
 default. A later entry is selected only when the parent packet records the
 typed role-to-agent evidence through `--select-agent-type`, stdout records
@@ -184,22 +229,23 @@ typed role-to-agent evidence through `--select-agent-type`, stdout records
 `parent_packet_ref`, and `status=blocked`; changing candidates requires a
 revised parent packet and wave.
 For T12 (`agent workflow tooling, AgentCanon submodule flow, or canon
-rearchitecture`), default-active specialists are exactly `scheduler`,
-`schedule_reviewer`, `project_reviewer`, `docs_workflow_steward`, and
-`prompt_config_reviewer`. `researcher`, `research_reviewer`, `infra_steward`,
+rearchitecture`), `scheduler`, `schedule_reviewer`, `project_reviewer`,
+`docs_workflow_steward`, and `prompt_config_reviewer` are candidate specialists;
+activate only the owner-critical roles selected by the route. `researcher`, `research_reviewer`, `infra_steward`,
 `infra_reviewer` and `python_reviewer` require explicit parent-packet evidence,
 changed-path evidence, or an explicitly selected review pack. `test_designer`
 additionally requires an implementation handoff that records an established or
 repaired owning mechanism and a concrete unresolved oracle, specification,
 regression, or failure-mode risk outside existing validation.
-The standard wave sequence is `plan`, `review`, `edit`. `team_manifest.yaml`
-records this as `run.standard_wave_sequence`; each dynamic wave points back to
-that sequence with `standard_sequence_ref`. The plan artifact records owner,
-input packet, route seed, validation route, and next gate. The review gate
-checks the route seed against responsibility search, reuse survey, stale-surface
-scan, and dependency expansion. The edit handoff starts from that
-dependency-expanded packet and bounded write scope.
-Mid-task expansion uses the same contract as the standard path.
+`plan`, `review`, and `edit` are conditional stage candidates. When selected,
+`team_manifest.yaml` may record `run.standard_wave_sequence` and a dynamic wave
+may point to it with `standard_sequence_ref`; neither field makes an unselected
+stage mandatory. A selected plan artifact records owner, input packet, route
+seed, validation route, and next gate. A selected review gate checks only the
+evidence that can change the route. A selected edit handoff starts from the
+dependency-expanded packet and bounded write scope. Mid-task expansion uses the
+same conditional contract, and a compatible active agent may receive revised
+scope without a fresh wave.
 When work can be split into independent workstreams, record the dependency
 edge and stage owner for each vertical dynamic wave instead of flattening all
 roles into one parent-owned wave. Sibling workstreams may run in the same
@@ -296,10 +342,10 @@ activation がある場合だけ選ばれます。review と edit handoff packet
 同じ quality-check route を参照します。
 
 `task_start.py` と `bootstrap_agent_run.py` は
-`DEFAULT_QUALITY_CHECKS=enabled`、`DEFAULT_QUALITY_CHECK_ROLES`、
-`DEFAULT_QUALITY_CHECK_AGENT_TYPES`、provenance lines を出します。これらの
-stdout line は、implementation handoff 前に既定の quality-check route を選択した
-起動時 evidence です。
+`DEFAULT_QUALITY_CHECKS=candidate_only`、candidate role / agent-type lines、
+selected-stage provenance lines を出します。これらの stdout line は候補の
+ルーティング情報であり、owner-critical decision または distinct unresolved
+claim/risk が選択されるまで quality-check stage や artifact を materialize しません。
 
 ## Subagent Return Investigation
 
@@ -324,19 +370,19 @@ nonterminal status.
 
 ## Intake Responsibility Wave
 
-Intake Responsibility Wave は、repo-changing task の責務分割を catalog の
-`stage_waves` から materialize する initial wave です。`WAVE-1` は active role
-set と catalog の `intake` stage から来ます。標準 catalog では active `manager`
-role が `requirements_organizer` として materialize されます。`explorer` と
-`execution_planner` は evidence / reuse / stale-surface inventory、dependency-expanded
-bounded path list、stage order、artifact routing、validation sequence、review route、
-Agent Wave Ledger が必要な場合に、parent packet または stage evidence で dynamic
-role として起動します。独立 workstream が複数ある場合、以後は stage owner が必要な
-child wave を vertical dynamic wave として追加します。parent はこの intake wave の
-output を統合し、workflow family の active spawn budget と `max_depth = 2` の下で
-次の stage wave を起動します。stage owner に child-subagent 起動を委譲する場合は、
-`team_manifest.yaml` の `run.delegated_spawn_policy` と Wave Plan Contract を handoff
-prompt に含めます。
+Intake Responsibility Wave は、責務分割または coordination が必要な
+repo-changing task でだけ catalog の `stage_waves` から materialize する
+候補 wave です。`WAVE-1` は owner-critical な active role set と catalog の
+`intake` stage が選択された場合だけ来ます。標準 catalog の `manager`、
+`requirements_organizer`、`explorer`、`execution_planner` は候補であり、
+evidence / reuse / stale-surface inventory、dependency-expanded bounded path
+list、stage order、artifact routing、validation sequence、review route、または
+Agent Wave Ledger が次の判断を変える場合だけ起動します。独立 workstream が
+複数ある場合も、必要な child wave だけを vertical dynamic wave として追加します。
+parent は選択した wave の output を統合し、workflow family の active spawn budget
+と `max_depth = 2` の下で次の決定へ進みます。stage owner に child-subagent 起動を
+委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` と Wave Plan
+Contract を handoff prompt に含めます。
 
 ## Empirical Skill Evaluation Lifecycle
 
@@ -443,14 +489,15 @@ spawn the roles after authorization.
 
 Candidate pre-goal roles:
 
-- `requirements_organizer`: derive a conservative Objective, non-goals,
+- `requirements_organizer`: derive a target-state-complete Objective, non-goals,
   constraints, and Exit Criteria from the user request and durable repo notes.
 - `explorer`: inspect repo docs, prior notes, dependency surfaces, existing
   tools, and reuse candidates that affect the goal.
 - `execution_planner`: group open `GW*` rows into the next cohesive slice after
   `goal_loop.py plan` exists.
-- `plan_reviewer`: verify that the candidate goal is checkable and that the
-  selected slice has evidence gates and rollback boundaries.
+- `plan_reviewer`: verify that the complete responsibility unit is checkable;
+  checkpoints remain nonblocking observations outside rollback and micro-slice
+  gates.
 
 Start with the roles needed for the current stage, keep unused roles as dynamic
 wave triggers, and add them when goal evidence, dependency state, or review
@@ -465,13 +512,14 @@ Activation Conditions:
   parseable, the Codex goal view is mirrored or queued, and the Plan-mode output
   contains evidence mapping.
 - This goal readiness rule applies to goal-driven tasks. Ordinary repo-changing
-  tasks with explicit implementation delegation use a run bundle, bounded
-  `allowed_paths`, write scope, validation plan, and tool-rejection preflight
-  before the selected write-capable implementer.
+  tasks with explicit implementation delegation use a structured handoff with
+  bounded `allowed_paths`, write scope, validation plan, and tool-rejection
+  preflight before the selected write-capable implementer. Use a run bundle when
+  coordination or resumption requires durable lifecycle evidence.
 - Materialize the initial goal intake from the active role set and catalog
-  `intake` stage. If rate limits force fewer agents, preserve that catalog-owned
-  intake slot; add or defer `explorer`, `execution_planner`, and `plan_reviewer`
-  only as evidence-gated dynamic roles.
+  `intake` stage only when that wave is owner-critical. If selected, add or defer
+  `explorer`, `execution_planner`, and `plan_reviewer` as evidence-gated dynamic
+  roles; catalog listing alone does not create a wave.
 - Handoffs must include `agents/workflows/codex-goals-workflow.md`,
   `agents/workflows/goal-plan-implementation-loop.md`, the candidate `goal.md`
   or goal artifact, and `team_manifest.yaml` lifecycle policy.
@@ -484,8 +532,12 @@ Activation Conditions:
 - これらは session-level setting で、per-agent TOML には書きません
 - runtime が `/agent` を提供する場合は inventory 確認に使います
 - `/agent` が使えない runtime では `.codex/agents/*.toml` を直接見ます
-- run bundle は `python3 tools/agent_tools/bootstrap_agent_run.py ...` で先に作ります
-- `--task-id` を使うと、task catalog の task-default specialist と default review pack を bundle へ自動展開します
+- run bundle は `python3 tools/agent_tools/bootstrap_agent_run.py ...` で、
+  coordination、resumption、または selected workflow が durable lifecycle
+  evidence を必要とするときだけ先に作ります
+- `--task-id` の task-default specialist と default review pack は候補として
+  読み込み、owner-critical operation、unresolved branch、または selected
+  validation route が有効化したものだけを materialize します
 
 ## Permanent Team To Codex Mapping
 
@@ -497,7 +549,7 @@ Activation Conditions:
 | `design_reviewer` | `detailed_design_reviewer` |
 | `document_flow_reviewer` | `document_flow_reviewer` |
 | `test_designer` | `test_designer` |
-| `implementer` | `worker` by default; `spark_worker` only for a bounded slice selected by `--select-agent-type implementer=spark_worker:<evidence>` and recorded in stdout / manifest |
+| `implementer` | `worker` by default; `spark_worker` only for a bounded slice selected by `--select-agent-type implementer=spark_worker:<evidence>` and recorded in stdout / manifest. Both roles may commit/push and return local PR/head/check evidence, but PR create/merge/close and integration finalization remain parent-owned. |
 | `change_reviewer` | `diff_triage_reviewer` by default; `python_reviewer`, `cpp_reviewer`, then `reviewer` only with language or broad-review eligibility evidence |
 | `final_reviewer` | `ship_reviewer` checks final diff traceability to the Abstract Design Frame and approved packet; then `reviewer` / `project_reviewer` when final gate escalation is needed |
 | `verifier` | parent validation runner |
@@ -568,9 +620,9 @@ Activation Conditions:
 - `oop_readability_reviewer`
   - `tools/oop/*/readability.py` の機械 report を読み、判定値を変えずに reader-facing な文書化、false positive 候補、優先度整理を行う
 - `worker`
-  - bounded な実装変更を切り出し、approved design と local precedent の naming に従う
+  - bounded な実装変更を切り出し、approved design と local precedent の naming に従う。commit/push を含む実装・統合境界の実行は可能だが、PR create/merge/close、admin override、base integration 判断、最終統合評価は parent が保持する。
 - `spark_worker`
-  - Abstract Design Frame と approved design packet で完全に切れる低リスク実装、docs sync、test sync、mechanical cleanup を低遅延に処理する
+  - Abstract Design Frame と approved design packet で完全に切れる低リスク実装、docs sync、test sync、mechanical cleanup を低遅延に処理する。実装・commit/push は可だが、PR create/merge/close、admin override、base integration 判断、最終統合評価は parent が保持する。
 - `docs_workflow_steward`
   - agent 文書、workflow、adapter file の整理を行う
 - `prompt_config_reviewer`
@@ -624,7 +676,7 @@ Activation Conditions:
 | 実装 | `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、既定は `worker`。`spark_worker` は `--select-agent-type implementer=spark_worker:<evidence>` の parent packet selection が stdout / manifest に記録された bounded slice だけに使う |
 | 低リスク実装slice | Abstract Design Frame、design trace、naming、validation、dependency-expanded handoff scope は `spark_worker` selection の必要 evidence ですが、それだけで既定 candidate を切り替えない |
 | 実装後レビュー | change-review decision が active のとき、`change_reviewer` は `diff_triage_reviewer` を既定 executable とする。`python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet evidence、または明示 review-pack activation がある場合だけ materialize する。Design Side-Effect Map から外れた side effect は設計差分として扱う |
-| 包括的開発の統合レビュー | T12 の default-active specialists は `scheduler`、`schedule_reviewer`、`project_reviewer`、`docs_workflow_steward`、`prompt_config_reviewer` の 5 role だけです。`python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet evidence、または明示 review-pack activation がある場合だけ active にします |
+| 包括的開発の統合レビュー | T12 の `scheduler`、`schedule_reviewer`、`project_reviewer`、`docs_workflow_steward`、`prompt_config_reviewer` は候補 specialists です。owner-critical な責務、unresolved branch、または selected validation route が有効化した role だけを active にします。`python_reviewer` / `cpp_reviewer` も changed-path evidence、parent packet evidence、または明示 review-pack activation がある場合だけ active にします |
 
 運用ルール:
 - role ごとの詳細な実行制約は `.codex/agents/*.toml` を見ます
@@ -650,27 +702,25 @@ Activation Conditions:
 
 ## Codex Model Settings
 
-`.codex/agents/*.toml` は Codex runtime が読む materialized role 定義です。
-role の `model` / `model_reasoning_effort` は各 agent TOML が正本です。
-`.codex/config.toml` は project feature、runtime cap、MCP、skill、agent registry
-を持ち、role model / reasoning は agent TOML に集約します。
-
-role の model / reasoning を変更するときは、該当 `.codex/agents/*.toml`
-を更新し、`tools/agent_tools/check_agent_runtime_alignment.py` と
-`tools/agent_tools/evaluate_codex_agent_roles.py` で検証します。Python checker、
-workflow docs、task catalog は agent TOML を参照します。
+`agents/model_profiles.toml` が canonical typed profile authority です。
+`tools/agent_tools/model_profile_registry.py` は closed generated views として
+`.codex/agents/*.toml` と `agents/agents_config.json` を materialize します。
+generated views は projection digest / readback surfaces であり、手動で編集しては
+なりません。model / reasoning の変更は registry / team / runtime source から始め、
+generated views を再生成して projection digest と readback を検証します。Codex
+runtime は再生成後に restart し、readback で反映を確認します。
 
 運用メモ:
 - OpenAI / Codex の current product evidence は `$openai-docs` で確認します。
   この文書は product-evidence route を示します。
-- この repo では、parent orchestrator / integrator は Sol/high、通常の planning / authoring / exploration / inventory / machine-report summarization / experiment execution / review child は Luna/high、`worker` と `ship_reviewer` は Luna/xhigh にします。`gpt-5.4-mini/medium` は fresh read-only artifact-only の `skill_evaluator` が明示的な T14 `skill_evaluation` で使う評価専用設定であり、permanent team role には割り当てません。`spark_worker` は explicit parent-packet selection がある機械的実装だけに使います。
+- `agents/model_profiles.toml` の closed registry が parent / reasoning / implementation / ship / Spark / evaluator profiles と explicit role bindings を所有します。`.codex/agents/*.toml` と `agents/agents_config.json` は generated projection と runtime readback を提供します。`spark_worker` は typed fixed-packet route が選んだ機械的実装だけに使います。
 - 親の既定は Sol/high とし、Sol/xhigh は high-risk / final escalation evidence があるときに起動します
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
 - 極端に狭く、待ち時間が支配的な implementation loop は `spark_worker` selection の evidence になり得ますが、`worker` 既定を切り替えるには explicit parent-packet selection が必要です
-- review / quality-check role TOML は Luna/high を使い、findings を親へ返します。`ship_reviewer` だけが Luna/xhigh で final findings を作り、final judgment と scope を変える統合判断は親 Sol が持ちます
+- review / quality-check role TOML は Luna/high を使い、hypotheses を親へ返します。parent Sol が current snapshot、reachable path、contract、witness/static proof を確認して accept / reject を adjudicate し、edit / rollback / publication authority を保持します。`ship_reviewer` は明示された final escalation の候補です
 - Spark model は `spark_worker` の低遅延 implementation loop に集約し、repo inventory、tool drift survey、machine-report / experiment-log summarization、execution-only experiment / log work は Luna/high の通常 role に置きます。mini/medium は明示的な T14 skill validation の `skill_evaluator` に限ります。
 - `spark_worker` へ渡す条件は、Abstract Design Frame、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ）、dependency-expanded handoff scope に加え、typed parent-packet selection が stdout / manifest に記録されていることです
-- 明示 spawn 許可がある repo-changing task では、coding / implementation / patch / doc-edit work の implementation critical path を pre-handoff investigation packet で作ってから、次の判断を変える独立検証を Luna review child へ切ります。各 gate は一つの accountable review child を持ち、文書 flow、requirements / plan、report traceability、research perspective は該当 decision / artifact があるときに specialist wave として起動します。
+- 明示 spawn 許可がある repo-changing task では、coding / implementation / patch / doc-edit work の implementation critical path を pre-handoff investigation packet で作ってから、次の判断を変える独立検証だけを Luna review child へ切ります。各 replaceable responsibility は一つの owning review gate で足り、文書 flow、requirements / plan、report traceability、research perspective は distinct unresolved claim / risk が owning gate で判定できないときだけ specialist wave として起動します。
 - coding / implementation / patch / doc-edit work を求める repo-changing task では、read-only / review wave は write-capable handoff の準備です。実装可能な handoff scope が dependency expansion から出た後は `worker` を既定として起動または schedule し、`spark_worker` は explicit parent-packet selection が記録された場合だけ使います。completion route は write-capable handoff、integration、review、validation で構成します。parent-direct は explicit exception rationale と validation evidence がある場合だけ completion route にできます。
 - `spark_worker` を選択できる実装は、Abstract Design Frame から導かれた差し替え可能な単位で、stable public interface、stable dependencies、fixed specification、既存 test / docs の局所更新で閉じるものです。この eligibility evidence に加えて typed parent-packet selection が必要です。
 - cross-module 整合、API shape、命名 / 責務境界、依存再構成、安全性、性能、conflict resolution のいずれかが入った時点で `worker` または設計 review へ戻します
@@ -685,7 +735,7 @@ workflow docs、task catalog は agent TOML を参照します。
 - ML claim / uncertainty / limitation が中心の場合だけ `ml_science_reviewer` を追加します
 - workflow / prototype discipline が論点の場合だけ `scientific_computing_reviewer` を追加します
 - full pack は `research_perspective_review` を明示したとき、または triage が methodology / benchmark / FAIR-data / ML-science / scientific-computing risk を返したときだけ起動します
-- parent が findings を `fix now`、`follow-up`、`delete-ok` に再分類して反映する
+- parent が findings を `fix now`、`follow-up`、`delete-ok`、`rejected` に adjudicate して反映する。`rejected` は `reason_code` と `evidence_ref` を持ち、修復 / review wave / rollback を起こさない
 
 ## Runtime Surfaces
 
@@ -693,13 +743,19 @@ workflow docs、task catalog は agent TOML を参照します。
 - permanent team ownership and write policy: `agents/agents_config.json`
 - skill shim: `.agents/skills/`
 - Codex project config: `.codex/config.toml`
-- Codex subagent definitions: `.codex/agents/*.toml`
+- generated Codex subagent readback views: `.codex/agents/*.toml`
 
 設定運用メモ:
 - role ownership や required output を変えるときは `agents/agents_config.json` を更新します
-- project subagent registration と runtime budget を変えるときは `.codex/config.toml` を更新し、role model / reasoning を変えるときは `.codex/agents/*.toml` を更新します
-- stage 固有の実行条件を増やすときは、この文書より先に `.codex/agents/*.toml` を更新します
+- project subagent registration と runtime budget を変えるときは
+  `.codex/config.toml`、role model / reasoning を変えるときは
+  `agents/model_profiles.toml` を更新して canonical materializer を実行します
+- stage 固有の profile/instruction 条件は `agents/model_profiles.toml` の owner
+  route で変更し、canonical materializer による generated view regeneration を
+  必須とします
 - wrapper や root entrypoint は `.codex/agents/*.toml` の参照入口に保ちます
+- generation 後は alignment readback を確認し、load 済み session の projection
+  freshness は registry materialization と fresh-session restart/readback で回復します
 
 ## Smoke Test
 
@@ -714,8 +770,38 @@ runtime inventory や review pack を変えたら、まず次を実行します�
 - `agents/agents_config.json` の required output が実テンプレートに結び付いている
 - `.codex/config.toml` が `.codex/agents/*.toml` を全 role 登録している
 - `.codex/agents/*.toml` が role ごとの model / reasoning 設定を持っている
-- temporary run bundle を task ごとと full-team で作り、required output が実際に生成される
+- selected workflow が bundle を必要とする場合だけ temporary run bundle を
+  作り、required output が実際に生成される
 - `agents/agents_config.json` に perspective reviewers と artifact mapping がある
 - `agents/task_catalog.yaml` に `research_perspective_triage` default pack と optional `research_perspective_review` pack がある
 - `.codex/agents/*.toml` に対応 subagent 定義がある
-- temporary run bundle を作って、各 perspective review artifact と `team_manifest.yaml` が実際に生成される
+- perspective review が選択され bundle が必要な場合だけ temporary run bundle を
+  作り、各 perspective review artifact と `team_manifest.yaml` が実際に生成される
+Fixed packet projection is owned by the canonical model/profile registry,
+implementation-route, capacity-handshake, and team/closeout consumers. Sol is
+the parent; Luna owns ambiguous design, causal repair, graph-owned cross-owner
+integration, and review; Spark is the fixed implementation owner; and
+`gpt-5.4-mini` is skill-evaluator-only. Model/profile policy stays out of
+`route.py`.
+
+Tool calls are canonical `ToolCallToken` values from the registry: natural
+language carries intent and typed failure semantics only. The implementation
+projection is Target-State-First and Decision Sufficiency is machine-readable;
+an identical owner/edit/validation action rejects unvalued read/search/check/
+review and transitions immediately to one direct Spark materialization followed
+by one owning gate. Compile/static failures are implementation feedback. Only
+an exact target contradiction creates one `StructuralDesignGap`, repaired once
+before the same Spark resumes.
+
+## Capacity And Lifecycle
+
+Capacity terms are requested, configured, platform-effective, workflow-demand,
+write-cap, nested-reserved, and available. Effective capacity is the minimum
+of known available constraints after reservations. Session reload mismatch is
+typed `restart_required`/queue evidence; model-capacity events are distinct
+from thread saturation. Lifecycle closeout is
+`spawned -> active -> durable result/error -> handed back -> all descendants
+closure verified -> close requested -> closed -> reservation released`; any
+open terminal, unknown descendant, missing handback, or leaked reservation
+fails closeout. The parent-visible ledger carries full topology and the
+canonical `close_agent` ToolCall in CloseoutPacket.

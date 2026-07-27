@@ -58,6 +58,50 @@ description = "Includes a top-level Markdown title."
 required_regex = ["(?m)^#\\s+"]
 
 [[evals]]
+id = "oop-type-design-runtime-contract"
+target = ".agents/skills/oop-type-design/SKILL.md"
+kind = "skill"
+description = "The runtime shim exposes the pre-implementation OOP/type-design contract and forbids post-hoc/static duplication."
+
+[[evals.checklist]]
+id = "OOP-TYPE-RUNTIME-1"
+critical = true
+required_regex = ["oop-type-design", "@dependency-start", "@dependency-end", "^1\\."]
+
+[[evals.checklist]]
+id = "OOP-TYPE-RUNTIME-2"
+critical = true
+required_regex = ["Protocol|interface", "value object", "aggregate", "constructor", "state transition", "composition", "dependency direction", "responsibility", "cohesive|cohesion"]
+
+[[evals.checklist]]
+id = "OOP-TYPE-RUNTIME-3"
+critical = true
+required_regex = ["statically decidable|static type|static checker", "runtime guard|runtime validation", "test-first|test first", "oop-readability-check", "python-review", "cpp-review"]
+forbidden_regex = ["keyword routing|keyword trigger"]
+
+[[evals]]
+id = "oop-type-design-human-contract"
+target = "agents/skills/oop-type-design.md"
+kind = "skill"
+description = "The human-facing skill doc fixes the packet order, boundary matrix, and delegated validation owners."
+
+[[evals.checklist]]
+id = "OOP-TYPE-HUMAN-1"
+critical = true
+required_regex = ["Abstract Design Frame|Responsibility model", "Implementation Source Packet", "Design Side-Effect Map", "Design-To-Implementation Trace"]
+
+[[evals.checklist]]
+id = "OOP-TYPE-HUMAN-2"
+critical = true
+required_regex = ["API", "serialization", "external input", "constructor invariant", "legal state transition", "Protocol|interface", "independent invariant", "change reason", "external effect", "substitutability", "dependency graph", "indivisible edge|shared transaction|consistency boundary", "coordination[_ ]cost", "connected-components"]
+
+[[evals.checklist]]
+id = "OOP-TYPE-HUMAN-3"
+critical = true
+required_regex = ["check_static_any.py", "pyright", "ruff", "oop-readability-check", "gpt-5.4-mini", "T14", "responsibility accumulation|oversized responsibility", "line/function count|function count", "composition root"]
+forbidden_regex = ["test-first", "keyword routing", "split.*line count|split.*function count"]
+
+[[evals]]
 id = "all-internal-routine-docs"
 target_glob = "agents/internal-routines/*.md"
 kind = "skill"
@@ -92,19 +136,6 @@ id = "WORKFLOW-GENERIC-2"
 critical = true
 description = "Includes a top-level Markdown title."
 required_regex = ["(?m)^#\\s+"]
-
-[[evals.checklist]]
-id = "CONVENTION-WORKFLOW-1"
-critical = true
-description = "Every workflow calls the convention compliance verifier before closeout or handoff."
-required_regex = [
-  "run `python3 tools/agent_tools/check_convention_compliance\\.py`",
-  "CONVENTION_COMPLIANCE=fail",
-]
-forbidden_regex = [
-  "(?i)(do not|don't|never|skip|omit)\\s+.*check_convention_compliance\\.py",
-  "(?i)check_convention_compliance\\.py.*(optional|not required)",
-]
 
 [[evals]]
 id = "result-artifact-writeout-skill"
@@ -319,8 +350,16 @@ required_regex = ["Before assigning read-only exploration", "canonical checker",
 [[evals.checklist]]
 id = "SUBAGENT-FRESH-CAPSULE-1"
 critical = true
-description = "Requires the fresh context capsule fields in handoff prompts."
-required_regex = ["Treat every spawned subagent as fresh", "Fresh Subagent Context Capsule", "Context Visibility Contract", "protocol-owned"]
+description = "Requires compatible-context reuse and limits fresh launches to independent or incompatible responsibility."
+required_regex = [
+  "Compatible active agents may\\s+be reused for revised scope",
+  "Reuse an active agent when owner, responsibility, context, write authority,\\s+and validation route remain compatible",
+  "independent\\s+review, disjoint authority, incompatible\\s+owner/context",
+  "New turns or\\s+renamed packets alone do not require fresh launch",
+  "Fresh Subagent Context Capsule",
+  "Context Visibility Contract",
+  "protocol-owned",
+]
 
 [[evals]]
 id = "md-style-check-human-doc-unified-rust-docs"
@@ -528,6 +567,32 @@ required_regex = [
 
 [[evals.checklist]]
 id = "CODE-VISUALIZATION-4"
+critical = true
+description = "Requires canonical typed omission prevention and post-format coverage/readback oracle evidence."
+required_regex = [
+  "literal user scope",
+  "source-owner and dependency\\s+closure",
+  "VisualizationSourceUniverse",
+  "ProjectionCoverageManifest",
+  "canonical owner ToolCall",
+  "agent_canon\\.visualization\\.coverage",
+  "agent_canon\\.visualization\\.arguments\\.coverage\\.v1",
+  "mandatory format",
+  "final-artifact readback|post-format readback",
+  "source_counts",
+  "rendered_counts",
+  "readback_counts",
+  "coverage_digest",
+  "final_token_readback",
+  "clustering",
+  "zoom",
+  "filtering",
+  "view[- ]only|reversible view[- ]state",
+  "typed renderer-capacity blocker|typed renderer-capacity rejection",
+]
+
+[[evals.checklist]]
+id = "CODE-VISUALIZATION-5"
 critical = true
 description = "Routes document-embedded diagrams through context and visual-plan selection."
 required_regex = ["Document Embedded Diagrams", "visual_plan", "section claim", "reader", "Mermaid"]
@@ -1095,8 +1160,8 @@ description = "Every Codex subagent prompt must be dependency-linked and declare
 [[evals.checklist]]
 id = "CODEX-AGENT-GENERIC-1"
 critical = true
-description = "Includes dependency manifest markers."
-required_regex = ["@dependency-start", "@dependency-end"]
+description = "Includes generated-view provenance for the canonical closed projection."
+required_regex = ["generated role view: generated_role_view_v1", "generated from agents/model_profiles.toml plus canonical team/runtime role metadata", "materializer: tools/agent_tools/model_profile_registry.py"]
 
 [[evals.checklist]]
 id = "CODEX-AGENT-GENERIC-2"
@@ -1132,7 +1197,7 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 id = "ROOT-AGENTS-SHARED-SEARCH-1"
 critical = true
 description = "Routes search, read scope, and reuse survey to deterministic owner surfaces."
-required_regex = ["search, read scope, and reuse survey", "semantic-index", "local-llm search", "dependency review artifacts"]
+required_regex = ["search, read scope, and reuse survey", "semantic-index", "search.py", "dependency review artifacts"]
 
 [[evals.checklist]]
 id = "ROOT-AGENTS-SHARED-PUBLISH-1"
@@ -1144,19 +1209,19 @@ required_regex = ["shared AgentCanon update", "update_agent_canon\\.sh", "sync_a
 id = "agent-canon-pr-gh-publish-workflow"
 target = "agents/workflows/agent-canon-pr-workflow.md"
 kind = "workflow"
-description = "The AgentCanon PR workflow must route push and PR operations through the gh-backed publish tool without noncanonical push routes."
+description = "The AgentCanon PR workflow binds one typed PR lifecycle to candidate CAS and publication readback."
 
 [[evals.checklist]]
 id = "AGENT-CANON-PR-GH-PUBLISH-1"
 critical = true
-description = "Requires gh-backed publish tool, explicit user task, and remote verification evidence."
-required_regex = ["tools/agent_tools/github_publish\\.py", "--user-task", "remote_verified=yes", "gh repo view", "git remote get-url origin"]
+description = "Requires the canonical adapter, typed topology, immutable permission identity, and retained PR Essence."
+required_regex = ["tools/agent_tools/github_publish\\.py", "PullRequestLifecycle", "user\\|fork\\|contributor", "permission", "PR Essence", "contributor diff"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-PR-GH-PUBLISH-2"
 critical = true
-description = "Forbids noncanonical remote inference and literal URL push as standard routes."
-required_regex = ["push 先を推定しません", "literal URL push is not a standard route", "hardcoded repository name"]
+description = "Separates candidate CAS from publication readback and hands one queue receipt to the frontier."
+required_regex = ["CandidateCasReceipt", "PublicationReadbackReceipt", "QueueReceipt", "DependencyFrontier", "parent pin/root sync before accepted frontier"]
 
 [[evals]]
 id = "agents-readme-routing-entrypoint"
@@ -1210,68 +1275,32 @@ required_regex = ["Common Evidence Packet", "Subagent handoffs", "run bundle pat
 id = "agent-orchestration-skill-call-routing"
 target = ".agents/skills/agent-orchestration/SKILL.md"
 kind = "skill"
-description = "The discoverable agent-orchestration skill must enforce mandatory skill-call routing and convention compliance tool delegation."
+description = "The discoverable orchestration shim points to the sole policy owner and consumes machine ToolCall tokens."
 
 [[evals.checklist]]
-id = "CONVENTION-SKILL-1"
+id = "ORCH-SHIM-POINTER-1"
 critical = true
-description = "Requires agent-orchestration first, repo execution skills, task-shape skill routing, existing-tool routing evidence, and convention verifier gate."
-required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py", "vertical dynamic wave", "write-capable handoff", "existing-tool route", "targeted-validation evidence"]
-forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
+description = "Points to the canonical policy and consumes semantic sufficiency through conditional structured transport."
+required_regex = [
+  "agents/skills/agent-orchestration\\.md",
+  "sole policy owner",
+  "semantic decision-sufficiency record",
+  "structured handoff or tool result is sufficient",
+  "durable packet reference only for coordination or resumption",
+]
+forbidden_regex = ["(?m)^## Decision Sufficiency Packet$", "agent-canon\\.decision-sufficiency\\.v1"]
 
 [[evals.checklist]]
-id = "VERTICAL-WAVE-POLICY-2"
+id = "ORCH-SHIM-TOOLCALL-1"
 critical = true
-description = "Keeps discoverable orchestration skill aligned with vertical dynamic waves and delegated spawn policy."
-required_regex = ["Intake Responsibility Wave", "dynamic expansion waves", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
+description = "Consumes machine-readable ToolCall tokens and returns typed failures without prose command reconstruction."
+required_regex = ["machine-readable ToolCall tokens", "typed failure semantics", "without translating them into prose commands"]
 
 [[evals.checklist]]
-id = "ORCH-TOOL-FIRST-1"
+id = "ORCH-SHIM-DISCOVERY-1"
 critical = true
-description = "Uses tool pass/finding output as the authority before broad reading or subagents."
-required_regex = ["canonical tool", "call the tool before prose review", "trust its structured pass/finding output", "requested_scope", "work packet"]
-
-[[evals.checklist]]
-id = "ORCH-TOOL-FIRST-2"
-critical = true
-description = "Routes deterministic tool coverage through structured artifacts and repairs the tool contract when abstraction is missing."
-required_regex = ["Use `explorer` or broad read-only review", "tool-verified properties need additional abstraction", "structured tool artifacts", "extend or repair the tool contract"]
-
-[[evals.checklist]]
-id = "ORCH-LITERATURE-FIRST-1"
-critical = true
-description = "Requires source-backed implementation skill call order to put literature-survey before research workflow and implementation branches."
-required_regex = ["\\$literature-survey", "before `\\$research-workflow`", "source packet", "adoption/exclusion", "implementation"]
-
-[[evals.checklist]]
-id = "ORCH-PRE-EDIT-PACKET-1"
-critical = true
-description = "Requires evidence-backed pre-edit investigation before edit path selection."
-required_regex = ["Pre-Edit Repository Investigation Packet", "agents/COMMUNICATION_PROTOCOL.md", "task risk", "Parent-Direct Context Note", "raw search hits"]
-
-[[evals.checklist]]
-id = "REPORT-ROUTING-SKILL-1"
-critical = true
-description = "Routes PR text, reader-facing reports, and evidence-backed document sections to report-writing and pairs raw machine result storage with result-artifact-writeout."
-required_regex = ["PR body", "reader-facing report", "\\$report-writing", "JSON/JSONL", "\\$result-artifact-writeout", "evidence-backed"]
-
-[[evals.checklist]]
-id = "HTML-OUTPUT-ROUTING-SKILL-1"
-critical = true
-description = "Routes explicit HTML/browser output to html-output while keeping report output Markdown by default."
-required_regex = ["\\$html-output", "\\$html-experiment-report", "defaults to Markdown", "explicitly asks for HTML", "external browser publication"]
-
-[[evals.checklist]]
-id = "STRUCTURE-ROUTING-SKILL-1"
-critical = true
-description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning; substantive document edits include prose graph routing and format-only skip evidence."
-required_regex = ["\\$structure-planning", "\\$prose-reasoning-graph", "experiment plan/report", "document", "paper", "refactor", "source map", "format-only", "structure_contract=skipped"]
-
-[[evals.checklist]]
-id = "TOOL-FINDING-ROUTING-SKILL-1"
-critical = true
-description = "Routes tool/checker discovery and before/after impact work to tool-finding-report."
-required_regex = ["tool/checker/hook/static-analysis", "\\$tool-finding-report", "before/after impact"]
+description = "Keeps the generated skill-tool command block as discovery while route execution stays token-owned."
+required_regex = ["## Tool Commands", "skill-tool-commands:start", "skill_tool_commands\\.py show --skill agent-orchestration"]
 
 [[evals]]
 id = "agent-orchestration-canonical-report-routing"
@@ -1286,10 +1315,85 @@ description = "Routes PR text, reader-facing reports, and evidence-backed docume
 required_regex = ["PR body", "reader-facing report", "report-writing", "JSON / JSONL", "result-artifact-writeout", "evidence-backed"]
 
 [[evals.checklist]]
+id = "DSV-ZERO-VALUE-1"
+critical = true
+description = "Rejects zero-value reads, searches, reviews, and checks when they cannot change the next decision."
+required_regex = [
+  "same owner, unit, mechanism, and validation\\s+route",
+  "Additional reads, searches, reviews, and checks are justified only\\s+when they can change",
+  "otherwise return to the selected work",
+  "do not manufacture a zero-value investigation, packet, or review stage",
+]
+
+[[evals.checklist]]
+id = "DSV-BRANCH-NAMING-1"
+critical = true
+description = "Requires only unresolved branches that can change the owner, unit, mechanism, or validation route."
+required_regex = [
+  "each unresolved branch that could change the owner, unit, mechanism, or route",
+  "changes_next_decision",
+  "unresolved owner/edit/validation\\s+branch",
+]
+
+[[evals.checklist]]
+id = "DSV-SPARK-FAST-PATH-1"
+critical = true
+description = "Keeps Spark scoped to explicit typed selection and routes one owner gate without broad review or test stages."
+required_regex = [
+  "固定 Spark implementation route",
+  "parent packet が.*--select-agent-type implementer=spark_worker:<evidence>",
+  "one owning review gate",
+  "Do not materialize empty reviewer or template artifacts",
+  "Validation is static/targeted first",
+  "Full suites, full dependency review, and\\s+remote CI are selected once for the final candidate only",
+]
+
+[[evals.checklist]]
+id = "DSV-IRRELEVANT-UNKNOWN-POSITIVE-1"
+critical = true
+description = "An irrelevant unknown may be serialized while remaining non-blocking and non-decision-changing."
+required_regex = [
+  "affects_owner_edit_validation",
+  "\\\"blocking\\\": false",
+  "\\\"serialized_in_decision_packet\\\": true",
+  "Unknowns that cannot change the next decision are non-blocking\\s+and may remain in local context",
+]
+
+[[evals.checklist]]
+id = "DSV-IRRELEVANT-UNKNOWN-NEGATIVE-1"
+critical = true
+description = "The owner prevents irrelevant unknowns and missing evidence fields from becoming blocking gates."
+required_regex = [
+  "Unknowns that cannot change the next decision are non-blocking",
+  "Do not convert missing artifact fields, counts, or digests into\\s+a new mandatory gate",
+  "affects_owner_edit_validation",
+]
+
+[[evals.checklist]]
+id = "DSV-NO-THRESHOLD-1"
+critical = true
+description = "Rejects fixed thresholds and zero-value repeat reads when they cannot change the owner decision."
+required_regex = [
+  "\\\"threshold_policy\\\": \\\"none\\\"",
+  "No artifact shape, digest, count, or fixed stage sequence is a substitute",
+  "no hypothesis-space or read-count form is\\s+required",
+  "Additional reads, searches, reviews, and checks are justified only\\s+when they can change",
+]
+
+[[evals.checklist]]
 id = "VERTICAL-WAVE-POLICY-3"
 critical = true
-description = "Keeps canonical orchestration skill aligned with vertical dynamic waves and delegated spawn policy."
-required_regex = ["Intake Responsibility Wave", "dynamic expansion wave", "vertical dynamic wave", "run\\.delegated_spawn_policy"]
+description = "Requires launchable owner-bounded waves, one owning gate, and targeted-final validation without default review or test waves."
+required_regex = [
+  "ready dependency-DAG frontier",
+  "stage owner",
+  "vertical dynamic wave",
+  "Select one owning review gate for the claims in one replaceable responsibility",
+  "Activate a specialist only when a distinct unresolved claim or risk cannot be\\s+judged by that gate",
+  "Validation is static/targeted first",
+  "Full suites, full dependency review, and\\s+remote CI are selected once for the final candidate only",
+  "Do not materialize empty reviewer or template artifacts",
+]
 
 [[evals.checklist]]
 id = "HTML-OUTPUT-ROUTING-CANONICAL-1"
@@ -1679,8 +1783,21 @@ description = "Codex subagent canon must require structured context capsules for
 [[evals.checklist]]
 id = "CODEX-SUBAGENTS-FRESH-CAPSULE-1"
 critical = true
-description = "Requires exact bounded context fields for fresh subagent launches."
-required_regex = ["Fresh Subagent Context Capsule", "context_artifacts", "allowed_paths", "do_not_read", "return_contract", "protocol-owned", "schema の定義は同文書だけ"]
+description = "Keeps the context schema protocol-owned while reusing compatible agents and limiting fresh launches to independent or incompatible responsibility."
+required_regex = [
+  "fresh subagent は必要な launch ごとに",
+  "active agent を再利用",
+  "compatible な revised scope",
+  "独立 review",
+  "disjoint write authority",
+  "incompatible\\s+owner/context",
+  "context_artifacts",
+  "allowed_paths",
+  "do_not_read",
+  "return_contract",
+  "protocol-owned",
+  "schema の定義は\\s+同文書だけ",
+]
 
 [[evals]]
 id = "slide-production-workflow"
@@ -1771,7 +1888,7 @@ required_regex = ["OOP Analysis Scope", "Paths", "Excludes", "Markdown report", 
 id = "OOP-ROUTE-3"
 critical = true
 description = "Separates survey execution from closeout signal-class and human-review execution."
-required_regex = ["--min-score 0", "signal class outcome", "human review gate"]
+required_regex = ["typed_boundary_evidence", "signal class outcome", "human review gate"]
 
 [[evals]]
 id = "oop-readability-skill-artifact"
@@ -2220,8 +2337,8 @@ required_regex = ["make agent-canon-ensure-latest", "make agent-canon-update-pla
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-2"
 critical = true
-description = "Separates local AgentCanon source commits from parent pin updates."
-required_regex = ["merge-main-into-current", "git -C vendor/agent-canon push origin HEAD", "AgentCanon branch/PR", "\\$agent-update-branch"]
+description = "Separates dirty vendor source work from clean parent pin projection through the managed topic workspace while retaining the standalone source publication route."
+required_regex = ["dirty vendor checkout is a refusal condition", "dependency-module", "prepare --topic", "--module", "--branch", "workspace/<topic-slug>/agent-canon", "clean vendor pin projection", "source branch/PR", "\\$agent-update-branch"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-3"
@@ -2233,19 +2350,19 @@ required_regex = ["agent_canon_update_todos\\.py status", "agent_canon_update_to
 id = "agent-canon-update-route-doc"
 target = "agents/skills/agent-canon-update.md"
 kind = "skill-doc"
-description = "The human AgentCanon update skill doc must point to the update route, latest checklist, and source-PR versus parent-pin separation."
+description = "The AgentCanon update consumer must point to the canonical transaction and source-to-parent frontier."
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-DOC-1"
 critical = true
-description = "Documents the canonical route references, high-level commands, and mandatory structure follow-up gate."
-required_regex = ["documents/agent-canon-update-route\\.md", "documents/agent-canon-parent-repo-latest-checklist\\.md", "make agent-canon-ensure-latest", "tools/update_agent_canon\\.sh", "agentcanon_structure_followup=required", "agentcanon_structure_followup=pass"]
+description = "Consumes the canonical front door and append-only source transaction receipts."
+required_regex = ["documents/agent-canon-update-route\\.md", "tools/update_agent_canon\\.sh", "SourceMainRebindReceipt", "PullRequestLifecycle", "source-main readback", "G1-G6"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-DOC-2"
 critical = true
-description = "Documents source PR and parent pin boundaries."
-required_regex = ["AgentCanon branch/PR", "parent-repo pin", "canon-pin", "standalone AgentCanon branch"]
+description = "Queues source publication once and blocks parent projection until the ordered frontier is accepted."
+required_regex = ["QueueReceipt", "DependencyFrontier", "#388 -> #389 -> current transaction", "accepted-frontier evidence before", "parent pin/root projection", "no parent projection"]
 
 [[evals]]
 id = "pr-processing-diff-intake-runtime"
@@ -2269,4 +2386,34 @@ description = "The human PR processing skill must require fixing required diffs 
 id = "PR-PROCESSING-DIFF-INTAKE-DOC-1"
 critical = true
 description = "Requires PR diff intake and head-branch repair before incorporation."
-required_regex = ["PR diff intake", "PR Essence", "missing", "head branch", "Parent pin / root-view diff"]
+required_regex = ["PR diff intake", "PR Essence", "missing", "head branch", "parent pin", "root-view", "QueueReceipt", "DependencyFrontier"]
+
+[[evals]]
+id = "p5-generated-runtime-profile-projection"
+target = "tools/agent_tools/check_agent_runtime_alignment.py"
+kind = "workflow"
+description = "The runtime profile projection gate is generated, topology-derived, and preserves typed capacity-domain separation."
+
+[[evals.checklist]]
+id = "P5-RUNTIME-PROJECTION-1"
+critical = true
+description = "Requires the closed generated role view and registry materializer parity gate."
+required_regex = ["generated_role_view_v1", "generate_role_views", "closed eight-field projection", "agents_config projection diverges"]
+
+[[evals.checklist]]
+id = "P5-RUNTIME-PROJECTION-2"
+critical = true
+description = "Requires declared topology derivation, exact 20+6 proof, and typed capacity requests."
+required_regex = ["declared_team_peak_plus_nested_reservations_v1", "requested_max_threads.*26", "direct_frontier_count == 20", "nested_reservation_count == 6", "task_catalog_capacity_request_v1", "team_manifest.run.write_scopes"]
+
+[[evals]]
+id = "p5-role-profile-attribution"
+target = "tools/agent_tools/evaluate_codex_agent_roles.py"
+kind = "workflow"
+description = "The role evaluator attributes profile and capacity evidence without becoming policy truth."
+
+[[evals.checklist]]
+id = "P5-ROLE-ATTRIBUTION-1"
+critical = true
+description = "Requires profile attribution and numeric-spawn duplicate rejection."
+required_regex = ["profile-attribution", "numeric-spawn-budget-duplicate", "declared-20-plus-6-does-not-derive-26"]

@@ -190,7 +190,7 @@ issues = [
 id = "shared-tooling"
 owner = "agent-canon"
 class = "tooling"
-description = "Shared automation, static gates, OOP checkers, Rust CLI, and tool catalog metadata."
+description = "Shared automation, canonical update-lifecycle schemas, static gates, OOP checkers, Rust CLI, and tool catalog metadata."
 paths = [
   "tools/**",
   "rust/**",
@@ -249,7 +249,6 @@ exclude_paths = [
 ]
 protecting_tools = [
   "tools/agent_tools/run_repo_dependency_review.sh",
-  "tools/ci/run_docs_checks.sh",
   "tools/agent_tools/responsibility_scope.py",
 ]
 issues = [

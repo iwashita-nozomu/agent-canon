@@ -49,6 +49,7 @@ allowed_top_level = [
   ".codex",
   ".devcontainer",
   ".dockerignore",
+  ".gitattributes",
   ".github",
   ".gitignore",
   ".vscode",
@@ -129,6 +130,26 @@ kind = "dir"
 category = "documents"
 
 [[profile.required]]
+path = "documents/rule"
+kind = "dir"
+category = "document_rules"
+
+[[profile.required]]
+path = "documents/rule/README.md"
+kind = "file"
+category = "document_rules"
+
+[[profile.required]]
+path = "documents/rule/naming.md"
+kind = "file"
+category = "document_rules"
+
+[[profile.required]]
+path = "documents/rule/directory-structure.md"
+kind = "file"
+category = "document_rules"
+
+[[profile.required]]
 path = "documents/tools"
 kind = "dir"
 category = "documents"
@@ -157,6 +178,11 @@ category = "tooling"
 path = "tools/agent_tools"
 kind = "dir"
 category = "tooling"
+
+[[profile.required]]
+path = "tools/agent_tools/update_lifecycle_contract.py"
+kind = "file"
+category = "update_lifecycle_contract"
 
 [[profile.required]]
 path = "tools/user"
@@ -222,6 +248,11 @@ category = "research_artifacts"
 path = "vendor"
 kind = "dir"
 category = "vendored_assets"
+
+[[profile.optional]]
+path = ".agent-canon/update-lifecycle"
+kind = "dir"
+category = "task_owned_update_runtime"
 
 [[profile]]
 id = "template_or_derived_repo"
@@ -339,3 +370,8 @@ category = "environment"
 path = "python"
 kind = "dir"
 category = "implementation"
+
+[[profile.optional]]
+path = ".agent-canon/update-lifecycle"
+kind = "dir"
+category = "task_owned_update_runtime"

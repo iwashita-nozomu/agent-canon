@@ -4,6 +4,7 @@
 contract workflow
 responsibility Documents 実験の標準手順 for this repository.
 upstream design README.md workflow catalog
+upstream design ../../documents/gpu-admission-r5-source-packet.md fixes the ff97 managed lifecycle binding
 @dependency-end
 -->
 
@@ -219,6 +220,14 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 - `environment_variables` の child 反映
 - GPU / CPU / worker slot の割当
 - worker start / finish の host 側観測点
+
+managed CLI の lifecycle binding は 1 本だけです。
+`StandardFullResourceScheduler.from_worker(...)` で scheduler を 1 回作り、
+`StandardRunner(scheduler=scheduler, ...)` を 1 回構築して
+`runner.run(worker)` を 1 回呼びます。この呼び出しは `None` を返し、
+terminal `ExecutionResult` は `scheduler.completions` だけが所有します。
+topic、Hook、admission context、互換 wrapper が runner return を result と
+して読むこと、または second runner/lifecycle call を足すことは禁止です。
 
 実装時にやらないことは次です。
 

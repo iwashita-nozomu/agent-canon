@@ -1,0 +1,137 @@
+# @dependency-start
+# contract design
+# responsibility Defines the machine-readable execution-time-aware orchestration contract owned by agent-orchestration.
+# upstream design agent-orchestration.md sole owner policy prose and invariants
+# downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py production contract checker
+# downstream implementation ../../tools/agent_tools/skill_tool_commands.py required selected-skill command route
+# downstream design pr-processing.md PR queue specialization consumer
+# downstream design ../templates/schedule.md schedule projection consumer
+# downstream implementation ../task_catalog.yaml task routing projection consumer
+# downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md runtime discovery consumer
+# @dependency-end
+
+schema = "agent-canon.execution-time-aware-orchestration.v1"
+owner_skill = "agent-orchestration"
+owner_doc = "agents/skills/agent-orchestration.md"
+owner_heading = "Execution-Time-Aware Work-Conservation Contract"
+owner_ref = "agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract"
+checker = "tools/agent_tools/check_execution_time_aware_orchestration.py"
+checker_command = "python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root ."
+required_skill_command = "python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root ."
+
+required_fields = [
+  "dependency_dag",
+  "makespan_objective",
+  "responsibility_completeness",
+  "correctness",
+  "critical_path",
+  "ready_set",
+  "context_reuse",
+  "affected_evidence_invalidation",
+]
+
+owner_markers = [
+  "Model the complete requested work as a dependency DAG",
+  "minimize makespan subject to responsibility completeness and correctness",
+  "Dispatch every ready node that is non-conflicting",
+  "Batch remote reads",
+  "Reuse the warm worker and reviewer contexts",
+  "before opening the owning review",
+  "Invalidate only evidence affected by the repaired node",
+  "Wait only when the useful ready set is empty",
+  "prompt-keyword routing is not a scheduling signal",
+  "no fixed duration, elapsed-time limit, or timeout cutoff may cut the requested scope",
+]
+
+rejected_classes = [
+  "duplicate_local_scheduling_definition",
+  "duration_or_timeout_scope_cutoff",
+  "keyword_based_routing",
+  "responsibility_scope_reduction",
+  "consumer_reference_without_executable_fields",
+  "consumer_reference_mismatch",
+]
+
+duplicate_definition_heading = "## Execution-Time-Aware Work-Conservation Contract"
+forbidden_consumer_markers = [
+  "Model the complete requested work as a dependency DAG",
+  "At every dispatch decision:",
+  "Dispatch every ready node that is non-conflicting and admissible",
+]
+scope_cutoff_markers = [
+  "duration budget:",
+  "timeout budget:",
+  "cut scope after",
+  "scope cutoff:",
+  "elapsed-time budget:",
+  "use timeout to cut",
+]
+keyword_routing_markers = [
+  "prompt keywords route",
+  "keyword-based routing:",
+  "keywords determine the ready",
+]
+scope_reduction_markers = [
+  "reduce requested responsibility",
+  "shrink requested scope",
+  "omit remaining responsibility",
+  "skip remaining candidates",
+  "only the first ready node is required",
+]
+
+[invariants]
+dag = "complete_dependency_dag_with_owner_and_consumer_closure"
+objective = "minimize_makespan_subject_to_responsibility_completeness_and_correctness"
+dispatch = "all_non_conflicting_ready_nodes"
+wait = "only_when_useful_ready_set_is_empty"
+evidence = "warm_context_reuse_and_affected_evidence_only_invalidation"
+review = "closure_before_one_exact_candidate_review"
+
+[[consumers]]
+id = "pr-processing"
+path = "agents/skills/pr-processing.md"
+kind = "specialization"
+reference_mode = "text"
+required_markers = [
+  "Execution-Time-Aware Queue Specialization",
+  "batched queue snapshot",
+  "independent candidates",
+  "one closure review for each exact candidate",
+  "same warm worker and reviewer context",
+  "merge candidates in dependency order",
+]
+
+[[consumers]]
+id = "task-catalog"
+path = "agents/task_catalog.yaml"
+kind = "structured_reference"
+reference_mode = "yaml"
+owner_ref_path = ["execution_time_policy", "owner_ref"]
+fields_path = ["execution_time_policy", "executable_fields"]
+projection_path = ["execution_time_policy", "projection"]
+projection_ref = "agents/templates/schedule.md#Execution-Time-Aware Plan"
+
+[[consumers]]
+id = "schedule"
+path = "agents/templates/schedule.md"
+kind = "schedule_projection"
+reference_mode = "text"
+required_markers = [
+  "Execution-Time-Aware Plan",
+  "Dependency DAG / closure",
+  "Critical path",
+  "Ready set",
+  "Useful ready set",
+  "Context reuse",
+  "Affected evidence invalidation",
+]
+
+[[consumers]]
+id = "runtime-shim"
+path = ".agents/skills/agent-orchestration/SKILL.md"
+kind = "runtime_reference"
+reference_mode = "text"
+required_markers = [
+  "Execution-Time-Aware Work-Conservation Contract",
+  "Executable scheduling fields",
+]

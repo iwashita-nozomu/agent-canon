@@ -58,6 +58,7 @@ Cross-Cutting Packet:
 - `documents/notes-lifecycle.md`
 - `agents/workflows/agent-learning-workflow.md`
 - `documents/runtime-profiles-and-check-matrix.md`
+- `documents/rule/dependency-module-changes.md`
 - `notes/guardrails/README.md`
 - `notes/guardrails/engineering_avoidances.md`
 - `docker/README.md`
@@ -73,10 +74,10 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - submodule repo では、read-only plan の判断対象を AgentCanon update surface に限定します。
 - AgentCanon update surface は `vendor/agent-canon/` submodule worktree、parent gitlink、`.gitmodules`、および `link-root` が触る AgentCanon-owned root symlink / copy view です。
 - clean な submodule worktree が remote main を指していて parent gitlink だけ古い場合も、preflight は checkout-preserving `approval_required` route を返します。承認後の protected update が parent gitlink の stage / commit を所有します。
-- clean な submodule worktree が non-default branch を指し、その branch head が remote branch に push 済みで fetched remote main を含み、parent gitlink だけが古い場合は `deferred_branch_pr` evidence として記録し、routing / planning / review を続けます。AgentCanon PR merge 後は再度 read-only plan を行い、mutation が必要なら approval と全 4 inline field を得た protected latest route を実行します。
-- `vendor/agent-canon/` に local commit、dirty state、remote main と diverge した history がある場合は current checkout を保存し、current-task user approval と全 4 inline field を得て protected `merge-main-into-current-preserve-dirty` を実行し、AgentCanon PR に出します。
-- local checkout branch は valid な shared-canon work surface です。local checkout に積まれた commit は消して最新化する対象ではなく、GitHub `main` を merge して conflict を解き、通常の AgentCanon PR として review / merge します。機械 evidence として `merge-main-into-current-preserve-dirty` の `agent_canon_merge_source_sha`、`agent_canon_merge_post_head`、`agent_canon_merge_remote_main_in_post_head=yes`、`agent_canon_merge_remote_main_verified=yes` を run bundle、PR body、または work log に残します。
-- update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出します。merge 後も read-only plan を先に行い、必要な approval と全 4 inline field を得た protected latest route の後で root view と parent pin を同期します。
+- clean な submodule worktree が non-default branch を指し、その branch head が remote branch に push 済みで fetched remote main を含み、parent gitlink だけが古い場合は `deferred_branch_pr` evidence として記録し、routing / planning / review を続けます。AgentCanon PR merge 後は再度 read-only plan を行い、mutation が必要なら approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route を実行します。
+- `vendor/agent-canon/` に local commit、dirty state、remote main と diverge した history がある場合は親モードの source-work surface として扱わず、直ちに `documents/rule/dependency-module-changes.md` の topic workspace branch clone route を案内して停止します。parent mode は vendor state を stash、保存、移送、再開しません。
+- local source branch は standalone source clone だけが所有します。parent projection は公開済み source の clean pin と root view の投影だけを受け取り、source correctness や dirty source state を vendor checkout で継続しません。
+- update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出します。merge 後も read-only plan を先に行い、必要な approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route の後で root view と parent pin を同期します。
 - AgentCanon source change、parent submodule pin change、`.gitmodules`
   change、AgentCanon-owned root runtime view / root-copy surface change、parent
   root sync PR は `agentcanon_structure_followup=required` です。template /
@@ -84,7 +85,7 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
   `bash tools/sync_agent_canon.sh check` が pass した後だけ
   `agentcanon_structure_followup=pass` として closeout に使えます。
 - 承認済み protected `ensure-latest` は `.gitmodules` の URL と immutable remote branch SHA を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定し、必要な pin と root shared surface を同期します。
-- local submodule commit が remote main に含まれている場合も、read-only plan の後に current-task user approval と全 4 inline field を得た protected `apply` / latest route で parent pin を remote main へ揃えます。
+- local submodule commit が remote main に含まれている場合も、read-only plan の後に current-task user approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected `apply` / latest route で parent pin を remote main へ揃えます。
 - local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って AgentCanon branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。
 - `task_start.py` と `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。template の root symlink view から起動したときに `skipped_source_canon` が出る場合は misconfiguration として扱い、workspace root、`.gitmodules`、`vendor/agent-canon` の状態を確認します。`skipped_source_canon` は standalone AgentCanon source checkout でだけ妥当です。
 
@@ -100,7 +101,7 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
 - branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に creation authority/reason と destructive authority/reason の全 4 値を置いた場合だけ実行できます。
-- AgentCanon source 変更は current `vendor/agent-canon` branch / AgentCanon PR を優先して継続します。parent repo の `canon-pin` branch は、AgentCanon PR route が確定した後に parent pin だけを隔離する場合に限ります。
+- AgentCanon source 変更は `dependency-module-change` で exact topic workspace clone を prepare/reuse し、その standalone source branch / AgentCanon PR を継続します。parent repo の `canon-pin` branch は source publication 後の clean parent pin projection だけを担います。
 
 ### Runtime Profile And Risk Selection
 
@@ -149,7 +150,7 @@ user の durable preference を見落とさないため、`memory/USER_PREFERENC
 agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
 
 raw text search の hit だけで編集対象を決めません。
-検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じたら、minimal write-capable `worker` / `spark_worker` handoff を作ります。parent repository edits は `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` かつ `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を記録した場合だけ許可します。
+検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を直接 materialize する handoff を作ります。空の unresolved-decision set は即時に one-pass materialization へ遷移し、owner gate は完了後だけです。parent repository edits は `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` かつ `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を記録した場合だけ許可します。
 bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。runtime `SKILL.md` 読了は、対象 property を正本として持つ existing tool の実行後に必要な場合だけ使う follow-up context です。結果の解釈や修正に必要な owner surface だけを開きます。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
 
 ```bash
@@ -227,10 +228,25 @@ routing / handoff artifact として扱い、edit authorization は別 gate で�
 を直接編集するには、同じ責務 model に加えて
 `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` と
 `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` が必要です。
-Gate 5 で作成された設計文書は、作成直後に Gate 6 の detailed design review を
-受けます。`design_review.md` が同一の design artifact path と対象 revision /
-section を `approve` した後に、その設計を implementation handoff、worker input、
-または follow-up 実装判断の根拠にします。
+Gate 6 の detailed design review は、owner/design boundary、API shape、仕様解釈、
+または別の unresolved claim が owning review gate では判定できない場合だけ選択します。
+設計文書の存在だけでは別 review stage や artifact を生成しません。reviewer output は
+hypothesis であり、parent / integration owner が current source snapshot、reachable
+input/control path、contract、witness/static proof を確認して adjudicate します。
+
+実装前の design gate は、run manifest の `run.active_design_packet` を唯一の
+artifact ownership source とします。schema は `waterfall.design_packet.v1` で、
+design artifact、technical design review、document-flow review の相対 path と
+`document_flow_required` を必須にします。generator の precedence は、explicit
+run `--active-design-packet` input、workflow-specific record、standard
+`agents_config` artifact registry の順です。generator は選択 record を生成済み
+run manifest に永続化し、以後その manifest が persisted authority になります。
+gate は persisted manifest の `run.active_design_packet` を唯一の runtime input として
+読み、manifest-declared path だけを active artifact route として消費します。
+missing / unknown field / unknown schema / invalid field / outside-bundle path は typed blocker として
+design owner に戻します。implementation handoff は、manifest-declared design artifact、
+両 review の一致する `Design artifact path:`、最終 `decision=approve`、および required
+な document-flow approval を要求します。
 
 API shape、責務境界、path layout、命名、アルゴリズム、test oracle、依存方向、
 runtime contract、config surface の判断が未確定なら、実装吸収ではなく
@@ -252,8 +268,8 @@ python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
 - shared config は `.codex/config.toml` の `[features].goals = true` を既定にします。
 - `goal.md` は durable source of truth、Codex goals は session view、`goal_loop.py status` は機械 gate です。
 - `goal.md` は repo-local state として管理します。
-- user が goal-driven intent を示したが exact `/goal <objective>` を渡していない場合は、parent が conservative な Objective draft を作り、`goal.md` に先に固定します。goal inference は explicit goal intent と Objective draft に基づけます。
-- repo-changing goal task では `/goal` 確定前に provisional run bundle を作り、active role set と catalog の `intake` stage から read-only WAVE-1 plan を materialize します。標準 catalog では `manager` が `requirements_organizer` として materialize され、`explorer`、`execution_planner`、`plan_reviewer` は parent-packet / stage evidence がある場合だけ dynamic wave に追加します。active runtime が explicit spawn authorization を持つ場合はその wave を起動し、runtime authorization が必要な場合は handoff packet と `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を artifact に残して許可待ちにします。write-capable implementation subagent は `/goal` mirror、parseable `goal.md`、Plan-mode evidence mapping が揃った時点で起動します。
+- user が goal-driven intent を示したが exact `/goal <objective>` を渡していない場合は、parent が target-state-complete Objective を作り、`goal.md` に先に固定します。intake draft は read-only discovery として扱い、edit authorization は target-state-complete Objective の固定後に開始します。
+- repo-changing goal task では、coordination、resumption、または選択された workflow が durable lifecycle evidence を要求する場合だけ run bundle を materialize します。その他は semantic handoff または tool result で owner、replaceable unit、mechanism、validation route、unresolved branch を満たします。goal の role / intake stage と catalog specialist は候補であり、owner-critical decision または distinct unresolved claim/risk が次の判断を変える場合だけ wave を materialize します。write-capable implementation subagent は、goal route が選択された場合に限り `/goal` mirror、parseable `goal.md`、Plan-mode evidence mapping を確認して起動します。
 - user が `/goal <objective>` または goal-driven task を指定した場合は、`/goal` を session view に設定した直後に `/plan <goal-driven task summary>` へ入り、Plan-mode output が `Goal Contract`、`Exit Criteria Mapping`、`Goal Work Breakdown`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を含む状態で実装へ進みます。
 - `Goal Work Breakdown` は `goal_loop.py plan` の `GW*` rows を run bundle `schedule.md` へ移したものです。実装は objective と work breakdown の両方に基づけます。
 - goal-driven task では、Codex goals と対応する `goal.md` Objective / Exit Criteria / Backlog / Loop Log を更新します。
@@ -383,7 +399,8 @@ bash tools/agent_tools/check_dependency_graph.sh --print-edges
 
 ## Completion Bar
 
-user-facing completion は、全 active clause、全 planned work unit、required review、validation、closeout gate が揃った状態です。
+user-facing completion は、全 active clause、selected work unit、selected owning
+review gate (when activated)、validation、closeout gate が揃った状態です。
 closeout 前に reviewer と auditor は次を明示的に確認します。
 
 - 各 must-do clause と completion-evidence clause が、実装、文書、test、command、artifact、または明示された deferred / rejected clause に対応している
@@ -392,14 +409,16 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 - task が数式、擬似コード、仕様、method contract を持つ場合、runtime success ではなく
   静的解析・読み取りによる implementation alignment evidence が review artifact に
   主証跡として残っている
-- required review の `fix now` findings が実装へ反映され、どの review-driven fix でも risk class と changed surface に対する active required review set を最新 diff に対して最新 diff 全体に対して再実行している
+- accepted review findings が実装へ反映され、behavior、owner/design boundary、correctness、validation、または publication state を変えた same-owner repair だけが selected gate の rerun を要求している
 - review reject、requested-change、または `required_change` への応答が、user
   request や design intent を捨てる rollback になっていない。実装 slice の
   revert / discard がある場合は、撤回、置換、owner 外、unsafe replacement、
   または escalation の authority と、保持された request clause が artifact に残っている
 - deferred findings は今回の completion readiness への影響、理由、escalation を artifact に記録している
 
-`closeout_gate.md` の `spec_product_coverage_complete=yes`、`review_findings_integrated=yes`、`post_fix_full_review_complete=yes` が揃った時点で、`user_completion_report=unlocked` にできます。
+`closeout_gate.md` の CompletionCoverage consumer、typed owner boundary、
+canonical formatter/dispatcher、validation-response、review integration が
+揃った時点で、`user_completion_report=unlocked` にできます。
 
 ## Mechanical Completion Loop
 
@@ -407,13 +426,17 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 
 1. `user_request_contract.md` の active clause、`schedule.md` の planned work unit、直近 review findings、validation blockers、commit / push、shared canon sync、follow-up 判断を一覧化します。
 1. 最新 diff と tracked / untracked state を確認し、変更対象 file の dependency manifest、downstream edge、旧参照、copy / snapshot / backup path を見ます。
-1. 必要な repo-wide dependency review、静的解析、読み取り確認、docs / targeted
-   tests / agent checks を実行します。動作確認や broad execution だけでは loop を
-   閉じません。
-1. read-only の diff-check agent を起動し、run bundle、request contract、schedule、latest diff、validation evidence、dependency evidence を渡します。
-1. diff-check agent の decision が `approve` 以外なら、fix-now finding を実装して loop の 1 に戻ります。`escalate` は該当する設計・計画 stage へ戻します。
+1. 静的解析、読み取り確認、docs / targeted tests / agent checks を先に実行します。
+   repo-wide dependency review や broad execution は、最終候補の touched contract
+   が要求して次の判断または最終 validation を変える場合だけ一度選択します。
+   completion predicate は選択した canonical route で確定します。
+1. 選択された owning review gate が diff-check を要求する場合だけ、read-only diff-check reviewer を起動し、選択された handoff、latest diff、validation evidence、dependency evidence を渡します。
+1. 選択された review の output は hypothesis として parent が adjudicate します。current snapshot、reachable path、contract、witness/static proof があり、behavior、owner boundary、correctness、validation、または publication state を変える accepted finding だけ same-owner repair loop を開きます。rejected hypothesis は `reason_code` と `evidence_ref` を残し、wave / rollback を起こしません。
    この修正 loop では、review finding への応答を、同じ意図を保つ修正、
    再設計、または authority 付き escalation / replacement として扱います。
+   Follow `agents/skills/agent-orchestration.md#Review Activation And Adjudication`
+   after final validation topology selection; this workflow surface does not
+   duplicate that semantic rule.
 1. diff-check agent が `approve` し、未完了 work unit、未解決 finding、未実行 validation、未同期 canon、未 commit / push、未判断 follow-up が無い場合だけ loop を止めます。
 
 `closeout_gate.md` の `mechanical_completion_loop_complete=yes` と `diff_check_agent_complete=yes` が揃った時点で、`user_completion_report=unlocked` にできます。
@@ -516,12 +539,17 @@ checked and cited.
 
 ### 4. Run Bootstrap
 
-repo-changing task では bundle 作成と explicit subagent activation を既定にします。
+repo-changing task では semantic handoff を既定にし、coordination、resumption、または
+selected workflow が durable lifecycle evidence を要求する場合だけ bundle と
+explicit subagent activation を materialize します。
 stage の具体的な責務と実行条件は prose ではなく `.codex/agents/*.toml` を正本にします。
 この文書は executable stage flow の正本です。workflow family 選定は
 `agent-orchestration`、prompt / config drift 監査は `prompt_config_reviewer`
 を先に通し、ここは executable stage flow に保ちます。
-goal-driven task では `/goal` 確定前でも provisional bundle を作り、read-only requirements / repo survey / planning review subagent の handoff plan を先に作ります。active runtime が明示許可を要求する場合は、許可があるときだけ実際に起動します。
+goal-driven task でも provisional bundle は coordination/resumption または owner-critical
+evidence が次の判断を変える場合だけ作り、candidate role の handoff plan を先に
+materialize しません。active runtime が明示許可を要求する場合は、許可があるときだけ
+実際に起動します。
 
 - repo を編集する
 - specialist handoff を明示したい
@@ -529,13 +557,17 @@ goal-driven task では `/goal` 確定前でも provisional bundle を作り、r
 - 長めの task で run 単位の記録が必要
 - subagent と parent の責務を分けたい
 
-full staged route では、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、active gate の場合の `document_flow_reviewer`、`test_designer` を標準構成とします。
+full staged route でも、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、
+active gate の場合の `document_flow_reviewer` は候補です。owner-critical decision または
+distinct unresolved claim/risk が選択した stage だけを materialize し、W2 の completion
+gate は approved typed contract evidence と active owner route で確定します。
 owner-bounded route では、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ full staged route へ昇格します。
-Codex subagent では、`requirements_organizer`、`manager_reviewer`、`execution_planner`、`plan_reviewer`、`detailed_designer`、`detailed_design_reviewer`、`document_flow_reviewer`、`test_designer`、`worker`、`spark_worker` を workflow family に応じて stage ごとに明示します。
-Agent Wave の標準順序は `計画 -> レビュー -> 編集` です。bootstrap は
-`team_manifest.yaml` に `run.standard_wave_sequence` を出し、parent は
-plan artifact、review gate decision、edit handoff evidence をこの順で
-`schedule.md` と `workflow_monitoring.md` に記録します。
+Codex subagent では、候補 role を workflow family に応じて宣言しますが、owner-critical
+decision、distinct unresolved claim/risk、または selected validation route が要求した
+role だけを materialize します。W2 の completion predicate は approved typed contract
+evidence と active owner route に結び付けます。
+Agent Wave に固定 plan-review-edit 順序はありません。bootstrap は selected stages だけを
+`team_manifest.yaml`、`schedule.md`、`workflow_monitoring.md` に記録します。
 bootstrap は `run.pre_handoff_scope_policy` も出します。implementation
 surface route は source packet seed であり、responsibility search、reuse
 survey、stale-surface scan、dependency expansion を通してから
@@ -543,7 +575,7 @@ survey、stale-surface scan、dependency expansion を通してから
 `review_gate` の handoff scope にします。
 `task_start.py` と `bootstrap_agent_run.py` は
 `run.default_quality_check_policy` も出します。この policy は active な
-`test_designer`、`change_reviewer`、`docs_workflow_steward`、
+`change_reviewer`、`docs_workflow_steward`、
 `python_reviewer`、`cpp_reviewer` と、それらから展開される Codex
 `agent_type`、task-default / changed-path / manual enable / review-pack
 provenance、軽量 static check command を記録します。review と edit の
@@ -551,12 +583,12 @@ handoff はこの policy を含めます。
 学術文章では、これに `notation_definition_reviewer` と `logic_gap_reviewer` を追加します。
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
-default の model / reasoning split は `.codex/agents/*.toml` を正本にします。code survey、tool drift survey、機械 report 要約、execution-only experiment / log work は Luna/high の通常 role TOML に置きます。通常の planning / authoring / review child は `gpt-5.6-luna/high`、`worker` と `ship_reviewer` は `gpt-5.6-luna/xhigh` とし、final judgment は `.codex/config.toml` の `gpt-5.6-sol/high` parent が持ちます。`gpt-5.4-mini/medium` は fresh read-only artifact-only の `skill_evaluator` が明示的な T14 `skill_evaluation` で使う評価専用設定で、permanent team role にはありません。`spark_worker` は Abstract Design Frame と design trace で完全に切れ、typed parent-packet selection がある機械的 slice だけに使います。
+default の model / reasoning authority は `agents/model_profiles.toml` の closed registry です。`.codex/agents/*.toml` は generated runtime readback view です。code survey、tool drift survey、機械 report 要約、execution-only experiment / log work は Luna/high profile、通常の planning / authoring / review child は `gpt-5.6-luna/high`、`worker` と `ship_reviewer` は `gpt-5.6-luna/xhigh`、final judgment は `gpt-5.6-sol/high` parent、`spark_worker` は fixed-packet `gpt-5.3-codex-spark/low`、fresh read-only T14 `skill_evaluation` は evaluator-only `gpt-5.4-mini/medium` profile を使います。
 - subagent の depth は `.codex/config.toml` と active spawn budget で管理します。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
-- active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。すべての repo-changing family は同時 active 4 体、write-capable 2 体までとし、`Skill Evaluation` / T14 は evaluator-only の `1/1` です。各 decision wave は、その decision が選んだ specialist だけを起動します。
+- active frontier、write scope、nested reservation、queue は capacity handshake owner が宣言 topology から生成し、その typed contract を workflow capacity policy の唯一の authority とします。fixed packet の標準経路は one Spark と one post-completion owning gate で、Luna は ambiguous design、causal repair、graph-owned cross-owner integration、review を保持します。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
 - budget を超える場合は例外扱いにし、`schedule.md` と `work_log.md` に理由、追加 role、expected output、write scope を残します。
-- write-capable subagent は既定 1 体です。ただし parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を明示した場合は、spawn budget 内で複数体を並列化できます。衝突する target は順序制約として扱い、同じ file / canonical surface / shared root contract に触る作業は先行 wave の validation と tool rerun 後に後続 wave へ回します。安全に分離できる writer は同一 wave、追加判断が要る writer は current checkout 内の後続 wave へ直列化します。
+- write-capable frontier は `team_manifest.yaml` の dependency order、wave plan、disjoint write scope、integration order、review gate と capacity readback から生成します。衝突する target は順序制約として扱い、同じ file / canonical surface / shared root contract に触る作業は先行 wave の validation と tool rerun 後に後続 waveへ回します。分離済み writer は available write capacity 内の同一 wave、追加判断が要る writer は current checkout 内の後続 wave へ直列化します。
 
 Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます。
 
@@ -625,9 +657,9 @@ handoff には `allowed_paths`、`do_not_read`、context artifact path、expecte
       --workspace-root "$PWD"
 
 Adaptive Improvement Loop では、outer run の `experiment_change_loop.md` に `Extension Backlog` を持ち、各 extension で別の waterfall run-id を作ります。
-次の extension へ進む前に、直前 extension の中間 `waterfall-gate-check`、final review、`task-close`、commit / push を完了させます。
+次の extension へ進む前に、直前 extension で選択された `waterfall-gate-check`、review、`task-close`、commit / push を完了させます。未選択の review artifact や full rerun は作りません。
 
-`--task-id` を指定すると、`agents/task_catalog.yaml` にある task-default specialist と `default_for_tasks` review pack を自動で有効化します。まず catalog default を使い、full perspective や extra reviewer は必要な根拠がある場合だけ `--enable` で補います。
+`--task-id` を指定しても、`agents/task_catalog.yaml` の task-default specialist と `default_for_tasks` review pack は候補です。owner-critical decision または distinct unresolved claim/risk が有効化したものだけ materialize し、空の reviewer/template artifact は生成しません。
 language-specific reviewer は `bootstrap_agent_run.py` が `--changed-path` か workspace の `git status --short` から自動で足します。
 run bundle を起こしたら、`user_request_contract.md` を planning 前に埋めます。stage artifact、handoff、review では clause ID を明示します。
 各 waterfall gate を次段へ進める前に `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <gate>"` で中間 gate を確認します。
@@ -642,7 +674,6 @@ run bundle を起こしたら、`user_request_contract.md` を planning 前に�
 - `detailed_designer`
 - `detailed_design_reviewer`
 - `document_flow_reviewer`
-- `test_designer`
 - `project_reviewer`
 - `docs_workflow_steward`
 - `prompt_config_reviewer`
@@ -655,19 +686,22 @@ cost を無視して review coverage を優先する run では、research-drive
 ### 5. Implementation
 
 - 実装は `agents/workflows/implementation-waterfall-workflow.md` の gate に従って進める
-- Gate 1 / 4 / 6 / 7 / 8 / 9 の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes` でない場合は指示された owner stage へ戻る
+- selected gate の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes`
+  でない場合は指示された owner stage へ戻る
 - 実装前に `design_brief.md` の `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design Side-Effect Map`、`Design-To-Implementation Trace` を読み、抽象責務と概念 model から実装 slice と downstream side effect が導かれていることを確認してから、そこにある artifact、repo docs、dependency surface、code path を読了する。test plan は、active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ読了する
-- 実装前に `design_review.md` を読み、`Design Artifact Under Review` が
-  現在の `design_brief.md` を指し、decision が `approve` であることを確認する。
-  設計を修正した後は Gate 6 で現行設計の approve を取り直す
-- 詳細設計 artifact がある run では、write-capable handoff と parent-direct
+- selected design review がある場合だけ、実装前に `design_review.md` を読み、
+  `Design Artifact Under Review` が現在の `design_brief.md` を指し decision が
+  `approve` であることを確認する。設計を修正した後は selected Gate 6 で現行設計を
+  adjudicate し直す
+- selected design review がある run では、write-capable handoff と parent-direct
   exception の前に `pre_handoff_gate_status` へ `design_review.md decision=approve`
-  と `waterfall-gate-check --gate design` pass evidence を記録する
+  と `waterfall-gate-check --gate design` pass evidence を記録する。candidate artifact
+  は記録や handoff を自動的に要求しない
 - 詳細設計前に `task_start.py` / `bootstrap_agent_run.py` の `DESIGN_DOCUMENT_PACKET` を読み、その path 群を `design_brief.md` の `Upstream Requirement Packet` に転記する
 - 詳細設計では `design_brief.md` の `Canonical Tree-Head Plan` に、この task の後に tracked tree に残してよい設計文書 path と実装 path を固定し、parallel design doc、implementation copy、snapshot、backup path を残さないことを明記する
 - worker の実装入力は、各 implementation slice の前に明示された design artifact path、design section、request clause ID です。test plan item は、active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ実装入力に含めます
 - worker は docs、workflow、prompt/config、validation output、dependency manifest、user-facing surface へ波及する変更を `Design Side-Effect Map` の item として扱い、implementation summary に owner stage と review gate を残す
-- `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、承認済み `design_review.md`、design gate check、および design と現行 repo docs / code / dependency surface の整合が揃った時点で実装へ進む。欠けた場合は Gate 5-6 へ戻る
+- `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、選択された場合の承認済み `design_review.md`、design gate check、および design と現行 repo docs / code / dependency surface の整合が揃った時点で実装へ進む。design review が未選択なら semantic decision sufficiency と owner validation evidence を使い、欠けた場合だけ Gate 5-6 へ戻る
 - 実装中に design issue が見つかった場合は、`design_issue_blocker=<issue>`、evidence、候補 option を artifact に残し、Gate 5-6 へ戻す。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾は設計側で解決します。run bundle が無い parent-direct task では編集を止めて user に設計判断を返す
 - `design_issue_blocker` は local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きではなく、Gate 5-6 の設計更新で閉じる。承認済み design と局所 precedent から一意に導ける typo、format、import、狭い機械的追従だけが同じ implementation pass で修正できる
 - compatibility-preservation drift と duplicate implementation は implementation GuardRail finding として扱い、旧 route、旧 wrapper、旧 helper、config mirror は caller migration で canonical owner へ統合する
@@ -676,7 +710,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - 新規または rename する file、function、class、theorem、artifact、CLI flag、
   config key は、implementation handoff 前に naming plan で固定する。naming plan は
   対象概念、責務語彙、既存 naming family、採用名、avoid-name list を含み、
-  `documents/conventions/common/02_naming.md` と言語別規約を参照します。
+  `documents/rule/naming.md` と言語別規約を参照します。
   名前が未確定な場合は Gate 5-6 へ戻り、worker handoff 前に naming plan を確定します
 - 明示 spawn 許可がある場合、実装前の repo inventory と tool drift survey は Luna/high の通常 role TOML へ、static validation failure triage と diff-local language review も該当 decision がある場合だけ `gpt-5.6-luna/high` review role TOML へ渡します。`gpt-5.4-mini/medium` は明示 T14 `skill_evaluation` の fresh read-only artifact-only `skill_evaluator` に限り、permanent team role にはありません。`worker` は `gpt-5.6-luna/xhigh` の既定 implementer で、typed parent-packet selection がある機械的 slice だけ `spark_worker` へ渡します。`.codex/config.toml` の `gpt-5.6-sol/high` parent は統合判断と次 gate 判定に集中します
 - `spark_worker` を選択できる実装は、Abstract Design Frame から導かれた差し替え可能な単位で、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする。design trace と dependency-expanded handoff scope は必要 evidence であり、実際の選択には `--select-agent-type implementer=spark_worker:<evidence>` が必要です。
@@ -684,17 +718,17 @@ cost を無視して review coverage を優先する run では、research-drive
 - すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を local/tool context 参照として扱い、prompt には選択済み `Fresh Subagent Context Capsule` fields を入れる
 - `spark_worker` は design trace と dependency-expanded handoff scope が揃い、typed parent-packet selection が記録された bounded implementation slice にだけ使い、設計判断、scope 判断、review 判断は frontier owner / reviewer に残す
 - chunk、slice、checkpoint、subpass の後は remaining planned work units と next gate を確認してから続行する
-- repo-changing task では current checkout の run bundle `work_log.md` を継続更新する
+- repo-changing task では selected durable coordination/resumption route がある場合だけ current checkout の run bundle `work_log.md` を継続更新し、それ以外は structured handoff/tool-result evidence を使う
 - 新規作業は current checkout で kickoff します。`WORKTREE_SCOPE.md` と `worktree_scope_lint.py` は legacy cleanup / drift diagnosis 専用です
 - stale な `WORKTREE_SCOPE.md`、別 branch、別 path の action log を見つけた場合は、current checkout の `work_log.md` に観測事実と扱いを残す
-- `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` の分離や、implementation 着手条件は `.codex/agents/*.toml` を正本にする
+- selected review の instance reuse / separation と implementation 着手条件は、semantic owner route と `.codex/agents/*.toml` の runtime projection に従う。compatible な同一責務 review は再利用し、distinct unresolved claim/risk の場合だけ分ける
 - 包括的開発では `project_reviewer` を intake と closeout に追加し、repo-wide な integration risk を確認する
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認する
-- README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書で reader-facing 構成を変える場合は `long-form-writing` を DSL-to-prose adapter として読み、docs-impact が高い場合だけ別 reviewer で `docs-completeness-review` も通す
-- 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を読み、`notation_definition_reviewer`、`logic_gap_reviewer`、必要に応じて別 reviewer の `docs-completeness-review` を通す
-- 投稿論文や thesis chapter の draft では `paper-writing` を読み、`citation_evidence_reviewer` も別 instance で通す
-- high-risk code 変更、新規 behavior、または regression-prone な修正では `test-design` を読み、実装前に `test_designer` で nasty case と regression case を固定する
-- contract-only wrapper や checker-owned validation だけの変更では、static contract validation と canonical command evidence を validation route に置く。pytest smoke、execution-only test、no-crash test、数値 smoke は behavior trigger がある場合に採用する
+- README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書で reader-facing 構成を変える場合は `long-form-writing` を DSL-to-prose adapter として読み、docs-impact がある distinct unresolved reader-path claim を owning gate が判定できない場合だけ `docs-completeness-review` を追加する
+- 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を読み、notation / logic reviewer は distinct unresolved claim が owning gate の範囲を超える場合だけ選択する
+- 投稿論文や thesis chapter の draft では `paper-writing` を読み、citation evidence reviewer は distinct unresolved citation claim が残る場合だけ追加する
+- contract-only wrapper や checker-owned validation だけの変更では、static contract validation と canonical command evidence を validation route に置く。
+  Approved typed contract evidence remains the completion criterion.
 - validation tool の autofix は changed contract、changed lines、または task plan が名指しした checker-owned property に結び付く finding に適用し、広い validation で出た既存 style debt は residual evidence と repair route に分ける
 - 研究・実験系の変更では active experiment profile の risk に応じて `report_reviewer` と research perspective reviewers を選ぶ
 - JAX export / native runtime の task では、対象 implementation slice で `generic callable path`、`specialized coeff path`、`export-based generic path` のどれを触るか宣言する。generic path は `jax.export` artifact producer と consumer/runtime smoke を完了条件に含める
@@ -712,38 +746,68 @@ cost を無視して review coverage を優先する run では、research-drive
 - runtime entrypoint は薄く保つ
 - skill は repo 正本を置き換えず、導線だけを担う
 
+### CompletionCoverage Applicability And State Contract
+
+`CODEX_WORKFLOW.md` owns applicability and state transitions for the checked
+CompletionCoverage read model. Existing ledger owners append facts; the W2
+projection/check boundary derives the read model; `task_close` and
+`report_artifact_checks` consume it. No reader may write back to the schema
+owner or become a second state machine.
+
+The minimal state is `context_binding`, `coverage_map`, `gate_evidence`,
+`failure_response`, `completion_boundary`, and `projection_metadata`. State
+transitions are `context_bound` → `design_pending` → `design_approved` →
+`writer_release_pending` → `writer_released` → `source_freeze_pending` →
+`source_frozen` → `change_review_pending` → `change_review_approved` →
+`integration_pending` → `publication_ready` → `delivered`. A validation
+failure enters `repair_pending`; same-intent repair returns to the owning gate,
+and unresolved or intent-changing work enters `escalation_pending`.
+
+`evaluate_completion_boundary` accepts one
+`control_topology_ledger.json` snapshot for all routing/publication facts. Its
+other inputs are schedule, open-work, repair, and crossing-edge state only;
+parent-route and global-publication state remain outside a second direct
+argument. It derives the independent predicates
+`all_planned_chunks_complete` and `overall_delivery_complete`. Each chunk, slice,
+checkpoint, or subpass remains an internal progress observation.
+
+W2-20 is ordered as W2 design `APPROVE`, exactly one isolated-branch writer
+release with collision preservation and
+`branch_creation_reason=convergence_w2_gate_completion_authority`, source
+freeze/review, then W3/parent integration. `routing_gate=verified` is observed at
+later integration/publication, while writer release authority remains the W2
+design `APPROVE` plus isolated branch release.
+
+W1 remains the producer of `ExecutionResourcePlan`. W2 consumes one broad
+W2-12 plan/actual/readback/failure certificate mapping and one W2-19 ordered
+GPU consumer mapping: candidate UUID set `A`, process-held `O_t` PID/start
+identities, active reservations `R_t`, selected UUIDs, atomic lock/lease plus
+post-lock readback, effective environment, terminal GPU identities, release
+versus retained-for-descendant disposition, and typed insufficient-eligible or
+mismatch failure. W2 does not parse NVML, select, reserve, construct the
+environment, produce resources, or duplicate tests/gates.
+
 ### 6. Validation
 
-- Validation starts with lightweight evidence: static analysis, dependency
-  checks, docs checks, route checks, and changed-file targeted tests. Full CI,
-  long test suites, benchmarks, experiments, GPU / CPU numerical runs, solver
-  sweeps, and randomized large cases use a task-linked approval note with
-  request clause, expected signal, runtime / resource budget, stop condition,
-  artifact path, and owner.
-- After any validation test/check failure, prohibited actions are simplifying,
-  reverting, deleting intended behavior/tests, weakening the oracle, or
-  downscoping required validation just to pass. First record the five machine
-  fields: `failing_contract`, `observation_level`, `cause_classification`,
-  `intent_preservation`, and `evidence`. The canonical token-safe
-  `cause_classification` and `intent_preservation` slug lists are owned by
+- Validation uses one canonical formatter/check path for Markdown, math, and
+  Mermaid plus selected non-Python static evidence. Duplicate CI, format,
+  check, and synthetic retest paths are not additional completion predicates.
+- After any validation failure, record `failing_contract`,
+  `observation_level`, `cause_classification`, `intent_preservation`, and
+  `evidence`. The canonical token-safe slug lists are owned by
   `documents/runtime-profiles-and-check-matrix.json` and projected into
-  `documents/runtime-profiles-and-check-matrix.md`; this workflow section only
-  states when Codex must apply that taxonomy. Repair with approved intent
-  preserved through the owner route named by the taxonomy, route unrelated
-  failures as residual evidence, and escalate approved-design / user-request
-  conflicts before changing intent.
+  `documents/runtime-profiles-and-check-matrix.md`; this workflow only points
+  to that taxonomy. Completion advances after response resolution through the
+  owning repair route or recorded escalation.
 - Shared canon、Large delivery、高 risk 変更では差分限定ではなく全 repo 対象で `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。Routine docs / Focused code は changed-file dependency checks と relevant downstream review を evidence にできる
-- Large delivery、explicit comprehensive validation、高 risk 変更では user-facing completion 前に `make ci` または同等の full local confidence gate を通し、pytest、pyright、pydocstyle、ruff を全 repo 設定で確認する。Shared canon 変更では active profile が指定する `make agent-canon-pr-check` または等価な AgentCanon PR gate を使い、Routine docs / Focused code は active profile の targeted checks を evidence にできる
-- Python / C++ 実装変更では `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を通し、裸の非自明数値を名前付き定数、typed configuration、API input、または根拠付き `hardcoded-number-ok` へ解消する
-- Python のログ出力 helper を変更した場合は `python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports` を通し、ログ helper 名を `_log...` に揃える
+- Source freeze 後は canonical formatter/check path と選択した非 Python static
+  evidence を一度記録する。別 CI、別 formatter、別 checker、checker-retest
+  は W2 completion gate にならない。
 - Hook、tool、skill、workflow、agent protocol、GitHub workflow、dependency manifest に触る前には `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、`TOOL_REJECTION_PREDICTED_GATE` を write-capable subagent handoff に渡す。parent 直編集に渡す場合は先に `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` と `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を記録する。予測 gate が出た場合は、gate-specific command と repair plan を実装前に固定する
 - tool / checker / hook / reviewer / subagent feedback から実装へ進む場合は `$tool-finding-report` で finding packet を作り、raw artifact、structured artifact、impact、prompt feedback decision を handoff に渡す。`handoff_prompt_gap` または `shared_skill_or_workflow_gap` は次の write-capable subagent 起動前に prompt を修正し、`workflow_monitor.py --runtime-feedback ... action=prompt_repair` で記録する
 - agent runtime / skill 変更では active profile に応じて `make agent-checks` または relevant subchecks を使う
-- checkpoint では `make ci-quick` を使ってよい。final closeout は risk class に応じて `make ci`、`make agent-checks`、または targeted checks を選ぶ
-- full confidence が必要な場合は `make ci`
-- Python 変更では `pyright`、`pytest tests/`、`ruff check python tests --select D,E,F,I,UP --ignore E501` を確認する
-- C / C++ 変更では project-native configure / build / test evidence を確認し、CMake project なら `cmake -S . -B build`、`cmake --build build`、`ctest --test-dir build` を既定候補にする
-- 文書変更では markdown / link check を使う
+- 文書変更では canonical formatter/check path が Markdown、math、Mermaid の
+  format/check を一つの証跡として記録する。
 - report を閉じる前には `documents/experiment-report-style.md` を確認する
 - 研究系 task では `critical-review` と `report-review` の decision state を確認し、必要なら `research-perspective-review` を追加する
 
@@ -759,9 +823,13 @@ cost を無視して review coverage を優先する run では、research-drive
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃ったら、chunk completion を全体 completion evidence に統合する
 - `closeout_gate.md` の `unfinished_tasks_absent=yes` で、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断の完了状態を示す
 - `closeout_gate.md` の `dependency_headers_complete=yes` で、作成・編集した text file の依存 file header coverage を示す
-- Shared canon、Large delivery、高 risk 変更では `closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` とともに、checkpoint / final review で全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` と header 修正 evidence を残す。Routine docs / Focused code は targeted dependency evidence を残す
-- Full local confidence gate が選択された変更では `closeout_gate.md` の `repo_wide_static_analysis_complete=yes` とともに、全 repo 対象の `make ci`、または `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501` の static analysis evidence を残す。Routine docs / Focused code / profile-specific gate は `repo_wide_static_analysis_complete=profile_selected` と targeted static evidence を残し、`make_ci_status` を `targeted` または `not_applicable` にする
-- `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` で、仕様 coverage と review finding disposition を示す
+- Full owner validation の static evidence とともに、`closeout_gate.md` の `repo_wide_static_analysis_complete=profile_selected` と canonical command evidence を記録します。
+- Shared canon、Large delivery、高 risk 変更で、最終候補の touched contract が要求した場合だけ、`closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` とともに一度だけ全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` と header 修正 evidence を残す。Routine docs / Focused code は targeted dependency evidence を残す
+- `closeout_gate.md` の `canonical_format_check_status=pass` と選択した非 Python
+  static evidence で、canonical validation を示す。別 CI は W2 gate ではない。
+- `closeout_gate.md` の `completion_coverage_consumer=yes`、
+  `mapping_error_sets_empty=yes`、`typed_owner_boundary_status=pass`、
+  `review_findings_integrated=yes` で、仕様 coverage と review disposition を示す
 - `closeout_gate.md` の `review_findings_integrated=yes` は、review reject /
   requested-change への応答として、user request と design intent が保持された
   evidence を要求します。revert / discard が含まれる場合は、撤回、置換、owner
@@ -772,7 +840,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - `closeout_gate.md` の `canonical_tree_head_complete=yes` で、設計文書、implementation surface、snapshot tree、backup path の正本状態を示す
 - `workflow_monitoring.md` の signals / behavior events / interventions / improvement decisions を埋め、skill / config / workflow / memory の改善判断を `applied`、`recorded`、`not_applicable` のいずれかにする
 - hook、code checker、static analysis、CI、review tool の結果が parent protocol または subagent protocol を変えるべきかを確認し、`workflow_monitoring.md` に `hook_tool_feedback=reviewed`、`parent_protocol_update=<applied|recorded|not_required>`、`subagent_protocol_update=<applied|recorded|not_required>`、`protocol_feedback_reason=...` を残す
-- evidence を確認済みの closeout では、`python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id> --closeout-token-preset` で `evaluate_agent_run.py` が消費する standard behavior tokens を記録できます。この preset は記録 shortcut であり、`make ci`、dependency review、diff-check approval、review finding resolution は個別 evidence として残します。
+- evidence を確認済みの closeout では、`python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id> --closeout-token-preset` で `evaluate_agent_run.py` が消費する standard behavior tokens を記録できます。この preset は記録 shortcut であり、canonical formatter/check、dependency review、diff-check approval、review finding resolution は個別 evidence として残します。
 - `tools/agent_tools/evaluate_agent_run.py --report-dir reports/agents/<run-id> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write` が pass し、`closeout_gate.md` の `agent_evaluation_complete=yes` と `agent_evaluation.md` の `feedback_actions_resolved: yes` が揃ったら、agent behavior evaluation と feedback resolution を complete にする
 - `schedule.md` を TODO 正本として埋め、`work_log.md` に execution trail を残す
 - `notes/guardrails/engineering_avoidances.md` の log-derived avoid に当たる変更は、修正または reviewer escalation の対象にする
@@ -796,15 +864,24 @@ cost を無視して review coverage を優先する run では、research-drive
 
 - `AGENTS.md` は Codex のruntime 入口として保つ
 - `.agents/skills/` を正規 skill path とする
-- repo-changing task では、stage ごとの subagent / specialist を明示する
-- `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は別 instance にする
-- 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別 instance にする
-- 論文 draft では `citation_evidence_reviewer` も別 instance にする
+- repo-changing task では、selected stage の subagent / specialist だけを明示し、候補 stage や未選択 reviewer を work にしない
+- `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は active な
+  distinct unresolved claim/risk がそれぞれ必要とした場合だけ選択し、選択した別 gate
+  の場合にだけ別 instance にする
+- 学術文章の notation / logic reviewer と論文 draft の citation evidence reviewer は候補であり、同じ owner、context、validation route で判定できる場合は active review instance を再利用し、distinct unresolved claim の場合だけ別 instance にする
 - 包括的開発では、parent が dependency order、wave plan、dependency-expanded disjoint write scope、integration order、review gate を handoff packet に載せます
 - 複数 writer を要する場合は、衝突 target を先行 / 後続 wave に分けます。安全に分離できる writer は同一 wave、追加判断が要る writer は current checkout 内の後続 wave へ直列化します
 - writer ごとの path / directory / object は `team_manifest.yaml` の write policy で管理します
-- required review を resolved にしてから `worker` 相当の実装を始める
-- tracked repo change がある task では、required review、validation、commit、`origin` への push を完了条件にする
+- selected owner/design review gate が resolved または not-needed になってから `worker`
+  相当の実装を始める
+- tracked repo change がある task では、selected review gate (when activated)、validation、
+  commit、`origin` への push を完了条件にする
+- standalone local source-branch push は reversible branch transport として、
+  verified remote identity/permission、named branch、commit/tree、SHA ref
+  push、remote `ls-remote` readback、push 前後の local identity 不変を
+  completion evidence にする。G1/G2/G3/PR lifecycle は生成・主張しない。
+  packet-bound push と PR mutation は既存 sealed 要件を使い、CI fresh-clone
+  fixture は通常 publication の証拠に数えない
 - tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行する。user が明示的に停止を指定した場合や external block がある場合は、理由を evidence に残す
 - planned work、review finding、validation、commit / push、shared canon sync、follow-up 判断の completion evidence を揃えて user-facing completion を返す
 - `verification.txt`、`closeout_gate.md`、`user_request_contract.md` の close 条件を満たして user-facing completion を返す

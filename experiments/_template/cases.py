@@ -6,6 +6,8 @@
 # @dependency-end
 """Template case-definition placeholder."""
 
-# IMPLEMENT HERE: define topic-specific cases, sweeps, or case factories.
-# Keep heavy imports out of this module when possible; worker-only dependencies
-# belong inside run.py run_case_worker() after process environment setup.
+# IMPLEMENT HERE: define domain cases for topic-owned reports only.
+# The managed route does not import this module as an execution entrypoint; it
+# adapts the selected topic main() into one external ExperimentRunner task.
+# Worker-only dependencies belong inside run.py run_case_worker() after the
+# frozen child environment has been installed.

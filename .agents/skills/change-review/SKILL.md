@@ -7,12 +7,22 @@ description: Use for code review, doc review, or AI-generated diff review when y
 contract skill
 responsibility Documents Change Review for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
+upstream design ../../../documents/rule/README.md document rule canon
+upstream design ../../../documents/design/README.md design canon reader route
 upstream design ../../../issues/README.md durable issue and GitHub mirror policy
 @dependency-end
 -->
 
 
 # Change Review
+
+## 文書正本
+
+文書の filename、配置、構成判断は
+[`documents/rule/README.md`](../../../documents/rule/README.md) を参照します。
+個別の target state と実装境界は
+[`documents/design/README.md`](../../../documents/design/README.md) を参照します。
+詳細規則はこの runtime shim に複製しません。
 
 ## Tool Commands
 
@@ -30,13 +40,23 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Read `agents/skills/change-review.md`.
 1. Review the actual diff first.
 1. Report findings before summaries.
+1. Treat reviewer output as hypotheses. The parent / integration owner is the
+   adjudicator; a reviewer cannot authorize edits, rollback, or publication.
+1. Accept a hypothesis only when it cites the current source snapshot, a
+   reachable input/control path, the violated request/design/behavior contract,
+   and a witness or static proof that changes the owner, edit, or validation
+   decision. Reject unreachable, stale, private/incidental, duplicate,
+   evidence-free, out-of-scope, or unproven design-conflict hypotheses with a
+   `reason_code` and `evidence_ref`; rejected hypotheses open no wave.
 1. Prioritize:
    - behavioral regressions
    - missing validation
    - missing tests
    - stale documentation
 1. For Python diffs that touch classes, dataclasses, `Protocol`, inheritance, public APIs, type boundaries, or dependency direction, add `python-review` and `$oop-readability-check`; require an OOP readability report with SOLID principle signal evidence plus `python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>` path coverage.
-1. Run `bash tools/agent_tools/run_repo_dependency_review.sh` against the full repository during checkpoint and final review; changed-file dependency checks alone are not enough.
+1. Use static checks and targeted validation first. Run the full repository
+   dependency review, full suite, or remote CI only once for the final candidate
+   when the touched contract requires it.
 1. Separate `fix now` from `follow-up`.
 1. For fixes made after validation failure, check that the diff records
    `failing_contract`, `observation_level`, `cause_classification`,
@@ -65,3 +85,7 @@ Execute the required and task-matching conditional commands that the packet prin
    In template or derived repo roots, `documents/...` is a logical AgentCanon
    path: resolve it under `vendor/agent-canon/documents/` unless
    `documents/README.md` lists the path as a template-owned active contract.
+1. One owning review gate may cover all claims in the same replaceable
+   responsibility. Add a specialist only for a distinct unresolved claim/risk
+   the owning gate cannot judge. Duplicate, stylistic, already-covered, or
+   witness-free findings are recorded without opening a repair wave.

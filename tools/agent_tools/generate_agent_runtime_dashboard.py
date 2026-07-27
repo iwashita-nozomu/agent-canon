@@ -23,7 +23,9 @@ import time
 from collections import Counter, defaultdict
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from pathlib import Path
 from typing import cast
 
@@ -95,13 +97,12 @@ MARKDOWN_TOOL_IDS = (
     "audit_and_fix_links.py",
     "fix_markdown_docs.py",
     "fix_markdown_headers.py",
-    "run_docs_checks.sh",
 )
 TOOL_SELECTION_ALIASES = {
     "docs check": "agent-canon-cli",
     "docs format": "agent-canon-cli",
-    "run_docs_checks.sh": "agent-canon-cli",
 }
+SELECTION_SOURCE_CANDIDATE_RE = re.compile(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*")
 SELECTION_EVIDENCE_TARGET = "compact report Selection Evidence Drilldown"
 MARKDOWN_EVIDENCE_TARGET = "compact report Markdown And Prompt Drilldown"
 PROMPT_TOOL_EVIDENCE_TARGET = "compact report Markdown And Prompt Drilldown"
@@ -1100,7 +1101,6 @@ class RuntimeDashboardVisuals:
             f"  ReferenceCapture[\"Reference capture<br/>urls: {summary.reference_capture_breakdown.url_observations}<br/>missing: {summary.reference_capture_breakdown.missing_url_observations}\"]",
             f"  WorkflowEval[\"Workflow selection evals<br/>reports: {family_count(summary, 'workflow-selection')}\"]",
             f"  ReportEval[\"Report quality evals<br/>reports: {family_count(summary, 'report-quality')}\"]",
-            f"  LocalLLM[\"Local LLM evals<br/>reports: {family_count(summary, 'local-llm-responsibility')}\"]",
             f"  RoleEval[\"Codex role evals<br/>reports: {family_count(summary, 'codex-agent-role')}\"]",
             f"  Issues[\"Durable issues<br/>open: {len(summary.evidence.open_issues)}<br/>closed: {len(summary.evidence.closed_issues)}\"]",
             "  Dashboard[\"Runtime dashboard<br/>read-only view\"]",
@@ -1126,7 +1126,6 @@ class RuntimeDashboardVisuals:
             "  ReferenceCapture --> Guide",
             "  WorkflowEval --> Dashboard",
             "  ReportEval --> Dashboard",
-            "  LocalLLM --> Dashboard",
             "  RoleEval --> Dashboard",
             "  Issues --> Dashboard",
             "  Dashboard --> Reviewer",
@@ -1157,11 +1156,6 @@ class RuntimeDashboardVisuals:
                 "report quality eval",
                 "report-quality",
                 "repair report-writing skill or reader-facing report outputs",
-            ),
-            self.family_row(
-                "local LLM eval",
-                "local-llm-responsibility",
-                "repair single-file responsibility prompt or local model harness",
             ),
             self.family_row(
                 "Codex role eval",
@@ -1315,7 +1309,6 @@ class AgentRuntimeDashboard:
         reader = ResultFamilyReader(self.root, self.recent_cutoff_epoch)
         result_families = (
             reader.read_family("skill-workflow-prompt"),
-            reader.read_family("local-llm-responsibility"),
             reader.read_family("workflow-selection"),
             reader.read_family("report-quality"),
             reader.read_family("codex-agent-role"),
@@ -2428,7 +2421,6 @@ def evidence_location_lines(root: Path) -> list[str]:
         "- agent_report_archive_index: `.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl`",
         "- agent_report_archive_command: `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`",
         "- skill_prompt_eval_reports: `.agent-canon/log-archive/eval-results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
-        "- local_llm_eval_reports: `.agent-canon/log-archive/eval-results/local-llm-responsibility/<eval-run-id>-<status>.md`",
         "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
         "- report_quality_eval_reports: `.agent-canon/log-archive/eval-results/report-quality/<eval-run-id>-<status>.md`",
         "- durable_issues: `issues/open/AC-*.md` and `issues/closed/AC-*.md`",
@@ -3405,7 +3397,6 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_HOOK_FILES={len(summary.hook_files)}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES={summary.hook_entries}",
         f"AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_REPORTS={family_count(summary, 'skill-workflow-prompt')}",
-        f"AGENT_RUNTIME_DASHBOARD_LOCAL_LLM_REPORTS={family_count(summary, 'local-llm-responsibility')}",
         f"AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_REPORTS={family_count(summary, 'workflow-selection')}",
         f"AGENT_RUNTIME_DASHBOARD_REPORT_QUALITY_REPORTS={family_count(summary, 'report-quality')}",
         f"AGENT_RUNTIME_DASHBOARD_CODEX_AGENT_ROLE_REPORTS={family_count(summary, 'codex-agent-role')}",
@@ -3919,7 +3910,11 @@ def read_candidate_selection_resets(
     """Return reset windows for existing candidate source paths."""
     resets: list[SelectionReset] = []
     for relative_path in selection_source_path_candidates(responsibility, name):
-        if (root / relative_path).exists():
+        try:
+            exists = (root / relative_path).exists()
+        except (OSError, ValueError):
+            continue
+        if exists:
             resets.append(read_selection_path_reset(root, relative_path))
     return tuple(resets)
 
@@ -3956,6 +3951,10 @@ def read_selection_path_reset(root: Path, relative_path: Path) -> SelectionReset
 def selection_source_path_candidates(responsibility: str, name: str) -> tuple[Path, ...]:
     """Return likely source paths for one skill, workflow, or tool."""
     slug = name.removeprefix("$")
+    if not _is_valid_selection_source_candidate(slug):
+        return ()
+    if responsibility in {"skill", "workflow"} and "/" in slug:
+        return ()
     if responsibility == "skill":
         return skill_source_path_candidates(slug)
     if responsibility == "workflow":
@@ -3985,6 +3984,8 @@ def workflow_source_path_candidates(slug: str) -> tuple[Path, ...]:
 
 def tool_source_path_candidates(slug: str) -> tuple[Path, ...]:
     """Return likely source paths for one tool name."""
+    if not _is_valid_selection_source_candidate(slug):
+        return ()
     if "/" in slug:
         return (Path(slug),)
     return (
@@ -3994,6 +3995,14 @@ def tool_source_path_candidates(slug: str) -> tuple[Path, ...]:
         Path("tools") / "docs" / slug,
         Path("tools") / "oop" / "python" / slug,
         Path("tools") / slug,
+    )
+
+
+def _is_valid_selection_source_candidate(value: str) -> bool:
+    """Return whether an evidence label can be projected as a repo-relative path."""
+    return bool(
+        SELECTION_SOURCE_CANDIDATE_RE.fullmatch(value)
+        and all(part not in {".", ".."} for part in value.split("/"))
     )
 
 

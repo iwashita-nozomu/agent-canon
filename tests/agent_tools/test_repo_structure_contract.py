@@ -156,10 +156,14 @@ class RepoStructureContractTest(unittest.TestCase):
             "ROOT_AGENTS.md",
             "AGENTS.md",
             "agents/TASK_WORKFLOWS.md",
+            "documents/rule/README.md",
+            "documents/rule/naming.md",
+            "documents/rule/directory-structure.md",
             "documents/shared-runtime-surfaces.toml",
             "documents/repo-structure-contract.toml",
             "tools/catalog.yaml",
             "rust/agent-canon/Cargo.toml",
+            "tools/agent_tools/update_lifecycle_contract.py",
         ]:
             self.write_file(root, file_path, f"{file_path}\n")
         for dir_path in [
@@ -167,6 +171,7 @@ class RepoStructureContractTest(unittest.TestCase):
             "agents/internal-routines",
             "agents/workflows",
             "agents/canonical",
+            "documents/rule",
             "documents/tools",
             "tools/agent_tools",
             "tools/user",
@@ -230,6 +235,18 @@ class RepoStructureContractTest(unittest.TestCase):
                     "type": "directory",
                     "name": "documents",
                     "contents": [
+                        {
+                            "type": "directory",
+                            "name": "rule",
+                            "contents": [
+                                {"type": "file", "name": "README.md"},
+                                {"type": "file", "name": "naming.md"},
+                                {
+                                    "type": "file",
+                                    "name": "directory-structure.md",
+                                },
+                            ],
+                        },
                         {"type": "directory", "name": "tools"},
                         {"type": "file", "name": "shared-runtime-surfaces.toml"},
                         {"type": "file", "name": "repo-structure-contract.toml"},
@@ -240,7 +257,16 @@ class RepoStructureContractTest(unittest.TestCase):
                     "name": "tools",
                     "contents": [
                         {"type": "file", "name": "catalog.yaml"},
-                        {"type": "directory", "name": "agent_tools"},
+                        {
+                            "type": "directory",
+                            "name": "agent_tools",
+                            "contents": [
+                                {
+                                    "type": "file",
+                                    "name": "update_lifecycle_contract.py",
+                                }
+                            ],
+                        },
                         {"type": "directory", "name": "user"},
                         {"type": "directory", "name": "internal"},
                         {"type": "directory", "name": "ci"},

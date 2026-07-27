@@ -7,13 +7,35 @@ description: Use when a report, experiment plan, Eval output, presentation story
 contract skill
 responsibility Documents Structure Planning runtime skill for this repository.
 upstream design ../../../agents/skills/structure-planning.md documents the human-facing structure planning workflow
+upstream design ../../../documents/rule/README.md document rule canon
+upstream design ../../../documents/design/README.md design canon reader route
 upstream design ../../../agents/skills/result-artifact-writeout.md defines raw result and summary artifact placement
 upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose graph structure evidence handoffs
 upstream design ../../../agents/workflows/slide-production-workflow.md defines PPT template, slot, and layout review workflow
+upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
+downstream implementation ../../../tests/agent_tools/test_check_dependency_headers.py validates this adapter dependency header.
 @dependency-end
 -->
 
 # Structure Planning
+
+## 文書正本
+
+文書の filename、配置、構成判断は
+[`documents/rule/README.md`](../../../documents/rule/README.md) を参照します。
+個別の target state と実装境界は
+[`documents/design/README.md`](../../../documents/design/README.md) を参照します。
+詳細規則はこの runtime shim に複製しません。
+
+## Visualization Adapter Boundary
+
+For every planned Mermaid, document, report, wiki, or browser graph, retain the
+structure contract as native planning evidence and call `$code-visualization`
+with the complete selected source set. Consume its
+`VisualizationSourceUniverse`, canonical `ToolCall`,
+`ProjectionCoverageManifest`, post-format readback, and final coverage status.
+This shim owns reader intent and layout only and does not duplicate universal
+omission or granularity rules.
 
 ## Tool Commands
 

@@ -18,6 +18,19 @@ It is `gh`-based for repository identity and PR operations, and uses `git push`
 only after `gh repo view` and `git remote get-url origin` agree on the same
 `owner/name`.
 
+The standalone `push` action is reversible branch transport, not correctness,
+review, or PR publication. With no packet file, it requires the verified remote
+identity/permission and a named current branch, captures local `HEAD`/tree,
+sends that commit with
+`git push -u --force-with-lease <remote> <commit-sha>:refs/heads/<branch>`, reads exactly one
+`git ls-remote <remote> refs/heads/<branch>` result, and verifies the remote SHA
+and unchanged local branch/HEAD/tree. It does not generate or claim G1/G2/G3 or
+PR lifecycle evidence; summaries use `publication_boundary=branch_transport_only`.
+If a sealed packet is supplied, its candidate identity is additionally checked
+and the summary retains the sealed publication evidence. Any identity mismatch
+is a typed `UserVisibleFailure`; there is no push API, alternate remote, or
+checkout fallback.
+
 The tool requires `--user-task` on every action. The compact stdout and optional
 `--summary-out` JSON include the task, repository, branch, remote verification,
 and next action. It rejects literal URL push, `.git/config` remote inference,
@@ -52,6 +65,12 @@ python3 tools/agent_tools/github_publish.py checks \
   --repo iwashita-nozomu/agent-canon \
   --pr <number-or-branch>
 ```
+
+CI fresh-clone fixtures validate clone/bootstrap or update behavior only. They
+are not ordinary publication evidence; publication evidence comes from the
+sealed lifecycle identity, the exact SHA ref push, and the remote readback.
+`publish-pr`, PR mutation, and merge remain packet/G1/G2/G3-bound operations;
+they reject a missing sealed packet.
 
 ## Hook Boundary
 

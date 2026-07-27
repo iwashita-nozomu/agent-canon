@@ -20,7 +20,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_runtime_dashboard.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from generate_agent_runtime_dashboard import HookWorkflowBreakdownReader  # noqa: E402
+from generate_agent_runtime_dashboard import (  # noqa: E402
+    HookWorkflowBreakdownReader,
+    tool_source_path_candidates,
+)
 from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
 
 DASHBOARD_PROMPT_CHAR_COUNT = 27
@@ -241,7 +244,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "AGENT_RUNTIME_DASHBOARD_HOOK_FILES=3",
             "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=6",
             "skill-workflow-prompt",
-            "local-llm-responsibility",
             "workflow-selection",
             "test-container",
             "environment-maintenance",
@@ -557,7 +559,57 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         )
         self.assertNotIn("| `tool` | `docs check` |", dashboard)
         self.assertNotIn("| `tool` | `docs format` |", dashboard)
-        self.assertNotIn("| `tool` | `run_docs_checks.sh` |", dashboard)
+
+    def test_invalid_tool_selection_label_does_not_abort_dashboard(self) -> None:
+        """Regex-like tool labels stay aggregate evidence without a reset path."""
+        invalid_tool = "pattern='AGENT_CANON_LLAMA_CPP|...'"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            hook_dir = (
+                mounted_log_archive_root(root)
+                / "hook-runs"
+                / repo_log_key(root)
+                / "test-container"
+            )
+            with (hook_dir / "skill_usage.jsonl").open("a", encoding="utf-8") as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "hook_run_id": "hook-invalid-tool-label",
+                            "hook_log_namespace": "test-container",
+                            "event": "UserPromptSubmit",
+                            "status": "pass",
+                            "payload_fingerprint": "payload-invalid-tool-label",
+                            "timestamp": "2026-05-17T01:02:07Z",
+                            "candidate_tools": [invalid_tool],
+                        }
+                    )
+                    + "\n"
+                )
+            output = root / "reports" / "dashboard.md"
+
+            self.assertEqual(tool_source_path_candidates(invalid_tool), ())
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            dashboard = output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "| `tool` | `pattern='AGENT_CANON_LLAMA_CPP|...'` | `0` | `1` | `1` |",
+            dashboard,
+        )
 
     def test_selection_metrics_ignore_related_only_skill_candidates(self) -> None:
         """Related skill hints should not inflate missed skill selections."""
@@ -658,14 +710,13 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         archive = mounted_log_archive_root(root)
         hook_dir = archive / "hook-runs" / repo_log_key(source) / "test-container"
         skill_dir = archive / "eval-results" / "skill-workflow-prompt"
-        local_llm_dir = archive / "eval-results" / "local-llm-responsibility"
         workflow_dir = archive / "eval-results" / "workflow-selection"
         evals_dir = root / "agents" / "evals"
         evals_dir.mkdir(parents=True)
         (evals_dir / "README.md").write_text("# Eval Fixture\n", encoding="utf-8")
-        self.create_fixture_dirs(root, hook_dir, skill_dir, local_llm_dir, workflow_dir)
+        self.create_fixture_dirs(root, hook_dir, skill_dir, workflow_dir)
         self.write_issue_memory_fixture(root)
-        self.write_eval_report_fixture(skill_dir, local_llm_dir, workflow_dir)
+        self.write_eval_report_fixture(skill_dir, workflow_dir)
         self.write_hook_fixture(hook_dir)
         self.write_workflow_monitor_fixture(root)
 
@@ -674,11 +725,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         root: Path,
         hook_dir: Path,
         skill_dir: Path,
-        local_llm_dir: Path,
         workflow_dir: Path,
     ) -> None:
         """Create fixture directories."""
-        for directory in (hook_dir, skill_dir, local_llm_dir, workflow_dir):
+        for directory in (hook_dir, skill_dir, workflow_dir):
             directory.mkdir(parents=True)
         (root / "issues" / "open").mkdir(parents=True)
         (root / "issues" / "closed").mkdir(parents=True)
@@ -709,7 +759,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
     def write_eval_report_fixture(
         self,
         skill_dir: Path,
-        local_llm_dir: Path,
         workflow_dir: Path,
     ) -> None:
         """Write eval report fixture files."""
@@ -719,10 +768,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         )
         (skill_dir / "skill-eval-test-fail-md-style-check.md").write_text(
             "- used_skills: `md-style-check`\nEVAL_STATUS=fail\n",
-            encoding="utf-8",
-        )
-        (local_llm_dir / "local-llm-eval-20260517T010203040506Z-1234567890-pass.md").write_text(
-            "LOCAL_LLM_EVAL_STATUS=pass\n",
             encoding="utf-8",
         )
         (workflow_dir / "workflow-selection-eval-20260517T010203040506Z-1234567890-pass.md").write_text(
@@ -939,7 +984,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                         "status": "pass",
                         "payload_fingerprint": "payload-tool-alias-candidate",
                         "timestamp": "2026-05-17T01:02:04Z",
-                        "candidate_tools": ["run_docs_checks.sh", "docs check", "docs format"],
+                        "candidate_tools": ["docs check", "docs format"],
                     }
                 )
                 + "\n"

@@ -5,7 +5,9 @@ contract skill
 responsibility Documents task-routing skill.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/tool-skill-routing-refactor.md short tool and skill naming policy
+upstream design ./agent-orchestration.md owns Decision Sufficiency policy and verdict validation
 downstream implementation ../../tools/agent_tools/route.py selects short routing areas
+downstream implementation ../../tools/agent_tools/agent_team.py materializes route ToolCall tokens
 @dependency-end
 -->
 
@@ -50,6 +52,26 @@ runtime feedback では、prompt routing の結果を入口にし、観測 evide
 
 ## Standard Command
 
+Consume the semantic decision-sufficiency record before selecting a route. It
+must identify the owner, replaceable unit, implementation mechanism, validation
+route, and any unresolved branch that could change them. A handoff message or
+tool result is sufficient; `run.decision_sufficiency.packet_ref` is used only
+when coordination or resumption needs durable state. This skill forwards the
+record and does not create a second sufficiency form or threshold policy.
+
+Executable routing is supplied directly in
+`run.repo_tool_routing_policy.*.tool_call_token` when a route operation is
+selected. The canonical route token has
+`tool_id=route`, an `agent-canon.route.args.v1` argument schema, typed
+arguments, intent, and typed failure semantics. The selected-skill packet token
+has `tool_id=skill-tool-commands` and
+`agent-canon.skill-tool-commands.args.v1`. Do not reconstruct either token as a
+prose shell command.
+
+Model/profile policy and implementation capacity are not `route.py` policy.
+Use the canonical model-profile/materializer and capacity-handshake owners for
+those projections; `route.py` remains the public skill-route composer.
+
 ```bash
 python3 tools/agent_tools/route.py --area checks --changed <path>
 python3 tools/agent_tools/route.py --name profile_surface_resolver.py
@@ -64,24 +86,30 @@ python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format t
 - `NEXT_ACTION`
 - `COMMANDS`
 - `EVIDENCE`
+- `DECISION_SUFFICIENCY_PACKET_REF`
+- owner-produced semantic sufficiency fields: `owner`, `replaceable_unit`,
+  `implementation_mechanism`, `validation_route`, and `unresolved_branch`
+- machine-readable `TOOL_CALL_TOKEN`
 - prompt routing の場合は `MODE`, `SKILLS`, `ACTIVE_SKILLS`,
   `DEFERRED_SKILLS`, `MATCHED_SKILLS`, `RELATED_SKILL_CANDIDATES`,
   `RELATED_SKILLS`, `REASONS`
+
+## Activation Boundary
+
+Task-catalog roles, default review packs, and related-skill candidates are
+candidate evidence, not automatic work. Activate an owner-critical skill before
+its edit, artifact, PR, pin, or integration operation. Activate a reviewer only
+when the selected validation or unresolved branch needs that review. Deferred
+candidates do not create packets, waves, or follow-up work.
 
 Long candidate names are aliases. Do not create a new public tool or skill
 until `route.py --name <candidate>` returns `STATUS=unknown` and the missing
 route is genuinely reusable.
 
-Runtime skill command packets are owned by `skill_tool_commands.py`. Use
-`python3 tools/agent_tools/skill_tool_commands.py check` when changing
-`.agents/skills/*/SKILL.md` files.
-Run bootstrap surfaces publish the selected-skill command packets under
-`run.repo_tool_routing_policy`. The sequential order is:
-`show_skill_packet`, `required_commands`, `task_matching_conditional_commands`,
-`validation_commands`. Related skill candidates remain dynamic triggers; when a
-candidate becomes active, regenerate that skill's command packet with
-`python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text`
-before continuing the handoff.
+Runtime route tokens are materialized by `agent_team.py` under
+`run.repo_tool_routing_policy`. Related skill candidates remain dynamic
+triggers; activation materializes a new token and retains the same owner DSV
+verdict unless changed input creates a successor decision.
 
 ## Official System Skill Delegation
 

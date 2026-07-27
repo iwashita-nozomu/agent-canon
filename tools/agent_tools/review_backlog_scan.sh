@@ -332,7 +332,6 @@ run_scope_checks() {
           --root "$scope_root" \
           --format markdown \
           --include-snippets \
-          --min-score 0 \
           --exclude .git \
           "${excludes[@]}" \
           "${paths[@]}"
@@ -343,7 +342,6 @@ run_scope_checks() {
           --root "$scope_root" \
           --format markdown \
           --include-snippets \
-          --min-score 0 \
           --exclude .git \
           "${excludes[@]}" \
           "${paths[@]}"

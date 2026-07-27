@@ -1,13 +1,51 @@
 # @dependency-start
 # contract registry
 # responsibility Maps task identifiers to workflow and review defaults.
+# upstream design skills/agent-orchestration.md execution-time-aware work-conservation owner
 # downstream design canonical/CODEX_WORKFLOW.md workflow consumes task routing catalog
 # downstream design canonical/CODEX_SUBAGENTS.md Codex subagent inventory consumes task routing
+# downstream design templates/schedule.md execution-time-aware schedule projection
 # downstream implementation ../.codex/config.toml Codex runtime config consumes task routing
 # @dependency-end
 version: 2
 
+review_activation_policy:
+  mode: candidate_only
+  owner_gate_cardinality: one_gate_per_replaceable_responsibility
+  specialist_activation: distinct_unresolved_claim_or_risk_only
+  task_default_specialists: candidate_only
+  default_review_packs: candidate_only
+  test_design:
+    activation: post_implementation_unresolved_oracle_or_failure_risk_only
+    test_plan_required: only_when_activation_required
+    existing_tests: evidence_not_first_edit_surface
+    checker_owned_properties: route_to_static_or_deterministic_checker
+    private_helpers_and_incidental_apis: do_not_freeze
+  review_finding_rework:
+    rework_when: behavior_owner_boundary_correctness_validation_or_publication_changes
+    record_without_new_wave: duplicate_stylistic_already_covered_or_evidence_free
+  validation:
+    order: static_then_targeted
+    full_suite_or_remote_ci: final_candidate_only_when_touched_contract_requires
+  artifacts:
+    empty_reviewer_or_template_files: do_not_materialize
+
+execution_time_policy:
+  owner_ref: "agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract"
+  applies_to: repo-changing execution
+  projection: agents/templates/schedule.md#Execution-Time-Aware Plan
+  executable_fields:
+    - dependency_dag
+    - makespan_objective
+    - responsibility_completeness
+    - correctness
+    - critical_path
+    - ready_set
+    - context_reuse
+    - affected_evidence_invalidation
+
 role_topology_defaults: &standard_role_topology
+  capacity_derivation: declared_team_peak_plus_nested_reservations_v1
   role_families:
     intake:
       - requirements_organizer
@@ -151,19 +189,23 @@ workflow_families:
       purpose: Prompt packet for owner-bounded fixes whose replaceable unit, public-impact boundary, and local validation route are already evidenced.
       prompt_preamble:
         - Treat this as an owner-bounded fix; route to `scoped_change` when public API, dependency, workflow, or specification interpretation is involved.
-        - Start from the run bundle, user_request_contract.md, schedule.md, and team_manifest.yaml; do not rely on chat-only summaries.
+        - Start from the structured handoff; use user_request_contract.md, schedule.md, and team_manifest.yaml only when the selected coordination or resumption route materializes them.
         - Include request_clause_ids, expected artifact path, parent-assigned write scope, validation command, and next review gate in every handoff.
       workflow_focus:
-        - Start from the catalog-owned intake role and `worker` default; add `explorer` and language-specific reviewers only from their evidence gates. Add `test_designer` only through the post-implementation risk handoff after the owning mechanism is established or repaired, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>` recorded in stdout and the manifest.
+        - Treat catalog intake roles, `worker`, `explorer`, language-specific reviewers, and review packs as candidates. Activate only the owner-critical implementation route or a distinct unresolved claim/risk. Add `test_designer` only after the owning mechanism is established or repaired and an unresolved oracle/specification/regression/failure-mode risk remains outside static analysis, checkers, and targeted validation; select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>` recorded in stdout and the manifest.
         - Keep this route only when the run's abstract responsibility frame derives a bounded implementation slice with public interface unchanged, no dependency change, no specification interpretation, and local validation. File count is not enough to select or keep this route.
-        - Require detailed design review approval before implementation handoff for any produced `design_brief.md` or equivalent detailed design artifact; document-flow and broad design review stay tied to reader-facing docs, new terms, public APIs, or workflow surfaces.
+        - Activate design, document-flow, and broad review only when an unresolved owner/design/reader-facing claim requires it. A produced design artifact does not by itself create a separate review wave; one owning review gate may cover the responsibility.
         - Escalate to `scoped_change` when the owner boundary is non-obvious, validation is cross-module, or the diff-triage reviewer returns escalate.
       reviewer_prompt:
         - Prefer language-specific and diff-triage findings before broad review.
         - Block completion if validation is missing, request clauses are not mapped, or write scope expanded beyond the owner-bounded route.
-    spawn_budget:
-      active_subagents: 4
-      max_write_subagents: 2
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
     role_topology: *standard_role_topology
     roles:
       always_on:
@@ -184,10 +226,10 @@ workflow_families:
   - id: scoped_change
     name: Scoped Change
     subagent_prompt:
-      purpose: Prompt packet for owner-bounded repo changes that still need the full staged gate sequence.
+      purpose: Prompt packet for owner-bounded repo changes whose selected owner gate needs more than the local route.
       prompt_preamble:
         - Treat this template repository as the default implementation starting point; do not route work to another repository unless the parent explicitly says so.
-        - Start from the run bundle, user_request_contract.md, schedule.md, and team_manifest.yaml; do not rely on chat-only summaries.
+        - Start from the structured handoff; use the run bundle, user_request_contract.md, schedule.md, and team_manifest.yaml only when selected coordination or resumption requires them.
         - Include request_clause_ids, expected artifact path, parent-assigned write scope, validation command, and next review gate in every handoff.
       workflow_focus:
         - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide their named findings, while the parent owns integration and final approval.
@@ -198,10 +240,14 @@ workflow_families:
         - Treat one fix, chunk, or checkpoint as internal progress until every active clause and planned work unit is complete.
       reviewer_prompt:
         - Verify behavior, tests, docs, and request-clause coverage rather than only checking style.
-        - Block completion if validation is only partial or if review findings were recorded but not integrated.
-    spawn_budget:
-      active_subagents: 4
-      max_write_subagents: 2
+        - Rework only findings that change requested behavior, owner/design boundary, correctness, validation, or publication state. Record duplicate, stylistic, already-covered, or evidence-free findings without opening a new wave; block completion only when an active claim remains unvalidated or unresolved.
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
     role_topology: *standard_role_topology
     roles:
       always_on:
@@ -232,7 +278,7 @@ workflow_families:
       prompt_preamble:
         - Treat this template repository as the default implementation starting point; external sources inform the work but do not replace repo-local artifacts.
         - Emit the skill call sequence with literature-survey before research-workflow when primary sources, prior art, official docs, or source-backed implementation claims are used; carry the source packet and adoption/exclusion decisions into design, implementation, benchmark, and report handoffs.
-        - Start from the run bundle, user_request_contract.md, schedule.md, research_notes.md or cited sources, and team_manifest.yaml.
+        - Start from the structured handoff; use the run bundle, user_request_contract.md, schedule.md, research_notes.md, cited sources, and team_manifest.yaml only when the selected research or coordination route requires them.
         - Separate correctness evidence, performance evidence, and reporting claims in the handoff.
       workflow_focus:
         - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide their named findings, while the parent owns integration and final approval.
@@ -244,10 +290,14 @@ workflow_families:
         - Preserve provenance: commands, seeds, environment, raw result paths, and rerun instructions.
       reviewer_prompt:
         - Block overclaims, spot/debug/partial evidence used as formal evidence, missing baselines, and missing reproducibility artifacts.
-        - For paper-like work, keep citation/evidence, notation, logic, and document-flow review as separate passes.
-    spawn_budget:
-      active_subagents: 4
-      max_write_subagents: 2
+        - For paper-like work, split citation/evidence, notation, logic, and document-flow review only when each is a distinct unresolved claim; otherwise one owning review gate may cover the responsibility.
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
     role_topology: *standard_role_topology
     roles:
       always_on:
@@ -293,7 +343,7 @@ workflow_families:
       purpose: Prompt packet for multi-surface delivery, new feature work, and large refactors.
       prompt_preamble:
         - Treat this template repository as the default implementation starting point and keep durable product state in canonical current-tree paths only.
-        - Start from the run bundle, user_request_contract.md, schedule.md, design_brief.md, and team_manifest.yaml.
+        - Start from the structured handoff; use the run bundle, user_request_contract.md, schedule.md, design_brief.md, and team_manifest.yaml only when selected coordination or resumption requires them.
         - Name the milestone, chunk, request_clause_ids, write scope, rollback point, and next gate in each handoff.
       workflow_focus:
         - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide their named findings, while the parent owns integration and final approval.
@@ -305,9 +355,13 @@ workflow_families:
       reviewer_prompt:
         - Block hidden semantic changes, incomplete path mapping, stale docs, and parallel durable truth surfaces.
         - Verify every chunk maps back to the umbrella completion boundary.
-    spawn_budget:
-      active_subagents: 4
-      max_write_subagents: 2
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
     role_topology: *standard_role_topology
     roles:
       always_on:
@@ -339,7 +393,7 @@ workflow_families:
       purpose: Prompt packet for Docker, CI, dependency, runtime, and development-environment changes.
       prompt_preamble:
         - Treat this template repository as the default implementation starting point; environment changes must support the template workflow first.
-        - Start from the run bundle, environment_change_proposal.md, user_request_contract.md, schedule.md, and team_manifest.yaml.
+        - Start from the structured handoff; use the run bundle, environment_change_proposal.md, user_request_contract.md, schedule.md, and team_manifest.yaml only when selected coordination or resumption requires them.
         - State the triggering code requirement, blocked command, source-of-truth surface, rollback path, and validation command in every handoff.
       workflow_focus:
         - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide their named findings, while the parent owns integration and final approval.
@@ -350,9 +404,13 @@ workflow_families:
       reviewer_prompt:
         - Block environment changes without a code requirement, rollback path, or validation evidence.
         - Verify docs, CI, Docker packs, and local developer commands remain aligned.
-    spawn_budget:
-      active_subagents: 4
-      max_write_subagents: 2
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
     role_topology: *standard_role_topology
     roles:
       always_on:
@@ -384,7 +442,7 @@ workflow_families:
       purpose: Prompt packet for repo-wide workflow, tooling, runtime, docs, and canon rearchitecture.
       prompt_preamble:
         - Treat this template repository as the default implementation starting point and the integration reference for derived repos.
-        - Start from the run bundle, user_request_contract.md, schedule.md, project_review.md, docs_workflow_review.md, and team_manifest.yaml.
+        - Start from the structured handoff; use the run bundle, user_request_contract.md, schedule.md, project_review.md, docs_workflow_review.md, and team_manifest.yaml only when selected coordination or resumption requires them.
         - Name all affected surfaces, request_clause_ids, canonical paths, expected validation, and next review gate in every handoff.
       workflow_focus:
         - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide their named findings, while the parent owns integration and final approval.
@@ -398,9 +456,13 @@ workflow_families:
       reviewer_prompt:
         - Block changes that work only for the touched diff but leave task catalog, starter tools, mirrors, docs, tests, or runtime validation stale.
         - Verify all workflow families and task ids still bootstrap with usable prompt, packet, role, and validation metadata.
-    spawn_budget:
-      active_subagents: 4
-      max_write_subagents: 2
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
     role_topology: *standard_role_topology
     roles:
       always_on:
@@ -438,7 +500,7 @@ workflow_families:
       purpose: Prompt packet for backlog-driven tuning, exploration, and repeated experiment-backed improvement.
       prompt_preamble:
         - Treat this template repository as the default implementation starting point; each improvement pass must still be a traceable waterfall slice.
-        - Start from the run bundle, backlog or decision-state artifact, user_request_contract.md, schedule.md, and team_manifest.yaml.
+        - Start from the structured handoff; use the run bundle, backlog or decision-state artifact, user_request_contract.md, schedule.md, and team_manifest.yaml only when selected coordination or resumption requires them.
         - State backlog item, hypothesis, run protocol, success metric, stopping rule, and next decision gate in every handoff.
       workflow_focus:
         - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide their named findings, while the parent owns integration and final approval.
@@ -449,9 +511,13 @@ workflow_families:
       reviewer_prompt:
         - Block progress claims from spot runs, partial runs, raw failure counts, or unreviewed protocol changes.
         - Verify the backlog, decision state, reproducibility evidence, and carry-over notes are current.
-    spawn_budget:
-      active_subagents: 4
-      max_write_subagents: 2
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
     role_topology: *standard_role_topology
     roles:
       always_on:
@@ -501,9 +567,13 @@ workflow_families:
       reviewer_prompt:
         - Verify that the evaluation route has no default worker, spark_worker, or reviewer wave.
         - Verify that the evaluator model and read-only/fresh policy remain unchanged.
-    spawn_budget:
-      active_subagents: 1
-      max_write_subagents: 1
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
     role_topology: *standard_role_topology
     roles:
       always_on: []

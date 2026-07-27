@@ -6,6 +6,7 @@
 # upstream implementation ../../tools/agent_tools/parent_repo_readiness.py checks parent repo surfaces
 # upstream implementation ../../tools/agent_tools/surface_manifest.py parses shared surface manifest
 # upstream design ../../documents/shared-runtime-surfaces.toml shared runtime surface manifest
+# upstream design ../../documents/gpu-admission-r5-source-packet.md runtime identity receipt and shared-surface test contract
 # @dependency-end
 
 from __future__ import annotations
@@ -67,6 +68,52 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("PARENT_REPO_READINESS=pass", result.stdout)
             self.assertFalse((root / ".codex" / "project-skills").exists())
+
+    def test_runtime_identity_receipt(self) -> None:
+        """Readiness fails when a script-owned runtime identity receipt edge is absent."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_parent_fixture(root)
+            linked_devcontainer = root / ".devcontainer"
+            linked_devcontainer.unlink()
+            shutil.copytree(PROJECT_ROOT / ".devcontainer", linked_devcontainer)
+            (linked_devcontainer / "finalize-shared-runtime.sh").unlink()
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "PARENT_REPO_READINESS_FINDING=error:runtime_identity_receipt:"
+                ".devcontainer/finalize-shared-runtime.sh:missing-file",
+                result.stdout,
+            )
+
+    def test_shared_surface_receipt(self) -> None:
+        """The shared devcontainer surface carries both exact identity receipt owners."""
+        manifest = load_manifest(
+            PROJECT_ROOT,
+            ".",
+            "documents/shared-runtime-surfaces.toml",
+        )
+        devcontainer = next(
+            entry for entry in manifest.entries if entry.path == ".devcontainer"
+        )
+
+        self.assertEqual(devcontainer.mode, "symlink")
+        self.assertTrue(
+            (
+                PROJECT_ROOT
+                / devcontainer.source_or_default()
+                / "bootstrap-shared-runtime.sh"
+            ).is_file()
+        )
+        self.assertTrue(
+            (
+                PROJECT_ROOT
+                / devcontainer.source_or_default()
+                / "finalize-shared-runtime.sh"
+            ).is_file()
+        )
 
     def test_regular_specs_skip_optional_project_skill_lane(self) -> None:
         """Optional project content should not be materialized by link-root."""

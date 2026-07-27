@@ -25,15 +25,18 @@ PLAN_REMOTE_OVERRIDE_URL="${AGENT_CANON_PLAN_REMOTE_URL:-}"
 CANONICAL_AGENT_CANON_REMOTE_URL="${AGENT_CANON_GITHUB_REMOTE_URL:-https://github.com/iwashita-nozomu/agent-canon.git}"
 SURFACE_MANIFEST="${AGENT_CANON_SURFACE_MANIFEST:-documents/shared-runtime-surfaces.toml}"
 PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
+COMMIT_AUTOMATION_AUTHOR_NAME="AgentCanon Sync Automation"
+COMMIT_AUTOMATION_AUTHOR_EMAIL="agent-canon-sync@automation.invalid"
+COMMIT_PROVENANCE_NEXT_ACTION="set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex> and rerun the same command"
 
 usage() {
   cat <<EOF
 Usage:
   bash tools/sync_agent_canon.sh plan [branch]
-  bash tools/sync_agent_canon.sh link-root
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root
   bash tools/sync_agent_canon.sh check
-  bash tools/sync_agent_canon.sh submodule-add <remote-url> [branch]
-  bash tools/sync_agent_canon.sh ensure-latest [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh submodule-add <remote-url> [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh ensure-latest [branch]
   bash tools/sync_agent_canon.sh status
 
 Legacy subtree / snapshot / direct push routes are compatibility-only and are
@@ -74,6 +77,26 @@ require_protected_git_authority() {
   echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
   echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
   die "protected AgentCanon update requires inherited branch/worktree and explicit destructive approval authority"
+}
+
+require_commit_request_evidence() {
+  local mode="$1"
+  local evidence="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE:-}"
+
+  if [[ "$evidence" =~ ^evidence:[0-9a-f]{64}$ ]]; then
+    return 0
+  fi
+
+  echo "COMMIT_PROVENANCE_GUARD=block"
+  echo "AGENT_CANON_COMMIT_PROVENANCE_SUBCOMMAND=$mode"
+  echo "NEXT_ACTION=$COMMIT_PROVENANCE_NEXT_ACTION"
+  die "auto-commit requires AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>"
+}
+
+require_commit_provenance() {
+  local mode="$1"
+  require_protected_git_authority "$mode"
+  require_commit_request_evidence "$mode"
 }
 
 resolve_remote_branch_sha() {
@@ -390,7 +413,8 @@ regular_path() {
   local source="${2:-}"
   local abs_path="$ROOT_DIR/$path"
   local abs_source=""
-  if [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+  if [ -e "$abs_path" ] && [ ! -L "$abs_path" ] \
+    && { [ "$path" != ".vscode" ] || [ -d "$abs_path" ]; }; then
     return
   fi
   [ -n "$source" ] || die "regular path '$path' is missing or is a symlink and has no seed source"
@@ -481,6 +505,15 @@ cmd_link_root() {
   ensure_surface_sync_safe "$force"
 
   local spec=""
+  # Materialize regular containers before child links. This converts legacy
+  # whole-directory symlinks first, so child operations cannot delete files in
+  # the AgentCanon source checkout through the old directory link.
+  while IFS= read -r spec; do
+    local path="${spec%%:*}"
+    local source="${spec#*:}"
+    regular_path "$path" "$source"
+  done < <(build_regular_specs)
+
   while IFS= read -r spec; do
     local path="${spec%%:*}"
     local target="${spec#*:}"
@@ -492,12 +525,6 @@ cmd_link_root() {
     local source="${spec#*:}"
     copy_path "$path" "$source"
   done < <(build_copy_specs)
-
-  while IFS= read -r spec; do
-    local path="${spec%%:*}"
-    local source="${spec#*:}"
-    regular_path "$path" "$source"
-  done < <(build_regular_specs)
 
   while IFS= read -r path; do
     [ -n "$path" ] || continue
@@ -554,7 +581,8 @@ cmd_check() {
   while IFS= read -r spec; do
     local path="${spec%%:*}"
     local abs_path="$ROOT_DIR/$path"
-    if [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+    if [ -e "$abs_path" ] && [ ! -L "$abs_path" ] \
+      && { [ "$path" != ".vscode" ] || [ -d "$abs_path" ]; }; then
       continue
     fi
     if [ -L "$abs_path" ]; then
@@ -589,7 +617,7 @@ cmd_check() {
   fi
 
   if [ "$failed" -ne 0 ]; then
-    die "shared surface drift detected; run 'bash tools/sync_agent_canon.sh link-root'"
+    die "shared surface drift detected; set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and rerun 'bash tools/sync_agent_canon.sh link-root'"
   fi
 
   echo "shared surface is in sync"
@@ -622,6 +650,8 @@ commit_sync_paths_if_needed() {
   local -a owned_paths=("$PREFIX")
   local spec=""
 
+  require_commit_provenance "commit-sync-paths"
+
   while IFS= read -r spec; do
     [ -n "$spec" ] || continue
     owned_paths+=("${spec%%:*}")
@@ -643,12 +673,36 @@ commit_sync_paths_if_needed() {
     return
   fi
 
+  GIT_AUTHOR_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
+  GIT_AUTHOR_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
+  GIT_COMMITTER_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
+  GIT_COMMITTER_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
   git -C "$ROOT_DIR" commit --only \
     -m "chore: sync agent-canon snapshot" \
-    -m "agent-canon-remote: $remote_sha" \
-    -m "agent-canon-update-method: $method" \
-    -m "agent-canon-prefix: $PREFIX" \
+    --trailer "AgentCanon-Automation-Actor=agent-canon-sync" \
+    --trailer "AgentCanon-Authority-Source=${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY}" \
+    --trailer "AgentCanon-Destructive-Authority=${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY}" \
+    --trailer "AgentCanon-Request-Evidence=${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
+    --trailer "AgentCanon-Remote=$remote_sha" \
+    --trailer "AgentCanon-Update-Method=$method" \
+    --trailer "AgentCanon-Prefix=$PREFIX" \
     -- "${owned_paths[@]}"
+}
+
+automation_commit_message() {
+  local remote_sha="$1"
+  local method="$2"
+  cat <<EOF
+chore: sync agent-canon snapshot
+
+AgentCanon-Automation-Actor: agent-canon-sync
+AgentCanon-Authority-Source: ${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY}
+AgentCanon-Destructive-Authority: ${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY}
+AgentCanon-Request-Evidence: ${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}
+AgentCanon-Remote: ${remote_sha}
+AgentCanon-Update-Method: ${method}
+AgentCanon-Prefix: ${PREFIX}
+EOF
 }
 
 find_commit_by_tree() {
@@ -847,7 +901,7 @@ print_plan_summary() {
   echo "agent_canon_plan_dirty_update_surface=$dirty_update_surface"
   echo "agent_canon_plan_route=$route"
   echo "agent_canon_plan_requires_clean=$requires_clean"
-  echo "agent_canon_plan_apply_command=bash tools/sync_agent_canon.sh ensure-latest $branch"
+  echo "agent_canon_plan_apply_command=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh ensure-latest $branch"
 }
 
 print_submodule_plan_details() {
@@ -1069,6 +1123,7 @@ pull_or_import_snapshot() {
   local remote_sha="$3"
   local local_tree="$4"
   local pull_log=""
+  local commit_message=""
 
   if ! has_subtree_metadata; then
     echo "agent_canon_subtree_pull=skipped_no_subtree_metadata"
@@ -1077,7 +1132,13 @@ pull_or_import_snapshot() {
   fi
 
   pull_log="$(mktemp)"
-  if git -C "$ROOT_DIR" subtree pull --prefix="$PREFIX" "$REMOTE_NAME" "$remote_sha" --squash >"$pull_log" 2>&1; then
+  commit_message="$(automation_commit_message "$remote_sha" "subtree_pull")"
+  if GIT_AUTHOR_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
+    GIT_AUTHOR_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
+    GIT_COMMITTER_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
+    GIT_COMMITTER_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
+    git -C "$ROOT_DIR" subtree pull --prefix="$PREFIX" "$REMOTE_NAME" "$remote_sha" \
+    --squash --message="$commit_message" >"$pull_log" 2>&1; then
     cat "$pull_log"
     rm -f "$pull_log"
     echo "agent_canon_update_method=subtree_pull"
@@ -1095,10 +1156,17 @@ pull_or_import_snapshot() {
 cmd_add() {
   local remote_url="$1"
   local branch="${2:-$DEFAULT_BRANCH}"
+  local remote_sha=""
   require_clean_worktree
   ensure_remote "$remote_url"
   git -C "$ROOT_DIR" fetch --no-write-fetch-head "$REMOTE_NAME" "$branch"
-  git -C "$ROOT_DIR" subtree add --prefix="$PREFIX" "$REMOTE_NAME" "$branch" --squash
+  remote_sha="$(git -C "$ROOT_DIR" rev-parse --verify "$REMOTE_NAME/$branch^{commit}")"
+  GIT_AUTHOR_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
+  GIT_AUTHOR_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
+  GIT_COMMITTER_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
+  GIT_COMMITTER_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
+    git -C "$ROOT_DIR" subtree add --prefix="$PREFIX" "$REMOTE_NAME" "$branch" \
+    --squash --message="$(automation_commit_message "$remote_sha" "subtree_add")"
   cmd_link_root 1
 }
 
@@ -1416,9 +1484,11 @@ main() {
   cd "$ROOT_DIR"
 
   local subcommand="${1:-}"
-  if [ "$subcommand" = "ensure-latest" ]; then
-    require_protected_git_authority "$subcommand"
-  fi
+  case "$subcommand" in
+    add|submodule-add|pull|ensure-latest|link-root|snapshot)
+      require_commit_provenance "$subcommand"
+      ;;
+  esac
   case "$subcommand" in
     link-root)
       cmd_link_root

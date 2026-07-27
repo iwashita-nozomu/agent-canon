@@ -3,29 +3,104 @@
 # contract tool
 # responsibility Provides run managed experiment experiment workflow tooling.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 composition and terminal frame
+# upstream design ../../documents/experiment_runner.md external ExperimentRunner ownership and task boundary
+# upstream implementation ./execution_resource_plan.py canonical admission planning and terminal owner
+# upstream implementation ../../documents/experiment-runner-ff97-lifecycle.md fixed ff97 StandardRunner lifecycle and scheduler source identity
+# downstream implementation ../../documents/gpu-admission-r5-ordered-integration-interface.json ordered W2-W4 interface
+# downstream implementation ../../experiments/_template/run.py exposes the topic main adapted from the frozen snapshot
+# downstream implementation ../../tests/tools/test_run_managed_experiment.py validates the sole composition and frozen topic adapter
+# upstream design ../../documents/gpu-admission-r5-nvidia-visibility.md NVIDIA process/PID/MIG/UUID visibility gate
 # @dependency-end
+
+# Static route evidence: run_cli -> execute_managed_run ->
+# StandardFullResourceScheduler.from_worker -> StandardRunner.run(worker) ->
+# terminal reducers -> cleanup. Alternate managed GPU launch routes: none; the
+# fixed opaque-UUID composition is the only managed route.
 
 """Run one experiment while recording canonical server-side run metadata."""
 
 from __future__ import annotations
 
 import argparse
+from contextlib import AbstractContextManager
 import hashlib
 import json
 import os
 import platform
+import runpy
 import shlex
 import shutil
 import socket
 import subprocess
 import sys
-import threading
 import time
-import tomllib
-from dataclasses import dataclass
-from datetime import UTC, datetime
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
+from dataclasses import dataclass, replace
+from datetime import datetime, timezone
+
 from pathlib import Path
-from typing import TextIO
+from typing import Callable, Mapping, cast
+
+from tools.experiments.execution_resource_plan import (
+    AdmittedEnvironment,
+    CALLER_ALLOCATION_PROVENANCE,
+    COMPLETION_COVERAGE_FILENAME,
+    CompletionCoverageAdapter,
+    ConcurrentRunEvidence,
+    DiscoveredResources,
+    DescendantRetentionEvidence,
+    EvidenceAbsenceField,
+    EvidenceDisposition,
+    EvidenceAbsence,
+    GPUAllocation,
+    GpuProcessOccupancyProbe,
+    GpuReservationTransaction,
+    LockPlacementEvidence,
+    LockReadback,
+    MigEvidence,
+    ProcessOccupancyEvidence,
+    FailureRecord,
+    FdReleaseEvidence,
+    GpuRunRequest,
+    HOST_RUNTIME_ROOT,
+    ManagedGpuOutcomeReducer,
+    PostToolUseProjectionReducer,
+    ResourceRequest,
+    ResourcePlanError,
+    ExecutionResourcePlan,
+    RuntimeIdentityReceipt,
+    TypedPreflightFailure,
+    NvidiaSMIResourceProbe,
+    freeze_resource_plan,
+    managed_run_adapter_integration_contract,
+    read_shared_runtime_provision,
+    read_shared_runtime_readback,
+    RuntimeIdentityReader,
+    RunGpuAdmissionReceipt,
+    SourceFreezeOwner,
+    UuidVisibilityEvidence,
+    build_completion_coverage_input,
+    build_source_path_set,
+    _normalize_failure,
+)
+from experiment_runner import (
+    ExecutionResult,
+    FullResourceCapacity,
+    FullResourceEstimate,
+    StandardFullResourceScheduler,
+    StandardRunner,
+    StandardWorker,
+    RunnerLifecycleEvidence,
+    TaskContext,
+    apply_environment_variables,
+)
+
+UTC = timezone.utc
 
 DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
 CONFIG_SOURCE_SNAPSHOT_NAME = "config_source.yaml"
@@ -52,12 +127,22 @@ MANAGED_RUN_ARTIFACTS = frozenset(
     }
 )
 FILE_READ_CHUNK_BYTES = 1024 * 1024
-STREAM_TERMINATION_TIMEOUT_SECONDS = 10
-INTERRUPTED_EXIT_CODE = 130
-COMMAND_START_FAILURE_EXIT_CODE = 127
 PREFLIGHT_FAILURE_EXIT_CODE = 2
 DURATION_ROUND_DIGITS = 3
 REGISTERED_COMMAND_KINDS = ("default", "formal")
+REVIEWED_W1_LINEAGE_ARTIFACT = (
+    "W1-IMPLEMENTATION-RECHECK-EF2DE34A-20260716-READONLY"
+)
+REVIEWED_W1_LINEAGE_COMMIT = "b829286c6a1c9de15f260199a44556e4f90be459"
+REVIEWED_W1_LINEAGE_TREE = "551abfa0a6e89f4a9218fc4fc0706b3addd2a84e"
+REVIEWED_W1_SOURCE_BLOBS = {
+    "tools/experiments/execution_resource_plan.py": (
+        "0a767491176530ecfe68a18e6b198de5d45f47fe"
+    ),
+    "tools/experiments/run_managed_experiment.py": (
+        "4de18aeb418423ac36152d6e8501b11c16e82e18"
+    ),
+}
 LEGACY_REGISTERED_COMMAND_ALIASES = {"smoke": "default"}
 SENSITIVE_ENV_KEY_PARTS = (
     "API_KEY",
@@ -158,6 +243,314 @@ class RunContext:
     command: CommandSelection
     created_at: str
     git: GitSnapshot
+
+
+@dataclass(frozen=True)
+class _ManagedTopicCase:
+    """One exact topic entrypoint bound to the frozen source snapshot."""
+
+    entrypoint_relative_path: str
+    argv: tuple[str, ...]
+    snapshot_root: str
+    environment_variables: tuple[tuple[str, str], ...]
+
+
+def build_admitted_environment(
+    plan: ExecutionResourcePlan,
+    runtime_identity: RuntimeIdentityReceipt,
+) -> AdmittedEnvironment:
+    """Build the exact opaque-UUID environment before generic runner construction."""
+    if runtime_identity.runtime_route != "MANAGED_CONTAINER":
+        raise TypedPreflightFailure(
+            "runtime_identity_route_invalid",
+            "managed admission requires the managed-container runtime identity",
+            runtime_route=runtime_identity.runtime_route,
+        )
+    selected = tuple(plan.gpu_allocation.selected_ids)
+    raw_environment = plan.execution.get("env")
+    if not isinstance(raw_environment, Mapping) or any(
+        not isinstance(key, str) or not isinstance(value, str)
+        for key, value in raw_environment.items()
+    ):
+        raise TypedPreflightFailure(
+            "admitted_environment_invalid",
+            "frozen execution environment must be a string mapping",
+        )
+    environment = {str(key): str(value) for key, value in raw_environment.items()}
+    expected = ",".join(selected)
+    if selected:
+        if environment.get("CUDA_VISIBLE_DEVICES") != expected:
+            raise TypedPreflightFailure(
+                "admitted_environment_uuid_mismatch",
+                "CUDA_VISIBLE_DEVICES is not the exact frozen UUID set",
+                selected_uuids=selected,
+            )
+        if environment.get("NVIDIA_VISIBLE_DEVICES") != expected:
+            raise TypedPreflightFailure(
+                "admitted_environment_uuid_mismatch",
+                "NVIDIA_VISIBLE_DEVICES is not the exact frozen UUID set",
+                selected_uuids=selected,
+            )
+    for name in ("CUDA_VISIBLE_DEVICES", "NVIDIA_VISIBLE_DEVICES"):
+        value = environment.get(name)
+        if value is not None and any(item.isdecimal() for item in value.split(",")):
+            raise TypedPreflightFailure(
+                "admitted_environment_integer_route_forbidden",
+                "GPU environment must contain opaque UUIDs, not indices",
+                variable=name,
+            )
+    exact_map = tuple(sorted(environment.items()))
+    fingerprint = hashlib.sha256(
+        json.dumps(
+            {
+                "schema_version": "admitted-environment/v1",
+                "exact_env_map": exact_map,
+                "cuda_visible_devices": expected,
+                "nvidia_visible_devices": expected,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    return AdmittedEnvironment(
+        schema_version="admitted-environment/v1",
+        exact_env_map=exact_map,
+        cuda_visible_devices=expected,
+        nvidia_visible_devices=expected,
+        environment_fingerprint=fingerprint,
+    )
+
+
+class RunGpuAdmissionContext(AbstractContextManager[GpuRunRequest]):
+    """Composition-only ordering and reverse-release context."""
+
+    @classmethod
+    def create(cls, request: GpuRunRequest) -> "RunGpuAdmissionContext":
+        return cls(request)
+
+    def __init__(self, request: GpuRunRequest) -> None:
+        self.request = request
+        self.state: str = "CREATED"
+        self._release_callbacks: list[Callable[[], object]] = []
+        self._release_failure_sink: Callable[[FailureRecord], None] | None = None
+
+    def register_release(self, callback: Callable[[], object]) -> None:
+        if self.state not in {"CREATED", "ENTERING", "ACTIVE"}:
+            raise TypedPreflightFailure(
+                "gpu_context_release_registration_closed",
+                "context release registration occurred after close",
+                state=self.state,
+            )
+        self._release_callbacks.append(callback)
+
+    def register_release_failure_sink(
+        self,
+        sink: Callable[[FailureRecord], None],
+    ) -> None:
+        """Register only the root-owned sink for typed release failures."""
+        if self.state not in {"CREATED", "ENTERING", "ACTIVE"}:
+            raise TypedPreflightFailure(
+                "gpu_context_release_registration_closed",
+                "context release failure sink was registered after close",
+                state=self.state,
+            )
+        self._release_failure_sink = sink
+
+    def __enter__(self) -> GpuRunRequest:
+        if self.state != "CREATED":
+            raise TypedPreflightFailure(
+                "gpu_context_reentered",
+                "GPU admission context is one-shot",
+                state=self.state,
+            )
+        self.state = "ENTERING"
+        self.state = "ACTIVE"
+        return self.request
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> bool:
+        if self.state not in {"ACTIVE", "ENTERING"}:
+            raise TypedPreflightFailure(
+                "gpu_context_exit_invalid",
+                "GPU admission context exit occurred outside an active state",
+                state=self.state,
+            )
+        self.state = "RELEASING"
+        for callback in reversed(self._release_callbacks):
+            try:
+                callback()
+            except BaseException as failure:
+                if self._release_failure_sink is not None:
+                    self._release_failure_sink(
+                        _normalize_failure(failure, "context_release")
+                    )
+        self.state = "CLOSED"
+        return False
+
+
+def _runner_owned_estimate(case: _ManagedTopicCase) -> FullResourceEstimate:
+    """Return the generic runner estimate without GPU-ID ownership."""
+    del case
+    return FullResourceEstimate(
+        host_memory_bytes=0,
+        gpu_count=0,
+        gpu_memory_bytes=0,
+        gpu_slots=1,
+    )
+
+
+def _build_admitted_context(case: _ManagedTopicCase) -> TaskContext:
+    """Build one fresh generic context from the immutable admitted case."""
+    return {
+        "environment_variables": dict(case.environment_variables),
+        "working_directory": case.snapshot_root,
+    }
+
+
+def _bind_managed_topic_case(
+    context: RunContext,
+    source_paths: tuple[str, ...],
+    exact_environment: Mapping[str, str],
+) -> _ManagedTopicCase:
+    """Bind the selected CLI entrypoint to its immutable snapshot location."""
+    expected_relative = f"experiments/{context.identity.topic}/run.py"
+    try:
+        topic_relative = context.topic_dir.resolve().relative_to(
+            context.repo_root.resolve()
+        )
+    except ValueError as exc:
+        raise TypedPreflightFailure(
+            "experiment_runner_topic_identity_mismatch",
+            "managed topic directory must be inside the repository root",
+            topic=context.identity.topic,
+        ) from exc
+    if topic_relative.as_posix() != f"experiments/{context.identity.topic}":
+        raise TypedPreflightFailure(
+            "experiment_runner_topic_identity_mismatch",
+            "managed topic directory is not the canonical experiments/<topic> path",
+            topic_relative_path=topic_relative.as_posix(),
+        )
+    if expected_relative not in source_paths:
+        raise TypedPreflightFailure(
+            "gpu_source_freeze_manifest_incomplete",
+            "the canonical topic entrypoint is absent from source membership",
+            entrypoint_relative_path=expected_relative,
+        )
+
+    command = tuple(context.command.command)
+    source_entrypoint = str(context.repo_root.resolve() / expected_relative)
+    matches = tuple(
+        index
+        for index, token in enumerate(command)
+        if token in {expected_relative, source_entrypoint}
+    )
+    interpreter_name = Path(command[0]).name if command else ""
+    python_interpreter = interpreter_name in {"python", "python3"} or (
+        interpreter_name.startswith("python3.")
+        and interpreter_name.removeprefix("python3.").isdigit()
+    )
+    if matches != (1,) or not python_interpreter:
+        raise TypedPreflightFailure(
+            "managed_command_entrypoint_mismatch",
+            "selected managed command must invoke the exact topic run.py with Python",
+            expected_entrypoint=expected_relative,
+            selected_command=command,
+        )
+
+    snapshot_root = context.paths.result_dir / "source_snapshot"
+    snapshot_entrypoint = snapshot_root / expected_relative
+    return _ManagedTopicCase(
+        entrypoint_relative_path=expected_relative,
+        argv=(str(snapshot_entrypoint), *command[2:]),
+        snapshot_root=str(snapshot_root),
+        environment_variables=tuple(sorted(exact_environment.items())),
+    )
+
+
+def _run_topic_case(
+    case: _ManagedTopicCase,
+    context: TaskContext,
+) -> ExecutionResult:
+    """Load the topic main from the frozen snapshot in the generic child."""
+    working_directory = context.get("working_directory")
+    if working_directory != case.snapshot_root:
+        raise TypedPreflightFailure(
+            "gpu_source_snapshot_cwd_mismatch",
+            "managed topic context did not retain the frozen source snapshot root",
+        )
+    snapshot_root = Path(case.snapshot_root)
+    entrypoint = snapshot_root / case.entrypoint_relative_path
+    try:
+        resolved_entrypoint = entrypoint.resolve(strict=True)
+        resolved_entrypoint.relative_to(snapshot_root.resolve(strict=True))
+        if not resolved_entrypoint.is_file():
+            raise OSError("topic entrypoint is not a regular file")
+    except OSError as exc:
+        raise TypedPreflightFailure(
+            "gpu_source_snapshot_entrypoint_unavailable",
+            "managed topic entrypoint is unavailable in the frozen source snapshot",
+            entrypoint_relative_path=case.entrypoint_relative_path,
+        ) from exc
+    except ValueError as exc:
+        raise TypedPreflightFailure(
+            "gpu_source_snapshot_entrypoint_escape",
+            "managed topic entrypoint escaped the frozen source snapshot root",
+            entrypoint_relative_path=case.entrypoint_relative_path,
+        ) from exc
+
+    previous_argv = sys.argv
+    previous_cwd = Path.cwd()
+    previous_sys_path = list(sys.path)
+    try:
+        os.chdir(snapshot_root)
+        sys.argv = list(case.argv)
+        sys.path = [str(resolved_entrypoint.parent), str(snapshot_root), *sys.path]
+        namespace = runpy.run_path(
+            str(resolved_entrypoint),
+            run_name="_agent_canon_managed_topic",
+        )
+        topic_main = namespace.get("main")
+        if not callable(topic_main):
+            raise TypedPreflightFailure(
+                "experiment_runner_topic_entrypoint_invalid",
+                "managed topic run.py must expose the documented main() entrypoint",
+                entrypoint_relative_path=case.entrypoint_relative_path,
+            )
+        result = topic_main()
+    finally:
+        sys.path = previous_sys_path
+        sys.argv = previous_argv
+        os.chdir(previous_cwd)
+
+    if not isinstance(result, int) or isinstance(result, bool):
+        raise TypedPreflightFailure(
+            "experiment_runner_topic_result_invalid",
+            "managed topic main() must return an integer status",
+            result_type=type(result).__name__,
+        )
+    if result == 0:
+        return ExecutionResult(
+            status="ok",
+            raw_exit_code=0,
+            source="managed_topic_main",
+        )
+    return ExecutionResult(
+        status="failed",
+        failure_kind="topic_main_nonzero",
+        message=f"topic main returned {result}",
+        raw_exit_code=result,
+        source="managed_topic_main",
+    )
+
+
+def _capture_runner_lifecycle(
+    runner: StandardRunner[_ManagedTopicCase] | None,
+) -> RunnerLifecycleEvidence | None:
+    """Read generic lifecycle evidence without inspecting process internals."""
+    if runner is None:
+        return None
+    return runner.last_lifecycle_evidence
 
 
 def repo_root_from_script() -> Path:
@@ -1057,107 +1450,6 @@ def resolve_registered_command_match(
     return None
 
 
-def mirror_stream(
-    stream: TextIO,
-    *,
-    console: TextIO,
-    side_log: TextIO,
-    combined_log: TextIO,
-    combined_lock: threading.Lock,
-    label: str,
-) -> None:
-    """Copy one child-process stream to console and log files."""
-    for line in stream:
-        console.write(line)
-        console.flush()
-        side_log.write(line)
-        side_log.flush()
-        with combined_lock:
-            combined_log.write(f"[{label}] {line}")
-            combined_log.flush()
-
-
-def run_streamed_command(
-    command: list[str],
-    *,
-    cwd: Path,
-    env: dict[str, str],
-    log_path: Path,
-    stdout_path: Path,
-    stderr_path: Path,
-) -> int:
-    """Run one command, teeing stdout and stderr to durable log files."""
-    with (
-        log_path.open("w", encoding="utf-8") as log_handle,
-        stdout_path.open("w", encoding="utf-8") as stdout_handle,
-        stderr_path.open("w", encoding="utf-8") as stderr_handle,
-    ):
-        command_line = "$ " + shlex.join(command) + "\n"
-        log_handle.write(command_line)
-        stdout_handle.write(command_line)
-        stderr_handle.write(command_line)
-        log_handle.flush()
-        stdout_handle.flush()
-        stderr_handle.flush()
-
-        try:
-            process = subprocess.Popen(
-                command,
-                cwd=cwd,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-        except OSError as exc:
-            message = f"command_start_error={type(exc).__name__}: {exc}\n"
-            sys.stderr.write(message)
-            log_handle.write("[stderr] " + message)
-            stderr_handle.write(message)
-            return COMMAND_START_FAILURE_EXIT_CODE
-
-        assert process.stdout is not None
-        assert process.stderr is not None
-        combined_lock = threading.Lock()
-        stdout_thread = threading.Thread(
-            target=mirror_stream,
-            kwargs={
-                "stream": process.stdout,
-                "console": sys.stdout,
-                "side_log": stdout_handle,
-                "combined_log": log_handle,
-                "combined_lock": combined_lock,
-                "label": "stdout",
-            },
-        )
-        stderr_thread = threading.Thread(
-            target=mirror_stream,
-            kwargs={
-                "stream": process.stderr,
-                "console": sys.stderr,
-                "side_log": stderr_handle,
-                "combined_log": log_handle,
-                "combined_lock": combined_lock,
-                "label": "stderr",
-            },
-        )
-        stdout_thread.start()
-        stderr_thread.start()
-        try:
-            exit_code = process.wait()
-        except KeyboardInterrupt:
-            process.terminate()
-            try:
-                exit_code = process.wait(timeout=STREAM_TERMINATION_TIMEOUT_SECONDS)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
-                exit_code = INTERRUPTED_EXIT_CODE
-        stdout_thread.join(timeout=STREAM_TERMINATION_TIMEOUT_SECONDS)
-        stderr_thread.join(timeout=STREAM_TERMINATION_TIMEOUT_SECONDS)
-        return exit_code
-
-
 def resolve_topic_dir(
     repo_root: Path, identity: RunIdentity, registry: RegistryContext
 ) -> Path:
@@ -1436,8 +1728,795 @@ def finalize_run_manifest(
     write_json(context.paths.artifact_manifest_path, build_artifact_manifest(context))
 
 
-def run_cli(args: argparse.Namespace) -> int:
-    """Run one managed experiment from parsed CLI args."""
+def _config_int(config: Mapping[str, object], key: str, default: int) -> int:
+    value = config.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{key} must be a non-negative integer")
+    return value
+
+
+def _config_bool(config: Mapping[str, object], key: str, default: bool) -> bool:
+    value = config.get(key, default)
+    if not isinstance(value, bool):
+        raise ValueError(f"{key} must be a boolean")
+    return value
+
+
+def _config_chunks(config: Mapping[str, object], run_name: str) -> tuple[str, ...]:
+    value = config.get("requested_chunks", [run_name])
+    if not isinstance(value, list) or not value or any(
+        not isinstance(item, str) or not item for item in value
+    ):
+        raise ValueError("requested_chunks must be a non-empty array of strings")
+    return tuple(value)
+
+
+def _resource_request_for_managed_run(
+    context: RunContext,
+    run_config: Mapping[str, object],
+) -> ResourceRequest:
+    """Translate CLI/config metadata into the one canonical resource request."""
+    raw_config = run_config.get("config", {})
+    if not isinstance(raw_config, Mapping):
+        raise ValueError("managed run config must remain a mapping")
+    config = cast(Mapping[str, object], raw_config)
+    try:
+        cpu_requested_set = tuple(
+            sorted(
+                os.sched_getaffinity(0)
+                if "cpu_requested_set" not in config
+                else cast(list[int], config["cpu_requested_set"])
+            )
+        )
+    except (AttributeError, OSError, TypeError, ValueError) as exc:
+        raise TypedPreflightFailure(
+            "cpu_capability_discovery_unavailable",
+            "managed run cannot declare an authoritative CPU set",
+        ) from exc
+    if any(isinstance(cpu, bool) or not isinstance(cpu, int) for cpu in cpu_requested_set):
+        raise ValueError("cpu_requested_set must contain integers")
+    environment = build_run_environment(context)
+    gpu_requested_count = _config_int(config, "gpu_requested_count", 0)
+    configured_provenance = str(config.get("gpu_allocation_provenance", ""))
+    if gpu_requested_count and configured_provenance not in {
+        "",
+        CALLER_ALLOCATION_PROVENANCE,
+    }:
+        raise TypedPreflightFailure(
+            "gpu_allocation_provenance_conflict",
+            "managed GPU execution cannot override canonical scheduler UUID provenance",
+            observed_provenance=configured_provenance,
+        )
+    lock_root_value = "/var/lib/agent-canon/runtime/locks"
+    timeout_value = config.get("maximum_timeout_seconds", 3600.0)
+    if isinstance(timeout_value, bool) or not isinstance(timeout_value, (int, float)):
+        raise ValueError("maximum_timeout_seconds must be a positive number")
+    return ResourceRequest(
+        owner_id=str(config.get("owner_id", "worker-luna")),
+        parent_id=str(config.get("parent_id", "parent-sol")),
+        context_id=str(config.get("context_id", "context-continuation")),
+        maximum_timeout_seconds=float(timeout_value),
+        argv=tuple(context.command.command),
+        cwd=context.repo_root,
+        environment=environment,
+        integration_contract=managed_run_adapter_integration_contract(),
+        plan_id=context.identity.run_name,
+        run_id=context.identity.run_name,
+        cpu_requested_set=cpu_requested_set,
+        gpu_requested_count=gpu_requested_count,
+        gpu_requested_memory_bytes=_config_int(
+            config, "gpu_requested_memory_bytes", 0
+        ),
+        gpu_allocation_provenance=(
+            CALLER_ALLOCATION_PROVENANCE if gpu_requested_count else ""
+        ),
+        temp_bytes=_config_int(config, "temp_bytes", 0),
+        runtime_root=Path("/var/lib/agent-canon/runtime"),
+        source_projection_root=Path(
+            f"/workspace/reports/agents/{context.identity.run_name}/runtime"
+        ),
+        requested_chunks=_config_chunks(config, context.identity.run_name),
+        lock_root=Path(lock_root_value),
+        lock_namespace_shared_across_schedulers=True,
+        lock_namespace_host_safe=True,
+        lock_namespace_visibility_witness="shared-runtime-receipt",
+    )
+
+
+def _r5_absence(
+    field_name: EvidenceAbsenceField,
+    disposition: EvidenceDisposition,
+    failure_kind: str | None,
+) -> EvidenceAbsence:
+    """Build one exact fingerprint for a missing typed evidence field."""
+    payload = {
+        "field_name": field_name,
+        "disposition": disposition,
+        "failure_kind": failure_kind,
+    }
+    return EvidenceAbsence(
+        field_name=field_name,
+        disposition=disposition,
+        failure_kind=failure_kind,
+        fingerprint=hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
+    )
+
+
+def _r5_evidence_fingerprint(payload: Mapping[str, object]) -> str:
+    """Fingerprint a composition-assembled typed evidence value."""
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+
+
+def execute_managed_run(
+    context: RunContext,
+    run_config: Mapping[str, object],
+) -> ExecutionResult:
+    """Compose the fixed owners around one generic ff97 runner invocation."""
+    request = _resource_request_for_managed_run(context, run_config)
+    raw_config = run_config.get("config", {})
+    config = cast(Mapping[str, object], raw_config) if isinstance(raw_config, Mapping) else {}
+    source_paths = build_source_path_set(
+        str(context.repo_root),
+        context.identity.topic,
+        context.command.command,
+    )
+    source_request = GpuRunRequest(
+        gpu_count=request.gpu_requested_count,
+        minimum_memory_bytes_per_unit=request.gpu_requested_memory_bytes,
+        max_workers=1,
+        host_memory_bytes=request.host_memory_bytes,
+        cuda_runtime_library_path=(
+            str(config["cuda_runtime_library_path"])
+            if isinstance(config.get("cuda_runtime_library_path"), str)
+            else None
+        ),
+        environment=dict(request.environment),
+        source_root=str(context.repo_root),
+        runtime_route="MANAGED_CONTAINER",
+        source_paths=source_paths,
+        planned_chunk_ids=request.requested_chunks,
+    )
+    admission_context = RunGpuAdmissionContext.create(source_request)
+    source_freeze = None
+    runtime_identity = None
+    admission: RunGpuAdmissionReceipt | None = None
+    frozen_plan = None
+    admitted_environment = None
+    reservation_transaction: GpuReservationTransaction | None = None
+    final_probe = None
+    reservation_dispositions: list[FdReleaseEvidence] = []
+    release_failures: list[FailureRecord] = []
+    coverage_lock_readback: LockReadback | None = None
+    coverage_environment: Mapping[str, str] | None = None
+    coverage_processes: tuple[ProcessOccupancyEvidence, ...] | None = None
+    coverage_concurrent: ConcurrentRunEvidence | None = None
+    coverage_mig: MigEvidence | None = None
+    coverage_visibility: UuidVisibilityEvidence | None = None
+    coverage_lock_placement: LockPlacementEvidence | None = None
+    coverage_descendants: DescendantRetentionEvidence | None = None
+    coverage_attempted: set[EvidenceAbsenceField] = set()
+    primary_exception: BaseException | None = None
+    lifecycle_failure: FailureRecord | None = None
+    execution_result: ExecutionResult | None = None
+    runner_lifecycle: RunnerLifecycleEvidence | None = None
+    runner_invoked = False
+    admission_context.register_release_failure_sink(release_failures.append)
+    with admission_context:
+        try:
+            source_owner = SourceFreezeOwner(str(context.paths.result_dir))
+            coverage_attempted.add("source_freeze_evidence")
+            source_freeze = source_owner.freeze(source_request)
+            admission_context.register_release(source_owner.close)
+
+            runtime_root = os.environ.get(
+                "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+                HOST_RUNTIME_ROOT,
+            )
+            if runtime_root != HOST_RUNTIME_ROOT:
+                raise TypedPreflightFailure(
+                    "runtime_identity_path_mismatch",
+                    "managed execution requires the exact shared runtime root",
+                    runtime_root=runtime_root,
+                )
+            expected_provision_path = (
+                f"{HOST_RUNTIME_ROOT}/shared-runtime-provision.json"
+            )
+            provision_path = os.environ.get(
+                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+                expected_provision_path,
+            )
+            if provision_path != expected_provision_path:
+                raise TypedPreflightFailure(
+                    "runtime_identity_path_mismatch",
+                    "managed execution requires the exact provision receipt path",
+                    provision_path=provision_path,
+                )
+            provision = read_shared_runtime_provision(provision_path)
+            readback = read_shared_runtime_readback(
+                f"{HOST_RUNTIME_ROOT}/shared-runtime-readback.json"
+            )
+            runtime_identity = RuntimeIdentityReader().read(provision, readback)
+
+            probe = NvidiaSMIResourceProbe.discover(
+                request.environment,
+                gpu_requested_count=request.gpu_requested_count,
+                runtime_root=request.runtime_root,
+            )
+            initial_observation = probe.observe()
+            inventory = initial_observation.nvidia_inventory
+            occupied_initial = ()
+            if request.gpu_requested_count:
+                if inventory is None:
+                    raise TypedPreflightFailure(
+                        "gpu_inventory_unproven",
+                        "GPU admission requires the strict NVIDIA inventory owner output",
+                    )
+                namespace_inode = os.stat("/proc/self/ns/pid").st_ino
+                occupied_initial = GpuProcessOccupancyProbe(
+                    inventory=inventory,
+                    namespace_inode=namespace_inode,
+                    processes=initial_observation.process_identities,
+                    process_inventory_disposition=(
+                        "COMPLETE_EMPTY"
+                        if not initial_observation.process_identities
+                        else "COMPLETE"
+                    ),
+                ).observe().occupied_uuids
+                candidates = tuple(sorted(initial_observation.caller_allocated_ids))
+                eligible = tuple(
+                    uuid
+                    for uuid in candidates
+                    if uuid not in occupied_initial
+                    and initial_observation.free_memory_bytes.get(uuid, 0)
+                    >= request.gpu_requested_memory_bytes
+                )
+                reservation_transaction = GpuReservationTransaction(request.lock_root)
+
+                def release_reservation() -> None:
+                    reservation_dispositions.extend(reservation_transaction.close())
+
+                coverage_attempted.add("lock_readback")
+                reservation = reservation_transaction.try_reserve(
+                    eligible,
+                    occupied_uuids=occupied_initial,
+                    requested_count=request.gpu_requested_count,
+                )
+                admission_context.register_release(release_reservation)
+                if (
+                    reservation.disposition != "ACQUIRED"
+                    or len(reservation.selected_uuids) != request.gpu_requested_count
+                ):
+                    raise TypedPreflightFailure(
+                        "gpu_candidate_unavailable",
+                        "the exact UUID candidate frontier could not satisfy the request",
+                        candidate_uuids=candidates,
+                        eligible_uuids=eligible,
+                        selected_uuids=reservation.selected_uuids,
+                    )
+                final_probe = NvidiaSMIResourceProbe.discover(
+                    request.environment,
+                    gpu_requested_count=request.gpu_requested_count,
+                    runtime_root=request.runtime_root,
+                )
+                final_observation = final_probe.observe()
+                final_inventory = final_observation.nvidia_inventory
+                if (
+                    final_inventory is None
+                    or final_observation.fingerprint == initial_observation.fingerprint
+                ):
+                    raise TypedPreflightFailure(
+                        "gpu_run_admission_raced",
+                        "final NVIDIA evidence did not provide a new admission snapshot",
+                    )
+                coverage_attempted.add("actual_gpu_processes")
+                final_occupancy = GpuProcessOccupancyProbe(
+                    inventory=final_inventory,
+                    namespace_inode=namespace_inode,
+                    processes=final_observation.process_identities,
+                    process_inventory_disposition=(
+                        "COMPLETE_EMPTY"
+                        if not final_observation.process_identities
+                        else "COMPLETE"
+                    ),
+                ).observe()
+                selected = reservation.selected_uuids
+                occupied_final = final_occupancy.occupied_uuids
+                coverage_processes = (final_occupancy,)
+                coverage_attempted.add("concurrent_run_evidence")
+                coverage_attempted.add("mig_evidence")
+                coverage_concurrent = ConcurrentRunEvidence(
+                    initial_snapshot_fingerprint=initial_observation.fingerprint,
+                    admission_snapshot_fingerprint=final_observation.fingerprint,
+                    final_snapshot_fingerprint=final_observation.fingerprint,
+                    initial_event_id=initial_observation.observation_event_id,
+                    admission_event_id=final_observation.observation_event_id,
+                    final_event_id=final_observation.observation_event_id,
+                    fingerprint=_r5_evidence_fingerprint(
+                        {
+                            "initial": initial_observation.fingerprint,
+                            "admission": final_observation.fingerprint,
+                            "final": final_observation.fingerprint,
+                        }
+                    ),
+                )
+                coverage_mig = MigEvidence(
+                    parent_by_uuid={
+                        join.mig_uuid: join.parent_uuid for join in final_inventory.joins
+                    },
+                    executable_leaf_uuids=final_inventory.mig_uuids,
+                    selected_physical_uuids=tuple(
+                        uuid
+                        for uuid in selected
+                        if uuid in final_inventory.physical_uuids
+                    ),
+                    fingerprint=_r5_evidence_fingerprint(
+                        {
+                            "parents": tuple(
+                                (join.mig_uuid, join.parent_uuid)
+                                for join in final_inventory.joins
+                            ),
+                            "leaves": final_inventory.mig_uuids,
+                        }
+                    ),
+                )
+                coverage_lock_readback = (
+                    reservation.locks[0] if reservation.locks else None
+                )
+                if coverage_lock_readback is None:
+                    raise TypedPreflightFailure(
+                        "gpu_lock_readback_missing",
+                        "GPU reservation returned no lock readback for an acquired reservation",
+                    )
+                coverage_lock_placement = LockPlacementEvidence(
+                    runtime_root="/var/lib/agent-canon/runtime",
+                    filesystem_type=coverage_lock_readback.filesystem_type,
+                    filesystem_source=str(request.lock_root),
+                    device=coverage_lock_readback.device,
+                    inode=coverage_lock_readback.inode,
+                    group_name="agent-canon-runtime",
+                    mode="0660",
+                    local_flock_filesystem=True,
+                    fingerprint=_r5_evidence_fingerprint(
+                        {
+                            "runtime_root": "/var/lib/agent-canon/runtime",
+                            "filesystem_type": coverage_lock_readback.filesystem_type,
+                            "filesystem_source": str(request.lock_root),
+                            "device": coverage_lock_readback.device,
+                            "inode": coverage_lock_readback.inode,
+                            "mode": "0660",
+                        }
+                    ),
+                )
+                coverage_attempted.add("os_safe_lock_placement")
+                if any(
+                    uuid not in final_observation.caller_allocated_ids
+                    or uuid in occupied_final
+                    or final_observation.free_memory_bytes.get(uuid, 0)
+                    < request.gpu_requested_memory_bytes
+                    for uuid in selected
+                ):
+                    raise TypedPreflightFailure(
+                        "gpu_run_admission_raced",
+                        "final UUID, occupancy, or memory evidence changed after reservation",
+                        selected_uuids=selected,
+                    )
+                lock_readback = {
+                    "reservation_owner": "GpuReservationTransaction",
+                    "reservation_evidence_fingerprint": reservation.evidence_fingerprint,
+                    "initial_observation_fingerprint": initial_observation.fingerprint,
+                    "admission_observation_fingerprint": final_observation.fingerprint,
+                    "final_eligible_ids": tuple(
+                        uuid
+                        for uuid in sorted(final_observation.caller_allocated_ids)
+                        if uuid not in occupied_final
+                        and final_observation.free_memory_bytes.get(uuid, 0)
+                        >= request.gpu_requested_memory_bytes
+                    ),
+                }
+                selected_memory = {
+                    uuid: final_observation.free_memory_bytes.get(uuid, 0)
+                    for uuid in selected
+                }
+                allocation = GPUAllocation(
+                    plan_fingerprint="pending",
+                    caller_allocated_ids=candidates,
+                    candidate_ids=candidates,
+                    occupied_ids=tuple(sorted(occupied_final)),
+                    reserved_ids=(),
+                    eligible_ids=tuple(cast(tuple[str, ...], lock_readback["final_eligible_ids"])),
+                    selected_ids=selected,
+                    reservation_ids=reservation_transaction.reservation_ids,
+                    free_memory_bytes=dict(final_observation.free_memory_bytes),
+                    occupied_process_identities=final_observation.process_identities,
+                    process_identities=final_observation.process_identities,
+                    allocation_id=reservation.evidence_fingerprint,
+                    lock_root=request.lock_root,
+                    selection_order=tuple(cast(tuple[str, ...], lock_readback["final_eligible_ids"])),
+                    memory_bytes={
+                        device.uuid: device.memory_bytes
+                        for device in final_observation.gpu_devices
+                        if device.uuid in selected_memory
+                    },
+                    slot_id=None,
+                    requested_count=request.gpu_requested_count,
+                    requested_memory_bytes=request.gpu_requested_memory_bytes,
+                    readback_fingerprint=hashlib.sha256(
+                        json.dumps(lock_readback, sort_keys=True).encode("utf-8")
+                    ).hexdigest(),
+                    lock_readback=lock_readback,
+                    allocation_provenance=request.gpu_allocation_provenance,
+                    leases=(),
+                )
+            else:
+                final_observation = initial_observation
+                allocation = GPUAllocation(
+                    plan_fingerprint="pending",
+                    caller_allocated_ids=(),
+                    candidate_ids=(),
+                    occupied_ids=(),
+                    reserved_ids=(),
+                    eligible_ids=(),
+                    selected_ids=(),
+                    reservation_ids=(),
+                    free_memory_bytes={},
+                    occupied_process_identities=(),
+                    process_identities=(),
+                    allocation_id="none",
+                    lock_root=request.lock_root,
+                    selection_order=(),
+                    memory_bytes={},
+                    slot_id=None,
+                    requested_count=0,
+                    requested_memory_bytes=0,
+                    readback_fingerprint=hashlib.sha256(b"gpu-unrequested").hexdigest(),
+                    lock_readback={
+                        "reservation_owner": "GpuReservationTransaction",
+                        "gpu_requested": False,
+                    },
+                    allocation_provenance="not_applicable",
+                    leases=(),
+                )
+            if request.gpu_requested_count:
+                if final_probe is None:
+                    raise TypedPreflightFailure(
+                        "gpu_final_probe_missing",
+                        "GPU admission completed without a final NVIDIA probe",
+                    )
+                discovered_probe = final_probe
+            else:
+                discovered_probe = probe
+            discovered = DiscoveredResources(
+                cpu_available_set=final_observation.cpu_available_set,
+                gpu_devices=final_observation.gpu_devices,
+                caller_allocated_ids=final_observation.caller_allocated_ids,
+                occupied_processes=final_observation.process_identities,
+                reserved_ids=frozenset(),
+                host_memory_bytes=final_observation.host_memory_bytes,
+                temp_bytes=final_observation.temp_bytes,
+                ports=(),
+                container_id=final_observation.container_id,
+                structure_tool=final_observation.structure_tool,
+                boot_id=final_observation.boot_id,
+                probe=discovered_probe,
+                observation=final_observation,
+                reservation_store=None,
+                tool_availability=final_observation.tool_availability,
+                allocation_provenance=request.gpu_allocation_provenance,
+                observed_at=final_observation.observed_at,
+                observation_fingerprint=final_observation.fingerprint,
+            )
+            exact_environment = dict(request.environment)
+            if request.gpu_requested_count:
+                exact_visible = ",".join(allocation.selected_ids)
+                exact_environment["CUDA_VISIBLE_DEVICES"] = exact_visible
+                exact_environment["NVIDIA_VISIBLE_DEVICES"] = exact_visible
+            frozen_plan = freeze_resource_plan(
+                replace(request, environment=exact_environment),
+                discovered,
+                allocation,
+            )
+            execution = dict(frozen_plan.execution)
+            execution.update(
+                {
+                    "cwd": str(context.paths.result_dir / "source_snapshot"),
+                    "source_freeze_fingerprint": source_freeze.receipt_fingerprint,
+                    "source_snapshot_relative_path": source_freeze.snapshot_relative_path,
+                    "provision_receipt_fingerprint": runtime_identity.provision_fingerprint,
+                    "runtime_readback_fingerprint": runtime_identity.readback_fingerprint,
+                    "admission_snapshot_fingerprint": final_observation.fingerprint,
+                    "inventory_fingerprint": (
+                        inventory.evidence_fingerprint if inventory is not None else None
+                    ),
+                }
+            )
+            resources = dict(frozen_plan.resources)
+            gpu_resources = dict(cast(Mapping[str, object], resources["gpu"]))
+            gpu_resources.update(
+                {
+                    "reservation_owner": "GpuReservationTransaction",
+                    "planner_provenance": "gpu_admission_transaction",
+                    "reservation_ids": allocation.reservation_ids,
+                    "admission_snapshot_fingerprint": final_observation.fingerprint,
+                }
+            )
+            resources["gpu"] = gpu_resources
+            plan_spec = {
+                "schema_version": frozen_plan.schema_version,
+                "plan_id": frozen_plan.plan_id,
+                "owner": frozen_plan.owner,
+                "resources": resources,
+                "execution": execution,
+                "container": frozen_plan.container,
+                "side_effect_inventory": frozen_plan.side_effect_inventory,
+            }
+            plan_fingerprint = hashlib.sha256(
+                json.dumps(plan_spec, sort_keys=True, default=str).encode("utf-8")
+            ).hexdigest()
+            frozen_plan = replace(
+                frozen_plan,
+                plan_fingerprint=plan_fingerprint,
+                resources=resources,
+                execution=execution,
+                gpu_allocation=replace(
+                    frozen_plan.gpu_allocation,
+                    plan_fingerprint=plan_fingerprint,
+                ),
+            )
+            coverage_attempted.add("effective_environment")
+            admitted_environment = build_admitted_environment(
+                frozen_plan,
+                runtime_identity,
+            )
+            coverage_environment = dict(admitted_environment.exact_env_map)
+            if request.gpu_requested_count:
+                exact_visible = admitted_environment.cuda_visible_devices
+                coverage_attempted.add("container_visible_uuid_mapping")
+                coverage_visibility = UuidVisibilityEvidence(
+                    cuda_visible_devices=admitted_environment.cuda_visible_devices,
+                    nvidia_visible_devices=admitted_environment.nvidia_visible_devices,
+                    disposition="explicit",
+                    visible_uuids=tuple(allocation.selected_ids),
+                    namespace_id=f"pid:[{runtime_identity.namespace_inode}]",
+                    provision_receipt_fingerprint=runtime_identity.provision_fingerprint,
+                    fingerprint=_r5_evidence_fingerprint(
+                        {
+                            "cuda": exact_visible,
+                            "nvidia": admitted_environment.nvidia_visible_devices,
+                            "visible_uuids": allocation.selected_ids,
+                            "namespace_id": f"pid:[{runtime_identity.namespace_inode}]",
+                            "provision_receipt_fingerprint": runtime_identity.provision_fingerprint,
+                        }
+                    ),
+                )
+            admission = RunGpuAdmissionReceipt(
+                schema_version="gpu-admission/v1",
+                candidate_uuids=allocation.candidate_ids,
+                occupied_uuids=allocation.occupied_ids,
+                reserved_uuids=allocation.reserved_ids,
+                selected_uuids=allocation.selected_ids,
+                inventory_fingerprint=(
+                    inventory.evidence_fingerprint if inventory is not None else ""
+                ),
+                occupancy_fingerprint=hashlib.sha256(
+                    "|".join(
+                        (
+                            initial_observation.fingerprint,
+                            final_observation.fingerprint,
+                        )
+                    ).encode("utf-8")
+                ).hexdigest(),
+                reservation_fingerprint=allocation.readback_fingerprint,
+                runtime_identity_fingerprint=runtime_identity.readback_fingerprint,
+                plan_fingerprint=plan_fingerprint,
+                admission_fingerprint="",
+                lock_readback=coverage_lock_readback,
+                effective_environment=coverage_environment,
+                actual_gpu_processes=coverage_processes,
+                concurrent_run_evidence=coverage_concurrent,
+                mig_evidence=coverage_mig,
+                container_visible_uuid_mapping=coverage_visibility,
+                os_safe_lock_placement=coverage_lock_placement,
+            )
+            exact_environment = dict(admitted_environment.exact_env_map)
+            admitted_case = _bind_managed_topic_case(
+                context,
+                source_paths,
+                exact_environment,
+            )
+            worker = StandardWorker(
+                task=_run_topic_case,
+                resource_estimator=_runner_owned_estimate,
+                initializer=apply_environment_variables,
+            )
+            scheduler = StandardFullResourceScheduler.from_worker(
+                cases=[admitted_case],
+                worker=worker,
+                context_builder=_build_admitted_context,
+                skip_controller=None,
+                disable_gpu_preallocation=True,
+                gpu_environment_config=None,
+                resource_capacity=FullResourceCapacity(
+                    max_workers=source_request.max_workers,
+                    host_memory_bytes=source_request.host_memory_bytes,
+                    gpu_devices=(),
+                ),
+            )
+            runner = StandardRunner(
+                scheduler=scheduler,
+                monitor=None,
+                on_case_finished=None,
+            )
+            runner_invoked = True
+            runner_exception: BaseException | None = None
+            try:
+                runner.run(worker)
+            except BaseException as exc:
+                runner_exception = exc
+            finally:
+                runner_lifecycle = _capture_runner_lifecycle(runner)
+            if runner_lifecycle is None:
+                missing_lifecycle = TypedPreflightFailure(
+                    "experiment_runner_lifecycle_missing",
+                    "generic runner completed without typed lifecycle evidence",
+                )
+                if runner_exception is None:
+                    raise missing_lifecycle
+                lifecycle_failure = _normalize_failure(
+                    missing_lifecycle,
+                    "runner_lifecycle",
+                )
+            if runner_exception is not None:
+                raise runner_exception
+            if not scheduler.completions:
+                raise TypedPreflightFailure(
+                    "experiment_runner_completion_missing",
+                    "generic runner completed without a scheduler terminal record",
+                )
+            execution_result = scheduler.completions[-1].result
+        except BaseException as exc:
+            primary_exception = exc
+
+    primary_failure = (
+        _normalize_failure(primary_exception, "managed_admission")
+        if primary_exception is not None
+        else (release_failures[0] if release_failures else None)
+    )
+    if primary_failure is not None:
+        outcome_exit_code = 1
+    else:
+        if execution_result is None:
+            raise ResourcePlanError(
+                "ExperimentRunner returned no typed result for a successful managed run"
+            )
+        outcome_exit_code = _execution_exit_code(execution_result)
+    secondary_failures = tuple(
+        ([lifecycle_failure] if lifecycle_failure is not None else [])
+        + (
+            release_failures
+            if primary_exception is not None
+            else release_failures[1:]
+        )
+    )
+    if runner_invoked:
+        lifecycle = runner_lifecycle
+        coverage_descendants = DescendantRetentionEvidence(
+            child_process_ids=(),
+            process_group_ids=(),
+            descendant_quiescence="PROVEN" if lifecycle is not None else "UNPROVEN",
+            retained_gpu_process_uuids=(),
+            release_blocked=lifecycle is None,
+            fingerprint=_r5_evidence_fingerprint(
+                {
+                    "runner_lifecycle": repr(lifecycle),
+                    "descendant_quiescence": (
+                        "PROVEN" if lifecycle is not None else "UNPROVEN"
+                    ),
+                    "release_blocked": lifecycle is None,
+                }
+            ),
+        )
+        coverage_attempted.add("descendant_retention_evidence")
+        if admission is not None:
+            admission = replace(
+                admission,
+                descendant_retention_evidence=coverage_descendants,
+                admission_fingerprint="",
+            )
+    outcome = ManagedGpuOutcomeReducer().reduce_terminal(
+        run_id=request.run_id or request.plan_id or context.identity.run_name,
+        planned_chunk_ids=request.requested_chunks,
+        admission=admission,
+        source_freeze=source_freeze,
+        runtime_identity=runtime_identity,
+        runner_lifecycle=runner_lifecycle,
+        primary_failure=primary_failure,
+        secondary_failures=secondary_failures,
+        release_disposition=tuple(reservation_dispositions),
+        context_state="closed",
+        exit_code=outcome_exit_code,
+    )
+    optional_fields = (
+        "source_freeze_evidence",
+        "lock_readback",
+        "effective_environment",
+        "actual_gpu_processes",
+        "concurrent_run_evidence",
+        "mig_evidence",
+        "container_visible_uuid_mapping",
+        "os_safe_lock_placement",
+        "descendant_retention_evidence",
+    )
+    evidence_values: Mapping[EvidenceAbsenceField, object | None] = {
+        "source_freeze_evidence": source_freeze,
+        "lock_readback": coverage_lock_readback,
+        "effective_environment": coverage_environment,
+        "actual_gpu_processes": coverage_processes,
+        "concurrent_run_evidence": coverage_concurrent,
+        "mig_evidence": coverage_mig,
+        "container_visible_uuid_mapping": coverage_visibility,
+        "os_safe_lock_placement": coverage_lock_placement,
+        "descendant_retention_evidence": coverage_descendants,
+    }
+    failure_kind = primary_failure.kind if primary_failure is not None else None
+    absence_dispositions = tuple(
+        _r5_absence(
+            field_name,
+            "failed" if field_name in coverage_attempted else "not_reached",
+            failure_kind if field_name in coverage_attempted else None,
+        )
+        for field_name in optional_fields
+        if evidence_values[field_name] is None
+    )
+    coverage_path = context.paths.result_dir / "runtime" / COMPLETION_COVERAGE_FILENAME
+    coverage_path.parent.mkdir(parents=True, exist_ok=True)
+    coverage = CompletionCoverageAdapter(coverage_path).record_once(
+        build_completion_coverage_input(
+            outcome,
+            admission,
+            source_freeze,
+            runtime_identity,
+            absence_dispositions,
+        )
+    )
+    projection = PostToolUseProjectionReducer().project(outcome, coverage)
+    projection_path = coverage_path.parent / "post_tool_use_projection.json"
+    try:
+        with projection_path.open("xb") as projection_file:
+            projection_file.write(projection)
+    except FileExistsError as exc:
+        raise ResourcePlanError(
+            "post-tool-use projection was delivered more than once"
+        ) from exc
+    if primary_exception is not None:
+        raise primary_exception
+    if execution_result is None:
+        raise ResourcePlanError("ExperimentRunner returned no execution result")
+    return execution_result
+
+
+def _execution_exit_code(execution_result: ExecutionResult) -> int:
+    raw_exit_code = execution_result.raw_exit_code
+    if raw_exit_code is None:
+        raise ResourcePlanError(
+            "ExperimentRunner returned an ExecutionResult without a raw exit code"
+        )
+    return raw_exit_code
+
+
+def run_cli(
+    args: argparse.Namespace,
+) -> int:
+    """Run one managed experiment through the canonical frozen topic adapter."""
     context = build_run_context(args)
     patterns = resolve_eval_artifact_patterns(
         context.registry.defaults,
@@ -1491,14 +2570,11 @@ def run_cli(args: argparse.Namespace) -> int:
             "command_source": context.command.source,
         },
     )
-    exit_code = run_streamed_command(
-        context.command.command,
-        cwd=context.repo_root,
-        env=build_run_environment(context),
-        log_path=context.paths.log_path,
-        stdout_path=context.paths.stdout_log_path,
-        stderr_path=context.paths.stderr_log_path,
+    execution_result = execute_managed_run(
+        context,
+        run_config,
     )
+    exit_code = _execution_exit_code(execution_result)
     append_startup_event(context, "command_exit", {"exit_code": exit_code})
     finalize_run_manifest(context, manifest, start_monotonic, exit_code, patterns)
     return exit_code
@@ -1508,7 +2584,7 @@ def main() -> int:
     """Run the CLI."""
     try:
         return run_cli(parse_args())
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, ResourcePlanError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
 

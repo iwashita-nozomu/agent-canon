@@ -3,8 +3,9 @@
 // responsibility Provides unified Rust Markdown documentation formatting and checks.
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
 // upstream design ../../../agents/skills/md-style-check.md Markdown style check skill contract
+// upstream implementation ../../../tools/agent_tools/visualization_contract.py owns typed source-universe, manifest, ToolCall, marker, readback, and coverage status
 // downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
-// downstream implementation ../../../tools/ci/run_docs_checks.sh forwards legacy docs-check calls
+// downstream implementation ../../../tests/tools/test_fix_mermaid.py tests syntax-only Mermaid formatting
 // @dependency-end
 
 use serde_json::Value;
@@ -71,7 +72,6 @@ const MERMAID_DIRECTIVES: &[&str] = &[
     "timeline",
 ];
 const FLOW_DIRECTIONS: &[&str] = &["bt", "lr", "rl", "tb", "td"];
-
 const RUNTIME_PROFILE_DEPENDENCY_HEADER: &str = "<!--
 @dependency-start
 contract reference

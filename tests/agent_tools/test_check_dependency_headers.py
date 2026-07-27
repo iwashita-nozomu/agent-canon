@@ -5,18 +5,64 @@
 # responsibility Tests changed-file dependency header detection.
 # upstream design ../../documents/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream implementation ../../tools/agent_tools/check_dependency_headers.py changed-file checks
+# upstream implementation ../../tools/agent_tools/graph_client.py validates persisted graph responses
+# upstream implementation ../../tools/agent_tools/visualization_contract.py canonical visualization contract dependency target
 # @dependency-end
 
 from __future__ import annotations
 
+import contextlib
+import io
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from tools.agent_tools import check_dependency_headers as graph_checker
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_headers.py"
+VISUALIZATION_QUEUE_PATHS = (
+    "agents/skills/algorithm-flowchart.md",
+    "agents/skills/catalog.yaml",
+    ".agents/skills/algorithm-flowchart/SKILL.md",
+    ".agents/skills/dependency-analysis/SKILL.md",
+    ".agents/skills/prose-reasoning-graph/SKILL.md",
+    "agents/skills/structure-refactor.md",
+    ".agents/skills/structure-refactor/SKILL.md",
+    "agents/skills/structure-planning.md",
+    ".agents/skills/structure-planning/SKILL.md",
+    "agents/skills/report-writing.md",
+    ".agents/skills/report-writing/SKILL.md",
+    "agents/skills/long-form-writing.md",
+    ".agents/skills/long-form-writing/SKILL.md",
+    "agents/skills/html-output.md",
+    ".agents/skills/html-output/SKILL.md",
+    "agents/skills/formal-proof-workflow.md",
+    ".agents/skills/formal-proof-workflow/SKILL.md",
+    "agents/skills/md-style-check.md",
+    ".agents/skills/md-style-check/SKILL.md",
+    "agents/skills/README.md",
+    "tools/agent_tools/skill_route_catalog.py",
+    "tools/agent_tools/capability_route.py",
+    "tests/agent_tools/test_render_dependency_manifest_graph.py",
+    "tools/catalog.yaml",
+    "tools/agent_tools/tool_catalog.py",
+    "tools/README.md",
+    "documents/tools/README.md",
+    "documents/tools/tool-docs.toml",
+    "tests/agent_tools/test_tool_catalog.py",
+    "tests/agent_tools/test_dependency_manifest_tools.py",
+    "tests/agent_tools/test_check_dependency_headers.py",
+    "rust/agent-canon/src/docs.rs",
+    "rust/agent-canon/src/main.rs",
+    "tests/tools/test_fix_mermaid.py",
+    "agents/workflows/implementation-waterfall-workflow.md",
+    "agents/workflows/agent-canon-pr-workflow.md",
+)
 
 
 class DependencyHeaderCheckTest(unittest.TestCase):
@@ -55,6 +101,24 @@ class DependencyHeaderCheckTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
+
+    def test_visualization_completion_queue_has_canonical_contract_edges(self) -> None:
+        """Every queue surface declares its canonical visualization dependency."""
+        for relative_path in VISUALIZATION_QUEUE_PATHS:
+            with self.subTest(path=relative_path):
+                header = "\n".join(
+                    (PROJECT_ROOT / relative_path)
+                    .read_text(encoding="utf-8")
+                    .splitlines()[:80]
+                )
+                self.assertIn("@dependency-start", header)
+                self.assertIn("@dependency-end", header)
+                self.assertTrue(
+                    "code-visualization.md" in header
+                    or "visualization_contract.py" in header
+                    or "visualization_contract.md" in header,
+                    relative_path,
+                )
 
     def test_accepts_skill_frontmatter_before_dependency_manifest(self) -> None:
         """SKILL.md may keep YAML frontmatter before the dependency manifest."""
@@ -254,6 +318,101 @@ class DependencyHeaderCheckTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
+
+
+class FakeDependencyGraphClient:
+    """Provide already-materialized dependency facts without producer execution."""
+
+    def __init__(
+        self,
+        _root: Path,
+        *,
+        status: str = "fresh",
+        nodes: list[dict[str, object]] | None = None,
+    ) -> None:
+        self._status = status
+        self._nodes = nodes or []
+
+    def status(self) -> SimpleNamespace:
+        return SimpleNamespace(
+            status=self._status,
+            exit_code=0 if self._status == "fresh" else 2,
+        )
+
+    def query(self, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            status=self._status,
+            exit_code=0 if self._status == "fresh" else 2,
+            payload={"nodes": self._nodes},
+        )
+
+
+class DependencyHeaderGraphConsumerTest(unittest.TestCase):
+    """Exercise consume-only dependency facts and freshness refusal."""
+
+    def run_main(
+        self,
+        root: Path,
+        graph: FakeDependencyGraphClient,
+        *paths: str,
+    ) -> tuple[int, str]:
+        output = io.StringIO()
+        argv = ["check_dependency_headers.py", "--root", str(root), *paths]
+        with (
+            patch.object(sys, "argv", argv),
+            patch.object(graph_checker, "GraphClient", lambda _root: graph),
+            contextlib.redirect_stdout(output),
+        ):
+            result = graph_checker.main()
+        return result, output.getvalue()
+
+    def test_consumes_fresh_manifest_node(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").mkdir()
+            (root / "doc.md").write_text("# doc\n", encoding="utf-8")
+            graph = FakeDependencyGraphClient(
+                root,
+                nodes=[
+                    {
+                        "id": "node:doc",
+                        "path": "doc.md",
+                        "payload": {
+                            "manifest_present": True,
+                            "contract_kind": "design",
+                        },
+                    }
+                ],
+            )
+            result, output = self.run_main(root, graph, "doc.md")
+            self.assertEqual(result, 0, output)
+            self.assertIn("DEPENDENCY_HEADERS=pass", output)
+
+    def test_missing_graph_manifest_fact_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").mkdir()
+            (root / "doc.md").write_text("# doc\n", encoding="utf-8")
+            result, output = self.run_main(
+                root,
+                FakeDependencyGraphClient(root),
+                "doc.md",
+            )
+            self.assertNotEqual(result, 0)
+            self.assertIn("missing top dependency manifest block", output)
+
+    def test_stale_graph_snapshot_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").mkdir()
+            (root / "doc.md").write_text("# doc\n", encoding="utf-8")
+            result, output = self.run_main(
+                root,
+                FakeDependencyGraphClient(root, status="stale"),
+                "doc.md",
+            )
+            self.assertNotEqual(result, 0)
+            self.assertIn("graph snapshot is not fresh", output)
 
 
 if __name__ == "__main__":

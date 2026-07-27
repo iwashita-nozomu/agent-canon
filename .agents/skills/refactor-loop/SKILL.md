@@ -28,6 +28,10 @@ upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py em
   batches, and strong review gates.
 - Boundary: this shim points to `agents/skills/refactor-loop.md` for the
   canonical human-facing contract and does not authorize feature additions.
+- Shared structure refactors follow the execution order in the human canon at
+  `agents/skills/refactor-loop.md`; this shim does not restate that order.
+  `structure-refactor` and `agent-canon-update` are reference routes, while
+  `refactor-loop` owns the order.
 
 ## Tool Commands
 

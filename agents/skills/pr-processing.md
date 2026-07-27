@@ -4,6 +4,7 @@
 contract skill
 responsibility Documents PR Processing Skill for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design agent-orchestration.md execution-time-aware work-conservation contract
 upstream design ../workflows/pr-queue-cleanup-workflow.md AgentCanon source and parent pin PR cleanup workflow
 upstream design ../workflows/agent-canon-pr-workflow.md AgentCanon source PR workflow
 upstream design ../../documents/agent-canon-update-route.md AgentCanon source PR versus parent pin route
@@ -20,7 +21,8 @@ downstream implementation ../../tools/agent_tools/check_convention_compliance.py
 - Purpose: process GitHub PR and Issue queues with authority, validation,
   evidence, and AgentCanon source/parent-pin separation.
 - Section path: Purpose, Use When, and Boundary define scope; Processing Graph
-  shows the high-level flow; PR Log Report Contract and Procedure define
+  shows the high-level flow; Execution-Time-Aware Queue Specialization consumes
+  the orchestration owner; PR Log Report Contract and Procedure define
   operational evidence; AgentCanon Queue covers source/pin coordination.
 - Use when: a user asks to inventory, repair, merge, publish, ready, or triage
   PRs/issues with durable run-bundle and PR Essence evidence.
@@ -57,26 +59,70 @@ inventory、authority、conflict、validation、merge、Issue 処理、closeout 
 - AgentCanon source PR と parent pin PR がつながっている場合は、
   `agent-canon-update` と `pr-queue-cleanup-workflow.md` を使い、source merge と
   parent pin 同期を分けます。
+  Before mutation, record source `origin/main`, parent `origin/main` gitlink,
+  target tree, merge strategy, and remote. The reviewed final tree is the
+  identity contract; do not rebase or preserve internal commit ids by ancestry
+  engineering.
+
+## Execution-Time-Aware Queue Specialization
+
+`agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`
+owns the dependency DAG, makespan objective, ready-set dispatch, batching,
+warm-context reuse, closure, and scope-preserving wait rules. This skill
+specializes that contract for PR and Issue queues:
+
+- Executable scheduling fields: `dependency_dag`, `makespan_objective`,
+  `responsibility_completeness`, `correctness`, `critical_path`, `ready_set`,
+  `context_reuse`, `affected_evidence_invalidation`.
+
+1. Take one immutable, batched queue snapshot for all in-scope PR and Issue
+   candidates, including the fields required for classification and dependency
+   ordering. Batch remote and tool reads while retaining exact candidate
+   identity and readback evidence.
+2. Compute each candidate's complete owner, schema, dependency, validation, and
+   publication closure before its first owning review. Prepare and, only with
+   the required mutation authority, publish independent candidates in
+   non-conflicting lanes; do not serialize independent candidate preparation.
+3. Run one closure review for each exact candidate after that candidate's
+   closure is complete. A review finding invalidates only the affected
+   candidate evidence and its dependent evidence; rerun that affected closure
+   with the same warm worker and reviewer context when the route is unchanged.
+4. Merge candidates in dependency order. Independent preparation and
+   publication may remain batched, but a dependent source, parent pin, or root
+   projection cannot merge before its accepted predecessor receipt and exact
+   readback.
+5. Never use elapsed time or a fixed duration to cut queue scope, skip a
+   candidate, replace closure review, or declare closeout. When no useful ready
+   candidate exists, record the actual dependency, conflict, capacity, or
+   external-state blocker and wait for that state to change.
 
 ## Processing Graph
 
 ```mermaid
 flowchart TD
-  A["Snapshot open PRs and issues"] --> B["Check mutation authority"]
-  B --> C["Classify PR state"]
-  C --> D["Order by dependency and conflict"]
-  D --> E["Repair branch or conflict"]
-  E --> F["Run surface validation"]
-  F --> G["Merge only when gates pass"]
-  G --> H["Sync dependent parent pin PRs"]
-  H --> I["Triage issues with evidence"]
-  I --> J["Record final counts and blockers"]
+  A["Immutable remote/base/head/permission snapshot"] --> B["PullRequestLifecycle validator"]
+  B --> C["G3 PR identity/CAS receipt"]
+  C --> D["Authorized PR mutation"]
+  D --> E["Exact PR/merge readback"]
+  E --> F["Source QueueReceipt"]
+  F --> G["Ordered DependencyFrontier"]
+  G --> H["Parent projection after acceptance"]
 ```
+
+`PullRequestLifecycle` in
+`tools/agent_tools/update_lifecycle_contract.py` is the only PR state machine.
+This skill consumes its `user|fork|contributor` discriminator and transition
+verdict; it does not define another draft/ready/review/conflict graph. Base/head
+repo, owner, ref, fork and permission identities remain immutable. PR Essence,
+reviews, and contributor diff are retained through draft/ready,
+changes-requested, external-review, closed-head, multiple-remote, merge, and
+conflict-successor handling. Unknown permission never implies push authority.
 
 ## PR Log Report Contract
 
-PR 作成 / 更新は、GitHub 上の PR body だけでなく run-local report も同時に
-更新します。active run bundle が無い場合は、PR 操作前に
+PR 作成 / 更新は、GitHub 上の PR body と、選択された場合の durable run-local
+report を整合させます。coordination、resumption、または selected workflow が
+durable evidence を必要とし、active run bundle が無い場合は、PR 操作前に
 `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --owner codex --workspace-root "$PWD"`
 を実行し、bootstrap output の `RUN_ID`、`REPORT_DIR`、
 `AGENT_CANON_PREFLIGHT_*` を `work_log.md` または `workflow_monitoring.md`
@@ -102,9 +148,11 @@ route を短く書きます。
 
 ## Procedure
 
-1. Run bundle と PR log report を固定します。
+1. PR log report を固定します。run bundle は coordination、resumption、または
+   selected workflow が必要とする場合だけ作成します。
    - 既存の `REPORT_DIR` または `reports/agents/.active_run` を確認する
-   - 無ければ `bootstrap_agent_run.py` で作る
+   - durable evidence が必要で無ければ structured handoff message/tool result
+     を使い、必要な場合だけ `bootstrap_agent_run.py` で作る
    - `work_log.md` に bootstrap output、routing declaration、PR task summary を残す
    - `pr_body.md` と `github_publish.json` の path を決める
    - `pr_body.md` の `PR Essence` に problem / user request、design intent、
@@ -153,11 +201,14 @@ route を短く書きます。
    - AgentCanon source PR は parent pin PR より先に merge する
    - 同じ root/runtime surface に触る PR は一つずつ main に取り込む
    - conflict は、先に入れる PR が確定してから後続 PR の head branch で解く
+   - source publication readback が accepted になるまで parent pin/root projection
+     を開始せず、accepted source tree を一度だけ parent へ投影する
 1. Conflict repair は head branch 上で行います。
    - fetch without changing the current checkout
    - if the current checkout is not `<head-branch>`, keep it unchanged and
      request user direction; do not switch as a collision workaround
-   - `git merge origin/<base>` または repo の標準 update route
+   - 事前に記録した merge strategy に従う。`git merge origin/<base>` は選択された
+     strategy の場合だけ使い、rebase や unrelated history の変更を行わない
    - conflict は `ours` / `theirs` の機械選択ではなく、semantic integration として扱う
    - merge base、head branch の意図、incoming base 側の意図、owning contract、validation surface を確認する
    - 各 side から保持する clause、書き換える clause、意図的に捨てる clause と理由を PR log または run bundle に記録する
@@ -178,6 +229,8 @@ route を短く書きます。
    - obsolete / not planned: なぜ現在の責務に残さないかを書く
    - active: residual work、owner、next validation を追記して open のまま残す
    - local issue ledger は削除せず、`issues/closed/` など正本の lifecycle に従う
+   - deletion / retirement は dependency closure と active-reference validation を
+     先に行い、代替実装や unrelated latest-main changes を発明・取り込まない
 1. Closeout を残します。
    - PR action table
    - Issue action table
@@ -192,16 +245,15 @@ route を短く書きます。
 
 ## AgentCanon Queue
 
-AgentCanon source PR と template / derived PR が連動している場合は、次を固定します。
+Source merge/readback は exact `(source_namespace, candidate_sha, tree_sha,
+input_digest)` の `QueueReceipt` を一度だけ enqueue します。同じ input の retry
+は accepted receipt を再利用し、再 enqueue しません。
 
-1. Source PR を先に green にする。
-1. Source PR を merge する。
-1. Parent repo の read-only plan を確認し、mutation が必要なら current-task
-   user approval と全 4 inline Git authority/reason field を得て protected
-   latest route を実行する。
-1. `bash tools/sync_agent_canon.sh link-root` と `check` を通す。
-1. Parent pin / root-view diff を PR Essence と source PR の最終差分に照合し、必要な差分修正を head branch 上で行う。
-1. Parent pin / root-view PR を作るか更新する。
-1. Parent PR gate を通してから ready / merge 判断を行う。
+`DependencyFrontier` は `#388 -> #389 -> current transaction` の機械順序、
+source-main publication readback、accepted QueueReceipt を一つの acceptance
+record に束ねます。pending frontier では parent pin/root projection を開始せず、
+accepted record と current publication readback の後だけ parent PR lane を一度
+進めます。source correctness、generated completeness、source PR CAS は parent
+lane で再検査しません。
 
 この細部は `agents/workflows/pr-queue-cleanup-workflow.md` を正本にします。

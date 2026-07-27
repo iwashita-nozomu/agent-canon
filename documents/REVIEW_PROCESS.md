@@ -103,7 +103,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. plan review で execution order、担当 subagent、rollback point を確認し、decision が `approve` でなければ planner に戻します。
 1. detailed design review で reuse plan、existing-style adherence、design doc completeness を確認し、decision が `approve` でなければ designer に戻します。
 1. detailed design review で、`Installed Libraries And Existing Implementation Survey` が dependency surface、導入済みライブラリ候補、既存実装候補、reuse / extend / replace / add-new の判断、既存では足りない理由を列挙していることを確認します。
-1. detailed design review で、新規または rename する identifier、path、CLI flag、config key、public API が design または local precedent で固定され、worker が reusable / user-facing な名前を発明しなくてよいことを確認します。naming plan は対象概念、責務語彙、既存 naming family、採用名、禁止名を含み、`documents/conventions/common/02_naming.md` と言語別規約に合っている必要があります。
+1. detailed design review で、新規または rename する identifier、path、CLI flag、config key、public API が design または local precedent で固定され、worker が reusable / user-facing な名前を発明しなくてよいことを確認します。naming plan は対象概念、責務語彙、既存 naming family、採用名、禁止名を含み、`documents/rule/naming.md` と言語別規約に合っている必要があります。
 1. detailed design review で、tree 上の親文書だけを読んで sibling / cross-cutting 文書を見落としていないか、`Cross-Doc Coverage Review` を確認します。
 1. detailed design review で、`Design Side-Effect Map` が主要設計判断ごとに影響する implementation、document、workflow、prompt/config、validation、dependency manifest、user-facing surface を列挙し、各 item を `Abstract Design Frame`、request clause ID、reuse precedent、owner stage、review gate、validation / test-plan item に接続していることを確認します。
 1. 数式、擬似コード、仕様記述、method contract を伴う task では detailed design review か checkpoint review で、[algorithm-implementation-boundary.md](algorithm-implementation-boundary.md) の Boundary Map を artifact に固定し、implementation がどの式・仕様項目・state boundary に対応するか、runtime success だけを acceptance 根拠にしないことを確認します。
@@ -188,7 +188,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 - README、guide、workflow、規約文書が最新実装を説明していること
 - `verification.txt` が `status=pass` であること
 - `closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` であること
-- `closeout_gate.md` が `spec_product_coverage_complete=yes` かつ `review_findings_integrated=yes` であること
+- `closeout_gate.md` が `completion_coverage_consumer=yes`、`coverage_check.ok=true`、および `completion_boundary.topology_errors=[]` を記録していること
 - `closeout_gate.md` が `post_fix_full_review_complete=yes` であること
 - `closeout_gate.md` が `mechanical_completion_loop_complete=yes` かつ `diff_check_agent_complete=yes` であること
 - `user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` であること
