@@ -55,7 +55,7 @@ running protected `apply` with all four inline Git authority/reason fields.
 
 派生 repo 側で shared canon を直す場合は、
 `documents/rule/dependency-module-changes.md` に従って
-`workspace-<topic-slug>/agent-canon/` の managed source clone で
+`workspace/<topic-slug>/agent-canon/` の managed source clone で
 `--branch` を指定して作業し、そこで通常の GitHub branch / PR を作ります。
 親 repo の `vendor/agent-canon/` は clean pin projection のままです。
 

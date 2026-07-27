@@ -420,7 +420,7 @@ findings for resilient test planning.
 1. すべての pending TODO が `completed` または `deferred` になったら `python3 tools/agent_tools/agent_canon_update_todos.py acknowledge` で `.agent-canon/update-state.toml` の `tasks_applied_through` を現在 pin へ進めます。
 1. `make agent-canon-update` は `make agent-canon-latest` と同じ high-level latest route の互換 alias です。
 1. root view が drift した場合だけ `bash tools/sync_agent_canon.sh link-root` を使います。
-1. 派生 repo 側の shared canon 差分を upstream に戻す場合は、`workspace-<topic>/agent-canon/` の managed source clone から AgentCanon PR を使います。親 repo の `vendor/agent-canon/` は clean pin projection のままです。
+1. 派生 repo 側の shared canon 差分を upstream に戻す場合は、`workspace/<topic>/agent-canon/` の managed source clone から AgentCanon PR を使います。親 repo の `vendor/agent-canon/` は clean pin projection のままです。
 
 `sync_agent_canon.sh` は低レベル実装です。
 日常の update 導線では `pull` や `push` を直接選ばず、Make target または `update_agent_canon.sh plan/latest` から入ります。

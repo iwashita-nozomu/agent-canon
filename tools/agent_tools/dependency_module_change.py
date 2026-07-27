@@ -11,9 +11,9 @@
 """Manage one topic root containing one parent and its source clones.
 
 The selected repository is never used as a vendored source branch.  A prepare
-operation creates or reuses ``<workspace-parent>/workspace-<topic-slug>`` and
-places the parent clone and each managed dependency clone directly inside it.
-Branch identity lives in Git and in a local marker; clone names do not encode
+operation creates or reuses ``<parent-repo>/workspace/<topic-slug>`` and places
+the parent clone and each managed dependency clone directly inside it. Branch
+identity lives in Git and in a local marker; clone names do not encode
 branches.
 """
 
@@ -103,7 +103,7 @@ def _slug(value: str, label: str) -> str:
 
 
 def _topic_name(topic: str) -> str:
-    return f"workspace-{_slug(topic, 'topic')}"
+    return _slug(topic, "topic")
 
 
 def _topic_workspace(root: Path, topic: str, *, create: bool) -> Path:
@@ -114,13 +114,17 @@ def _topic_workspace(root: Path, topic: str, *, create: bool) -> Path:
                 "container topic workspace must expose the selected repository directly below /workspace"
             )
         return CONTAINER_WORKSPACE_ROOT
-    if root.parent.name.startswith("workspace-"):
+    if root.parent.parent.name == "workspace":
         if root.parent.name != expected_name:
             raise DependencyModuleChangeError(
-                f"selected repository is already in {root.parent.name}, not {expected_name}"
+                f"selected repository is already in workspace/{root.parent.name}, not workspace/{expected_name}"
             )
         return root.parent
-    candidate = root.parent.parent / expected_name
+    if root.parent.name.startswith("workspace-"):
+        raise DependencyModuleChangeError(
+            "legacy workspace-<topic-slug> topology is not supported; use workspace/<topic-slug>"
+        )
+    candidate = root / "workspace" / expected_name
     if not create and not candidate.is_dir():
         raise DependencyModuleChangeError(
             f"topic workspace is absent: {candidate}; run prepare --topic {topic} first"
