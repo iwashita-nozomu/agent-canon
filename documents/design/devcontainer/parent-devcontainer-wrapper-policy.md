@@ -91,6 +91,9 @@ fi
 
 - `AGENT_CANON_DOCKER_COMPOSE_OUTPUT`（未指定時は既定の
   `.devcontainer/docker-compose.generated.yml`）
+- 親 wrapper から呼ぶ場合は `AGENT_CANON_DEVCONTAINER_REPO_ROOT` に親レポの
+  root を渡す。これにより generator の実体位置ではなく、親レポを compose と
+  topic workspace root の基準にできる。
 
 相対 path は `${repo_root}` からの相対で解決する。
 
