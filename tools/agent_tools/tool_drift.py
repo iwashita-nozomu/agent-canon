@@ -670,11 +670,24 @@ def check_text(root: Path, contract: ToolContract, text_check: TextCheck) -> lis
             Finding("missing-file", contract.name, text_check.path, text_check.detail)
         ]
     text = path.read_text(encoding="utf-8")
-    if text_check.snippet in text:
+    snippets = {text_check.snippet, projected_runtime_snippet(root, text_check.snippet)}
+    if any(snippet in text for snippet in snippets):
         return []
     return [
         Finding("missing-required-text", contract.name, text_check.path, text_check.detail)
     ]
+
+
+def projected_runtime_snippet(root: Path, snippet: str) -> str:
+    """Map standalone AgentCanon tool paths to a parent runtime projection."""
+    if not (root / "tools" / "agent-canon").exists() or (root / "tools" / "ci").exists():
+        return snippet
+    return (
+        snippet.replace("tools/agent_tools/", "tools/agent-canon/agent_tools/")
+        .replace("tools/ci/", "tools/agent-canon/ci/")
+        .replace("tools/sync_agent_canon.sh", "tools/agent-canon/sync_agent_canon.sh")
+        .replace("tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh")
+    )
 
 
 def check_catalog_entries(root: Path) -> list[Finding]:
