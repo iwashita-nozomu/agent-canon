@@ -422,7 +422,13 @@ project_copy_source() {
     return
   fi
 
-  perl -pe '
+  perl -ne '
+    if ($in_manifest || /\@dependency-start/) {
+      print;
+      $in_manifest = 1 if /\@dependency-start/;
+      $in_manifest = 0 if /\@dependency-end/;
+      next;
+    }
     s{vendor/agent-canon/tools/}{__CANON_TOOLS__/}g;
     s{vendor/agent-canon/documents/}{__CANON_DOCUMENTS__/}g;
     s{vendor/agent-canon/issues/}{__CANON_ISSUES__/}g;
@@ -439,6 +445,7 @@ project_copy_source() {
     s{__DOCUMENTS_TOOLS__}{documents/tools/}g;
     s{__TESTS_TOOLS__}{tests/tools/}g;
     s{__PARENT_TOOLS__}{tools/agent-canon/}g;
+    print;
   ' "$source"
 }
 
