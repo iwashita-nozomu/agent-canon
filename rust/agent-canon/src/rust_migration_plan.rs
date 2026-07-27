@@ -575,7 +575,11 @@ mod tests {
     #[test]
     fn foundation_reports_missing_post_create() {
         let root = make_fixture_root();
-        write(&root, "documents/design/rust-agent-tool-migration.md", "fixture\n");
+        write(
+            &root,
+            "documents/design/rust-agent-tool-migration.md",
+            "fixture\n",
+        );
         write(&root, "rust/agent-canon/Cargo.toml", "fixture\n");
         write(&root, "tools/bin/agent-canon", "fixture\n");
 
@@ -597,7 +601,11 @@ mod tests {
     }
 
     fn write_foundation(root: &Path) {
-        write(root, "documents/design/rust-agent-tool-migration.md", "fixture\n");
+        write(
+            root,
+            "documents/design/rust-agent-tool-migration.md",
+            "fixture\n",
+        );
         write(root, "rust/agent-canon/Cargo.toml", "fixture\n");
         write(root, "tools/bin/agent-canon", "fixture\n");
         write(

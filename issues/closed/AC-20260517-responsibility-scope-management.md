@@ -4,8 +4,8 @@
 @dependency-start
 contract issue
 responsibility Records the finding that AgentCanon lacks a machine-readable responsibility scope map.
-upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md defines shared runtime surface ownership.
-upstream design ../../documents/runtime/shared-runtime-surfaces.toml defines shared surface classes.
+upstream design ../../documents/SHARED_RUNTIME_SURFACES.md defines shared runtime surface ownership.
+upstream design ../../documents/shared-runtime-surfaces.toml defines shared surface classes.
 upstream design ../../tools/catalog.yaml defines tool ownership.
 downstream design ../../responsibility-scope.toml defines repo-local scope ownership.
 downstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope ownership.
@@ -19,8 +19,8 @@ severity: S1
 evidence: User feedback on 2026-05-17: responsibility boundaries and tool responses remain weak and need a management tool.
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/243
 resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/312
-affected_surfaces: documents/runtime/SHARED_RUNTIME_SURFACES.md, documents/runtime/shared-runtime-surfaces.toml, responsibility-scope.toml, tools/catalog.yaml, tools/README.md, documents/tools/README.md, .codex/hooks.json, .codex/hooks/library_implementation_guard.py, .codex/hooks/helper_first_guard.py, ROOT_AGENTS.md, agents/workflows/agent-canon-pr-workflow.md
-edit_scope: responsibility-scope.toml, documents/templates/responsibility-scope.template.toml, documents/design/responsibility-scope-management.md, documents/conventions/coding-conventions-python.md, tools/agent_tools/responsibility_scope.py, tools/agent_tools/import_responsibility.py, .codex/hooks/library_implementation_guard.py, .codex/hooks/helper_first_guard.py, tests/agent_tools/test_responsibility_scope.py, tests/agent_tools/test_import_responsibility.py, tests/agent_tools/test_codex_hooks.py, tools/catalog.yaml, tools/README.md, documents/tools/README.md, tools/ci/run_all_checks.sh, agents/workflows/implementation-waterfall-workflow.md, agents/skills/codex-task-workflow.md
+affected_surfaces: documents/SHARED_RUNTIME_SURFACES.md, documents/shared-runtime-surfaces.toml, responsibility-scope.toml, tools/catalog.yaml, tools/README.md, documents/tools/README.md, .codex/hooks.json, .codex/hooks/library_implementation_guard.py, .codex/hooks/helper_first_guard.py, ROOT_AGENTS.md, agents/workflows/agent-canon-pr-workflow.md
+edit_scope: responsibility-scope.toml, documents/templates/responsibility-scope.template.toml, documents/responsibility-scope-management.md, documents/coding-conventions-python.md, tools/agent_tools/responsibility_scope.py, tools/agent_tools/import_responsibility.py, .codex/hooks/library_implementation_guard.py, .codex/hooks/helper_first_guard.py, tests/agent_tools/test_responsibility_scope.py, tests/agent_tools/test_import_responsibility.py, tests/agent_tools/test_codex_hooks.py, tools/catalog.yaml, tools/README.md, documents/tools/README.md, tools/ci/run_all_checks.sh, agents/workflows/implementation-waterfall-workflow.md, agents/skills/codex-task-workflow.md
 required_action: Add a machine-readable responsibility scope manifest and checker so tools, issues, evals, memory, GitHub surfaces, shared runtime paths, local Python import boundaries, external library boundaries and implementations, and helper-first implementation drift have explicit owners and gates.
 close_condition: Checkers validate required top-level responsibility scopes, owner classes, matching tool paths, issue links, import rules, unused imports, wildcard imports, local scope import crossings, direct library implementation rewrites, external-library boundary decisions, and helper-like function additions without ownership evidence.
 

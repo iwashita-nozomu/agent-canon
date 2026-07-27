@@ -4,7 +4,7 @@ contract issue
 responsibility Tracks OOP readability refactor work for the experiment registry checker.
 upstream implementation ../../tools/ci/check_experiment_registry.py validates experiment registry contracts.
 upstream implementation ../../tools/oop/python/readability.py reports OOP readability findings.
-upstream design ../../documents/conventions/object-oriented-design.md defines OOP readability policy.
+upstream design ../../documents/object-oriented-design.md defines OOP readability policy.
 @dependency-end
 -->
 

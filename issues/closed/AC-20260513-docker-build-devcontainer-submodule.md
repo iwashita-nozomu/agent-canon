@@ -4,7 +4,7 @@
 @dependency-start
 contract issue
 responsibility Records the workflow defect where Docker Build CI consumed a shared devcontainer symlink without checking out AgentCanon.
-upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md defines devcontainer ownership.
+upstream design ../../documents/github-first-module-and-devcontainer-policy.md defines devcontainer ownership.
 upstream implementation ../../tools/ci/check_github_workflows.py validates workflow checkout policy.
 downstream implementation ../../tests/tools/test_check_github_workflows.py verifies Docker workflow checkout rules.
 @dependency-end
@@ -16,8 +16,8 @@ source: ci
 severity: S1
 evidence: https://github.com/iwashita-nozomu/project_template/actions/runs/25843396500
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/246
-affected_surfaces: .github/workflows/docker-build.yml, tools/ci/check_github_workflows.py, tests/tools/test_check_github_workflows.py, documents/contracts/github-first-module-and-devcontainer-policy.md
-edit_scope: .github/workflows/docker-build.yml, tools/ci/check_github_workflows.py, tests/tools/test_check_github_workflows.py, documents/runtime/SHARED_RUNTIME_SURFACES.md, documents/contracts/github-first-module-and-devcontainer-policy.md, docker/README.md
+affected_surfaces: .github/workflows/docker-build.yml, tools/ci/check_github_workflows.py, tests/tools/test_check_github_workflows.py, documents/github-first-module-and-devcontainer-policy.md
+edit_scope: .github/workflows/docker-build.yml, tools/ci/check_github_workflows.py, tests/tools/test_check_github_workflows.py, documents/SHARED_RUNTIME_SURFACES.md, documents/github-first-module-and-devcontainer-policy.md, docker/README.md
 required_action: Make Docker Build workflows check out the AgentCanon submodule before consuming shared `.devcontainer/` root views.
 close_condition: Template Docker Build CI passes after the workflow uses the AgentCanon checkout helper, and the GitHub workflow checker rejects Docker workflows that omit it.
 resolved_by: https://github.com/iwashita-nozomu/project_template/actions/runs/25843396500, GITHUB_WORKFLOWS=pass from `python3 tools/ci/check_github_workflows.py`

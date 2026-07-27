@@ -6,7 +6,7 @@ contract issue
 responsibility Tracks OOP readability refactor work for dependency edge indexing.
 upstream implementation ../../tools/agent_tools/check_design_doc_claims.py checks design claims.
 upstream implementation ../../tools/oop/python/readability.py reports OOP readability findings.
-upstream design ../../documents/design/dependency-manifest-design.md defines dependency graph semantics.
+upstream design ../../documents/dependency-manifest-design.md defines dependency graph semantics.
 @dependency-end
 -->
 
@@ -15,7 +15,7 @@ status: resolved
 source: runtime
 severity: S2
 evidence: reports/agents/oop-readability-20260621-refactor-issues/oop_readability_check_design_doc_claims.md
-affected_surfaces: tools/agent_tools/check_design_doc_claims.py, documents/design/dependency-manifest-design.md, tests/agent_tools/test_check_design_doc_claims.py
+affected_surfaces: tools/agent_tools/check_design_doc_claims.py, documents/dependency-manifest-design.md, tests/agent_tools/test_check_design_doc_claims.py
 edit_scope: tools/agent_tools/check_design_doc_claims.py dependency_indexes, dependency_closure, reports/agents/oop-readability-20260621-refactor-issues/oop_readability_check_design_doc_claims.md
 required_action: Refactor `dependency_indexes` so index construction exposes explicit source and target maps without mixed return/effect morphology.
 close_condition: `python3 tools/oop/python/readability.py --root . --language all --min-score 95 tools/agent_tools/check_design_doc_claims.py tests/agent_tools/test_check_design_doc_claims.py` no longer reports `dependency_indexes`.

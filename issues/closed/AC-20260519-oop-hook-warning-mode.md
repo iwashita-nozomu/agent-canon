@@ -10,7 +10,7 @@ upstream implementation ../../.codex/hooks.json wires the OOP readability hook.
 upstream implementation ../../tools/oop/python/readability.py provides the Python OOP analyzer used by the hook.
 upstream implementation ../../tools/oop/cpp/readability.py provides the C++ OOP analyzer used by the hook.
 downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates OOP hook behavior.
-downstream design ../../documents/runtime/runtime-log-archive.md documents hook-run result semantics.
+downstream design ../../documents/runtime-log-archive.md documents hook-run result semantics.
 @dependency-end
 -->
 
@@ -19,7 +19,7 @@ status: resolved
 source: user
 severity: S2
 evidence: reports/dependency-review/oop-hook-warning-mode-20260519/search_hits.txt
-affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks.json, tests/agent_tools/test_codex_hooks.py, documents/runtime/runtime-log-archive.md
+affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks.json, tests/agent_tools/test_codex_hooks.py, documents/runtime-log-archive.md
 edit_scope: reports/dependency-review/oop-hook-warning-mode-20260519/dependency_edit_scope.txt
 required_action: Change the OOP readability hook from a source-edit blocker to a warning/logging hook while keeping explicit readability validation available as a closeout gate.
 close_condition: OOP hook findings no longer stop editing tools, hook logs preserve warning evidence, and targeted hook tests cover the warning behavior.

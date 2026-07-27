@@ -5,7 +5,7 @@
 contract issue
 responsibility Records the resolved workflow defect where hook results were root-local, duplicated, and hard to use for improvement.
 upstream design ../README.md defines AgentCanon operational issue conventions
-upstream design ../../documents/runtime/runtime-log-archive.md defines hook result accumulation
+upstream design ../../documents/runtime-log-archive.md defines hook result accumulation
 upstream implementation ../../.codex/hooks/oop_readability_guard.py records OOP hook outcomes
 upstream implementation ../../.codex/hooks/skill_usage_logger.py records skill hook outcomes
 downstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py summarizes hook results
@@ -16,10 +16,10 @@ issue_id: AC-20260513-hook-result-accumulation
 status: resolved
 source: user
 severity: S0
-evidence: documents/runtime/runtime-log-archive.md
+evidence: documents/runtime-log-archive.md
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/248
-affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks/skill_usage_logger.py, .codex/hooks/hook_event_log.py, documents/runtime/runtime-log-archive.md, tools/agent_tools/generate_agent_improvement_guide.py
-edit_scope: .codex/hooks/oop_readability_guard.py, .codex/hooks/skill_usage_logger.py, .codex/hooks/hook_event_log.py, documents/runtime/runtime-log-archive.md, tools/agent_tools/generate_agent_improvement_guide.py, tests/agent_tools/test_codex_hooks.py
+affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks/skill_usage_logger.py, .codex/hooks/hook_event_log.py, documents/runtime-log-archive.md, tools/agent_tools/generate_agent_improvement_guide.py
+edit_scope: .codex/hooks/oop_readability_guard.py, .codex/hooks/skill_usage_logger.py, .codex/hooks/hook_event_log.py, documents/runtime-log-archive.md, tools/agent_tools/generate_agent_improvement_guide.py, tests/agent_tools/test_codex_hooks.py
 required_action: Store hook results in AgentCanon-owned append-only logs with unique hook_run_id, payload fingerprints, and actionable status fields.
 close_condition: Hook logs default to AgentCanon result storage, read-only Bash payloads do not trigger OOP reruns, and tests validate unique IDs plus skip/failure fields.
 resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/16

@@ -7,7 +7,7 @@ responsibility Records the workflow defect where run-bundle findings were not pr
 upstream design ../README.md defines AgentCanon operational issue conventions
 upstream design ../../agents/workflows/agent-learning-workflow.md defines durable learning capture
 upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines PR route and issue gate
-upstream design ../../documents/design/dependency-manifest-design.md defines search-to-edit-scope evidence
+upstream design ../../documents/dependency-manifest-design.md defines search-to-edit-scope evidence
 downstream implementation ../../tools/ci/check_github_workflows.py validates issue and PR-template gates
 @dependency-end
 -->
@@ -18,7 +18,7 @@ source: user
 severity: S0
 evidence: reports/agents/20260513-071352-fix-duplicated-agentcanon-freshness-skil/
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/247
-affected_surfaces: ROOT_AGENTS.md, issues/README.md, agents/canonical/CODEX_WORKFLOW.md, agents/workflows/agent-learning-workflow.md, agents/workflows/agent-canon-pr-workflow.md, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, tools/ci/check_github_workflows.py, documents/design/dependency-manifest-design.md
+affected_surfaces: ROOT_AGENTS.md, issues/README.md, agents/canonical/CODEX_WORKFLOW.md, agents/workflows/agent-learning-workflow.md, agents/workflows/agent-canon-pr-workflow.md, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, tools/ci/check_github_workflows.py, documents/dependency-manifest-design.md
 edit_scope: reports/agents/20260513-093806-detail-agentcanon-pr-template-workflow-a/dependency_edit_scope.txt
 required_action: Make AgentCanon workflow and PR gates require durable operational finding capture instead of leaving defects only in run bundles.
 close_condition: The AgentCanon PR workflow, PR templates, issue conventions, and CI checks require durable issue search/write evidence, and focused tests validate the rule.

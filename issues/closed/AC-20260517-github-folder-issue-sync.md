@@ -19,7 +19,7 @@ severity: S1
 evidence: User feedback on 2026-05-17: GitHub Issues and the repository issues folder should synchronize.
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/254
 affected_surfaces: issues/README.md, issues/open, issues/closed, .github/workflows/issue-mirror.yml, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, agents/workflows/agent-canon-pr-workflow.md, tools/ci/check_github_workflows.py
-edit_scope: issues/README.md, .github/workflows/issue-mirror.yml, tools/agent_tools/issue_sync.py, tests/agent_tools/test_issue_sync.py, tools/catalog.yaml, tools/README.md, documents/tools/README.md, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, tools/ci/check_github_workflows.py, tests/tools/test_check_github_workflows.py, documents/runtime/shared-runtime-surfaces.toml
+edit_scope: issues/README.md, .github/workflows/issue-mirror.yml, tools/agent_tools/issue_sync.py, tests/agent_tools/test_issue_sync.py, tools/catalog.yaml, tools/README.md, documents/tools/README.md, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, tools/ci/check_github_workflows.py, tests/tools/test_check_github_workflows.py, documents/shared-runtime-surfaces.toml
 required_action: Define local issue files as the durable source and add PR-visible read-only GitHub mirror checks plus explicit operator sync tooling.
 close_condition: Local issue validation is automated, GitHub mirror fields are documented, PR Actions report missing mirrors and linked mirror drift, and explicit sync mode can update linked GitHub Issues.
 resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/95
