@@ -137,7 +137,6 @@ implementation source remains `vendor/agent-canon/tools/`.
 Inventory and review tooling must distinguish these roles: standalone
 `tools/` is the AgentCanon source, parent `tools/` is a local container, and
 `tools/agent-canon` is the only shared-tool projection in that container.
-
 ### Parent Copy Projection
 
 The AgentCanon source keeps `.github/` copy surfaces executable in the
