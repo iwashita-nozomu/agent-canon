@@ -1,3 +1,17 @@
+<!--
+@dependency-start
+contract design
+responsibility Parent/standalone devcontainer wrapper boundaryを定義する。
+upstream design ../../SHARED_RUNTIME_SURFACES.md shared runtime surface ownership and topology
+upstream design ../../shared-runtime-surfaces.toml machine-readable shared runtime surface manifest
+upstream design ../../github-first-module-and-devcontainer-policy.md devcontainer ownership boundary
+downstream implementation ../../../tools/agent_tools/surface_manifest.py materializes and checks shared surface entries
+downstream implementation ../../../tools/sync_agent_canon.sh materializes AgentCanon root views
+downstream implementation ../../../.devcontainer/generate-runtime-compose.sh generates runtime compose
+downstream implementation ../../../tools/agent_tools/parent_repo_readiness.py checks parent repository readiness
+@dependency-end
+-->
+
 # 親/Source 分離のdevcontainer構成方針
 
 ## 責務境界
