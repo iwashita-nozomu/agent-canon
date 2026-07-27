@@ -13,7 +13,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP_DIR="$(mktemp -d -t template-fresh-clone-XXXXXX)"
-TOPIC_ROOT="${TMP_DIR}/workspace-fresh-clone"
+TOPIC_ROOT="${TMP_DIR}/workspace/fresh-clone"
 CLONE_DIR="${TOPIC_ROOT}/agent-canon"
 trap 'rm -rf "${TMP_DIR}"' EXIT
 
