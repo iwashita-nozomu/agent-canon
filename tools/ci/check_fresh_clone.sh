@@ -59,14 +59,16 @@ AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:${COMMIT_REQUEST_EVIDENCE_DIGEST}"
 echo "fresh-clone commit request evidence: ${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}"
 
 python3 -m json.tool .devcontainer/devcontainer.json >/dev/null
-bash .devcontainer/generate-runtime-compose.sh >/dev/null
+AGENT_CANON_DEVCONTAINER_REPO_ROOT=. \
+AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml \
+bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh >/dev/null
 python3 - <<'PY'
 from __future__ import annotations
 
 from pathlib import Path
 import yaml
 
-compose_path = Path(".devcontainer/docker-compose.generated.yml")
+compose_path = Path(".agent-canon/docker-compose.generated.yml")
 data = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
 assert data["name"].endswith("-devcontainer"), "compose project name missing"
 assert "services" in data and "workspace" in data["services"], "workspace service missing"

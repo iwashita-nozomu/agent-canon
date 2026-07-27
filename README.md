@@ -97,7 +97,7 @@ Top-level surface は次のように読む。`Tracked` は `git ls-files`、`Man
 | root files | 9 | 7 | `README.md`、`PHILOSOPHY.md`、`ROOT_AGENTS.md`、`responsibility-scope.toml` などの root entrypoint と root policy。 |
 | `.agents/` | 42 | 42 | Codex skill discovery 用の runtime skill entrypoint。 |
 | `.codex/` | 61 | 61 | Codex config、role TOML、hook runtime surface。 |
-| `.devcontainer/` | 6 | 6 | shared devcontainer source と parent wrapper の境界を定義する surface。 |
+| `.devcontainer/` | 6 | 6 | AgentCanon source の devcontainer script と linked parent config が使う共有 runtime surface。 |
 | `.vscode/` | 4 | 4 | shared VS Code defaults and validation tasks。 |
 | `.github/` | 12 | 12 | GitHub workflow、Issue / PR template、GitHub agent entrypoint。 |
 | `agents/` | 143 | 143 | workflow、skill canon、template、task catalog の human-facing hub。`agents/evals/` は旧 manifest path の compatibility stub。 |

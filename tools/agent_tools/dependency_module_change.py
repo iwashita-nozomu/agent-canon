@@ -4,7 +4,7 @@
 # responsibility Manages topic source clones and reconstructibility-gated cleanup while retaining topic-root container visibility.
 # upstream design ../../documents/rule/dependency-module-changes.md generic dependency module policy
 # upstream design ../../documents/design/dependency-manifest-design.md structured dependency ownership model
-# upstream environment ../../.devcontainer/generate-runtime-compose.sh owns the topic-root mount
+# upstream environment ../../.devcontainer/devcontainer.json selects the direct topic-root Compose source
 # downstream implementation ../../tests/agent_tools/test_dependency_module_change.py validates lifecycle and refusal semantics
 # downstream design ../../documents/tools/dependency_module_change.md documents the CLI surface
 # @dependency-end

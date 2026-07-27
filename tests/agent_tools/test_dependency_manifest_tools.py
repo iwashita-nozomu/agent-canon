@@ -684,7 +684,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / ".devcontainer" / "devcontainer.json").write_text(
-                '{"postCreateCommand": "bash .devcontainer/post-create.sh /workspace"}\n',
+                '{"postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace"}\n',
                 encoding="utf-8",
             )
             (root / ".dockerignore").write_text(

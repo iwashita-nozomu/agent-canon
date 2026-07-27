@@ -29,8 +29,7 @@ mode = "symlink"
 owner = "agent-canon"
 class = "runtime_surface"
 # .devcontainer は親側の実体ディレクトリです。
-# bootstrap, finalize, compose, attach は親側 wrapper で保持し、
-# AgentCanon 側は個別ファイルで差分管理します。
+# 共有 script は AgentCanon source を直接参照し、親側には必要な親固有 source だけを置きます。
 paths = [
   "agents",
   ".agents",

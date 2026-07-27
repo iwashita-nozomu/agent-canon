@@ -86,7 +86,7 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 
 - `docker/Dockerfile` を更新する変更では、依存追加の有無にかかわらず `README.md`、`QUICK_START.md`、関連する `documents/` の command や説明も同じ変更で見直します。
 - Docker 変更で新しい tool を同梱する場合は、その tool の用途、呼び出し入口、不要になったときの削除方針を文書へ残します。
-- Docker 変更で agent convenience tool が必要になった場合は、`CONTAINER_OPERATIONS.md` の devcontainer boundary に従って AgentCanon-owned `.devcontainer/post-create.sh` を更新します。
+- Docker 変更で agent convenience tool が必要になった場合は、`CONTAINER_OPERATIONS.md` の devcontainer boundary に従って AgentCanon-owned `vendor/agent-canon/.devcontainer/post-create.sh` を更新します。
 - Docker runtime の再利用 surface は `docker/packs/*.toml`、`docker/codex-container-profiles.toml`、`docker/python-execution-rules.toml` を正本にし、path 分岐は各 surface の契約へ集約します。
 - Docker runtime、runtime pack、devcontainer 生成導線を変えた場合は `python3 tools/ci/container_config.py` を通し、`docker/Dockerfile`、`docker/packs/*.toml`、`.devcontainer/` の整合を確認します。
 - main server host の path、mount、builder 前提は `documents/contracts/server-host-contract.md` と `documents/templates/server_runtime_layout.template.toml` を正本にし、実行経路を都度記録して共有します。
