@@ -191,7 +191,7 @@ for lifecycle_path in \
   cp "${source_namespace}/${lifecycle_path}" "${target_namespace}/${lifecycle_path}"
 done
 
-PYTHONPATH="${PWD}/tools/agent_tools" \
+PYTHONPATH="${CANON_TOOLS_ROOT}/agent_tools" \
   python3 - "${target_namespace}" <<'PY'
 import json
 import sys
