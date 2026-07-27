@@ -5,7 +5,7 @@ responsibility Provides a slide-style overview of the project template repositor
 upstream design ../README.md repository overview
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface policy
 upstream design ./template-github-remote.md template GitHub remote policy
-upstream design ./agent-canon-github-remote.md AgentCanon GitHub remote policy
+upstream design ../agent-canon/agent-canon-github-remote.md AgentCanon GitHub remote policy
 upstream design ./linux-wsl-host-requirements.md host runtime policy
 downstream design ./README.md document index links this slide deck
 @dependency-end

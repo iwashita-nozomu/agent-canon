@@ -130,6 +130,17 @@ is_skip_path() {
   esac
 }
 
+is_historical_issue_path() {
+  case "$1" in
+    issues/*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 collect_paths() {
   if [[ ${#INPUT_PATHS[@]} -gt 0 ]]; then
     printf '%s\n' "${INPUT_PATHS[@]}"
@@ -325,6 +336,12 @@ check_file() {
     fi
     target="$(normalize_path "$file" "$rel_path")"
     if [[ ! -e "$target" ]]; then
+      # Issue files are durable mirrors. Their dependency paths describe the
+      # historical repository state and must not be rewritten as part of a
+      # current document relocation.
+      if is_historical_issue_path "$file"; then
+        continue
+      fi
       echo "$file:$line_no: dependency target does not exist: $rel_path"
       return 1
     fi

@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents the dedicated wiki publication tool.
-upstream design ../agent-canon-github-remote.md defines canonical GitHub wiki remote policy.
+upstream design ../agent-canon/agent-canon-github-remote.md defines canonical GitHub wiki remote policy.
 upstream design ../../agents/skills/wiki-publication.md owns workflow and source/projection boundary.
 upstream implementation ../../tools/agent_tools/wiki_publish.py owns deterministic publish gates.
 downstream implementation ../../tests/agent_tools/test_wiki_publish.py validates the CLI and blocker transitions.

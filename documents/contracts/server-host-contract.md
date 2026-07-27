@@ -3,7 +3,7 @@
 contract reference
 responsibility Documents Server Host Contract for this repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
-downstream design ./tools/html_artifact_access.md documents remote HTML artifact access commands
+downstream design ../tools/html_artifact_access.md documents remote HTML artifact access commands
 @dependency-end
 -->
 

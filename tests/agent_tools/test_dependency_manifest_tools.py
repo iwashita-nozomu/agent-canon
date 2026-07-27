@@ -742,6 +742,38 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
 
+    def test_format_preserves_missing_targets_in_issue_mirrors(self) -> None:
+        """Durable issue mirrors may retain dependency paths from their recorded state."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "documents" / "design").mkdir(parents=True)
+            (root / "documents" / "design" / "dependency-contract-kinds.toml").write_text(
+                "allowed_kinds = [\n  \"test\"\n]\n",
+                encoding="utf-8",
+            )
+            issue = root / "issues" / "closed" / "AC-1.md"
+            issue.parent.mkdir(parents=True)
+            issue.write_text(
+                "\n".join(
+                    [
+                        "<!--",
+                        "@dependency-start",
+                        "contract test",
+                        "responsibility Preserves a durable issue mirror.",
+                        "upstream design ../../documents/removed-document.md historical reference",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(issue), root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
     def test_format_accepts_markdown_h1_before_manifest(self) -> None:
         """Markdown H1 titles may precede the dependency manifest near the top."""
         with tempfile.TemporaryDirectory() as tmp_dir:

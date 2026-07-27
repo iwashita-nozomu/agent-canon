@@ -3,7 +3,7 @@
 contract reference
 responsibility Documents 作業別チェックリスト for this repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
-upstream design ./github-first-module-and-devcontainer-policy.md environment ownership boundary
+upstream design ../contracts/github-first-module-and-devcontainer-policy.md environment ownership boundary
 @dependency-end
 -->
 

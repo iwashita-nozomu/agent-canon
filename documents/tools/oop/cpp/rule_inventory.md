@@ -4,7 +4,7 @@
 contract reference
 responsibility Documents C++ OOP rule inventory behavior in Japanese.
 upstream implementation ../../../../tools/oop/cpp/rule_inventory.py C++ OOP inventory checker
-upstream design ../../../object-oriented-design.md OOP policy source
+upstream design ../../../conventions/object-oriented-design.md OOP policy source
 downstream design ../../tool-docs.toml one-to-one tool/document manifest
 @dependency-end
 -->

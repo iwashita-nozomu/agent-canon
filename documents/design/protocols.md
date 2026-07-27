@@ -3,7 +3,7 @@
 contract design
 responsibility Documents Protocol 設計 for this repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
-downstream design ../object-oriented-design.md consumes Protocol boundary rules
+downstream design ../conventions/object-oriented-design.md consumes Protocol boundary rules
 @dependency-end
 -->
 

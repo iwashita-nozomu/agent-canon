@@ -6,8 +6,8 @@ contract reference
 responsibility Documents machine-readable responsibility scope management for each repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
 upstream design ../runtime/shared-runtime-surfaces.toml shared surface manifest
-upstream design ../responsibility-scope.toml machine-readable repo-local scope manifest
-downstream design templates/responsibility-scope.template.toml starter manifest for template-derived repositories
+upstream design ../../responsibility-scope.toml machine-readable repo-local scope manifest
+downstream design ../templates/responsibility-scope.template.toml starter manifest for template-derived repositories
 upstream design ../../tools/catalog.yaml structured tool ownership
 downstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope coverage
 downstream implementation ../../tools/agent_tools/import_responsibility.py validates local import ownership
@@ -106,7 +106,7 @@ Edit-time hooks use the same ownership model for two common failure modes:
 For template or derived repositories, run it from the parent root. The tool
 expects the parent repository to carry its own top-level
 `responsibility-scope.toml`. Use
-`vendor/agent-canon/documents/templates/responsibility-scope.template.toml` as
+`vendor/agent-canon/documents/../templates/responsibility-scope.template.toml` as
 the starter when initializing that file.
 
 ## Issue And GitHub Sync

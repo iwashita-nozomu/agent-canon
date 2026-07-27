@@ -4,8 +4,8 @@ contract reference
 responsibility Documents shortest safe onboarding path for repositories that vendor AgentCanon.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md defines root view ownership.
 upstream design ../agent-canon/agent-canon-parent-repo-latest-checklist.md defines freshness and TODO handling.
-upstream design ./agent-canon-submodule-rollback.md defines rollback.
-upstream design ./codex-configuration-reference.md defines MCP configuration boundaries.
+upstream design ../agent-canon/agent-canon-submodule-rollback.md defines rollback.
+upstream design ../codex/codex-configuration-reference.md defines MCP configuration boundaries.
 downstream implementation ../../tools/agent_tools/parent_repo_readiness.py validates derived repo readiness.
 @dependency-end
 -->
@@ -46,9 +46,9 @@ runtime data, and `goal.md` remain repo-local.
 | `vendor/agent-canon` missing | `git submodule update --init --recursive` |
 | root symlink/copy drift | `bash tools/sync_agent_canon.sh check` |
 | stale AgentCanon pin | request-evidence-authorized `make agent-canon-ensure-latest` |
-| MCP unavailable | `documents/codex/codex-configuration-reference.md` |
+| MCP unavailable | `documents/code../codex/codex-configuration-reference.md` |
 | GitHub auth or workflow failure | `python3 tools/ci/check_github_workflows.py` |
-| need rollback | `documents/agent-canon/agent-canon-submodule-rollback.md` |
+| need rollback | `documents/agent-cano../agent-canon/agent-canon-submodule-rollback.md` |
 
 Do not fix a generic shared-canon defect only in the derived repo. Open an
 AgentCanon branch/PR, merge it, then update the derived repo pin.

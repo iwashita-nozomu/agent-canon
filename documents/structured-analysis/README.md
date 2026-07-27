@@ -10,8 +10,8 @@ downstream design code-analysis.md defines code dependency graph adapter scope
 downstream design document-canon-analysis.md defines document duplicate and non-canonical document adapter scope
 downstream design ../prose-reasoning-graph/dsl-spec.md defines prose reasoning graph DSL
 downstream design ../design/dependency-manifest-design.md defines dependency manifest DSL and validation model
-downstream design ../../tools/prose_reasoning_graph.md documents prose graph CLI usage
-downstream design ../../tools/render_dependency_manifest_graph.md documents dependency graph report rendering
+downstream design ../../tools/agent_tools/prose_reasoning_graph.py documents prose graph CLI usage
+downstream design ../../tools/agent_tools/render_dependency_manifest_graph.py documents dependency graph report rendering
 @dependency-end
 -->
 

@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents Codex Configuration Reference for this repository.
-upstream design ../ROOT_AGENTS.md template-root Codex runtime entrypoint
+upstream design ../../ROOT_AGENTS.md template-root Codex runtime entrypoint
 upstream implementation ../../.codex/config.toml shared project-scoped Codex config
 upstream implementation ../../.codex/hooks.json hook-based runtime startup context
 downstream design ./codex-configuration-slides.md slide deck derived from this reference

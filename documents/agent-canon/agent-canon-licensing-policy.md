@@ -3,7 +3,7 @@
 @dependency-start
 contract policy
 responsibility Documents AgentCanon licensing ownership and parent-repository boundary.
-upstream design ../LICENSE AgentCanon license text
+upstream design ../../LICENSE AgentCanon license text
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 upstream design ../../vendor/README.md third-party vendor policy
 downstream design ../runtime/shared-runtime-surfaces.toml classifies parent-repository license surfaces
@@ -14,7 +14,7 @@ AgentCanon is licensed under Apache License 2.0.
 
 The license boundary is explicit:
 
-- `vendor/agent-canon/LICENSE` covers AgentCanon-owned runtime, workflow, skill,
+- `vendor/agent-can../../LICENSE` covers AgentCanon-owned runtime, workflow, skill,
   subagent, MCP, tool, and shared documentation surfaces.
 - Parent repository code, experiments, Docker runtime, project documents, and
   root `LICENSE` remain parent-owned unless they are symlink or synced-copy views

@@ -6,7 +6,7 @@ contract reference
 responsibility Documents AgentCanon submodule update and legacy subtree migration for this repository.
 downstream design ../../agents/workflows/derived-agent-canon-diff-workflow.md consumes the subtree migration contract
 upstream design ./agent-canon-github-remote.md defines GitHub canonical remote policy
-upstream design ./github-first-module-and-devcontainer-policy.md defines GitHub-first module and devcontainer policy
+upstream design ../contracts/github-first-module-and-devcontainer-policy.md defines GitHub-first module and devcontainer policy
 downstream design ../design/dependency-manifest-design.md defines dependency manifest surface added to root
 downstream implementation ../../tools/sync_agent_canon.sh vendoring sync tool
 downstream implementation ../../tools/update_agent_canon.sh derived repo update helper

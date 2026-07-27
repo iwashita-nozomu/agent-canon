@@ -3,10 +3,10 @@
 contract policy
 responsibility Documents GitHub-first reusable module and devcontainer ownership policy.
 downstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
-upstream design ./rule/dependency-module-changes.md general dependency source-clone rule
+upstream design ../rule/dependency-module-changes.md general dependency source-clone rule
 downstream design ../conventions/coding-conventions-project.md project environment rules
-upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-downstream environment ../.devcontainer/devcontainer.json shared devcontainer entrypoint
+upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
+downstream environment ../../.devcontainer/devcontainer.json shared devcontainer entrypoint
 downstream implementation ../../tools/ci/container_config.py validates Dockerfile and devcontainer boundaries
 @dependency-end
 -->

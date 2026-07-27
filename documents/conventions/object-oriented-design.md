@@ -6,7 +6,7 @@ upstream design ./README.md documents index and discovery path
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./coding-conventions-house-style.md shared implementation style contract
 upstream design ./coding-conventions-python.md Python convention entrypoint
-upstream design ./design/protocols.md Protocol and type-boundary placement contract
+upstream design ../design/protocols.md Protocol and type-boundary placement contract
 downstream implementation ../../tools/oop/python/readability.py Python OOP typed-boundary evidence
 downstream implementation ../../tools/oop/cpp/readability.py C++ OOP typed-boundary evidence
 downstream implementation ../../tools/oop/python/rule_inventory.py inventories Python OOP rule surfaces

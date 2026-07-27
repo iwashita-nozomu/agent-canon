@@ -4,9 +4,9 @@ contract reference
 responsibility Defines checklist and manifest format for skill, prompt, and workflow behavior evals.
 upstream design ../../agents/canonical/skills.md defines skill registry.
 upstream design ../../agents/canonical/CODEX_SUBAGENTS.md defines subagent routing.
-upstream design ../.agents/skills/code-visualization/SKILL.md defines the runtime route under evaluation.
+upstream design ../../.agents/skills/code-visualization/SKILL.md defines the runtime route under evaluation.
 upstream design ../../agents/skills/code-visualization.md defines the canonical route contract under evaluation.
-downstream implementation ../evidence/agent-evals/issue_eval_manifest.toml registers issue-derived eval cases.
+downstream implementation ../../evidence/agent-evals/issue_eval_manifest.toml registers issue-derived eval cases.
 downstream implementation ../../.github/ISSUE_TEMPLATE/eval-capture.yml captures new eval candidates.
 downstream implementation ../../.github/PULL_REQUEST_TEMPLATE.md requires eval evidence.
 @dependency-end

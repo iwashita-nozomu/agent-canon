@@ -5,7 +5,7 @@ responsibility Documents tool and skill routing refactor policy.
 upstream design README.md AgentCanon documentation index
 downstream implementation ../../tools/agent_tools/route.py selects short tool and skill routes
 downstream design ../../agents/skills/task-routing.md public skill for route decisions
-downstream design tools/route.md route tool reader documentation
+downstream design ../tools/route.md route tool reader documentation
 @dependency-end
 -->
 

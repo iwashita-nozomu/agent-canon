@@ -3,12 +3,12 @@
 contract reference
 responsibility Documents Rust migration policy for AgentCanon tools.
 upstream design README.md AgentCanon documentation index
-upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-downstream environment ../.devcontainer/post-create.sh installs Rust toolchain and CLI
-downstream implementation ../rust/agent-canon/src/main.rs Rust CLI entrypoint
-downstream implementation ../rust/agent-canon/src/migration_audit.rs validates migration boundaries
-downstream implementation ../rust/agent-canon/src/rust_migration_plan.rs prints sequential migration candidates
-downstream implementation ../rust/agent-canon/src/structured_analysis.rs implements structured document inventory migration target
+upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
+downstream environment ../../.devcontainer/post-create.sh installs Rust toolchain and CLI
+downstream implementation ../../rust/agent-canon/src/main.rs Rust CLI entrypoint
+downstream implementation ../../rust/agent-canon/src/migration_audit.rs validates migration boundaries
+downstream implementation ../../rust/agent-canon/src/rust_migration_plan.rs prints sequential migration candidates
+downstream implementation ../../rust/agent-canon/src/structured_analysis.rs implements structured document inventory migration target
 downstream implementation ../../tools/bin/agent-canon stable shell wrapper
 @dependency-end
 -->

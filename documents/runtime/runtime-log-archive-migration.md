@@ -5,7 +5,7 @@ responsibility Documents how to move AgentCanon in-tree hook and eval logs into 
 upstream design runtime-log-archive.md runtime log archive ownership and branch policy
 upstream design ../conventions/coding-conventions-logging.md JSONL logging convention
 upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py imports and pushes legacy hook JSONL and eval reports
-downstream design ../evidence/agent-evals/README.md points readers away from in-tree result paths
+downstream design ../../evidence/agent-evals/README.md points readers away from in-tree result paths
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates mounted archive JSONL and eval reports
 @dependency-end
 -->

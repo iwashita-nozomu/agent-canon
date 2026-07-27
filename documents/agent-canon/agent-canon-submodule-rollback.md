@@ -5,7 +5,7 @@ responsibility Documents rollback procedure for AgentCanon submodule pin updates
 upstream design ./agent-canon-parent-repo-latest-checklist.md defines parent update readiness checks.
 upstream design ./agent-canon-update-route.md defines canonical update route ownership.
 upstream implementation ../../tools/sync_agent_canon.sh repairs root views and validates shared surfaces.
-downstream design ./derived-repo-bootstrap-runbook.md links rollback from derived repo onboarding.
+downstream design ../contracts/derived-repo-bootstrap-runbook.md links rollback from derived repo onboarding.
 @dependency-end
 -->
 

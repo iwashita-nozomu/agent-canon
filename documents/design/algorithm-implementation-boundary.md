@@ -3,8 +3,8 @@
 contract policy
 responsibility Documents アルゴリズム数理・実装境界方針 for this repository.
 upstream design ./README.md durable document index
-upstream design ./REVIEW_PROCESS.md review gate for equation/spec alignment
-upstream design ./experiment-critical-review.md mathematical validity review
+upstream design ../conventions/REVIEW_PROCESS.md review gate for equation/spec alignment
+upstream design ../experiments/experiment-critical-review.md mathematical validity review
 upstream design ../../agents/workflows/research-workflow.md research workflow equation-to-code mapping
 upstream design ../conventions/coding-conventions-python.md Python implementation policy entrypoint
 upstream design ../conventions/coding-conventions-cpp.md C++ implementation policy entrypoint

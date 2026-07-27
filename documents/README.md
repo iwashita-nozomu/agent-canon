@@ -7,7 +7,7 @@ upstream design ./design/README.md target state と実装境界。
 upstream design ./runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface policy。
 upstream design ./runtime/shared-runtime-surfaces.toml machine-readable ownership manifest。
 downstream design ./parent-repository/README.md parent repository structure and projection boundary。
-downstream implementation ../tools/agent_tools/document_inventory.py document inventory。
+downstream implementation ../rust/agent-canon/src/structured_analysis.rs document inventory。
 @dependency-end
 -->
 

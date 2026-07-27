@@ -6,7 +6,7 @@ upstream design README.md structured analysis package index
 upstream design database-design.md defines SQLite tables and validation boundary
 upstream design code-analysis.md defines code dependency adapter scope
 upstream design ../design/dependency-manifest-design.md defines dependency manifest DSL and graph semantics
-upstream design ../../tools/render_dependency_manifest_graph.md documents dependency graph report rendering
+upstream design ../../tools/agent_tools/render_dependency_manifest_graph.py documents dependency graph report rendering
 upstream implementation ../../tools/agent_tools/check_dependency_graph.sh emits dependency manifest graph artifacts
 upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependency evidence separately
 @dependency-end

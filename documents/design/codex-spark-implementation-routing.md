@@ -5,7 +5,7 @@ responsibility Defines Target-State-First Spark implementation routing and model
 upstream design ../README.md design-document index and canonical design ownership
 upstream design dependency-manifest-design.md dependency evidence and header contract
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md AgentCanon source/view ownership
-upstream design ../object-oriented-design.md OOP responsibility and dependency-direction rules
+upstream design ../conventions/object-oriented-design.md OOP responsibility and dependency-direction rules
 upstream design ../runtime/runtime-profiles-and-check-matrix.md validation profile and closeout routing
 upstream design ../../agents/task_catalog.yaml workflow activation and role topology
 upstream design ../../agents/agents_config.json permanent role ownership and artifact policy
@@ -4132,7 +4132,7 @@ owner identities:
 | `tools/agent_tools/skill_route_catalog.py` | `c09ef7d29a378aa31000157847e7d742cea77e734c4cc2c155d712c582161e28` | explicit skill capability catalog/index |
 | `tools/agent_tools/capability_route.py` | `f9bdc819cae5f66c7f3450f2948fde7d89668a9248e57e80b153b5de90534482` | raw-argv preflight and immutable explicit-skill decision |
 | `tools/agent_tools/route.py` | `544ce80bfba6be4817f28e4c16801483f9e929e5502a6e7698d7f328f50e4ee7` | public explicit-skill route composition/rendering; preserves the rebound deterministic `search.py` invocation |
-| `documents/conventions/object-oriented-design.md` | `232d81fa627fc742679aa3c3958b41252330c3585a4f750bde773dd57db338e9` | shared type, invariant, boundary, and dependency policy |
+| `documents/conventio../conventions/object-oriented-design.md` | `232d81fa627fc742679aa3c3958b41252330c3585a4f750bde773dd57db338e9` | shared type, invariant, boundary, and dependency policy |
 
 The one permitted rebind from `3ce14a5e` to `404678e1` changed exactly seven
 paths inside this design's future write set. Their immutable old/new identities

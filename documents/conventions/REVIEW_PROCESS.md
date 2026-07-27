@@ -3,7 +3,7 @@
 contract reference
 responsibility Documents レビュー手順とポリシー for this repository.
 upstream design README.md durable document index
-upstream design ../issues/README.md durable issue and GitHub mirror policy
+upstream design ../../issues/README.md durable issue and GitHub mirror policy
 downstream design ../design/algorithm-implementation-boundary.md algorithm math-to-code boundary policy
 @dependency-end
 -->

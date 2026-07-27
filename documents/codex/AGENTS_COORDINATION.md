@@ -4,7 +4,7 @@
 contract reference
 responsibility Documents エージェント運用の入口 for this repository.
 upstream design README.md durable document index
-upstream design ../ROOT_AGENTS.md template-root Codex runtime instruction surface
+upstream design ../../ROOT_AGENTS.md template-root Codex runtime instruction surface
 upstream design ../../AGENTS.md standalone AgentCanon Codex runtime instruction surface
 @dependency-end
 -->

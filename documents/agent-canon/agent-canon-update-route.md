@@ -4,7 +4,7 @@ contract reference
 responsibility Owns the canonical AgentCanon source-to-parent update transaction and namespace boundaries.
 upstream design ../../agents/skills/agent-orchestration.md owns Decision Sufficiency policy.
 upstream design ../../agents/skills/structure-refactor.md owns final-structure-first scope formation.
-upstream design ./rule/dependency-module-changes.md owns generic dependency source-clone and clean-projection policy.
+upstream design ../rule/dependency-module-changes.md owns generic dependency source-clone and clean-projection policy.
 upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns lifecycle schemas and transition guards.
 downstream implementation ../../tools/update_agent_canon.sh executes source rebind, queue/frontier, and parent-projection guards.
 downstream implementation ../../tools/agent_tools/publication_integrator.py owns source publication CAS/readback.
@@ -46,7 +46,7 @@ repository is a parent projection consumer and never becomes a second source
 namespace.
 
 For any dependency source edit, first apply
-`documents/rule/dependency-module-changes.md`: prepare or reuse the exact
+`document../rule/dependency-module-changes.md`: prepare or reuse the exact
 topic workspace branch clone, edit there, publish the source result, and project a
 clean vendor pin. Parent mode is not a source branch. Its
 `merge-main-into-current*` routes refuse vendor mutation in parent mode and

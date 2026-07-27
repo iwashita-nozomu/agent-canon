@@ -3,8 +3,8 @@
 contract policy
 responsibility Documents プロジェクト全体の運用規約 for this repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
-upstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
-upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
+upstream design ../contracts/github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
+upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
 downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates legacy forwarder warning policy
 downstream implementation ../../tools/agent_tools/convention_compliance_contracts.toml declares convention marker contracts
 @dependency-end

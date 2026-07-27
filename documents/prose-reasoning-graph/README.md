@@ -6,7 +6,7 @@ upstream design ../README.md AgentCanon document index
 upstream design ../structured-analysis/README.md structured analysis package boundary
 upstream design ../structured-analysis/graph-dsl.md shared Graph DSL Core storage contract
 downstream design dsl-spec.md normative DSL and graph contract
-downstream design ../../tools/prose_reasoning_graph.md tool usage documentation
+downstream design ../../tools/agent_tools/prose_reasoning_graph.py tool usage documentation
 downstream design ../../agents/skills/prose-reasoning-graph.md skill handoff contract
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py current MVP implementation
 @dependency-end

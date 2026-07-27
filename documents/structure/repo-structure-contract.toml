@@ -5,7 +5,7 @@
 # upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared root surface policy
 # upstream design ../runtime/shared-runtime-surfaces.toml machine-readable shared root surface manifest
 # downstream implementation ../../tools/agent_tools/repo_structure_contract.py compares observed trees against this contract
-# downstream implementation ../tests/agent_tools/test_repo_structure_contract.py tests structure contract validation
+# downstream implementation ../../tests/agent_tools/test_repo_structure_contract.py tests structure contract validation
 # @dependency-end
 
 catalog_kind = "agent_canon_repo_structure_contract"
