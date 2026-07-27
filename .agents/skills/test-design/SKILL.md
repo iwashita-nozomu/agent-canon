@@ -1,6 +1,6 @@
 ---
 name: test-design
-description: Use only after the owning implementation mechanism exists when an explicit unresolved oracle, specification, regression, or failure-mode risk remains beyond static analysis, existing checkers, and targeted validation.
+description: Use after the owning implementation mechanism exists to proactively design a logically minimal test set; classify unresolved oracle, specification, regression, and failure-mode risk before adding cases.
 ---
 <!--
 @dependency-start
@@ -26,11 +26,17 @@ Execute the required and task-matching conditional commands that the packet prin
 <!-- skill-tool-commands:end -->
 
 
-1. Read `agents/skills/test-design.md` and return `Activation Decision` first.
+1. Read `agents/skills/test-design.md` and return `Activation Decision` first. This is
+   a post-start classification, not a pre-start gate; once selected, run the
+   classification before deciding the test cases.
 1. Confirm that the owning production design / algorithm contract and implementation mechanism are established or repaired. If not, return `activation=deferred` with the owning repair route; do not run tools or require `test_plan.md`.
-1. Confirm a concrete unresolved oracle, specification, regression, or failure-mode risk remains outside static analysis, existing checkers, and targeted validation. Ordinary code changes, bug fixes, parser changes, and validation failures alone do not activate this skill.
+1. Confirm a concrete unresolved oracle, specification, regression, or failure-mode risk remains outside static analysis, existing checkers, and targeted validation. Ordinary code changes, bug fixes, parser changes, and validation failures alone do not justify unlimited test creation.
 1. If the risk is absent or checker-owned, return `activation=not_needed` with the canonical validation route; do not run test-design tools or require `test_plan.md`.
 1. Only for `activation=required`, record code paths and related test paths as survey and placement evidence, inspect branches/parsing/error/state transitions, and design a concrete behavior-regression oracle.
+1. `activation=required` does not mean exhaustive test generation. Choose one
+   stable observation level per unresolved risk, reuse one case when it covers
+   multiple risks, and omit duplicate contract checks, no-crash checks, and
+   internal-shape checks already owned by static validation or existing tests.
 1. For algorithm fixes, enter through the algorithm contract and code-side
    repair route before changing tests. Read the public entrypoint, recurrence or
    state transition, invariant, stopping or acceptance rule, failure semantics,

@@ -103,6 +103,25 @@ that decision.
 1. implementation が scope に入るときだけ Codex routing を出す
 1. tool が既に check した property を `explorer` や read-only reviewer に再読解させない。subagent へ渡すのは structured tool artifact と owned finding scope で、tool output が必要な抽象を欠く場合は tool contract の不足として扱う
 
+## Validation Boundary Contract
+
+検査を選ぶ前に、対象propertyの論理的な役割を次の三つから分類します。
+
+- `necessary_presence`: 要求されたディレクトリ、ファイル、リンク、正本参照、または入力条件が存在すること。欠落はfailureですが、存在だけでは実装や構造全体の正しさを証明しません。
+- `forbidden_presence`: 削除済みラッパー、旧経路、禁止されたroot copy、またはownerが明示した不許可surfaceが存在しないこと。存在はfailureですが、無いことだけでは他の要件を証明しません。
+- `sufficient_behavior`: 実装の意味、公開契約、状態遷移、数理特性、またはreader-facing成果が成立すること。これはownerが明示した場合だけ、必要な観測・静的解析・証明・テストで閉じます。
+
+readiness、構造確認、移行漏れ確認は原則として `necessary_presence` と
+`forbidden_presence` に留めます。例示tree、manifestの列挙、コピーの存在、
+format成功を、完成形の十分条件や全責務の証明へ自動昇格させません。
+`sufficient_behavior` が未要求の作業に、動作テスト、完全一致比較、実行成功、
+網羅的レビューを追加してはいけません。逆にownerが十分条件を要求した場合は、
+必要条件だけで完了扱いにせず、要求されたbehavior evidenceへ進みます。
+
+各validation itemは `boundary_class`、failure predicate、owner surface、次に
+変わる判断をrouting packetまたはtool artifactで示します。判断が変わらない
+確認は重複確認として削除し、warningだけの確認はcompletion gateに昇格させません。
+
 mode の意味:
 
 - `repo-changing execution`

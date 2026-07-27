@@ -234,9 +234,12 @@ rearchitecture`), `scheduler`, `schedule_reviewer`, `project_reviewer`,
 activate only the owner-critical roles selected by the route. `researcher`, `research_reviewer`, `infra_steward`,
 `infra_reviewer` and `python_reviewer` require explicit parent-packet evidence,
 changed-path evidence, or an explicitly selected review pack. `test_designer`
-additionally requires an implementation handoff that records an established or
-repaired owning mechanism and a concrete unresolved oracle, specification,
-regression, or failure-mode risk outside existing validation.
+requires an implementation handoff that records an established or repaired
+owning mechanism. Launch it proactively after that handoff; its first output is
+an activation decision and boundary classification. Only an unresolved oracle,
+specification, regression, or failure-mode risk outside existing validation
+produces test cases, and the resulting set must be logically minimal while
+covering the selected contract.
 `plan`, `review`, and `edit` are conditional stage candidates. When selected,
 `team_manifest.yaml` may record `run.standard_wave_sequence` and a dynamic wave
 may point to it with `standard_sequence_ref`; neither field makes an unselected
@@ -604,7 +607,7 @@ Activation Conditions:
 - `long_form_writer`
   - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書を、graph/DSL closure 後に roadmap-led で prose projection する
 - `test_designer`
-  - 実装後に owning mechanism が確立または修復済みで、既存の static analysis、checker、targeted validation の所有範囲外に具体的な oracle / specification / regression / failure-mode risk が残る場合だけ、activation decision を返し、必要なら test plan を起こす
+  - owning mechanism の確立または修復後に積極的に起動し、まず activation decision と boundary classification を返す。既存のstatic analysis、checker、targeted validationの外側にある未解決oracleだけを、重複・no-crash・内部形状固定なしの論理的に最小なtest planへ落とす
 - `diff_triage_reviewer`
   - 狭い diff の triage review を境界証拠付きで行い、language-specific reviewer または broad `reviewer` へ上げるかを決める
 - `ship_reviewer`
