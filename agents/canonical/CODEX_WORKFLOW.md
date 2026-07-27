@@ -405,6 +405,7 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 
 - 各 must-do clause と completion-evidence clause が、実装、文書、test、command、artifact、または明示された deferred / rejected clause に対応している
 - request に含まれる仕様と実際の product surface の間に未実装の gap が残っていない
+- validation は `necessary_presence`、`forbidden_presence`、`sufficient_behavior` を区別する。必要なpath・linkの存在や禁止された旧経路の不在をbehavior成立の十分条件へ昇格させず、behaviorの十分条件が要求されない作業に実行テスト・完全一致比較・網羅レビューを追加しない
 - schedule、review、validation、commit / push、shared canon sync、follow-up 判断を含む今回 scope の task が 1 つも未完了で残っていない
 - task が数式、擬似コード、仕様、method contract を持つ場合、runtime success ではなく
   静的解析・読み取りによる implementation alignment evidence が review artifact に
@@ -477,6 +478,7 @@ checked and cited.
   - `cpp-review`
 - test design:
   - `test-design`
+- owning implementation mechanism の確立または修復後は `test-design` / `test_designer` を積極的に起動し、Activation Decision と boundary classification を先に返す。起動後は未解決oracleを必要十分に覆う最小ケースだけを設計し、checker-owned property、重複契約、no-crash、内部形状固定をtestへ追加しない
 - paper writing:
   - `paper-writing`
 - general explanatory docs:

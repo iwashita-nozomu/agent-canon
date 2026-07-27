@@ -64,7 +64,12 @@ set -euo pipefail
 #
 # ═══════════════════════════════════════════════════════════════════════════
 
-WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_DIR}/../lib/repo_paths.sh"
+WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
+CANON_TOOLS_ROOT="$(agent_canon_tools_root "$WORKSPACE_ROOT")"
+CANON_CI_ROOT="${CANON_TOOLS_ROOT}/ci"
+CANON_BIN="${CANON_TOOLS_ROOT}/bin/agent-canon"
 cd "$WORKSPACE_ROOT"
 
 AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
@@ -152,7 +157,7 @@ EXIT_CODE=0
 
 if [ -f "${WORKSPACE_ROOT}/WORKTREE_SCOPE.md" ]; then
   echo "0️⃣a worktree scope / action-log checks を実行中..."
-  if "$PYTHON_BIN" tools/agent_tools/worktree_scope_lint.py --current 2>&1; then
+  if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/worktree_scope_lint.py" --current 2>&1; then
     echo "✅ worktree scope / action-log checks 成功"
   else
     echo "❌ worktree scope / action-log checks 失敗"
@@ -163,49 +168,49 @@ fi
 
 # 0. agent/runtime sync checks
 echo "0️⃣  agent/runtime sync checks を実行中..."
-if "$PYTHON_BIN" tools/agent_tools/smoke_test_research_perspective_pack.py 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/smoke_test_research_perspective_pack.py" 2>&1; then
   echo "✅ research perspective pack smoke test 成功"
 else
   echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/check_dependency_headers.py --changed 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_dependency_headers.py" --changed 2>&1; then
   echo "✅ dependency header checks 成功"
 else
   echo "❌ dependency header checks 失敗"
   EXIT_CODE=1
 fi
-if bash tools/agent_tools/scan_dependency_headers.sh --changed 2>&1; then
+if bash "${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh" --changed 2>&1; then
   echo "✅ dependency manifest scan 成功"
 else
   echo "❌ dependency manifest scan 失敗"
   EXIT_CODE=1
 fi
-if bash tools/agent_tools/check_dependency_header_format.sh --changed 2>&1; then
+if bash "${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh" --changed 2>&1; then
   echo "✅ dependency manifest format checks 成功"
 else
   echo "❌ dependency manifest format checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_hardcoded_numbers.py" --changed --exclude tests --exclude vendor --exclude reports 2>&1; then
   echo "✅ hardcoded numeric literal checks 成功"
 else
   echo "❌ hardcoded numeric literal checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/check_static_any.py 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_static_any.py" 2>&1; then
   echo "✅ explicit Any static checks 成功"
 else
   echo "❌ explicit Any static checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_log_helper_names.py" --changed --exclude vendor --exclude reports 2>&1; then
   echo "✅ log helper naming checks 成功"
 else
   echo "❌ log helper naming checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/import_responsibility.py --changed 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/import_responsibility.py" --changed 2>&1; then
   echo "✅ import responsibility checks 成功"
 else
   echo "❌ import responsibility checks 失敗"
@@ -218,56 +223,56 @@ else
   EXIT_CODE=1
 fi
 if [ -d python ]; then
-  if "$PYTHON_BIN" tools/agent_tools/check_algorithm_module_nested_contract.py python 2>&1; then
+  if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_algorithm_module_nested_contract.py" python 2>&1; then
     echo "✅ algorithm module nested contract checks 成功"
   else
     echo "❌ algorithm module nested contract checks 失敗"
     EXIT_CODE=1
   fi
 fi
-if "$PYTHON_BIN" tools/agent_tools/check_convention_compliance.py 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py" 2>&1; then
   echo "✅ convention compliance wiring checks 成功"
 else
   echo "❌ convention compliance wiring checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/check_skill_frontmatter.py 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_skill_frontmatter.py" 2>&1; then
   echo "✅ runtime skill frontmatter checks 成功"
 else
   echo "❌ runtime skill frontmatter checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/skill_tool_commands.py check 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check 2>&1; then
   echo "✅ runtime skill tool command checks 成功"
 else
   echo "❌ runtime skill tool command checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/tool_catalog.py 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/tool_catalog.py" 2>&1; then
   echo "✅ tool catalog checks 成功"
 else
   echo "❌ tool catalog checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/tool_proof_coverage.py 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/tool_proof_coverage.py" 2>&1; then
   echo "✅ tool proof coverage checks 成功"
 else
   echo "❌ tool proof coverage checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/tool_drift.py 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py" 2>&1; then
   echo "✅ tool/convention drift checks 成功"
 else
   echo "❌ tool/convention drift checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/responsibility_scope.py 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/responsibility_scope.py" 2>&1; then
   echo "✅ responsibility scope checks 成功"
 else
   echo "❌ responsibility scope checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/issue_sync.py 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/issue_sync.py" 2>&1; then
   echo "✅ local issue sync checks 成功"
 else
   echo "❌ local issue sync checks 失敗"
@@ -275,13 +280,13 @@ else
 fi
 accumulated_eval_args=(--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}")
 if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
-  "$PYTHON_BIN" tools/agent_tools/run_accumulated_agent_evals.py "${accumulated_eval_args[@]}" 2>&1; then
+  "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then
   echo "✅ accumulated agent eval producers 成功"
 else
   echo "❌ accumulated agent eval producers 失敗"
   EXIT_CODE=1
 fi
-if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" tools/agent_tools/eval_accumulation_check.py 2>&1; then
+if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/eval_accumulation_check.py" 2>&1; then
   echo "✅ eval accumulation checks 成功"
 else
   echo "❌ eval accumulation checks 失敗"
@@ -307,13 +312,13 @@ else
 fi
 if [ "$SKIP_GITHUB_WORKFLOWS" -eq 1 ]; then
   echo "GITHUB_WORKFLOW_CHECKS=skip reason=already_checked_by_parent_gate"
-elif "$PYTHON_BIN" tools/ci/check_github_workflows.py 2>&1; then
+elif "$PYTHON_BIN" "${CANON_CI_ROOT}/check_github_workflows.py" 2>&1; then
   echo "✅ GitHub workflow / PR template checks 成功"
 else
   echo "❌ GitHub workflow / PR template checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/ci/container_config.py 2>&1; then
+if "$PYTHON_BIN" "${CANON_CI_ROOT}/container_config.py" 2>&1; then
   echo "✅ container configuration checks 成功"
 else
   echo "❌ container configuration checks 失敗"
@@ -325,7 +330,7 @@ echo ""
 echo "1️⃣  documentation checks を実行中..."
 if [ "$SKIP_DOCS" -eq 1 ]; then
   echo "DOCS_CHECKS=skip reason=already_checked_by_parent_gate"
-elif tools/bin/agent-canon docs check 2>&1; then
+elif "$CANON_BIN" docs check 2>&1; then
   echo "✅ documentation checks 成功"
 else
   echo "❌ documentation checks 失敗"
@@ -338,7 +343,7 @@ echo "2️⃣  experiment registry checks を実行中..."
 if [ ! -e experiments/registry.toml ]; then
   echo "EXPERIMENT_REGISTRY=skip"
   echo "experiment registry absent in this checkout; skipping registry validation"
-elif "$PYTHON_BIN" tools/ci/check_experiment_registry.py 2>&1; then
+elif "$PYTHON_BIN" "${CANON_CI_ROOT}/check_experiment_registry.py" 2>&1; then
   echo "✅ experiment registry checks 成功"
 else
   echo "❌ experiment registry checks 失敗"
@@ -351,7 +356,7 @@ python_quality_args=()
 if [ "$QUICK_MODE" -eq 1 ]; then
   python_quality_args+=(--quick)
 fi
-if bash tools/ci/run_python_quality_checks.sh "${python_quality_args[@]}"; then
+if bash "${CANON_CI_ROOT}/run_python_quality_checks.sh" "${python_quality_args[@]}"; then
   echo "✅ Python quality checks 成功"
 else
   echo "❌ Python quality checks 失敗"

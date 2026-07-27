@@ -8,7 +8,10 @@
 # @dependency-end
 set -euo pipefail
 
-WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_DIR}/../lib/repo_paths.sh"
+WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
+CANON_TOOLS_ROOT="$(agent_canon_tools_root "$WORKSPACE_ROOT")"
 cd "${WORKSPACE_ROOT}"
 
 PYTHON_BIN="${PYTHON_BIN:-}"
@@ -38,9 +41,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 PYTHON_IMPORT_PATHS=()
-for candidate_path in python tools/agent_tools tools .codex/hooks; do
+for candidate_path in python "${CANON_TOOLS_ROOT}/agent_tools" "${CANON_TOOLS_ROOT}" .codex/hooks; do
   if [ -d "${candidate_path}" ]; then
-    PYTHON_IMPORT_PATHS+=("${WORKSPACE_ROOT}/${candidate_path}")
+    PYTHON_IMPORT_PATHS+=("${candidate_path}")
   fi
 done
 if [ ${#PYTHON_IMPORT_PATHS[@]} -gt 0 ]; then
@@ -73,12 +76,12 @@ if [ -d python ]; then
 else
   AGENT_CANON_W2_OWNER_PATHS=(
     .codex/hooks/completion_review_guard.py \
-    tools/agent_tools/artifact_identity.py \
-    tools/agent_tools/external_artifact_binding.py \
-    tools/agent_tools/publication_integrator.py \
-    tools/agent_tools/report_artifact_checks.py \
-    tools/agent_tools/review_dispatch.py \
-    tools/agent_tools/work_log.py \
+    "${CANON_TOOLS_ROOT}/agent_tools/artifact_identity.py" \
+    "${CANON_TOOLS_ROOT}/agent_tools/external_artifact_binding.py" \
+    "${CANON_TOOLS_ROOT}/agent_tools/publication_integrator.py" \
+    "${CANON_TOOLS_ROOT}/agent_tools/report_artifact_checks.py" \
+    "${CANON_TOOLS_ROOT}/agent_tools/review_dispatch.py" \
+    "${CANON_TOOLS_ROOT}/agent_tools/work_log.py" \
     tests/agent_tools/test_artifact_identity.py \
     tests/agent_tools/test_codex_hooks.py \
     tests/agent_tools/test_external_artifact_binding.py \
