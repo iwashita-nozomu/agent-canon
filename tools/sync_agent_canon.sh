@@ -405,7 +405,47 @@ copy_path() {
   [ -e "$abs_source" ] || die "copy source '$source' does not exist"
   rm -rf "$abs_path"
   mkdir -p "$(dirname "$abs_path")"
-  cp "$abs_source" "$abs_path"
+  project_copy_source "$abs_source" > "$abs_path"
+  chmod --reference="$abs_source" "$abs_path"
+}
+
+parent_copy_projection_enabled() {
+  [ -n "$SUPERPROJECT_DIR" ] \
+    && [ -L "$ROOT_DIR/tools/agent-canon" ] \
+    && [ "$(readlink "$ROOT_DIR/tools/agent-canon")" = "../vendor/agent-canon/tools" ]
+}
+
+project_copy_source() {
+  local source="$1"
+  if ! parent_copy_projection_enabled; then
+    cat "$source"
+    return
+  fi
+
+  perl -pe '
+    s{vendor/agent-canon/tools/}{__CANON_TOOLS__/}g;
+    s{vendor/agent-canon/documents/}{__CANON_DOCUMENTS__/}g;
+    s{vendor/agent-canon/issues/}{__CANON_ISSUES__/}g;
+    s{documents/tools/}{__DOCUMENTS_TOOLS__/}g;
+    s{tests/tools/}{__TESTS_TOOLS__/}g;
+    s{tools/agent-canon/}{__PARENT_TOOLS__/}g;
+    s{((?:\.\./)+)documents/}{$1vendor/agent-canon/documents/}g;
+    s{((?:\.\./)+)issues/}{$1vendor/agent-canon/issues/}g;
+    s{((?:\.\./)+)tools/}{$1tools/agent-canon/}g;
+    s{(?<![A-Za-z0-9_./-])tools/}{tools/agent-canon/}g;
+    s{__CANON_TOOLS__}{vendor/agent-canon/tools/}g;
+    s{__CANON_DOCUMENTS__}{vendor/agent-canon/documents/}g;
+    s{__CANON_ISSUES__}{vendor/agent-canon/issues/}g;
+    s{__DOCUMENTS_TOOLS__}{documents/tools/}g;
+    s{__TESTS_TOOLS__}{tests/tools/}g;
+    s{__PARENT_TOOLS__}{tools/agent-canon/}g;
+  ' "$source"
+}
+
+copy_matches_source() {
+  local destination="$1"
+  local source="$2"
+  cmp -s "$destination" <(project_copy_source "$source")
 }
 
 regular_path() {
@@ -572,7 +612,8 @@ cmd_check() {
     local source="${spec#*:}"
     local abs_path="$ROOT_DIR/$path"
     local abs_source="$ROOT_DIR/$source"
-    if [ -f "$abs_path" ] && [ -f "$abs_source" ] && cmp -s "$abs_path" "$abs_source"; then
+    if [ -f "$abs_path" ] && [ -f "$abs_source" ] \
+      && copy_matches_source "$abs_path" "$abs_source"; then
       continue
     fi
     if [ -e "$abs_path" ]; then
