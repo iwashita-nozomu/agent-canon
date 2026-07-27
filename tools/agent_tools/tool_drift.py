@@ -529,7 +529,8 @@ def repo_relative(root: Path, path: Path) -> str:
 
 def normalize_target(root: Path, source: Path, relative_target: str) -> str:
     """Normalize one manifest target relative to its source file."""
-    return repo_relative(root, source.parent / relative_target)
+    logical_source = root / repo_relative(root, source)
+    return repo_relative(root, logical_source.parent / relative_target)
 
 
 def manifest_edges(root: Path, relative_path: str) -> tuple[ManifestEdge, ...]:
