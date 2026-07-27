@@ -243,9 +243,16 @@ def validate_protecting_tools(
     """Validate that scope protecting tools exist and are cataloged."""
     findings: list[Finding] = []
     for tool in scope.protecting_tools:
-        if not (root / tool).exists():
+        logical_tool = cast(str, logical_tool_path(tool))
+        candidates = (root / logical_tool,)
+        if logical_tool.startswith("tools/"):
+            candidates += (
+                root / "tools" / "agent-canon" / logical_tool.removeprefix("tools/"),
+                root / "vendor" / "agent-canon" / logical_tool,
+            )
+        if not any(candidate.exists() for candidate in candidates):
             findings.append(Finding("scope_tool", scope.scope_id, f"missing:{tool}"))
-        if tool not in catalog_paths:
+        if logical_tool not in catalog_paths:
             findings.append(Finding("scope_tool", scope.scope_id, f"uncataloged:{tool}"))
     return findings
 
