@@ -119,23 +119,24 @@ either parent-owned path; both are optional project content.
 
 ### Tools Directory Boundary
 
-Root `tools/` is a symlink view, not a project-local implementation directory.
-Its source is `vendor/agent-canon/tools/`, which owns shared agent tooling,
-workflow automation, CI helpers, container runners, document maintenance tools,
-and static-analysis utilities.
+The standalone AgentCanon source owns the real `tools/` directory. In a template
+or derived parent repository, Root `tools/` is a parent-owned regular container,
+and its shared-canon child is the single symlink
+`tools/agent-canon -> ../vendor/agent-canon/tools`.
 
-Parent repositories call shared tooling through the stable root command path,
-such as `python3 tools/agent_tools/check_convention_compliance.py`. Generic
+Parent repositories call shared tooling through the explicit AgentCanon
+namespace, such as
+`python3 tools/agent-canon/agent_tools/check_convention_compliance.py`.
+Parent-local automation may live directly under root `tools/`, while shared
 tool edits use the independent source-clone route in
-`documents/rule/dependency-module-changes.md`; `vendor/agent-canon/tools/...`
-is only the clean pin projection. Project-local automation must stay in project-owned paths, such as
-`scripts/`, package-local modules, project-specific CI files, or another
-repo-owned path. A derived repository must not turn root `tools/` into a mixed
-directory or add project-specific files under that symlink view.
+`documents/rule/dependency-module-changes.md`. The container and child symlink
+prevent parent-local tools from being mixed into the AgentCanon source.
+Project-local automation must stay in project-owned paths, and the pinned
+implementation source remains `vendor/agent-canon/tools/`.
 
-Inventory and review tooling should distinguish these roles: `tools/` at the
-root is the AgentCanon tool view, and `vendor/agent-canon/tools/` is the
-AgentCanon tool source.
+Inventory and review tooling must distinguish these roles: standalone
+`tools/` is the AgentCanon source, parent `tools/` is a local container, and
+`tools/agent-canon` is the only shared-tool projection in that container.
 
 GitHub-facing AgentCanon symlink views include `.github/AGENTS.md`.
 

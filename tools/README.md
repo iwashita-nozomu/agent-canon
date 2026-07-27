@@ -38,25 +38,28 @@ downstream implementation ../rust/agent-canon/src/test_design.rs runs test desig
 @dependency-end
 -->
 
-Root `tools/` is a symlink view into `vendor/agent-canon/tools/`. The root path
-is the stable command surface for template and derived repositories; the
-vendored AgentCanon path is the canonical implementation source. These two
-paths must not become separate ownership surfaces.
+The standalone AgentCanon source owns the real `tools/` directory. In a
+template or derived parent repository, root `tools/` is a parent-owned regular
+container and `tools/agent-canon -> ../vendor/agent-canon/tools` is the single
+shared-tool view. These paths must not become separate AgentCanon ownership
+surfaces.
 
 Shared agent helper, CI/check, container runner, experiment helper, Markdown
-maintenance, and validation tools live in `vendor/agent-canon/tools/` and are
-called through `tools/...` from parent repositories. Project-local automation
-that is not reusable AgentCanon capability belongs in project-owned paths such
-as `scripts/`, package-local modules, or repo-specific CI files. Do not add
-project-specific files under root `tools/`; it is an AgentCanon-owned runtime
-view.
+maintenance, and validation tools live in the standalone source `tools/` and
+are called through `tools/agent-canon/...` from parent repositories.
+Project-local automation that is not reusable AgentCanon capability belongs in
+the parent-owned `tools/` container or other project-owned paths such as
+`scripts/`, package-local modules, or repo-specific CI files. Do not copy
+AgentCanon files directly into that container.
 
 When a change is generic, read `documents/rule/dependency-module-changes.md`,
 edit the managed source clone in the topic workspace, open or merge an
-AgentCanon change, update the parent repo submodule pin, and repair the root
-view with `bash tools/sync_agent_canon.sh link-root`. When a command or test log
-mentions `tools/...`, read it as the root execution path for AgentCanon-owned
-tooling unless the path is explicitly project-owned elsewhere.
+AgentCanon change, update the parent repo submodule pin, and repair the parent
+view with `bash tools/agent-canon/sync_agent_canon.sh link-root`. In the
+standalone source the equivalent command remains
+`bash tools/sync_agent_canon.sh link-root`. When a parent command or test log
+mentions `tools/agent-canon/...`, read it as the execution path for
+AgentCanon-owned tooling unless the path is explicitly project-owned elsewhere.
 
 Mutating AgentCanon update routes must receive the existing validated Git
 authority/reason fields and

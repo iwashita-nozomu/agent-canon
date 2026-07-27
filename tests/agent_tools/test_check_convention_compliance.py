@@ -144,7 +144,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "documents/contracts/template-bootstrap.md "
         "documents/contracts/github-first-module-and-devcontainer-policy.md "
         "memory/USER_PREFERENCES.md "
-        "tests/agent_tools/ Root `tools/` is a symlink view "
+        "tests/agent_tools/ Root `tools/` is a parent-owned regular container "
+        "tools/agent-canon -> ../vendor/agent-canon/tools "
         "vendor/agent-canon/tools/ "
         "Project-local automation must stay in project-owned paths\n"
     ),
@@ -921,7 +922,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / "documents" / "SHARED_RUNTIME_SURFACES.md").write_text(
+            (root / "documents" / "runtime" / "SHARED_RUNTIME_SURFACES.md").write_text(
                 "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml\n",
                 encoding="utf-8",
             )

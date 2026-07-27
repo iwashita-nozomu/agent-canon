@@ -820,7 +820,8 @@ SURFACE_POLICY_MARKERS = (
     "documents/contracts/github-first-module-and-devcontainer-policy.md",
     "memory/USER_PREFERENCES.md",
     "tests/agent_tools/",
-    "Root `tools/` is a symlink view",
+    "Root `tools/` is a parent-owned regular container",
+    "tools/agent-canon -> ../vendor/agent-canon/tools",
     "vendor/agent-canon/tools/",
     "Project-local automation must stay in project-owned paths",
 )

@@ -417,6 +417,11 @@ regular_path() {
     && { [ "$path" != ".vscode" ] || [ -d "$abs_path" ]; }; then
     return
   fi
+  if [ -z "$source" ]; then
+    rm -rf "$abs_path"
+    mkdir -p "$abs_path"
+    return
+  fi
   [ -n "$source" ] || die "regular path '$path' is missing or is a symlink and has no seed source"
   abs_source="$ROOT_DIR/$source"
   [ -e "$abs_source" ] || die "regular seed source '$source' does not exist"
