@@ -233,7 +233,15 @@ path constraint のための checked copy に限定します。regular file / di
 │   ├── config.toml -> ../vendor/agent-canon/.codex/config.toml
 │   ├── project-config.toml  # optional parent-owned skill overlay
 │   └── project-skills/  # optional parent-owned additions
-├── .devcontainer -> vendor/agent-canon/.devcontainer
+├── .devcontainer/
+│   ├── bootstrap-shared-runtime.sh
+│   ├── finalize-shared-runtime.sh
+│   ├── post-create.sh
+│   ├── post-create-parent.sh  # optional
+│   ├── post-attach.sh
+│   ├── generate-runtime-compose.sh
+│   ├── devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json
+│   └── ...（親固有の wrapper / 設定）
 ├── .github/
 │   ├── AGENTS.md -> ../vendor/agent-canon/.github/AGENTS.md
 │   ├── PULL_REQUEST_TEMPLATE/
@@ -285,7 +293,10 @@ python3 tools/agent_tools/parent_repo_readiness.py --root <parent-root> --tree-d
 - `.agents -> vendor/agent-canon/.agents`: Codex skill discovery 用の root view。
 - `.codex/config.toml -> vendor/agent-canon/.codex/config.toml`: Codex runtime config の共有 view。
 - `.codex/agents -> vendor/agent-canon/.codex/agents`: Codex subagent role TOML の共有 view。
-- `.devcontainer -> vendor/agent-canon/.devcontainer`: devcontainer profile の共有 view。
+- `.devcontainer/`: 親-owned の実体ディレクトリ。AgentCanon の共通 `devcontainer.json` は
+  `.devcontainer/devcontainer.json` へ symlink され、その他の runtime スクリプトは
+  親固有 wrapper として配置され、Vendor source 側は `../vendor/agent-canon/.devcontainer/*`
+  を相対参照します。
 - `.vscode/`: parent-owned real directory with the four individual AgentCanon symlink surfaces。
 - `tools -> vendor/agent-canon/tools`: shared automation の共有 view。
 - `documents/*`: template / derived repo root では active contract だけを regular file として残し、AgentCanon-owned shared policy docs は `vendor/agent-canon/documents/` から読みます。

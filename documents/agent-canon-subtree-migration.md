@@ -40,7 +40,9 @@ downstream implementation ../tools/update_agent_canon.sh derived repo update hel
 - root 側の shared runtime surface:
   - `documents/shared-runtime-surfaces.toml` に載っている symlink view、synced copy、regular active contract、repo-local state
 - root 側の shared devcontainer:
-  - `.devcontainer/` は AgentCanon-owned symlink view とし、repo-local Dockerfile / runtime pack を消費する
+  - `.devcontainer/` は親-owned の実体ディレクトリ。`bootstrap-shared-runtime.sh` や
+    `finalize-shared-runtime.sh` などは親 wrapper で管理し、`devcontainer.json` だけを
+    AgentCanon source (`vendor/agent-canon/.devcontainer/devcontainer.json`) へ symlink します。
 - root 側の template entrypoint:
   - `README.md`
   - `QUICK_START.md`

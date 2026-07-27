@@ -32,7 +32,12 @@ fi
 repo_basename="$(basename "$repo_root")"
 container_repo_root="/workspace/${repo_basename}"
 pack="${repo_root}/docker/packs/default.toml"
-output="${repo_root}/.devcontainer/docker-compose.generated.yml"
+compose_output_raw="${AGENT_CANON_DOCKER_COMPOSE_OUTPUT:-.devcontainer/docker-compose.generated.yml}"
+if [ "${compose_output_raw#/}" = "$compose_output_raw" ]; then
+  compose_output="${repo_root}/${compose_output_raw}"
+else
+  compose_output="$compose_output_raw"
+fi
 default_project_name="$(
   python3 - "$repo_root" <<'PY'
 from __future__ import annotations
@@ -266,6 +271,7 @@ fi
   fi
   printf '    environment:\n'
   printf '%s\n' "${environment_lines[@]}"
-} > "$output"
+} > "$compose_output"
+
 
 printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s network=auto secret_mount=%s pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$secret_mount_status" "$pack"

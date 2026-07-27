@@ -62,7 +62,9 @@ def write_devcontainer(root: Path) -> None:
     )
     for name in ("finalize-shared-runtime.sh", "post-create.sh", "post-attach.sh"):
         write_file(root, f".devcontainer/{name}", "#!/usr/bin/env bash\n")
-    write_file(root, ".devcontainer/generate-runtime-compose.sh", "#!/usr/bin/env bash\n")
+    write_file(
+        root, ".devcontainer/generate-runtime-compose.sh", "#!/usr/bin/env bash\n"
+    )
 
 
 def write_compose(
@@ -78,12 +80,18 @@ def write_compose(
         {"type": "bind", "source": str(topic_root), "target": "/workspace"},
     ]
     if duplicate_repo_mount:
-        volumes.append({"type": "bind", "source": str(root.resolve()), "target": repo_target})
-    environment_lines = [
-        "    environment:",
-        "      AGENT_CANON_WORKSPACE_ROOT: /workspace",
-        f"      AGENT_CANON_REPOSITORY_ROOT: {repo_target}",
-    ] if include_runtime_environment else []
+        volumes.append(
+            {"type": "bind", "source": str(root.resolve()), "target": repo_target}
+        )
+    environment_lines = (
+        [
+            "    environment:",
+            "      AGENT_CANON_WORKSPACE_ROOT: /workspace",
+            f"      AGENT_CANON_REPOSITORY_ROOT: {repo_target}",
+        ]
+        if include_runtime_environment
+        else []
+    )
     write_file(
         root,
         ".devcontainer/docker-compose.generated.yml",
@@ -120,8 +128,16 @@ def write_topic_fixture(
         duplicate_repo_mount=duplicate_repo_mount,
         include_runtime_environment=include_runtime_environment,
     )
-    write_file(repo, ".gitmodules", '[submodule "dependency"]\n\tpath = vendor/dependency\n\turl = https://example.invalid/dependency.git\n')
-    write_file(repo, "tools/agent_tools/dependency_module_change.py", "#!/usr/bin/env python3\n")
+    write_file(
+        repo,
+        ".gitmodules",
+        '[submodule "dependency"]\n\tpath = vendor/dependency\n\turl = https://example.invalid/dependency.git\n',
+    )
+    write_file(
+        repo,
+        "tools/agent_tools/dependency_module_change.py",
+        "#!/usr/bin/env python3\n",
+    )
     return repo
 
 
@@ -129,7 +145,7 @@ def write_surface_manifest(root: Path, prefix: str = "") -> None:
     """Write the real-container/four-individual-symlink manifest."""
     manifest = "\n".join(
         [
-            'version = 1',
+            "version = 1",
             f'prefix = "{prefix or "vendor/agent-canon"}"',
             "",
             "[[surface]]",
@@ -148,13 +164,22 @@ def write_surface_manifest(root: Path, prefix: str = "") -> None:
             "",
         ]
     )
-    path = root / ("documents/shared-runtime-surfaces.toml" if not prefix else f"{prefix}/documents/shared-runtime-surfaces.toml")
+    path = root / (
+        "documents/shared-runtime-surfaces.toml"
+        if not prefix
+        else f"{prefix}/documents/shared-runtime-surfaces.toml"
+    )
     write_file(root, str(path.relative_to(root)), manifest)
 
 
 def write_vscode_source(root: Path, relative: str = ".vscode") -> None:
     """Write regular source files for the four shared VS Code surfaces."""
-    for name in ("c_cpp_properties.json", "extensions.json", "settings.json", "tasks.json"):
+    for name in (
+        "c_cpp_properties.json",
+        "extensions.json",
+        "settings.json",
+        "tasks.json",
+    ):
         write_file(root, f"{relative}/{name}", "{}\n")
 
 
@@ -201,7 +226,11 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     """The generator writes the host topic root only into generated Compose."""
     repo = tmp_path / "workspace" / "workspace-topic" / "agent-canon"
     write_devcontainer(repo)
-    write_file(repo, ".devcontainer/generate-runtime-compose.sh", GENERATOR.read_text(encoding="utf-8"))
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
     (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
     home = tmp_path / "home"
     home.mkdir()
@@ -215,17 +244,81 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(encoding="utf-8")
+    compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
     assert compose.count('target: "/workspace"') == 1
     assert str(repo.parent.resolve()) in compose
     assert "/workspace/agent-canon" in compose
+
+
+def test_generator_accepts_explicit_output_path(tmp_path: Path) -> None:
+    """Generator writes compose output to an explicit caller-provided destination."""
+    repo = tmp_path / "workspace" / "workspace-topic" / "agent-canon"
+    write_devcontainer(repo)
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    home = tmp_path / "home"
+    output_path = repo / ".devcontainer/custom-compose.generated.yml"
+    home.mkdir()
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": str(output_path),
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert output_path.is_file(), "explicit compose output must be written"
+    default_output = repo / ".devcontainer/docker-compose.generated.yml"
+    assert not default_output.exists()
+    compose = output_path.read_text(encoding="utf-8")
+    assert compose.count('target: "/workspace"') == 1
+    assert str(repo.parent.resolve()) in compose
+    assert "/workspace/agent-canon" in compose
+
+    relative_output = ".devcontainer/custom-compose-relative.generated.yml"
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": relative_output,
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    relative_path = repo / relative_output
+    assert relative_path.is_file(), (
+        "relative compose output path must resolve from repo root"
+    )
+    relative_compose = relative_path.read_text(encoding="utf-8")
+    assert relative_compose.count('target: "/workspace"') == 1
 
 
 def test_generator_rejects_legacy_topic_root(tmp_path: Path) -> None:
     """The generator rejects the removed workspace-<topic-slug> root."""
     repo = tmp_path / "workspace-topic" / "agent-canon"
     write_devcontainer(repo)
-    write_file(repo, ".devcontainer/generate-runtime-compose.sh", GENERATOR.read_text(encoding="utf-8"))
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
     (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
     home = tmp_path / "home"
     home.mkdir()
@@ -257,8 +350,15 @@ def test_template_vscode_surface_uses_individual_symlinks(tmp_path: Path) -> Non
     write_surface_manifest(tmp_path, "vendor/agent-canon")
     write_vscode_source(tmp_path, "vendor/agent-canon/.vscode")
     (tmp_path / ".vscode").mkdir()
-    for name in ("c_cpp_properties.json", "extensions.json", "settings.json", "tasks.json"):
-        (tmp_path / ".vscode" / name).symlink_to(f"../vendor/agent-canon/.vscode/{name}")
+    for name in (
+        "c_cpp_properties.json",
+        "extensions.json",
+        "settings.json",
+        "tasks.json",
+    ):
+        (tmp_path / ".vscode" / name).symlink_to(
+            f"../vendor/agent-canon/.vscode/{name}"
+        )
 
     result = run_validator(tmp_path)
 
@@ -269,7 +369,9 @@ def test_legacy_vscode_directory_symlink_is_rejected(tmp_path: Path) -> None:
     """The checker rejects the removed whole-directory topology."""
     write_surface_manifest(tmp_path, "vendor/agent-canon")
     write_vscode_source(tmp_path, "vendor/agent-canon/.vscode")
-    (tmp_path / ".vscode").symlink_to("vendor/agent-canon/.vscode", target_is_directory=True)
+    (tmp_path / ".vscode").symlink_to(
+        "vendor/agent-canon/.vscode", target_is_directory=True
+    )
 
     result = run_validator(tmp_path)
 

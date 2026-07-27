@@ -26,6 +26,9 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
 - [protocols.md](protocols.md)
   - Protocol 層の責務分割
   - 型パラメータ化の方針
+- [devcontainer/parent-devcontainer-wrapper-policy.md](devcontainer/parent-devcontainer-wrapper-policy.md)
+  - 親root と AgentCanon source の devcontainer 境界、wrapper 順序、compose 出力、
+    親 hook 契約を定義します。
 - [experiment_runner.md](../experiment_runner.md)
   - `experiment_runner` の契約と実行モデル
 - [python-structure-hash.md](python-structure-hash.md)
