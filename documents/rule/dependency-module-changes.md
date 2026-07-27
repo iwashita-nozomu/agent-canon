@@ -43,7 +43,7 @@ rootを越える検索・編集はこの tool の責務外です。
 
 mount target と選択 repo の作業 directory は別の devcontainer 契約です。
 通常の runtime pack の既存 `workdir` schema は変更せず、
-`.devcontainer/generate-runtime-compose.sh` だけが選択 clone の親である topic
+`vendor/agent-canon/.devcontainer/generate-runtime-compose.sh` だけが選択 clone の親である topic
 root (`..`) を一度だけ source にし、選択 repo の working directory を
 `/workspace/<clone-basename>` に materialize します。build context は repo (`..`)
 のままです。通常 Docker/CI runner の `/workspace` 意味はこの devcontainer

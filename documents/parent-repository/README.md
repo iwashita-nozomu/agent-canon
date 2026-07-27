@@ -29,40 +29,25 @@ downstream design ../../README.md AgentCanon source reader route
 - 親レポ root の `documents/README.md`: 親レポ固有文書の索引。AgentCanon の
   shared document は `vendor/agent-canon/documents/` を読む。
 
-## Root の期待構造
+## Root の最低限構造
 
 ```text
 <parent-root>/
 ├── AGENTS.md -> vendor/agent-canon/ROOT_AGENTS.md
 ├── README.md                         # parent-owned regular file
-├── .agents -> vendor/agent-canon/.agents
-├── .codex/                           # parent-owned regular directory
-│   ├── agents -> ../../vendor/agent-canon/.codex/agents
-│   ├── config.toml -> ../../vendor/agent-canon/.codex/config.toml
-│   ├── project-config.toml           # optional parent-owned file
-│   └── project-skills/               # optional parent-owned directory
 ├── .devcontainer/                    # parent-owned regular directory
-│   ├── devcontainer.json -> ../../vendor/agent-canon/.devcontainer/devcontainer.json
-│   ├── bootstrap-shared-runtime.sh   # parent-owned wrapper
-│   ├── finalize-shared-runtime.sh    # parent-owned wrapper
-│   ├── generate-runtime-compose.sh   # parent-owned wrapper
-│   ├── post-attach.sh                 # parent-owned wrapper
-│   ├── post-create.sh                # parent-owned ordering wrapper
-│   └── post-create-parent.sh          # optional parent-owned hook
-├── .github/                          # parent-owned path-constrained surfaces
-├── .vscode/                          # parent-owned regular directory
-│   └── <individual AgentCanon file symlinks>
-├── agents -> vendor/agent-canon/agents
-├── documents/                        # parent-owned regular directory
-├── docker/                           # parent-owned regular directory
-├── experiments/                      # parent-owned regular directory
-├── notes/                            # parent-owned regular directory
-├── reports/                          # parent-owned generated/evidence directory
-├── tools/                            # parent-owned regular container
-│   └── agent-canon -> ../vendor/agent-canon/tools
-└── vendor/
-    └── agent-canon/                  # clean submodule pin
+│   ├── devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json
+│   └── post-create-parent.sh         # parent-specific source
+├── .gitmodules                       # AgentCanon submodule declaration
+├── documents/README.md                # parent document index
+└── vendor/agent-canon/                # AgentCanon submodule pin
 ```
+
+`.agents/`, `.codex/`, `agents/`, `.github/`, `.vscode/`, `docker/`, `experiments/`,
+`notes/`, `reports/`, `tools/`, implementation directories, and additional parent
+content are allowed extensions. Their presence, absence, and internal shape are
+owned by the relevant parent contract or directory document; this minimum does not
+claim to be a complete repository shape.
 
 ## Surface の意味
 
@@ -87,7 +72,7 @@ Regular surface は親レポが ownership を持ち、親固有の責務や stat
 ために使います。AgentCanon の source を親の regular copy として二重管理する
 ためのものではありません。
 
-- `.devcontainer/`: 親固有 wrapper と hook の実体 directory。
+- `.devcontainer/`: 親固有 source と shared `devcontainer.json` view の実体 directory。
 - `.codex/`: parent config overlay と project-specific skill の容器。
 - `.github/`: GitHub が root path を要求する checked copy と親 workflow の容器。
 - `documents/`: 親レポ固有の design / contract と document index。
@@ -108,7 +93,7 @@ Regular surface は親レポが ownership を持ち、親固有の責務や stat
 
 - `AGENTS.md`、`.agents/`、`.codex/`、`agents/`: `AGENTS.md`、
   `agents/README.md`、`agents/canonical/README.md`。
-- `.devcontainer/`: `../design/devcontainer/parent-devcontainer-wrapper-policy.md`。
+- `.devcontainer/`: `../design/devcontainer/parent-devcontainer-policy.md`。
 - `.github/`、`.vscode/`、`tools/`、`vendor/`: `../SHARED_RUNTIME_SURFACES.md`
   と各 directory の README。
 - `documents/`: `../README.md` と `../rule/README.md`。
@@ -130,18 +115,14 @@ checked copy として投影します。checked copy は独立した正本では
 ## Devcontainer 境界
 
 `.devcontainer/` 全体を `vendor/agent-canon/.devcontainer` へ Symlinkする構成は
-禁止します。directory 自体を親が所有することで、親固有 hook と shared runtime
-の順序を同じ entrypoint で表現できます。
+禁止します。directory 自体を親が所有し、共有 script は linked config から
+AgentCanon の実体パスを直接呼び出します。
 
 - `devcontainer.json` だけを AgentCanon source から Symlinkする。
-- wrapper は `BASH_SOURCE[0]` から親 root を解決し、cwd に依存せず source script
-  を呼ぶ。
-- `post-create.sh` は AgentCanon の標準処理を先に実行し、成功した場合だけ
-  `post-create-parent.sh` を実行する。
-- compose generator を source path から呼ぶときは
-  `AGENT_CANON_DEVCONTAINER_REPO_ROOT` に親 root を渡す。
-- compose の生成物は親 `.devcontainer/` に置き、`vendor/agent-canon/` に
-  混在させない。
+- shared bootstrap / post-create / post-attach / Compose generator は
+  `vendor/agent-canon/.devcontainer/` を直接呼ぶ。
+- `post-create-parent.sh` は shared post-create の成功後に呼ぶ親固有 source とする。
+- Compose の生成物は親の `.agent-canon/docker-compose.generated.yml` に置く。
 
 この分離により、shared runtime の更新と親プロジェクトの hook / build 設定を
 別々に review でき、親固有の変更が AgentCanon source の pin を汚染しません。

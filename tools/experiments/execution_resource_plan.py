@@ -12,8 +12,7 @@
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
 # downstream implementation ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
 # downstream implementation ../../experiments/_template/run.py direct GPU launch is statically prohibited
-# downstream environment ../../.devcontainer/bootstrap-shared-runtime.sh publishes the provision receipt through this owner
-# downstream environment ../../.devcontainer/finalize-shared-runtime.sh parses and publishes runtime receipts through this owner
+# downstream environment ../../.devcontainer/devcontainer.json selects the shared runtime receipt stages
 # @dependency-end
 
 # Static consumer closure: run_managed_experiment.py is the only managed-run

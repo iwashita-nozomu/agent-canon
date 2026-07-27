@@ -160,10 +160,12 @@ conventions subtrees, tool docs, reusable templates, `documents/README.md`,
 decide which repo-specific documents appear in root `documents/`.
 
 `.devcontainer/` is a parent-owned runtime container directory in derived repos.
-It holds wrappers for `bootstrap-shared-runtime.sh`, `post-create.sh`,
-`generate-runtime-compose.sh`, and `post-attach.sh`, while AgentCanon owns only
-`.devcontainer/devcontainer.json` via symlink to keep shared `devcontainer.json`
-contracts stable.
+Its minimum shared shape is the symlink
+`.devcontainer/devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json`
+and any parent-specific source such as `post-create-parent.sh`. The linked config
+calls shared scripts directly under `vendor/agent-canon/.devcontainer/`; parent
+wrappers and copied shared scripts are not part of the surface. Generated Compose
+is written to the ignored parent state path `.agent-canon/docker-compose.generated.yml`.
 
 The devcontainer consumes repo-local `docker/Dockerfile`,
 `docker/packs/default.toml`, and `docker/install_python_dependencies.sh`; it does
@@ -171,16 +173,16 @@ not make `docker/` AgentCanon-owned.
 
 GPU admission runtime identity scripts (`bootstrap-shared-runtime.sh`,
 `finalize-shared-runtime.sh`, `post-attach.sh`) remain in AgentCanon source and are
-invoked from parent wrappers by relative path under `.devcontainer/`. The exact
+invoked from the linked config by their direct `vendor/agent-canon/.devcontainer/`
+paths. The exact
 receipt paths and parser/writer ownership are defined by
 `documents/experiments/gpu-admission-r5-source-packet.md` and
 `agent-canon-environment.toml`.
 
-`parent-hook` must not replace AgentCanon shared stages. Parent-specific behavior is
-provided only by wrapper files, and `post-create.sh` in parent ownership runs
-`vendor/agent-canon/.devcontainer/post-create.sh` first, then optionally
-`post-create-parent.sh` in `set -e` mode. If AgentCanon standard `post-create`
-fails, parent hook is not executed.
+`parent-hook` must not replace AgentCanon shared stages. The linked config runs
+`vendor/agent-canon/.devcontainer/post-create.sh` first, then
+`.devcontainer/post-create-parent.sh` in `set -e` mode. If AgentCanon standard
+`post-create` fails, the parent hook is not executed.
 
 `.vscode/` is also a shared AgentCanon runtime ergonomics surface. The parent
 owns the real directory container; AgentCanon owns the individual

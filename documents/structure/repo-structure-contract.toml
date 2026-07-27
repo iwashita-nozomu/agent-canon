@@ -351,16 +351,6 @@ path = "documents/README.md"
 kind = "file"
 category = "parent_active_contract"
 
-[[profile.required]]
-path = "goal.md"
-kind = "file"
-category = "parent_state"
-
-[[profile.required]]
-path = "responsibility-scope.toml"
-kind = "file"
-category = "responsibility_scope"
-
 [[profile.optional]]
 path = "docker"
 kind = "dir"

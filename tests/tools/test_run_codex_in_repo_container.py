@@ -2,8 +2,7 @@
 # contract test
 # responsibility Tests nested Codex container runner behavior.
 # upstream implementation ../../tools/ci/run_codex_in_repo_container.py runs Codex inside the repo container
-# upstream implementation ../../.devcontainer/post-create.sh invokes runtime identity finalization before nested Codex
-# upstream implementation ../../.devcontainer/finalize-shared-runtime.sh publishes the runtime readback receipt
+# upstream implementation ../../.devcontainer/devcontainer.json selects runtime setup before nested Codex
 # upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer boundary
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact in-container runtime identity oracle
 # @dependency-end
@@ -36,7 +35,7 @@ def test_print_only_runs_shared_post_create_before_codex() -> None:
     result = run_cli("--print-only")
 
     assert result.returncode == 0, result.stderr
-    assert "bash /workspace/.devcontainer/post-create.sh /workspace" in result.stdout
+    assert "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace" in result.stdout
     assert "setpriv --reuid" in result.stdout
     assert "--user" not in result.stdout
     assert "exec codex" in result.stdout
@@ -114,7 +113,7 @@ def test_runtime_identity(tmp_path: Path) -> None:
     ).read_text(encoding="utf-8")
 
     assert result.returncode == 0, result.stderr
-    assert "bash /workspace/.devcontainer/post-create.sh /workspace" in result.stdout
+    assert "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace" in result.stdout
     assert "umask 0007" in post_create
     assert '"${devcontainer_dir}/finalize-shared-runtime.sh"' in post_create
     assert '"schema_version": "shared-runtime-readback/v1"' in finalize
