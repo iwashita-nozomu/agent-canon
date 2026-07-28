@@ -64,11 +64,17 @@ git -C vendor/agent-canon status --short --branch --untracked-files=all 2>/dev/n
    approval. Creation requires both creation and destructive authority/reason
    fields in the same command segment.
 
-1. If `vendor/agent-canon/` is a submodule, unrelated parent dirty state does not block an AgentCanon update. `make agent-canon-ensure-latest` classifies the update surface directly:
+1. If `vendor/agent-canon/` is a submodule, unrelated parent dirty state does not block an AgentCanon update. `make agent-canon-ensure-latest` classifies the update surface directly using the [`AgentCanon parent state decision table`](../rule/dependency-module-changes.md#agentcanon-parent-state-decision-table):
 
-- dirty `vendor/agent-canon/` checkout state is a parent-mode refusal. Stop and
-  route source work to the managed topic workspace clone. Root views and pin
-  updates consume only a clean projection.
+- clean `vendor/agent-canon/` on named `main` with worktree `HEAD` equal to the
+  staged index gitlink is the parent pin/root projection pass state.
+- clean `vendor/agent-canon/` on a named topic branch is the source-edit owner;
+  `main` is only the topic-creation starting point.
+- dirty `vendor/agent-canon/` follows the table's requested-topic identity
+  decision: missing identity is `topic_identity_required`, matching named
+  current branch materializes the current vendor topic, and a differing topic
+  alone selects the managed workspace fallback. Root views and pin updates
+  consume only a clean projection.
 - local AgentCanon source commits stay on the AgentCanon branch/PR route.
 - detached heads, merge conflicts, restore conflicts, unresolved local pin changes, `.gitmodules` edits, and AgentCanon-owned root-view edits that `link-root` would overwrite still report a recovery action instead of being hidden.
 
@@ -98,15 +104,17 @@ binary just because the source commit has not changed yet.
 
 1. If only unrelated parent paths are dirty, keep those changes intact and still run the latest update. Record that the dirty paths were outside the AgentCanon update surface.
 
-1. If latest reports dirty AgentCanon checkout state, stop and prepare the
-   topic workspace branch clone. Detached head, merge conflict, `.gitmodules`
-   change, parent gitlink conflict, or AgentCanon-owned root-view overwrite risk
-   is repaired only after the source/pin owner is selected; no vendor state is
-   restored as a source route.
+1. If latest reports dirty AgentCanon checkout state, stop and select the typed
+   repair route. Prepare the topic workspace branch clone only when another
+   topic occupies the vendor checkout. Detached head, merge conflict,
+   `.gitmodules` change, parent gitlink conflict, or AgentCanon-owned root-view
+   overwrite risk is repaired only after the source/pin owner is selected; no
+   vendor state is restored as a source route.
 
-Parent mode must not invoke `merge-main-into-current*`; it reports the
-workspace-root clone route. Standalone source mode may use its source-branch
-merge route after the standalone source owner is established.
+Parent `latest` first handles a clean named topic source owner through the
+source PR merge route; its parent pin/root projection phase does not invoke
+`merge-main-into-current*`. A parent checkout on `main` stops at topic creation,
+and standalone source mode retains its own source-branch merge route.
 
 1. After AgentCanon update or PR merge, restore root views from the manifest and verify drift.
 
@@ -348,10 +356,10 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - stale parent gitlink: not latest, even when `vendor/agent-canon` worktree HEAD already equals AgentCanon remote main; commit the parent gitlink pin before treating the parent repo as latest.
 - local-ahead parent gitlink without pushed branch evidence: AgentCanon branch / PR required; do not treat `local_contains_remote` as latest.
 - clean parent gitlink pinned to a pushed non-main AgentCanon branch head: classify as `deferred_branch_pr`, continue local checks, and rerun `make agent-canon-ensure-latest` after the AgentCanon PR merges.
-- local checkout branch or dirty vendor source: parent mode refusal. Prepare the
-  managed topic-workspace source clone with owner evidence and return only the
-  clean pin projection after the source PR; standalone source mode has its own
-  source-branch merge route.
+- local checkout branch or dirty vendor source: use the clean named topic source
+  owner when available; prepare the managed topic-workspace source clone only
+  for another topic's dirty vendor occupancy. Otherwise use the typed repair /
+  rebuild route; standalone source mode has its own source-branch merge route.
 - `blocked_shared_canon_workflow`: do not hide shared-canon edits in a parent-only diff; commit the AgentCanon branch, merge main into it, and open an AgentCanon PR.
 - `skipped_source_canon`: running inside standalone AgentCanon; update parent repos after AgentCanon changes are committed.
 - `missing checklist`: restore or update `vendor/agent-canon/`, then rerun
