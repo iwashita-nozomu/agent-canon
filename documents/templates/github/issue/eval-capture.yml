@@ -1,12 +1,12 @@
 # @dependency-start
 # contract configuration
 # responsibility Defines issue form for converting agent failures into eval cases.
-# upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md eval capture checklist.
-# upstream design ../../agents/evals/README.md eval evidence storage contract.
-# upstream design ../../documents/operations/issue-label-taxonomy.md issue labels and template routing.
-# upstream design ../AGENTS.md GitHub subtree instructions.
-# upstream design ../../documents/templates/README.md canonical template owner.
-# downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
+# upstream design ../../../../documents/codex/prompt-skill-evaluation-checklist.md eval capture checklist.
+# upstream design ../../../../agents/evals/README.md eval evidence storage contract.
+# upstream design ../../../operations/issue-label-taxonomy.md issue labels and template routing.
+# upstream design ../../../../.github/AGENTS.md GitHub subtree instructions.
+# upstream design ../../README.md canonical template owner.
+# downstream implementation ../../../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
 # @dependency-end
 
 # Canonical source: documents/templates/github/issue/eval-capture.yml. Generated projection targets .github/ISSUE_TEMPLATE/eval-capture.yml; edit this source only.

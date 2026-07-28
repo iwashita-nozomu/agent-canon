@@ -28,9 +28,20 @@ upstream implementation ../../../tools/agent_tools/agent_canon_preflight.py bloc
   or routing local AgentCanon commits through source PRs before parent pins.
 - Tool Commands: run this skill's command packet, then read the canonical
   update-route and parent latest-state documents.
-- Boundary: use `dependency-module-change` for source edits. Parent projection
-  consumes only a clean vendor pin projection; parent source changes go through
-  the managed topic workspace source clone.
+- Boundary: use `dependency-module-change` for source edits. Parent source編集は
+  原則 `vendor/agent-canon` の topic-named branch で行い、別 topic の dirty
+  親 vendor 状態がある場合のみ `workspace/<topic-slug>/agent-canon` の
+  standalone clone に fallback します。Parent pin/root projection は clean
+  `main` と staged index gitlink と worktree `HEAD` の一致が pass 条件です。
+  `main` は source edit owner ではなく topic 作成の起点です。
+  Parent state, requested topic identity, and dirty fallback next actions are
+  defined only by the [`AgentCanon parent state decision table`](../../../documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table).
+  `latest` の更新対象 branch 引数を topic slug に転用しません。
+  Under that decision table, a dirty vendor checkout is a refusal condition
+  when it is not the intended source working branch; do not preserve or resume
+  that state. For parent pin/root projection, only a clean vendor pin projection
+  is eligible, while a differing requested topic may use the managed workspace
+  clone only through the table's topic-identity rule.
 - Standalone local source-branch publication follows the canonical transport
   contract in `documents/tools/github_publish.md`: verified remote identity/
   permission, named branch, captured local identity, exact SHA ref push, remote
@@ -51,7 +62,8 @@ Execute the required and task-matching conditional commands that the packet prin
 <!-- skill-tool-commands:end -->
 
 
-1. Read `documents/rule/dependency-module-changes.md`, then
+1. Read the `AgentCanon parent state decision table` in
+   `documents/rule/dependency-module-changes.md`, then
    `agents/skills/agent-canon-update.md`.
 1. Read `documents/agent-canon/agent-canon-update-route.md` and
    `documents/agent-canon/agent-canon-parent-repo-latest-checklist.md`.
@@ -62,11 +74,16 @@ Execute the required and task-matching conditional commands that the packet prin
    clean status, target tree, selected merge strategy, and selected remote.
    Do not rebase, alter unrelated history, or preserve internal commit ids by
    ancestry engineering when reviewed final-tree identity is the contract.
-1. In parent repos, classify the AgentCanon projection surface:
+1. In parent repos, classify the AgentCanon projection surface using the rule
+   decision table:
    `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned
-   root views. A dirty vendor checkout is a refusal condition: stop and route
-   the source change to the exact topic workspace branch clone. Do not preserve
-   the old vendor state or continue from it.
+   root views. If the parent vendor state is corrupt、書込先が誤っている、または
+   mismatch の場合は、restore/逆パッチで旧状態へ戻さず `origin/main` からの
+   clean checkout 再構築に切替え、意図した差分のみを再 materialize して再PR化します。
+   別 topic dirty checkout は、requested topic identity が named current branch
+   と異なる場合だけ `workspace/<topic-slug>/agent-canon` フォールバックを使用。
+   `parent` 側が `main` のみの checkout ではまず `checkout_or_create_topic_branch_from_main`
+   の next action とし、同ブランチを編集 source route の開始点にしません。
 1. Before the high-level update runs, task-start preflight fails closed when an
    exact `reports/agent-eval-runs/<run-id>/<producer>.stdout.txt` or
    `.stderr.txt` capture remains tracked, untracked, or ignored. Preserve the
@@ -81,13 +98,15 @@ current-task user approval and rerun
 with all four inline Git authority/reason fields in the same command segment.
 
 1. If `vendor/agent-canon/` contains local AgentCanon source commits or source
-   dirty state, stop. Do not invoke `merge-main-into-current*`, stash, preserve,
-   or resume that vendor state. Run the generic dependency-module tool from the
-   parent with owner evidence:
+   dirty state that is not the intended source working branch, stop. Do not invoke
+   `merge-main-into-current*`, stash, preserve, or resume that vendor state.
+   Run the generic dependency-module tool from the parent with owner evidence:
    `prepare --topic <topic> --module vendor/agent-canon --branch <source-branch>`.
-   Make the source branch/PR in `workspace/<topic-slug>/agent-canon`; only the
-   resulting clean pin is projected into the parent. Standalone source clones retain the source-mode merge/publication
-   route.
+   Make the source branch/PR in `workspace/<topic-slug>/agent-canon` only when the
+   parent vendor is occupied by another topic's dirty state and the requested
+   topic differs from the named current branch; otherwise follow the decision
+   table's typed stop or edit the parent vendor branch directly. Standalone
+   source clones retain the source-mode merge/publication route.
 
    Reuse the current AgentCanon source branch / PR when it already owns the
    shared-canon work. Do not create a fresh branch for a bounded follow-up,

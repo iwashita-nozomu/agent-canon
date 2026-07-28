@@ -41,20 +41,20 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 - この repo の実験運用正本は `agents/workflows/experiment-workflow.md` です。
 - 実験結果を見ながら code change、調査、チューニングまで含めた loop を回す場合は `adaptive-improvement-loop` を追加します。
 - topic の entrypoint と formal command は project-root `experiments/registry.toml` を project-owned 正本にします。AgentCanon source は registry 契約を `documents/experiments/experiment-registry.md` で定義します。template / derived repo root からは `vendor/agent-canon/documents/experiments/experiment-registry.md` として読みます。
-- 新規 topic は最初に実験名を固定し、`python3 tools/experiments/create_experiment_topic.py <topic>` を実行して AgentCanon template path `vendor/agent-canon/experiments/_template/` から project-root `experiments/<topic>/` を作成し、project registry へ topic entry を追加します。
+- 新規 topic は最初に実験名を固定し、`python3 tools/experiments/create_experiment_topic.py <topic>` を実行します。create tool が内部の runnable scaffold owner を解決し、project-root `experiments/<topic>/`、canonical な topic `README.md` / `provenance.toml`、および project registry の topic entry を配置します。`experiments/_template/` の直接コピーは行いません。
 - topic 作成後は `run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
 - project registry がある場合は、formal 実行前に `python3 tools/ci/check_experiment_registry.py` で registry schema と registered command placeholder を確認します。
-- 実験の正本 entrypoint は `/usr/bin/python experiments/<topic>/run.py` のオプションなし直実行です。`run.py` が run directory 作成、設定 snapshot、artifact 書き出し、notebook 実行を所有します。
+- 実験の利用者向け入口は `python3 tools/experiments/run_managed_experiment.py --topic <topic> --variant formal -- python3 experiments/<topic>/run.py` です。`run.py` は managed runner から呼ばれる inner entrypoint として、run directory 作成、設定 snapshot、artifact 書き出し、notebook 実行を所有します。
 - 実験設定の checked-in 正本は `experiments/<topic>/config.yaml` に置き、run 時に `config_snapshot.json` などの topic config snapshot として保存します。
 - GPU / JAX の実行環境の所有者は scheduler または caller environment とします。実験 topic の code と checked-in config は、GPU visibility、JAX platform、allocator、preallocation などの run ごとの環境割当を埋め込まない形に保ちます。実行環境 contract 自体を変更する task では、`environment-maintenance` と scheduler の正本へ分岐します。
 - topic README は、実験内容、問い、比較対象、標準コマンド、設定正本、可視化 notebook、出力 schema、run_name 規則を固定する入口です。
 - 非自明な実験 README には、再利用する `python/` 配下の file、class、function を名前で列挙する implementation source map と、各 step が作る object、更新する object、下流へ渡す object、artifact として書く object を追える object-flow 節を置きます。variant 比較では、共通実行 path と、variant が分岐する factory / function 境界を明示します。
 - 可視化は `experiments/<topic>/visualize.ipynb` の Jupyter notebook に置き、formal run の起動や設定正本にはしません。
 - notebook の各可視化項目は、直前の Markdown cell に日本語で「入力 artifact」「描く量」「読み方」を 1-2 文で説明します。
-- 実験 topic を review する段階では `experiment-review` を使い、`run.py` 直実行、GPU/JAX 環境所有、artifact schema、notebook readiness を checklist として確認します。
+- 実験 topic を review する段階では `experiment-review` を使い、managed runner route、GPU/JAX 環境所有、artifact schema、notebook readiness を checklist として確認します。
 - 各 run は `result/<run_name>/` を持ちます。追加ログが必要な topic は `result/<run_name>/logs/` に stdout、stderr、startup、tool、diagnostic logs を分けます。
-- 標準 run artifact は `summary.json`、`cases.jsonl`、topic config snapshot、case artifacts、`visualize_executed.ipynb` を含みます。これらが無い run は再現性が不足した run として扱い、正式結果には使う前に rerun または明示的な limitation を残します。
-- smoke / formal の入口は project `Makefile` に置く場合も、内側では topic `run.py` をオプションなしで呼びます。
+- 標準 run artifact は `summary.json`、`cases.jsonl`、topic config snapshot、case artifacts、`visualize_executed.ipynb` を含みます。これらが無い run は再現性が不足した run として扱い、正式結果には使う前に managed runner route で rerun または明示的な limitation を残します。
+- smoke / formal の入口は project `Makefile` に置く場合も、内側では同じ managed runner が topic `run.py` を inner command として呼びます。
 - formal run は source checkout、既定では `main` で実行し、run 完了後に
   `save-experiment-results` で retention plan、dirty-source formal-status、
   overwrite policy、branch reason を固定してから

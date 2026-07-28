@@ -2,16 +2,16 @@
 @dependency-start
 contract reference
 responsibility Upstream sync note:.
-upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
-upstream design ../../issues/README.md durable operational issue storage
-upstream design ../../tools/catalog.yaml structured tool catalog
-downstream implementation ../../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
-downstream implementation ../../tools/agent_tools/tool_drift.py validates PR/tool trace contracts
-downstream implementation ../../tools/agent_tools/issue_sync.py validates local/GitHub issue sync state
-downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates PR Essence checklist wiring
-upstream design ../../documents/templates/README.md canonical template owner and projection boundary
-upstream design ../../documents/operations/issue-label-taxonomy.md issue/eval routing taxonomy
-upstream design ../AGENTS.md GitHub subtree instructions
+upstream design ../../../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
+upstream design ../../../../issues/README.md durable operational issue storage
+upstream design ../../../../tools/catalog.yaml structured tool catalog
+downstream implementation ../../../../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
+downstream implementation ../../../../tools/agent_tools/tool_drift.py validates PR/tool trace contracts
+downstream implementation ../../../../tools/agent_tools/issue_sync.py validates local/GitHub issue sync state
+downstream implementation ../../../../tools/agent_tools/check_convention_compliance.py validates PR Essence checklist wiring
+upstream design ../../README.md canonical template owner and projection boundary
+upstream design ../../../../documents/operations/issue-label-taxonomy.md issue/eval routing taxonomy
+upstream design ../../../../.github/AGENTS.md GitHub subtree instructions
 @dependency-end
 -->
 

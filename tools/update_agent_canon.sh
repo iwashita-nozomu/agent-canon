@@ -66,13 +66,11 @@ Commands:
   rebuild-tools
       Rebuild compiled AgentCanon tools from the currently checked-out source.
   merge-main-into-current
-      Standalone source mode only: fetch AgentCanon main and merge it into the
-      independent AgentCanon source branch. Parent projection mode refuses this
-      route and points source edits to a topic workspace branch clone.
+      Fetch AgentCanon main and merge it into the current source branch.
+      Parent projection mode uses the parent vendor source owner.
   merge-main-into-current-preserve-dirty
-      Standalone source mode only. Parent projection mode refuses this command;
-      source changes must use the managed topic workspace clone and return as a
-      clean vendor pin projection.
+      Standalone source mode only. Parent projection mode uses the current
+      parent source owner with dirty-worktree preservation when safe.
   status
       Print low-level AgentCanon submodule/root-view status.
 
@@ -88,16 +86,142 @@ die() {
   exit 1
 }
 
-refuse_parent_vendor_source_mutation() {
+classify_parent_vendor_source() {
+  local requested_topic="${1:-${AGENT_CANON_TOPIC_SLUG:-}}"
+  local current_branch=""
+  local source_head=""
+  local parent_prefix_head=""
+  local source_status=""
+  local fallback_topic=""
+  local workspace_root=""
+
   if [ "$AGENT_CANON_SOURCE_MODE" != "parent_projection" ]; then
+    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=standalone_source"
     return 0
   fi
-  echo "AGENT_CANON_PARENT_VENDOR_SOURCE_MUTATION=refused"
-  echo "AGENT_CANON_DEPENDENCY_MODULE_ROUTE=documents/rule/dependency-module-changes.md"
-  echo "AGENT_CANON_DEPENDENCY_MODULE_TOOL=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic <topic> --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
-  echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-  echo "NEXT_ACTION=prepare_topic_workspace_source_clone_then_project_clean_vendor_pin"
-  die "parent projection mode must not mutate vendor/agent-canon; use the topic workspace source route"
+
+  current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  source_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD 2>/dev/null || true)"
+  source_status="$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all 2>/dev/null || true)"
+  parent_prefix_head="$(git -C "$ROOT_DIR" rev-parse ":$PREFIX" 2>/dev/null || true)"
+
+  if [ -n "$source_status" ]; then
+    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=dirty_worktree"
+    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=${current_branch:-<detached>}"
+    echo "AGENT_CANON_PARENT_PREFIX_HEAD=$parent_prefix_head"
+    if [ -z "$requested_topic" ]; then
+      echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=required"
+      echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
+      echo "NEXT_ACTION=topic_identity_required"
+      return 2
+    fi
+
+    if [ "$requested_topic" = "$DEFAULT_BRANCH" ] || [ "$requested_topic" = "main" ]; then
+      echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=invalid_default_branch"
+      echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
+      echo "NEXT_ACTION=topic_identity_required"
+      return 2
+    fi
+
+    if [ -n "$current_branch" ] && [ "$requested_topic" = "$current_branch" ]; then
+      echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=$requested_topic"
+      echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
+      echo "NEXT_ACTION=materialize_current_vendor_topic_commit_push_pr_then_resume"
+      return 2
+    fi
+
+    fallback_topic="$(sanitize_ref_component "$requested_topic")"
+    if [ "$fallback_topic" = "$DEFAULT_BRANCH" ] || [ "$fallback_topic" = "main" ]; then
+      echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=invalid_default_branch"
+      echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
+      echo "NEXT_ACTION=topic_identity_required"
+      return 2
+    fi
+    workspace_root="$(dirname "$ROOT_DIR")/workspace/$fallback_topic/agent-canon"
+    echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=$requested_topic"
+    echo "AGENT_CANON_PARENT_BRANCH_SOURCE_CLONE_PATH=$workspace_root"
+    echo "AGENT_CANON_DEPENDENCY_MODULE_ROUTE=documents/rule/dependency-module-changes.md"
+    echo "AGENT_CANON_DEPENDENCY_MODULE_TOOL=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic $fallback_topic --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
+    echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
+    echo "NEXT_ACTION=materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
+    return 2
+  fi
+
+  if [ -z "$source_head" ] || [ -z "$current_branch" ]; then
+    if [ -n "$source_head" ]; then
+      echo "AGENT_CANON_PARENT_VENDOR_SOURCE_HEAD=$source_head"
+    else
+      echo "AGENT_CANON_PARENT_VENDOR_SOURCE_HEAD=<unknown>"
+    fi
+    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=detached_head"
+    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=<detached>"
+    echo "AGENT_CANON_PARENT_PIN_STATUS=unusable_state"
+    echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
+    echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
+    return 3
+  fi
+
+  if [ "$current_branch" = "$DEFAULT_BRANCH" ]; then
+    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=default_branch"
+    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=$current_branch"
+    echo "AGENT_CANON_PARENT_PIN_STATUS=needs_topic_branch"
+    echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
+    echo "NEXT_ACTION=checkout_or_create_topic_branch_from_$DEFAULT_BRANCH"
+    return 1
+  fi
+
+  if [ -z "$parent_prefix_head" ] || [ "$source_head" != "$parent_prefix_head" ]; then
+    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=pin_mismatch"
+    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=$current_branch"
+    echo "AGENT_CANON_PARENT_VENDOR_PIN=$parent_prefix_head"
+    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_HEAD=$source_head"
+    echo "AGENT_CANON_DEPENDENCY_MODULE_ROUTE=documents/rule/dependency-module-changes.md"
+    echo "AGENT_CANON_DEPENDENCY_MODULE_TOOL=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic ${current_branch} --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
+    echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
+    echo "NEXT_ACTION=materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
+    return 2
+  fi
+
+  echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=clean_topic_branch"
+  echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=$current_branch"
+  echo "AGENT_CANON_PARENT_PREFIX_HEAD=$parent_prefix_head"
+  echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=allowed"
+  return 0
+}
+
+require_protected_git_authority() {
+  local mode="$1"
+  local branch_authority="${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-}"
+  local branch_reason="${AGENT_CANON_BRANCH_WORKTREE_REASON:-}"
+  local destructive_authority="${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY:-}"
+  local destructive_reason="${AGENT_CANON_DESTRUCTIVE_GIT_REASON:-}"
+
+  if { [ "$branch_authority" = "user_request" ] || [ "$branch_authority" = "agent_canon_workflow" ]; } \
+    && [ -n "$branch_reason" ] \
+    && [ "$destructive_authority" = "explicit_user_approval" ] \
+    && [ -n "$destructive_reason" ]; then
+    return 0
+  fi
+
+  echo "DESTRUCTIVE_GIT_GUARD=block"
+  echo "BRANCH_WORKTREE_CREATION_GUARD=block"
+  echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
+  echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
+  die "protected AgentCanon update requires same-command branch/worktree and explicit destructive approval authority"
+}
+
+require_commit_request_evidence() {
+  local mode="$1"
+  local evidence="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE:-}"
+
+  if [[ "$evidence" =~ ^evidence:[0-9a-f]{64}$ ]]; then
+    return 0
+  fi
+
+  echo "COMMIT_PROVENANCE_GUARD=block"
+  echo "AGENT_CANON_COMMIT_PROVENANCE_SUBCOMMAND=$mode"
+  echo "NEXT_ACTION=$COMMIT_PROVENANCE_NEXT_ACTION"
+  die "auto-commit requires AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>"
 }
 
 require_protected_git_authority() {
@@ -1074,6 +1198,42 @@ cmd_latest() {
     cmd_merge_main_into_current_preserve_dirty "$branch"
     return
   fi
+  if [ "$AGENT_CANON_SOURCE_MODE" = "parent_projection" ]; then
+    local latest_state_rc=0
+    local latest_state=""
+    classify_parent_vendor_source || {
+      latest_state_rc="$?"
+      if [ "$latest_state_rc" -eq 1 ]; then
+        latest_state="parent_vendor_on_default_branch"
+        echo "AGENT_CANON_LATEST_ROUTE_STATE=$latest_state"
+        echo "NEXT_ACTION=checkout_or_create_topic_branch_from_$DEFAULT_BRANCH"
+        return "$latest_state_rc"
+      elif [ "$latest_state_rc" -eq 2 ]; then
+        latest_state="parent_vendor_worktree_dirty_or_pin_mismatch"
+        echo "AGENT_CANON_LATEST_ROUTE_STATE=$latest_state"
+        return "$latest_state_rc"
+      elif [ "$latest_state_rc" -eq 3 ]; then
+        latest_state="parent_vendor_detached_head"
+        echo "AGENT_CANON_LATEST_ROUTE_STATE=$latest_state"
+        return "$latest_state_rc"
+      elif [ "$latest_state_rc" -eq 4 ]; then
+        latest_state="parent_vendor_not_on_default_branch"
+        echo "AGENT_CANON_LATEST_ROUTE_STATE=$latest_state"
+        echo "AGENT_CANON_LATEST_TOOL_ROUTE=$route"
+        echo "NEXT_ACTION=checkout_or_create_topic_branch_from_$DEFAULT_BRANCH"
+        return "$latest_state_rc"
+      else
+        latest_state="parent_vendor_unready"
+        echo "AGENT_CANON_LATEST_ROUTE_STATE=$latest_state"
+        return "$latest_state_rc"
+      fi
+    }
+    echo "AGENT_CANON_LATEST_ROUTE_STATE=parent_vendor_clean_source_owner"
+    echo "AGENT_CANON_LATEST_TOOL_ROUTE=merge-main-into-current"
+    cmd_merge_main_into_current "$branch"
+    return "$?"
+  fi
+
   require_accepted_dependency_frontier
 
   park_eval_log_dirty_state_if_safe || park_rc=$?
@@ -1091,9 +1251,6 @@ cmd_latest() {
   submodule_worktree_status="$(plan_value agent_canon_plan_submodule_worktree_status "$plan_output")"
 
   if route_requires_agent_workflow "$route" "$prefix_mode" "$dirty_update_surface" "$submodule_worktree_status"; then
-    if [ "$AGENT_CANON_SOURCE_MODE" = "parent_projection" ]; then
-      refuse_parent_vendor_source_mutation
-    fi
     if can_preserve_dirty_agentcanon_latest "$route" "$prefix_mode" "$submodule_worktree_status"; then
       preserve_dirty_agentcanon_latest "$branch" "$route"
       return $?
@@ -1204,7 +1361,7 @@ cmd_merge_main_into_current() {
   local result=""
   local conflict_files=""
 
-  refuse_parent_vendor_source_mutation
+  classify_parent_vendor_source || return "$?"
   ensure_agent_canon_submodule
   remote_url="$(submodule_remote_url)"
   [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
@@ -1298,7 +1455,7 @@ cmd_merge_main_into_current_preserve_dirty() {
   local restore_log=""
   local restore_rc=0
 
-  refuse_parent_vendor_source_mutation
+  classify_parent_vendor_source || return "$?"
   ensure_agent_canon_submodule
   current_branch="$(git -C "$AGENT_CANON_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
   submodule_status="$(git -C "$AGENT_CANON_DIR" status --short --untracked-files=all)"

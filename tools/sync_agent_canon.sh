@@ -405,7 +405,7 @@ copy_path() {
   [ -e "$abs_source" ] || die "copy source '$source' does not exist"
   rm -rf "$abs_path"
   mkdir -p "$(dirname "$abs_path")"
-  project_copy_source "$abs_source" > "$abs_path"
+  project_copy_source "$abs_source" "$abs_path" > "$abs_path"
   chmod --reference="$abs_source" "$abs_path"
 }
 
@@ -417,42 +417,67 @@ parent_copy_projection_enabled() {
 
 project_copy_source() {
   local source="$1"
-  if ! parent_copy_projection_enabled; then
+  local target="${2:-}"
+  local projected=""
+  local github_target=0
+  if [[ "$target" == "$ROOT_DIR/.github/ISSUE_TEMPLATE/"* || "$target" == "$ROOT_DIR/.github/PULL_REQUEST_TEMPLATE/"* ]]; then
+    github_target=1
+  fi
+  if ! parent_copy_projection_enabled && [ "$github_target" -eq 0 ]; then
     cat "$source"
     return
   fi
-
-  perl -ne '
-    if ($in_manifest || /\@dependency-start/) {
+  if parent_copy_projection_enabled; then
+    projected="$(perl -ne '
+      if ($in_manifest || /\@dependency-start/) {
+        print;
+        $in_manifest = 1 if /\@dependency-start/;
+        $in_manifest = 0 if /\@dependency-end/;
+        next;
+      }
+      s{vendor/agent-canon/tools/}{__CANON_TOOLS__/}g;
+      s{vendor/agent-canon/documents/}{__CANON_DOCUMENTS__/}g;
+      s{vendor/agent-canon/issues/}{__CANON_ISSUES__/}g;
+      s{documents/tools/}{__DOCUMENTS_TOOLS__/}g;
+      s{tests/tools/}{__TESTS_TOOLS__/}g;
+      s{tools/agent-canon/}{__PARENT_TOOLS__/}g;
+      s{((?:\.\./)+)documents/}{$1vendor/agent-canon/documents/}g;
+      s{((?:\.\./)+)issues/}{$1vendor/agent-canon/issues/}g;
+      s{((?:\.\./)+)tools/}{$1tools/agent-canon/}g;
+      s{(?<![A-Za-z0-9_./-])tools/}{tools/agent-canon/}g;
+      s{__CANON_TOOLS__}{vendor/agent-canon/tools/}g;
+      s{__CANON_DOCUMENTS__}{vendor/agent-canon/documents/}g;
+      s{__CANON_ISSUES__}{vendor/agent-canon/issues/}g;
+      s{__DOCUMENTS_TOOLS__}{documents/tools/}g;
+      s{__TESTS_TOOLS__}{tests/tools/}g;
+      s{__PARENT_TOOLS__}{tools/agent-canon/}g;
       print;
-      $in_manifest = 1 if /\@dependency-start/;
-      $in_manifest = 0 if /\@dependency-end/;
-      next;
-    }
-    s{vendor/agent-canon/tools/}{__CANON_TOOLS__/}g;
-    s{vendor/agent-canon/documents/}{__CANON_DOCUMENTS__/}g;
-    s{vendor/agent-canon/issues/}{__CANON_ISSUES__/}g;
-    s{documents/tools/}{__DOCUMENTS_TOOLS__/}g;
-    s{tests/tools/}{__TESTS_TOOLS__/}g;
-    s{tools/agent-canon/}{__PARENT_TOOLS__/}g;
-    s{((?:\.\./)+)documents/}{$1vendor/agent-canon/documents/}g;
-    s{((?:\.\./)+)issues/}{$1vendor/agent-canon/issues/}g;
-    s{((?:\.\./)+)tools/}{$1tools/agent-canon/}g;
-    s{(?<![A-Za-z0-9_./-])tools/}{tools/agent-canon/}g;
-    s{__CANON_TOOLS__}{vendor/agent-canon/tools/}g;
-    s{__CANON_DOCUMENTS__}{vendor/agent-canon/documents/}g;
-    s{__CANON_ISSUES__}{vendor/agent-canon/issues/}g;
-    s{__DOCUMENTS_TOOLS__}{documents/tools/}g;
-    s{__TESTS_TOOLS__}{tests/tools/}g;
-    s{__PARENT_TOOLS__}{tools/agent-canon/}g;
-    print;
-  ' "$source"
+    ' "$source")"
+  else
+    projected="$(cat "$source")"
+  fi
+
+  if [ "$github_target" -eq 1 ]; then
+    printf '%s\n' "$projected" | perl -0pe '
+      s{(@dependency-start.*?@dependency-end)}{
+        my $block = $1;
+        $block =~ s{\.\./\.\./\.\./operations/}{../../documents/operations/}g;
+        $block =~ s{\.\./\.\./\.\./\.\./\.github/}{../}g;
+        $block =~ s{\.\./\.\./\.\./\.github/}{../}g;
+        $block =~ s{\.\./\.\./\.\./\.\./(documents|agents|issues|tools)/}{../../$1/}g;
+        $block =~ s{\.\./\.\./README\.md}{../../documents/templates/README.md}g;
+        $block;
+      }gse
+    '
+  else
+    printf '%s\n' "$projected"
+  fi
 }
 
 copy_matches_source() {
   local destination="$1"
   local source="$2"
-  cmp -s "$destination" <(project_copy_source "$source")
+  cmp -s "$destination" <(project_copy_source "$source" "$destination")
 }
 
 regular_path() {
@@ -522,6 +547,45 @@ check_agentcanon_root_view_symlink_targets() {
   return "$had_broken"
 }
 
+assert_parent_submodule_projection_ready() {
+  local submodule_status=""
+  local submodule_branch=""
+  local parent_prefix_head=""
+  local submodule_head=""
+
+  if ! is_submodule_prefix; then
+    return 0
+  fi
+  [ -d "$ROOT_DIR/$PREFIX" ] || die "prefix '$PREFIX' does not exist"
+
+  submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all)"
+  if [ -n "$submodule_status" ]; then
+    echo "agent_canon_parent_submodule=dirty"
+    return 1
+  fi
+
+  submodule_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  if [ -z "$submodule_branch" ]; then
+    echo "agent_canon_parent_submodule=detached"
+    return 2
+  fi
+
+  if [ "$submodule_branch" != "$DEFAULT_BRANCH" ]; then
+    echo "agent_canon_parent_submodule=non_default_branch"
+    return 4
+  fi
+
+  parent_prefix_head="$(git -C "$ROOT_DIR" rev-parse ":$PREFIX" 2>/dev/null || true)"
+  submodule_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+  if [ -z "$parent_prefix_head" ] || [ "$submodule_head" != "$parent_prefix_head" ]; then
+    echo "agent_canon_parent_submodule=gitlink_mismatch"
+    return 3
+  fi
+
+  echo "agent_canon_parent_submodule=projection_ready"
+  return 0
+}
+
 ensure_surface_sync_safe() {
   local force="${1:-0}"
   local -a paths=()
@@ -554,6 +618,22 @@ ensure_surface_sync_safe() {
 cmd_link_root() {
   local force="${1:-0}"
   ensure_prefix_exists
+  assert_parent_submodule_projection_ready || {
+    local projection_rc="$?"
+    local next_action=""
+    if [ "$projection_rc" -eq 1 ]; then
+      next_action="materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
+    elif [ "$projection_rc" -eq 2 ]; then
+      next_action="request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
+    elif [ "$projection_rc" -eq 4 ]; then
+      next_action="checkout_${DEFAULT_BRANCH}_at_staged_gitlink_commit"
+    else
+      next_action="request_parent_vendor_source_readiness_and_rerun_link-root"
+    fi
+    echo "NEXT_ACTION=$next_action"
+    echo "agent_canon_projection_requirements=parent_vendor_named_branch_and_gitlink_match_required"
+    die "projection-ready required for link-root: current parent vendor checkout must be clean, on $DEFAULT_BRANCH, and gitlink-matched"
+  }
   ensure_surface_sync_safe "$force"
 
   local spec=""
@@ -596,6 +676,7 @@ cmd_check() {
 
   local spec=""
   local failed=0
+  local projection_rc=0
 
   while IFS= read -r spec; do
     local path="${spec%%:*}"
@@ -669,7 +750,29 @@ cmd_check() {
     failed=1
   fi
 
+  assert_parent_submodule_projection_ready || {
+    projection_rc="$?"
+    if [ "$projection_rc" -eq 1 ]; then
+      failed=1
+      echo "NEXT_ACTION=materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
+      echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
+    elif [ "$projection_rc" -eq 2 ]; then
+      failed=1
+      echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
+      echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
+    elif [ "$projection_rc" -eq 4 ]; then
+      failed=1
+      echo "NEXT_ACTION=checkout_${DEFAULT_BRANCH}_at_staged_gitlink_commit"
+      echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
+    else
+      failed=1
+      echo "NEXT_ACTION=request_parent_vendor_source_readiness_and_rerun_check"
+      echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
+    fi
+  }
+
   if [ "$failed" -ne 0 ]; then
+    [ "$failed" -ne 0 ] || return 0
     die "shared surface drift detected; set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and rerun 'bash tools/sync_agent_canon.sh link-root'"
   fi
 

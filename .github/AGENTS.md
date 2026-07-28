@@ -4,6 +4,7 @@
 contract reference
 responsibility Documents GitHub Agent Entry Point for this repository.
 upstream design ../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
+upstream design ../documents/templates/github/README.md canonical GitHub template source and projection map
 @dependency-end
 -->
 
@@ -25,8 +26,14 @@ surface it names, not here.
 - shared instructions: `/AGENTS.md`
 - human canonical hub: `/agents/README.md`
 - curated project skills: `/.agents/skills/`
+- canonical GitHub template source: `/documents/templates/github/issue/` and
+  `/documents/templates/github/pull-request/`
 - standalone AgentCanon PR checklist: `/.github/PULL_REQUEST_TEMPLATE.md`
-- template / derived repo AgentCanon PR checklist: `/.github/PULL_REQUEST_TEMPLATE/agent_canon.md`
+- generated template / derived repo AgentCanon PR checklist:
+  `/.github/PULL_REQUEST_TEMPLATE/agent_canon.md`; edit the canonical source above.
+- The standalone checklist is an AgentCanon-only `standalone_only` surface; it is not
+  projected into a parent template root and is not a second owner of the generated
+  template-side checklist.
 - Plan mode: use `/plan` or an explicit written plan before non-trivial changes
   under `.github/`, including GitHub Actions, PR templates, issue templates, and
   GitHub-facing automation.
