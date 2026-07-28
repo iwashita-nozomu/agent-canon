@@ -6,7 +6,7 @@ contract issue
 responsibility Tracks OOP readability refactor work for design-claim dependency closure traversal.
 upstream implementation ../../tools/agent_tools/check_design_doc_claims.py checks design claims.
 upstream implementation ../../tools/oop/python/readability.py reports OOP readability findings.
-upstream design ../../documents/dependency-manifest-design.md defines dependency graph semantics.
+upstream design ../../documents/design/dependency-manifest-design.md defines dependency graph semantics.
 @dependency-end
 -->
 

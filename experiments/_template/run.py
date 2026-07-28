@@ -6,7 +6,6 @@
 # upstream implementation ../../tools/experiments/run_managed_experiment.py is the only authorized ExperimentRunner entrypoint and adapts main().
 # upstream implementation ../../tools/experiments/create_experiment_topic.py copies this file.
 # upstream implementation visualize.ipynb renders the reader notebook artifact.
-# downstream implementation result stores per-run outputs for copied topics.
 # @dependency-end
 """Template experiment entrypoint."""
 

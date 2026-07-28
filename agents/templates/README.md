@@ -34,13 +34,22 @@ approval criteria.
 
 ## Active Design Packet Projection
 
-`agents_config.json#artifacts.active_design_packet` defines one neutral
-`waterfall.design_packet.v1` record. Its selected design, technical review, and
-document-flow review paths are projected into one run bundle and persisted at
-`team_manifest.yaml#run.active_design_packet`.
+`agents_config.json#artifacts.active_design_packet` defines one neutral closed
+`waterfall.design_packet.v1` record. Its selected design, technical review,
+and document-flow review paths plus the clause registry and four typed entries
+are projected into one run bundle and persisted at
+`team_manifest.yaml#run.active_design_packet`. The companion
+`active_design_packet_reference_projection` records the selected packet SHA,
+source-byte identities, dependency endpoints, selected outputs, and reviewer
+artifact identities. The four entries are projected into the matching sections
+of `design_brief.md`;
+`design_review.md` reviews the exact artifact identity and all four entries;
+`document_flow_review.md` reviews the source packet and reader-visible side
+effects; `change_review.md` and `final_review.md` verify the integrated trace.
 
 Templates do not parse or infer packet authority. `create_run_bundle` resolves
-the packet, validates its closed field set and relative artifact paths, renders the selected
-templates, and publishes one complete bundle for task-start and bootstrap.
-Review templates record evidence only; they cannot write or advance the active
-run pointer.
+the packet, validates its closed field set, relative artifact paths, typed graph
+references, and materialized source/dependency identity, renders all selected
+templates in memory, and publishes one complete bundle for task-start,
+bootstrap, and document-start producers. Review templates are authorization
+records only and cannot write or advance the active run pointer.

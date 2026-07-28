@@ -3,7 +3,7 @@
 contract reference
 responsibility 実験計画、GPU admission、ExperimentRunner、結果保持の文書入口。
 upstream design ../README.md documents 索引と正本境界。
-downstream implementation ../../tools/experiments/ 実験 tool 群。
+downstream implementation ../../tools/README.md 実験 tool 群の canonical owner。
 @dependency-end
 -->
 

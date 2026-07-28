@@ -76,7 +76,7 @@ rather than local implementation judgment.
 
 <!-- List every artifact the worker must read before editing: user_request_contract.md, schedule.md, this design brief, design_review.md when active, document_flow_review.md when active, test_plan.md only when post-implementation test design is active, repo docs, dependency surfaces, code paths, tests, and external references if any. Mark each item required or not used. -->
 
-<!-- Packet entry: entry_id=implementation-source-packet. Preserve the exact active-packet references and dependency on entry:abstract-design-frame. -->
+<!-- Packet entry: entry_id=implementation-source-packet. Preserve the exact active-packet references, selected graph-packet identity, materialization reader, and dependency on entry:abstract-design-frame. -->
 
 ## Design Side-Effect Map
 
@@ -108,7 +108,7 @@ rather than local implementation judgment.
 
 <!-- For each planned edit, map design section, user-request clause ID, source/reuse document or code path, test-plan item, and expected validation evidence. The worker must cite this mapping before editing. -->
 
-<!-- Packet entry: entry_id=design-to-implementation-trace. Preserve dependencies on the other three entries and map every source and deletion record to one integrated responsibility unit. -->
+<!-- Packet entry: entry_id=design-to-implementation-trace. Preserve dependencies on the other three entries and map every source, generated, and deletion record to one integrated responsibility unit. -->
 
 ## Identifier And Naming Plan
 

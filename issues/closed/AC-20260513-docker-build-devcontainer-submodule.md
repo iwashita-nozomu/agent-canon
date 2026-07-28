@@ -4,7 +4,7 @@
 @dependency-start
 contract issue
 responsibility Records the workflow defect where Docker Build CI consumed a shared devcontainer symlink without checking out AgentCanon.
-upstream design ../../documents/github-first-module-and-devcontainer-policy.md defines devcontainer ownership.
+upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md defines devcontainer ownership.
 upstream implementation ../../tools/ci/check_github_workflows.py validates workflow checkout policy.
 downstream implementation ../../tests/tools/test_check_github_workflows.py verifies Docker workflow checkout rules.
 @dependency-end

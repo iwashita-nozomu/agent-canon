@@ -110,18 +110,9 @@ Use `--scope changed` only when the request explicitly asks for changed scope:
 python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json
 ```
 
-For a supplied TSV path, use the same renderer and bundle with the exact input
-flag:
-
-```bash
-python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json
-```
-
-Treat these three commands as immutable flag templates. Copy the selected
+Treat these two commands as immutable flag templates. Copy the selected
 command with every shown flag: `--root .` and `--format json` are mandatory in
-all three routes. Do not remove, add, or rename any flag. For a supplied TSV,
-only the path value after `--graph-tsv` and the path value after `--bundle-dir`
-may be replaced with user-provided paths; keep every other token unchanged.
+both routes. Do not remove, add, or rename any flag.
 
 The selected command is a typed adapter ToolCall downstream of the canonical
 owner ToolCall. Log both calls in order:
@@ -138,14 +129,11 @@ path and CLI flags in the literal command are execution details, never ToolID
 or ToolCall argument-schema substitutes.
 
 `--json` is invalid; use `--format json`.
-`check_dependency_graph.sh` owns dependency pass/fail authority. In generated
-mode, the renderer invokes that checker for the
-generated TSV and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest
-projection creation. For a supplied TSV, checker status is `not_run`: the
-supplied TSV producer owns source facts and the renderer owns only projections.
-This route does not call a separate raw checker, scan, helper, or Mermaid route
-because the renderer invokes that checker in generated mode. The generated
-bundle preserves GraphIR v2 and contains exactly these six basenames:
+The canonical graph owns dependency status and facts. The renderer performs one
+typed dependency query through `GraphClient` and owns only Graph IR, Markdown,
+DOT, HTML, and bundle/manifest projection creation. There is no supplied-input,
+raw-checker, scan, helper, or Mermaid fallback. Its generated bundle contains
+exactly these six basenames:
 
 1. `dependency_graph.tsv`
 2. `dependency_graph.ir.json`

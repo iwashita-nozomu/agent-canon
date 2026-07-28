@@ -1514,8 +1514,13 @@ def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
         "agents/task_catalog.yaml",
         "agents/model_profiles.toml",
         "agents/capacity_policy.toml",
+        "agents/canonical/CODEX_WORKFLOW.md",
+        "agents/templates/design_brief.md",
+        "agents/workflows/implementation-waterfall-workflow.md",
+        "documents/design/dependency-manifest-design.md",
     ):
         destination = workspace.workspace_root / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / relative_path, destination)
     (workspace.workspace_root / "WORKTREE_SCOPE.md").write_text(
         "\n".join(

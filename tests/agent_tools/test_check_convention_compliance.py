@@ -599,7 +599,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "| ------ | --------- |\n"
         "| Scoped Change | `agents/task_catalog.yaml` "
         "`workflow_families[].id=scoped_change` |\n\n"
-        "Implementation Flow Graph\n"
+        "## Design Artifact Shape\n\n"
+        "Implementation design uses the four-entry active design packet.\n"
     ),
     "agents/templates/test_plan.md": "validation route behavior-owned cases\n",
     "evidence/agent-evals/skill_workflow_prompt_eval.toml": (
@@ -987,7 +988,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / "documents" / "coding-conventions-python.md").write_text(
+            (
+                root / "documents" / "conventions" / "coding-conventions-python.md"
+            ).write_text(
                 "# Python\n\n- 公開関数には型注釈が必須です。\n",
                 encoding="utf-8",
             )
@@ -1574,7 +1577,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            testing_policy = root / "documents" / "coding-conventions-testing.md"
+            testing_policy = (
+                root / "documents" / "conventions" / "coding-conventions-testing.md"
+            )
             testing_policy.write_text("testing canonical command\n", encoding="utf-8")
 
             result = self.run_checker(root)
@@ -1599,7 +1604,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            troubleshooting = root / "documents" / "TROUBLESHOOTING.md"
+            troubleshooting = root / "documents" / "operations" / "TROUBLESHOOTING.md"
             troubleshooting.write_text(
                 troubleshooting.read_text(encoding="utf-8")
                 + "\n`documents/runtime/runtime-profiles-and-check-matrix.md`、"
@@ -1658,7 +1663,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            house_style = root / "documents" / "coding-conventions-house-style.md"
+            house_style = (
+                root / "documents" / "conventions" / "coding-conventions-house-style.md"
+            )
             house_style.write_text(
                 "house canonical owner check_convention_compliance.py\n",
                 encoding="utf-8",
@@ -1780,7 +1787,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            python_policy = root / "documents" / "coding-conventions-python.md"
+            python_policy = (
+                root / "documents" / "conventions" / "coding-conventions-python.md"
+            )
             python_policy.write_text(
                 python_policy.read_text(encoding="utf-8").replace(
                     "SOLID_PRINCIPLES_BY_KIND",

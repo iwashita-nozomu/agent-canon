@@ -136,11 +136,13 @@ def path_changed_from_baseline(path: Path, baseline_path: Path) -> bool:
 
 
 def write_task_authority_baselines(report_dir: Path, report_root: Path) -> None:
-    """Write baselines for active-run pointer and task authority after bootstrap."""
+    """Materialize ownership baselines for the active pointer and run authority."""
     active_pointer = report_root / ACTIVE_RUN_POINTER.name
     if active_pointer.is_file():
-        active_baseline = active_pointer.with_name(ACTIVE_RUN_BASELINE_POINTER.name)
-        write_hash_baseline(active_pointer, active_baseline)
+        write_hash_baseline(
+            active_pointer,
+            report_root / ACTIVE_RUN_BASELINE_POINTER.name,
+        )
     authority_path = report_dir / AUTHORITY_FILE_NAME
     if authority_path.is_file():
         write_hash_baseline(authority_path, authority_baseline_path(authority_path))

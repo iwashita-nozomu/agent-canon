@@ -3,7 +3,7 @@
 contract policy
 responsibility Documents GitHub-first reusable module and devcontainer ownership policy.
 downstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
-upstream design ../rule/dependency-module-changes.md general dependency source-clone rule
+downstream design ../rule/dependency-module-changes.md general dependency source-clone rule
 downstream design ../conventions/coding-conventions-project.md project environment rules
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
 downstream environment ../../.devcontainer/devcontainer.json shared devcontainer entrypoint
@@ -126,39 +126,38 @@ parent repository. The generated Compose file must also set a top-level project
 It must not set fixed subnet, gateway, or IPAM values; Docker Compose should
 allocate the project network automatically.
 
-Dependency source visibility is owned by one topic-root mount. Host layout is
-`<parent-repo-root>/workspace/<topic-slug>/<parent-repo>` plus same-level
-`<module-basename>` clones; generated Compose canonicalizes the topic root from
-the `.devcontainer` location once to `/workspace`. It does not bind the parent
-repository and each clone separately, and it never writes a host absolute path
-into tracked config. `AGENT_CANON_WORKSPACE_ROOT=/workspace` is the fixed
-container contract. A missing `/workspace` mount or missing
-dependency tool is a startup design error reported by post-attach and
-`tools/ci/container_config.py`.
+依存 source の作業領域は、親 repository root 直下の Git 管理外
+`workspace/<topic-slug>/` に置く clone の filesystem / lifecycle として扱います。
+親 repository clone と dependency source clone は同じ topic root の直下に置きます。
+親 repository の `.gitignore` は `workspace/` を Git 管理外にすることが必須です。
+`prepare` の前にこの ignore rule を確認し、満たさない親 repository では
+dependency source work を開始しません。
 
-## VS Code Surface Boundary
+ここでいう topic workspace は filesystem / lifecycle と devcontainer mount の
+用語です。VS Code workspace を意味しません。devcontainer は topic workspace
+root を一度だけ `/workspace` に bind mountし、`AGENT_CANON_WORKSPACE_ROOT=/workspace`
+を固定します。`<parent-repo-root>/workspace/<topic-slug>/<parent-repo>` と
+同列の `<module-basename>` clone が host layout です。個別 clone や親 repository
+の二重 mount、host absolute path の tracked config への書き込みは行いません。
+`/workspace` mount または dependency tool の欠落は startup design error として
+post-attach と `tools/ci/container_config.py` が報告します。
 
-`.vscode/` has a parent-owned regular directory container. Template and derived
-repos expose the four shared AgentCanon files as individual symlinks into
-`vendor/agent-canon/.vscode`. Dependency source work-area composition is
-caller-owned and uses the paths returned by `prepare`; work-area storage,
-metadata, and editor state are outside the AgentCanon contract.
+## VS Code surface の責務境界
 
-The shared VS Code surface owns:
+依存 source clone の表示・構成のために、VS Code multi-root workspace、
+`*.code-workspace`、`workspace.json`、その他の editor workspace metadata を
+作成、更新、管理、または要求してはなりません。`prepare` が返す
+`PARENT_ROOT`、`SOURCE_CLONE`、`CONTINUE_PATH` は filesystem / lifecycle と
+devcontainer mount の path contract であり、VS Code workspace の構成入力では
+ありません。
 
-- recommended extensions for AgentCanon, template, and derived repo operation;
-- editor defaults that are safe across repositories;
-- task entries for shared AgentCanon validation commands.
-
-It must not own:
-
-- personal editor state or machine-local settings;
-- host-specific include paths, interpreter paths, or absolute workspace paths;
-- project/product-specific build, experiment, or server commands.
-
-Project-specific VS Code guidance belongs in repo-local docs or project-owned
-scripts. If a derived repository needs local editor state, keep it outside the
-tracked shared `.vscode/` view.
+この禁止は `.vscode/` の共有 extension/settings/tasks surface を変更しません。
+`.vscode/` は親所有の regular directory container とし、template と derived repo
+には `vendor/agent-canon/.vscode` の共有ファイルを個別 symlink として公開します。
+共有面は推奨 extension、repository 間で安全な editor defaults、共有 validation
+task を所有しますが、dependency clone 群の構成責務は所有しません。個人の
+editor state、machine-local settings、host-specific path、project/product 固有の
+command は共有面に置きません。
 
 ## Validation
 

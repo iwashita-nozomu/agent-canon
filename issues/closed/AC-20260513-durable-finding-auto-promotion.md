@@ -7,7 +7,7 @@ responsibility Records the workflow defect where run-bundle findings were not pr
 upstream design ../README.md defines AgentCanon operational issue conventions
 upstream design ../../agents/workflows/agent-learning-workflow.md defines durable learning capture
 upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines PR route and issue gate
-upstream design ../../documents/dependency-manifest-design.md defines search-to-edit-scope evidence
+upstream design ../../documents/design/dependency-manifest-design.md defines search-to-edit-scope evidence
 downstream implementation ../../tools/ci/check_github_workflows.py validates issue and PR-template gates
 @dependency-end
 -->

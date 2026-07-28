@@ -965,7 +965,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir)
             entries = resolve_cross_cutting_document_packet(workspace_root)
-            review_process = (PROJECT_ROOT / "documents" / "REVIEW_PROCESS.md").resolve()
+            review_process = (
+                PROJECT_ROOT / "documents" / "conventions" / "REVIEW_PROCESS.md"
+            ).resolve()
 
             self.assertIn(review_process, {entry.path for entry in entries})
             self.assertTrue(all(entry.path.exists() for entry in entries))
@@ -973,6 +975,14 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             config = load_team_config()
             role = resolve_role(config, "design_reviewer")
             active_design_packet = resolve_active_design_packet_config(config)
+            self.assertEqual(
+                active_design_packet.schema,
+                "waterfall.design_packet.v1",
+            )
+            self.assertEqual(
+                active_design_packet.implementation_source_packet.entry_id,
+                "implementation-source-packet",
+            )
             packet = resolve_role_document_packet(
                 config=config,
                 role=role,

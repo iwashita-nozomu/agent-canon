@@ -1,6 +1,6 @@
 // @dependency-start
 // contract implementation
-// responsibility Owns the one-build AgentCanon dependency graph and persisted runtime-evidence snapshot.
+// responsibility Owns the one-build AgentCanon dependency graph and optional persisted runtime-evidence snapshot.
 // upstream implementation dependency_manifest.rs provides the complete-file source snapshot
 // upstream implementation structured_analysis.rs provides the graph storage schema
 // downstream implementation main.rs dispatches the public graph command
@@ -8,8 +8,9 @@
 // @dependency-end
 
 use crate::dependency_manifest::{
-    capture_snapshot, probe_snapshot_identity, write_snapshot_jsonl, DependencyDeclaration,
-    ManifestSnapshot, SnapshotRequest, SourceIdentity, SourceSpan,
+    capture_snapshot, diagnostic_category, probe_snapshot_identity, snapshot_completeness,
+    write_snapshot_jsonl, DependencyDeclaration, ManifestSnapshot, SnapshotRequest, SourceIdentity,
+    SourceSpan,
 };
 use crate::structured_analysis::{initialize_graph_schema, validate_graph_connection};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
@@ -72,6 +73,7 @@ struct RuntimeEvidenceSnapshot {
 
 #[derive(Debug, Clone)]
 struct InputFingerprintProbe {
+    runtime_evidence_present: bool,
     input_fingerprint: Option<String>,
     artifact_sha256: Option<String>,
     receipt_sha256: Option<String>,
@@ -85,10 +87,11 @@ struct InputFingerprintProbe {
 
 #[derive(Debug, Clone, Default)]
 struct PersistedInputIdentity {
+    runtime_evidence_present: bool,
     input_fingerprint: String,
-    artifact_sha256: String,
-    receipt_sha256: String,
-    live_identity_fingerprint: String,
+    artifact_sha256: Option<String>,
+    receipt_sha256: Option<String>,
+    live_identity_fingerprint: Option<String>,
     source_fingerprint: String,
     source_head_oid: String,
     dirty_fingerprint: String,
@@ -177,7 +180,7 @@ struct BuildMaterial {
     graph_root: PathBuf,
     profile: String,
     snapshot: ManifestSnapshot,
-    runtime_evidence: RuntimeEvidenceSnapshot,
+    runtime_evidence: Option<RuntimeEvidenceSnapshot>,
     nodes: Vec<Value>,
     facts: Vec<Value>,
     producer_artifacts: Vec<ProducerArtifact>,
@@ -920,6 +923,26 @@ fn active_runtime_event(root: &Path) -> Result<(PathBuf, Vec<u8>), GraphError> {
     }
     let bytes = fs::read(&event).map_err(|error| GraphError::Unavailable(error.to_string()))?;
     Ok((event, bytes))
+}
+
+fn load_optional_runtime_evidence_snapshot(
+    root: &Path,
+) -> Result<Option<RuntimeEvidenceSnapshot>, GraphError> {
+    let pointer = root.join("reports/agents/.active_run");
+    match fs::symlink_metadata(&pointer) {
+        Ok(metadata) if metadata.file_type().is_file() => {
+            load_runtime_evidence_snapshot(root).map(Some)
+        }
+        Ok(_) => Err(runtime_boundary(
+            "runtime_evidence_changed",
+            "active run pointer is not a regular file",
+        )),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(runtime_boundary(
+            "runtime_evidence_changed",
+            format!("active run pointer: {error}"),
+        )),
+    }
 }
 
 fn publication_attempt_id(materialization_id: &str, target_path: &str) -> String {
@@ -1809,15 +1832,11 @@ fn graph_input_fingerprint(
     source_fingerprint: &str,
     source_head: &str,
     dirty_fingerprint: &str,
-    runtime_fingerprint: &str,
+    runtime_fingerprint: Option<&str>,
     profile: &str,
 ) -> String {
-    sha256(
-        format!(
-            "{source_fingerprint}\0{source_head}\0{dirty_fingerprint}\0{runtime_fingerprint}\0{profile}"
-        )
-        .as_bytes(),
-    )
+    let runtime_fingerprint = runtime_fingerprint.unwrap_or("absent");
+    sha256(format!("{source_fingerprint}\0{source_head}\0{dirty_fingerprint}\0{runtime_fingerprint}\0{profile}").as_bytes())
 }
 
 fn source_node(snapshot: &ManifestSnapshot, identity: &SourceIdentity) -> Value {
@@ -1855,14 +1874,18 @@ fn dependency_fact(
 fn graph_fingerprint(
     nodes: &[Value],
     facts: &[Value],
-    runtime: &RuntimeEvidenceSnapshot,
+    runtime: Option<&RuntimeEvidenceSnapshot>,
 ) -> String {
-    let value = json!({"nodes":nodes,"facts":facts,"runtime":runtime_evidence_json(runtime)});
+    let runtime = runtime.map(runtime_evidence_json).unwrap_or(Value::Null);
+    let value = json!({"nodes":nodes,"facts":facts,"runtime":runtime});
     sha256(serde_json::to_string(&value).unwrap_or_default().as_bytes())
 }
 
-fn capture_runtime_dashboard(snapshot: &RuntimeEvidenceSnapshot) -> ProducerArtifact {
-    runtime_evidence_producer(snapshot)
+fn capture_runtime_dashboard(snapshot: Option<&RuntimeEvidenceSnapshot>) -> Vec<ProducerArtifact> {
+    snapshot
+        .map(runtime_evidence_producer)
+        .into_iter()
+        .collect()
 }
 
 fn collect_build_material(root: &Path, profile: &str) -> Result<BuildMaterial, GraphError> {
@@ -1874,7 +1897,7 @@ fn collect_build_material_with_mode(
     profile: &str,
     _probe: bool,
 ) -> Result<BuildMaterial, GraphError> {
-    let runtime_evidence = load_runtime_evidence_snapshot(root)?;
+    let runtime_evidence = load_optional_runtime_evidence_snapshot(root)?;
     let snapshot_request = SnapshotRequest {
         root: root.to_path_buf(),
         profile: "parent".to_string(),
@@ -1905,16 +1928,16 @@ fn collect_build_material_with_mode(
         .iter()
         .filter_map(|declaration| dependency_fact(&snapshot, declaration))
         .collect::<Vec<_>>();
-    let runtime_fp = runtime_evidence_fingerprint(&runtime_evidence);
+    let runtime_fp = runtime_evidence.as_ref().map(runtime_evidence_fingerprint);
     let input_fingerprint = graph_input_fingerprint(
         &snapshot.header.source_fingerprint,
         &snapshot.header.git_head,
         &snapshot.header.git_status_hash,
-        &runtime_fp,
+        runtime_fp.as_deref(),
         profile,
     );
-    let graph_fingerprint = graph_fingerprint(&nodes, &facts, &runtime_evidence);
-    let producer = capture_runtime_dashboard(&runtime_evidence);
+    let graph_fingerprint = graph_fingerprint(&nodes, &facts, runtime_evidence.as_ref());
+    let producer_artifacts = capture_runtime_dashboard(runtime_evidence.as_ref());
     Ok(BuildMaterial {
         root: root.to_path_buf(),
         graph_root: root.join(".agent-canon/knowledge-graph"),
@@ -1923,7 +1946,7 @@ fn collect_build_material_with_mode(
         runtime_evidence,
         nodes,
         facts,
-        producer_artifacts: vec![producer],
+        producer_artifacts,
         input_fingerprint,
         graph_fingerprint,
     })
@@ -1948,6 +1971,67 @@ fn metadata_optional(connection: &Connection, key: &str) -> Result<Option<String
         )
         .optional()
         .map_err(|error| GraphError::Unavailable(error.to_string()))
+}
+
+fn source_diagnostic_counts(connection: &Connection) -> Result<(usize, usize, usize), GraphError> {
+    let mut statement = connection
+        .prepare("SELECT rule, COUNT(*) FROM diagnostics WHERE layer='source' GROUP BY rule")
+        .map_err(|error| GraphError::Unavailable(error.to_string()))?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, usize>(1)?))
+        })
+        .map_err(|error| GraphError::Unavailable(error.to_string()))?;
+    let mut counts = (0, 0, 0);
+    for row in rows {
+        let (rule, count) = row.map_err(|error| GraphError::Unavailable(error.to_string()))?;
+        match diagnostic_category(&rule) {
+            "unresolved" => counts.0 += count,
+            "ambiguous" => counts.1 += count,
+            "uncovered" => counts.2 += count,
+            _ => unreachable!("diagnostic category is closed"),
+        }
+    }
+    Ok(counts)
+}
+
+fn runtime_metadata_matches(
+    connection: &Connection,
+    runtime: Option<&RuntimeEvidenceSnapshot>,
+) -> Result<bool, GraphError> {
+    let keys = [
+        "runtime_event_materialization",
+        "runtime_event_artifact",
+        "runtime_event_artifact_sha256",
+        "runtime_event_outcome_receipt",
+        "runtime_event_outcome_receipt_sha256",
+        "runtime_live_identity_fingerprint",
+    ];
+    let Some(runtime) = runtime else {
+        for key in keys {
+            if metadata_optional(connection, key)?.is_some() {
+                return Ok(false);
+            }
+        }
+        return Ok(true);
+    };
+    let runtime_json = serde_json::to_string(&runtime_evidence_json(runtime))
+        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    let artifact = String::from_utf8(runtime.artifact_bytes.clone())
+        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    let receipt = String::from_utf8(runtime.receipt_bytes.clone())
+        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    Ok(
+        metadata(connection, "runtime_event_materialization")? == runtime_json
+            && metadata(connection, "runtime_event_artifact")? == artifact
+            && metadata(connection, "runtime_event_artifact_sha256")?
+                == sha256(&runtime.artifact_bytes)
+            && metadata(connection, "runtime_event_outcome_receipt")? == receipt
+            && metadata(connection, "runtime_event_outcome_receipt_sha256")?
+                == sha256(&runtime.receipt_bytes)
+            && metadata(connection, "runtime_live_identity_fingerprint")?
+                == runtime.live_identity_fingerprint,
+    )
 }
 
 fn canonical_published_graph_path(root: &Path) -> Result<PathBuf, GraphError> {
@@ -2102,11 +2186,11 @@ fn build_graph_staging(
         let id = format!("diagnostic:{}", sha256(diagnostic.message.as_bytes()));
         connection.execute("INSERT INTO diagnostics(id,layer,target_node_id,target_edge_id,severity,rule,message,suggested_action_json) VALUES(?1,'source',?2,'',?3,?4,?5,'{}')", params![id, target_node, if diagnostic.severity == "error" { "blocker" } else { diagnostic.severity.as_str() }, diagnostic.code, diagnostic.message]).map_err(|error| GraphError::Io(error.to_string()))?;
     }
-    let runtime_json = runtime_evidence_json(&material.runtime_evidence);
-    let runtime_artifact = String::from_utf8(material.runtime_evidence.artifact_bytes.clone())
-        .map_err(|error| GraphError::Validation(error.to_string()))?;
-    let runtime_receipt = String::from_utf8(material.runtime_evidence.receipt_bytes.clone())
-        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    let runtime_json = material
+        .runtime_evidence
+        .as_ref()
+        .map(runtime_evidence_json)
+        .unwrap_or(Value::Null);
     let producer_json = serde_json::to_string(
         &material
             .producer_artifacts
@@ -2131,7 +2215,12 @@ fn build_graph_staging(
         producer_artifacts: material.producer_artifacts.clone(),
         runtime_evidence: runtime_json.clone(),
         verified: true,
-        verification_code: "runtime-evidence-readback-v2".to_string(),
+        verification_code: if material.runtime_evidence.is_some() {
+            "runtime-evidence-readback-v2"
+        } else {
+            "source-facts-readback-v1"
+        }
+        .to_string(),
     };
     connection
         .execute(
@@ -2139,42 +2228,48 @@ fn build_graph_staging(
             params![serde_json::to_string(&integration.json()).unwrap_or_default()],
         )
         .map_err(|error| GraphError::Io(error.to_string()))?;
-    connection
-        .execute(
-            "INSERT INTO metadata(key,value) VALUES('runtime_event_materialization',?1)",
-            params![serde_json::to_string(&runtime_json).unwrap_or_default()],
-        )
-        .map_err(|error| GraphError::Io(error.to_string()))?;
-    connection
-        .execute(
-            "INSERT INTO metadata(key,value) VALUES('runtime_event_artifact',?1)",
-            params![runtime_artifact],
-        )
-        .map_err(|error| GraphError::Io(error.to_string()))?;
-    connection
-        .execute(
-            "INSERT INTO metadata(key,value) VALUES('runtime_event_artifact_sha256',?1)",
-            params![sha256(&material.runtime_evidence.artifact_bytes)],
-        )
-        .map_err(|error| GraphError::Io(error.to_string()))?;
-    connection
-        .execute(
-            "INSERT INTO metadata(key,value) VALUES('runtime_event_outcome_receipt',?1)",
-            params![runtime_receipt],
-        )
-        .map_err(|error| GraphError::Io(error.to_string()))?;
-    connection
-        .execute(
-            "INSERT INTO metadata(key,value) VALUES('runtime_event_outcome_receipt_sha256',?1)",
-            params![sha256(&material.runtime_evidence.receipt_bytes)],
-        )
-        .map_err(|error| GraphError::Io(error.to_string()))?;
-    connection
-        .execute(
-            "INSERT INTO metadata(key,value) VALUES('runtime_live_identity_fingerprint',?1)",
-            params![material.runtime_evidence.live_identity_fingerprint],
-        )
-        .map_err(|error| GraphError::Io(error.to_string()))?;
+    if let Some(runtime) = material.runtime_evidence.as_ref() {
+        let runtime_artifact = String::from_utf8(runtime.artifact_bytes.clone())
+            .map_err(|error| GraphError::Validation(error.to_string()))?;
+        let runtime_receipt = String::from_utf8(runtime.receipt_bytes.clone())
+            .map_err(|error| GraphError::Validation(error.to_string()))?;
+        connection
+            .execute(
+                "INSERT INTO metadata(key,value) VALUES('runtime_event_materialization',?1)",
+                params![serde_json::to_string(&runtime_json).unwrap_or_default()],
+            )
+            .map_err(|error| GraphError::Io(error.to_string()))?;
+        connection
+            .execute(
+                "INSERT INTO metadata(key,value) VALUES('runtime_event_artifact',?1)",
+                params![runtime_artifact],
+            )
+            .map_err(|error| GraphError::Io(error.to_string()))?;
+        connection
+            .execute(
+                "INSERT INTO metadata(key,value) VALUES('runtime_event_artifact_sha256',?1)",
+                params![sha256(&runtime.artifact_bytes)],
+            )
+            .map_err(|error| GraphError::Io(error.to_string()))?;
+        connection
+            .execute(
+                "INSERT INTO metadata(key,value) VALUES('runtime_event_outcome_receipt',?1)",
+                params![runtime_receipt],
+            )
+            .map_err(|error| GraphError::Io(error.to_string()))?;
+        connection
+            .execute(
+                "INSERT INTO metadata(key,value) VALUES('runtime_event_outcome_receipt_sha256',?1)",
+                params![sha256(&runtime.receipt_bytes)],
+            )
+            .map_err(|error| GraphError::Io(error.to_string()))?;
+        connection
+            .execute(
+                "INSERT INTO metadata(key,value) VALUES('runtime_live_identity_fingerprint',?1)",
+                params![runtime.live_identity_fingerprint],
+            )
+            .map_err(|error| GraphError::Io(error.to_string()))?;
+    }
     connection
         .execute(
             "INSERT INTO metadata(key,value) VALUES('snapshot_head',?1)",
@@ -2244,23 +2339,11 @@ fn materialize_graph_store(material: &BuildMaterial) -> Result<GraphIntegrationR
     let readback = open_db(&material.root)?;
     validate_graph_connection(&readback)
         .map_err(|error| GraphError::Validation(error.to_string()))?;
-    let runtime_json = runtime_evidence_json(&material.runtime_evidence);
+    let runtime_metadata_match =
+        runtime_metadata_matches(&readback, material.runtime_evidence.as_ref())?;
     let expected_integration = serde_json::to_string(&integration.json()).unwrap_or_default();
     if metadata(&readback, "integration_record")? != expected_integration
-        || metadata(&readback, "runtime_event_materialization")?
-            != serde_json::to_string(&runtime_json).unwrap_or_default()
-        || metadata(&readback, "runtime_event_artifact")?
-            != String::from_utf8(material.runtime_evidence.artifact_bytes.clone())
-                .map_err(|error| GraphError::Validation(error.to_string()))?
-        || metadata(&readback, "runtime_event_artifact_sha256")?
-            != sha256(&material.runtime_evidence.artifact_bytes)
-        || metadata(&readback, "runtime_event_outcome_receipt")?
-            != String::from_utf8(material.runtime_evidence.receipt_bytes.clone())
-                .map_err(|error| GraphError::Validation(error.to_string()))?
-        || metadata(&readback, "runtime_event_outcome_receipt_sha256")?
-            != sha256(&material.runtime_evidence.receipt_bytes)
-        || metadata(&readback, "runtime_live_identity_fingerprint")?
-            != material.runtime_evidence.live_identity_fingerprint
+        || !runtime_metadata_match
         || metadata(&readback, "input_fingerprint")? != material.input_fingerprint
         || metadata(&readback, "graph_fingerprint")? != material.graph_fingerprint
         || metadata(&readback, "snapshot_head")? != material.snapshot.header.git_head
@@ -2377,6 +2460,52 @@ fn persisted_input_identity(
             .cloned()
             .ok_or_else(|| mismatch(&format!("metadata {key} is absent")))
     };
+    let runtime_evidence_present = match integration.get("runtime_evidence") {
+        Some(Value::Null) => false,
+        Some(Value::Object(_)) => true,
+        Some(_) => return Err(mismatch("persisted runtime evidence is invalid")),
+        None => return Err(mismatch("persisted runtime evidence is absent")),
+    };
+    if !runtime_evidence_present {
+        let runtime_keys = [
+            "runtime_event_materialization",
+            "runtime_event_artifact",
+            "runtime_event_artifact_sha256",
+            "runtime_event_outcome_receipt",
+            "runtime_event_outcome_receipt_sha256",
+            "runtime_live_identity_fingerprint",
+        ];
+        if runtime_keys.iter().any(|key| values.contains_key(*key)) {
+            return Err(mismatch("source-only graph contains runtime metadata"));
+        }
+        let input_fingerprint = required("input_fingerprint")?;
+        let source_fingerprint = required("source_fingerprint")?;
+        let source_head_oid = required("snapshot_head")?;
+        let dirty_fingerprint = required("dirty_fingerprint")?;
+        let profile = integration
+            .get("profile")
+            .and_then(Value::as_str)
+            .ok_or_else(|| mismatch("persisted profile is absent"))?
+            .to_string();
+        if integration.get("input_fingerprint").and_then(Value::as_str)
+            != Some(input_fingerprint.as_str())
+            || integration.get("snapshot_head").and_then(Value::as_str)
+                != Some(source_head_oid.as_str())
+        {
+            return Err(mismatch("persisted graph identity disagrees"));
+        }
+        return Ok(PersistedInputIdentity {
+            runtime_evidence_present: false,
+            input_fingerprint,
+            artifact_sha256: None,
+            receipt_sha256: None,
+            live_identity_fingerprint: None,
+            source_fingerprint,
+            source_head_oid,
+            dirty_fingerprint,
+            profile,
+        });
+    }
     let materialization_text = required("runtime_event_materialization")?;
     let artifact_text = required("runtime_event_artifact")?;
     let artifact_bytes_sha = required("runtime_event_artifact_sha256")?;
@@ -2612,10 +2741,11 @@ fn persisted_input_identity(
         return Err(mismatch("persisted graph identity disagrees"));
     }
     Ok(PersistedInputIdentity {
+        runtime_evidence_present: true,
         input_fingerprint,
-        artifact_sha256,
-        receipt_sha256,
-        live_identity_fingerprint,
+        artifact_sha256: Some(artifact_sha256),
+        receipt_sha256: Some(receipt_sha256),
+        live_identity_fingerprint: Some(live_identity_fingerprint),
         source_fingerprint,
         source_head_oid,
         dirty_fingerprint,
@@ -2630,6 +2760,7 @@ fn probe_input_fingerprint(
     let source = probe_snapshot_identity(root, "parent")
         .map_err(|error| GraphError::Validation(error.to_string()))?;
     let base = InputFingerprintProbe {
+        runtime_evidence_present: false,
         input_fingerprint: None,
         artifact_sha256: None,
         receipt_sha256: None,
@@ -2640,15 +2771,16 @@ fn probe_input_fingerprint(
         profile: profile.to_string(),
         reason: None,
     };
-    match load_runtime_evidence_snapshot(root) {
-        Ok(runtime) => {
+    match load_optional_runtime_evidence_snapshot(root) {
+        Ok(Some(runtime)) => {
             let runtime_fingerprint = runtime_evidence_fingerprint(&runtime);
             Ok(InputFingerprintProbe {
+                runtime_evidence_present: true,
                 input_fingerprint: Some(graph_input_fingerprint(
                     &base.source_fingerprint,
                     &base.source_head_oid,
                     &base.dirty_fingerprint,
-                    &runtime_fingerprint,
+                    Some(&runtime_fingerprint),
                     profile,
                 )),
                 artifact_sha256: Some(runtime.artifact_sha256),
@@ -2657,11 +2789,23 @@ fn probe_input_fingerprint(
                 ..base
             })
         }
+        Ok(None) => Ok(InputFingerprintProbe {
+            input_fingerprint: Some(graph_input_fingerprint(
+                &base.source_fingerprint,
+                &base.source_head_oid,
+                &base.dirty_fingerprint,
+                None,
+                profile,
+            )),
+            ..base
+        }),
         Err(GraphError::RuntimeBoundary { reason, .. }) => Ok(InputFingerprintProbe {
+            runtime_evidence_present: true,
             reason: Some(reason),
             ..base
         }),
         Err(_error) => Ok(InputFingerprintProbe {
+            runtime_evidence_present: true,
             reason: Some("runtime_evidence_changed".to_string()),
             ..base
         }),
@@ -2698,12 +2842,16 @@ fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
         .get("integration_record")
         .and_then(|value| serde_json::from_str::<Value>(value).ok())
         .unwrap_or(Value::Null);
+    let (unresolved_count, ambiguous_count, uncovered_count) =
+        source_diagnostic_counts(&connection)?;
     let persisted_result = persisted_input_identity(&values, &integration);
     let persisted_mismatch = persisted_result.is_err();
     let persisted = persisted_result.unwrap_or_default();
     let probe = probe_input_fingerprint(&root, &args.profile)?;
     let probe_reason = if persisted_mismatch {
         Some("persisted_readback_mismatch".to_string())
+    } else if probe.runtime_evidence_present != persisted.runtime_evidence_present {
+        Some("runtime_evidence_changed".to_string())
     } else if matches!(
         probe.reason.as_deref(),
         Some("runtime_receipt_invalid" | "runtime_receipt_missing" | "runtime_receipt_uncertain")
@@ -2711,13 +2859,14 @@ fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
         probe.reason.clone()
     } else if probe.reason.as_deref() == Some("runtime_evidence_changed")
         || (probe.reason.is_none()
-            && (probe.artifact_sha256.as_deref() != Some(persisted.artifact_sha256.as_str())
-                || probe.receipt_sha256.as_deref() != Some(persisted.receipt_sha256.as_str())))
+            && probe.runtime_evidence_present
+            && (probe.artifact_sha256 != persisted.artifact_sha256
+                || probe.receipt_sha256 != persisted.receipt_sha256))
     {
         Some("runtime_evidence_changed".to_string())
     } else if probe.reason.as_deref() == Some("source_changed")
-        || probe.live_identity_fingerprint.as_deref()
-            != Some(persisted.live_identity_fingerprint.as_str())
+        || (probe.runtime_evidence_present
+            && probe.live_identity_fingerprint != persisted.live_identity_fingerprint)
         || probe.source_fingerprint != persisted.source_fingerprint
         || probe.source_head_oid != persisted.source_head_oid
         || probe.dirty_fingerprint != persisted.dirty_fingerprint
@@ -2730,9 +2879,24 @@ fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
     } else {
         None
     };
-    let fresh = probe_reason.is_none();
+    let source_complete = unresolved_count + ambiguous_count + uncovered_count == 0;
+    let fresh = probe_reason.is_none() && source_complete;
+    let status = if probe_reason.is_some() {
+        "stale"
+    } else if source_complete {
+        "fresh"
+    } else {
+        "incomplete"
+    };
+    let reason = if probe_reason.is_some() {
+        probe_reason.clone()
+    } else if source_complete {
+        None
+    } else {
+        Some("source_completeness_incomplete".to_string())
+    };
     Ok(
-        json!({"schema":"agent-canon.graph.status.v1","command":"status","status":if fresh {"fresh"} else {"stale"},"profile":args.profile,"root":root,"db_path":root.join(".agent-canon/knowledge-graph/graph.sqlite"),"input_fingerprint":persisted.input_fingerprint,"graph_fingerprint":integration.get("graph_fingerprint"),"integration_record":integration,"probe_reason":probe_reason,"reason":probe_reason,"exit_code":if fresh {0} else {2}}),
+        json!({"schema":"agent-canon.graph.status.v1","command":"status","status":status,"profile":args.profile,"root":root,"db_path":root.join(".agent-canon/knowledge-graph/graph.sqlite"),"input_fingerprint":persisted.input_fingerprint,"graph_fingerprint":integration.get("graph_fingerprint"),"integration_record":integration,"unresolved_count":unresolved_count,"ambiguous_count":ambiguous_count,"uncovered_count":uncovered_count,"probe_reason":probe_reason,"reason":reason,"exit_code":if fresh {0} else {2}}),
     )
 }
 
@@ -2849,8 +3013,21 @@ fn build_graph_with_failure(args: &GraphArgs) -> Result<Value, GraphError> {
         .map_err(|error| GraphError::Io(error.to_string()))?;
     let material = collect_build_material(&root, &args.profile)?;
     let integration = materialize_graph_store(&material)?;
+    let (unresolved_count, ambiguous_count, uncovered_count) =
+        snapshot_completeness(&material.snapshot);
+    let complete = unresolved_count + ambiguous_count + uncovered_count == 0;
+    let status = if complete { "fresh" } else { "incomplete" };
+    let diagnostic_values = |category: &str| {
+        material
+            .snapshot
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic_category(&diagnostic.code) == category)
+            .map(|diagnostic| json!({"code":diagnostic.code,"message":diagnostic.message}))
+            .collect::<Vec<_>>()
+    };
     Ok(
-        json!({"schema":"agent-canon.graph.build.v1","command":"build","status":"fresh","graph_status":"fresh","profile":args.profile,"root":root,"db_path":integration.db_path,"input_fingerprint":integration.input_fingerprint,"graph_fingerprint":integration.graph_fingerprint,"unresolved_count":material.snapshot.diagnostics.len(),"unresolved":material.snapshot.diagnostics.iter().map(|diagnostic| json!({"code":diagnostic.code,"message":diagnostic.message})).collect::<Vec<_>>(),"producer_artifacts":integration.producer_artifacts.iter().map(ProducerArtifact::json).collect::<Vec<_>>(),"integration_record":integration.json(),"publication":"published","durability":"durable","exit_code":0}),
+        json!({"schema":"agent-canon.graph.build.v1","command":"build","status":status,"graph_status":status,"profile":args.profile,"root":root,"db_path":integration.db_path,"input_fingerprint":integration.input_fingerprint,"graph_fingerprint":integration.graph_fingerprint,"unresolved_count":unresolved_count,"ambiguous_count":ambiguous_count,"uncovered_count":uncovered_count,"unresolved":diagnostic_values("unresolved"),"ambiguous":diagnostic_values("ambiguous"),"uncovered":diagnostic_values("uncovered"),"producer_artifacts":integration.producer_artifacts.iter().map(ProducerArtifact::json).collect::<Vec<_>>(),"integration_record":integration.json(),"publication":"published","durability":"durable","exit_code":if complete {0} else {1}}),
     )
 }
 
@@ -3438,6 +3615,88 @@ mod tests {
             fs::read(&fixture.receipt).expect("receipt readback"),
             persisted_receipt
         );
+    }
+
+    #[test]
+    fn graph_build_and_query_succeed_without_active_runtime_evidence() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        fs::remove_file(fixture.root.join("reports/agents/.active_run"))
+            .expect("remove active runtime pointer");
+        let args = graph_args(&fixture.root);
+
+        let build = build_graph_with_failure(&args).expect("source-only graph build");
+        assert_eq!(build["status"], "fresh");
+        assert_eq!(build["integration_record"]["runtime_evidence"], Value::Null);
+        assert_eq!(build["producer_artifacts"], json!([]));
+
+        let connection = Connection::open(
+            fixture
+                .root
+                .join(".agent-canon/knowledge-graph/graph.sqlite"),
+        )
+        .expect("persisted source-only graph");
+        for key in [
+            "runtime_event_materialization",
+            "runtime_event_artifact",
+            "runtime_event_artifact_sha256",
+            "runtime_event_outcome_receipt",
+            "runtime_event_outcome_receipt_sha256",
+            "runtime_live_identity_fingerprint",
+        ] {
+            assert!(
+                metadata_optional(&connection, key)
+                    .expect("source-only runtime metadata lookup")
+                    .is_none(),
+                "unexpected source-only runtime metadata: {key}"
+            );
+        }
+        drop(connection);
+
+        let status = read_graph_status(&args).expect("source-only status");
+        let query = query_graph(&args).expect("source-only query");
+        assert_eq!(status["status"], "fresh");
+        assert_eq!(query["status"], "fresh");
+        assert!(!query["nodes"]
+            .as_array()
+            .expect("source-only nodes")
+            .is_empty());
+
+        fs::write(
+            fixture.root.join("reports/agents/.active_run"),
+            b"run-graph\n",
+        )
+        .expect("restore active runtime pointer");
+        let status = read_graph_status(&args).expect("runtime-present status");
+        assert_eq!(status["status"], "stale");
+        assert_eq!(status["probe_reason"], "runtime_evidence_changed");
+    }
+
+    #[test]
+    fn graph_build_publishes_incomplete_state_for_snapshot_diagnostics() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        fs::remove_file(fixture.root.join("reports/agents/.active_run"))
+            .expect("remove active runtime pointer");
+        fs::write(
+            fixture.root.join("src/manifest.md"),
+            "<!--\n@dependency-start\ncontract implementation\nupstream design missing.md missing target\n@dependency-end\n-->\n",
+        )
+        .expect("incomplete manifest");
+        let args = graph_args(&fixture.root);
+
+        let build = build_graph_with_failure(&args).expect("incomplete graph publication");
+        assert_eq!(build["status"], "incomplete");
+        assert_eq!(build["exit_code"], 1);
+        assert_eq!(build["unresolved_count"], 1);
+
+        let status = read_graph_status(&args).expect("incomplete status");
+        assert_eq!(status["status"], "incomplete");
+        assert_eq!(status["reason"], "source_completeness_incomplete");
+        assert_eq!(status["unresolved_count"], 1);
+        let query = query_graph(&args).expect("incomplete query response");
+        assert_eq!(query["status"], "incomplete");
+        assert_eq!(query["exit_code"], 2);
     }
 
     #[test]

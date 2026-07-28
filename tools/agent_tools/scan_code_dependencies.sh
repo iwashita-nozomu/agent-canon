@@ -11,12 +11,13 @@ set -euo pipefail
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 CHANGED=0
 PRINT_UNRESOLVED=0
+PATHS_FILE=""
 declare -a INPUT_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  scan_code_dependencies.sh [--root DIR] [--changed] [--print-unresolved] [paths...]
+  scan_code_dependencies.sh [--root DIR] [--changed] [--print-unresolved] [--paths-file FILE] [paths...]
 
 Extracts best-effort code dependency edges from source files.
 This is intentionally separate from dependency manifest header tools:
@@ -43,6 +44,11 @@ while [[ $# -gt 0 ]]; do
       PRINT_UNRESOLVED=1
       shift
       ;;
+    --paths-file)
+      [[ $# -ge 2 ]] || { echo "scan_code_dependencies.sh: --paths-file requires a value" >&2; exit 2; }
+      PATHS_FILE="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -56,7 +62,35 @@ done
 
 cd "$ROOT_DIR"
 
+if [[ -n "$PATHS_FILE" ]]; then
+  if [[ ${#INPUT_PATHS[@]} -gt 0 || "$CHANGED" -eq 1 ]]; then
+    echo "scan_code_dependencies.sh: --paths-file cannot be combined with --changed or positional paths" >&2
+    exit 2
+  fi
+  if [[ "$PATHS_FILE" != /* ]]; then
+    PATHS_FILE="$ROOT_DIR/$PATHS_FILE"
+  fi
+  if [[ ! -f "$PATHS_FILE" || -L "$PATHS_FILE" ]]; then
+    echo "scan_code_dependencies.sh: --paths-file must name a regular non-symlink file" >&2
+    exit 2
+  fi
+  while IFS= read -r candidate || [[ -n "$candidate" ]]; do
+    [[ -n "$candidate" ]] || continue
+    if [[ "$candidate" == /* || "$candidate" == *\\* || "$candidate" == *$'\t'* || "$candidate" == *$'\r'* || "$candidate" == ../* || "$candidate" == */../* || "$candidate" == */.. ]]; then
+      echo "scan_code_dependencies.sh: invalid --paths-file entry: $candidate" >&2
+      exit 2
+    fi
+  done < "$PATHS_FILE"
+fi
+
 collect_paths() {
+  if [[ -n "$PATHS_FILE" ]]; then
+    while IFS= read -r path || [[ -n "$path" ]]; do
+      [[ -n "$path" ]] || continue
+      printf '%s\n' "$path"
+    done < "$PATHS_FILE"
+    return
+  fi
   if [[ ${#INPUT_PATHS[@]} -gt 0 ]]; then
     printf '%s\n' "${INPUT_PATHS[@]}"
     return
@@ -79,7 +113,7 @@ trim() {
 }
 
 relative_path() {
-  realpath -m --relative-to="$ROOT_DIR" "$1"
+  realpath -s -m --relative-to="$ROOT_DIR" "$1"
 }
 
 emit_edge() {
@@ -143,6 +177,9 @@ scan_python() {
       module="${BASH_REMATCH[1]}"
       imports="${BASH_REMATCH[2]}"
       target="$(resolve_python_module "$file" "$module" 2>/dev/null || true)"
+      if [[ -z "$target" && "$module" != .* ]]; then
+        target="external:python:$module"
+      fi
       emit_edge "python" "import" "$source" "$target" "$module" "$raw"
       IFS=',' read -ra import_items <<< "$imports"
       for import_item in "${import_items[@]}"; do
@@ -154,6 +191,9 @@ scan_python() {
           combined_module="$module.$import_item"
         fi
         target="$(resolve_python_module "$file" "$combined_module" 2>/dev/null || true)"
+        if [[ -z "$target" && "$combined_module" != .* ]]; then
+          target="external:python:$combined_module"
+        fi
         emit_edge "python" "from-import-symbol" "$source" "$target" "$combined_module" "$raw"
       done
     elif [[ "$line" =~ ^import[[:space:]]+(.+) ]]; then
@@ -163,6 +203,9 @@ scan_python() {
         module="$(trim "${import_item%% as *}")"
         [[ -n "$module" ]] || continue
         target="$(resolve_python_module "$file" "$module" 2>/dev/null || true)"
+        if [[ -z "$target" ]]; then
+          target="external:python:$module"
+        fi
         emit_edge "python" "import" "$source" "$target" "$module" "$raw"
       done
     fi
@@ -206,6 +249,9 @@ scan_shell() {
         target="$(relative_path "$source_dir/$include")"
       elif [[ -f "$include" ]]; then
         target="$(relative_path "$include")"
+      fi
+      if [[ -z "$target" && ( "$include" == /* || "$include" == *'$'* || "$include" == *'${'* ) ]]; then
+        target="external:shell:$include"
       fi
       emit_edge "shell" "source" "$source" "$target" "$include" "$raw"
     fi

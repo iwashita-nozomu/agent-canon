@@ -29,8 +29,8 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Callable, Mapping, cast
+from pathlib import Path, PurePosixPath
+from typing import Callable, Literal, Mapping, cast
 
 import yaml
 if __package__:
@@ -683,15 +683,76 @@ class RoleDocumentPacket:
     notes: str
 
 
+ActiveDesignSection = Literal[
+    "abstract_design_frame",
+    "implementation_source_packet",
+    "design_side_effect_map",
+    "design_to_implementation_trace",
+]
+ACTIVE_DESIGN_SECTIONS: tuple[ActiveDesignSection, ...] = (
+    "abstract_design_frame",
+    "implementation_source_packet",
+    "design_side_effect_map",
+    "design_to_implementation_trace",
+)
+ACTIVE_DESIGN_REFERENCE_FIELDS = (
+    "clause_refs",
+    "owner_refs",
+    "source_refs",
+    "dependency_refs",
+    "output_refs",
+    "reviewer_refs",
+)
+ACTIVE_PACKET_ENTRY_IDS = {
+    "abstract_design_frame": "abstract-design-frame",
+    "implementation_source_packet": "implementation-source-packet",
+    "design_side_effect_map": "design-side-effect-map",
+    "design_to_implementation_trace": "design-to-implementation-trace",
+}
+
+
+@dataclass(frozen=True)
+class ActiveDesignClause:
+    """One closed packet clause and its canonical source reference."""
+
+    clause_id: str
+    source_ref: str
+
+
+@dataclass(frozen=True)
+class ActiveDesignPacketEntry:
+    """One typed graph edge set for an active design packet entry."""
+
+    entry_id: str
+    responsibility_id: str
+    clause_refs: tuple[str, ...]
+    owner_refs: tuple[str, ...]
+    source_refs: tuple[str, ...]
+    dependency_refs: tuple[str, ...]
+    output_refs: tuple[str, ...]
+    reviewer_refs: tuple[str, ...]
+
+
 @dataclass(frozen=True)
 class ActiveDesignPacketConfig:
-    """Typed artifact-registry declaration for one run's active design packet."""
+    """Typed active packet plus its closed graph/reference projection contract."""
 
     schema: str
     design_artifact: str
     design_review_artifact: str
     document_flow_review_artifact: str
     document_flow_required: bool
+    clause_registry: tuple[ActiveDesignClause, ...]
+    abstract_design_frame: ActiveDesignPacketEntry
+    implementation_source_packet: ActiveDesignPacketEntry
+    design_side_effect_map: ActiveDesignPacketEntry
+    design_to_implementation_trace: ActiveDesignPacketEntry
+
+    def section_entries(
+        self,
+    ) -> tuple[tuple[ActiveDesignSection, ActiveDesignPacketEntry], ...]:
+        """Return graph entries in their canonical dependency order."""
+        return tuple((name, getattr(self, name)) for name in ACTIVE_DESIGN_SECTIONS)
 
 
 def resolve_cross_cutting_document_packet(
@@ -879,7 +940,76 @@ ACTIVE_DESIGN_PACKET_FIELDS = (
     "schema",
     *ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS,
     "document_flow_required",
+    "clause_registry",
+    *ACTIVE_DESIGN_SECTIONS,
 )
+
+ACTIVE_PACKET_ENTRY_FIELDS = (
+    "entry_id",
+    "responsibility_id",
+    *ACTIVE_DESIGN_REFERENCE_FIELDS,
+)
+ACTIVE_PACKET_REFERENCE_PREFIXES = {
+    "clause_refs": (),
+    "owner_refs": ("role:",),
+    "source_refs": ("repo:", "artifact:"),
+    "dependency_refs": ("entry:", "header:"),
+    "output_refs": ("artifact:",),
+    "reviewer_refs": ("role:",),
+}
+ACTIVE_PACKET_SCHEMA = ACTIVE_DESIGN_PACKET_SCHEMA
+
+
+def _active_packet_reference_tuple(value: object, field: str) -> tuple[str, ...]:
+    """Validate one non-empty typed reference list."""
+    values = _as_string_tuple(value, field)
+    if not values:
+        raise RuntimeError(f"{field}:empty")
+    prefixes = ACTIVE_PACKET_REFERENCE_PREFIXES[field.rsplit(".", 1)[-1]]
+    if prefixes and any(not candidate.startswith(prefixes) for candidate in values):
+        raise RuntimeError(f"{field}:invalid_reference")
+    if field.rsplit(".", 1)[-1] == "clause_refs" and any(
+        re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", candidate) is None
+        for candidate in values
+    ):
+        raise RuntimeError(f"{field}:invalid_reference")
+    return values
+
+
+def _normalize_active_packet_entry(
+    raw_entry: object,
+    section: ActiveDesignSection,
+    field_prefix: str,
+) -> ActiveDesignPacketEntry:
+    """Normalize one graph entry with explicit closed fields and dependencies."""
+    entry_field = f"{field_prefix}.{section}"
+    entry = _as_object_mapping(raw_entry, entry_field)
+    unknown = sorted(set(entry).difference(ACTIVE_PACKET_ENTRY_FIELDS))
+    if unknown:
+        raise RuntimeError(f"{entry_field}:field_unknown:" + ",".join(unknown))
+    missing = [field for field in ACTIVE_PACKET_ENTRY_FIELDS if field not in entry]
+    if missing:
+        raise RuntimeError(f"{entry_field}:field_missing:" + ",".join(missing))
+    entry_id = _as_required_string(entry["entry_id"], f"{entry_field}.entry_id")
+    if entry_id != ACTIVE_PACKET_ENTRY_IDS[section]:
+        raise RuntimeError(f"{entry_field}.entry_id:invalid")
+    responsibility_id = _as_required_string(
+        entry["responsibility_id"], f"{entry_field}.responsibility_id"
+    )
+    references = {
+        field: _active_packet_reference_tuple(entry[field], f"{entry_field}.{field}")
+        for field in ACTIVE_DESIGN_REFERENCE_FIELDS
+    }
+    return ActiveDesignPacketEntry(
+        entry_id=entry_id,
+        responsibility_id=responsibility_id,
+        clause_refs=references["clause_refs"],
+        owner_refs=references["owner_refs"],
+        source_refs=references["source_refs"],
+        dependency_refs=references["dependency_refs"],
+        output_refs=references["output_refs"],
+        reviewer_refs=references["reviewer_refs"],
+    )
 
 
 def normalize_active_design_packet_config(
@@ -909,12 +1039,74 @@ def normalize_active_design_packet_config(
         raise RuntimeError(
             f"{field_prefix}:field_invalid:document_flow_required"
         )
+    raw_clauses = packet["clause_registry"]
+    if not isinstance(raw_clauses, list) or not raw_clauses:
+        raise RuntimeError(f"{field_prefix}.clause_registry:field_invalid")
+    clauses: list[ActiveDesignClause] = []
+    for index, raw_clause in enumerate(raw_clauses):
+        clause_field = f"{field_prefix}.clause_registry[{index}]"
+        clause = _as_object_mapping(raw_clause, clause_field)
+        if set(clause) != {"clause_id", "source_ref"}:
+            unknown = sorted(set(clause).difference({"clause_id", "source_ref"}))
+            if unknown:
+                raise RuntimeError(f"{clause_field}:field_unknown:" + ",".join(unknown))
+            missing = sorted({"clause_id", "source_ref"}.difference(clause))
+            raise RuntimeError(f"{clause_field}:field_missing:" + ",".join(missing))
+        clause_id = _as_required_string(clause["clause_id"], f"{clause_field}.clause_id")
+        source_ref = _as_required_string(clause["source_ref"], f"{clause_field}.source_ref")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", clause_id):
+            raise RuntimeError(f"{clause_field}.clause_id:invalid")
+        if not source_ref.startswith(("repo:", "artifact:")):
+            raise RuntimeError(f"{clause_field}.source_ref:invalid")
+        clauses.append(ActiveDesignClause(clause_id, source_ref))
+    clause_ids = tuple(clause.clause_id for clause in clauses)
+    if len(set(clause_ids)) != len(clause_ids):
+        raise RuntimeError(f"{field_prefix}.clause_registry:duplicate_id")
+    entries = {
+        section: _normalize_active_packet_entry(packet[section], section, field_prefix)
+        for section in ACTIVE_DESIGN_SECTIONS
+    }
+    responsibility_ids = {entry.responsibility_id for entry in entries.values()}
+    if len(responsibility_ids) != 1:
+        raise RuntimeError(f"{field_prefix}:responsibility_id:inconsistent")
+    known_entry_ids = {entry.entry_id for entry in entries.values()}
+    expected_dependencies: dict[ActiveDesignSection, set[str]] = {
+        "abstract_design_frame": set(),
+        "implementation_source_packet": {"abstract-design-frame"},
+        "design_side_effect_map": {"abstract-design-frame"},
+        "design_to_implementation_trace": {
+            "abstract-design-frame",
+            "implementation-source-packet",
+            "design-side-effect-map",
+        },
+    }
+    referenced_clauses: set[str] = set()
+    for section, entry in entries.items():
+        referenced_clauses.update(entry.clause_refs)
+        if not referenced_clauses.issubset(set(clause_ids)):
+            raise RuntimeError(f"{field_prefix}.{section}.clause_refs:invalid")
+        dependency_entries = {
+            value.removeprefix("entry:")
+            for value in entry.dependency_refs
+            if value.startswith("entry:")
+        }
+        if dependency_entries != expected_dependencies[section] or not dependency_entries.issubset(
+            known_entry_ids
+        ):
+            raise RuntimeError(f"{field_prefix}.{section}.dependency_refs:invalid")
+    if referenced_clauses != set(clause_ids):
+        raise RuntimeError(f"{field_prefix}.clause_registry:unreferenced_clause")
     return ActiveDesignPacketConfig(
         schema=schema,
         design_artifact=paths["design_artifact"],
         design_review_artifact=paths["design_review_artifact"],
         document_flow_review_artifact=paths["document_flow_review_artifact"],
         document_flow_required=document_flow_required,
+        clause_registry=tuple(clauses),
+        abstract_design_frame=entries["abstract_design_frame"],
+        implementation_source_packet=entries["implementation_source_packet"],
+        design_side_effect_map=entries["design_side_effect_map"],
+        design_to_implementation_trace=entries["design_to_implementation_trace"],
     )
 
 
@@ -929,6 +1121,205 @@ def parse_active_design_packet_input(
     except json.JSONDecodeError as exc:
         raise RuntimeError("active_design_packet:json_invalid") from exc
     return normalize_active_design_packet_config(parsed, "active_design_packet")
+
+
+def _active_packet_entry_mapping(entry: ActiveDesignPacketEntry) -> dict[str, object]:
+    """Serialize one typed graph entry for manifest materialization."""
+    return {
+        "entry_id": entry.entry_id,
+        "responsibility_id": entry.responsibility_id,
+        "clause_refs": list(entry.clause_refs),
+        "owner_refs": list(entry.owner_refs),
+        "source_refs": list(entry.source_refs),
+        "dependency_refs": list(entry.dependency_refs),
+        "output_refs": list(entry.output_refs),
+        "reviewer_refs": list(entry.reviewer_refs),
+    }
+
+
+def active_design_packet_mapping(
+    packet: ActiveDesignPacketConfig,
+) -> dict[str, object]:
+    """Serialize the exact closed active packet and graph entries."""
+    return {
+        "schema": packet.schema,
+        "design_artifact": packet.design_artifact,
+        "design_review_artifact": packet.design_review_artifact,
+        "document_flow_review_artifact": packet.document_flow_review_artifact,
+        "document_flow_required": packet.document_flow_required,
+        "clause_registry": [
+            {"clause_id": clause.clause_id, "source_ref": clause.source_ref}
+            for clause in packet.clause_registry
+        ],
+        **{
+            section: _active_packet_entry_mapping(entry)
+            for section, entry in packet.section_entries()
+        },
+    }
+
+
+ACTIVE_DESIGN_PACKET_MATERIALIZATION_SCHEMA = (
+    "waterfall.active_design_packet_materialization.v1"
+)
+
+
+def _distinct_active_packet_references(
+    packet: ActiveDesignPacketConfig,
+    field: str,
+) -> tuple[str, ...]:
+    """Return packet references once, preserving the declared order."""
+    values: list[str] = []
+    for _section, entry in packet.section_entries():
+        for reference in cast(tuple[str, ...], getattr(entry, field)):
+            if reference not in values:
+                values.append(reference)
+    return tuple(values)
+
+
+def _materialized_source_identity(
+    spec: RunBundleSpec,
+    reference: str,
+) -> dict[str, object]:
+    """Resolve one source reference and bind it to the current file bytes."""
+    root_name, separator, fragment = reference.partition("#")
+    prefix, delimiter, relative_value = root_name.partition(":")
+    if not delimiter or prefix not in {"repo", "artifact"}:
+        raise RuntimeError(f"active_design_packet_reference_invalid:source:{reference}")
+    relative = Path(relative_value)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise RuntimeError(f"active_design_packet_reference_invalid:source:{reference}")
+    root = spec.report_dir if prefix == "artifact" else spec.workspace_root
+    candidate = (root / relative).resolve()
+    try:
+        candidate.relative_to(root.resolve())
+    except ValueError as exc:
+        raise RuntimeError(
+            f"active_design_packet_reference_invalid:source:{reference}"
+        ) from exc
+    if not candidate.is_file() or candidate.is_symlink():
+        raise RuntimeError(f"active_design_packet_reference_missing:{reference}")
+    fragment_kind = "none"
+    fragment_value = None
+    if separator:
+        fragment_kind, fragment_value = fragment.split(":", 1)
+        if fragment_kind not in {"section", "symbol"} or not fragment_value:
+            raise RuntimeError(f"active_design_packet_reference_invalid:source:{reference}")
+    return {
+        "declared_ref": reference,
+        "root_key": prefix,
+        "relative_path": relative.as_posix(),
+        "fragment_kind": fragment_kind,
+        "fragment_value": fragment_value,
+        "sha256": hashlib.sha256(candidate.read_bytes()).hexdigest(),
+        "parser_match_count": 1,
+    }
+
+
+def _materialized_dependency_identity(
+    spec: RunBundleSpec,
+    reference: str,
+) -> dict[str, object]:
+    """Bind one declared dependency edge to endpoint bytes without reparsing prose."""
+    match = re.fullmatch(
+        r"header:(?P<direction>[^:]+):(?P<kind>[^:]+):repo:(?P<source>[^#]+)->repo:(?P<target>[^#]+)",
+        reference,
+    )
+    if match is None:
+        raise RuntimeError(f"active_design_packet_reference_invalid:dependency:{reference}")
+    source = Path(match.group("source"))
+    target = Path(match.group("target"))
+    if source.is_absolute() or target.is_absolute() or ".." in source.parts or ".." in target.parts:
+        raise RuntimeError(f"active_design_packet_reference_invalid:dependency:{reference}")
+    source_path = (spec.workspace_root / source).resolve()
+    target_path = (spec.workspace_root / target).resolve()
+    if not source_path.is_file() or not target_path.is_file():
+        raise RuntimeError(f"active_design_packet_reference_missing:{reference}")
+    normalized = (
+        f"header:{match.group('direction')}:{match.group('kind')}:repo:"
+        f"{source.as_posix()}->repo:{target.as_posix()}"
+    )
+    return {
+        "declared_ref": reference,
+        "normalized_key": normalized,
+        "source_path": source.as_posix(),
+        "target_path": target.as_posix(),
+        "source_sha256": hashlib.sha256(source_path.read_bytes()).hexdigest(),
+        "target_sha256": hashlib.sha256(target_path.read_bytes()).hexdigest(),
+        "verification": "declared_header_identity",
+    }
+
+
+def active_design_packet_reference_projection(
+    spec: RunBundleSpec,
+    packet: ActiveDesignPacketConfig,
+    artifact_names: tuple[str, ...],
+) -> dict[str, object]:
+    """Materialize the selected packet's graph identity for downstream readers."""
+    packet_mapping = active_design_packet_mapping(packet)
+    source_refs = list(_distinct_active_packet_references(packet, "source_refs"))
+    for clause in packet.clause_registry:
+        if clause.source_ref not in source_refs:
+            source_refs.append(clause.source_ref)
+    dependency_refs = tuple(
+        reference
+        for reference in _distinct_active_packet_references(packet, "dependency_refs")
+        if reference.startswith("header:")
+    )
+    output_refs = _distinct_active_packet_references(packet, "output_refs")
+    role_output_projections = [
+        {
+            "role_ref": f"role:{role.id}",
+            "output_refs": [f"artifact:{output}" for output in selected_role_outputs(spec.config, role, packet)],
+        }
+        for role in spec.roles
+    ]
+    reviewer_refs = _distinct_active_packet_references(packet, "reviewer_refs")
+    review_outputs = {
+        f"artifact:{packet.design_review_artifact}",
+        f"artifact:{packet.document_flow_review_artifact}",
+    }
+    reviewer_projections = []
+    role_output_map = {
+        item["role_ref"]: cast(list[str], item["output_refs"])
+        for item in role_output_projections
+    }
+    for reviewer in reviewer_refs:
+        matches = [
+            output for output in role_output_map.get(reviewer, []) if output in review_outputs
+        ]
+        if len(matches) == 1:
+            reviewer_projections.append(
+                {"reviewer_ref": reviewer, "review_artifact_ref": matches[0]}
+            )
+    planned_paths = tuple(PurePosixPath(path) for path in artifact_names)
+    return {
+        "schema": ACTIVE_DESIGN_PACKET_MATERIALIZATION_SCHEMA,
+        "packet_sha256": hashlib.sha256(canonical_json_bytes(packet_mapping)).hexdigest(),
+        "source_results": [
+            _materialized_source_identity(spec, reference) for reference in source_refs
+        ],
+        "dependency_results": [
+            _materialized_dependency_identity(spec, reference)
+            for reference in dependency_refs
+        ],
+        "role_output_projections": role_output_projections,
+        "reviewer_artifact_projections": reviewer_projections,
+        "clause_results": [
+            {"clause_id": clause.clause_id, "source_ref": clause.source_ref}
+            for clause in packet.clause_registry
+        ],
+        "output_results": [
+            {
+                "output_ref": reference,
+                "relative_path": reference.removeprefix("artifact:"),
+                "planned_count": planned_paths.count(
+                    PurePosixPath(reference.removeprefix("artifact:"))
+                ),
+            }
+            for reference in output_refs
+        ],
+        "planned_output_paths": sorted(path.as_posix() for path in planned_paths),
+    }
 
 
 def resolve_active_design_packet_config(
@@ -3276,13 +3667,27 @@ def manifest_run_lines(
         f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
         f"  task_catalog: {str(ROOT / str(spec.config.team['task_catalog']))!r}",
         "  active_design_packet:",
-        f"    schema: {active_design_packet.schema}",
-        f"    design_artifact: {active_design_packet.design_artifact}",
-        f"    design_review_artifact: {active_design_packet.design_review_artifact}",
-        "    document_flow_review_artifact: "
-        f"{active_design_packet.document_flow_review_artifact}",
-        "    document_flow_required: "
-        f"{str(active_design_packet.document_flow_required).lower()}",
+    ]
+    packet_yaml = yaml.safe_dump(
+        active_design_packet_mapping(active_design_packet),
+        sort_keys=False,
+        default_flow_style=False,
+    ).splitlines()
+    lines.extend(f"    {line}" for line in packet_yaml)
+    projection = active_design_packet_reference_projection(
+        spec,
+        active_design_packet,
+        iter_artifacts(spec.config, spec.roles, active_design_packet),
+    )
+    lines.append("  active_design_packet_reference_projection:")
+    projection_yaml = yaml.safe_dump(
+        projection,
+        sort_keys=False,
+        default_flow_style=False,
+    ).splitlines()
+    lines.extend(f"    {line}" for line in projection_yaml)
+    lines.extend(
+        [
         "  parent_lineage_id: " + repr(capacity_runtime.parent_lineage_id),
         "  implementation_execution:",
         "    schema_id: 'implementation_execution_contract_v1'",
@@ -3293,7 +3698,8 @@ def manifest_run_lines(
         "    same_spark_gap_continuation: 'resume_same_spark_after_gap'",
         "    deterministic_search_route: 'python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json'",
         "  capacity_request:",
-    ]
+        ]
+    )
     capacity_yaml = yaml.safe_dump(
         capacity_projection,
         sort_keys=False,

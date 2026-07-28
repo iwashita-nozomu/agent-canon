@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from copy import deepcopy
 from pathlib import Path
 from typing import cast
 from unittest.mock import patch
@@ -46,19 +47,76 @@ from update_lifecycle_contract import (  # noqa: E402
 )
 from work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
 
-RUNTIME_PROFILE_INVENTORY = PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
+RUNTIME_PROFILE_INVENTORY = (
+    PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
+)
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
 TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 WORKTREE_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "worktree_start.py"
 SETUP_WORKTREE_SCRIPT = PROJECT_ROOT / "tools" / "setup_worktree.sh"
-U2_ACTIVE_DESIGN_PACKET = {
-    "schema": "waterfall.design_packet.v1",
-    "design_artifact": "u2_design_brief.md",
-    "design_review_artifact": "u2_design_review.md",
-    "document_flow_review_artifact": "u2_document_flow_review.md",
-    "document_flow_required": True,
-}
+
+
+def seed_workspace_config(workspace_root: Path) -> None:
+    """Seed explicit runtime inputs consumed by task-start and bundle loading."""
+    config_path = workspace_root / ".codex" / "config.toml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "[agents]\nmax_threads = 26\nmax_depth = 2\n",
+        encoding="utf-8",
+    )
+    registry_path = workspace_root / "agents" / "model_profiles.toml"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_bytes(
+        (PROJECT_ROOT / "agents" / "model_profiles.toml").read_bytes()
+    )
+    for relative_path in (
+        "agents/canonical/CODEX_WORKFLOW.md",
+        "agents/templates/design_brief.md",
+        "agents/workflows/implementation-waterfall-workflow.md",
+        "documents/design/dependency-manifest-design.md",
+    ):
+        destination = workspace_root / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((PROJECT_ROOT / relative_path).read_bytes())
+
+
+def selected_active_design_packet(prefix: str) -> dict[str, object]:
+    """Build a current closed packet while rebinding every selected output."""
+    config = load_team_config()
+    packet = deepcopy(
+        agent_team.active_design_packet_mapping(
+            agent_team.resolve_active_design_packet_config(config)
+        )
+    )
+    selected = {
+        "design_artifact": f"{prefix}_design_brief.md",
+        "design_review_artifact": f"{prefix}_design_review.md",
+        "document_flow_review_artifact": f"{prefix}_document_flow_review.md",
+    }
+    packet.update(selected)
+    default_to_selected = {
+        "artifact:design_brief.md": f"artifact:{selected['design_artifact']}",
+        "artifact:design_review.md": f"artifact:{selected['design_review_artifact']}",
+        "artifact:document_flow_review.md": f"artifact:{selected['document_flow_review_artifact']}",
+    }
+    for entry_name in (
+        "abstract_design_frame",
+        "implementation_source_packet",
+        "design_side_effect_map",
+        "design_to_implementation_trace",
+    ):
+        entry = packet[entry_name]
+        assert isinstance(entry, dict)
+        entry["output_refs"] = [
+            default_to_selected.get(reference, reference)
+            for reference in entry["output_refs"]
+        ]
+    return packet
+
+
+GRAPH_ACTIVE_DESIGN_PACKET = selected_active_design_packet("graph")
+U2_ACTIVE_DESIGN_PACKET = selected_active_design_packet("u2")
 
 
 def update_lifecycle_closeout_fixture() -> dict[str, object]:
@@ -413,7 +471,7 @@ def write_ready_schedule(report_dir: Path) -> None:
                     "---------------- | ----------- | ----------------- | -------------------- | ------ |"
                 ),
                 (
-                    "| WAVE-1 | parent | parent | initial_intake | 0/12 | 1/12 | 24 | 2 | "
+                    "| WAVE-1 | parent | parent | initial_intake | 0/12 | 1/12 | 26 | 2 | "
                     "requirements_organizer | "
                     "manager:manager_requirements_organizer:requirements_organizer:"
                     "team_manifest.yaml | none | reports/agents/run | "
@@ -465,7 +523,7 @@ def write_ready_workflow_monitoring(report_dir: Path) -> None:
                 (
                     "- wave_event=recorded wave_id=WAVE-1 event_kind=initial_intake "
                     "spawn_authority=parent trigger=initial_intake budget_before=0/12 "
-                    "budget_after=1/12 runtime_max_threads=24 runtime_max_depth=2 "
+                    "budget_after=1/12 runtime_max_threads=26 runtime_max_depth=2 "
                     "spawned_roles=requirements_organizer "
                     "role_instances=manager:manager_requirements_organizer:"
                     "requirements_organizer:team_manifest.yaml "
@@ -545,7 +603,7 @@ def append_mid_task_wave_checkpoint(
         + "\n"
         + (
             f"| WAVE-2 | parent | {spawn_authority} | mid_task_user_input | "
-            f"3/12 | 3/12 | 24 | 2 | {spawned_roles} | {role_instances} | {skipped_roles} | "
+            f"3/12 | 3/12 | 26 | 2 | {spawned_roles} | {role_instances} | {skipped_roles} | "
             f"{allowed_paths} | {do_not_read} | {write_scope} | "
             f"{validation_route} | {review_gate} | {handoff_artifacts} | "
             f"team_manifest.yaml#run.subagent_lifecycle_policy | {status} |"
@@ -558,7 +616,7 @@ def append_mid_task_wave_checkpoint(
     actual_event = (
         "- wave_event=recorded wave_id=WAVE-2 event_kind=mid_task_user_input "
         f"spawn_authority={spawn_authority} trigger=mid_task_user_input "
-        "budget_before=3/12 budget_after=3/12 runtime_max_threads=24 "
+        "budget_before=3/12 budget_after=3/12 runtime_max_threads=26 "
         f"runtime_max_depth=2 spawned_roles={spawned_roles} "
         f"role_instances={role_instances} "
         f"skipped_roles={skipped_roles} allowed_paths={allowed_paths} "
@@ -1102,6 +1160,118 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 continue
             self.assert_role_prompt_includes(manifest, role_id, fields)
 
+    def assert_graph_active_packet_bundle(
+        self,
+        report_dir: Path,
+        stdout: str,
+    ) -> None:
+        """Assert one entrypoint persisted and propagated the graph packet."""
+        selected_paths = (
+            "graph_design_brief.md",
+            "graph_design_review.md",
+            "graph_document_flow_review.md",
+        )
+        for path in selected_paths:
+            self.assertTrue((report_dir / path).is_file(), path)
+        for path in (
+            "design_brief.md",
+            "design_review.md",
+            "document_flow_review.md",
+        ):
+            self.assertFalse((report_dir / path).exists(), path)
+
+        manifest_text = (report_dir / "team_manifest.yaml").read_text(
+            encoding="utf-8"
+        )
+        manifest_value: object = yaml.safe_load(manifest_text)
+        self.assertIsInstance(manifest_value, dict)
+        manifest = cast("dict[str, object]", manifest_value)
+        run = cast("dict[str, object]", manifest["run"])
+        self.assertEqual(run["active_design_packet"], GRAPH_ACTIVE_DESIGN_PACKET)
+        projection = cast(
+            "dict[str, object]",
+            run["active_design_packet_reference_projection"],
+        )
+        self.assertEqual(
+            projection["schema"],
+            "waterfall.active_design_packet_materialization.v1",
+        )
+        self.assertEqual(len(cast("list[object]", projection["clause_results"])), 4)
+        self.assertTrue(cast("list[object]", projection["source_results"]))
+        self.assertTrue(cast("list[object]", projection["dependency_results"]))
+        output_results = cast("list[object]", projection["output_results"])
+        output_refs = {
+            str(cast("dict[str, object]", result)["output_ref"])
+            for result in output_results
+            if isinstance(result, dict)
+        }
+        self.assertTrue(
+            {
+                "artifact:graph_design_brief.md",
+                "artifact:graph_design_review.md",
+                "artifact:graph_document_flow_review.md",
+            }.issubset(output_refs)
+        )
+        pre_handoff_status = cast(
+            "dict[str, object]",
+            run["pre_handoff_gate_status"],
+        )
+        self.assertEqual(
+            pre_handoff_status["applies_when"],
+            "run.active_design_packet.design_artifact="
+            "graph_design_brief.md;"
+            "condition=exists_before_implementation_or_handoff",
+        )
+        for unselected_basename in (
+            "design_brief.md",
+            "design_review.md",
+            "document_flow_review.md",
+        ):
+            self.assertNotIn(
+                f"artifact:{unselected_basename}",
+                output_refs,
+                f"unselected packet output remains: {unselected_basename}",
+            )
+        artifact_inventory = cast("list[object]", manifest["artifacts"])
+        for path in selected_paths:
+            self.assertIn(path, artifact_inventory)
+
+        role_entries = cast("list[object]", manifest["roles"])
+        roles_by_id = {
+            str(role["id"]): role
+            for value in role_entries
+            if isinstance(value, dict)
+            for role in (cast("dict[str, object]", value),)
+        }
+        expected_outputs = {
+            "designer": selected_paths[0],
+            "design_reviewer": selected_paths[1],
+            "document_flow_reviewer": selected_paths[2],
+        }
+        for role_id, expected_output in expected_outputs.items():
+            role = roles_by_id[role_id]
+            self.assertEqual(role["required_outputs"], [expected_output])
+            write_policy = cast("dict[str, object]", role["write_policy"])
+            self.assertEqual(
+                write_policy["allowed_files"],
+                [str((report_dir / expected_output).resolve())],
+            )
+
+        implementer = roles_by_id["implementer"]
+        document_packet = cast("dict[str, object]", implementer["document_packet"])
+        read_entries = cast(
+            "list[object]",
+            document_packet["role_specific_read_before_work"],
+        )
+        read_paths = {
+            str(cast("dict[str, object]", entry)["path"])
+            for entry in read_entries
+            if isinstance(entry, dict)
+        }
+        for path in selected_paths:
+            self.assertIn(str((report_dir / path).resolve()), read_paths)
+            self.assertIn(path, stdout)
+
     def test_bootstrap_skips_agent_canon_preflight_in_source_repo(self) -> None:
         """Source AgentCanon runs do not require a derived-repo update target."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1147,13 +1317,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             root = Path(tmp_dir)
             for script in (BOOTSTRAP_SCRIPT, TASK_START_SCRIPT):
                 report_root = root / f"reports-{script.stem}"
-                run_id = f"u2-{script.stem}"
+                run_id = f"graph-{script.stem}"
                 result = subprocess.run(
                     [
                         sys.executable,
                         str(script),
                         "--task",
-                        "typed active packet smoke",
+                        "graph active packet smoke",
                         "--owner",
                         "codex",
                         "--run-id",
@@ -1163,7 +1333,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "--report-root",
                         str(report_root),
                         "--active-design-packet",
-                        json.dumps(U2_ACTIVE_DESIGN_PACKET, separators=(",", ":")),
+                        json.dumps(GRAPH_ACTIVE_DESIGN_PACKET, separators=(",", ":")),
                         "--skip-agent-canon-preflight",
                     ],
                     cwd=PROJECT_ROOT,
@@ -1178,16 +1348,17 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 )
                 self.assertEqual(
                     manifest["run"]["active_design_packet"],
-                    U2_ACTIVE_DESIGN_PACKET,
+                    GRAPH_ACTIVE_DESIGN_PACKET,
                 )
-                for artifact in U2_ACTIVE_DESIGN_PACKET.values():
+                for artifact in GRAPH_ACTIVE_DESIGN_PACKET.values():
                     if isinstance(artifact, str) and artifact.endswith(".md"):
                         self.assertTrue((report_dir / artifact).is_file(), artifact)
                         self.assertIn(artifact, result.stdout)
                 self.assertIn(
-                    "run.active_design_packet.design_artifact=u2_design_brief.md;",
+                    "run.active_design_packet.design_artifact=graph_design_brief.md;",
                     (report_dir / "team_manifest.yaml").read_text(encoding="utf-8"),
                 )
+                self.assert_graph_active_packet_bundle(report_dir, result.stdout)
 
     def test_entrypoints_reject_invalid_active_design_packet_before_bundle_creation(
         self,
@@ -1255,6 +1426,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
+            seed_workspace_config(workspace_root)
             (workspace_root / "vendor" / "agent-canon").mkdir(parents=True)
             (workspace_root / "vendor" / "agent-canon" / "README.md").write_text(
                 "shared canon candidate\n",
@@ -1309,11 +1481,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
+            seed_workspace_config(workspace_root)
             checklist = (
                 workspace_root
                 / "vendor"
                 / "agent-canon"
                 / "documents"
+                / "agent-canon"
                 / "agent-canon-parent-repo-latest-checklist.md"
             )
             checklist.parent.mkdir(parents=True)
@@ -1357,11 +1531,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
+            seed_workspace_config(workspace_root)
             checklist = (
                 workspace_root
                 / "vendor"
                 / "agent-canon"
                 / "documents"
+                / "agent-canon"
                 / "agent-canon-parent-repo-latest-checklist.md"
             )
             checklist.parent.mkdir(parents=True)
@@ -1455,11 +1631,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
+            seed_workspace_config(workspace_root)
             checklist = (
                 workspace_root
                 / "vendor"
                 / "agent-canon"
                 / "documents"
+                / "agent-canon"
                 / "agent-canon-parent-repo-latest-checklist.md"
             )
             checklist.parent.mkdir(parents=True)
@@ -1588,6 +1766,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(
                 [
@@ -1621,7 +1800,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
-            self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
+            self.assertIn("RUNTIME_MAX_THREADS=26", result.stdout)
             self.assertIn("RUNTIME_MAX_DEPTH=2", result.stdout)
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
             self.assertIn(
@@ -1862,7 +2041,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             same_role_instances = role_topology["same_role_parallel_instances"]
             self.assertEqual(spawn_budget["active_subagents"], 4)
             self.assertEqual(spawn_budget["max_write_subagents"], 2)
-            self.assertEqual(spawn_budget["runtime_max_threads"], 24)
+            self.assertEqual(spawn_budget["runtime_max_threads"], 26)
             self.assertEqual(spawn_budget["runtime_max_depth"], 2)
             self.assertFalse(spawn_budget["initial_three_agent_intake_is_total_cap"])
             self.assertIn("workflow_families[].spawn_budget", spawn_budget["source"])
@@ -2102,6 +2281,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
 
             result = subprocess.run(
@@ -2189,6 +2369,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
 
             result = subprocess.run(
@@ -2258,6 +2439,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
 
             result = subprocess.run(
@@ -2317,6 +2499,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
 
             result = subprocess.run(
@@ -2355,6 +2538,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(
                 [
@@ -2396,6 +2580,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(
                 [
@@ -2437,6 +2622,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(
                 [
@@ -2484,12 +2670,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertNotIn("parent_direct_write_exception_required", contract_policy)
             self.assertNotIn("parent_direct_write_exception", contract_policy)
 
-    def test_academic_reviewers_precede_work_and_ship_review_is_deferred(self) -> None:
-        """Academic reviewers run before work while ship review awaits its gate."""
+    def test_academic_route_uses_current_bounded_dynamic_waves(self) -> None:
+        """Academic routing follows the current bounded designer/worker sequence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(
                 [
@@ -2523,21 +2710,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIsNotNone(dynamic_waves_match)
             dynamic_waves = cast(re.Match[str], dynamic_waves_match).group(1)
-            self.assertLess(
-                dynamic_waves.index("report_reviewer"),
-                dynamic_waves.index("worker"),
-            )
-            self.assertLess(
-                dynamic_waves.index("citation_evidence_reviewer"),
-                dynamic_waves.index("worker"),
-            )
-            self.assertLess(
-                dynamic_waves.index("notation_definition_reviewer"),
-                dynamic_waves.index("worker"),
-            )
-            self.assertLess(
-                dynamic_waves.index("logic_gap_reviewer"),
-                dynamic_waves.index("worker"),
+            self.assertEqual(
+                dynamic_waves,
+                "WAVE-2=detailed_designer;WAVE-3=worker",
             )
             self.assertNotIn("ship_reviewer", dynamic_waves)
             role_instances_match = re.search(
@@ -2548,12 +2723,11 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIsNotNone(role_instances_match)
             role_instances = cast(re.Match[str], role_instances_match).group(1)
             self.assertIn(
-                "research_reviewer:research_reviewer_reviewer:reviewer", role_instances
+                "WAVE-2=designer:designer_detailed_designer:detailed_designer",
+                role_instances,
             )
             self.assertIn(
-                "citation_evidence_reviewer:"
-                "citation_evidence_reviewer_citation_evidence_reviewer:"
-                "citation_evidence_reviewer",
+                "WAVE-3=implementer:implementer_worker:worker",
                 role_instances,
             )
             manifest_text = (
@@ -2570,7 +2744,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     for item in wave["role_instances"]
                 )
             ]
-            self.assertEqual(wave_ids, ["WAVE-7"])
+            self.assertEqual(wave_ids, [])
 
     def test_large_refactor_task_start_suggests_refactor_skill(self) -> None:
         """Large refactor should advertise the dedicated refactor skill."""
@@ -2578,6 +2752,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(
                 [
@@ -2606,7 +2781,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
+            self.assertIn("RUNTIME_MAX_THREADS=26", result.stdout)
             self.assertIn("RUNTIME_MAX_DEPTH=2", result.stdout)
             self.assertIn(
                 "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
@@ -2622,7 +2797,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_scope_policy = manifest["run"]["write_scope_policy"]
             self.assertEqual(spawn_budget["active_subagents"], 4)
             self.assertEqual(spawn_budget["max_write_subagents"], 2)
-            self.assertEqual(spawn_budget["runtime_max_threads"], 24)
+            self.assertEqual(spawn_budget["runtime_max_threads"], 26)
             self.assert_current_checkout_write_policy(write_scope_policy, 2)
             self.assertIn("spawn_budget:", manifest_text)
             self.assertIn("active_subagents: 4", manifest_text)
@@ -2649,6 +2824,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             run_id = "test-default-workspace-report-root"
             result = subprocess.run(
                 [
@@ -2672,7 +2848,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
-            self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
+            self.assertIn("RUNTIME_MAX_THREADS=26", result.stdout)
             report_dir = workspace_root / "reports" / "agents" / run_id
             self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
             self.assertIn(
@@ -2680,6 +2856,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertTrue(report_dir.is_dir())
             self.assertTrue((report_dir / "work_log.md").is_file())
+            for packet_artifact in (
+                "design_brief.md",
+                "design_review.md",
+                "document_flow_review.md",
+            ):
+                self.assertTrue((report_dir / packet_artifact).is_file())
             self.assertTrue((report_dir / "task_authority.yaml").is_file())
             self.assertTrue((report_dir / "task_authority.yaml.sha256").is_file())
             self.assertTrue(
@@ -2699,6 +2881,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("cross_cutting_document_packet:", manifest_text)
             self.assertIn("document_packet:", manifest_text)
+            self.assertIn("schema: waterfall.design_packet.v1", manifest_text)
+            self.assertIn("design_artifact: design_brief.md", manifest_text)
+            self.assertIn("design_review_artifact: design_review.md", manifest_text)
+            self.assertIn(
+                "document_flow_review_artifact: document_flow_review.md",
+                manifest_text,
+            )
             self.assertNotIn("subagent_prompt_packet:", manifest_text)
             self.assertIn("must_cite_before_edit: true", manifest_text)
             self.assertIn(str(report_dir / "design_brief.md"), manifest_text)
@@ -2717,6 +2906,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "custom-reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             run_id = "test-custom-report-root"
             result = subprocess.run(
                 [
@@ -2756,6 +2946,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(
                 [
@@ -2782,7 +2973,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
+            self.assertIn("RUNTIME_MAX_THREADS=26", result.stdout)
             self.assertIn(
                 "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
                 result.stdout,
@@ -2914,7 +3105,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 spawn_budget["active_subagents"],
                 spawn_budget["max_write_subagents"],
             )
-            self.assertEqual(spawn_budget["runtime_max_threads"], 24)
+            self.assertEqual(spawn_budget["runtime_max_threads"], 26)
             self.assertEqual(spawn_budget["runtime_max_depth"], 2)
             self.assertFalse(spawn_budget["initial_three_agent_intake_is_total_cap"])
             self.assertLessEqual(
@@ -3106,7 +3297,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("spawn_budget:", manifest_text)
             self.assertIn("active_subagents: 4", manifest_text)
             self.assertIn("max_write_subagents: 2", manifest_text)
-            self.assertIn("runtime_max_threads: 24", manifest_text)
+            self.assertIn("runtime_max_threads: 26", manifest_text)
             self.assertIn("runtime_max_depth: 2", manifest_text)
             self.assertIn("standard_wave_sequence:", manifest_text)
             self.assertIn(
@@ -3261,6 +3452,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(
                 [
@@ -3356,6 +3548,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             report_root.mkdir(parents=True, exist_ok=True)
 
             for task_id in [f"T{index}" for index in range(1, 14)]:
@@ -5277,7 +5470,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         (
                             "<!-- - wave_event=recorded wave_id=WAVE-1 event_kind=initial_intake "
                             "spawn_authority=parent trigger=initial_intake budget_before=0/12 "
-                            "budget_after=1/12 runtime_max_threads=24 runtime_max_depth=2 "
+                            "budget_after=1/12 runtime_max_threads=26 runtime_max_depth=2 "
                             "spawned_roles=requirements_organizer "
                             "role_instances=manager:manager_requirements_organizer:"
                             "requirements_organizer:team_manifest.yaml "

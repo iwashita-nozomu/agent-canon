@@ -5,6 +5,7 @@ contract workflow
 responsibility Documents Workflow Monitoring for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md defines staged workflow and closeout gates
 upstream design ../workflows/agent-learning-workflow.md defines feedback and self-improvement capture
+downstream implementation ../../tools/agent_tools/workflow_monitor.py appends canonical monitoring and measurement entries
 downstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluates monitoring evidence
 downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py predicts pre-edit rejection gates
 @dependency-end
@@ -18,7 +19,7 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 
 ## Signals
 
-<!-- Record workflow signals observed during execution. Prefer `python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --signal "..."` and tool-level `--report-dir` hooks over hand edits. Required signals include selected skills, stage owners, subagent or parent-direct routing, wave_id, repo dependency intake, web-research decision, review status, validation status, and any drift risk. -->
+<!-- Record workflow signals observed during execution. Prefer `python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --signal "..."` and tool-level `--report-dir` hooks over hand edits. Required signals include selected skills, stage owners, subagent or parent-direct routing, wave_id, repo dependency intake, web-research decision, review status, validation status, and any drift risk. The run-bundle producer emits one canonical `runtime_measurement_input=<JSON>` signal through `workflow_monitor.py`; preserve null versus explicit zero and do not hand-author or duplicate that measurement record. -->
 
 ## Behavior Events
 

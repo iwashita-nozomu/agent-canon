@@ -405,7 +405,7 @@ The evaluator's `gpt-5.4-mini/medium` setting is reserved for this explicit T14
 lane; no permanent team role uses that model assignment.
 
 1. Parent Iteration 0 freezes one answer-free Scenario Packet for each frozen
-   scenario: `full`, `changed`, and the supplied-TSV hold-out. The packet carries
+   scenario: `full` and `changed`. The packet carries
    the full Prompt Under Test text and path, Canonical Target Files, Prompt
    Dependency Files, the frozen scenario, requirements/checklist, method, and
    fixed report grammar. Expected commands, expected artifacts, answers, prior
@@ -414,14 +414,9 @@ lane; no permanent team role uses that model assignment.
    scenario. Every scenario, iteration, and malformed-report rerun receives a
    new instance. Fresh provenance includes a unique instance ID,
    iteration ID, and Scenario Packet digest.
-3. The supplied-TSV hold-out explicitly supplies a TSV path. The evaluator
-   keeps the exact command skeleton
-   `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json`
-   and may replace only the values after `--graph-tsv` and `--bundle-dir`. It
-   does not call a separate raw checker.
-4. A malformed report is unscored and rerun with a new fresh evaluator on the
+3. A malformed report is unscored and rerun with a new fresh evaluator on the
    same frozen packet. It is neither a pass nor a convergence iteration.
-5. After every return, the parent scores the observed `Output` and requirement
+4. After every return, the parent scores the observed `Output` and requirement
    observations against the frozen checklist. The evaluator emits report
    validity through `evaluation_status` and initializes feedback / learning
    fields as unresolved. It emits no parent score or convergence status; the

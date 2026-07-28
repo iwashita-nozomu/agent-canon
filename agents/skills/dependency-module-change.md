@@ -6,6 +6,7 @@ contract skill
 responsibility Documents the short human-facing route for dependency module changes.
 upstream design ../canonical/skills.md shared skill canon registry
 upstream design ../../documents/rule/dependency-module-changes.md detailed dependency module policy
+upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace and VS Code workspace boundary
 downstream implementation ../../tools/agent_tools/dependency_module_change.py lifecycle tool
 downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates skill registration
 @dependency-end
@@ -18,14 +19,18 @@ cleanup を同じ責務境界で扱います。
 
 ## 使う route
 
-詳細な判断は [`documents/rule/dependency-module-changes.md`](../../documents/rule/dependency-module-changes.md) だけを読みます。`.gitmodules` の identity、`vendor/<module>` の clean pin/runtime projection、`workspace/<topic-slug>/<module-basename>` source clone、results owner surface の順に責務を分けます。
+詳細な source-clone 判断は [`documents/rule/dependency-module-changes.md`](../../documents/rule/dependency-module-changes.md) を読みます。
+topic workspace の filesystem / lifecycle、devcontainer mount、VS Code workspace 運用の禁止、
+`.vscode/` 共有面の境界は [`documents/contracts/github-first-module-and-devcontainer-policy.md`](../../documents/contracts/github-first-module-and-devcontainer-policy.md)
+だけを正本として参照します。`.gitmodules` の identity、`vendor/<module>` の clean
+pin/runtime projection、`workspace/<topic-slug>/<module-basename>` source clone、
+results owner surface はそれぞれの owner に分けます。
 
 `prepare --topic <topic> --module <path> --branch <task-branch>
 --owner-evidence <file> [--parent-branch <pin-branch>]` は owner evidence がある source-edit のときだけ使い、pin-only・
 update-only・read-only では clone を作りません。返された `PARENT_ROOT`、
-`SOURCE_CLONE`、`CONTINUE_PATH` は `workspace/<topic-slug>/` の
-editor-independent な作業領域で使います。作業領域の追加メタデータはこの tool
-の責務ではありません。cleanup は dry-run を経て remote に全 state がある場合
+`SOURCE_CLONE`、`CONTINUE_PATH` は正本契約の filesystem / lifecycle 作業領域で
+使います。cleanup は dry-run を経て remote に全 state がある場合
 だけ apply します。
 
 AgentCanon update はこの一般 route の具体例です。parent mode の vendor

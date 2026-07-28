@@ -119,15 +119,21 @@ python3 tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
   --base-ref <base-ref>
 ```
 
-The Rust graph command consumes the prepared artifact plus the latest confirmed
-committed receipt during one `graph build`. Its v2 persisted runtime-evidence
-snapshot retains the exact artifact/receipt bytes, their hashes, the live
-source identity fingerprint, and the validated observation. `graph status`,
-`graph query`, `graph context`, and dependency-review consumers reuse that one
-snapshot and perform only one bounded freshness probe per command. They never
-rerun the runtime producer. Missing, uncertain, invalid, stale, or mismatched
-runtime evidence makes the graph unavailable or stale instead of regenerating
-an event.
+When an active runtime pointer exists, the Rust graph command consumes the
+prepared artifact plus the latest confirmed committed receipt during one
+`graph build`. Its v2 persisted runtime-evidence snapshot retains the exact
+artifact/receipt bytes, their hashes, the live source identity fingerprint,
+and the validated observation. Without an active runtime pointer, the same
+builder publishes the source facts and completeness diagnostics without a
+runtime producer snapshot. `graph status`, `graph query`, `graph context`, and
+dependency-review consumers reuse that one snapshot and perform only one
+bounded freshness probe per command. They never rerun the runtime producer.
+Nonempty source completeness diagnostics produce `incomplete` rather than
+`fresh`; status remains inspectable, while query and context refuse to
+authorize evidence until the diagnostic sets are empty.
+Once a runtime pointer is present, missing, uncertain, invalid, stale, or
+mismatched runtime evidence remains unavailable or stale instead of being
+regenerated.
 
 ## Layout
 

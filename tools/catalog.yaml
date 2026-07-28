@@ -675,7 +675,7 @@ entries:
       - tests/agent_tools/test_runtime_log_archive_git.py
 
   - id: agent-canon-graph
-    summary: Builds and serves the one-build dependency graph with a persisted runtime-evidence snapshot.
+    summary: Builds and serves the one-build dependency graph with an optional persisted runtime-evidence snapshot.
     path: rust/agent-canon/src/graph.rs
     family: root
     role: runner

@@ -229,7 +229,6 @@ run_standalone_static_gate_ci() {
   cargo test --manifest-path rust/agent-canon/Cargo.toml
   python3 tools/agent_tools/tool_catalog.py
   python3 tools/agent_tools/tool_proof_coverage.py
-  python3 tools/agent_tools/tool_drift.py
   python3 tools/agent_tools/responsibility_scope.py
   BASE_REF="${GITHUB_BASE_REF:-main}"
   git fetch origin "${BASE_REF}" --depth=1 || true
@@ -346,9 +345,12 @@ run_pr_agent_checks
 echo ""
 
 echo "6️⃣  strict dependency review"
+tools/bin/agent-canon graph build --root . --profile default --format json
+python3 tools/agent_tools/tool_drift.py
 bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
 python3 tools/agent_tools/render_dependency_manifest_graph.py \
-  --graph-tsv "${PR_DEPENDENCY_REVIEW_DIR}/dependency_graph.tsv" \
+  --root . \
+  --scope full \
   --markdown-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.md" \
   --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
 echo ""

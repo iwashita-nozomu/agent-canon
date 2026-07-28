@@ -2,6 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents Shared Runtime Surfaces for this repository.
+upstream design ../contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace and VS Code workspace boundary
 downstream design ./shared-runtime-surfaces.toml machine-readable surface manifest
 downstream design ../experiments/gpu-admission-r5-source-packet.md exact shared runtime identity contract
 downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
@@ -91,10 +92,11 @@ Core runtime surfaces include `AGENTS.md`, `agents/`, `.agents/`,
 `.vscode/` is a parent-owned regular container whose
 `c_cpp_properties.json`, `extensions.json`, `settings.json`, and `tasks.json`
 children are the four individual AgentCanon symlink surfaces. Work-area
-composition is caller-owned: use `PARENT_ROOT`, `SOURCE_CLONE`, and
-`CONTINUE_PATH` from `prepare` within the editor-independent
-`workspace/<topic-slug>/` contract. Work-area storage and metadata are outside
-the AgentCanon contract.
+composition follows the canonical filesystem/lifecycle and VS Code workspace
+boundary in [`contracts/github-first-module-and-devcontainer-policy.md`](../contracts/github-first-module-and-devcontainer-policy.md):
+use `PARENT_ROOT`, `SOURCE_CLONE`, and `CONTINUE_PATH` within the Git-ignored
+`workspace/<topic-slug>/` clone lifecycle. This document owns the shared `.vscode/`
+surface, not dependency clone composition.
 These paths are installed capability. The active profile and required checks
 are selected by `documents/runtime/runtime-profiles-and-check-matrix.md`.
 
@@ -187,9 +189,9 @@ receipt paths and parser/writer ownership are defined by
 `.vscode/` is also a shared AgentCanon runtime ergonomics surface. The parent
 owns the real directory container; AgentCanon owns the individual
 `c_cpp_properties.json`, `extensions.json`, `settings.json`, and `tasks.json`
-symlink surfaces. The dependency source work area remains caller-owned and uses
-the paths returned by `dependency_module_change.py prepare`; it is not a shared
-surface source.
+symlink surfaces. The dependency source work area follows the canonical
+filesystem/lifecycle and VS Code workspace boundary and uses the paths returned
+by `dependency_module_change.py prepare`; it is not a shared surface source.
 Do not store personal editor state, host-specific include paths, workspace-local
 secrets, or product-specific commands in the shared `.vscode/` view. Put
 project-specific editor guidance in repo-local docs or project-owned scripts

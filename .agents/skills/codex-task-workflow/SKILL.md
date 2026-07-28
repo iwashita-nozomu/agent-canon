@@ -58,6 +58,13 @@ python3 tools/agent_tools/skill_tool_commands.py show --skill codex-task-workflo
 Execute the required and task-matching conditional commands that the packet prints.
 <!-- skill-tool-commands:end -->
 
+Treat the approved design packet as the complete four-entry
+`waterfall.design_packet.v1` value materialized through `create_run_bundle`.
+The implementation slice is the full replaceable responsibility unit, executed
+by one writer in dependency order; file, finding, test, or review-area splits
+are not slices. Pause the whole unit only for an actual write conflict or an
+unresolved predecessor.
+
 1. Read `agents/canonical/CODEX_WORKFLOW.md`.
 1. Route skill selection through `$agent-orchestration` first; this skill executes the selected Codex task flow after routing is selected.
 1. Run `make agent-canon-ensure-latest` before planning or implementation when the AgentCanon update surface is repairable. In submodule repos, the blocking scope is the AgentCanon update surface. If the update surface itself is unsafe to refresh, route it through `agents/workflows/agent-canon-pr-workflow.md` or `agents/workflows/derived-agent-canon-diff-workflow.md`, merge the AgentCanon PR or proposal first, then rerun `make agent-canon-ensure-latest` and `bash tools/sync_agent_canon.sh link-root` in the template / derived repo.

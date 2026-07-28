@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,12 +25,15 @@ from agent_team import (
     ACTIVE_DESIGN_PACKET_FIELDS,
     ACTIVE_DESIGN_PACKET_SCHEMA,
     ReportBundleArtifactPathError,
+    active_design_packet_mapping,
+    normalize_active_design_packet_config,
     resolve_report_bundle_artifact_path,
     resolve_report_root,
 )
 from report_artifact_checks import (
     check_schedule_artifact,
     check_work_log_artifact,
+    has_approve_decision,
     is_placeholder_only_section,
     section_has_content,
     table_body_rows,
@@ -68,7 +72,6 @@ ABSTRACT_DESIGN_FRAME_REQUIRED_TERMS: dict[str, tuple[str, ...]] = {
     ),
 }
 
-
 @dataclass(frozen=True)
 class ArtifactCheck:
     """One artifact requirement for a waterfall gate."""
@@ -89,6 +92,8 @@ class ActiveDesignPacket:
     design_review_artifact: Path
     document_flow_review_artifact: Path
     document_flow_required: bool
+    packet_mapping: dict[str, object]
+    reference_projection: dict[str, object]
 
 
 @dataclass(frozen=True)
@@ -137,9 +142,7 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
     "document_flow": (
         # The document-flow gate is resolved from run.active_design_packet below.
     ),
-    "test": (
-        ArtifactCheck("test_plan.md", require_filled=True),
-    ),
+    "test": (ArtifactCheck("test_plan.md", require_filled=True),),
     "implementation": (
         ArtifactCheck(
             "change_review.md",
@@ -203,13 +206,14 @@ def resolve_report_dir(args: argparse.Namespace) -> Path:
         raise SystemExit("Provide exactly one of --run-id or --report-dir.")
     if args.report_dir:
         return Path(args.report_dir).resolve()
-    return (resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)).resolve()
+    return (
+        resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)
+    ).resolve()
 
 
 def decision_is_approve(text: str) -> bool:
     """Return whether the artifact contains an approve decision."""
-    decisions = [match.group(1).lower() for match in DECISION_PATTERN.finditer(text)]
-    return bool(decisions) and decisions[-1] == "approve"
+    return has_approve_decision(text)
 
 
 def check_user_request_contract(text: str) -> list[str]:
@@ -226,8 +230,15 @@ def check_user_request_contract(text: str) -> list[str]:
     ):
         for row in table_body_rows(text, heading):
             if "unknown_or_open_question" in row:
-                slug = heading.removeprefix("## ").lower().replace("-", "_").replace(" ", "_")
-                blockers.append(f"user_request_contract.md:active_unknown_clause:{slug}")
+                slug = (
+                    heading.removeprefix("## ")
+                    .lower()
+                    .replace("-", "_")
+                    .replace(" ", "_")
+                )
+                blockers.append(
+                    f"user_request_contract.md:active_unknown_clause:{slug}"
+                )
     return blockers
 
 
@@ -338,6 +349,72 @@ def active_design_blocker(code: str) -> GateBlocker:
     return GateBlocker(code=code, owner_gate="design")
 
 
+def _normalize_packet_error(error: RuntimeError) -> str:
+    """Map the shared normalizer's typed error to the waterfall blocker grammar."""
+    message = str(error)
+    if ":field_unknown:" in message:
+        return "team_manifest.yaml:active_design_packet_field_unknown:" + message.rsplit(
+            ":field_unknown:", 1
+        )[1]
+    if ":field_missing:" in message:
+        return "team_manifest.yaml:active_design_packet_field_missing:" + message.rsplit(
+            ":field_missing:", 1
+        )[1]
+    if ":schema_unknown:" in message:
+        return "team_manifest.yaml:active_design_packet_schema_unknown:" + message.rsplit(
+            ":schema_unknown:", 1
+        )[1]
+    if ":field_invalid:" in message:
+        return "team_manifest.yaml:active_design_packet_field_invalid:" + message.rsplit(
+            ":field_invalid:", 1
+        )[1]
+    field = message.rsplit(".", 1)[-1].split(":", 1)[0]
+    return f"team_manifest.yaml:active_design_packet_field_invalid:{field}"
+
+
+def _validate_reference_projection(
+    packet_mapping: dict[str, object],
+    projection_value: object,
+) -> dict[str, object] | None:
+    """Validate the selected graph/reference projection without rebuilding it."""
+    if not isinstance(projection_value, dict):
+        return None
+    required = {
+        "schema",
+        "packet_sha256",
+        "source_results",
+        "dependency_results",
+        "role_output_projections",
+        "reviewer_artifact_projections",
+        "clause_results",
+        "output_results",
+        "planned_output_paths",
+    }
+    if set(projection_value) != required:
+        return None
+    if projection_value.get("schema") != "waterfall.active_design_packet_materialization.v1":
+        return None
+    expected_sha = hashlib.sha256(
+        json.dumps(packet_mapping, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+    if projection_value.get("packet_sha256") != expected_sha:
+        return None
+    for field in (
+        "source_results",
+        "dependency_results",
+        "role_output_projections",
+        "reviewer_artifact_projections",
+        "clause_results",
+        "output_results",
+        "planned_output_paths",
+    ):
+        if not isinstance(projection_value[field], list):
+            return None
+    return cast(dict[str, object], projection_value)
+
+
 def load_active_design_packet(
     report_dir: Path,
 ) -> tuple[ActiveDesignPacket | None, list[GateBlocker]]:
@@ -388,6 +465,25 @@ def load_active_design_packet(
             )
     if blockers:
         return None, blockers
+    try:
+        normalized = normalize_active_design_packet_config(
+            packet,
+            "active_design_packet",
+        )
+    except RuntimeError as exc:
+        return None, [active_design_blocker(_normalize_packet_error(exc))]
+    packet_mapping = active_design_packet_mapping(normalized)
+    projection = _validate_reference_projection(
+        packet_mapping,
+        run_value.get("active_design_packet_reference_projection"),
+    )
+    if projection is None:
+        return None, [
+            active_design_blocker(
+                "team_manifest.yaml:active_design_packet_field_invalid:"
+                "active_design_packet_reference_projection"
+            )
+        ]
     schema_value = packet["schema"]
     if not isinstance(schema_value, str):
         return None, [
@@ -441,6 +537,8 @@ def load_active_design_packet(
             design_review_artifact=resolved["design_review_artifact"],
             document_flow_review_artifact=resolved["document_flow_review_artifact"],
             document_flow_required=document_flow_required,
+            packet_mapping=packet_mapping,
+            reference_projection=projection,
         ),
         [],
     )

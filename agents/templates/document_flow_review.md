@@ -20,7 +20,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 ## Term And Prerequisite Introduction
 
-<!-- Check whether terms, assumptions, and prerequisites are introduced before they are used. -->
+<!-- Check whether terms, assumptions, and prerequisites from the exact active-packet Implementation Source Packet are introduced before they are used. Record the design artifact path and packet entry ID; chat or schedule prose is not authority. -->
 
 ## Section Order And Reader Path
 
@@ -28,7 +28,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 ## Reader-Visible Side Effects
 
-<!-- Check whether side-effect items that change reader-facing docs, workflows, prompts, CLI/help text, reports, or validation output appear in the reader path at the point where a first reader needs them. -->
+<!-- Check every reader-facing item in the exact active-packet Design Side-Effect Map: docs, workflows, prompts, CLI/help text, reports, and validation output. Record the packet entry and source reference for each finding. -->
 
 ## Rewrite Targets
 

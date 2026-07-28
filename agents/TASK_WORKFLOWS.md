@@ -11,6 +11,7 @@ downstream design workflows/implementation-waterfall-workflow.md stage gate impl
 downstream implementation ../tools/agent_tools/task_start.py emits workflow packets.
 downstream implementation ../tools/agent_tools/bootstrap_agent_run.py creates workflow run bundles.
 downstream implementation ../tools/agent_tools/workflow_monitor.py records dynamic wave events.
+downstream implementation ../tools/agent_tools/check_agent_runtime_alignment.py validates the canonical packet owner marker.
 @dependency-end
 -->
 
@@ -73,19 +74,31 @@ packet is regenerated for that skill before the handoff proceeds.
 
 Implementation design is owned by the neutral closed active design packet
 `waterfall.design_packet.v1`, persisted at
-`team_manifest.yaml#run.active_design_packet`. Its selected artifact paths,
-review paths, and `document_flow_required` flag are typed runtime authority;
-chat, schedule prose, history, and inferred headings are not packet authority.
-The required reader-facing anchors are:
+`team_manifest.yaml#run.active_design_packet`. The selected artifact paths,
+review paths, and `document_flow_required` flag remain the main runtime fields;
+the closed graph contract adds one clause registry and four typed entries. The
+persisted `active_design_packet_reference_projection` binds those entries to
+source bytes, dependency endpoints, selected outputs, and review identities.
+Chat, schedule prose, history, and inferred headings are not packet authority.
 
 - `Abstract Design Frame`
-- `Implementation Flow Graph`
 - `Implementation Source Packet`
 - `Design Side-Effect Map`
 - `Design-To-Implementation Trace`
 
-The graph ties request clauses and compact findings to mechanical scope,
-implementation slices, validation, review, sync, and closeout.
+Each entry declares its exact clause, owner, source, dependency, output, and
+reviewer references. Chat, schedule prose, history, and inferred headings are
+not packet authority. `agent_team.py::create_run_bundle` is the sole public
+delegator: it resolves the packet, validates all references, renders every
+projection, and atomically publishes the complete bundle for task-start,
+bootstrap, and document-start producers. One responsibility unit remains one
+implementation handoff even when its internal work is dependency ordered.
+
+## Implementation Flow Graph
+
+The implementation waterfall remains the production stage graph; the active
+packet's typed entries provide its selected graph anchors and materialization
+reader path.
 
 ## Workflow Family Reader Paths
 

@@ -1666,7 +1666,93 @@
       "design_artifact": "design_brief.md",
       "design_review_artifact": "design_review.md",
       "document_flow_review_artifact": "document_flow_review.md",
-      "document_flow_required": true
+      "document_flow_required": true,
+      "clause_registry": [
+        {
+          "clause_id": "CANON-ADF",
+          "source_ref": "repo:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate"
+        },
+        {
+          "clause_id": "CANON-SOURCE-PACKET",
+          "source_ref": "repo:agents/templates/design_brief.md#section:implementation-source-packet"
+        },
+        {
+          "clause_id": "CANON-SIDE-EFFECT",
+          "source_ref": "repo:agents/templates/design_brief.md#section:design-side-effect-map"
+        },
+        {
+          "clause_id": "CANON-TRACE",
+          "source_ref": "repo:agents/templates/design_brief.md#section:design-to-implementation-trace"
+        }
+      ],
+      "abstract_design_frame": {
+        "entry_id": "abstract-design-frame",
+        "responsibility_id": "active-design-packet",
+        "clause_refs": ["CANON-ADF"],
+        "owner_refs": ["role:designer"],
+        "source_refs": [
+          "repo:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate",
+          "repo:agents/templates/design_brief.md#section:abstract-design-frame"
+        ],
+        "dependency_refs": [
+          "header:upstream:design:repo:agents/templates/design_brief.md->repo:documents/design/dependency-manifest-design.md"
+        ],
+        "output_refs": ["artifact:design_brief.md"],
+        "reviewer_refs": ["role:design_reviewer", "role:document_flow_reviewer"]
+      },
+      "implementation_source_packet": {
+        "entry_id": "implementation-source-packet",
+        "responsibility_id": "active-design-packet",
+        "clause_refs": ["CANON-SOURCE-PACKET"],
+        "owner_refs": ["role:designer"],
+        "source_refs": [
+          "repo:agents/templates/design_brief.md#section:implementation-source-packet",
+          "repo:agents/workflows/implementation-waterfall-workflow.md#section:active-design-packet"
+        ],
+        "dependency_refs": [
+          "entry:abstract-design-frame",
+          "header:upstream:design:repo:agents/templates/design_brief.md->repo:documents/design/dependency-manifest-design.md"
+        ],
+        "output_refs": ["artifact:design_brief.md"],
+        "reviewer_refs": ["role:design_reviewer"]
+      },
+      "design_side_effect_map": {
+        "entry_id": "design-side-effect-map",
+        "responsibility_id": "active-design-packet",
+        "clause_refs": ["CANON-SIDE-EFFECT"],
+        "owner_refs": ["role:designer"],
+        "source_refs": [
+          "repo:agents/templates/design_brief.md#section:design-side-effect-map",
+          "repo:agents/workflows/implementation-waterfall-workflow.md#section:active-design-packet"
+        ],
+        "dependency_refs": [
+          "entry:abstract-design-frame",
+          "header:upstream:design:repo:agents/templates/design_brief.md->repo:documents/design/dependency-manifest-design.md"
+        ],
+        "output_refs": ["artifact:design_brief.md"],
+        "reviewer_refs": ["role:design_reviewer", "role:document_flow_reviewer"]
+      },
+      "design_to_implementation_trace": {
+        "entry_id": "design-to-implementation-trace",
+        "responsibility_id": "active-design-packet",
+        "clause_refs": ["CANON-TRACE"],
+        "owner_refs": ["role:designer"],
+        "source_refs": [
+          "repo:agents/templates/design_brief.md#section:design-to-implementation-trace",
+          "repo:agents/canonical/CODEX_WORKFLOW.md#section:5.-implementation"
+        ],
+        "dependency_refs": [
+          "entry:abstract-design-frame",
+          "entry:implementation-source-packet",
+          "entry:design-side-effect-map"
+        ],
+        "output_refs": [
+          "artifact:design_brief.md",
+          "artifact:design_review.md",
+          "artifact:document_flow_review.md"
+        ],
+        "reviewer_refs": ["role:design_reviewer", "role:document_flow_reviewer"]
+      }
     },
     "change_review": "change_review.md",
     "final_review": "final_review.md",

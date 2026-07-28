@@ -6,7 +6,7 @@ contract issue
 responsibility Records the workflow defect where memory, eval, hook, and issue evidence was not summarized on PR or branch push.
 upstream design ../README.md defines durable issue storage
 upstream design ../../agents/evals/README.md defines eval and behavior evidence
-upstream design ../../documents/runtime-log-archive.md defines hook result evidence
+upstream design ../../documents/runtime/runtime-log-archive.md defines hook result evidence
 downstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py generates the guide
 downstream implementation ../../.github/workflows/agent-improvement-guide.yml runs the guide on PR and push
 @dependency-end

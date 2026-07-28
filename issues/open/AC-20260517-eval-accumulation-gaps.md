@@ -5,7 +5,7 @@
 contract issue
 responsibility Records the finding that eval and hook evidence accumulation needs a dedicated gate.
 upstream design ../../evidence/agent-evals/README.md defines eval usage requirements.
-upstream design ../../documents/runtime-log-archive.md defines append-only eval and hook result storage.
+upstream design ../../documents/runtime/runtime-log-archive.md defines append-only eval and hook result storage.
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated eval evidence.
 downstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py consumes accumulated evidence.
 @dependency-end

@@ -123,8 +123,9 @@ Issue / edit-scope evidence:
 
 - [ ] Validation failure response, if any, cites `documents/runtime/runtime-profiles-and-check-matrix.json` as the canonical taxonomy owner; `documents/runtime/runtime-profiles-and-check-matrix.md` is the generated reader projection. PR evidence records the required evidence and same-intent repair / escalation result.
 - [ ] `PR_CHECK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"` and dependency review reports were written under `$PR_CHECK_TMP`, not `reports/`
+- [ ] `tools/bin/agent-canon graph build --root . --profile default --format json`
 - [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "$PR_CHECK_TMP/dependency-review/agent-canon-pr"`
-- [ ] `python3 tools/agent_tools/render_dependency_manifest_graph.py --graph-tsv "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_graph.tsv" --markdown-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.md" --dot-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.dot"`
+- [ ] `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --markdown-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.md" --dot-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.dot"`
 - [ ] `python3 tools/agent_tools/check_agent_runtime_alignment.py`
 - [ ] `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml`
 - [ ] `python3 tools/agent_tools/check_convention_compliance.py`
