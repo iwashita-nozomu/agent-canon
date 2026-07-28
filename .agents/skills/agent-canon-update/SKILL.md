@@ -37,6 +37,11 @@ upstream implementation ../../../tools/agent_tools/agent_canon_preflight.py bloc
   Parent state, requested topic identity, and dirty fallback next actions are
   defined only by the [`AgentCanon parent state decision table`](../../../documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table).
   `latest` の更新対象 branch 引数を topic slug に転用しません。
+  Under that decision table, a dirty vendor checkout is a refusal condition
+  when it is not the intended source working branch; do not preserve or resume
+  that state. For parent pin/root projection, only a clean vendor pin projection
+  is eligible, while a differing requested topic may use the managed workspace
+  clone only through the table's topic-identity rule.
 - Standalone local source-branch publication follows the canonical transport
   contract in `documents/tools/github_publish.md`: verified remote identity/
   permission, named branch, captured local identity, exact SHA ref push, remote
