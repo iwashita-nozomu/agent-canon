@@ -4,7 +4,7 @@ contract reference
 responsibility Documents dependency manifest graph report rendering.
 upstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders Markdown and DOT graph reports.
 upstream implementation ../../tools/agent_tools/visualization_contract.py owns projection identity, marker, readback, and coverage semantics.
-upstream design ../dependency-manifest-design.md defines dependency manifest semantics.
+upstream design ../design/dependency-manifest-design.md defines dependency manifest semantics.
 upstream design ../structured-analysis/graph-dsl.md defines shared graph storage and projection contract.
 upstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph adapter vocabulary when dependency graph views are embedded in prose workflows.
 downstream implementation ../../tests/agent_tools/test_render_dependency_manifest_graph.py tests renderer behavior.

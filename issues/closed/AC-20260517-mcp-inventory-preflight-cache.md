@@ -6,8 +6,8 @@ contract issue
 responsibility Records the operational finding that MCP inventory checks are too noisy when repeated for every repository task.
 upstream design ../README.md defines AgentCanon operational issue conventions.
 upstream design ../../.codex/README.md documents MCP inventory preflight.
-upstream design ../../documents/codex-configuration-reference.md documents MCP configuration boundaries.
-upstream design ../../documents/template-agent-canon-audit-resolution.md records repo-local MCP inventory retirement.
+upstream design ../../documents/codex/codex-configuration-reference.md documents MCP configuration boundaries.
+upstream design ../../documents/agent-canon/template-agent-canon-audit-resolution.md records repo-local MCP inventory retirement.
 upstream design ../../agents/skills/codex-task-workflow.md routes MCP preflight for repository tasks.
 @dependency-end
 -->

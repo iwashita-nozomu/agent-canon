@@ -40,7 +40,7 @@ worktree を作った直後は、最低限次を残します。
 ## Template
 
 - kickoff と継続記録には [WORKTREE_LOG_TEMPLATE.md](WORKTREE_LOG_TEMPLATE.md) を使います。
-- closeout で再利用知識へ昇格させるときは `documents/notes-lifecycle.md` を見ます。
+- closeout で再利用知識へ昇格させるときは `documents/operations/notes-lifecycle.md` を見ます。
 
 ## What To Extract
 

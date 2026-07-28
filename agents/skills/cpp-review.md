@@ -27,9 +27,9 @@ C / C++ 差分を build 境界、header 境界、所有権、例外・error path
 
 ## Core References
 
-- `documents/coding-conventions-cpp.md`
-- `documents/coding-conventions-testing.md`
-- `documents/REVIEW_PROCESS.md`
+- `documents/conventions/coding-conventions-cpp.md`
+- `documents/conventions/coding-conventions-testing.md`
+- `documents/conventions/REVIEW_PROCESS.md`
 
 ## Expected Outcome
 

@@ -2,14 +2,14 @@
 # @dependency-start
 # contract tool
 # responsibility Detects drift between tool contracts, convention docs, and dependency manifests.
-# upstream design ../../documents/dependency-manifest-design.md dependency manifest graph semantics
+# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest graph semantics
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR validation contract
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
 # upstream design ../../agents/TASK_WORKFLOWS.md workflow routing contract
 # upstream design ../../agents/skills/agent-orchestration.md orchestration routing contract
 # upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill prompt
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt routing eval contract
-# upstream design ../../documents/REVIEW_PROCESS.md closeout validation policy
+# upstream design ../../documents/conventions/REVIEW_PROCESS.md closeout validation policy
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
 # upstream implementation ./tool_catalog.py validates catalog structure
@@ -123,7 +123,7 @@ CONTRACTS = (
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("documents/tools/tool-docs.toml"),
-            LinkCheck("documents/repo-local-tool-imports.md"),
+            LinkCheck("documents/tools/repo-local-tool-imports.md"),
             LinkCheck("tools/ci/run_all_checks.sh"),
             LinkCheck("tests/agent_tools/test_tool_catalog.py"),
         ),
@@ -144,7 +144,7 @@ CONTRACTS = (
                 "missing-tool-docs-pointer",
             ),
             TextCheck(
-                "documents/repo-local-tool-imports.md",
+                "documents/tools/repo-local-tool-imports.md",
                 "tools/catalog.yaml",
                 "missing-tool-catalog-pointer",
             ),
@@ -156,7 +156,7 @@ CONTRACTS = (
         links=(
             LinkCheck("responsibility-scope.toml"),
             LinkCheck("documents/templates/responsibility-scope.template.toml"),
-            LinkCheck("documents/responsibility-scope-management.md"),
+            LinkCheck("documents/design/responsibility-scope-management.md"),
             LinkCheck("tools/catalog.yaml"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
@@ -169,8 +169,8 @@ CONTRACTS = (
         tool="tools/agent_tools/import_responsibility.py",
         links=(
             LinkCheck("responsibility-scope.toml"),
-            LinkCheck("documents/responsibility-scope-management.md"),
-            LinkCheck("documents/coding-conventions-python.md"),
+            LinkCheck("documents/design/responsibility-scope-management.md"),
+            LinkCheck("documents/conventions/coding-conventions-python.md"),
             LinkCheck("tools/catalog.yaml"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
@@ -215,7 +215,7 @@ CONTRACTS = (
         tool="tools/agent_tools/issue_sync.py",
         links=(
             LinkCheck("issues/README.md"),
-            LinkCheck("documents/responsibility-scope-management.md"),
+            LinkCheck("documents/design/responsibility-scope-management.md"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("tools/ci/run_all_checks.sh"),
@@ -227,8 +227,8 @@ CONTRACTS = (
         tool="tools/agent_tools/eval_accumulation_check.py",
         links=(
             LinkCheck("evidence/agent-evals/README.md"),
-            LinkCheck("documents/runtime-log-archive.md"),
-            LinkCheck("documents/runtime-log-archive-migration.md"),
+            LinkCheck("documents/runtime/runtime-log-archive.md"),
+            LinkCheck("documents/runtime/runtime-log-archive-migration.md"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("tools/ci/run_all_checks.sh"),
@@ -240,7 +240,7 @@ CONTRACTS = (
         tool="tools/agent_tools/run_accumulated_agent_evals.py",
         links=(
             LinkCheck("evidence/agent-evals/README.md"),
-            LinkCheck("documents/runtime-log-archive.md"),
+            LinkCheck("documents/runtime/runtime-log-archive.md"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("tools/catalog.yaml"),
@@ -400,7 +400,7 @@ CONTRACTS = (
         name="repo_dependency_review",
         tool="tools/agent_tools/run_repo_dependency_review.sh",
         links=(
-            LinkCheck("documents/dependency-manifest-design.md"),
+            LinkCheck("documents/design/dependency-manifest-design.md"),
             LinkCheck("agents/canonical/CODEX_WORKFLOW.md"),
             LinkCheck("agents/templates/closeout_gate.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
@@ -412,7 +412,7 @@ CONTRACTS = (
         name="container_config",
         tool="tools/ci/container_config.py",
         links=(
-            LinkCheck("documents/coding-conventions-project.md"),
+            LinkCheck("documents/conventions/coding-conventions-project.md"),
             LinkCheck("agents/skills/environment-maintenance.md"),
             LinkCheck("tools/docker_dependency_validator.sh"),
             LinkCheck("tools/ci/container_runtime.py"),
@@ -456,13 +456,18 @@ def as_sequence(value: object) -> Sequence[object] | None:
 
 
 def resolve_repo_path(root: Path, relative_path: str) -> Path:
-    """Resolve an AgentCanon source path from standalone or parent root."""
-    canon_root = (
-        root / "vendor" / "agent-canon"
-        if (root / "vendor" / "agent-canon").is_dir()
-        else root
-    )
-    return canon_root / relative_path
+    """Resolve a path through the root view or vendored AgentCanon source."""
+    root_path = root / relative_path
+    if root_path.exists():
+        return root_path
+    if relative_path.startswith("tools/"):
+        projected_path = root / "tools" / "agent-canon" / relative_path.removeprefix("tools/")
+        if projected_path.exists():
+            return projected_path
+    vendor_path = root / "vendor" / "agent-canon" / relative_path
+    if vendor_path.exists():
+        return vendor_path
+    return root_path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -504,12 +509,25 @@ def compatible_reverse_kind(
     )
 
 
+def logical_graph_path(path: str) -> str:
+    """Normalize standalone, vendored, and projected graph paths."""
+    normalized = path.replace("\\", "/").removeprefix("./")
+    if normalized.startswith("vendor/agent-canon/"):
+        return normalized.removeprefix("vendor/agent-canon/")
+    if normalized.startswith("tools/agent-canon/"):
+        return "tools/" + normalized.removeprefix("tools/agent-canon/")
+    return normalized
+
+
 def matching_direct_edges(
     edges: Sequence[GraphDependencyFact], tool: str, target: str
 ) -> tuple[GraphDependencyFact, ...]:
     """Return direct tool-to-target manifest edges."""
     return tuple(
-        edge for edge in edges if edge.source == tool and edge.target == target
+        edge
+        for edge in edges
+        if logical_graph_path(edge.source) == tool
+        and logical_graph_path(edge.target) == target
     )
 
 
@@ -518,7 +536,10 @@ def matching_reverse_edges(
 ) -> tuple[GraphDependencyFact, ...]:
     """Return target-to-tool manifest edges."""
     return tuple(
-        edge for edge in edges if edge.source == target and edge.target == tool
+        edge
+        for edge in edges
+        if logical_graph_path(edge.source) == target
+        and logical_graph_path(edge.target) == tool
     )
 
 
@@ -588,13 +609,26 @@ def check_text(
             Finding("missing-file", contract.name, text_check.path, text_check.detail)
         ]
     text = path.read_text(encoding="utf-8")
-    if text_check.snippet in text:
+    snippets = {text_check.snippet, projected_runtime_snippet(root, text_check.snippet)}
+    if any(snippet in text for snippet in snippets):
         return []
     return [
         Finding(
             "missing-required-text", contract.name, text_check.path, text_check.detail
         )
     ]
+
+
+def projected_runtime_snippet(root: Path, snippet: str) -> str:
+    """Map standalone AgentCanon tool paths to a parent runtime projection."""
+    if not (root / "tools" / "agent-canon").exists() or (root / "tools" / "ci").exists():
+        return snippet
+    return (
+        snippet.replace("tools/agent_tools/", "tools/agent-canon/agent_tools/")
+        .replace("tools/ci/", "tools/agent-canon/ci/")
+        .replace("tools/sync_agent_canon.sh", "tools/agent-canon/sync_agent_canon.sh")
+        .replace("tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh")
+    )
 
 
 def check_catalog_entries(root: Path) -> list[Finding]:
@@ -690,7 +724,7 @@ def run_checks(root: Path, names: Sequence[str]) -> list[Finding]:
     """Run drift checks."""
     contracts = selected_contracts(names)
     graph = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE).query(
-        all=True,
+        all_nodes=True,
         relation="dependency",
         direction="both",
         depth=0,

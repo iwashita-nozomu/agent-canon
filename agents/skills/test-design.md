@@ -28,12 +28,30 @@ placement の evidence であり、最初に tests を書き換える根拠で�
 
 ## Activation Decision
 
-最初の出力は必ず `Activation Decision` とします。
+最初の出力は必ず `Activation Decision` とします。これはskill起動後の分類結果で
+あり、skillを起動しないための事前ゲートではありません。選択されたらまず分類を
+完了し、`activation=required` の場合は過剰なケースを増やさずに下記の後段設計へ
+進みます。
 
 1. owning design / algorithm contract、public entrypoint、state transition または recurrence、invariant、stopping / acceptance rule、failure semantics、および code-side implementation mechanism が確立または修復済みか確認します。未確立なら `activation=deferred` として owning repair route を返し、test plan と tool run は要求しません。
-1. concrete unresolved oracle、specification、regression、または failure-mode risk があるか確認します。ordinary code change、bug fix、parser change、validation failure、public behavior の変更だけでは activation の根拠にしません。
+1. concrete unresolved oracle、specification、regression、または failure-mode risk があるか確認します。ordinary code change、bug fix、parser change、validation failure、public behavior の変更だけでは、テストを無制限に増やす根拠にしません。
 1. その risk が static validation、existing checker、formatter、dependency review、type checker、lint、docs check、または targeted validation の所有範囲外か確認します。該当しなければ `activation=not_needed` として canonical validation route だけを返し、test plan、test-design tool、test の変更を要求しません。
 1. mechanism と unresolved risk の両方が残る場合だけ `activation=required` とし、以下の conditional checklist を適用します。
+
+## Test Admission Boundary
+
+テストを設計する前に、対象propertyのboundary classを決めます。
+
+- `necessary_presence`: 必要なディレクトリ、ファイル、リンク、型、設定、または参照の存在。path・link・manifest・parser・type checkerなど、既存の静的検査で観測できるものはテストにしません。
+- `forbidden_presence`: 旧ラッパー、削除済み経路、禁止された重複実装、または明示された不許可surfaceの不在。存在禁止の検査は対象pathのabsence checkerで閉じ、実行テストへ昇格させません。
+- `sufficient_behavior`: 公開behavior、状態遷移、数理特性、error semantics、またはreader-facing outcomeの成立。owner contractがこの成立を要求し、静的解析・既存checker・targeted validationで閉じない未解決oracleがある場合だけ、`activation=required` のテストへ進みます。
+
+必要条件の充足は十分条件ではなく、禁止条件の不在も十分条件ではありません。
+逆に十分条件を要求していない構造・移行・format変更へ、完全一致、no-crash、
+実行成功、網羅性、またはAPIの内部形状を追加のoracleとして固定しません。
+テストを提案する場合は `boundary_class`、failure predicate、owner contract、
+観測レベル、既存checkerで閉じない理由を先に記録し、どれかが欠ければ
+`activation=not_needed` または `activation=deferred` に戻します。
 
 ## Expected Outcome
 
@@ -42,6 +60,15 @@ placement の evidence であり、最初に tests を書き換える根拠で�
 - `activation=required` の場合だけ、static path survey、contract source、observation level、observable outcome、oracle、input space、adequacy evidence、nasty case、regression case、placement notes を具体化する
 - checker-owned property は canonical static validation evidence に戻す
 - tests は concrete behavior regression oracle がある場合だけ作成または編集する
+
+## Post-Activation Test Budget
+
+`activation=required` は、テストスイート全体の網羅化や全checkerの再実行を意味しません。
+未解決riskごとに最小の安定した観測レベルを一つ選び、同じ契約を確認する重複ケース、
+実行できることだけを見るno-crashケース、内部helperや行数を固定するケースは追加しません。
+一つのケースが複数のriskを覆う場合は、それを明示してケースを増やさないようにします。
+ケース追加の前に、既存ケース・static checker・targeted validationで同じoracleが
+閉じていないことを確認し、閉じていれば新規testではなく既存evidenceを参照します。
 
 ## Conditional Checklist
 
@@ -52,7 +79,7 @@ placement の evidence であり、最初に tests を書き換える根拠で�
 - contract source、behavior contract、observation level、observable outcome、oracle、input space、adequacy evidence、Do Not Freeze を分ける
 - malformed input、boundary value、empty / null-ish input、error path、state transition、再発しやすい regression を、安定した観測レベルで列挙する
 - parser / formatter / graph / router / mapping では property または metamorphic relation を検討するが、checker-owned property は test oracle に昇格させない
-- numerical、randomized、tolerance、solver、convergence、residual、benchmark、experiment-style test は、`documents/coding-conventions-testing.md` の Numerical Test Admission Gate を owner とし、`activation=required` かつ数値 trigger、non-numerical alternative、oracle、budget が approved route にある場合だけ提案する
+- numerical、randomized、tolerance、solver、convergence、residual、benchmark、experiment-style test は、`documents/conventions/coding-conventions-testing.md` の Numerical Test Admission Gate を owner とし、`activation=required` かつ数値 trigger、non-numerical alternative、oracle、budget が approved route にある場合だけ提案する
 - existing test style、fixture layout、naming を mirror し、test の追加・編集は concrete behavior regression oracle に限定する
 
 ## Validation Failure Response
@@ -61,8 +88,8 @@ test / check が失敗した場合、単純化、revert、feature / test deletio
 weakening、intended behavior の削除、validation downscope に進む前に、
 `failing_contract`、`observation_level`、`cause_classification`、
 `intent_preservation`、`evidence` を記録します。slug set と route semantics は
-`documents/runtime-profiles-and-check-matrix.json` が所有し、
-`documents/runtime-profiles-and-check-matrix.md` は generated reader projection
+`documents/runtime/runtime-profiles-and-check-matrix.json` が所有し、
+`documents/runtime/runtime-profiles-and-check-matrix.md` は generated reader projection
 として参照します。
 
 `cause_classification=implementation_bug` で contract と oracle が安定している

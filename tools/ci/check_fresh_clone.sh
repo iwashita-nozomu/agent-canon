@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Checks fresh-clone bootstrap, AgentCanon update, and runtime surfaces.
 # upstream design ../README.md shared automation index
-# upstream environment ../../documents/linux-wsl-host-requirements.md documents host tool requirements for fresh clone checks
+# upstream environment ../../documents/contracts/linux-wsl-host-requirements.md documents host tool requirements for fresh clone checks
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns source projection aggregation and validation.
 # upstream implementation ./check_agent_canon_pr.py owns the authoritative G2 materializer API.
 # upstream implementation ../agent_tools/github_publish.py owns the authoritative G3 materializer API.
@@ -11,10 +11,14 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_DIR}/../lib/repo_paths.sh"
+ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
+CANON_TOOLS_ROOT="$(agent_canon_tools_root "$ROOT_DIR")"
 TMP_DIR="$(mktemp -d -t template-fresh-clone-XXXXXX)"
-TOPIC_ROOT="${TMP_DIR}/workspace-fresh-clone"
+TOPIC_ROOT="${TMP_DIR}/workspace/fresh-clone"
 CLONE_DIR="${TOPIC_ROOT}/agent-canon"
+CLONE_TOOLS_ROOT=""
 trap 'rm -rf "${TMP_DIR}"' EXIT
 
 mkdir -p "${TOPIC_ROOT}"
@@ -36,6 +40,7 @@ git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
 git config --global --add safe.directory "${CLONE_DIR}"
 overlay_current_tree
 cd "${CLONE_DIR}"
+CLONE_TOOLS_ROOT="$(agent_canon_tools_root "${CLONE_DIR}")"
 if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1; then
   rm -rf vendor/agent-canon
   git -c protocol.file.allow=always submodule update --init --recursive vendor/agent-canon
@@ -59,14 +64,16 @@ AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:${COMMIT_REQUEST_EVIDENCE_DIGEST}"
 echo "fresh-clone commit request evidence: ${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}"
 
 python3 -m json.tool .devcontainer/devcontainer.json >/dev/null
-bash .devcontainer/generate-runtime-compose.sh >/dev/null
+AGENT_CANON_DEVCONTAINER_REPO_ROOT=. \
+AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml \
+bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh >/dev/null
 python3 - <<'PY'
 from __future__ import annotations
 
 from pathlib import Path
 import yaml
 
-compose_path = Path(".devcontainer/docker-compose.generated.yml")
+compose_path = Path(".agent-canon/docker-compose.generated.yml")
 data = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
 assert data["name"].endswith("-devcontainer"), "compose project name missing"
 assert "services" in data and "workspace" in data["services"], "workspace service missing"
@@ -87,7 +94,7 @@ if [ "$parent_projection_mode" = false ]; then
   exit 0
 fi
 
-bash tools/sync_agent_canon.sh check
+bash "${CLONE_TOOLS_ROOT}/sync_agent_canon.sh" check
 AGENT_CANON_TEST_REMOTE="${TMP_DIR}/agent-canon-upstream.git"
 AGENT_CANON_TEST_WORK="${TMP_DIR}/agent-canon-work"
 git init --bare "${AGENT_CANON_TEST_REMOTE}" >/dev/null
@@ -186,7 +193,7 @@ for lifecycle_path in \
   cp "${source_namespace}/${lifecycle_path}" "${target_namespace}/${lifecycle_path}"
 done
 
-PYTHONPATH="${PWD}/tools/agent_tools" \
+PYTHONPATH="${CLONE_TOOLS_ROOT}/agent_tools" \
   python3 - "${target_namespace}" <<'PY'
 import json
 import sys
@@ -234,14 +241,14 @@ PY
 git config user.name "Fresh Clone Check"
 git config user.email "fresh-clone-check@example.invalid"
 materialize_current_lifecycle_projection
-bash tools/update_agent_canon.sh plan | tee "${TMP_DIR}/agent-canon-plan.txt"
-grep -Eq "agent_canon_plan_route=(subtree_pull|submodule_update)" "${TMP_DIR}/agent-canon-plan.txt"
+bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-canon-plan.txt"
+grep -Eq "agent_canon_plan_route=(already_current_submodule|subtree_pull|submodule_update)" "${TMP_DIR}/agent-canon-plan.txt"
 AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
 AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
 AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
 AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
-  bash tools/update_agent_canon.sh apply
+  bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 (
   cd "${AGENT_CANON_TEST_WORK}"
@@ -251,7 +258,7 @@ test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
   git push origin main >/dev/null
 )
 mkdir -p "${TMP_DIR}/missing-git-exec"
-GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash tools/update_agent_canon.sh plan | tee "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
+GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
 grep -Eq "agent_canon_plan_route=(snapshot_import_tree_match|snapshot_import_no_subtree|submodule_update)" "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
 AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
 AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
@@ -259,9 +266,9 @@ AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
 AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
 GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" \
-  bash tools/update_agent_canon.sh apply
+  bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-no-subtree-marker
-make agent-checks
+make -C "${CLONE_DIR}" agent-checks
 echo "FRESH_CLONE_REPOSITORY_CI_OWNER=repository_ci_job"
 
 echo "FRESH_CLONE_ACCEPTANCE=pass"

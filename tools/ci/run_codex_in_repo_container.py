@@ -219,7 +219,9 @@ def build_nested_codex_script(
 ) -> str:
     """Return the shell prelude that prepares the mounted workspace before Codex."""
     quoted_command = shlex.join(command)
-    post_create = shlex.quote(f"{workspace.rstrip('/')}/.devcontainer/post-create.sh")
+    post_create = shlex.quote(
+        f"{workspace.rstrip('/')}/vendor/agent-canon/.devcontainer/post-create.sh"
+    )
     lines = [
         "set -euo pipefail",
         'mkdir -p "$HOME"',

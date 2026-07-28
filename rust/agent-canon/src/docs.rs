@@ -1,7 +1,7 @@
 // @dependency-start
 // contract implementation
 // responsibility Provides unified Rust Markdown documentation formatting and checks.
-// upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
+// upstream design ../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // upstream design ../../../agents/skills/md-style-check.md Markdown style check skill contract
 // upstream implementation ../../../tools/agent_tools/visualization_contract.py owns typed source-universe, manifest, ToolCall, marker, readback, and coverage status
 // downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
@@ -32,8 +32,8 @@ const BOOTSTRAP_DOCS: &[&str] = &[
     "QUICK_START.md",
     "docker/README.md",
     "scripts/README.md",
-    "documents/template-bootstrap.md",
-    "documents/linux-wsl-host-requirements.md",
+    "documents/contracts/template-bootstrap.md",
+    "documents/contracts/linux-wsl-host-requirements.md",
 ];
 
 const DERIVED_REPO_STALE_STRINGS: &[&str] = &[
@@ -76,12 +76,12 @@ const RUNTIME_PROFILE_DEPENDENCY_HEADER: &str = "<!--
 @dependency-start
 contract reference
 responsibility Defines AgentCanon runtime profiles and risk-based validation routing.
-upstream design ../ROOT_AGENTS.md root runtime entrypoint and closeout model
+upstream design ../../ROOT_AGENTS.md root runtime entrypoint and closeout model
 upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
-downstream design ../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
-downstream design ./agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
-downstream implementation ../tools/ci/run_all_checks.sh repo check runner
-downstream implementation ../tools/catalog.yaml structured tool catalog
+downstream design ../../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
+downstream design ../agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
+downstream implementation ../../tools/ci/run_all_checks.sh repo check runner
+downstream implementation ../../tools/catalog.yaml structured tool catalog
 @dependency-end
 -->
 ";
@@ -260,7 +260,7 @@ fn print_usage() {
 
 fn render_runtime_profile_command(root: &Path) -> i32 {
     match render_runtime_profile_inventory(
-        &root.join("documents/runtime-profiles-and-check-matrix.json"),
+        &root.join("documents/runtime/runtime-profiles-and-check-matrix.json"),
     ) {
         Ok(rendered) => {
             print!("{rendered}");
@@ -1460,7 +1460,7 @@ fn check_bootstrap_docs(root: &Path) -> Vec<Finding> {
         if !path.is_file() {
             continue;
         }
-        let skip_stale = *relative == "documents/template-bootstrap.md"
+        let skip_stale = *relative == "documents/contracts/template-bootstrap.md"
             && path.is_symlink()
             && path
                 .canonicalize()
@@ -1525,8 +1525,8 @@ fn current_project_name(root: &Path) -> Option<String> {
 }
 
 fn check_runtime_profile_inventory(root: &Path) -> Vec<Finding> {
-    let inventory_path = root.join("documents/runtime-profiles-and-check-matrix.json");
-    let doc_path = root.join("documents/runtime-profiles-and-check-matrix.md");
+    let inventory_path = root.join("documents/runtime/runtime-profiles-and-check-matrix.json");
+    let doc_path = root.join("documents/runtime/runtime-profiles-and-check-matrix.md");
     if !inventory_path.is_file() || !doc_path.is_file() {
         return Vec::new();
     }
@@ -1550,7 +1550,7 @@ fn check_runtime_profile_inventory(root: &Path) -> Vec<Finding> {
             path: Some(doc_path),
             line: None,
             message:
-                "runtime profile inventory markdown drifts from documents/runtime-profiles-and-check-matrix.json"
+                "runtime profile inventory markdown drifts from documents/runtime/runtime-profiles-and-check-matrix.json"
                     .to_string(),
         }]
     }

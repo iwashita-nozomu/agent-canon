@@ -7,7 +7,10 @@
 
 set -euo pipefail
 
-WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_DIR}/../lib/repo_paths.sh"
+WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
+CANON_CI_ROOT="$(agent_canon_tools_root "$WORKSPACE_ROOT")/ci"
 cd "$WORKSPACE_ROOT"
 
 PYTHON_BIN="${PYTHON_BIN:-}"
@@ -22,4 +25,4 @@ if [ -z "$PYTHON_BIN" ]; then
   fi
 fi
 
-exec "$PYTHON_BIN" tools/ci/run_container_pack.py "$@"
+exec "$PYTHON_BIN" "${CANON_CI_ROOT}/run_container_pack.py" "$@"

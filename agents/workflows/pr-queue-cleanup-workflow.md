@@ -5,7 +5,7 @@
 contract workflow
 responsibility Owns ordered source projection, parent frontier consumption, and task-owned cleanup after remote readback.
 upstream design ../workflows/agent-canon-pr-workflow.md owns source PR merge and publication readback.
-upstream design ../../documents/agent-canon-update-route.md owns the end-to-end transaction.
+upstream design ../../documents/agent-canon/agent-canon-update-route.md owns the end-to-end transaction.
 upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns QueueReceipt, DependencyFrontier, CleanupProof, and close token schemas.
 upstream implementation ../../tools/update_agent_canon.sh emits queue/frontier receipts and blocks early parent projection.
 upstream implementation ../../tools/agent_tools/report_artifact_checks.py remains the upstream completion Materializer.

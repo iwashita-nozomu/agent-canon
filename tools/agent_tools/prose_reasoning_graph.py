@@ -22,7 +22,7 @@ import re
 import sqlite3
 import subprocess
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -30,6 +30,21 @@ from typing import TypedDict, cast
 from urllib.parse import quote
 
 import yaml
+
+try:
+    from .graph_client import (
+        CANONICAL_GRAPH_EXECUTABLE,
+        GraphClient,
+        GraphClientError,
+        GraphResponse,
+    )
+except ImportError:  # pragma: no cover - direct CLI execution
+    from graph_client import (
+        CANONICAL_GRAPH_EXECUTABLE,
+        GraphClient,
+        GraphClientError,
+        GraphResponse,
+    )
 
 SCHEMA_VERSION = 1
 DEFAULT_PROFILE = "writing"
@@ -225,13 +240,6 @@ ALIGNED_ATTRIBUTE_CONCEPTS = frozenset(
     {"metric", "baseline", "expected", "result", "指標", "ベースライン", "期待"}
 )
 DECISION_SEQUENCE_CONCEPTS = frozenset({"option", "choice", "decision", "step", "選択肢", "判断"})
-DEPENDENCY_MANIFEST_START = "@dependency-start"
-DEPENDENCY_MANIFEST_END = "@dependency-end"
-DEPENDENCY_MANIFEST_RECORD_RE = re.compile(
-    r"^(?P<role>responsibility|(?:upstream|downstream)\s+(?:design|implementation))\s+(?P<body>.+)$"
-)
-
-
 @dataclass(frozen=True)
 class Node:
     """One graph node used in projections."""
@@ -314,8 +322,8 @@ class ProjectionView:
 
 
 @dataclass(frozen=True)
-class DependencyManifestRecord:
-    """One dependency-manifest responsibility or dependency entry."""
+class GraphDependencyRecord:
+    """One dependency record projected from the canonical graph response."""
 
     role: str
     body: str
@@ -997,6 +1005,11 @@ def command_ingest(args: argparse.Namespace) -> int:
     db_path = graph_db_path(args, [input_path])
     text = input_path.read_text(encoding="utf-8")
     prompt_text = prompt_context(args)
+    graph_root = structured_repo_root(args, input_path)
+    graph_records, graph_fingerprint = graph_dependency_records_for_inputs(
+        graph_root,
+        ((input_path, text),),
+    )
     semantic_ir = semantic_prose_ir_payload(args, [input_path], prompt_text, db_path)
     corpus_hints = corpus_hints_from_semantic_ir(semantic_ir)
     with connect(db_path) as connection:
@@ -1004,6 +1017,7 @@ def command_ingest(args: argparse.Namespace) -> int:
         clear_database(connection)
         set_metadata(connection, "semantic_prose_ir", semantic_ir)
         set_metadata(connection, "corpus_hints", corpus_hints)
+        set_metadata(connection, "canonical_graph_fingerprint", graph_fingerprint)
         set_metadata(
             connection,
             "corpus_hint_inputs",
@@ -1021,6 +1035,10 @@ def command_ingest(args: argparse.Namespace) -> int:
             document_id="doc:1",
             source_node_id="src:1",
             kind=cast(str, args.kind),
+            dependency_records=graph_records.get(
+                graph_source_path(graph_root, input_path),
+                (),
+            ),
         )
     emit_command_stats(
         args,
@@ -1040,6 +1058,11 @@ def command_ingest_set(args: argparse.Namespace) -> int:
     input_paths = expand_ingest_inputs(input_args, bool(args.recursive))
     prompt_text = prompt_context(args)
     documents = [(path, path.read_text(encoding="utf-8")) for path in input_paths]
+    graph_root = structured_repo_root(args, input_paths[0])
+    graph_records, graph_fingerprint = graph_dependency_records_for_inputs(
+        graph_root,
+        documents,
+    )
     semantic_ir = semantic_prose_ir_payload(args, input_paths, prompt_text, db_path)
     corpus_hints = corpus_hints_from_semantic_ir(semantic_ir)
     with connect(db_path) as connection:
@@ -1047,6 +1070,7 @@ def command_ingest_set(args: argparse.Namespace) -> int:
         clear_database(connection)
         set_metadata(connection, "semantic_prose_ir", semantic_ir)
         set_metadata(connection, "corpus_hints", corpus_hints)
+        set_metadata(connection, "canonical_graph_fingerprint", graph_fingerprint)
         set_metadata(
             connection,
             "corpus_hint_inputs",
@@ -1070,6 +1094,10 @@ def command_ingest_set(args: argparse.Namespace) -> int:
                 source_node_id=f"src:{index}",
                 kind=cast(str, args.kind),
                 node_prefix=f"d{index}:",
+                dependency_records=graph_records.get(
+                    graph_source_path(graph_root, path),
+                    (),
+                ),
             )
     emit_command_stats(
         args,
@@ -1104,6 +1132,163 @@ def expand_ingest_inputs(inputs: Sequence[Path], recursive: bool) -> list[Path]:
     return output
 
 
+def graph_source_path(root: Path, input_path: Path) -> str:
+    """Return the canonical graph source path for one input document."""
+    resolved_root = root.resolve()
+    resolved_input = input_path.resolve()
+    try:
+        return resolved_input.relative_to(resolved_root).as_posix()
+    except ValueError:
+        return resolved_input.as_posix()
+
+
+def graph_dependency_records_for_inputs(
+    root: Path,
+    documents: Sequence[tuple[Path, str]],
+) -> tuple[dict[str, tuple[GraphDependencyRecord, ...]], str]:
+    """Project dependency records from one canonical graph query."""
+    try:
+        result = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE).query(
+            all_nodes=True,
+            relation="dependency",
+            direction="both",
+            depth=0,
+        )
+    except GraphClientError as error:
+        raise ValueError(f"canonical graph dependency query failed: {error}") from error
+    if result.status != "fresh" or result.exit_code != 0:
+        raise ValueError(
+            "canonical graph dependency query is unavailable: "
+            f"status={result.status} reason={result.payload.get('reason')}"
+        )
+    graph_fingerprint = result.payload.get("graph_fingerprint")
+    if not isinstance(graph_fingerprint, str) or not graph_fingerprint:
+        raise ValueError("canonical graph query lacks graph_fingerprint")
+    return (
+        {
+            source_path: dependency_records_for_graph_source(
+                result,
+                source_path,
+                text,
+            )
+            for input_path, text in documents
+            if (source_path := graph_source_path(root, input_path))
+        },
+        graph_fingerprint,
+    )
+
+
+def dependency_records_for_graph_source(
+    result: GraphResponse,
+    source_path: str,
+    source_text: str,
+) -> tuple[GraphDependencyRecord, ...]:
+    """Return graph records for one source without interpreting manifest syntax."""
+    records: list[GraphDependencyRecord] = []
+    raw_nodes_value = result.payload.get("nodes")
+    if not isinstance(raw_nodes_value, list):
+        raise ValueError("canonical graph query nodes must be an array")
+    raw_nodes = cast(list[object], raw_nodes_value)
+    source_node: dict[str, object] | None = None
+    for raw_node in raw_nodes:
+        if not isinstance(raw_node, dict):
+            continue
+        node = cast(dict[str, object], raw_node)
+        if node.get("path") == source_path:
+            source_node = node
+            break
+    if source_node is not None:
+        raw_payload = source_node.get("payload")
+        if not isinstance(raw_payload, dict):
+            raise ValueError("canonical graph source payload must be an object")
+        payload = cast(dict[str, object], raw_payload)
+        responsibility = payload.get("manifest_responsibility")
+        if isinstance(responsibility, str) and responsibility:
+            raw_span = source_node.get("source_span")
+            if raw_span is not None and not isinstance(raw_span, dict):
+                raise ValueError("canonical graph source span must be an object or null")
+            source_span = (
+                cast(dict[str, object], raw_span) if isinstance(raw_span, dict) else None
+            )
+            start, end = graph_source_offsets(source_text, source_span, source_path)
+            records.append(
+                GraphDependencyRecord(
+                    role="responsibility",
+                    body=responsibility,
+                    text=f"responsibility {responsibility}",
+                    source_start=start,
+                    source_end=end,
+                )
+            )
+    for fact in result.dependency_facts:
+        if fact.source != source_path:
+            continue
+        body = f"{fact.target} {fact.reason}".strip()
+        role = f"{fact.direction} {fact.kind}"
+        start, end = graph_source_offsets(source_text, fact.source_span, source_path)
+        records.append(
+            GraphDependencyRecord(
+                role=role,
+                body=body,
+                text=f"{role} {body}",
+                source_start=start,
+                source_end=end,
+            )
+        )
+    return tuple(
+        sorted(records, key=lambda record: (record.source_start, record.role, record.text))
+    )
+
+
+def graph_source_offsets(
+    source_text: str,
+    span: Mapping[str, object] | None,
+    source_path: str,
+) -> tuple[int, int]:
+    """Convert one parser-owned scalar line span to source scalar offsets."""
+    if span is None:
+        raise ValueError(f"canonical graph source span is missing: {source_path}")
+    span_path = span.get("path")
+    if span_path != source_path:
+        raise ValueError(
+            f"canonical graph source span path mismatch: {span_path!r} != {source_path!r}"
+        )
+    start_line = graph_span_integer(span, "start_line", source_path)
+    start_column = graph_span_integer(span, "start_column", source_path)
+    end_line = graph_span_integer(span, "end_line", source_path)
+    end_column = graph_span_integer(span, "end_column", source_path)
+    start = source_scalar_offset(source_text, start_line, start_column, source_path)
+    end = source_scalar_offset(source_text, end_line, end_column, source_path)
+    if end < start:
+        raise ValueError(f"canonical graph source span is reversed: {source_path}")
+    return start, end
+
+
+def graph_span_integer(span: Mapping[str, object], field: str, source_path: str) -> int:
+    """Return one positive parser-owned source-span integer."""
+    value = span.get(field)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise ValueError(f"canonical graph source span {field} is invalid: {source_path}")
+    return value
+
+
+def source_scalar_offset(text: str, line: int, column: int, source_path: str) -> int:
+    """Return a zero-based scalar offset for a one-based line and column."""
+    lines = text.splitlines(keepends=True)
+    if line > len(lines):
+        raise ValueError(
+            f"canonical graph source span line is out of range: {source_path}:{line}"
+        )
+    line_text = lines[line - 1]
+    scalar_line = line_text.rstrip("\r\n")
+    if column > len(scalar_line) + 1:
+        raise ValueError(
+            "canonical graph source span column is out of range: "
+            f"{source_path}:{line}:{column}"
+        )
+    return sum(len(value) for value in lines[: line - 1]) + column - 1
+
+
 def ingest_document(
     connection: sqlite3.Connection,
     input_path: Path,
@@ -1113,6 +1298,7 @@ def ingest_document(
     source_node_id: str,
     kind: str,
     node_prefix: str = "",
+    dependency_records: Sequence[GraphDependencyRecord] = (),
 ) -> None:
     """Insert one source document and its source/form nodes."""
     title = infer_title(text, input_path)
@@ -1133,6 +1319,9 @@ def ingest_document(
         payload={
             "path": str(input_path),
             "kind": kind,
+            "graph_dependency_records": [
+                asdict(record) for record in dependency_records
+            ],
         },
     )
     ingest_blocks(connection, document_id, text, str(input_path), node_prefix=node_prefix)
@@ -1917,7 +2106,7 @@ def add_evidence_layer(
                     sentence.source_end,
                 )
             )
-    evidence_nodes.extend(add_dependency_manifest_evidence_nodes(connection, document_id))
+    evidence_nodes.extend(add_graph_dependency_evidence_nodes(connection, document_id))
     for claim in claims:
         evidence = best_supporting_evidence(claim, evidence_nodes)
         if evidence is not None:
@@ -1954,24 +2143,32 @@ def add_evidence_layer(
     return tuple(evidence_nodes)
 
 
-def add_dependency_manifest_evidence_nodes(connection: sqlite3.Connection, document_id: str) -> tuple[Node, ...]:
-    """Materialize dependency-manifest responsibility entries as evidence."""
+def add_graph_dependency_evidence_nodes(
+    connection: sqlite3.Connection, document_id: str
+) -> tuple[Node, ...]:
+    """Materialize canonical-graph dependency records as prose evidence."""
     row = connection.execute(
-        "SELECT id, text, source_start FROM nodes WHERE layer = 'source' AND kind = 'document' AND document_id = ? LIMIT 1",
+        "SELECT id, payload_json, source_start FROM nodes WHERE layer = 'source' AND kind = 'document' AND document_id = ? LIMIT 1",
         (document_id,),
     ).fetchone()
     if row is None:
         return ()
     source_node_id = str(row["id"])
-    source_text = str(row["text"])
     source_start = int(row["source_start"])
-    records = dependency_manifest_records(source_text)
+    records = dependency_records_from_source_payload(
+        read_json_object(str(row["payload_json"])),
+        source_node_id,
+    )
     evidence_nodes: list[Node] = []
     for index, record in enumerate(records, start=1):
         evidence_id = f"evidence:dependency:{index}"
-        kind = "document_responsibility" if record.role == "responsibility" else "dependency_manifest"
+        kind = (
+            "document_responsibility"
+            if record.role == "responsibility"
+            else "graph_dependency"
+        )
         payload = {
-            "source": "dependency_manifest",
+            "source": "canonical_graph",
             "manifest_role": record.role,
             "responsibility_terms": sorted(set(tokens(record.body)) - STOPWORDS),
             "strength": "responsibility_contract",
@@ -2006,7 +2203,7 @@ def add_dependency_manifest_evidence_nodes(connection: sqlite3.Connection, docum
                     **payload,
                     "source_anchor_id": source_node_id,
                     "member_anchor_ids": [source_node_id],
-                    "derivation_basis": "dependency_manifest",
+                    "derivation_basis": "canonical_graph",
                 },
                 source_start + record.source_start,
                 source_start + record.source_end,
@@ -2015,44 +2212,50 @@ def add_dependency_manifest_evidence_nodes(connection: sqlite3.Connection, docum
     return tuple(evidence_nodes)
 
 
-def dependency_manifest_records(source_text: str) -> tuple[DependencyManifestRecord, ...]:
-    """Return dependency-manifest records from a source document."""
-    records: list[DependencyManifestRecord] = []
-    in_manifest = False
-    offset = 0
-    for line in source_text.splitlines(keepends=True):
-        stripped_line = line.strip()
-        if DEPENDENCY_MANIFEST_START in stripped_line:
-            in_manifest = True
-            offset += len(line)
-            continue
-        if DEPENDENCY_MANIFEST_END in stripped_line:
-            break
-        if in_manifest:
-            cleaned = clean_dependency_manifest_line(stripped_line)
-            match = DEPENDENCY_MANIFEST_RECORD_RE.match(cleaned)
-            if match is not None:
-                role = match.group("role")
-                body = match.group("body").strip()
-                records.append(
-                    DependencyManifestRecord(
-                        role=role,
-                        body=body,
-                        text=f"{role} {body}",
-                        source_start=offset,
-                        source_end=offset + len(line),
-                    )
-                )
-        offset += len(line)
+def dependency_records_from_source_payload(
+    payload: dict[str, object],
+    source_node_id: str,
+) -> tuple[GraphDependencyRecord, ...]:
+    """Decode graph-derived dependency records stored at ingest time."""
+    raw_records = payload.get("graph_dependency_records")
+    if not isinstance(raw_records, list):
+        raise ValueError(
+            f"source node lacks canonical graph dependency records: {source_node_id}"
+        )
+    records: list[GraphDependencyRecord] = []
+    for index, value in enumerate(cast(list[object], raw_records)):
+        if not isinstance(value, dict):
+            raise ValueError(
+                f"source node dependency record is not an object: {source_node_id}:{index}"
+            )
+        record = cast(dict[str, object], value)
+        role = record.get("role")
+        body = record.get("body")
+        text = record.get("text")
+        source_start = record.get("source_start")
+        source_end = record.get("source_end")
+        if (
+            not isinstance(role, str)
+            or not isinstance(body, str)
+            or not isinstance(text, str)
+            or not isinstance(source_start, int)
+            or isinstance(source_start, bool)
+            or not isinstance(source_end, int)
+            or isinstance(source_end, bool)
+        ):
+            raise ValueError(
+                f"source node dependency record is invalid: {source_node_id}:{index}"
+            )
+        records.append(
+            GraphDependencyRecord(
+                role=role,
+                body=body,
+                text=text,
+                source_start=source_start,
+                source_end=source_end,
+            )
+        )
     return tuple(records)
-
-
-def clean_dependency_manifest_line(line: str) -> str:
-    """Remove comment syntax around a dependency-manifest line."""
-    cleaned = line.strip()
-    cleaned = cleaned.removeprefix("<!--").removesuffix("-->").strip()
-    cleaned = cleaned.removeprefix("#").strip()
-    return cleaned
 
 
 def derived_anchor_payload(anchor_id: str, basis: str) -> dict[str, object]:
@@ -2088,8 +2291,8 @@ def best_supporting_evidence(claim: Node, evidence_nodes: Sequence[Node]) -> Nod
         if str(evidence.payload.get("sentence_id", "")) == claim_sentence_id:
             return evidence
     for evidence in evidence_nodes:
-        if evidence.kind in {"document_responsibility", "dependency_manifest"}:
-            if dependency_manifest_covers_claim(claim, evidence):
+        if evidence.kind in {"document_responsibility", "graph_dependency"}:
+            if graph_dependency_covers_claim(claim, evidence):
                 return evidence
             continue
         if lexical_overlap(claim.text, evidence.text) >= EVIDENCE_SUPPORT_MIN_OVERLAP:
@@ -2097,8 +2300,8 @@ def best_supporting_evidence(claim: Node, evidence_nodes: Sequence[Node]) -> Nod
     return None
 
 
-def dependency_manifest_covers_claim(claim: Node, evidence: Node) -> bool:
-    """Return true when manifest responsibility terms cover claim concepts."""
+def graph_dependency_covers_claim(claim: Node, evidence: Node) -> bool:
+    """Return true when graph dependency terms cover claim concepts."""
     claim_terms = responsibility_terms(claim.text)
     evidence_terms = responsibility_terms(evidence.text)
     if not claim_terms or not evidence_terms:
@@ -2117,8 +2320,8 @@ def responsibility_terms(text: str) -> set[str]:
 
 def evidence_support_basis(claim: Node, evidence: Node) -> str:
     """Return support edge basis for a claim/evidence relation."""
-    if evidence.kind in {"document_responsibility", "dependency_manifest"}:
-        return "dependency_manifest_concept_coverage"
+    if evidence.kind in {"document_responsibility", "graph_dependency"}:
+        return "graph_dependency_concept_coverage"
     if str(evidence.payload.get("sentence_id", "")) == str(claim.payload.get("sentence_id", "")):
         return "same_sentence_evidence"
     return "document_neighborhood"
@@ -4010,6 +4213,10 @@ def command_check_document(args: argparse.Namespace) -> int:
     inventory_json = structured_inventory_path(args, repo_root)
     prompt_text = prompt_context(args)
     source_text = input_path.read_text(encoding="utf-8")
+    graph_records, graph_fingerprint = graph_dependency_records_for_inputs(
+        repo_root,
+        ((input_path, source_text),),
+    )
     semantic_ir = semantic_prose_ir_payload(args, [input_path], prompt_text, db_path)
     corpus_hints = corpus_hints_from_semantic_ir(semantic_ir)
 
@@ -4024,6 +4231,7 @@ def command_check_document(args: argparse.Namespace) -> int:
         clear_database(connection)
         set_metadata(connection, "semantic_prose_ir", semantic_ir)
         set_metadata(connection, "corpus_hints", corpus_hints)
+        set_metadata(connection, "canonical_graph_fingerprint", graph_fingerprint)
         set_metadata(
             connection,
             "corpus_hint_inputs",
@@ -4041,6 +4249,10 @@ def command_check_document(args: argparse.Namespace) -> int:
             document_id="doc:1",
             source_node_id="src:1",
             kind=cast(str, args.kind),
+            dependency_records=graph_records.get(
+                graph_source_path(repo_root, input_path),
+                (),
+            ),
         )
         clear_analysis(connection)
         analyze_graph(connection, cast(str, args.profile))

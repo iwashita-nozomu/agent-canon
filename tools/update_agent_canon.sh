@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Provides GitHub-first AgentCanon submodule update automation.
-# upstream design ../documents/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
+# upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
 # upstream design ../documents/rule/dependency-module-changes.md defines independent source-clone and clean projection policy.
-# upstream design ../documents/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
+# upstream design ../documents/agent-canon/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
 # upstream implementation ./sync_agent_canon.sh performs low-level submodule freshness and root-view synchronization.
 # upstream implementation ./agent_tools/update_lifecycle_contract.py owns queue/frontier receipt mechanics and guards.
 # upstream implementation ./rebuild_agent_tools.sh rebuilds compiled AgentCanon tools after safe updates.
@@ -16,11 +16,12 @@ set -euo pipefail
 export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-SUPERPROJECT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
-if [ -n "$SUPERPROJECT_DIR" ]; then
-  ROOT_DIR="$SUPERPROJECT_DIR"
-else
-  ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+source "${SCRIPT_DIR}/lib/repo_paths.sh"
+ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
+CANON_TOOLS_ROOT="$(agent_canon_tools_root "$ROOT_DIR")"
+SUPERPROJECT_DIR=""
+if [ "$ROOT_DIR" != "$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)" ]; then
+  SUPERPROJECT_DIR="$ROOT_DIR"
 fi
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
@@ -514,14 +515,14 @@ preserve_dirty_agentcanon_latest() {
     return "$preserve_rc"
   fi
   echo "AGENT_CANON_LATEST_DIRTY_PRESERVE=pass"
-  if ! bash "$ROOT_DIR/tools/sync_agent_canon.sh" link-root; then
+  if ! bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" link-root; then
     echo "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR=failed"
     echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_root_view_repair_failed"
     echo "NEXT_ACTION=commit_or_stash_agentcanon_root_view_changes_then_rerun_make_agent-canon-ensure-latest AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>"
     return 1
   fi
   echo "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR=pass"
-  if ! bash "$ROOT_DIR/tools/sync_agent_canon.sh" check; then
+  if ! bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" check; then
     echo "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK=failed"
     echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_shared_surface_check_failed"
     echo "NEXT_ACTION=repair_shared_surface_with_link-root_then_rerun_make_agent-canon-ensure-latest AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>"
@@ -536,7 +537,7 @@ preserve_dirty_agentcanon_latest() {
 }
 
 acknowledge_update_todos_if_available() {
-  local todo_tool="$ROOT_DIR/tools/agent_tools/agent_canon_update_todos.py"
+  local todo_tool="$CANON_TOOLS_ROOT/agent_tools/agent_canon_update_todos.py"
   local state_path="$ROOT_DIR/.agent-canon/update-state.toml"
   local todo_log=""
   local pending_count=""
@@ -588,7 +589,7 @@ acknowledge_update_todos_if_available() {
 }
 
 rebuild_agent_tools_if_available() {
-  local rebuild_tool="$ROOT_DIR/tools/rebuild_agent_tools.sh"
+  local rebuild_tool="$CANON_TOOLS_ROOT/rebuild_agent_tools.sh"
   if [ ! -f "$rebuild_tool" ]; then
     echo "AGENT_CANON_TOOL_REBUILD=skipped_missing_tool"
     return
@@ -608,7 +609,7 @@ emit_queue_receipt() {
   local current_marker="$UPDATE_STATE_DIR/current-transaction"
 
   mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
-  PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
+  PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
     python3 - "$binding_file" "$rebind_receipt_file" \
       "$source_main_readback_evidence_ref" "$predecessor_388_evidence_ref" \
       "$predecessor_389_evidence_ref" "$source_projection_packet" \
@@ -746,7 +747,7 @@ accept_dependency_frontier() {
   [[ "$source_main_tree" =~ ^[0-9a-f]{40}$ ]] \
     || die "accepted frontier requires exact origin/main tree readback identity"
   mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
-  PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
+  PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
     python3 - "$pending_frontier_file" "$queue_receipt_file" \
       "$rebind_receipt_file" "$source_main_sha" "$source_main_tree" \
       "$acceptance_evidence_ref" \
@@ -903,7 +904,7 @@ advance_source_projection() {
   source_main_tree="$(git -C "$AGENT_CANON_DIR" rev-parse "$source_main_sha^{tree}")"
   mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
   mapfile -t projection_values < <(
-    PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
+    PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
       python3 - "$packet" "$binding_file" "$rebind_file" \
         "$source_main_sha" "$source_main_tree" <<'PY'
 import json
@@ -992,7 +993,7 @@ require_accepted_dependency_frontier() {
     || die "parent projection blocked until dependency frontier acceptance"
   [ -f "$g4_receipt" ] \
     || die "parent projection blocked until G4 integrity evidence"
-  PYTHONPATH="$ROOT_DIR/tools/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
+  PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
     python3 - "$accepted_frontier" "$accepted_queue" "$current_marker" \
       "$g4_receipt" <<'PY'
 import json
@@ -1050,7 +1051,7 @@ cmd_plan() {
     echo "agent_canon_plan_branch=$branch"
     return
   fi
-  bash "$ROOT_DIR/tools/sync_agent_canon.sh" plan "$branch"
+  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" plan "$branch"
 }
 
 cmd_latest() {
@@ -1102,7 +1103,7 @@ cmd_latest() {
   fi
 
   latest_log="$(mktemp)"
-  bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
+  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
   if [ "$latest_rc" -ne 0 ]; then
     cat "$latest_log"
     rm -f "$latest_log"
@@ -1117,14 +1118,14 @@ cmd_latest() {
   fi
   if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
     rm -f "$latest_log"
-    bash "$ROOT_DIR/tools/sync_agent_canon.sh" check
+    bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" check
     echo "AGENT_CANON_LATEST_TOOL_RESULT=deferred_branch_pr"
     echo "NEXT_ACTION=after_agentcanon_PR_merge_rerun_make_agent-canon-ensure-latest"
     return 0
   fi
   rm -f "$latest_log"
 
-  bash "$ROOT_DIR/tools/sync_agent_canon.sh" check
+  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" check
   rebuild_agent_tools_if_available
   acknowledge_update_todos_if_available || todo_rc=$?
   if [ "$todo_rc" -eq 2 ]; then
@@ -1157,7 +1158,7 @@ cmd_apply() {
   fi
 
   latest_log="$(mktemp)"
-  bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
+  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
   cat "$latest_log"
   if [ "$latest_rc" -ne 0 ]; then
     rm -f "$latest_log"
@@ -1185,7 +1186,7 @@ cmd_status() {
     echo "agent_canon_source_worktree_status=$(git -C "$AGENT_CANON_DIR" status --porcelain=v1 --untracked-files=all | wc -l | tr -d ' ')"
     return
   fi
-  bash "$ROOT_DIR/tools/sync_agent_canon.sh" status
+  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" status
 }
 
 cmd_merge_main_into_current() {

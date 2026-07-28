@@ -1,7 +1,7 @@
 # @dependency-start
 # contract data
 # responsibility Registers issue-derived AgentCanon behavior eval cases.
-# upstream design ../../documents/prompt-skill-evaluation-checklist.md defines eval taxonomy and close conditions.
+# upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md defines eval taxonomy and close conditions.
 # upstream design ../../issues/README.md defines durable operational issue storage.
 # downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py consumes skill/workflow eval patterns.
 # downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval accumulation surfaces.
@@ -49,7 +49,7 @@ forbidden_route = [
   "edit library before caller-side extension point search",
 ]
 linked_rules = [
-  "documents/api-surface-traversal-policy.md",
+  "documents/design/api-surface-traversal-policy.md",
   "agents/workflows/hypothesis-validation-workflow.md",
 ]
 
@@ -70,8 +70,8 @@ forbidden_route = [
   "close issue with markdown-only note and no eval decision",
 ]
 linked_rules = [
-  "documents/SHARED_RUNTIME_SURFACES.md",
-  "documents/issue-label-taxonomy.md",
+  "documents/runtime/SHARED_RUNTIME_SURFACES.md",
+  "documents/operations/issue-label-taxonomy.md",
 ]
 
 [[eval]]
@@ -91,8 +91,8 @@ forbidden_route = [
   "plan -> apply -> merge-main-into-current as normal sequence",
 ]
 linked_rules = [
-  "documents/agent-canon-update-route.md",
-  "documents/agent-canon-subtree-migration.md",
+  "documents/agent-canon/agent-canon-update-route.md",
+  "documents/agent-canon/agent-canon-subtree-migration.md",
 ]
 
 [[eval]]
@@ -131,7 +131,7 @@ forbidden_route = [
   "hide AgentCanon source edit inside template-only pin PR",
 ]
 linked_rules = [
-  "documents/agent-canon-update-route.md",
+  "documents/agent-canon/agent-canon-update-route.md",
   "agents/skills/agent-update-branch.md",
 ]
 
@@ -252,14 +252,14 @@ protects = [
   "bootstrap evidence names fresh clone, submodule, root views, and validation",
 ]
 expected_route = [
-  "follow documents/derived-repo-bootstrap-runbook.md",
+  "follow documents/contracts/derived-repo-bootstrap-runbook.md",
   "record parent repo readiness and path/risk checks",
 ]
 forbidden_route = [
   "tell operators to copy scattered files without submodule/root-view validation",
 ]
 linked_rules = [
-  "documents/derived-repo-bootstrap-runbook.md",
+  "documents/contracts/derived-repo-bootstrap-runbook.md",
   "tools/agent_tools/parent_repo_readiness.py",
 ]
 
@@ -317,15 +317,15 @@ protects = [
   "rollback evidence includes submodule status and parent pin SHA",
 ]
 expected_route = [
-  "follow documents/agent-canon-submodule-rollback.md",
+  "follow documents/agent-canon/agent-canon-submodule-rollback.md",
   "rerun parent pin freshness and shared surface checks after rollback",
 ]
 forbidden_route = [
   "reset parent repo or submodule branch without recording the rollback lane",
 ]
 linked_rules = [
-  "documents/agent-canon-submodule-rollback.md",
-  "documents/agent-canon-update-route.md",
+  "documents/agent-canon/agent-canon-submodule-rollback.md",
+  "documents/agent-canon/agent-canon-update-route.md",
 ]
 
 [[eval]]
@@ -360,14 +360,14 @@ protects = [
   "eval closeout distinguishes self-report from observable behavior",
 ]
 expected_route = [
-  "use documents/prompt-skill-evaluation-checklist.md before prompt or skill closeout",
+  "use documents/codex/prompt-skill-evaluation-checklist.md before prompt or skill closeout",
   "add or cite issue-derived eval cases for observed failures",
 ]
 forbidden_route = [
   "close prompt/skill change with prose-only confidence",
 ]
 linked_rules = [
-  "documents/prompt-skill-evaluation-checklist.md",
+  "documents/codex/prompt-skill-evaluation-checklist.md",
   "evidence/agent-evals/issue_eval_manifest.toml",
 ]
 
@@ -382,7 +382,7 @@ protects = [
 ]
 expected_route = [
   "use AgentCanon maintenance or eval capture issue form",
-  "classify labels with documents/issue-label-taxonomy.md",
+  "classify labels with documents/operations/issue-label-taxonomy.md",
 ]
 forbidden_route = [
   "create free-form maintenance issue with no affected surface or validation field",
@@ -390,5 +390,5 @@ forbidden_route = [
 linked_rules = [
   ".github/ISSUE_TEMPLATE/agentcanon-maintenance.yml",
   ".github/ISSUE_TEMPLATE/eval-capture.yml",
-  "documents/issue-label-taxonomy.md",
+  "documents/operations/issue-label-taxonomy.md",
 ]

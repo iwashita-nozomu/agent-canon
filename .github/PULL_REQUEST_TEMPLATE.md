@@ -5,7 +5,7 @@ contract reference
 responsibility Documents the standalone AgentCanon pull request checklist.
 upstream design ../ROOT_AGENTS.md defines AgentCanon closeout requirements
 upstream design ../agents/workflows/agent-canon-pr-workflow.md defines shared canon PR flow
-upstream design ../documents/SHARED_RUNTIME_SURFACES.md defines synced root surfaces
+upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md defines synced root surfaces
 upstream design ../issues/README.md defines durable operational issue storage
 upstream design ../tools/catalog.yaml defines structured tool catalog
 downstream implementation ../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
@@ -81,7 +81,7 @@ Authority / blocker notes:
 - [ ] This PR targets the standalone AgentCanon repository, not a template / derived repo pin PR.
 - [ ] Template / derived repo follow-up is tracked through `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` after this source change lands.
 - [ ] The source of truth was edited in AgentCanon, not only through a derived repo root view.
-- [ ] New shared surfaces are listed in `documents/SHARED_RUNTIME_SURFACES.md` or explicitly documented as standalone-only.
+- [ ] New shared surfaces are listed in `documents/runtime/SHARED_RUNTIME_SURFACES.md` or explicitly documented as standalone-only.
 - [ ] `agentcanon_structure_followup=required` was recorded for this AgentCanon source / synced-surface change.
 - [ ] If parent root sync has not run for this source PR yet, the parent pin/root-view PR or blocker that must later provide `agentcanon_structure_followup=pass` is recorded below.
 - [ ] `agentcanon_structure_followup=pass` is recorded only when `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check` have both passed from the template / derived parent root.
@@ -107,7 +107,7 @@ Orchestration evidence:
 
 - [ ] `issues/README.md` was reviewed.
 - [ ] AgentCanon maintenance issues use `.github/ISSUE_TEMPLATE/agentcanon-maintenance.yml` fields or explain why an older issue shape is sufficient.
-- [ ] Skill/prompt/workflow behavior defects are evaluated against `documents/prompt-skill-evaluation-checklist.md` and `evidence/agent-evals/issue_eval_manifest.toml`, or the PR explains why no eval applies.
+- [ ] Skill/prompt/workflow behavior defects are evaluated against `documents/codex/prompt-skill-evaluation-checklist.md` and `evidence/agent-evals/issue_eval_manifest.toml`, or the PR explains why no eval applies.
 - [ ] Existing durable findings were searched in `issues/open/`, `issues/closed/`, `memory/`, `notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
 - [ ] New user / reviewer / runtime / CI workflow defect findings were written to `issues/open/AC-YYYYMMDD-<slug>.md`, `memory/`, or `notes/failures/` before closeout.
 - [ ] Structure intake, responsibility-scope, or dependency-review evidence used to choose the fix surface is cited below; dependency review evidence that starts from an approved search-hits file uses `run_repo_dependency_review.sh --search-hits-file <path>` and cites the dependency-expanded edit scope.
@@ -121,7 +121,7 @@ Issue / edit-scope evidence:
 
 ## Validation Evidence
 
-- [ ] Validation failure response, if any, cites `documents/runtime-profiles-and-check-matrix.json` as the canonical taxonomy owner; `documents/runtime-profiles-and-check-matrix.md` is the generated reader projection. PR evidence records the required evidence and same-intent repair / escalation result.
+- [ ] Validation failure response, if any, cites `documents/runtime/runtime-profiles-and-check-matrix.json` as the canonical taxonomy owner; `documents/runtime/runtime-profiles-and-check-matrix.md` is the generated reader projection. PR evidence records the required evidence and same-intent repair / escalation result.
 - [ ] `PR_CHECK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"` and dependency review reports were written under `$PR_CHECK_TMP`, not `reports/`
 - [ ] `tools/bin/agent-canon graph build --root . --profile default --format json`
 - [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "$PR_CHECK_TMP/dependency-review/agent-canon-pr"`

@@ -3,13 +3,13 @@
 contract design
 responsibility Defines the Graph DSL Core storage contract for structured analysis.
 upstream design README.md structured analysis package index
-upstream design ../dependency-manifest-design.md dependency manifest graph semantics
+upstream design ../design/dependency-manifest-design.md dependency manifest graph semantics
 downstream design database-design.md SQLite materialization
 downstream design ../prose-reasoning-graph/README.md documents prose adapter ownership
 downstream design ../prose-reasoning-graph/dsl-spec.md prose adapter/profile over the core
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs graph contract implementation
-downstream design ../tools/prose_reasoning_graph.md documents the prose graph adapter command surface
-downstream design ../tools/render_dependency_manifest_graph.md documents dependency graph projection rendering
+downstream design ../../tools/agent_tools/prose_reasoning_graph.py documents the prose graph adapter command surface
+downstream design ../../tools/agent_tools/render_dependency_manifest_graph.py documents dependency graph projection rendering
 downstream implementation ../../rust/agent-canon/src/graph.rs materializes canonical repository graph facts into this schema
 downstream implementation ../../tools/agent_tools/graph_client.py supplies typed read-only graph projections
 @dependency-end
@@ -24,7 +24,7 @@ surfaces.
 
 The core boundary is storage, joins, projections, and representation checks.
 Domain tools keep their own semantics and pass/fail authority as documented in `../prose-reasoning-graph/dsl-spec.md`,
-`../dependency-manifest-design.md`, and
+`../design/dependency-manifest-design.md`, and
 `../../rust/agent-canon/src/structured_analysis.rs`.
 
 ## Reader Map
@@ -40,7 +40,7 @@ sections define validation, SQLite materialization, and extension rules.
 - Evidence paths:
   `README.md`, `database-design.md`,
   `../prose-reasoning-graph/dsl-spec.md`,
-  `../dependency-manifest-design.md`, and
+  `../design/dependency-manifest-design.md`, and
   `../../rust/agent-canon/src/structured_analysis.rs`.
 - DSL term:
   Graph DSL Core means this storage contract plus the
@@ -112,7 +112,7 @@ prose.
 The tuple is sufficient for current AgentCanon graph-shaped surfaces with a
 faithful adapter mapping such as the mappings in
 `../prose-reasoning-graph/dsl-spec.md` and
-`../dependency-manifest-design.md`:
+`../design/dependency-manifest-design.md`:
 
 $$
 \phi_{\mathrm{surface}} : \mathrm{SurfaceObject} \to D + N + E + A + P + X + M
@@ -258,7 +258,7 @@ layer is promoted here.
 | Surface | Mapping |
 | --- | --- |
 | Prose Reasoning Graph | Source spans correspond to `source`/`form`; claims, evidence, discourse, presentation features, diagnostics, edit operations, and projections correspond to their matching layers in `../prose-reasoning-graph/dsl-spec.md`. |
-| Dependency manifest graph | Manifest records correspond to `deps` nodes and edges; dependency validation findings correspond to diagnostics/check records in `../dependency-manifest-design.md`. |
+| Dependency manifest graph | Manifest records correspond to `deps` nodes and edges; dependency validation findings correspond to diagnostics/check records in `../design/dependency-manifest-design.md`. |
 | Canonical repository graph | `graph.rs` maps the parser-owned source snapshot and authoritative producer artifacts into validated nodes, edges, diagnostics, projections, and metadata. `GraphClient` reads command JSON only; no Python transport decoder or alternate SQLite writer exists. |
 | Code dependency graph | Source files and symbols correspond to `code` nodes or payload locators; imports/includes/source references correspond to `code` edges. |
 | Artifact and directory responsibility | Files/directories correspond to `artifact` nodes; containment and responsibility support correspond to `artifact` edges in `../../rust/agent-canon/src/structured_analysis.rs`. |

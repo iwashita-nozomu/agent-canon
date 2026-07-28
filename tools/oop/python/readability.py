@@ -4,7 +4,7 @@
 # contract tool
 # responsibility Runs Python-specific OOP readability checks.
 # upstream implementation ../shared/readability_core.py shared OOP typed-boundary evidence
-# upstream design ../../../documents/object-oriented-design.md OOP policy source
+# upstream design ../../../documents/conventions/object-oriented-design.md OOP policy source
 # upstream design ../../../documents/tools/README.md tool documentation placement policy
 # downstream implementation ../../../tests/agent_tools/test_analyze_oop_readability.py tests Python entrypoint
 # @dependency-end

@@ -4,7 +4,7 @@ contract policy
 responsibility Documents 文書の配置・分割・正本境界の規約。
 upstream design ./README.md document rule canon index
 upstream design ../design/README.md design canon reader route
-upstream design ../repo-structure-contract.toml machine validator companion
+upstream design ../structure/repo-structure-contract.toml machine validator companion
 downstream implementation ../../tools/agent_tools/repo_structure_contract.py expected tree validation
 downstream implementation ../../tools/agent_tools/responsibility_scope.py responsibility validation
 downstream implementation ../../tools/agent_tools/import_responsibility.py import boundary validation
@@ -36,7 +36,7 @@ downstream implementation ../../tools/agent_tools/import_responsibility.py impor
 - `documents/rule/` は、命名・配置・構成判断を再利用できる抽象規約として持ちます。
 - `documents/design/` は、個別の target state、実装境界、前提、影響範囲を固定する設計正本として持ちます。ここには配置規則そのものを複製しません。
 - reports、logs、raw evidence、generated artifacts、issues は、それぞれの evidence または運用 owner に置き、design の代替にしません。
-- machine validator が必要とする expected directory/path は `documents/repo-structure-contract.toml` に置き、人間向けの理由や規約をそこへ重複記載しません。
+- machine validator が必要とする expected directory/path は `documents/structure/repo-structure-contract.toml` に置き、人間向けの理由や規約をそこへ重複記載しません。
 
 ## 更新と検証
 

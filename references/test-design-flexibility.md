@@ -3,7 +3,7 @@
 contract reference
 responsibility Records source basis for resilient test design skill and tool policy.
 upstream design README.md AgentCanon reference index
-downstream design ../documents/coding-conventions-testing.md translates testing guidance into repo policy
+downstream design ../documents/conventions/coding-conventions-testing.md translates testing guidance into repo policy
 downstream design ../agents/skills/test-design.md uses the guidance in the test-design skill
 downstream implementation ../rust/agent-canon/src/test_design.rs implements deterministic diagnostic hints
 @dependency-end

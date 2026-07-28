@@ -208,6 +208,10 @@ path = "../.agents/skills/result-artifact-writeout/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/result-visualize/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/owner-bounded-routing/SKILL.md"
 enabled = true
 

@@ -130,11 +130,10 @@ or ToolCall argument-schema substitutes.
 
 `--json` is invalid; use `--format json`.
 The canonical graph owns dependency status and facts. The renderer performs one
-typed dependency query and owns only Graph IR, Markdown, DOT, HTML, and
-bundle/manifest projection creation. It has no supplied-input, raw-checker,
-scan, helper, or Mermaid fallback
-because the renderer invokes that checker in generated mode. The generated
-bundle preserves GraphIR v2 and contains exactly these six basenames:
+typed dependency query through `GraphClient` and owns only Graph IR, Markdown,
+DOT, HTML, and bundle/manifest projection creation. There is no supplied-input,
+raw-checker, scan, helper, or Mermaid fallback. Its generated bundle contains
+exactly these six basenames:
 
 1. `dependency_graph.tsv`
 2. `dependency_graph.ir.json`

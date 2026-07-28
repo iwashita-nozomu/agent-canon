@@ -4,8 +4,8 @@
 # responsibility Validates Docker dependency declarations in repository tooling.
 # upstream design README.md shared automation index
 # upstream design ../CONTAINER_OPERATIONS.md canonical Docker and devcontainer ownership boundary
-# upstream design ../documents/rust-agent-tool-migration.md Rust toolchain and AgentCanon CLI migration boundary
-# upstream environment ../documents/linux-wsl-host-requirements.md documents canonical host tool inventory
+# upstream design ../documents/design/rust-agent-tool-migration.md Rust toolchain and AgentCanon CLI migration boundary
+# upstream environment ../documents/contracts/linux-wsl-host-requirements.md documents canonical host tool inventory
 # @dependency-end
 
 set -euo pipefail
@@ -116,11 +116,15 @@ check_dockerfile_coherence() {
 }
 
 check_post_create_python_install() {
-  local post_create=".devcontainer/post-create.sh"
-  local generate_compose=".devcontainer/generate-runtime-compose.sh"
+  local shared_devcontainer=".devcontainer"
+  if [ -d vendor/agent-canon/.devcontainer ]; then
+    shared_devcontainer="vendor/agent-canon/.devcontainer"
+  fi
+  local post_create="${shared_devcontainer}/post-create.sh"
+  local generate_compose="${shared_devcontainer}/generate-runtime-compose.sh"
   local installer="docker/install_python_dependencies.sh"
   local devcontainer=".devcontainer/devcontainer.json"
-  local post_attach=".devcontainer/post-attach.sh"
+  local post_attach="${shared_devcontainer}/post-attach.sh"
 
   printf '\n3. Checking post-create Python dependency setup...\n'
   if [ "$has_devcontainer_surface" -eq 0 ]; then
@@ -130,78 +134,78 @@ check_post_create_python_install() {
     printf '   docker/ absent; checking shared devcontainer source only\n'
   fi
   if [ ! -f "$post_create" ]; then
-    report_issue ".devcontainer/post-create.sh not found"
+    report_issue "${post_create} not found"
   else
     grep -q 'run_as_root' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must route privileged setup through run_as_root"
+      || report_issue "${post_create} must route privileged setup through run_as_root"
     grep -q 'docker/register_safe_directories.sh' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must register safe directories"
+      || report_issue "${post_create} must register safe directories"
     grep -q 'docker/install_python_dependencies.sh' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must run the Python dependency installer"
+      || report_issue "${post_create} must run the Python dependency installer"
     grep -q 'git config --global --add safe.directory "$workspace"' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must provide standalone safe.directory route"
+      || report_issue "${post_create} must provide standalone safe.directory route"
     grep -q 'repo-local Python dependency installer absent' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must skip missing repo-local Python installer"
+      || report_issue "${post_create} must skip missing repo-local Python installer"
     grep -q 'cli.github.com/packages' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must configure the GitHub CLI apt repository"
+      || report_issue "${post_create} must configure the GitHub CLI apt repository"
     grep -q 'apt_install gh' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must install gh"
+      || report_issue "${post_create} must install gh"
     grep -q 'npm install -g @openai/codex' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must install the Codex CLI"
+      || report_issue "${post_create} must install the Codex CLI"
     grep -q 'gh --version' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must smoke-check gh"
+      || report_issue "${post_create} must smoke-check gh"
     grep -q 'codex --version' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must smoke-check Codex CLI"
+      || report_issue "${post_create} must smoke-check Codex CLI"
     grep -q 'rustup toolchain install' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must install the Rust toolchain"
+      || report_issue "${post_create} must install the Rust toolchain"
     grep -q 'rustfmt' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must install rustfmt"
+      || report_issue "${post_create} must install rustfmt"
     grep -q 'clippy' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must install clippy"
+      || report_issue "${post_create} must install clippy"
     grep -q 'rust-analyzer' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must install rust-analyzer"
+      || report_issue "${post_create} must install rust-analyzer"
     grep -q 'cargo build --release' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must build the AgentCanon Rust CLI"
+      || report_issue "${post_create} must build the AgentCanon Rust CLI"
     grep -q 'AGENT_CANON_TOOLS_HOME' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must define AGENT_CANON_TOOLS_HOME"
+      || report_issue "${post_create} must define AGENT_CANON_TOOLS_HOME"
     grep -q '${tools_home}/agent-canon/bin/agent-canon' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must install the AgentCanon Rust CLI under AGENT_CANON_TOOLS_HOME"
+      || report_issue "${post_create} must install the AgentCanon Rust CLI under AGENT_CANON_TOOLS_HOME"
     grep -q '/usr/local/bin/agent-canon' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must expose the AgentCanon Rust CLI on PATH"
+      || report_issue "${post_create} must expose the AgentCanon Rust CLI on PATH"
     grep -q 'AGENT_CANON_RUNTIME_ROOT' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must publish the container-local runtime root"
+      || report_issue "${post_create} must publish the container-local runtime root"
     grep -q 'tool-availability.json' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must publish cataloged tool availability"
+      || report_issue "${post_create} must publish cataloged tool availability"
     grep -q '/etc/profile.d/agent-canon-rust.sh' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must publish Rust PATH for non-interactive devcontainer exec"
+      || report_issue "${post_create} must publish Rust PATH for non-interactive devcontainer exec"
   fi
 
   if [ "$has_docker_surface" -eq 0 ]; then
     if [ ! -f "$devcontainer" ]; then
       report_issue ".devcontainer/devcontainer.json not found"
     else
-      grep -q '"postCreateCommand": "bash .devcontainer/post-create.sh /workspace"' "$devcontainer" \
-        || report_issue "devcontainer postCreateCommand must call .devcontainer/post-create.sh"
-      grep -q '"postAttachCommand": "bash .devcontainer/post-attach.sh"' "$devcontainer" \
-        || report_issue "devcontainer postAttachCommand must call .devcontainer/post-attach.sh"
+      grep -q '"postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace' "$devcontainer" \
+        || report_issue "devcontainer postCreateCommand must call vendor/agent-canon/.devcontainer/post-create.sh"
+      grep -q '"postAttachCommand": "bash vendor/agent-canon/.devcontainer/post-attach.sh"' "$devcontainer" \
+        || report_issue "devcontainer postAttachCommand must call vendor/agent-canon/.devcontainer/post-attach.sh"
     fi
     if [ ! -f "$generate_compose" ]; then
-      report_issue ".devcontainer/generate-runtime-compose.sh not found"
+      report_issue "${generate_compose} not found"
     else
       if grep -F '${HOME}/.codex:/root/.codex' "$generate_compose" >/dev/null 2>&1; then
-        report_issue ".devcontainer/generate-runtime-compose.sh must not mount host ~/.codex"
+        report_issue "${generate_compose} must not mount host ~/.codex"
       fi
       grep -q 'agent-canon-source-only' "$generate_compose" \
-        || report_issue ".devcontainer/generate-runtime-compose.sh must support standalone AgentCanon source-only mode"
+        || report_issue "${generate_compose} must support standalone AgentCanon source-only mode"
       grep -q 'mcr.microsoft.com/devcontainers/base:ubuntu-22.04' "$generate_compose" \
-        || report_issue ".devcontainer/generate-runtime-compose.sh must provide a standalone base image"
+        || report_issue "${generate_compose} must provide a standalone base image"
       grep -q 'AGENT_CANON_SECRET_DIR' "$generate_compose" \
-        || report_issue ".devcontainer/generate-runtime-compose.sh must support optional host secret directory mounts"
+        || report_issue "${generate_compose} must support optional host secret directory mounts"
       grep -q 'AGENT_CANON_SECRET_MOUNT' "$generate_compose" \
-        || report_issue ".devcontainer/generate-runtime-compose.sh must expose the optional secret mount target"
+        || report_issue "${generate_compose} must expose the optional secret mount target"
     fi
     if [ ! -f "$post_attach" ]; then
-      report_issue ".devcontainer/post-attach.sh not found"
+      report_issue "${post_attach} not found"
     fi
     return
   fi
@@ -222,8 +226,8 @@ check_post_create_python_install() {
   if [ ! -f "$devcontainer" ]; then
     report_issue ".devcontainer/devcontainer.json not found"
   else
-    grep -q '"postCreateCommand": "bash .devcontainer/post-create.sh /workspace"' "$devcontainer" \
-      || report_issue "devcontainer postCreateCommand must call .devcontainer/post-create.sh"
+    grep -q '"postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace' "$devcontainer" \
+      || report_issue "devcontainer postCreateCommand must call vendor/agent-canon/.devcontainer/post-create.sh"
   fi
 }
 
@@ -373,7 +377,7 @@ check_pythonpath_documentation() {
     printf '   docker/ absent; skipping repo-local Docker documentation checks\n'
     return
   fi
-  for file in README.md QUICK_START.md documents/coding-conventions-project.md; do
+  for file in README.md QUICK_START.md documents/conventions/coding-conventions-project.md; do
     [ -f "$file" ] || continue
     if grep -q 'PYTHONPATH' "$file" && grep -q '=/workspace/python' "$file"; then
       documented=1

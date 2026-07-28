@@ -55,11 +55,11 @@ ISSUE_CONTRACT_MARKERS: dict[str, tuple[tuple[str, str], ...]] = {
     "experiment-lifecycle": (
         (
             "experiment-registry-contract",
-            "documents/experiment-registry.md",
+            "documents/experiments/experiment-registry.md",
         ),
         (
             "experiment-registry-template-contract-path",
-            "vendor/agent-canon/documents/experiment-registry.md",
+            "vendor/agent-canon/documents/experiments/experiment-registry.md",
         ),
         (
             "experiment-registry-project-root",
@@ -69,17 +69,17 @@ ISSUE_CONTRACT_MARKERS: dict[str, tuple[tuple[str, str], ...]] = {
     "research-workflow": (
         (
             "critical-review-template-path",
-            "vendor/agent-canon/documents/experiment-critical-review.md",
+            "vendor/agent-canon/documents/experiments/experiment-critical-review.md",
         ),
     ),
     "start-repository": (
         (
             "remote-doc-template-path",
-            "vendor/agent-canon/documents/agent-canon-github-remote.md",
+            "vendor/agent-canon/documents/agent-canon/agent-canon-github-remote.md",
         ),
         (
             "profile-doc-template-path",
-            "vendor/agent-canon/documents/runtime-profiles-and-check-matrix.md",
+            "vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md",
         ),
     ),
     "tool-finding-report": (

@@ -5,7 +5,7 @@
 # responsibility Tests accumulated agent eval producer routing and bounded output capture.
 # upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py runs eval producers in accumulation mode
 # upstream design ../../evidence/agent-evals/README.md eval accumulation contract
-# upstream design ../../documents/runtime-log-archive.md external eval archive contract
+# upstream design ../../documents/runtime/runtime-log-archive.md external eval archive contract
 # @dependency-end
 
 from __future__ import annotations

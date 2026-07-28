@@ -29,7 +29,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 | team shape と spawn budget を見る | [agents_config.json](agents_config.json), [task_catalog.yaml](task_catalog.yaml) | role、write policy、default specialist を固定する |
 | handoff / review の契約を見る | [COMMUNICATION_PROTOCOL.md](COMMUNICATION_PROTOCOL.md), [canonical/CODEX_SUBAGENTS.md](canonical/CODEX_SUBAGENTS.md) | subagent input packet、review separation、lifecycle を決める |
 | Codex task の実行順を見る | [canonical/CODEX_WORKFLOW.md](canonical/CODEX_WORKFLOW.md), [canonical/CLI_ENTRYPOINTS.md](canonical/CLI_ENTRYPOINTS.md) | bootstrap、plan、implementation、closeout の順序を確認する |
-| AgentCanon update transaction を進める | [../documents/agent-canon-update-route.md](../documents/agent-canon-update-route.md) | source transaction と projection frontier の唯一の入口を選ぶ |
+| AgentCanon update transaction を進める | [../documents/agent-canon/agent-canon-update-route.md](../documents/agent-canon/agent-canon-update-route.md) | source transaction と projection frontier の唯一の入口を選ぶ |
 | run artifact の置き場を確認する | [canonical/ARTIFACT_PLACEMENT.md](canonical/ARTIFACT_PLACEMENT.md) | reports、issues、notes、experiments の責務を分ける |
 | skill を選ぶ | [skills/README.md](skills/README.md), [skills/catalog.yaml](skills/catalog.yaml) | 個別 skill 文書へ進む前に family と trigger を決める |
 | internal routine を確認する | [internal-routines/README.md](internal-routines/README.md) | workflow が呼ぶ review / validation / compatibility routine を見る |

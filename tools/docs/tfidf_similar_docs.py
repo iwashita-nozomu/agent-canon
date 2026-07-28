@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Finds TF-IDF-similar Markdown documents and drafts merge candidates.
 # upstream design ../README.md shared tool index
-# downstream design ../../documents/result-log-retention-and-visualization.md result policy
+# downstream design ../../documents/experiments/result-log-retention-and-visualization.md result policy
 # @dependency-end
 """
 tfidf_similar_docs.py

@@ -1517,7 +1517,7 @@ def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
         "agents/canonical/CODEX_WORKFLOW.md",
         "agents/templates/design_brief.md",
         "agents/workflows/implementation-waterfall-workflow.md",
-        "documents/dependency-manifest-design.md",
+        "documents/design/dependency-manifest-design.md",
     ):
         destination = workspace.workspace_root / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)

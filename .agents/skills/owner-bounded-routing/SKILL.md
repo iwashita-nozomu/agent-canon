@@ -8,7 +8,7 @@ contract skill
 responsibility Documents Owner-Bounded Change Routing runtime skill for this repository.
 upstream design ../../../agents/skills/owner-bounded-routing.md documents the human-facing route
 upstream design ../../../agents/task_catalog.yaml owns Owner-Bounded Change workflow identity
-upstream design ../../../documents/runtime-profiles-and-check-matrix.md owns Routine docs and Focused code validation profiles
+upstream design ../../../documents/runtime/runtime-profiles-and-check-matrix.md owns Routine docs and Focused code validation profiles
 downstream implementation ../../../tools/agent_tools/convention_compliance_contracts.toml declares owner-bounded marker contract
 @dependency-end
 -->

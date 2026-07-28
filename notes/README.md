@@ -35,7 +35,7 @@ upstream design ../README.md notes lifecycle index
 - [`failures/`](./failures/README.md)
   - 再発させたくない failure の短い記録
 
-`branches/` と `worktrees/` は常用カテゴリではありません。`documents/worktree-lifecycle.md` に従って branch / worktree を例外運用した場合だけ使います。
+`branches/` と `worktrees/` は常用カテゴリではありません。`documents/operations/worktree-lifecycle.md` に従って branch / worktree を例外運用した場合だけ使います。
 
 ## 置くもの
 
@@ -65,7 +65,7 @@ upstream design ../README.md notes lifecycle index
 
 - 実行中の局所ログは `notes/worktrees/` に残します。
 - closeout 時に、再利用知識は `notes/knowledge/`、topic synthesis は `notes/themes/`、再発防止は `notes/failures/` へ昇格させます。
-- どこへ昇格させるか迷うときは `documents/notes-lifecycle.md` を見ます。
+- どこへ昇格させるか迷うときは `documents/operations/notes-lifecycle.md` を見ます。
 - `notes/` は「書き捨て」ではなく、closeout ごとに再編して太らせる前提です。
 - 会話から抽出した durable preference は shared canon `memory/USER_PREFERENCES.md` に集約します。
 - agent-side の作業哲学、対話から得た学習、task retrospective は shared canon `memory/AGENT_PHILOSOPHY.md` に集約します。

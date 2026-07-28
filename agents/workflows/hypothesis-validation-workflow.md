@@ -5,7 +5,7 @@ responsibility Documents analysis-first hypothesis validation workflow before ed
 upstream design README.md workflow catalog
 upstream design ../TASK_WORKFLOWS.md workflow family routing contract
 upstream design implementation-waterfall-workflow.md staged implementation gate
-upstream design ../../documents/dependency-manifest-design.md manifest dependency model
+upstream design ../../documents/design/dependency-manifest-design.md manifest dependency model
 downstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependency edges
 downstream implementation ../../tools/agent_tools/check_dependency_graph.sh validates header dependency graph
 @dependency-end
@@ -103,7 +103,7 @@ bash tools/agent_tools/run_repo_dependency_review.sh
 - `Expected Mechanism:` その変更がどう改善へつながるか。可読性、正しさ、性能、保守性などの改善軸を明示する。
 - `Expected Fix Surface:` 修正候補 path、symbol、doc section。
 - `API Surface Traversal:` dependency/API capability 仮説では
-  `documents/api-surface-traversal-policy.md` に従い、public import/export、
+  `documents/design/api-surface-traversal-policy.md` に従い、public import/export、
   signature、nested config、example を確認してから negative conclusion を出す。
 - `Expected Non-Surface:` 触らない path と理由。
 - `Disconfirming Evidence:` この仮説が間違いだと分かる条件。
@@ -168,8 +168,8 @@ Validation test/check が失敗した場合は、通すために仮説、intende
 または required validation を縮めません。先に `failing_contract`、
 `observation_level`、`cause_classification`、`intent_preservation`、`evidence` を
 記録します。`cause_classification` と `intent_preservation` の slug set と route
-semantics は `documents/runtime-profiles-and-check-matrix.json` を canonical
-taxonomy owner として cite し、`documents/runtime-profiles-and-check-matrix.md`
+semantics は `documents/runtime/runtime-profiles-and-check-matrix.json` を canonical
+taxonomy owner として cite し、`documents/runtime/runtime-profiles-and-check-matrix.md`
 を generated reader projection として扱います。workflow、subagent、review
 surface は required evidence と same-intent repair / escalation result だけを
 記録します。`cause_classification=implementation_bug` で contract と oracle が

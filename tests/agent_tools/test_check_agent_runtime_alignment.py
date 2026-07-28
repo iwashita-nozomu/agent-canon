@@ -965,7 +965,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir)
             entries = resolve_cross_cutting_document_packet(workspace_root)
-            review_process = (PROJECT_ROOT / "documents" / "REVIEW_PROCESS.md").resolve()
+            review_process = (
+                PROJECT_ROOT / "documents" / "conventions" / "REVIEW_PROCESS.md"
+            ).resolve()
 
             self.assertIn(review_process, {entry.path for entry in entries})
             self.assertTrue(all(entry.path.exists() for entry in entries))

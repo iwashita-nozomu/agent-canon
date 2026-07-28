@@ -24,7 +24,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `agents/skills/change-review.md`
 - `agents/skills/python-review.md`
 - `agents/skills/cpp-review.md`
-- `documents/REVIEW_PROCESS.md`
+- `documents/conventions/REVIEW_PROCESS.md`
 
 ## Expected Outcome
 

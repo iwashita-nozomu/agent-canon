@@ -2,7 +2,7 @@
 @dependency-start
 contract design
 responsibility Documents check_design_doc_claims.py operator usage.
-upstream design ../dependency-manifest-design.md dependency manifest graph semantics
+upstream design ../design/dependency-manifest-design.md dependency manifest graph semantics
 upstream design ../design/README.md design-document evidence policy
 upstream implementation ../../tools/agent_tools/graph_client.py provides canonical graph status, query, and context responses
 upstream implementation ../../tools/agent_tools/check_design_doc_claims.py checks design-document claims

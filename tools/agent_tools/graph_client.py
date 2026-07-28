@@ -174,7 +174,7 @@ class GraphClient:
         payload_exit = typed.get("exit_code")
         if type(payload_exit) is not int or payload_exit != process.returncode:
             raise GraphClientError("graph response exit status mismatch")
-        if status not in {"fresh", "stale", "unavailable"}:
+        if status not in {"fresh", "incomplete", "stale", "unavailable"}:
             raise GraphClientError("graph response status is invalid")
         return GraphResponse(
             cast(str, schema),

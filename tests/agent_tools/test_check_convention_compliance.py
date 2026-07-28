@@ -85,7 +85,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/python/15_jax_rules.md": "jax\n",
     "documents/conventions/python/20_benchmark_policy.md": "benchmark\n",
     "documents/conventions/python/30_experiment_directory_structure.md": "experiments\n",
-    "documents/coding-conventions-python.md": (
+    "documents/conventions/coding-conventions-python.md": (
         "python import_responsibility.py\n"
         "SOLID 設計契約 Single responsibility Open/closed Liskov substitution "
         "Interface segregation Dependency inversion "
@@ -93,12 +93,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "tools/agent_tools/check_solid_evidence.py SOLID principle signal scanned_paths "
         "SOLID_PRINCIPLES_BY_KIND readability.py\n"
     ),
-    "documents/coding-conventions-cpp.md": "cpp\n",
-    "documents/coding-conventions-project.md": (
+    "documents/conventions/coding-conventions-cpp.md": "cpp\n",
+    "documents/conventions/coding-conventions-project.md": (
         "project container_config.py claim grounding program contract proof obligation "
         "run-local planning evidence\n"
     ),
-    "documents/coding-conventions-house-style.md": (
+    "documents/conventions/coding-conventions-house-style.md": (
         "house compatibility-preservation drift duplicate implementation "
         "canonical owner caller migration contract-complete implementation "
         "acceptance contract design_issue_blocker implementation shortcut "
@@ -107,7 +107,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "単一公開入口 "
         "check_convention_compliance.py\n"
     ),
-    "documents/coding-conventions-testing.md": (
+    "documents/conventions/coding-conventions-testing.md": (
         "testing contract-only wrapper static contract validation "
         "static-analysis-duplicate-test canonical command Validation repair scope "
         "Validation test/check "
@@ -116,68 +116,69 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "$oop-readability-check tools/oop/python/readability.py "
         "tools/oop/cpp/readability.py import_responsibility.py "
         "failing_contract cause_classification intent_preservation "
-        "documents/runtime-profiles-and-check-matrix.json "
-        "documents/runtime-profiles-and-check-matrix.md\n"
+        "documents/runtime/runtime-profiles-and-check-matrix.json "
+        "documents/runtime/runtime-profiles-and-check-matrix.md\n"
     ),
-    "documents/coding-conventions-reviews.md": "reviews\n",
-    "documents/coding-conventions-experiments.md": "experiments\n",
-    "documents/coding-conventions-logging.md": "check_log_helper_names.py\n",
-    "documents/algorithm-implementation-boundary.md": "algorithm\n",
-    "documents/object-oriented-design.md": (
+    "documents/conventions/coding-conventions-reviews.md": "reviews\n",
+    "documents/conventions/coding-conventions-experiments.md": "experiments\n",
+    "documents/conventions/coding-conventions-logging.md": "check_log_helper_names.py\n",
+    "documents/design/algorithm-implementation-boundary.md": "algorithm\n",
+    "documents/conventions/object-oriented-design.md": (
         "readability.py SOLID との対応 Single responsibility Open/closed "
         "Liskov substitution Interface segregation Dependency inversion "
         "tools/oop/shared/readability_core.py SOLID_PRINCIPLES_BY_KIND "
         "import_responsibility.py\n"
     ),
-    "documents/experiment-registry.md": (
+    "documents/experiments/experiment-registry.md": (
         "experiment_execution_surface_guard tool_rejection_preflight.py "
         "check_experiment_registry.py tests/tools/test_run_managed_experiment.py\n"
     ),
-    "documents/REVIEW_PROCESS.md": (
+    "documents/conventions/REVIEW_PROCESS.md": (
         "review structure-planning prose-reasoning-graph md-style-check "
         "structure_contract=skipped Review Finding Issue Routing issue_route "
         "issues/open/ issue_sync.py github_mirror\n"
     ),
-    "documents/SHARED_RUNTIME_SURFACES.md": (
-        "surface_manifest.py documents/shared-runtime-surfaces.toml owner class\n"
+    "documents/runtime/SHARED_RUNTIME_SURFACES.md": (
+        "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml owner class\n"
         ".codex/hooks.json .codex/hooks .devcontainer/ .vscode/ documents/README.md "
-        "documents/template-bootstrap.md "
-        "documents/github-first-module-and-devcontainer-policy.md "
+        "documents/contracts/template-bootstrap.md "
+        "documents/contracts/github-first-module-and-devcontainer-policy.md "
         "memory/USER_PREFERENCES.md "
-        "tests/agent_tools/ Root `tools/` is a symlink view "
+        "tests/agent_tools/ Root `tools/` is a parent-owned regular container "
+        "tools/agent-canon -> ../vendor/agent-canon/tools "
         "vendor/agent-canon/tools/ "
         "Project-local automation must stay in project-owned paths\n"
     ),
-    "documents/shared-runtime-surfaces.toml": (
+    "documents/runtime/shared-runtime-surfaces.toml": (
         'mode = "standalone_only"\n'
         'owner = "agent-canon-standalone"\n'
         'path = "goal.md"\n'
         '"documents/README.md"\n'
-        '"documents/template-bootstrap.md"\n'
+        '"documents/contracts/template-bootstrap.md"\n'
         '".devcontainer"\n'
         '".vscode"\n'
-        '"documents/github-first-module-and-devcontainer-policy.md"\n'
+        '"documents/contracts/github-first-module-and-devcontainer-policy.md"\n'
         '".codex/hooks.json"\n'
         '"tests/agent_tools/test_check_convention_compliance.py"\n'
     ),
-    "documents/agent-canon-parent-repo-latest-checklist.md": "checklist\n",
-    "documents/runtime-profiles-and-check-matrix.md": (
+    "documents/agent-canon/agent-canon-parent-repo-latest-checklist.md": "checklist\n",
+    "documents/runtime/runtime-profiles-and-check-matrix.md": (
         "Static analysis and reading evidence primary validation evidence "
         "operation checks supplemental evidence unresolved static/read findings "
         "runtime behavior\n"
     ),
-    "documents/TROUBLESHOOTING.md": (
+    "documents/operations/TROUBLESHOOTING.md": (
         "validation test/check failure failing_contract cause_classification "
-        "intent_preservation documents/runtime-profiles-and-check-matrix.json "
-        "documents/runtime-profiles-and-check-matrix.md\n"
+        "intent_preservation documents/runtime/runtime-profiles-and-check-matrix.json "
+        "documents/runtime/runtime-profiles-and-check-matrix.md\n"
     ),
-    "documents/codex-configuration-reference.md": (
+    "documents/codex/codex-configuration-reference.md": (
         "## Hook Severity Policy\n"
         "fail-open CRITICAL_BLOCKING_CHILD_HOOKS warning/evidence\n"
         "*_FORWARDER=deprecated *_FORWARDER_SEVERITY=fix-now "
         "caller chain canonical command\n"
     ),
-    "documents/responsibility-scope-management.md": "import_responsibility.py responsibility_scope.py\n",
+    "documents/design/responsibility-scope-management.md": "import_responsibility.py responsibility_scope.py\n",
     "documents/tools/README.md": (
         "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py "
         "tool_rejection_preflight.py responsibility_scope responsibility-scope.toml "
@@ -342,8 +343,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "observable behavior validation repair scope mathematical necessity gate "
         "Numerical Trigger Non-Numerical Alternative checker-owned property "
         "failing contract observation level failure cause approved intent escalate "
-        "oracle weakening documents/runtime-profiles-and-check-matrix.json "
-        "documents/runtime-profiles-and-check-matrix.md\n"
+        "oracle weakening documents/runtime/runtime-profiles-and-check-matrix.json "
+        "documents/runtime/runtime-profiles-and-check-matrix.md\n"
     ),
     ".agents/skills/experiment-lifecycle/SKILL.md": skill_fixture(
         "experiment-lifecycle",
@@ -473,8 +474,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "observable behavior validation repair scope mathematical necessity gate "
         "Numerical Trigger Non-Numerical Alternative checker-owned property "
         "failing contract observation level cause classification approved intent "
-        "escalation oracle weakening documents/runtime-profiles-and-check-matrix.json "
-        "documents/runtime-profiles-and-check-matrix.md\n"
+        "escalation oracle weakening documents/runtime/runtime-profiles-and-check-matrix.json "
+        "documents/runtime/runtime-profiles-and-check-matrix.md\n"
     ),
     "agents/skills/experiment-lifecycle.md": (
         "experiment_execution_surface_guard tool_rejection_preflight.py "
@@ -755,7 +756,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "| public skill registry | `agents/skills/catalog.yaml` | "
         "`check_agent_runtime_alignment.py` |\n"
         "| AgentCanon update transaction | "
-        "`documents/agent-canon-update-route.md` | "
+        "`documents/agent-canon/agent-canon-update-route.md` | "
         "`update_lifecycle_contract.py` |\n"
     ),
 }
@@ -922,15 +923,15 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / "documents" / "SHARED_RUNTIME_SURFACES.md").write_text(
-                "surface_manifest.py documents/shared-runtime-surfaces.toml\n",
+            (root / "documents" / "runtime" / "SHARED_RUNTIME_SURFACES.md").write_text(
+                "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml\n",
                 encoding="utf-8",
             )
 
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("surface_manifest:documents/SHARED_RUNTIME_SURFACES.md", result.stdout)
+            self.assertIn("surface_manifest:documents/runtime/SHARED_RUNTIME_SURFACES.md", result.stdout)
             self.assertIn("missing-marker:.codex/hooks.json", result.stdout)
 
     def test_hook_guardrail_policy_marker_fails(self) -> None:
@@ -987,7 +988,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / "documents" / "coding-conventions-python.md").write_text(
+            (
+                root / "documents" / "conventions" / "coding-conventions-python.md"
+            ).write_text(
                 "# Python\n\n- 公開関数には型注釈が必須です。\n",
                 encoding="utf-8",
             )
@@ -1400,7 +1403,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
     def test_static_read_validation_policy_contract_is_manifest_backed(self) -> None:
         """Static/read validation policy surfaces are manifest-backed."""
         self.assertIn(
-            "documents/runtime-profiles-and-check-matrix.md",
+            "documents/runtime/runtime-profiles-and-check-matrix.md",
             STATIC_READ_VALIDATION_POLICY_MARKERS,
         )
         self.assertIn(
@@ -1574,7 +1577,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            testing_policy = root / "documents" / "coding-conventions-testing.md"
+            testing_policy = (
+                root / "documents" / "conventions" / "coding-conventions-testing.md"
+            )
             testing_policy.write_text("testing canonical command\n", encoding="utf-8")
 
             result = self.run_checker(root)
@@ -1599,13 +1604,13 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            troubleshooting = root / "documents" / "TROUBLESHOOTING.md"
+            troubleshooting = root / "documents" / "operations" / "TROUBLESHOOTING.md"
             troubleshooting.write_text(
                 troubleshooting.read_text(encoding="utf-8")
-                + "\n`documents/runtime-profiles-and-check-matrix.md`、"
+                + "\n`documents/runtime/runtime-profiles-and-check-matrix.md`、"
                 "`agents/canonical/CODEX_WORKFLOW.md`、"
                 "`agents/canonical/CODEX_SUBAGENTS.md`、"
-                "`documents/REVIEW_PROCESS.md` の slug set を参照します。\n",
+                "`documents/conventions/REVIEW_PROCESS.md` の slug set を参照します。\n",
                 encoding="utf-8",
             )
 
@@ -1658,7 +1663,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            house_style = root / "documents" / "coding-conventions-house-style.md"
+            house_style = (
+                root / "documents" / "conventions" / "coding-conventions-house-style.md"
+            )
             house_style.write_text(
                 "house canonical owner check_convention_compliance.py\n",
                 encoding="utf-8",
@@ -1780,7 +1787,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            python_policy = root / "documents" / "coding-conventions-python.md"
+            python_policy = (
+                root / "documents" / "conventions" / "coding-conventions-python.md"
+            )
             python_policy.write_text(
                 python_policy.read_text(encoding="utf-8").replace(
                     "SOLID_PRINCIPLES_BY_KIND",

@@ -2,13 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Checks whether a parent repository satisfies AgentCanon runtime expectations.
-# upstream design ../../documents/shared-runtime-surfaces.toml root surface ownership manifest
-# upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md parent update checklist
-# upstream design ../../documents/gpu-admission-r5-source-packet.md runtime identity receipt consumer boundary
+# upstream design ../../documents/runtime/shared-runtime-surfaces.toml root surface ownership manifest
+# upstream design ../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent update checklist
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md runtime identity receipt consumer boundary
 # upstream implementation ./surface_manifest.py parses shared runtime surface manifests
 # upstream implementation ../ci/container_config.py validates parent Docker/devcontainer surfaces
-# upstream implementation ../../.devcontainer/bootstrap-shared-runtime.sh publishes the provision receipt
-# upstream implementation ../../.devcontainer/finalize-shared-runtime.sh publishes the readback receipt
+# upstream implementation ../../.devcontainer/devcontainer.json selects the shared runtime sources
 # downstream implementation ../../tests/agent_tools/test_parent_repo_readiness.py tests checker behavior
 # @dependency-end
 """Check parent repository readiness for an AgentCanon submodule pin."""
@@ -31,7 +30,7 @@ from typing import Protocol, cast
 from surface_manifest import SurfaceEntry, load_manifest, target_for_entry
 
 DEFAULT_PREFIX = "vendor/agent-canon"
-DEFAULT_MANIFEST = "documents/shared-runtime-surfaces.toml"
+DEFAULT_MANIFEST = "documents/runtime/shared-runtime-surfaces.toml"
 DEFAULT_TREE_DEPTH = 3
 DEFAULT_TREE_IGNORE = ".git|__pycache__|.venv|node_modules|target|reports"
 ERROR = "error"
@@ -103,61 +102,24 @@ class ContainerValidationReport(Protocol):
 
 PARENT_CONTRACT_PATHS = (
     ExpectedPath("README.md", "parent_document", "file"),
-    ExpectedPath("QUICK_START.md", "parent_document", "file"),
-    ExpectedPath("Makefile", "parent_automation", "file"),
     ExpectedPath(".gitmodules", "agent_canon_submodule", "file"),
-    ExpectedPath("goal.md", "parent_state", "file"),
-    ExpectedPath("responsibility-scope.toml", "responsibility_scope", "file"),
-    ExpectedPath(".agent-canon/update-state.toml", "agent_canon_update_state", "file", WARN),
-    ExpectedPath("scripts/README.md", "parent_automation", "file"),
+    ExpectedPath("documents/README.md", "parent_document", "file"),
 )
 
 ENVIRONMENT_PATHS = (
-    ExpectedPath(".dockerignore", "container_environment", "file"),
-    ExpectedPath("docker/README.md", "container_environment", "file"),
-    ExpectedPath("docker/Dockerfile", "container_environment", "file"),
-    ExpectedPath("docker/requirements.txt", "container_environment", "file"),
-    ExpectedPath("docker/install_python_dependencies.sh", "container_environment", "file", executable=True),
-    ExpectedPath("docker/register_safe_directories.sh", "container_environment", "file", executable=True),
-    ExpectedPath("docker/packs", "container_environment", "dir"),
-    ExpectedPath("docker/packs/default.toml", "container_environment", "file"),
-    ExpectedPath("docker/packs/default-host-docker.toml", "container_environment", "file"),
+    ExpectedPath(".devcontainer", "devcontainer_environment", "dir"),
     ExpectedPath(".devcontainer/devcontainer.json", "devcontainer_environment", "file"),
     ExpectedPath(
-        ".devcontainer/bootstrap-shared-runtime.sh",
-        "runtime_identity_receipt",
-        "file",
-        executable=True,
-    ),
-    ExpectedPath(
-        ".devcontainer/finalize-shared-runtime.sh",
-        "runtime_identity_receipt",
-        "file",
-        executable=True,
-    ),
-    ExpectedPath(".devcontainer/post-create.sh", "devcontainer_environment", "file", executable=True),
-    ExpectedPath(
-        ".devcontainer/post-attach.sh",
-        "runtime_identity_receipt",
-        "file",
-        executable=True,
-    ),
-    ExpectedPath(
-        ".devcontainer/generate-runtime-compose.sh",
+        ".devcontainer/post-create-parent.sh",
         "devcontainer_environment",
         "file",
         executable=True,
     ),
-    ExpectedPath(".github/workflows/ci.yml", "github_environment", "file"),
-    ExpectedPath(".github/workflows/docker-build.yml", "github_environment", "file"),
-    ExpectedPath(".github/scripts/checkout_agent_canon_submodule.sh", "github_environment", "file", executable=True),
 )
 
 CONTENT_MARKERS = (
     ContentMarker(".gitmodules", "vendor/agent-canon", "agent_canon_submodule"),
     ContentMarker(".gitmodules", "agent-canon", "agent_canon_submodule"),
-    ContentMarker("responsibility-scope.toml", "catalog_kind = \"agent_canon_responsibility_scope\"", "responsibility_scope"),
-    ContentMarker(".agent-canon/update-state.toml", "tasks_applied_through", "agent_canon_update_state", WARN),
 )
 
 
@@ -176,12 +138,22 @@ class ExpectedPathChecker:
             path = self.root / expected.path
             if not self.path_matches_kind(path, expected.kind):
                 findings.append(
-                    Finding(expected.severity, expected.category, expected.path, f"missing-{expected.kind}")
+                    Finding(
+                        expected.severity,
+                        expected.category,
+                        expected.path,
+                        f"missing-{expected.kind}",
+                    )
                 )
                 continue
             if expected.executable and not os.access(path, os.X_OK):
                 findings.append(
-                    Finding(expected.severity, expected.category, expected.path, "not-executable")
+                    Finding(
+                        expected.severity,
+                        expected.category,
+                        expected.path,
+                        "not-executable",
+                    )
                 )
         return tuple(findings)
 
@@ -211,7 +183,12 @@ class ContentMarkerChecker:
             text = path.read_text(encoding="utf-8") if path.is_file() else ""
             if marker.marker not in text:
                 findings.append(
-                    Finding(marker.severity, marker.category, marker.path, f"missing-marker:{marker.marker}")
+                    Finding(
+                        marker.severity,
+                        marker.category,
+                        marker.path,
+                        f"missing-marker:{marker.marker}",
+                    )
                 )
         return tuple(findings)
 
@@ -231,10 +208,19 @@ class SubmoduleShapeChecker:
         source_root = self.root / self.prefix
         manifest_path = source_root / DEFAULT_MANIFEST
         if not source_root.is_dir():
-            findings.append(Finding(ERROR, "agent_canon_submodule", self.prefix, "missing-directory"))
+            findings.append(
+                Finding(
+                    ERROR, "agent_canon_submodule", self.prefix, "missing-directory"
+                )
+            )
         if not manifest_path.is_file():
             findings.append(
-                Finding(ERROR, "agent_canon_submodule", f"{self.prefix}/{DEFAULT_MANIFEST}", "missing-manifest")
+                Finding(
+                    ERROR,
+                    "agent_canon_submodule",
+                    f"{self.prefix}/{DEFAULT_MANIFEST}",
+                    "missing-manifest",
+                )
             )
         if not self.skip_git_marker:
             findings.extend(self.check_git_marker(source_root))
@@ -244,16 +230,32 @@ class SubmoduleShapeChecker:
         """Return findings for a missing or non-submodule .git marker."""
         git_marker = source_root / ".git"
         if not git_marker.exists():
-            return (Finding(ERROR, "agent_canon_submodule", f"{self.prefix}/.git", "missing-git-marker"),)
+            return (
+                Finding(
+                    ERROR,
+                    "agent_canon_submodule",
+                    f"{self.prefix}/.git",
+                    "missing-git-marker",
+                ),
+            )
         if git_marker.is_dir():
-            return (Finding(ERROR, "agent_canon_submodule", f"{self.prefix}/.git", "expected-submodule-gitfile"),)
+            return (
+                Finding(
+                    ERROR,
+                    "agent_canon_submodule",
+                    f"{self.prefix}/.git",
+                    "expected-submodule-gitfile",
+                ),
+            )
         return ()
 
 
 class SurfaceReadinessChecker:
     """Checks AgentCanon shared root view readiness from the manifest."""
 
-    def __init__(self, root: Path, prefix: str, entries: Iterable[SurfaceEntry]) -> None:
+    def __init__(
+        self, root: Path, prefix: str, entries: Iterable[SurfaceEntry]
+    ) -> None:
         """Store manifest entries and path context."""
         self.root = root
         self.prefix = prefix
@@ -282,24 +284,70 @@ class SurfaceReadinessChecker:
         """Return a finding when a standalone-only path leaked into the parent root."""
         path = self.root / entry.path
         if os.path.lexists(path):
-            return (Finding(ERROR, "standalone_only_leak", entry.path, "must-not-exist-in-parent-root"),)
+            return (
+                Finding(
+                    ERROR,
+                    "standalone_only_leak",
+                    entry.path,
+                    "must-not-exist-in-parent-root",
+                ),
+            )
         return ()
 
     def check_regular(self, entry: SurfaceEntry) -> tuple[Finding, ...]:
-        """Return findings for a parent-owned regular file."""
+        """Return findings for a parent-owned regular file or directory."""
         path = self.root / entry.path
         if entry.optional and not path.exists():
             return ()
         if entry.surface_class == "project_content":
             if not path.is_dir():
-                return (Finding(ERROR, "project_content", entry.path, "missing-directory"),)
+                return (
+                    Finding(ERROR, "project_content", entry.path, "missing-directory"),
+                )
             if path.is_symlink():
-                return (Finding(ERROR, "project_content", entry.path, "must-be-parent-owned-directory"),)
+                return (
+                    Finding(
+                        ERROR,
+                        "project_content",
+                        entry.path,
+                        "must-be-parent-owned-directory",
+                    ),
+                )
+            return ()
+        source = self.root / self.prefix / entry.source_or_default()
+        if source.is_dir():
+            if not path.is_dir():
+                return (
+                    Finding(
+                        ERROR,
+                        "active_contract",
+                        entry.path,
+                        "missing-regular-directory",
+                    ),
+                )
+            if path.is_symlink():
+                return (
+                    Finding(
+                        ERROR,
+                        "active_contract",
+                        entry.path,
+                        "must-be-parent-owned-directory",
+                    ),
+                )
             return ()
         if not path.is_file():
-            return (Finding(ERROR, "active_contract", entry.path, "missing-regular-file"),)
+            return (
+                Finding(ERROR, "active_contract", entry.path, "missing-regular-file"),
+            )
         if path.is_symlink():
-            return (Finding(ERROR, "active_contract", entry.path, "must-be-parent-owned-regular-file"),)
+            return (
+                Finding(
+                    ERROR,
+                    "active_contract",
+                    entry.path,
+                    "must-be-parent-owned-regular-file",
+                ),
+            )
         return ()
 
     def check_symlink(self, entry: SurfaceEntry) -> tuple[Finding, ...]:
@@ -308,12 +356,18 @@ class SurfaceReadinessChecker:
         source = self.root / self.prefix / entry.source_or_default()
         findings: list[Finding] = []
         if not source.exists():
-            findings.append(Finding(ERROR, "shared_surface_source", entry.path, "missing-source"))
+            findings.append(
+                Finding(ERROR, "shared_surface_source", entry.path, "missing-source")
+            )
         if not os.path.lexists(path):
-            findings.append(Finding(ERROR, "shared_surface", entry.path, "missing-symlink"))
+            findings.append(
+                Finding(ERROR, "shared_surface", entry.path, "missing-symlink")
+            )
             return tuple(findings)
         if not path.is_symlink():
-            findings.append(Finding(ERROR, "shared_surface", entry.path, "must-be-symlink"))
+            findings.append(
+                Finding(ERROR, "shared_surface", entry.path, "must-be-symlink")
+            )
             return tuple(findings)
         expected_target = target_for_entry(self.root, self.prefix, entry)
         actual_target = os.readlink(path)
@@ -336,8 +390,6 @@ class SurfaceReadinessChecker:
             return (Finding(ERROR, "github_copy_source", entry.path, "missing-source"),)
         if not path.is_file():
             return (Finding(ERROR, "github_copy", entry.path, "missing-copy"),)
-        if path.read_bytes() != source.read_bytes():
-            return (Finding(ERROR, "github_copy", entry.path, "copy-differs-from-agent-canon-source"),)
         return ()
 
 
@@ -366,7 +418,12 @@ class ContainerConfigChecker:
         module = self.load_module(module_path)
         validate_object: object = getattr(module, "validate", None)
         if not callable(validate_object):
-            finding = Finding(ERROR, "container_environment", str(module_path), "validate-not-callable")
+            finding = Finding(
+                ERROR,
+                "container_environment",
+                str(module_path),
+                "validate-not-callable",
+            )
             return (finding,), ("container_config:invalid",)
         validate = cast(Callable[[Path], ContainerValidationReport], validate_object)
         report = validate(self.root)
@@ -386,7 +443,9 @@ class ContainerConfigChecker:
     @staticmethod
     def load_module(module_path: Path) -> ModuleType:
         """Load the container validator module from the AgentCanon source path."""
-        spec = importlib.util.spec_from_file_location("_agent_canon_container_config", module_path)
+        spec = importlib.util.spec_from_file_location(
+            "_agent_canon_container_config", module_path
+        )
         if spec is None or spec.loader is None:
             raise RuntimeError(f"cannot load module: {module_path}")
         module = importlib.util.module_from_spec(spec)
@@ -461,14 +520,25 @@ class ParentRepoReadinessChecker:
         ).run()
         findings.extend(tree_findings)
         checked.extend(tree_checked)
-        findings.extend(SubmoduleShapeChecker(self.root, self.prefix, self.skip_submodule_check).run())
+        findings.extend(
+            SubmoduleShapeChecker(
+                self.root, self.prefix, self.skip_submodule_check
+            ).run()
+        )
         try:
             manifest = load_manifest(self.root, self.prefix, self.manifest_path)
-            findings.extend(SurfaceReadinessChecker(self.root, self.prefix, manifest.entries).run())
+            findings.extend(
+                SurfaceReadinessChecker(self.root, self.prefix, manifest.entries).run()
+            )
             checked.append(f"surface_manifest:{len(manifest.entries)}")
         except (OSError, ValueError) as exc:
             findings.append(
-                Finding(ERROR, "shared_surface_manifest", self.manifest_path, f"load-failed:{exc}")
+                Finding(
+                    ERROR,
+                    "shared_surface_manifest",
+                    self.manifest_path,
+                    f"load-failed:{exc}",
+                )
             )
         expected_paths = (*PARENT_CONTRACT_PATHS, *ENVIRONMENT_PATHS)
         findings.extend(ExpectedPathChecker(self.root, expected_paths).run())
@@ -481,17 +551,28 @@ class ParentRepoReadinessChecker:
         findings.extend(container_findings)
         checked.extend(container_checked)
         sorted_findings = tuple(
-            sorted(findings, key=lambda item: (item.severity, item.category, item.path, item.detail))
+            sorted(
+                findings,
+                key=lambda item: (item.severity, item.category, item.path, item.detail),
+            )
         )
-        status = "fail" if any(finding.severity == ERROR for finding in sorted_findings) else "pass"
+        status = (
+            "fail"
+            if any(finding.severity == ERROR for finding in sorted_findings)
+            else "pass"
+        )
         return ReadinessReport(status, sorted_findings, tuple(checked), tree_command)
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", default=".", help="Parent repository root. Defaults to cwd.")
-    parser.add_argument("--prefix", default=DEFAULT_PREFIX, help="AgentCanon prefix relative to root.")
+    parser.add_argument(
+        "--root", default=".", help="Parent repository root. Defaults to cwd."
+    )
+    parser.add_argument(
+        "--prefix", default=DEFAULT_PREFIX, help="AgentCanon prefix relative to root."
+    )
     parser.add_argument(
         "--manifest",
         default=DEFAULT_MANIFEST,
@@ -547,7 +628,9 @@ def render_text(report: ReadinessReport) -> None:
         print(finding.render())
     errors = sum(1 for finding in report.findings if finding.severity == ERROR)
     warnings = sum(1 for finding in report.findings if finding.severity == WARN)
-    print(f"PARENT_REPO_READINESS_CHECKED={','.join(report.checked) if report.checked else 'none'}")
+    print(
+        f"PARENT_REPO_READINESS_CHECKED={','.join(report.checked) if report.checked else 'none'}"
+    )
     print(f"PARENT_REPO_READINESS_TREE_COMMAND={report.tree_command}")
     print(f"PARENT_REPO_READINESS_ERRORS={errors}")
     print(f"PARENT_REPO_READINESS_WARNINGS={warnings}")

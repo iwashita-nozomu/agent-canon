@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Checks Python run-log ownership and Info summary emission contracts.
-# upstream design ../../documents/coding-conventions-logging.md logging convention overview
+# upstream design ../../documents/conventions/coding-conventions-logging.md logging convention overview
 # upstream design ../../documents/conventions/common/01_principles.md canonical simplicity principle
 # downstream implementation ../../tests/agent_tools/test_check_run_log_contract.py tests checker behavior
 # @dependency-end

@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Runs repo dependency review agent workflow automation.
-# upstream design ../../documents/dependency-manifest-design.md dependency review policy
+# upstream design ../../documents/design/dependency-manifest-design.md dependency review policy
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout requires dependency evidence
 # upstream design ../../agents/templates/closeout_gate.md closeout dependency evidence gate
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR dependency checklist

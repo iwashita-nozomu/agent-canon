@@ -3,7 +3,7 @@
 contract workflow
 responsibility Documents Agent Task Workflows for this repository.
 upstream design README.md agent canon overview.
-upstream design ../documents/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy.
+upstream design ../documents/runtime/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy.
 upstream implementation task_catalog.yaml workflow family defaults.
 upstream implementation agents_config.json permanent team and role mapping.
 upstream design canonical/CODEX_SUBAGENTS.md subagent role contract.
@@ -40,8 +40,8 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | implementation stage gate | `agents/workflows/implementation-waterfall-workflow.md` |
 | active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; `agents/agents_config.json#artifacts.active_design_packet` |
 | closeout authority | `task_close.py`; `report_artifact_checks.py` |
-| validation failure response taxonomy | `documents/runtime-profiles-and-check-matrix.json`; generated reader projection: `documents/runtime-profiles-and-check-matrix.md` |
-| validation failure response workflow projections | `agents/canonical/CODEX_WORKFLOW.md`; `agents/canonical/CODEX_SUBAGENTS.md`; `documents/REVIEW_PROCESS.md` |
+| validation failure response taxonomy | `documents/runtime/runtime-profiles-and-check-matrix.json`; generated reader projection: `documents/runtime/runtime-profiles-and-check-matrix.md` |
+| validation failure response workflow projections | `agents/canonical/CODEX_WORKFLOW.md`; `agents/canonical/CODEX_SUBAGENTS.md`; `documents/conventions/REVIEW_PROCESS.md` |
 
 Contract edits start in the owner surface. This reader map changes when the
 reader path changes.
@@ -112,7 +112,7 @@ reader path.
 | Comprehensive Development | `agents/task_catalog.yaml` `workflow_families[].id=comprehensive_development` |
 | Adaptive Improvement Loop | `agents/task_catalog.yaml` `workflow_families[].id=adaptive_improvement_loop` |
 
-`documents/runtime-profiles-and-check-matrix.md` selects the active validation
+`documents/runtime/runtime-profiles-and-check-matrix.md` selects the active validation
 matrix for the changed path and risk class.
 
 ## Dynamic Wave Evidence

@@ -148,8 +148,8 @@ VALIDATION_ROUTE_ARGV_SUFFIX = (
     "E501",
 )
 COMPLETION_COVERAGE_TAXONOMY_REFS = (
-    "documents/runtime-profiles-and-check-matrix.json",
-    "documents/runtime-profiles-and-check-matrix.md",
+    "documents/runtime/runtime-profiles-and-check-matrix.json",
+    "documents/runtime/runtime-profiles-and-check-matrix.md",
 )
 RUNTIME_PROFILE_TAXONOMY_PATH = (
     Path(__file__).resolve().parents[2]

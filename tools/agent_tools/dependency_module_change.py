@@ -3,8 +3,8 @@
 # contract tool
 # responsibility Manages topic source clones and reconstructibility-gated cleanup while retaining topic-root container visibility.
 # upstream design ../../documents/rule/dependency-module-changes.md generic dependency module policy
-# upstream design ../../documents/dependency-manifest-design.md structured dependency ownership model
-# upstream environment ../../.devcontainer/generate-runtime-compose.sh owns the topic-root mount
+# upstream design ../../documents/design/dependency-manifest-design.md structured dependency ownership model
+# upstream environment ../../.devcontainer/devcontainer.json selects the direct topic-root Compose source
 # downstream implementation ../../tests/agent_tools/test_dependency_module_change.py validates lifecycle and refusal semantics
 # downstream design ../../documents/tools/dependency_module_change.md documents the CLI surface
 # @dependency-end
@@ -114,16 +114,16 @@ def _topic_workspace(root: Path, topic: str, *, create: bool) -> Path:
                 "container topic workspace must expose the selected repository directly below /workspace"
             )
         return CONTAINER_WORKSPACE_ROOT
-    if root.parent.name.startswith("workspace-"):
-        raise DependencyModuleChangeError(
-            "legacy workspace-<topic-slug> topology is not supported; use workspace/<topic-slug>"
-        )
     if root.parent.parent.name == "workspace":
         if root.parent.name != expected_name:
             raise DependencyModuleChangeError(
                 f"selected repository is already in workspace/{root.parent.name}, not workspace/{expected_name}"
             )
         return root.parent
+    if root.parent.name.startswith("workspace-"):
+        raise DependencyModuleChangeError(
+            "legacy workspace-<topic-slug> topology is not supported; use workspace/<topic-slug>"
+        )
     candidate = root / "workspace" / expected_name
     if not create and not candidate.is_dir():
         raise DependencyModuleChangeError(

@@ -44,7 +44,7 @@ method note、symbol-dense claim-heavy explanation の文書を、共通 graph/D
 - `agents/workflows/academic-writing-workflow.md`
 - `agents/workflows/paper-writing-workflow.md`
 - `agents/workflows/long-form-writing-workflow.md`
-- `documents/REVIEW_PROCESS.md`
+- `documents/conventions/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/skills/literature-survey.md`
 - `CONTAINER_OPERATIONS.md`

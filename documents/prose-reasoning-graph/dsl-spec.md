@@ -9,11 +9,11 @@ coverage dsl_design_trace requires source-truth anchor|source truth|source span;
 coverage graph_format_trace requires node record|nodes table; edge record|edges table; payload_json|payload json
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py current MVP implementation
 downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py validates current graph behavior
-downstream design ../tools/prose_reasoning_graph.md documents CLI usage
-downstream design ../tools/README.md documents graph visualization tool routing from the documentation hub
-downstream design ../tools/render_dependency_manifest_graph.md documents dependency graph visualization adapter
+downstream design ../../tools/agent_tools/prose_reasoning_graph.py documents CLI usage
+downstream design ../../tools/README.md documents graph visualization tool routing from the documentation hub
+downstream design ../../tools/agent_tools/render_dependency_manifest_graph.py documents dependency graph visualization adapter
 downstream design ../tools/semantic_provider_html_report.md documents semantic provider visualization adapter
-downstream design ../tools/jit_canonical_ir.md documents JIT-canonical source facts available to future graph visualization adapters
+downstream design ../../tools/agent_tools/jit_canonical_ir.py documents JIT-canonical source facts available to future graph visualization adapters
 downstream design ../../tools/README.md documents graph visualization tool routing from the execution hub
 downstream design ../../agents/skills/prose-reasoning-graph.md documents skill handoff workflow
 downstream implementation ../../.agents/skills/prose-reasoning-graph/SKILL.md runtime skill entrypoint

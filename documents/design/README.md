@@ -2,9 +2,9 @@
 @dependency-start
 contract design
 responsibility Documents 設計ドキュメント for this repository.
-upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../rule/README.md document rule canon
-upstream design ../dependency-manifest-design.md dependency evidence contract
+upstream design dependency-manifest-design.md dependency evidence contract
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-doc claim evidence
 @dependency-end
 -->
@@ -26,11 +26,14 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
 - [protocols.md](protocols.md)
   - Protocol 層の責務分割
   - 型パラメータ化の方針
-- [experiment_runner.md](../experiment_runner.md)
+- [devcontainer/parent-devcontainer-policy.md](devcontainer/parent-devcontainer-policy.md)
+  - 親root と AgentCanon source の devcontainer 境界、wrapper 順序、compose 出力、
+    親 hook 契約を定義します。
+- [experiment_runner.md](experiment_runner.md)
   - `experiment_runner` の契約と実行モデル
 - [python-structure-hash.md](python-structure-hash.md)
   - Python の structural duplicate analysis と module-group dependency priority
-- [../remote-execution-repo-contract.md](../remote-execution-repo-contract.md)
+- [../remote-execution-repo-contract.md](../contracts/remote-execution-repo-contract.md)
   - remote execution を受ける repo の最小契約
 
 ## 追加の module 設計を置くとき
@@ -43,7 +46,7 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
 ## 更新ルール
 
 - 共有契約や `Protocol` の責務を変えた場合は [protocols.md](protocols.md) を更新します。
-- `experiment_runner` の契約を変えた場合は [experiment_runner.md](../experiment_runner.md) を更新します。
+- `experiment_runner` の契約を変えた場合は [experiment_runner.md](experiment_runner.md) を更新します。
 - 特定 topic の設計書を新設したら、この index にも入口を追加します。
 
 ## 正本維持ルール

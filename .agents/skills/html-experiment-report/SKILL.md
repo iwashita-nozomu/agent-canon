@@ -11,7 +11,7 @@ upstream design ../../../agents/skills/structure-planning.md defines reusable st
 upstream design ../../../agents/skills/report-writing.md defines reader-facing report quality gates
 upstream design ../../../agents/skills/html-output.md defines HTML layout, ImageGen, and browser publication
 upstream design ../../../agents/skills/result-artifact-writeout.md defines raw artifact placement
-upstream design ../../../documents/semantic_index.md defines semantic provider comparison authority boundaries
+upstream design ../../../documents/tools/semantic_index.md defines semantic provider comparison authority boundaries
 downstream implementation ../../../tools/agent_tools/semantic_provider_html_report.py renders semantic provider comparison HTML reports
 @dependency-end
 -->

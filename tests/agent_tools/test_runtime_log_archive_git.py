@@ -5,7 +5,7 @@
 # responsibility Tests runtime log archive Git clone, branch, status, and push behavior.
 # upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages the ignored log archive clone
 # upstream implementation ../../tools/agent_tools/runtime_log_paths.py defines repo keys and archive mount paths
-# upstream design ../../documents/runtime-log-archive.md documents archive branch and push policy
+# upstream design ../../documents/runtime/runtime-log-archive.md documents archive branch and push policy
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md source-bound runtime-event communication and checkpoint contract
 # @dependency-end
 

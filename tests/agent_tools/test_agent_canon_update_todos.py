@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests AgentCanon update TODO state routing for parent repositories.
-# upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md parent update TODO workflow
-# upstream design ../../documents/agent-canon-update-tasks.toml shared update TODO manifest
+# upstream design ../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent update TODO workflow
+# upstream design ../../documents/agent-canon/agent-canon-update-tasks.toml shared update TODO manifest
 # upstream implementation ../../tools/agent_tools/agent_canon_update_todos.py manages parent update state
 # @dependency-end
 
@@ -122,7 +122,7 @@ class AgentCanonUpdateTodosTest(unittest.TestCase):
             self.assertIn("# contract data", state_text)
             self.assertIn(target, state_text)
             self.assertIn(
-                "../vendor/agent-canon/documents/agent-canon-update-tasks.toml",
+                "../vendor/agent-canon/documents/agent-canon/agent-canon-update-tasks.toml",
                 state_text,
             )
             self.assertEqual(

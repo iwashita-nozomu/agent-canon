@@ -2,9 +2,9 @@
 @dependency-start
 contract workflow
 responsibility Documents slide production workflow for this repository.
-upstream design ../../documents/codex-configuration-slides.md slide deck source reference
-upstream design ../../documents/template-bootstrap.md repo bootstrap and canonical runtime views
-upstream design ../../documents/experiment-report-style.md document quality and evidence discipline
+upstream design ../../documents/codex/codex-configuration-slides.md slide deck source reference
+upstream design ../../documents/contracts/template-bootstrap.md repo bootstrap and canonical runtime views
+upstream design ../../documents/experiments/experiment-report-style.md document quality and evidence discipline
 downstream implementation ../../evidence/agent-evals/skill_workflow_prompt_eval.toml workflow prompt eval coverage
 @dependency-end
 -->
@@ -38,9 +38,9 @@ source packet and reporting workflows.
 
 Before drafting, read:
 
-- `documents/codex-configuration-slides.md`
-- `documents/template-bootstrap.md`
-- `documents/experiment-report-style.md` when the deck carries evidence or
+- `documents/codex/codex-configuration-slides.md`
+- `documents/contracts/template-bootstrap.md`
+- `documents/experiments/experiment-report-style.md` when the deck carries evidence or
   comparative results
 
 If the deck is being produced inside a larger repo task, also read the active

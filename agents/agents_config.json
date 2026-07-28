@@ -1695,7 +1695,7 @@
           "repo:agents/templates/design_brief.md#section:abstract-design-frame"
         ],
         "dependency_refs": [
-          "header:upstream:design:repo:agents/templates/design_brief.md->repo:documents/dependency-manifest-design.md"
+          "header:upstream:design:repo:agents/templates/design_brief.md->repo:documents/design/dependency-manifest-design.md"
         ],
         "output_refs": ["artifact:design_brief.md"],
         "reviewer_refs": ["role:design_reviewer", "role:document_flow_reviewer"]
@@ -1711,7 +1711,7 @@
         ],
         "dependency_refs": [
           "entry:abstract-design-frame",
-          "header:upstream:design:repo:agents/templates/design_brief.md->repo:documents/dependency-manifest-design.md"
+          "header:upstream:design:repo:agents/templates/design_brief.md->repo:documents/design/dependency-manifest-design.md"
         ],
         "output_refs": ["artifact:design_brief.md"],
         "reviewer_refs": ["role:design_reviewer"]
@@ -1727,7 +1727,7 @@
         ],
         "dependency_refs": [
           "entry:abstract-design-frame",
-          "header:upstream:design:repo:agents/templates/design_brief.md->repo:documents/dependency-manifest-design.md"
+          "header:upstream:design:repo:agents/templates/design_brief.md->repo:documents/design/dependency-manifest-design.md"
         ],
         "output_refs": ["artifact:design_brief.md"],
         "reviewer_refs": ["role:design_reviewer", "role:document_flow_reviewer"]

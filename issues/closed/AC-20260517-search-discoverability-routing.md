@@ -5,7 +5,7 @@
 contract issue
 responsibility Records the operational finding that repo search tooling is difficult to discover without prior tool-name knowledge.
 upstream design ../README.md defines AgentCanon operational issue conventions.
-upstream design ../../documents/dependency-manifest-design.md defines search-to-edit-scope evidence.
+upstream design ../../documents/design/dependency-manifest-design.md defines search-to-edit-scope evidence.
 upstream design ../../tools/README.md documents shared tool entrypoints.
 upstream implementation ../../tools/agent_tools/vector_search.py provides text-surface vector search.
 downstream design ../../documents/tools/README.md should document user-facing tool discovery routes.

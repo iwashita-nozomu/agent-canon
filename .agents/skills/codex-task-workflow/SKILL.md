@@ -9,8 +9,8 @@ contract skill
 responsibility Documents Codex Task Workflow for this repository.
 upstream design ../../../agents/canonical/CODEX_WORKFLOW.md defines the executable Codex workflow
 upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit investigation and context capsule handoff packets
-upstream design ../../../documents/dependency-manifest-design.md defines dependency manifest requirements
-upstream design ../../../documents/BRANCH_SCOPE.md defines Git commit correctness and push evidence
+upstream design ../../../documents/design/dependency-manifest-design.md defines dependency manifest requirements
+upstream design ../../../documents/operations/BRANCH_SCOPE.md defines Git commit correctness and push evidence
 upstream design ../../../agents/skills/codex-task-workflow.md documents the human-facing skill
 upstream design ../../../agents/skills/tool-finding-report.md defines tool finding packets and prompt feedback decisions
 @dependency-end
@@ -129,7 +129,7 @@ unresolved predecessor.
    generated artifact failures to their owner; record unrelated failures as
    residual; escalate approved-design/user-request conflicts before changing
    intent.
-1. Before commit or push, satisfy the `documents/BRANCH_SCOPE.md` commit correctness contract and scope-split contract: treat the commit as the runnable Git unit and the PR as the review unit; include every validation-read source/config/schema/fixture/doc/tool entrypoint in the tracked tree; when a diff spans multiple problems, canonical owners, behavior or contract deltas, or validation routes, write a scope table and split independently landable slices into separate PRs or commits before merge; for code changes record file-level code dependency plus function/public-entrypoint call-site evidence when language tools support it; and record branch, commit SHA, submodule SHA, validation commands, validation paths, and any remaining dirty or untracked path classification.
+1. Before commit or push, satisfy the `documents/operations/BRANCH_SCOPE.md` commit correctness contract and scope-split contract: treat the commit as the runnable Git unit and the PR as the review unit; include every validation-read source/config/schema/fixture/doc/tool entrypoint in the tracked tree; when a diff spans multiple problems, canonical owners, behavior or contract deltas, or validation routes, write a scope table and split independently landable slices into separate PRs or commits before merge; for code changes record file-level code dependency plus function/public-entrypoint call-site evidence when language tools support it; and record branch, commit SHA, submodule SHA, validation commands, validation paths, and any remaining dirty or untracked path classification.
 1. Load the extra skills required by the current stage and contract; carry unrelated skills as deferred route signals. Nontrivial document creation or revision adds `prose-reasoning-graph` as the common graph/DSL gate and `$structure-planning` as the structure contract gate, then file/document responsibility selects the DSL-to-prose adapter: general explanatory README/workflow/guide/migration/spec docs add `long-form-writing`, submission papers or thesis-chapter drafts add `paper-writing`, broader academic or scholarly-note writing adds `academic-writing`, and the required notation/logic/citation reviewers follow that adapter choice. For typo/link/format-only edits, pair `$md-style-check` with `structure_contract=skipped` and the reason.
 1. When the evidence shows a bounded owner, replaceable unit, targeted validation route, and no public behavior / schema expansion, or when the work is Routine docs, Focused code, or typo/link/format-only, add `$owner-bounded-routing` before patching and keep targeted validation as the closeout route. File count is only auxiliary context.
 1. If coordination, resumption, or selected specialist roles need durable

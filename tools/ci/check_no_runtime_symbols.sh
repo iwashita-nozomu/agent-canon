@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Checks that compiled artifacts do not expose forbidden runtime symbols.
 # upstream design ../README.md shared automation index
-# downstream design ../../documents/cpp-build-layout.md describes native smoke-test entrypoints that may use this helper
+# downstream design ../../documents/design/cpp-build-layout.md describes native smoke-test entrypoints that may use this helper
 # @dependency-end
 
 set -euo pipefail

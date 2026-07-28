@@ -82,7 +82,7 @@ Assign each cluster to one primary cause and optional secondary causes:
 
 | cause | evidence signal | likely route target |
 | --- | --- | --- |
-| `archive_hygiene` | dirty archive, foreign repo-key tree, unreadable result, malformed accumulation | `documents/runtime-log-archive.md`, `runtime_log_archive_git.py`, `result-artifact-writeout` |
+| `archive_hygiene` | dirty archive, foreign repo-key tree, unreadable result, malformed accumulation | `documents/runtime/runtime-log-archive.md`, `runtime_log_archive_git.py`, `result-artifact-writeout` |
 | `workflow_attribution` | missing workflow labels, unknown events, namespace debt, status mapping gaps | hook logging owner, `agent-learning`, dashboard owner |
 | `selection_gap` | skill, workflow, or tool candidate selected late, missed, or routed to the wrong surface | affected skill, `agents/skills/catalog.yaml`, `task-routing` |
 | `wave_execution` | planned wave lacks actual row, blocked/skipped wave lacks cause, same-role instance drift | `subagent-bootstrap`, `CODEX_SUBAGENTS.md`, run-bundle templates |

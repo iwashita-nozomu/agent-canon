@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Projects and validates dependency relations captured by the canonical graph.
-# upstream design ../../documents/dependency-manifest-design.md dependency graph semantics
+# upstream design ../../documents/design/dependency-manifest-design.md dependency graph semantics
 # upstream implementation ../../rust/agent-canon/src/graph.rs owns dependency parsing, binding, and storage
 # downstream implementation ./render_dependency_manifest_graph.py renders exported dependency TSV
 # @dependency-end

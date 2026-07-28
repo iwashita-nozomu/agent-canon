@@ -62,7 +62,7 @@ source / pin routing を参照として担当します。
 - `agents/TASK_WORKFLOWS.md`
 - `agents/workflows/implementation-waterfall-workflow.md`
 - `agents/workflows/comprehensive-refactoring-workflow.md`
-- `documents/REVIEW_PROCESS.md`
+- `documents/conventions/REVIEW_PROCESS.md`
 - `agents/workflows/main-integration-workflow.md`
 
 ## Required Contract

@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents the gh-backed GitHub publish and PR tool.
-upstream design ../agent-canon-github-remote.md defines canonical GitHub remote policy.
+upstream design ../agent-canon/agent-canon-github-remote.md defines canonical GitHub remote policy.
 upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines PR workflow usage.
 upstream design ../../ROOT_AGENTS.md defines PR mutation authority.
 downstream implementation ../../tools/agent_tools/github_publish.py implements the tool.

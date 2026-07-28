@@ -56,7 +56,7 @@ summary = "C++ OOP rule inventory documentation."
 [[tool]]
 id = "semantic-index"
 tool = "rust/agent-canon/src/semantic_index.rs"
-doc = "documents/semantic_index.md"
+doc = "documents/tools/semantic_index.md"
 language = "rust"
 summary = "Semantic vector index and Eval harness documentation."
 

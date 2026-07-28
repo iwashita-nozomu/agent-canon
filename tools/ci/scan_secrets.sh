@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Runs dedicated secret scanners against current tree and git history.
 # upstream design ../../CONTAINER_OPERATIONS.md shared devcontainer security tooling policy
-# downstream environment ../../.devcontainer/post-create.sh installs scanner commands
+# downstream environment ../../.devcontainer/devcontainer.json invokes the shared scanner setup
 # downstream design ../../tools/README.md documents the command surface
 # downstream design ../../documents/tools/README.md documents operator usage
 # @dependency-end
@@ -70,7 +70,7 @@ require_command() {
   if ! command -v "$command_name" >/dev/null 2>&1; then
     cat >&2 <<EOF
 SECRET_SCAN=missing_tool tool=${command_name}
-Install the shared devcontainer, rerun .devcontainer/post-create.sh, or install ${command_name} locally before scanning.
+Install the shared devcontainer, rerun vendor/agent-canon/.devcontainer/post-create.sh, or install ${command_name} locally before scanning.
 EOF
     exit 127
   fi

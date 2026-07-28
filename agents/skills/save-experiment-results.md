@@ -6,7 +6,7 @@ responsibility Documents Save Experiment Results for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design experiment-lifecycle.md experiment lifecycle workflow
 upstream design result-artifact-writeout.md durable raw/result/report artifact writeout
-upstream design ../../documents/experiment-report-style.md experiment report artifact policy
+upstream design ../../documents/experiments/experiment-report-style.md experiment report artifact policy
 downstream implementation ../../.agents/skills/save-experiment-results/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../tools/experiments/publish_result_branch.py publishes formal result branches
 @dependency-end

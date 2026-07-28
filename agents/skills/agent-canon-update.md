@@ -4,7 +4,7 @@
 contract skill
 responsibility Documents AgentCanon Update Skill for this repository.
 upstream design ../canonical/skills.md skill canon registry
-upstream design ../../documents/agent-canon-update-route.md canonical AgentCanon update route
+upstream design ../../documents/agent-canon/agent-canon-update-route.md canonical AgentCanon update route
 upstream design ../../documents/rule/dependency-module-changes.md generic dependency module change contract
 upstream design ./agent-orchestration.md owns Decision Sufficiency policy
 upstream design ./structure-refactor.md owns final-structure-first scope formation
@@ -48,8 +48,8 @@ TODO state up to date.
 
 ## Core References
 
-- `documents/agent-canon-update-route.md`
-- `documents/SHARED_RUNTIME_SURFACES.md`
+- `documents/agent-canon/agent-canon-update-route.md`
+- `documents/runtime/SHARED_RUNTIME_SURFACES.md`
 - `agents/skills/structure-refactor.md#Pre-Task Structure Repair Contract`
 - `agents/skills/refactor-loop.md#共有構造 refactor の実行順`
 - `tools/update_agent_canon.sh`

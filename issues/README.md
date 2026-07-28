@@ -6,7 +6,7 @@ contract issue
 responsibility Defines durable AgentCanon operational finding storage and issue-file conventions.
 upstream design ../ROOT_AGENTS.md requires durable learning and closeout evidence
 upstream design ../agents/workflows/agent-canon-pr-workflow.md requires issue checks in AgentCanon PR flow
-upstream design ../documents/dependency-manifest-design.md defines dependency graph and search-to-edit-scope evidence
+upstream design ../documents/design/dependency-manifest-design.md defines dependency graph and search-to-edit-scope evidence
 downstream design closed/AC-20260513-durable-finding-auto-promotion.md records the initial workflow defect
 downstream design closed/README.md defines closed finding storage
 downstream implementation ../tools/ci/check_github_workflows.py validates issue conventions

@@ -4,7 +4,7 @@ contract agent-runtime
 responsibility Documents Codex Subagents for this repository.
 upstream design ../task_catalog.yaml task routing catalog
 upstream design ../agents_config.json permanent team role ownership and artifact policy
-upstream design ../../documents/prompt-skill-evaluation-checklist.md empirical evaluation packet and report contract
+upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md empirical evaluation packet and report contract
 downstream design CODEX_WORKFLOW.md workflow consumes subagent routing contract
 downstream implementation ../../.codex/config.toml Codex runtime config consumes subagent routing
 downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP readability report reviewer role
@@ -193,8 +193,8 @@ validation just to pass. The packet records `failing_contract`, `observation_lev
 implementation intent changes.
 
 The canonical token-safe `cause_classification` and `intent_preservation` slug
-lists are owned by `documents/runtime-profiles-and-check-matrix.json` and
-projected into `documents/runtime-profiles-and-check-matrix.md`. This section is
+lists are owned by `documents/runtime/runtime-profiles-and-check-matrix.json` and
+projected into `documents/runtime/runtime-profiles-and-check-matrix.md`. This section is
 only the subagent handoff projection: handoffs must carry those five fields and
 must cite the runtime profile taxonomy rather than defining a separate slug
 list. Implementation bugs, test-oracle/spec mismatches, fixture or environment
@@ -234,9 +234,12 @@ rearchitecture`), `scheduler`, `schedule_reviewer`, `project_reviewer`,
 activate only the owner-critical roles selected by the route. `researcher`, `research_reviewer`, `infra_steward`,
 `infra_reviewer` and `python_reviewer` require explicit parent-packet evidence,
 changed-path evidence, or an explicitly selected review pack. `test_designer`
-additionally requires an implementation handoff that records an established or
-repaired owning mechanism and a concrete unresolved oracle, specification,
-regression, or failure-mode risk outside existing validation.
+requires an implementation handoff that records an established or repaired
+owning mechanism. Launch it proactively after that handoff; its first output is
+an activation decision and boundary classification. Only an unresolved oracle,
+specification, regression, or failure-mode risk outside existing validation
+produces test cases, and the resulting set must be logically minimal while
+covering the selected contract.
 `plan`, `review`, and `edit` are conditional stage candidates. When selected,
 `team_manifest.yaml` may record `run.standard_wave_sequence` and a dynamic wave
 may point to it with `standard_sequence_ref`; neither field makes an unselected
@@ -599,7 +602,7 @@ Activation Conditions:
 - `long_form_writer`
   - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書を、graph/DSL closure 後に roadmap-led で prose projection する
 - `test_designer`
-  - 実装後に owning mechanism が確立または修復済みで、既存の static analysis、checker、targeted validation の所有範囲外に具体的な oracle / specification / regression / failure-mode risk が残る場合だけ、activation decision を返し、必要なら test plan を起こす
+  - owning mechanism の確立または修復後に積極的に起動し、まず activation decision と boundary classification を返す。既存のstatic analysis、checker、targeted validationの外側にある未解決oracleだけを、重複・no-crash・内部形状固定なしの論理的に最小なtest planへ落とす
 - `diff_triage_reviewer`
   - 狭い diff の triage review を境界証拠付きで行い、language-specific reviewer または broad `reviewer` へ上げるかを決める
 - `ship_reviewer`

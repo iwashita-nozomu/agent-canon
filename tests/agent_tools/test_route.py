@@ -7,7 +7,7 @@
 # upstream implementation ../../tools/agent_tools/skill_route_catalog.py owns catalog/rule/index behavior
 # upstream implementation ../../tools/agent_tools/capability_route.py owns capability preflight/decision behavior
 # upstream implementation ../../tools/agent_tools/visualization_contract.py owns exact ToolCall validation
-# upstream design ../../documents/tool-skill-routing-refactor.md defines naming policy
+# upstream design ../../documents/design/tool-skill-routing-refactor.md defines naming policy
 # upstream design ../../.agents/skills/code-visualization/SKILL.md owns the runtime direct-route text
 # upstream design ../../agents/skills/code-visualization.md owns the canonical direct-route contract
 # @dependency-end

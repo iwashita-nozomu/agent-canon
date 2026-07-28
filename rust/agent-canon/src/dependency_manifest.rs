@@ -1,7 +1,7 @@
 // @dependency-start
 // contract implementation
 // responsibility Owns the complete-file dependency manifest snapshot consumed by the graph transaction.
-// upstream design ../../../documents/dependency-manifest-design.md canonical dependency-header grammar
+// upstream design ../../../documents/design/dependency-manifest-design.md canonical dependency-header grammar
 // downstream implementation graph.rs builds one graph from this source snapshot
 // @dependency-end
 
@@ -203,21 +203,112 @@ fn git_text(root: &Path, args: &[&str]) -> Result<String, ManifestError> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-fn normalize_relative(path: &Path) -> String {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TargetPathError {
+    Absolute,
+    EscapesRoot,
+}
+
+fn normalize_relative(path: &Path) -> Result<String, TargetPathError> {
     let mut components: Vec<String> = Vec::new();
     for component in path.components() {
         match component {
             std::path::Component::CurDir => {}
             std::path::Component::ParentDir => {
-                components.pop();
+                if components.pop().is_none() {
+                    return Err(TargetPathError::EscapesRoot);
+                }
             }
             std::path::Component::Normal(value) => {
                 components.push(value.to_string_lossy().to_string())
             }
-            _ => {}
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => {
+                return Err(TargetPathError::Absolute)
+            }
         }
     }
-    components.join("/")
+    Ok(components.join("/"))
+}
+
+fn resolve_source_relative_target(
+    source_path: &str,
+    declared_target: &str,
+) -> Result<String, TargetPathError> {
+    let target = Path::new(declared_target);
+    if target.is_absolute() {
+        return Err(TargetPathError::Absolute);
+    }
+    let source_parent = Path::new(source_path).parent().unwrap_or(Path::new("."));
+    normalize_relative(&source_parent.join(target))
+}
+
+fn target_path_diagnostic_code(error: TargetPathError) -> &'static str {
+    match error {
+        TargetPathError::Absolute => "target-absolute",
+        TargetPathError::EscapesRoot => "target-escapes-root",
+    }
+}
+
+fn target_path_diagnostic(
+    relative: &str,
+    line_number: usize,
+    line: &str,
+    target: &str,
+    error: TargetPathError,
+) -> Diagnostic {
+    Diagnostic {
+        code: target_path_diagnostic_code(error).to_string(),
+        message: format!("{relative}:{line_number}:{target}"),
+        severity: "error".to_string(),
+        source_span: Some(SourceSpan {
+            path: relative.to_string(),
+            start_line: line_number,
+            start_column: 1,
+            end_line: line_number,
+            end_column: line.len() + 1,
+        }),
+    }
+}
+
+fn target_unresolved_diagnostic(
+    relative: &str,
+    line_number: usize,
+    line: &str,
+    target: &str,
+) -> Diagnostic {
+    Diagnostic {
+        code: "target-unresolved".to_string(),
+        message: format!("{relative}:{line_number}:{target}"),
+        severity: "error".to_string(),
+        source_span: Some(SourceSpan {
+            path: relative.to_string(),
+            start_line: line_number,
+            start_column: 1,
+            end_line: line_number,
+            end_column: line.len() + 1,
+        }),
+    }
+}
+
+pub(crate) fn diagnostic_category(code: &str) -> &'static str {
+    match code {
+        "target-ambiguous" => "ambiguous",
+        "source-uncovered" => "uncovered",
+        _ => "unresolved",
+    }
+}
+
+pub(crate) fn snapshot_completeness(snapshot: &ManifestSnapshot) -> (usize, usize, usize) {
+    let mut counts = [0; 3];
+    for diagnostic in &snapshot.diagnostics {
+        match diagnostic_category(&diagnostic.code) {
+            "unresolved" => counts[0] += 1,
+            "ambiguous" => counts[1] += 1,
+            "uncovered" => counts[2] += 1,
+            _ => unreachable!("diagnostic category is closed"),
+        }
+    }
+    (counts[0], counts[1], counts[2])
 }
 
 pub(crate) fn source_path_is_explicitly_excluded(relative_path: &str) -> bool {
@@ -613,29 +704,33 @@ pub(crate) fn capture_snapshot(
                 });
                 continue;
             }
-            let target_path = if target.starts_with('.') {
-                normalize_relative(&path.parent().unwrap_or(Path::new(".")).join(target))
-            } else {
-                normalize_relative(Path::new(target))
+            let resolved = match resolve_source_relative_target(relative, target) {
+                Ok(target_path) => {
+                    let resolved = identity_by_path
+                        .get(&target_path)
+                        .filter(|_| !excluded_set.contains(&target_path))
+                        .cloned();
+                    if resolved.is_none() {
+                        diagnostics.push(target_unresolved_diagnostic(
+                            relative,
+                            line_number,
+                            &line,
+                            target,
+                        ));
+                    }
+                    resolved
+                }
+                Err(error) => {
+                    diagnostics.push(target_path_diagnostic(
+                        relative,
+                        line_number,
+                        &line,
+                        target,
+                        error,
+                    ));
+                    None
+                }
             };
-            let resolved = identity_by_path
-                .get(&target_path)
-                .filter(|_| !excluded_set.contains(&target_path))
-                .cloned();
-            if resolved.is_none() {
-                diagnostics.push(Diagnostic {
-                    code: "target-unresolved".to_string(),
-                    message: format!("{relative}:{line_number}:{target}"),
-                    severity: "error".to_string(),
-                    source_span: Some(SourceSpan {
-                        path: relative.clone(),
-                        start_line: line_number,
-                        start_column: 1,
-                        end_line: line_number,
-                        end_column: line.len() + 1,
-                    }),
-                });
-            }
             declarations.push(DependencyDeclaration {
                 declaration_id: hash_text(&format!(
                     "{snapshot_id}\0{relative}\0{line_number}\0{line}"
@@ -740,7 +835,10 @@ pub(crate) fn write_snapshot_jsonl(
 
 #[cfg(test)]
 mod tests {
-    use super::manifest_lines;
+    use super::{
+        manifest_lines, resolve_source_relative_target, target_path_diagnostic_code,
+        TargetPathError,
+    };
     use std::path::Path;
 
     #[test]
@@ -771,6 +869,45 @@ mod tests {
             )[0]
             .1,
             "contract implementation"
+        );
+    }
+
+    #[test]
+    fn source_relative_targets_resolve_parent_current_and_bare_sibling() {
+        assert_eq!(
+            resolve_source_relative_target(
+                ".agents/skills/academic-writing/SKILL.md",
+                "../../../agents/canonical/skills.md"
+            ),
+            Ok("agents/canonical/skills.md".to_string())
+        );
+        assert_eq!(
+            resolve_source_relative_target("documents/design/example.md", "./dependency.md"),
+            Ok("documents/design/dependency.md".to_string())
+        );
+        assert_eq!(
+            resolve_source_relative_target("documents/design/example.md", "sibling.md"),
+            Ok("documents/design/sibling.md".to_string())
+        );
+    }
+
+    #[test]
+    fn source_relative_targets_reject_absolute_paths_and_root_escape() {
+        assert_eq!(
+            resolve_source_relative_target("documents/design/example.md", "/README.md"),
+            Err(TargetPathError::Absolute)
+        );
+        assert_eq!(
+            target_path_diagnostic_code(TargetPathError::Absolute),
+            "target-absolute"
+        );
+        assert_eq!(
+            resolve_source_relative_target("README.md", "../outside.md"),
+            Err(TargetPathError::EscapesRoot)
+        );
+        assert_eq!(
+            target_path_diagnostic_code(TargetPathError::EscapesRoot),
+            "target-escapes-root"
         );
     }
 }

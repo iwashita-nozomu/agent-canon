@@ -5,7 +5,7 @@ responsibility Documents route tool usage.
 upstream implementation ../../tools/agent_tools/route.py selects short tool and skill routes
 upstream implementation ../../tools/agent_tools/visualization_contract.py owns the exact typed visualization ToolCall contract
 upstream design ../../agents/skills/code-visualization.md owns sole-public-owner and coverage/readback policy
-upstream design ../tool-skill-routing-refactor.md defines short naming policy
+upstream design ../design/tool-skill-routing-refactor.md defines short naming policy
 upstream design ../../agents/skills/structure-refactor.md defines repo-refactor and personal runtime routing boundary
 downstream implementation ../../tests/agent_tools/test_route.py validates route behavior
 @dependency-end

@@ -8,9 +8,9 @@ contract skill
 responsibility Documents AgentCanon Update for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/agent-canon-update.md human-facing skill canon
-upstream design ../../../documents/agent-canon-update-route.md canonical AgentCanon update route
+upstream design ../../../documents/agent-canon/agent-canon-update-route.md canonical AgentCanon update route
 upstream design ../../../documents/rule/dependency-module-changes.md generic dependency module change contract
-upstream design ../../../documents/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
+upstream design ../../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 upstream design ../../../agents/skills/refactor-loop.md shared-structure refactor execution order
 upstream implementation ../../../tools/update_agent_canon.sh high-level AgentCanon update wrapper
 upstream implementation ../../../tools/sync_agent_canon.sh root-view and submodule sync helper
@@ -53,8 +53,8 @@ Execute the required and task-matching conditional commands that the packet prin
 
 1. Read `documents/rule/dependency-module-changes.md`, then
    `agents/skills/agent-canon-update.md`.
-1. Read `documents/agent-canon-update-route.md` and
-   `documents/agent-canon-parent-repo-latest-checklist.md`.
+1. Read `documents/agent-canon/agent-canon-update-route.md` and
+   `documents/agent-canon/agent-canon-parent-repo-latest-checklist.md`.
 1. Classify the repo as standalone AgentCanon, parent submodule repo, or legacy
    compatibility repo before running update commands.
 1. Before any branch, tag, PR, merge, or pin mutation, record source

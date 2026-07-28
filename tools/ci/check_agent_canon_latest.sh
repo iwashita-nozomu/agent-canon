@@ -10,12 +10,15 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_DIR}/../lib/repo_paths.sh"
+ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
+CANON_TOOLS_ROOT="$(agent_canon_tools_root "$ROOT_DIR")"
 cd "$ROOT_DIR"
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 
 if [[ -n "${AGENT_CANON_LATEST_GATE_BUNDLE:-}" ]]; then
-  PYTHONPATH="${ROOT_DIR}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+  PYTHONPATH="${CANON_TOOLS_ROOT}/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 - "${AGENT_CANON_LATEST_GATE_BUNDLE}" <<'PY'
 import json
 import sys
@@ -39,7 +42,7 @@ PY
   exit 0
 fi
 
-plan_output="$(bash tools/update_agent_canon.sh plan)"
+plan_output="$(bash "${CANON_TOOLS_ROOT}/update_agent_canon.sh" plan)"
 printf '%s\n' "$plan_output"
 
 route="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_route=/{print $2}')"

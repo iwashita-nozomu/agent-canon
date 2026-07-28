@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Provides shared OOP boundary observations for language-specific tools.
-# upstream design ../../../documents/object-oriented-design.md OOP boundary policy
-# upstream design ../../../documents/coding-conventions-house-style.md shared readability rules
+# upstream design ../../../documents/conventions/object-oriented-design.md OOP boundary policy
+# upstream design ../../../documents/conventions/coding-conventions-house-style.md shared readability rules
 # upstream design ../../../agents/workflows/comprehensive-refactoring-workflow.md static boundary evidence
 # downstream implementation ../python/readability.py Python OOP readability entrypoint
 # downstream implementation ../cpp/readability.py C++ OOP readability entrypoint

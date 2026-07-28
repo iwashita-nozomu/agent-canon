@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Detects drift between runtime profile inventory JSON and its rendered markdown doc.
-# upstream design ../../documents/runtime-profiles-and-check-matrix.json runtime profile inventory source of truth
-# upstream design ../../documents/runtime-profiles-and-check-matrix.md human-readable runtime profile doc
+# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json runtime profile inventory source of truth
+# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md human-readable runtime profile doc
 # upstream implementation ../docs/render_runtime_profile_inventory.py renderer used for drift comparison
 # downstream implementation ../../tests/agent_tools/test_check_runtime_profile_inventory.py tests it
 # @dependency-end
@@ -18,8 +18,8 @@ import sys
 from pathlib import Path
 
 AGENT_CANON_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_INVENTORY = AGENT_CANON_ROOT / "documents/runtime-profiles-and-check-matrix.json"
-DEFAULT_DOC = AGENT_CANON_ROOT / "documents/runtime-profiles-and-check-matrix.md"
+DEFAULT_INVENTORY = AGENT_CANON_ROOT / "documents/runtime/runtime-profiles-and-check-matrix.json"
+DEFAULT_DOC = AGENT_CANON_ROOT / "documents/runtime/runtime-profiles-and-check-matrix.md"
 RENDER_SCRIPT = AGENT_CANON_ROOT / "tools/docs/render_runtime_profile_inventory.py"
 
 

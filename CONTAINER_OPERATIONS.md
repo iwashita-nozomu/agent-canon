@@ -5,11 +5,11 @@
 contract reference
 responsibility Documents AgentCanon-owned container, devcontainer, editor workspace, and recent cross-repository operation rules.
 upstream design README.md AgentCanon top-level entrypoint and rule index.
-upstream design documents/SHARED_RUNTIME_SURFACES.md shared root view and owner-class manifest.
-upstream design documents/gpu-admission-r5-source-packet.md exact GPU admission runtime identity boundary.
-downstream design documents/github-first-module-and-devcontainer-policy.md GitHub-first module and shared devcontainer boundary policy.
-downstream design documents/rust-agent-tool-migration.md Rust toolchain and AgentCanon CLI migration boundary.
-downstream design documents/coding-conventions-project.md project environment and dependency ownership conventions.
+upstream design documents/runtime/SHARED_RUNTIME_SURFACES.md shared root view and owner-class manifest.
+upstream design documents/experiments/gpu-admission-r5-source-packet.md exact GPU admission runtime identity boundary.
+downstream design documents/contracts/github-first-module-and-devcontainer-policy.md GitHub-first module and shared devcontainer boundary policy.
+downstream design documents/design/rust-agent-tool-migration.md Rust toolchain and AgentCanon CLI migration boundary.
+downstream design documents/conventions/coding-conventions-project.md project environment and dependency ownership conventions.
 downstream environment agent-canon-environment.toml machine-readable AgentCanon environment contract.
 downstream implementation .devcontainer/devcontainer.json shared AgentCanon devcontainer entrypoint.
 downstream implementation .devcontainer/post-create.sh shared AgentCanon post-create bootstrap.
@@ -46,8 +46,8 @@ Read this file when a task touches any of these surfaces:
 - `.github/scripts/checkout_agent_canon_submodule.sh`
 - `tools/ci/container_config.py`
 - `tools/ci/check_github_workflows.py`
-- `documents/github-first-module-and-devcontainer-policy.md`
-- `documents/rust-agent-tool-migration.md`
+- `documents/contracts/github-first-module-and-devcontainer-policy.md`
+- `documents/design/rust-agent-tool-migration.md`
 
 ## Canonical Source Contract
 

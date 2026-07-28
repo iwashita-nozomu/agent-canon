@@ -27,10 +27,10 @@
 # upstream design ../../agents/templates/workflow_monitoring.md tool warning closeout ledger
 # upstream design ../../agents/templates/closeout_gate.md closeout gate policy
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
-# upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
-# upstream design ../../documents/shared-runtime-surfaces.toml shared surface manifest
-# upstream design ../../documents/codex-configuration-reference.md Codex hook severity policy
-# upstream design ../../documents/coding-conventions-house-style.md implementation ownership guardrail
+# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
+# upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared surface manifest
+# upstream design ../../documents/codex/codex-configuration-reference.md Codex hook severity policy
+# upstream design ../../documents/conventions/coding-conventions-house-style.md implementation ownership guardrail
 # upstream design ../../notes/guardrails/engineering_avoidances.md recurring implementation avoidances
 # upstream design ../../.codex/README.md Codex runtime hook behavior summary
 # upstream design ../../tools/catalog.yaml structured tool catalog
@@ -98,17 +98,17 @@ CONVENTION_SOURCES = (
     "documents/conventions/python/15_jax_rules.md",
     "documents/conventions/python/20_benchmark_policy.md",
     "documents/conventions/python/30_experiment_directory_structure.md",
-    "documents/coding-conventions-python.md",
-    "documents/coding-conventions-cpp.md",
-    "documents/coding-conventions-project.md",
-    "documents/coding-conventions-house-style.md",
-    "documents/coding-conventions-testing.md",
-    "documents/coding-conventions-reviews.md",
-    "documents/coding-conventions-experiments.md",
-    "documents/coding-conventions-logging.md",
-    "documents/algorithm-implementation-boundary.md",
-    "documents/object-oriented-design.md",
-    "documents/REVIEW_PROCESS.md",
+    "documents/conventions/coding-conventions-python.md",
+    "documents/conventions/coding-conventions-cpp.md",
+    "documents/conventions/coding-conventions-project.md",
+    "documents/conventions/coding-conventions-house-style.md",
+    "documents/conventions/coding-conventions-testing.md",
+    "documents/conventions/coding-conventions-reviews.md",
+    "documents/conventions/coding-conventions-experiments.md",
+    "documents/conventions/coding-conventions-logging.md",
+    "documents/design/algorithm-implementation-boundary.md",
+    "documents/conventions/object-oriented-design.md",
+    "documents/conventions/REVIEW_PROCESS.md",
     "agents/canonical/CODEX_WORKFLOW.md",
 )
 
@@ -143,7 +143,7 @@ TOOL_GATES = {
         "tools/agent_tools/check_log_helper_names.py",
         (
             "tools/ci/run_all_checks.sh",
-            "documents/coding-conventions-logging.md",
+            "documents/conventions/coding-conventions-logging.md",
             "documents/rule/naming.md",
         ),
     ),
@@ -158,8 +158,8 @@ TOOL_GATES = {
     "oop_readability": (
         "tools/oop/python/readability.py",
         (
-            "documents/object-oriented-design.md",
-            "documents/coding-conventions-python.md",
+            "documents/conventions/object-oriented-design.md",
+            "documents/conventions/coding-conventions-python.md",
             "agents/skills/oop-readability-check.md",
             ".agents/skills/oop-readability-check/SKILL.md",
             "agents/skills/python-review.md",
@@ -170,7 +170,7 @@ TOOL_GATES = {
     "oop_cpp_readability": (
         "tools/oop/cpp/readability.py",
         (
-            "documents/object-oriented-design.md",
+            "documents/conventions/object-oriented-design.md",
             "agents/workflows/comprehensive-refactoring-workflow.md",
         ),
     ),
@@ -216,8 +216,8 @@ TOOL_GATES = {
         "tools/agent_tools/import_responsibility.py",
         (
             "tools/ci/run_all_checks.sh",
-            "documents/responsibility-scope-management.md",
-            "documents/coding-conventions-python.md",
+            "documents/design/responsibility-scope-management.md",
+            "documents/conventions/coding-conventions-python.md",
         ),
     ),
     "github_workflow_pr_flow": (
@@ -232,14 +232,14 @@ TOOL_GATES = {
         (
             "tools/ci/run_all_checks.sh",
             "agents/skills/environment-maintenance.md",
-            "documents/coding-conventions-project.md",
+            "documents/conventions/coding-conventions-project.md",
         ),
     ),
     "surface_manifest": (
         "tools/agent_tools/surface_manifest.py",
         (
             "tools/sync_agent_canon.sh",
-            "documents/SHARED_RUNTIME_SURFACES.md",
+            "documents/runtime/SHARED_RUNTIME_SURFACES.md",
         ),
     ),
     "runtime_profile_inventory": (
@@ -401,7 +401,7 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "$md-style-check",
         "structure_contract=skipped",
     ),
-    "documents/REVIEW_PROCESS.md": (
+    "documents/conventions/REVIEW_PROCESS.md": (
         "structure-planning",
         "prose-reasoning-graph",
         "md-style-check",
@@ -525,7 +525,7 @@ DOCUMENT_CLAIM_GROUNDING_MARKERS = {
         "provisional wording",
         "check_convention_compliance.py",
     ),
-    "documents/coding-conventions-project.md": (
+    "documents/conventions/coding-conventions-project.md": (
         "claim grounding",
         "program contract",
         "proof obligation",
@@ -559,7 +559,7 @@ DOCUMENT_CLAIM_GROUNDING_MARKERS = {
     ),
 }
 TEST_CONTRACT_ROUTING_MARKERS = {
-    "documents/coding-conventions-testing.md": (
+    "documents/conventions/coding-conventions-testing.md": (
         "contract-only wrapper",
         "static contract validation",
         "static-analysis-duplicate-test",
@@ -578,26 +578,26 @@ TEST_CONTRACT_ROUTING_MARKERS = {
     ),
 }
 VALIDATION_FAILURE_RESPONSE_MARKERS = {
-    "documents/TROUBLESHOOTING.md": (
+    "documents/operations/TROUBLESHOOTING.md": (
         "validation test/check failure",
         "failing_contract",
         "cause_classification",
         "intent_preservation",
-        "documents/runtime-profiles-and-check-matrix.json",
-        "documents/runtime-profiles-and-check-matrix.md",
+        "documents/runtime/runtime-profiles-and-check-matrix.json",
+        "documents/runtime/runtime-profiles-and-check-matrix.md",
     ),
-    "documents/coding-conventions-testing.md": (
+    "documents/conventions/coding-conventions-testing.md": (
         "Validation test/check",
         "failing_contract",
         "cause_classification",
         "intent_preservation",
-        "documents/runtime-profiles-and-check-matrix.json",
-        "documents/runtime-profiles-and-check-matrix.md",
+        "documents/runtime/runtime-profiles-and-check-matrix.json",
+        "documents/runtime/runtime-profiles-and-check-matrix.md",
     ),
 }
 VALIDATION_FAILURE_RESPONSE_STALE_OWNER_PHRASES = (
     "runtime-profiles-and-check-matrix.md`、`agents/canonical/CODEX_WORKFLOW.md",
-    "agents/canonical/CODEX_SUBAGENTS.md`、`documents/REVIEW_PROCESS.md",
+    "agents/canonical/CODEX_SUBAGENTS.md`、`documents/conventions/REVIEW_PROCESS.md",
 )
 MATHEMATICAL_NECESSITY_MARKERS = {
     "documents/conventions/common/05_docs.md": (
@@ -606,7 +606,7 @@ MATHEMATICAL_NECESSITY_MARKERS = {
         "necessary-and-sufficient condition",
         "non-contractual mathematical judgment",
     ),
-    "documents/coding-conventions-testing.md": (
+    "documents/conventions/coding-conventions-testing.md": (
         "mathematical necessity gate",
         "Numerical Trigger",
         "Non-Numerical Alternative",
@@ -638,7 +638,7 @@ MATHEMATICAL_NECESSITY_MARKERS = {
     ),
 }
 IMPLEMENTATION_GUARDRAIL_MARKERS = {
-    "documents/coding-conventions-house-style.md": (
+    "documents/conventions/coding-conventions-house-style.md": (
         "compatibility-preservation drift",
         "duplicate implementation",
         "canonical owner",
@@ -706,7 +706,7 @@ REFACTOR_SEQUENCE_MARKERS = {
         "usage-surface repair",
         "return-gate validation",
     ),
-    "documents/coding-conventions-house-style.md": (
+    "documents/conventions/coding-conventions-house-style.md": (
         "two-stage refactor",
         "forced migration",
         "usage-surface repair",
@@ -728,7 +728,7 @@ REVIEW_ISSUE_ROUTING_MARKERS = {
         "new_local_issue",
         "github_mirror",
     ),
-    "documents/REVIEW_PROCESS.md": (
+    "documents/conventions/REVIEW_PROCESS.md": (
         "Review Finding Issue Routing",
         "issue_route",
         "issues/open/",
@@ -803,24 +803,25 @@ PROMPT_EVAL_MARKERS = (
     "CONVENTION-SKILL",
 )
 SURFACE_MANIFEST_FILES = (
-    "documents/SHARED_RUNTIME_SURFACES.md",
-    "documents/shared-runtime-surfaces.toml",
-    "documents/agent-canon-parent-repo-latest-checklist.md",
+    "documents/runtime/SHARED_RUNTIME_SURFACES.md",
+    "documents/runtime/shared-runtime-surfaces.toml",
+    "documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
     "tools/sync_agent_canon.sh",
     "tools/agent_tools/surface_manifest.py",
 )
 SURFACE_POLICY_MARKERS = (
-    "documents/shared-runtime-surfaces.toml",
+    "documents/runtime/shared-runtime-surfaces.toml",
     "owner class",
     ".codex/hooks.json",
     ".codex/hooks",
     ".devcontainer/",
     "documents/README.md",
-    "documents/template-bootstrap.md",
-    "documents/github-first-module-and-devcontainer-policy.md",
+    "documents/contracts/template-bootstrap.md",
+    "documents/contracts/github-first-module-and-devcontainer-policy.md",
     "memory/USER_PREFERENCES.md",
     "tests/agent_tools/",
-    "Root `tools/` is a symlink view",
+    "Root `tools/` is a parent-owned regular container",
+    "tools/agent-canon -> ../vendor/agent-canon/tools",
     "vendor/agent-canon/tools/",
     "Project-local automation must stay in project-owned paths",
 )
@@ -829,9 +830,9 @@ SURFACE_MANIFEST_MARKERS = (
     'owner = "agent-canon-standalone"',
     'path = "goal.md"',
     '"documents/README.md"',
-    '"documents/template-bootstrap.md"',
+    '"documents/contracts/template-bootstrap.md"',
     '".devcontainer"',
-    '"documents/github-first-module-and-devcontainer-policy.md"',
+    '"documents/contracts/github-first-module-and-devcontainer-policy.md"',
     '".codex/hooks.json"',
     '"tests/agent_tools/test_check_convention_compliance.py"',
 )
@@ -864,7 +865,7 @@ HOOK_GUARDRAIL_POLICY_MARKERS = {
         "systemMessage",
         "hookSpecificOutput.additionalContext",
     ),
-    "documents/codex-configuration-reference.md": (
+    "documents/codex/codex-configuration-reference.md": (
         "Hook Severity Policy",
         "fail-open",
         "CRITICAL_BLOCKING_CHILD_HOOKS",
@@ -931,7 +932,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "AgentCanon update transaction",
-                    "documents/agent-canon-update-route.md",
+                    "documents/agent-canon/agent-canon-update-route.md",
                     "update_lifecycle_contract.py",
                 ),
             ),
@@ -1554,23 +1555,23 @@ def check_surface_manifest_wiring(root: Path) -> list[Finding]:
         for path in SURFACE_MANIFEST_FILES
         if (resolved := readable_path(root, path)) is not None
     }
-    policy_text = readable_files.get("documents/SHARED_RUNTIME_SURFACES.md", "")
+    policy_text = readable_files.get("documents/runtime/SHARED_RUNTIME_SURFACES.md", "")
     for marker in SURFACE_POLICY_MARKERS:
         if marker not in policy_text:
             findings.append(
                 Finding(
                     "surface_manifest",
-                    "documents/SHARED_RUNTIME_SURFACES.md",
+                    "documents/runtime/SHARED_RUNTIME_SURFACES.md",
                     f"missing-marker:{marker}",
                 )
             )
-    manifest_text = readable_files.get("documents/shared-runtime-surfaces.toml", "")
+    manifest_text = readable_files.get("documents/runtime/shared-runtime-surfaces.toml", "")
     for marker in SURFACE_MANIFEST_MARKERS:
         if marker not in manifest_text:
             findings.append(
                 Finding(
                     "surface_manifest",
-                    "documents/shared-runtime-surfaces.toml",
+                    "documents/runtime/shared-runtime-surfaces.toml",
                     f"missing-marker:{marker}",
                 )
             )
@@ -1762,7 +1763,7 @@ def check_legacy_forwarder_warning_policy(root: Path) -> list[Finding]:
     policy_text = "\n".join(
         resolved.read_text(encoding="utf-8", errors="replace")
         for path in (
-            "documents/codex-configuration-reference.md",
+            "documents/codex/codex-configuration-reference.md",
             ".codex/README.md",
         )
         if (resolved := readable_path(root, path)) is not None

@@ -95,7 +95,7 @@ docs formatting/checking only.
 
 | Responsibility | Canonical owner | Replaceable responsibility unit | Consumers |
 | --- | --- | --- | --- |
-| validation requirement and route selection | `documents/runtime-profiles-and-check-matrix.json`; Markdown is its generated reader | registered route definition plus deterministic resolver | materializer, reviewer, publication, closeout |
+| validation requirement and route selection | `documents/runtime/runtime-profiles-and-check-matrix.json`; Markdown is its generated reader | registered route definition plus deterministic resolver | materializer, reviewer, publication, closeout |
 | result artifact shape and placement | `agents/skills/result-artifact-writeout.md`, `agents/canonical/ARTIFACT_PLACEMENT.md` | `CanonicalRunResultMaterializer` | ledger event, monitor, report checks |
 | append/CAS/current-attempt state | `tools/agent_tools/work_log.py` under the approved v6/v7 transaction contract | one generic result-attempt transition in L | workflow monitor, completion projection, closeout |
 | structured materializer ingress | `tools/agent_tools/workflow_monitor.py` | owner-resolved route invocation; no evidence overrides | task/team routing, reviewer |
@@ -276,7 +276,7 @@ One execution begins from exactly one immutable object:
   "definition_owner": {
     "profile_id": "<active runtime profile ID>",
     "profile_version": 1,
-    "profile_source_path": "documents/runtime-profiles-and-check-matrix.json",
+    "profile_source_path": "documents/runtime/runtime-profiles-and-check-matrix.json",
     "profile_source_commit": "<candidate-visible owner commit>",
     "profile_source_tree": "<candidate-visible owner tree>",
     "profile_source_blob": "<40 lowercase Git blob>",
@@ -1196,8 +1196,8 @@ implementation_authorization=blocked
 | `agents/COMMUNICATION_PROTOCOL.md` | one-ledger completion and validation evidence schema owner | `74b04f3cd6ca274eb2ef36f558a2b33859613379` |
 | `agents/canonical/ARTIFACT_PLACEMENT.md` | run-local artifact placement owner | `5a51fba8b84604a27fc22e650c2fa1059b110a7b` |
 | `agents/skills/result-artifact-writeout.md` | raw/summary/manifest materialization contract | `ffc7e73552653e71d793933582145805898083e8` |
-| `documents/runtime-profiles-and-check-matrix.json` | canonical active-profile and validation-route owner | `c0d8c64b8df5d58ab7ac1c3adca2dfa3de42ec98` |
-| `documents/runtime-profiles-and-check-matrix.md` | generated profile reader | `5a3f0d4b98a8ad656b6b76c726a81cf539eb8536` |
+| `documents/runtime/runtime-profiles-and-check-matrix.json` | canonical active-profile and validation-route owner | `c0d8c64b8df5d58ab7ac1c3adca2dfa3de42ec98` |
+| `documents/runtime/runtime-profiles-and-check-matrix.md` | generated profile reader | `5a3f0d4b98a8ad656b6b76c726a81cf539eb8536` |
 | `tools/catalog.yaml` | canonical quality wrapper registration | `f1976aefa171c1aed3f0578ab35cd5f234a98520` |
 | `tools/ci/run_python_quality_checks.sh` | exact full Ruff argv source | `be0715a0a771b0571f394f1756df55593c8a5f78` |
 | `agents/skills/python-review.md` | independent Python review command reader | `2bd38730a86c9ce50e87fd07c611fe3cba701299` |
@@ -1214,7 +1214,7 @@ Relevant exact complete-file SHA256 readbacks at v10:
 | `agents/COMMUNICATION_PROTOCOL.md` | `00c3eaa15e81fd19b6a9496c59586aa5d0f5503d3fa9519ee95e17329db3090b` |
 | `agents/canonical/ARTIFACT_PLACEMENT.md` | `dcc99521b1010c7c74a6d60ffbabee456855e2d9da77ffdfad523851cdc82e1a` |
 | `agents/skills/result-artifact-writeout.md` | `c867507594ce2f0ac765a18bda03336d286231e0afe8bd513bfbf9639b487a16` |
-| `documents/runtime-profiles-and-check-matrix.json` | `bd4f020ca1d3bf6e27228a242e0c53651dcdc5e840f26e67ec7c9b2b6c2a45c2` |
+| `documents/runtime/runtime-profiles-and-check-matrix.json` | `bd4f020ca1d3bf6e27228a242e0c53651dcdc5e840f26e67ec7c9b2b6c2a45c2` |
 | `tools/agent_tools/work_log.py` | `74d94a23d7b0f8fa94d347757718f2441d5ee610edb6c9f16395659786974244` |
 | `tools/agent_tools/workflow_monitor.py` | `3d1175f487989d21474aaead65e0a21a978280ec0450b78731e333a1c057b60f` |
 | `tools/agent_tools/report_artifact_checks.py` | `c77859a97282829d5fbfa4ac3801e884c1f15cde59b5a57c45525b9fcc0ac471` |
@@ -1236,7 +1236,7 @@ design commit.
 | `agents/COMMUNICATION_PROTOCOL.md` | replace standalone validation receipt language with registered-route plus materializer event/current-attempt contract | V11-M1, V11-R1 | schema-owner review |
 | `agents/canonical/ARTIFACT_PLACEMENT.md` | state that validation raw/manifest files use existing run-local unique result placement | V11-M1 | placement checker |
 | `agents/skills/result-artifact-writeout.md` and runtime skill mirror | add registered-validation payload and current-attempt provenance without a new ledger | V11-M1, V11-P1 | skill mirror/runtime alignment |
-| `documents/runtime-profiles-and-check-matrix.json` and generated Markdown | register exact route ID/revision, argv template, environment, executable selector, version policy, and required-set semantics | V11-R1, V11-E1 | profile inventory/checker |
+| `documents/runtime/runtime-profiles-and-check-matrix.json` and generated Markdown | register exact route ID/revision, argv template, environment, executable selector, version policy, and required-set semantics | V11-R1, V11-E1 | profile inventory/checker |
 | `tools/catalog.yaml`, `tools/README.md`, `documents/tools/README.md` | bind canonical Python quality wrapper and result materializer owner | V11-R1 | tool drift/convention checks |
 | `tools/agent_tools/work_log.py` | implement generic begin/settle materializer transaction, current-attempt pointer, route/event validation, and v7 atomic recovery | V11-M1 | existing work-log tests |
 | `tools/agent_tools/workflow_monitor.py` | expose owner-derived materializer ingress and reject evidence overrides | V11-M1, V11-P1 | existing monitor tests |
@@ -1266,7 +1266,7 @@ Every later dependency pair is reciprocal:
 | `agents/COMMUNICATION_PROTOCOL.md`: downstream implementation `../tools/agent_tools/work_log.py` owns canonical registered-result event/attempt transactions | `work_log.py`: upstream design `../../agents/COMMUNICATION_PROTOCOL.md` owns canonical validation event/current-attempt semantics |
 | `ARTIFACT_PLACEMENT.md`: downstream implementation `../../tools/agent_tools/work_log.py` places run-local materializer artifacts | `work_log.py`: upstream design `../../agents/canonical/ARTIFACT_PLACEMENT.md` owns result placement |
 | `result-artifact-writeout.md`: downstream implementation `../../tools/agent_tools/work_log.py` materializes raw/manifest validation results | `work_log.py`: upstream design `../../agents/skills/result-artifact-writeout.md` owns result output shape |
-| runtime profile JSON/reader: downstream implementation `../tools/agent_tools/workflow_monitor.py` resolves registered validation routes | `workflow_monitor.py`: upstream design `../../documents/runtime-profiles-and-check-matrix.json` owns route/profile selection |
+| runtime profile JSON/reader: downstream implementation `../tools/agent_tools/workflow_monitor.py` resolves registered validation routes | `workflow_monitor.py`: upstream design `../../documents/runtime/runtime-profiles-and-check-matrix.json` owns route/profile selection |
 | `work_log.py`: downstream implementation `./workflow_monitor.py` invokes generic materializer transitions | `workflow_monitor.py`: upstream implementation `./work_log.py` owns transaction append/CAS/current attempt |
 | `work_log.py`: downstream implementation `./report_artifact_checks.py` verifies result-attempt transactions | `report_artifact_checks.py`: upstream implementation `./work_log.py` owns canonical transaction/history |
 | `report_artifact_checks.py`: downstream implementation `./task_close.py` consumes required-validation projection | `task_close.py`: upstream implementation `./report_artifact_checks.py` verifies current materializer provenance |

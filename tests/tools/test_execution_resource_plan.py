@@ -3,9 +3,9 @@
 # contract test
 # responsibility Exercises public ExecutionResourcePlan resource, environment, certificate, lock, readback, terminal, cleanup, and completion observables.
 # upstream implementation ../../tools/experiments/execution_resource_plan.py canonical resource-plan owner
-# upstream design ../../documents/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 test frame
-# upstream design ../../documents/experiment_runner.md ExperimentRunner lifecycle and scheduler boundary
-# downstream implementation ../../documents/gpu-admission-r5-ordered-integration-interface.json selects this contract source without executing it
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 test frame
+# upstream design ../../documents/design/experiment_runner.md ExperimentRunner lifecycle and scheduler boundary
+# downstream implementation ../../documents/experiments/gpu-admission-r5-ordered-integration-interface.json selects this contract source without executing it
 # @dependency-end
 """Public contract-source selectors for the canonical resource plan."""
 

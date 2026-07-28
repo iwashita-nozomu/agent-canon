@@ -21,7 +21,7 @@ Use this skill when agent-runtime updates should not be mixed into ordinary feat
 repairs move through `$agent-canon-update` and a standalone AgentCanon
 branch/PR first. After that PR lands, the parent repo uses
 `make agent-canon-ensure-latest` and root-view sync to advance the pin. See
-`documents/agent-canon-update-route.md`.
+`documents/agent-canon/agent-canon-update-route.md`.
 
 This skill does not authorize a new branch when the current parent branch
 already owns the same lane. Continue the existing branch / PR for added user

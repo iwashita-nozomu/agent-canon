@@ -4,8 +4,8 @@
 @dependency-start
 contract issue
 responsibility Records the finding that AgentCanon lacks a machine-readable responsibility scope map.
-upstream design ../../documents/SHARED_RUNTIME_SURFACES.md defines shared runtime surface ownership.
-upstream design ../../documents/shared-runtime-surfaces.toml defines shared surface classes.
+upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md defines shared runtime surface ownership.
+upstream design ../../documents/runtime/shared-runtime-surfaces.toml defines shared surface classes.
 upstream design ../../tools/catalog.yaml defines tool ownership.
 downstream design ../../responsibility-scope.toml defines repo-local scope ownership.
 downstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope ownership.

@@ -20,7 +20,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Core References
 
-- `documents/coding-conventions-project.md`
+- `documents/conventions/coding-conventions-project.md`
 - `documents/README.md`
 - `agents/internal-routines/docs-consistency-review.md`
 - `agents/skills/md-style-check.md`

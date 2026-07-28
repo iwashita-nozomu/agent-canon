@@ -4,7 +4,7 @@
 # responsibility Renders dependency manifest graph TSV artifacts into deterministic bundle and projection reports.
 # upstream implementation ./check_dependency_graph.sh writes dependency graph TSV artifacts.
 # upstream implementation ./visualization_contract.py owns the seven-function projection serialization and coverage API.
-# upstream design ../../documents/dependency-manifest-design.md defines manifest graph semantics.
+# upstream design ../../documents/design/dependency-manifest-design.md defines manifest graph semantics.
 # downstream design ../../documents/tools/render_dependency_manifest_graph.md documents report generation.
 # downstream implementation ../../tests/agent_tools/test_render_dependency_manifest_graph.py tests graph rendering.
 # @dependency-end

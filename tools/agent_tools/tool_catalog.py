@@ -7,7 +7,7 @@
 # upstream design ../../documents/tools/README.md root-facing tool entrypoint policy
 # upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
 # upstream implementation ./visualization_contract.py canonical typed visualization contract/checker
-# upstream design ../../documents/repo-local-tool-imports.md legacy tool disposition policy
+# upstream design ../../documents/tools/repo-local-tool-imports.md legacy tool disposition policy
 # upstream implementation ./tool_path_policy.py defines retired legacy path policy
 # downstream implementation ../../tools/ci/run_all_checks.sh runs catalog validation
 # downstream implementation ../../tests/agent_tools/test_tool_catalog.py tests validator
@@ -51,7 +51,7 @@ CATALOG_DOCS = (
     "tools/README.md",
     "documents/tools/README.md",
     TOOL_DOCS_PATH,
-    "documents/repo-local-tool-imports.md",
+    "documents/tools/repo-local-tool-imports.md",
 )
 VISUALIZATION_CONTRACT_ID = "visualization-contract"
 VISUALIZATION_CONTRACT_PATH = "tools/agent_tools/visualization_contract.py"
@@ -525,7 +525,7 @@ def check_visualization_contract_entry(
 def validate_catalog(root: Path) -> CatalogReport:
     """Run catalog validation."""
     root = root.resolve()
-    data, findings = load_catalog(root / CATALOG_PATH)
+    data, findings = load_catalog(resolve_repo_path(root, CATALOG_PATH))
     if data is None:
         return CatalogReport(tuple(findings), ())
 

@@ -10,7 +10,7 @@ upstream implementation ../../.codex/hooks.json wires the OOP readability hook.
 upstream implementation ../../tools/oop/python/readability.py provides the Python OOP analyzer used by the hook.
 upstream implementation ../../tools/oop/cpp/readability.py provides the C++ OOP analyzer used by the hook.
 downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates OOP hook behavior.
-downstream design ../../documents/runtime-log-archive.md documents hook-run result semantics.
+downstream design ../../documents/runtime/runtime-log-archive.md documents hook-run result semantics.
 @dependency-end
 -->
 

@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Checks experiment registry CI readiness.
 # upstream design ../README.md shared automation index
-# upstream design ../../documents/experiment-registry.md defines registry schema
+# upstream design ../../documents/experiments/experiment-registry.md defines registry schema
 # downstream implementation ../../tests/tools/test_run_managed_experiment.py tests
 # @dependency-end
 
@@ -48,7 +48,16 @@ class Finding:
 
 
 def repo_root_from_script() -> Path:
-    """Return the repository root from the script path."""
+    """Return the repository root from the checkout or script path."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=Path.cwd(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        return Path(result.stdout.strip())
     return Path(__file__).absolute().parents[2]
 
 

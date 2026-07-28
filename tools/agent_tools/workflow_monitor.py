@@ -139,6 +139,7 @@ VALIDATION_FAILURE_REPAIR_REQUIRED_KEYS = (
 RUNTIME_PROFILE_INVENTORY_PATH = (
     Path(__file__).resolve().parents[2]
     / "documents"
+    / "runtime"
     / "runtime-profiles-and-check-matrix.json"
 )
 

@@ -52,8 +52,8 @@ evidence only.
 | --- | --- |
 | `agents/COMMUNICATION_PROTOCOL.md` | Canonical ledger envelope, immutable intent revision, canonical evidence-event, and context visibility schemas. |
 | `agents/canonical/CODEX_WORKFLOW.md` | Candidate creation/attestation owner, publication transaction, target tuple, branch reason, topology, integration mode, and CAS route. |
-| `documents/REVIEW_PROCESS.md` | Independent candidate-review receipt policy, reviewer separation, approval semantics, templates, and durable review-consumer closure. |
-| `documents/dependency-manifest-design.md` | Exact forward/reverse dependency-header grammar and closure rules. |
+| `documents/conventions/REVIEW_PROCESS.md` | Independent candidate-review receipt policy, reviewer separation, approval semantics, templates, and durable review-consumer closure. |
+| `documents/design/dependency-manifest-design.md` | Exact forward/reverse dependency-header grammar and closure rules. |
 | `tools/agent_tools/work_log.py` | Canonical append, current-head selection, immutable history, event ordering, and structural owner attestation. |
 | `tools/agent_tools/workflow_monitor.py` | Structured event ingress and byte-preserving canonical payload passthrough. |
 | `tools/agent_tools/report_artifact_checks.py` | Read-only public authority, artifact, Git-object, tree-delta, pointer, and receipt verification. |
@@ -578,7 +578,7 @@ The receipt body is:
   "receipt_id": "interface-candidate-review:<first-16-attestation-hash>:1",
   "review_round": 1,
   "owner": "ship_reviewer",
-  "owner_surface": "documents/REVIEW_PROCESS.md#interface-candidate-review",
+  "owner_surface": "documents/conventions/REVIEW_PROCESS.md#interface-candidate-review",
   "reviewer_identity": "<independent reviewer identity>",
   "reviewer_separate": true,
   "candidate_attestation_id": "<attestation ID>",
@@ -1016,8 +1016,8 @@ The complete retained direct closure is:
 
 | Owner/path | Exact edge/responsibility |
 | --- | --- |
-| `documents/REVIEW_PROCESS.md` | `downstream implementation ../tools/check_convention_consistency.py parses review-policy rules for convention contradiction checks` |
-| `tools/check_convention_consistency.py` | `upstream design ../documents/REVIEW_PROCESS.md review-policy rule source` |
+| `documents/conventions/REVIEW_PROCESS.md` | `downstream implementation ../tools/check_convention_consistency.py parses review-policy rules for convention contradiction checks` |
+| `tools/check_convention_consistency.py` | `upstream design ../documents/conventions/REVIEW_PROCESS.md review-policy rule source` |
 | `tools/README.md` | `downstream implementation ./check_convention_consistency.py convention consistency checker` |
 | `tools/check_convention_consistency.py` | retained `upstream design README.md shared automation index` |
 | `tools/check_convention_consistency.py` | `downstream implementation ./run_comprehensive_review.sh invokes checker` |
@@ -1182,8 +1182,8 @@ commit merely because it exists.
 | --- | --- | --- | --- |
 | `agents/COMMUNICATION_PROTOCOL.md` | Replace copied current intent with immutable intent rows/pointer; add pending tagged event and current-event pointer rules. | V5-P1-A/B | Schema-owner review |
 | `agents/canonical/CODEX_WORKFLOW.md` | Add candidate owner/ref/attestation transaction, post-review publication derivation, target freeze, CAS route, and retry transaction. | V5-P0-A/B | Workflow-owner review |
-| `documents/REVIEW_PROCESS.md` | Define independent candidate-receipt fields, reviewer separation, APPROVE/REVISE rules, and generated integration-receipt review. | V5-P0-A/B | Review-owner review |
-| `documents/dependency-manifest-design.md` | Apply existing exact closure rules; no semantic generalization. | PRESERVE | Dependency review |
+| `documents/conventions/REVIEW_PROCESS.md` | Define independent candidate-receipt fields, reviewer separation, APPROVE/REVISE rules, and generated integration-receipt review. | V5-P0-A/B | Review-owner review |
+| `documents/design/dependency-manifest-design.md` | Apply existing exact closure rules; no semantic generalization. | PRESERVE | Dependency review |
 | `tools/README.md` | Route candidate/publication/CAS owner tool and retain convention-checker navigation edge. | V5-P0-B, PRESERVE | Docs review |
 | `tools/agent_tools/work_log.py` | Validate immutable intent rows/pointer, pending transitions, candidate/current pointers, structural owner attestations, publication/result append order. | V5-P0-A, V5-P1-A/B | Ledger tests/review |
 | `tools/agent_tools/workflow_monitor.py` | Preserve tagged pending/terminal canonical evidence payloads and pointers unchanged. | V5-P1-B | Monitor tests |

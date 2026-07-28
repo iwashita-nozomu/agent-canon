@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Resolves and executes canonical completion-authority publication with expected-old CAS.
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md owns active-W2 publication authority and route state.
-# upstream design ../../documents/BRANCH_SCOPE.md owns branch, push, merge, and main publication policy.
+# upstream design ../../documents/operations/BRANCH_SCOPE.md owns branch, push, merge, and main publication policy.
 # upstream design ../../agents/workflows/main-integration-workflow.md owns main integration ordering.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md owns AgentCanon PR publication policy.
 # upstream implementation ./review_dispatch.py resolves current explicit APPROVE state.

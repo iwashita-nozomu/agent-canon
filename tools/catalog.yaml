@@ -2,7 +2,7 @@
 # contract registry
 # responsibility Defines the structured AgentCanon tool catalog.
 # upstream design README.md shared tool family ownership
-# upstream design ../documents/repo-local-tool-imports.md legacy import disposition ledger
+# upstream design ../documents/tools/repo-local-tool-imports.md legacy import disposition ledger
 # upstream design ../documents/tools/visualization_contract.md canonical visualization coverage and readback tool contract
 # downstream implementation agent_tools/tool_catalog.py validates this catalog
 # downstream implementation agent_tools/tool_drift.py checks catalog drift contracts
@@ -176,7 +176,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/responsibility-scope-management.md
+      - documents/design/responsibility-scope-management.md
       - responsibility-scope.toml
       - documents/templates/responsibility-scope.template.toml
     tests:
@@ -196,9 +196,9 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/shared-runtime-surfaces.toml
-      - documents/agent-canon-parent-repo-latest-checklist.md
-      - documents/github-first-module-and-devcontainer-policy.md
+      - documents/runtime/shared-runtime-surfaces.toml
+      - documents/agent-canon/agent-canon-parent-repo-latest-checklist.md
+      - documents/contracts/github-first-module-and-devcontainer-policy.md
     tests:
       - tests/agent_tools/test_parent_repo_readiness.py
 
@@ -237,7 +237,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/render_dependency_manifest_graph.md
-      - documents/dependency-manifest-design.md
+      - documents/design/dependency-manifest-design.md
       - documents/structured-analysis/graph-dsl.md
       - documents/prose-reasoning-graph/dsl-spec.md
     tests:
@@ -256,7 +256,7 @@ entries:
       pr_check: false
     docs:
       - documents/tools/git_dependency_diff_summary.md
-      - documents/dependency-manifest-design.md
+      - documents/design/dependency-manifest-design.md
     tests:
       - tests/agent_tools/test_git_dependency_diff_summary.py
 
@@ -275,7 +275,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/classify_path_risk.md
-      - documents/runtime-profiles-and-check-matrix.md
+      - documents/runtime/runtime-profiles-and-check-matrix.md
     tests:
       - tests/agent_tools/test_classify_path_risk.py
 
@@ -511,7 +511,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/repo_structure_contract.md
-      - documents/repo-structure-contract.toml
+      - documents/structure/repo-structure-contract.toml
     tests:
       - tests/agent_tools/test_repo_structure_contract.py
 
@@ -529,8 +529,8 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/responsibility-scope-management.md
-      - documents/coding-conventions-python.md
+      - documents/design/responsibility-scope-management.md
+      - documents/conventions/coding-conventions-python.md
       - responsibility-scope.toml
     tests:
       - tests/agent_tools/test_import_responsibility.py
@@ -550,7 +550,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - issues/README.md
-      - documents/responsibility-scope-management.md
+      - documents/design/responsibility-scope-management.md
     tests:
       - tests/agent_tools/test_issue_sync.py
 
@@ -570,7 +570,7 @@ entries:
       - documents/tools/README.md
       - documents/tools/github_publish.md
       - agents/workflows/agent-canon-pr-workflow.md
-      - documents/agent-canon-github-remote.md
+      - documents/agent-canon/agent-canon-github-remote.md
     tests:
       - tests/agent_tools/test_github_publish.py
 
@@ -589,7 +589,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/wiki_publish.md
-      - documents/agent-canon-github-remote.md
+      - documents/agent-canon/agent-canon-github-remote.md
       - agents/skills/wiki-publication.md
     tests:
       - tests/agent_tools/test_wiki_publish.py
@@ -609,8 +609,8 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - evidence/agent-evals/README.md
-      - documents/runtime-log-archive.md
-      - documents/runtime-log-archive-migration.md
+      - documents/runtime/runtime-log-archive.md
+      - documents/runtime/runtime-log-archive-migration.md
     tests:
       - tests/agent_tools/test_eval_accumulation_check.py
 
@@ -649,7 +649,7 @@ entries:
       - documents/tools/README.md
       - evidence/agent-evals/README.md
       - agents/workflows/agent-canon-pr-workflow.md
-      - documents/runtime-log-archive.md
+      - documents/runtime/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_run_accumulated_agent_evals.py
 
@@ -667,15 +667,15 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/runtime-log-archive.md
-      - documents/runtime-log-archive-migration.md
+      - documents/runtime/runtime-log-archive.md
+      - documents/runtime/runtime-log-archive-migration.md
       - agents/canonical/ARTIFACT_PLACEMENT.md
     tests:
       - tests/agent_tools/test_hook_event_log.py
       - tests/agent_tools/test_runtime_log_archive_git.py
 
   - id: agent-canon-graph
-    summary: Builds and serves the one-build dependency graph with a persisted runtime-evidence snapshot.
+    summary: Builds and serves the one-build dependency graph with an optional persisted runtime-evidence snapshot.
     path: rust/agent-canon/src/graph.rs
     family: root
     role: runner
@@ -689,7 +689,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - agents/canonical/CLI_ENTRYPOINTS.md
-      - documents/dependency-manifest-design.md
+      - documents/design/dependency-manifest-design.md
     tests:
       - tests/agent_tools/test_check_dependency_headers.py
       - tests/agent_tools/test_check_design_doc_claims.py
@@ -729,7 +729,7 @@ entries:
       - documents/tools/README.md
       - evidence/agent-evals/README.md
       - evidence/agent-evals/workflow_selection_eval.toml
-      - documents/runtime-log-archive.md
+      - documents/runtime/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_evaluate_workflow_selection.py
 
@@ -749,7 +749,7 @@ entries:
       - documents/tools/README.md
       - evidence/agent-evals/README.md
       - evidence/agent-evals/report_quality_eval.toml
-      - documents/runtime-log-archive.md
+      - documents/runtime/runtime-log-archive.md
       - agents/skills/report-writing.md
     tests:
       - tests/agent_tools/test_evaluate_report_quality.py
@@ -769,7 +769,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/test_design.md
-      - documents/coding-conventions-testing.md
+      - documents/conventions/coding-conventions-testing.md
       - references/test-design-flexibility.md
       - agents/skills/test-design.md
     tests:
@@ -789,7 +789,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/search-coordination.md
+      - documents/tools/search-coordination.md
     tests:
       - tests/agent_tools/test_search.py
 
@@ -807,7 +807,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/search-coordination.md
+      - documents/tools/search-coordination.md
       - .gitignore
     tests:
       - tests/agent_tools/test_search.py
@@ -826,8 +826,8 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/search-coordination.md
-      - documents/semantic_index.md
+      - documents/tools/search-coordination.md
+      - documents/tools/semantic_index.md
       - .gitignore
     tests:
       - rust/agent-canon/src/semantic_index.rs
@@ -848,7 +848,7 @@ entries:
       - documents/tools/README.md
       - documents/tools/semantic_provider_html_report.md
       - agents/skills/html-experiment-report.md
-      - documents/semantic_index.md
+      - documents/tools/semantic_index.md
       - documents/prose-reasoning-graph/dsl-spec.md
     tests:
       - tests/agent_tools/test_semantic_provider_html_report.py
@@ -890,7 +890,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/route.md
-      - documents/tool-skill-routing-refactor.md
+      - documents/design/tool-skill-routing-refactor.md
     tests:
       - tests/agent_tools/test_route.py
 
@@ -925,7 +925,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/dependency-manifest-design.md
+      - documents/design/dependency-manifest-design.md
     tests:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
@@ -945,7 +945,7 @@ entries:
       - documents/tools/README.md
       - documents/tools/check_design_doc_claims.md
       - documents/design/README.md
-      - documents/dependency-manifest-design.md
+      - documents/design/dependency-manifest-design.md
     tests:
       - tests/agent_tools/test_check_design_doc_claims.py
       - tests/agent_tools/test_dependency_manifest_tools.py
@@ -963,7 +963,7 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
-      - documents/dependency-manifest-design.md
+      - documents/design/dependency-manifest-design.md
     tests:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
@@ -980,8 +980,8 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
-      - documents/dependency-manifest-design.md
-      - documents/dependency-contract-kinds.toml
+      - documents/design/dependency-manifest-design.md
+      - documents/design/dependency-contract-kinds.toml
     tests:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
@@ -998,8 +998,8 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
-      - documents/dependency-manifest-design.md
-      - documents/dependency-contract-kinds.toml
+      - documents/design/dependency-manifest-design.md
+      - documents/design/dependency-contract-kinds.toml
     tests:
       - tests/agent_tools/test_check_dependency_headers.py
 
@@ -1016,7 +1016,7 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
-      - documents/dependency-manifest-design.md
+      - documents/design/dependency-manifest-design.md
     tests:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
@@ -1033,7 +1033,7 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
-      - documents/dependency-manifest-design.md
+      - documents/design/dependency-manifest-design.md
     tests:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
@@ -1069,7 +1069,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/coding-conventions-project.md
+      - documents/conventions/coding-conventions-project.md
     tests:
       - tests/tools/test_container_config.py
 
@@ -1109,7 +1109,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/agent-canon.md
-      - documents/rust-agent-tool-migration.md
+      - documents/design/rust-agent-tool-migration.md
       - .codex/README.md
     tests: []
     test_exempt_reason: Validated by rust/agent-canon cargo tests and devcontainer smoke.
@@ -1128,7 +1128,7 @@ entries:
       ci: false
       pr_check: false
     docs:
-      - documents/agent-canon-update-route.md
+      - documents/agent-canon/agent-canon-update-route.md
       - agents/workflows/agent-canon-pr-workflow.md
     tests:
       - tests/tools/test_update_agent_canon.py
@@ -1235,7 +1235,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/SHARED_RUNTIME_SURFACES.md
+      - documents/runtime/SHARED_RUNTIME_SURFACES.md
     tests:
       - tests/tools/test_update_agent_canon.py
 
@@ -1253,7 +1253,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/agent-canon-subtree-migration.md
+      - documents/agent-canon/agent-canon-subtree-migration.md
     tests:
       - tests/tools/test_update_agent_canon.py
 
@@ -1271,7 +1271,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/rust-agent-tool-migration.md
+      - documents/design/rust-agent-tool-migration.md
     tests:
       - tests/tools/test_update_agent_canon.py
 
@@ -1289,7 +1289,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/agent-canon-parent-repo-latest-checklist.md
+      - documents/agent-canon/agent-canon-parent-repo-latest-checklist.md
     tests:
       - tests/agent_tools/test_agent_canon_update_todos.py
 
@@ -1468,7 +1468,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/experiment-registry.md
+      - documents/experiments/experiment-registry.md
     tests: []
     test_exempt_reason: Registry contract is exercised through repo-wide CI smoke checks.
 
@@ -1519,7 +1519,7 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
-      - documents/coding-conventions-python.md
+      - documents/conventions/coding-conventions-python.md
       - agents/skills/oop-readability-check.md
     tests:
       - tests/agent_tools/test_check_solid_evidence.py
@@ -1537,7 +1537,7 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
-      - documents/coding-conventions-logging.md
+      - documents/conventions/coding-conventions-logging.md
     tests:
       - tests/agent_tools/test_check_log_helper_names.py
 
@@ -1554,7 +1554,7 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
-      - documents/coding-conventions-logging.md
+      - documents/conventions/coding-conventions-logging.md
     tests:
       - tests/agent_tools/test_check_run_log_contract.py
 
@@ -1571,7 +1571,7 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
-      - documents/algorithm-implementation-boundary.md
+      - documents/design/algorithm-implementation-boundary.md
     tests:
       - tests/agent_tools/test_check_algorithm_module_nested_contract.py
 
@@ -1605,7 +1605,7 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
-      - documents/algorithm-implementation-boundary.md
+      - documents/design/algorithm-implementation-boundary.md
     tests:
       - tests/agent_tools/test_check_algorithm_module_public_surface.py
 
@@ -1622,7 +1622,7 @@ entries:
       pr_check: false
     docs:
       - documents/tools/oop/python/readability.md
-      - documents/object-oriented-design.md
+      - documents/conventions/object-oriented-design.md
     tests:
       - tests/agent_tools/test_analyze_oop_readability.py
 
@@ -1639,7 +1639,7 @@ entries:
       pr_check: false
     docs:
       - documents/tools/oop/python/rule_inventory.md
-      - documents/object-oriented-design.md
+      - documents/conventions/object-oriented-design.md
     tests:
       - tests/agent_tools/test_oop_rule_inventory.py
 
@@ -1656,7 +1656,7 @@ entries:
       pr_check: false
     docs:
       - documents/tools/oop/cpp/readability.md
-      - documents/object-oriented-design.md
+      - documents/conventions/object-oriented-design.md
     tests:
       - tests/agent_tools/test_analyze_oop_readability.py
 
@@ -1673,7 +1673,7 @@ entries:
       pr_check: false
     docs:
       - documents/tools/oop/cpp/rule_inventory.md
-      - documents/object-oriented-design.md
+      - documents/conventions/object-oriented-design.md
     tests:
       - tests/agent_tools/test_oop_rule_inventory.py
 
@@ -1725,7 +1725,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/SHARED_RUNTIME_SURFACES.md
+      - documents/runtime/SHARED_RUNTIME_SURFACES.md
     tests:
       - tests/agent_tools/test_file_surface_inventory.py
 
@@ -1747,7 +1747,7 @@ entries:
       - documents/structured-analysis/graph-dsl.md
       - documents/structured-analysis/database-design.md
       - documents/structured-analysis/document-canon-analysis.md
-      - documents/rust-agent-tool-migration.md
+      - documents/design/rust-agent-tool-migration.md
       - agents/skills/document-canon-cleanup.md
     tests:
       - rust/agent-canon/src/structured_analysis.rs
@@ -1766,7 +1766,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/coding-conventions-python.md
+      - documents/conventions/coding-conventions-python.md
     tests:
       - tests/agent_tools/test_helper_function_inventory.py
 
@@ -1784,7 +1784,7 @@ entries:
     docs:
       - tools/README.md
       - evidence/agent-evals/README.md
-      - documents/runtime-log-archive.md
+      - documents/runtime/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_log_surface_inventory.py
 
@@ -1931,7 +1931,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - evidence/agent-evals/README.md
-      - documents/runtime-log-archive.md
+      - documents/runtime/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_generate_agent_improvement_guide.py
 
@@ -1950,7 +1950,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - evidence/agent-evals/README.md
-      - documents/runtime-log-archive.md
+      - documents/runtime/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_generate_agent_runtime_dashboard.py
 
@@ -2019,7 +2019,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/result-log-retention-and-visualization.md
+      - documents/experiments/result-log-retention-and-visualization.md
     tests:
       - tests/tools/test_result_log_tools.py
 
@@ -2037,7 +2037,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/result-log-retention-and-visualization.md
+      - documents/experiments/result-log-retention-and-visualization.md
     tests:
       - tests/tools/test_result_log_tools.py
 
@@ -2089,7 +2089,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/experiment-registry.md
+      - documents/experiments/experiment-registry.md
     tests:
       - tests/tools/test_run_managed_experiment.py
 
@@ -2108,7 +2108,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/html_artifact_access.md
-      - documents/result-log-retention-and-visualization.md
+      - documents/experiments/result-log-retention-and-visualization.md
     tests:
       - tests/tools/test_html_artifact_access.py
 
@@ -2126,7 +2126,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/result-log-retention-and-visualization.md
+      - documents/experiments/result-log-retention-and-visualization.md
     tests:
       - tests/tools/test_update_latest_result.py
 
@@ -2144,7 +2144,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/result-log-retention-and-visualization.md
+      - documents/experiments/result-log-retention-and-visualization.md
       - agents/workflows/experiment-workflow.md
     tests:
       - tests/tools/test_publish_result_branch.py

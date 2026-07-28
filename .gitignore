@@ -1,7 +1,7 @@
 # @dependency-start
 # contract reference
 # responsibility Defines AgentCanon-local ignored generated artifacts.
-# upstream design documents/coding-conventions-project.md repository hygiene rules
+# upstream design documents/conventions/coding-conventions-project.md repository hygiene rules
 # downstream environment tools/ci/check_agent_canon_latest.sh expects generated caches not to dirty submodule status
 # @dependency-end
 

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract reference
 # responsibility Provides a starter top-level responsibility-scope.toml for template-derived repositories.
-# upstream design ../responsibility-scope-management.md responsibility scope policy
+# upstream design ../design/responsibility-scope-management.md responsibility scope policy
 # downstream implementation ../../tools/agent_tools/responsibility_scope.py validates responsibility scopes
 # @dependency-end
 

@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests repo structure contract comparison from filesystem and tree JSON input.
 # upstream implementation ../../tools/agent_tools/repo_structure_contract.py compares repo trees with contract profiles
-# upstream design ../../documents/repo-structure-contract.toml defines expected repository structure profiles
+# upstream design ../../documents/structure/repo-structure-contract.toml defines expected repository structure profiles
 # @dependency-end
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "repo_structure_contract.py"
-CONTRACT = PROJECT_ROOT / "documents" / "repo-structure-contract.toml"
+CONTRACT = PROJECT_ROOT / "documents" / "structure" / "repo-structure-contract.toml"
 
 
 class RepoStructureContractTest(unittest.TestCase):
@@ -198,8 +198,8 @@ class RepoStructureContractTest(unittest.TestCase):
             "documents/rule/README.md",
             "documents/rule/naming.md",
             "documents/rule/directory-structure.md",
-            "documents/shared-runtime-surfaces.toml",
-            "documents/repo-structure-contract.toml",
+            "documents/runtime/shared-runtime-surfaces.toml",
+            "documents/structure/repo-structure-contract.toml",
             "tools/catalog.yaml",
             "rust/agent-canon/Cargo.toml",
             "tools/agent_tools/update_lifecycle_contract.py",
@@ -287,8 +287,20 @@ class RepoStructureContractTest(unittest.TestCase):
                             ],
                         },
                         {"type": "directory", "name": "tools"},
-                        {"type": "file", "name": "shared-runtime-surfaces.toml"},
-                        {"type": "file", "name": "repo-structure-contract.toml"},
+                        {
+                            "type": "directory",
+                            "name": "runtime",
+                            "contents": [
+                                {"type": "file", "name": "shared-runtime-surfaces.toml"}
+                            ],
+                        },
+                        {
+                            "type": "directory",
+                            "name": "structure",
+                            "contents": [
+                                {"type": "file", "name": "repo-structure-contract.toml"}
+                            ],
+                        },
                     ],
                 },
                 {

@@ -4,7 +4,7 @@
 contract template
 responsibility Documents Final Review for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
-upstream design ../../documents/dependency-manifest-design.md dependency review policy
+upstream design ../../documents/design/dependency-manifest-design.md dependency review policy
 @dependency-end
 -->
 
