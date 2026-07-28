@@ -716,6 +716,62 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("result-log / visualization requirements present", result.stdout)
             self.assertIn("Summary: 0 issues found", result.stdout)
 
+    def test_docker_validator_supports_parent_tool_projection_and_direct_git_refs(self) -> None:
+        """Portable Docker validator checks should work via tools/agent-canon path."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "python").mkdir()
+            (root / "docker").mkdir()
+            (root / "tools").mkdir()
+            (root / "tools" / "ci").mkdir(parents=True)
+            (root / "vendor").mkdir()
+            (root / "vendor" / "agent-canon").symlink_to(PROJECT_ROOT)
+            (root / "tools" / "agent-canon").symlink_to("../vendor/agent-canon/tools")
+            (root / "pyproject.toml").write_text(
+                "[project]\ndependencies = []\n",
+                encoding="utf-8",
+            )
+            (root / "docker" / "requirements.txt").write_text(
+                "\n".join(
+                    [
+                        "jupyterlab",
+                        "notebook",
+                        "ipykernel",
+                        "pydeps",
+                        "snakeviz",
+                        "pyyaml",
+                        "custom-visualizer @ git+ssh://git@github.com/org/custom-visualizer.git@v1.0.0",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "docker" / "Dockerfile").write_text(
+                "RUN apt-get update && apt-get install -y rsync openssh-client graphviz python3.11-venv\n",
+                encoding="utf-8",
+            )
+            (root / ".dockerignore").write_text("vendor/agent-canon\n.git\n.state\n", encoding="utf-8")
+            (root / ".gitignore").write_text(".venv/\nvenv/\n", encoding="utf-8")
+            (root / "README.md").write_text(
+                "PYTHONPATH=/workspace/python\nUse docker run for execution.\n",
+                encoding="utf-8",
+            )
+            (root / "tools" / "ci" / "python_env_policy.py").symlink_to(
+                PROJECT_ROOT / "tools" / "ci" / "python_env_policy.py"
+            )
+
+            result = subprocess.run(
+                ["bash", str(root / "tools" / "agent-canon" / "docker_dependency_validator.sh")],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("result-log / visualization requirements present", result.stdout)
+            self.assertIn("Summary: 0 issues found", result.stdout)
+
     def test_format_accepts_line_comment_manifest(self) -> None:
         """Line-comment manifests are valid for Python-like files."""
         with tempfile.TemporaryDirectory() as tmp_dir:

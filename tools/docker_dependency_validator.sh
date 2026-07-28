@@ -10,6 +10,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_ROOT="$SCRIPT_DIR"
+ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd -P)"
+
 issues=0
 has_docker_surface=0
 has_devcontainer_surface=0
@@ -46,6 +50,28 @@ trim_line() {
   printf '%s' "$line"
 }
 
+resolve_agent_canon_tool() {
+  local relative_path="$1"
+  local root_path="$ROOT_DIR/$relative_path"
+  local script_path="$SCRIPT_ROOT/$relative_path"
+  local portable_path="${relative_path#tools/}"
+
+  if [ -f "$root_path" ]; then
+    echo "$root_path"
+    return 0
+  fi
+  if [ -f "$script_path" ]; then
+    echo "$script_path"
+    return 0
+  fi
+  if [ "$portable_path" != "$relative_path" ] && [ -f "$SCRIPT_ROOT/$portable_path" ]; then
+    echo "$SCRIPT_ROOT/$portable_path"
+    return 0
+  fi
+
+  return 1
+}
+
 check_requirements_format() {
   local req_file="docker/requirements.txt"
   local line_num=0
@@ -66,7 +92,7 @@ check_requirements_format() {
     line_num=$((line_num + 1))
     trimmed="$(trim_line "$line")"
     [ -n "$trimmed" ] || continue
-    if [[ ! "$trimmed" =~ ^[A-Za-z0-9_.-]+(\[[A-Za-z0-9_,.-]+\])?([[:space:]]*(==|>=|<=|~=|!=|>|<).+)?$ ]]; then
+    if [[ ! "$trimmed" =~ ^[A-Za-z0-9_.-]+(\[[A-Za-z0-9_,.-]+\])?([[:space:]]*@([[:space:]]*[^#[:space:]]+))?([[:space:]]*(==|>=|<=|~=|!=|>|<).+)?$ ]]; then
       report_issue "Line ${line_num}: invalid requirement syntax: ${trimmed}"
     fi
   done < "$req_file"
@@ -278,8 +304,8 @@ check_result_visualization_requirements() {
 }
 
 check_python_dependency_manifest_contract() {
-  local validator="tools/requirement_sync_validator.py"
   local output_file=""
+  local validator=""
 
   printf '\n6. Checking pyproject/docker dependency contract...\n'
   if [ "$has_docker_surface" -eq 0 ]; then
@@ -290,8 +316,8 @@ check_python_dependency_manifest_contract() {
     report_issue "pyproject.toml not found"
     return
   fi
-  if [ ! -f "$validator" ]; then
-    report_issue "requirement sync validator missing: $validator"
+  if ! validator="$(resolve_agent_canon_tool "tools/requirement_sync_validator.py")"; then
+    report_issue "requirement sync validator missing: tools/requirement_sync_validator.py"
     return
   fi
 
@@ -316,7 +342,7 @@ check_repo_local_venv_policy() {
   local roots=()
   local root=""
   local pattern='python3?[[:space:]]+-m[[:space:]]+venv|virtualenv|conda[[:space:]]+create|uv[[:space:]]+venv|pipenv|poetry[[:space:]]+env'
-  local canonical_tool="tools/ci/python_env_policy.py"
+  local canonical_tool=""
 
   printf '\n7. Checking repo-local virtual-environment policy...\n'
 
@@ -341,8 +367,8 @@ check_repo_local_venv_policy() {
     report_issue ".gitignore not found"
   fi
 
-  if [ ! -f "$canonical_tool" ]; then
-    report_issue "canonical env-policy tool missing: $canonical_tool"
+  if ! canonical_tool="$(resolve_agent_canon_tool "tools/ci/python_env_policy.py")"; then
+    report_issue "canonical env-policy tool missing: tools/ci/python_env_policy.py"
   fi
 
   if [ -f docker/Dockerfile ] && ! grep -q 'python3.11-venv' docker/Dockerfile; then

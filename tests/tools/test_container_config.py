@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import os
 import subprocess
 import sys
@@ -181,6 +182,22 @@ def write_vscode_source(root: Path, relative: str = ".vscode") -> None:
         "tasks.json",
     ):
         write_file(root, f"{relative}/{name}", "{}\n")
+
+
+def load_container_config_module():
+    """Load container_config as a test module."""
+    module_name = "agent_canon_container_config"
+    spec = importlib.util.spec_from_file_location(
+        module_name,
+        PROJECT_ROOT / "tools" / "ci" / "container_config.py",
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    import sys
+
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_topic_compose_semantics_pass(tmp_path: Path) -> None:
@@ -390,3 +407,26 @@ def test_missing_individual_symlink_is_rejected(tmp_path: Path) -> None:
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert "expected-individual-symlink" in result.stdout
+
+
+def test_validate_requirements_accepts_pep508_direct_reference(tmp_path: Path) -> None:
+    """Direct references should be accepted while still collecting required package names."""
+    module = load_container_config_module()
+    write_file(
+        tmp_path,
+        "docker/requirements.txt",
+        "\n".join(
+            [
+                "jupyterlab",
+                "notebook",
+                "ipykernel",
+                "pydeps",
+                "snakeviz",
+                "pyyaml",
+                "custom-visualizer @ git+ssh://git@github.com/org/custom-visualizer.git@v1.0.0",
+                "",
+            ]
+        ),
+    )
+
+    assert module.validate_requirements(tmp_path) == []
