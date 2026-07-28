@@ -152,7 +152,7 @@ second command manual.
 ## よく使うもの
 
 - `tools/ci/run_all_checks.sh`
-  - full confidence が必要な時に主要なチェックをまとめて実行します。docs-focused / focused code では check matrix に従って個別 check を選びます。
+  - full confidence が必要な時に主要なチェックをまとめて実行します。docs-focused / focused code では check matrix に従って個別 check を選びます。AgentCanon PR gate は strict dependency review 後に内部 receipt を渡し、検証済みなら graph/dependency-header producer を省略します。receipt のない通常経路は全 producer を実行します。
 - `tools/ci/pre_review.sh`
   - review 前の基礎 gate をまとめて実行します。
 - `tools/bin/agent-canon docs check`
@@ -433,10 +433,16 @@ confirmed; uncertain, malformed, colliding, or unconfirmed records block.
 
 `tools/bin/agent-canon graph build` は dependency-manifest snapshot、prepared
 artifact、latest committed receipt を一つの `BuildMaterial` transaction で
-取得します。`run_all_checks` は最初の graph-backed consumer より前に
+取得します。通常の `run_all_checks` は最初の graph-backed consumer より前に
 `WORKSPACE_ROOT` の graph を一度だけ build し、すべての graph-backed consumer
-は同じ fresh snapshot を共有します。build に失敗した場合は graph-backed
-checks を実行せず、一つの CI failure として扱います。
+は同じ fresh snapshot を共有します。AgentCanon PR gate は strict dependency
+review で作った graph と dependency-header verdict を owner、root identity、
+parent PID、prepared markers 付きの一時 receipt で quick CI に渡します。
+`run_all_checks` はその receipt を検証できた場合だけ `CANON_GRAPH_READY=1`
+として snapshot を消費し、graph/dependency-header producer を省略します。
+receipt が無い通常経路は全 producer を実行し、不正な receipt は fail closed
+です。build に失敗した場合は graph-backed checks を実行せず、一つの CI
+failure として扱います。
 `graph status/query/context` とその consumer は snapshot の参照専用で、
 `check_design_doc_claims.py` も persisted v2 snapshot を消費します。Each graph
 command performs at most one bounded freshness probe; consumers do not reparse

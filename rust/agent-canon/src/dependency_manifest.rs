@@ -11,6 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
 use std::io::Write;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -382,6 +384,63 @@ fn git_visible_paths(root: &Path) -> Result<Vec<String>, ManifestError> {
     Ok(paths)
 }
 
+struct SourcePathRead {
+    bytes: Vec<u8>,
+    file_mode: &'static str,
+    exists: bool,
+}
+
+fn missing_source_path() -> SourcePathRead {
+    SourcePathRead {
+        bytes: Vec::new(),
+        file_mode: "100644",
+        exists: false,
+    }
+}
+
+fn read_source_path(root: &Path, relative: &str) -> Result<SourcePathRead, ManifestError> {
+    let path = root.join(relative);
+    let metadata = match fs::symlink_metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(missing_source_path())
+        }
+        Err(error) => return Err(ManifestError::Io(error.to_string())),
+    };
+    if metadata.file_type().is_symlink() {
+        let target = match fs::read_link(&path) {
+            Ok(target) => target,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(missing_source_path())
+            }
+            Err(error) => return Err(ManifestError::Io(error.to_string())),
+        };
+        return Ok(SourcePathRead {
+            bytes: target.as_os_str().as_bytes().to_vec(),
+            file_mode: "120000",
+            exists: true,
+        });
+    }
+    if metadata.file_type().is_file() {
+        let bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(missing_source_path())
+            }
+            Err(error) => return Err(ManifestError::Io(error.to_string())),
+        };
+        return Ok(SourcePathRead {
+            bytes,
+            file_mode: "100644",
+            exists: true,
+        });
+    }
+    Err(ManifestError::Io(format!(
+        "source path is not a regular file or symlink: {}",
+        path.display()
+    )))
+}
+
 fn source_fingerprint_for_paths(root: &Path, paths: &[String]) -> Result<String, ManifestError> {
     let mut rows = Vec::new();
     let mut processed = BTreeSet::new();
@@ -393,16 +452,13 @@ fn source_fingerprint_for_paths(root: &Path, paths: &[String]) -> Result<String,
         }
         let remaining_before = paths.len() - index;
         if !source_path_is_explicitly_excluded(relative) {
-            let bytes = match fs::read(root.join(relative)) {
-                Ok(value) => value,
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-                Err(error) => return Err(ManifestError::Io(error.to_string())),
-            };
+            let source = read_source_path(root, relative)?;
             rows.push(format!(
-                "{}\0{}\0{}\n",
+                "{}\0{}\0{}\0{}\n",
                 relative,
-                root.join(relative).exists(),
-                hash_bytes(&bytes)
+                source.exists,
+                source.file_mode,
+                hash_bytes(&source.bytes)
             ));
         }
         let remaining_after = paths.len() - processed.len();
@@ -620,12 +676,7 @@ pub(crate) fn capture_snapshot(
             ));
         }
         let path = root.join(relative);
-        let exists = path.exists();
-        let bytes = match fs::read(&path) {
-            Ok(value) => value,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-            Err(error) => return Err(ManifestError::Io(error.to_string())),
-        };
+        let source = read_source_path(&root, relative)?;
         let identity_id = identity_by_path.get(relative).cloned().unwrap_or_default();
         let blob = git_text(&root, &["hash-object", "--", relative])
             .or_else(|_| git_text(&root, &["rev-parse", &format!(":{relative}")]))
@@ -638,10 +689,10 @@ pub(crate) fn capture_snapshot(
             alternate_locators: Vec::new(),
             locator_kind: "repo-relative".to_string(),
             path_role: "source".to_string(),
-            file_mode: "100644".to_string(),
-            exists,
+            file_mode: source.file_mode.to_string(),
+            exists: source.exists,
             is_dirty: dirty_set.contains(relative),
-            content_hash: hash_bytes(&bytes),
+            content_hash: hash_bytes(&source.bytes),
             git_blob_or_gitlink: blob,
             submodule_commit: String::new(),
             snapshot_id: snapshot_id.clone(),
@@ -660,7 +711,7 @@ pub(crate) fn capture_snapshot(
             });
             continue;
         }
-        let Ok(text) = String::from_utf8(bytes) else {
+        let Ok(text) = String::from_utf8(source.bytes) else {
             continue;
         };
         let entries = manifest_lines(&path, &text);
