@@ -496,6 +496,7 @@ prune_parent_devcontainer_artifacts() {
     "$abs_path/bootstrap-shared-runtime.sh" \
     "$abs_path/finalize-shared-runtime.sh" \
     "$abs_path/generate-runtime-compose.sh" \
+    "$abs_path/docker-compose.generated.yml" \
     "$abs_path/post-attach.sh" \
     "$abs_path/post-create.sh"
 }

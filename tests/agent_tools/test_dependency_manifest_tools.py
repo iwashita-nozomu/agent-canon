@@ -660,6 +660,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             devcontainer.mkdir()
             custom_hook = devcontainer / "post-create-parent.sh"
             unknown_file = devcontainer / "parent-local-marker.txt"
+            old_generated = devcontainer / "docker-compose.generated.yml"
             custom_hook.write_text(
                 '\n'.join(
                     [
@@ -672,6 +673,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
             unknown_file.write_text("do-not-drop-me\n", encoding="utf-8")
+            old_generated.write_text("version: 3\n", encoding="utf-8")
 
             first = subprocess.run(
                 ["bash", "tools/sync_agent_canon.sh", "link-root"],
@@ -689,6 +691,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
             first_hook = hashlib.sha256(custom_hook.read_bytes()).hexdigest()
             first_unknown = hashlib.sha256(unknown_file.read_bytes()).hexdigest()
+            self.assertFalse(old_generated.exists())
             second = subprocess.run(
                 ["bash", "tools/sync_agent_canon.sh", "link-root"],
                 cwd=root,
@@ -706,6 +709,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
             self.assertEqual(first_hook, hashlib.sha256(custom_hook.read_bytes()).hexdigest())
             self.assertEqual(first_unknown, hashlib.sha256(unknown_file.read_bytes()).hexdigest())
+            self.assertFalse(old_generated.exists())
 
     def test_docker_validator_accepts_requirement_extras_for_required_packages(self) -> None:
         """The Docker validator should accept valid extras syntax in requirements."""
