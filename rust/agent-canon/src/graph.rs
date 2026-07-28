@@ -3214,6 +3214,30 @@ mod tests {
         receipt_canonical_bytes(value, false).expect("canonical receipt")
     }
 
+    fn materialize_standalone_surface_manifest(root: &Path) {
+        let files: &[(&str, &[u8])] = &[
+            (
+                "tools/agent_tools/surface_manifest.py",
+                include_bytes!("../../../tools/agent_tools/surface_manifest.py"),
+            ),
+            (
+                "documents/runtime/shared-runtime-surfaces.toml",
+                include_bytes!("../../../documents/runtime/shared-runtime-surfaces.toml"),
+            ),
+        ];
+        let mut exclude = OpenOptions::new()
+            .append(true)
+            .open(root.join(".git/info/exclude"))
+            .expect("fixture git exclude");
+        for (relative, bytes) in files {
+            let target = root.join(relative);
+            fs::create_dir_all(target.parent().expect("fixture canonical file parent"))
+                .expect("fixture canonical file directory");
+            fs::write(target, bytes).expect("fixture canonical file");
+            writeln!(exclude, "/{relative}").expect("fixture canonical file exclusion");
+        }
+    }
+
     fn graph_fixture() -> GraphFixture {
         let counter = FIXTURE_COUNTER.fetch_add(1, Ordering::SeqCst);
         let nanos = SystemTime::now()
@@ -3226,6 +3250,7 @@ mod tests {
         ));
         fs::create_dir_all(root.join("src")).expect("fixture root");
         fixture_git(&root, &["init", "-q"]);
+        materialize_standalone_surface_manifest(&root);
         fixture_git(&root, &["config", "user.email", "test@example.invalid"]);
         fixture_git(&root, &["config", "user.name", "Graph Test"]);
         let target = root.join("src/target.txt");
