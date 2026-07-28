@@ -561,8 +561,13 @@ required_regex = [
   "\\$algorithm-flowchart",
   "skill_tool_commands\\.py show --skill code-visualization",
   "render_dependency_manifest_graph\\.py --root \\. --scope full --bundle-dir reports/dependency-graph --format json",
-  "check_dependency_graph\\.sh.*owns dependency pass/fail authority",
-  "supplied TSV producer owns source facts",
+  "canonical graph owns dependency status and facts",
+  "typed dependency query",
+  "supplied-input",
+  "raw-checker",
+  "Mermaid fallback",
+  "agent_canon\\.visualization\\.coverage",
+  "agent_canon\\.visualization\\.arguments\\.coverage\\.v1",
 ]
 
 [[evals.checklist]]
