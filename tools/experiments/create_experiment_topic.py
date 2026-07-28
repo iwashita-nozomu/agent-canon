@@ -6,7 +6,7 @@
 # upstream design ../../documents/templates/experiment/README.template.md canonical topic README template.
 # upstream design ../../documents/templates/experiment/experiment-provenance.template.toml canonical provenance template.
 # downstream implementation ../../experiments/_template/run.py runnable topic scaffold.
-# downstream implementation ../../experiments/registry.toml project experiment registry.
+# upstream design ../../documents/experiments/experiment-registry.md project experiment registry contract.
 # @dependency-end
 
 """Create one experiment topic from the template and register it."""

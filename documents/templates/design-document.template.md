@@ -4,13 +4,24 @@ contract template
 responsibility Provides the canonical structure for a design document.
 upstream design ../design/README.md design-document ownership and reader route.
 upstream design ../rule/README.md repository document filename and language rules.
-downstream implementation <implementation-path> implements the approved boundary.
+downstream implementation README.md implements the approved boundary.
 @dependency-end
 -->
 
 # <Design title>
 
 この template は、設計判断を実装可能な責務境界へ変換するための正本雛形です。
+
+## Dependency header sample
+
+派生 repo で利用するときは、実際の implementation path に置き換えた dependency header を
+この本文 sample から作成します。sample はこの template 自体の graph header ではありません。
+
+```text
+@dependency-start
+downstream implementation <implementation-path> implements the approved boundary.
+@dependency-end
+```
 
 ## 責務
 

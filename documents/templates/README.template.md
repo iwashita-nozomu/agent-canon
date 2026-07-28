@@ -4,7 +4,7 @@ contract template
 responsibility Provides the canonical structure for a repository or directory README.
 upstream design ../README.md document index and reader routing.
 upstream design ../rule/README.md repository document filename and language rules.
-downstream implementation <repository-path> owns the described entrypoint.
+downstream implementation README.md owns the described entrypoint.
 @dependency-end
 -->
 
@@ -12,6 +12,17 @@ downstream implementation <repository-path> owns the described entrypoint.
 
 この template は、読者が正しい入口から目的の source、実装、検証へ到達するための
 README 正本雛形です。
+
+## Dependency header sample
+
+派生 repo で利用するときは、実際の repository path に置き換えた dependency header を
+この本文 sample から作成します。sample はこの template 自体の graph header ではありません。
+
+```text
+@dependency-start
+downstream implementation <repository-path> owns the described entrypoint.
+@dependency-end
+```
 
 ## 責務
 
