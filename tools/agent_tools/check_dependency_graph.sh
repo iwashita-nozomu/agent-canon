@@ -90,8 +90,37 @@ if [[ "$query_exit" -ne 0 || "$(jq -r '.status // "invalid"' "$query_file" 2>/de
   exit 1
 fi
 
-jq -r '.facts[] | select(.kind == "dependency" and .inferred == false) | [(.dependency_detail.direction // ""), (.dependency_detail.kind // ""), (.payload.from_selector // .from), (.payload.to_selector // .to // "")] | @tsv' "$query_file" | sed '/^[[:space:]]*$/d' | sort -u >"$all_edges"
+jq -r '
+  (.nodes | map({key: .id, value: .path}) | from_entries) as $node_paths
+  | .facts[]
+  | select(.kind == "dependency" and .inferred == false)
+  | [
+      (.dependency_detail.direction // ""),
+      (.dependency_detail.kind // ""),
+      ($node_paths[.from] // ""),
+      ($node_paths[.to] // "")
+    ]
+  | @tsv
+' "$query_file" | sort -u >"$all_edges"
 jq -r '.nodes[] | select(.layer == "source" and .payload.manifest_present == true) | .path' "$query_file" | sort -u >"$manifest_files"
+
+failures=0
+while IFS= read -r projection_error; do
+  [[ -n "$projection_error" ]] || continue
+  echo "$projection_error"
+  failures=$((failures + 1))
+done < <(
+  awk -F '\t' '
+    function display(value) { return value == "" ? "<empty>" : value }
+    $3 == "" || $4 == "" {
+      printf "dependency graph projection has unresolved endpoint: source=%s target=%s\n", display($3), display($4)
+      next
+    }
+    $1 == "" || $2 == "" {
+      printf "dependency graph projection has incomplete relation: direction=%s kind=%s source=%s target=%s\n", display($1), display($2), $3, $4
+    }
+  ' "$all_edges"
+)
 
 collect_changed() {
   {
@@ -173,7 +202,6 @@ if [[ "$EDIT_SCOPE" -eq 1 ]]; then
   echo "DEPENDENCY_EDIT_SCOPE_PATHS=$(wc -l <"$scope_file" | tr -d ' ')"
 fi
 
-failures=0
 while IFS= read -r manifest_file; do
   [[ -n "$manifest_file" ]] || continue
   if ! awk -F '\t' -v file="$manifest_file" '$3 == file || $4 == file { found = 1 } END { exit(found ? 0 : 1) }' "$edges_file"; then
@@ -183,7 +211,6 @@ while IFS= read -r manifest_file; do
 done <"$manifest_files"
 
 while IFS=$'\t' read -r direction kind source target; do
-  [[ -n "${direction:-}" ]] || continue
   if [[ "$source" == "$target" ]]; then
     echo "$source: self reference in $direction $kind edge"
     failures=$((failures + 1))
@@ -195,12 +222,12 @@ while IFS=$'\t' read -r direction kind source target; do
       failures=$((failures + 1))
     fi
   fi
-done <"$edges_file"
+done < <(awk -F '\t' '$1 != "" && $2 != "" && $3 != "" && $4 != ""' "$edges_file")
 
 check_cycles() {
   local direction="$1"
   awk -F '\t' -v wanted="$direction" '
-    $1 == wanted { adj[$3] = adj[$3] SUBSEP $4; nodes[$3] = 1; nodes[$4] = 1 }
+    $1 == wanted && $2 != "" && $3 != "" && $4 != "" { adj[$3] = adj[$3] SUBSEP $4; nodes[$3] = 1; nodes[$4] = 1 }
     function dfs(node, raw, parts, count, i, next_node) {
       state[node] = 1; raw = adj[node]; count = split(raw, parts, SUBSEP)
       for (i = 1; i <= count; i++) { next_node = parts[i]; if (next_node == "") continue; if (state[next_node] == 1) { print wanted " cycle includes " node " -> " next_node; found = 1; return } if (state[next_node] == 0) { dfs(next_node); if (found) return } }

@@ -258,6 +258,14 @@ dependency detail. Python consumers use `GraphClient` and
 `GraphResponse.dependency_facts`; shell consumers invoke the same executable
 with fixed arguments.
 
+dependency fact の `from` / `to` は stable node ID です。現行の source node ID は
+`node:source:<path>` ですが、consumer は文字列 prefix を除去して path を作ってはいけません。
+`nodes[]` の `id` と `path` の対応を正本とし、`nodes[].id -> nodes[].path` の map を一度作って
+endpoint ID を repo-relative path へ解決します。optional な `payload.from_selector` /
+`payload.to_selector`、文字列加工、header の再 parse などの fallback には依存しません。
+`nodes[]` で endpoint を解決できない場合は、空の endpoint を含む projection を黙認せず、
+consumer が checker failure として明示診断します。
+
 `dependency_graph.tsv` remains a deterministic review projection only. It is
 generated from canonical query rows by `check_dependency_graph.sh` or
 `render_dependency_manifest_graph.py`; it is never accepted as an alternate
