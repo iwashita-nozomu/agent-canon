@@ -1048,7 +1048,7 @@ fn canonicalize_surface_path(
         else {
             continue;
         };
-        let replace = selected.map_or(true, |(selected_entry, _)| {
+        let replace = selected.is_none_or(|(selected_entry, _)| {
             let selected_view = selected_entry.path.trim_end_matches('/');
             view.len() > selected_view.len()
                 || (view.len() == selected_view.len() && view < selected_view)
