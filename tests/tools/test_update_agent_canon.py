@@ -836,8 +836,17 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             REPO_ROOT / "tools" / "agent_tools" / "surface_manifest.py",
             work_dir / "tools" / "agent_tools" / "surface_manifest.py",
         )
-        (work_dir / "documents").mkdir()
-        (work_dir / "documents" / "shared-runtime-surfaces.toml").write_text(
+        github_template_paths = sorted(
+            path.relative_to(REPO_ROOT).as_posix()
+            for template_dir in (
+                REPO_ROOT / ".github" / "ISSUE_TEMPLATE",
+                REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE",
+            )
+            for path in template_dir.iterdir()
+            if path.is_file()
+        )
+        (work_dir / "documents" / "runtime").mkdir(parents=True)
+        (work_dir / "documents" / "runtime" / "shared-runtime-surfaces.toml").write_text(
             "\n".join(
                 [
                     'version = 1',
@@ -877,7 +886,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     'local_override_allowed = false',
                     'paths = [',
                     '  ".github/workflows/agent-coordination.yml",',
-                    '  ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",',
+                    *(f'  "{path}",' for path in github_template_paths),
                     ']',
                     '',
                     '[[group]]',
@@ -889,6 +898,13 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     'paths = [',
                     '  "documents/README.md",',
                     ']',
+                    '',
+                    '[[surface]]',
+                    'path = "tools/agent-canon"',
+                    'mode = "symlink"',
+                    'source = "tools"',
+                    'owner = "agent-canon"',
+                    'class = "runtime_surface"',
                     '',
                     '[[group]]',
                     'mode = "standalone_only"',
@@ -911,7 +927,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             encoding="utf-8",
         )
         (work_dir / ".github" / "workflows").mkdir(parents=True)
-        (work_dir / ".github" / "PULL_REQUEST_TEMPLATE").mkdir(parents=True)
         (work_dir / ".vscode").mkdir()
         for vscode_name in (
             "c_cpp_properties.json",
@@ -958,10 +973,15 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             "name: agent coordination\n",
             encoding="utf-8",
         )
-        (work_dir / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md").write_text(
-            "# AgentCanon PR\n",
-            encoding="utf-8",
-        )
+        for template_path in github_template_paths:
+            destination = work_dir / template_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            content = (
+                "python3 tools/agent_tools/route.py\n"
+                if "PULL_REQUEST_TEMPLATE" in destination.parts
+                else "name: issue fixture\n"
+            )
+            destination.write_text(content, encoding="utf-8")
         subprocess.run(
             [
                 "git",
@@ -984,7 +1004,14 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         )
         return bare_repo, work_dir
 
-    def make_superproject(self, root: Path, bare_repo: Path) -> Path:
+    def make_superproject(
+        self,
+        root: Path,
+        bare_repo: Path,
+        *,
+        public_submodule_add: bool = False,
+        commit_submodule: bool = True,
+    ) -> Path:
         """Create one derived repo with AgentCanon as a submodule."""
         repo = root / "derived"
         repo.mkdir()
@@ -996,30 +1023,48 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             check=True,
         )
         (repo / "tools").mkdir()
-        shutil.copy2(REPO_ROOT / "tools" / "sync_agent_canon.sh", repo / "tools")
+        shutil.copy2(
+            REPO_ROOT / "tools" / "sync_agent_canon.sh",
+            repo / "tools",
+        )
         shutil.copy2(REPO_ROOT / "tools" / "update_agent_canon.sh", repo / "tools")
         shutil.copy2(REPO_ROOT / "tools" / "rebuild_agent_tools.sh", repo / "tools")
-        subprocess.run(
-            [
-                "git",
-                "-c",
-                "protocol.file.allow=always",
-                "submodule",
-                "add",
-                "-b",
-                "main",
-                str(bare_repo),
-                "vendor/agent-canon",
-            ],
-            cwd=repo,
-            check=True,
-        )
-        subprocess.run(
-            ["git", "add", ".gitmodules", "tools", "vendor/agent-canon"],
-            cwd=repo,
-            check=True,
-        )
-        subprocess.run(["git", "commit", "-m", "add submodule"], cwd=repo, check=True)
+        if public_submodule_add:
+            subprocess.run(["git", "add", "tools"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "initial parent"], cwd=repo, check=True)
+            env = dict(os.environ)
+            env["GIT_ALLOW_PROTOCOL"] = "file"
+            subprocess.run(
+                [
+                    "bash",
+                    "tools/sync_agent_canon.sh",
+                    "submodule-add",
+                    str(bare_repo),
+                    "main",
+                ],
+                cwd=repo,
+                check=True,
+                env=env,
+            )
+        else:
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "protocol.file.allow=always",
+                    "submodule",
+                    "add",
+                    "-b",
+                    "main",
+                    str(bare_repo),
+                    "vendor/agent-canon",
+                ],
+                cwd=repo,
+                check=True,
+            )
+        if commit_submodule:
+            subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "add submodule"], cwd=repo, check=True)
         return repo
 
     def protected_state(self, repo: Path) -> tuple[str, ...]:
@@ -1564,11 +1609,72 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertTrue((repo / "vendor" / "agent-canon" / "remote-marker.txt").is_file())
 
     def test_status_reports_submodule_mode_and_pin(self) -> None:
-        """Status output should expose submodule mode, URL, and pin evidence."""
+        """Submodule-add should project parent headers before exposing pin status."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
-            repo = self.make_superproject(root, bare_repo)
+            subprocess.run(
+                ["git", "push", "--force", str(bare_repo), "HEAD:refs/heads/main"],
+                cwd=REPO_ROOT,
+                check=True,
+            )
+            repo = self.make_superproject(
+                root,
+                bare_repo,
+                public_submodule_add=True,
+                commit_submodule=False,
+            )
+
+            index_entry = subprocess.run(
+                ["git", "ls-files", "--stage", "--", "vendor/agent-canon"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertRegex(index_entry, r"^160000 [0-9a-f]{40} 0\tvendor/agent-canon$")
+
+            issue_templates = sorted(
+                path
+                for path in (repo / ".github" / "ISSUE_TEMPLATE").iterdir()
+                if path.is_file() and not path.is_symlink()
+            )
+            pull_request_templates = sorted(
+                path
+                for path in (repo / ".github" / "PULL_REQUEST_TEMPLATE").iterdir()
+                if path.is_file() and not path.is_symlink()
+            )
+            projected_templates = [*issue_templates, *pull_request_templates]
+            self.assertEqual(len(issue_templates), 3)
+            self.assertEqual(len(pull_request_templates), 1)
+            for template in projected_templates:
+                body = template.read_text(encoding="utf-8")
+                self.assertIn("../../vendor/agent-canon/", body)
+                self.assertIn("../../tools/agent-canon/", body)
+
+            format_check = subprocess.run(
+                [
+                    "bash",
+                    str(
+                        REPO_ROOT
+                        / "tools"
+                        / "agent_tools"
+                        / "check_dependency_header_format.sh"
+                    ),
+                    "--root",
+                    str(repo),
+                    *(path.relative_to(repo).as_posix() for path in projected_templates),
+                ],
+                cwd=REPO_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(format_check.returncode, 0, format_check.stdout)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", format_check.stdout)
+
+            subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "add submodule"], cwd=repo, check=True)
 
             result = subprocess.run(
                 ["bash", "tools/sync_agent_canon.sh", "status"],
@@ -1602,7 +1708,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertIn("agent_canon_snapshot_alias=deprecated_use_link_root", result.stdout)
 
     def test_link_root_keeps_goal_local_and_syncs_copy_surfaces(self) -> None:
-        """Link-root should restore root views without copying standalone-only PR templates."""
+        """Link-root should restore root views and project GitHub copy surfaces."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
@@ -1634,19 +1740,21 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     / "agent-coordination.yml"
                 ).read_text(encoding="utf-8"),
             )
-            self.assertEqual(
-                (repo / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md").read_text(
-                    encoding="utf-8"
-                ),
-                (
-                    repo
-                    / "vendor"
-                    / "agent-canon"
-                    / ".github"
-                    / "PULL_REQUEST_TEMPLATE"
-                    / "agent_canon.md"
-                ).read_text(encoding="utf-8"),
+            issue_templates = sorted(
+                path
+                for path in (repo / ".github" / "ISSUE_TEMPLATE").iterdir()
+                if path.is_file() and not path.is_symlink()
             )
+            pull_request_templates = sorted(
+                path
+                for path in (repo / ".github" / "PULL_REQUEST_TEMPLATE").iterdir()
+                if path.is_file() and not path.is_symlink()
+            )
+            self.assertEqual(len(issue_templates), 3)
+            self.assertEqual(len(pull_request_templates), 1)
+            pull_request_body = pull_request_templates[0].read_text(encoding="utf-8")
+            self.assertIn("tools/agent-canon/agent_tools/route.py", pull_request_body)
+            self.assertNotIn("tools/agent_tools/route.py", pull_request_body)
             self.assertFalse((repo / ".github" / "PULL_REQUEST_TEMPLATE.md").exists())
 
     def test_link_root_migrates_legacy_vscode_directory_before_child_links(self) -> None:
