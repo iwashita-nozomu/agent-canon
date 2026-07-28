@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub const SNAPSHOT_SCHEMA_VERSION: &str = "source_snapshot.v1";
+const SURFACE_MANIFEST_SNAPSHOT_SCHEMA: &str = "agent-canon.surface-manifest.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SourceSpan {
@@ -60,6 +61,7 @@ pub(crate) struct DependencyDeclaration {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SourceIdentity {
     pub identity_id: String,
+    pub authority_id: String,
     pub logical_id: String,
     pub repo_rel_path: String,
     pub canonical_locator: String,
@@ -162,10 +164,68 @@ pub(crate) struct SnapshotProbe {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct SurfaceManifestEntry {
+    path: String,
+    mode: String,
+    source: String,
+    owner: String,
+    surface_class: String,
+    local_override_allowed: bool,
+    optional: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SurfaceManifestSnapshot {
+    prefix: String,
+    entries: Vec<SurfaceManifestEntry>,
+    requires_parent_gitlink: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SourceCandidate {
+    relative: String,
+    authority_id: String,
+    canonical_locator: String,
+    locator_kind: String,
+    path_role: String,
+    file_mode: String,
+    exists: bool,
+    bytes: Vec<u8>,
+    git_blob_or_gitlink: String,
+    submodule_commit: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GitlinkAuthority {
+    path: String,
+    staged_oid: String,
+    submodule_head: String,
+    submodule_root: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum GitlinkIndexState {
+    Missing,
+    NonGitlinkMode { mode: String },
+    Conflict { stage: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ManifestError {
     Io(String),
     Git(String),
     Transport(String),
+    SurfaceManifest(String),
+    Gitlink(String),
+    GitlinkIndexState {
+        path: String,
+        state: GitlinkIndexState,
+    },
+    GitlinkHeadMismatch {
+        path: String,
+        staged_oid: String,
+        head_oid: String,
+    },
     SnapshotInconsistent(String),
 }
 
@@ -175,7 +235,30 @@ impl fmt::Display for ManifestError {
             Self::Io(message)
             | Self::Git(message)
             | Self::Transport(message)
+            | Self::SurfaceManifest(message)
+            | Self::Gitlink(message)
             | Self::SnapshotInconsistent(message) => formatter.write_str(message),
+            Self::GitlinkIndexState { path, state } => match state {
+                GitlinkIndexState::Missing => {
+                    write!(formatter, "gitlink_index_state: path={path} state=missing")
+                }
+                GitlinkIndexState::NonGitlinkMode { mode } => write!(
+                    formatter,
+                    "gitlink_index_state: path={path} state=non-160000 mode={mode}"
+                ),
+                GitlinkIndexState::Conflict { stage } => write!(
+                    formatter,
+                    "gitlink_index_state: path={path} state=conflict stage={stage}"
+                ),
+            },
+            Self::GitlinkHeadMismatch {
+                path,
+                staged_oid,
+                head_oid,
+            } => write!(
+                formatter,
+                "gitlink_head_mismatch: path={path} staged_oid={staged_oid} submodule_head={head_oid}"
+            ),
         }
     }
 }
@@ -203,6 +286,195 @@ fn git_text(root: &Path, args: &[&str]) -> Result<String, ManifestError> {
         ));
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn git_bytes_owned(root: &Path, args: &[String]) -> Result<Vec<u8>, ManifestError> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .map_err(|error| ManifestError::Git(error.to_string()))?;
+    if !output.status.success() {
+        return Err(ManifestError::Git(
+            String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        ));
+    }
+    Ok(output.stdout)
+}
+
+fn required_json_object<'a>(
+    value: &'a serde_json::Value,
+    owner: &str,
+) -> Result<&'a serde_json::Map<String, serde_json::Value>, ManifestError> {
+    value.as_object().ok_or_else(|| {
+        ManifestError::SurfaceManifest(format!("surface_manifest_snapshot: {owner} must be object"))
+    })
+}
+
+fn required_json_string(
+    object: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    owner: &str,
+) -> Result<String, ManifestError> {
+    object
+        .get(key)
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| {
+            ManifestError::SurfaceManifest(format!(
+                "surface_manifest_snapshot: {owner}.{key} must be nonempty string"
+            ))
+        })
+}
+
+fn required_json_bool(
+    object: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    owner: &str,
+) -> Result<bool, ManifestError> {
+    object
+        .get(key)
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| {
+            ManifestError::SurfaceManifest(format!(
+                "surface_manifest_snapshot: {owner}.{key} must be boolean"
+            ))
+        })
+}
+
+fn require_exact_json_keys(
+    object: &serde_json::Map<String, serde_json::Value>,
+    expected: &[&str],
+    owner: &str,
+) -> Result<(), ManifestError> {
+    let actual = object.keys().map(String::as_str).collect::<BTreeSet<_>>();
+    let expected = expected.iter().copied().collect::<BTreeSet<_>>();
+    if actual != expected {
+        return Err(ManifestError::SurfaceManifest(format!(
+            "surface_manifest_snapshot: {owner} fields are not canonical"
+        )));
+    }
+    Ok(())
+}
+
+fn surface_manifest_script(root: &Path) -> Result<(PathBuf, bool), ManifestError> {
+    let parent_script = root.join("vendor/agent-canon/tools/agent_tools/surface_manifest.py");
+    if parent_script.is_file() {
+        return Ok((parent_script, true));
+    }
+    let standalone_script = root.join("tools/agent_tools/surface_manifest.py");
+    if standalone_script.is_file() {
+        return Ok((standalone_script, false));
+    }
+    Err(ManifestError::SurfaceManifest(
+        "surface_manifest_snapshot: canonical Python producer is missing".to_string(),
+    ))
+}
+
+fn load_surface_manifest_snapshot(root: &Path) -> Result<SurfaceManifestSnapshot, ManifestError> {
+    let (script, requires_parent_gitlink) = surface_manifest_script(root)?;
+    let output = Command::new("python3")
+        .arg(script)
+        .args([
+            "--root",
+            root.to_str().ok_or_else(|| {
+                ManifestError::SurfaceManifest(
+                    "surface_manifest_snapshot: root is not UTF-8".to_string(),
+                )
+            })?,
+            "--prefix",
+            "vendor/agent-canon",
+            "--manifest",
+            "documents/runtime/shared-runtime-surfaces.toml",
+            "normalized-snapshot",
+        ])
+        .output()
+        .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
+    if !output.status.success() {
+        return Err(ManifestError::SurfaceManifest(format!(
+            "surface_manifest_snapshot: producer failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )));
+    }
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).map_err(|error| {
+        ManifestError::SurfaceManifest(format!("surface_manifest_snapshot: invalid JSON: {error}"))
+    })?;
+    let object = required_json_object(&value, "snapshot")?;
+    require_exact_json_keys(object, &["entries", "prefix", "schema"], "snapshot")?;
+    if object.get("schema").and_then(serde_json::Value::as_str)
+        != Some(SURFACE_MANIFEST_SNAPSHOT_SCHEMA)
+    {
+        return Err(ManifestError::SurfaceManifest(
+            "surface_manifest_snapshot: schema mismatch".to_string(),
+        ));
+    }
+    let prefix = required_json_string(object, "prefix", "snapshot")?;
+    let raw_entries = object
+        .get("entries")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| {
+            ManifestError::SurfaceManifest(
+                "surface_manifest_snapshot: snapshot.entries must be array".to_string(),
+            )
+        })?;
+    let mut entries = Vec::with_capacity(raw_entries.len());
+    let mut paths = BTreeSet::new();
+    for (index, raw_entry) in raw_entries.iter().enumerate() {
+        let owner = format!("snapshot.entries[{index}]");
+        let entry = required_json_object(raw_entry, &owner)?;
+        require_exact_json_keys(
+            entry,
+            &[
+                "class",
+                "local_override_allowed",
+                "mode",
+                "optional",
+                "owner",
+                "path",
+                "source",
+            ],
+            &owner,
+        )?;
+        let path = required_json_string(entry, "path", &owner)?;
+        if !paths.insert(path.clone()) {
+            return Err(ManifestError::SurfaceManifest(format!(
+                "surface_manifest_snapshot: duplicate path {path}"
+            )));
+        }
+        let mode = required_json_string(entry, "mode", &owner)?;
+        let source = entry
+            .get("source")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                ManifestError::SurfaceManifest(format!(
+                    "surface_manifest_snapshot: {owner}.source must be string"
+                ))
+            })?
+            .to_string();
+        let owner_value = required_json_string(entry, "owner", &owner)?;
+        let surface_class = required_json_string(entry, "class", &owner)?;
+        if matches!(mode.as_str(), "symlink" | "copy") && source.is_empty() {
+            return Err(ManifestError::SurfaceManifest(format!(
+                "surface_manifest_snapshot: {path} projection source is empty"
+            )));
+        }
+        entries.push(SurfaceManifestEntry {
+            path,
+            mode,
+            source,
+            owner: owner_value,
+            surface_class,
+            local_override_allowed: required_json_bool(entry, "local_override_allowed", &owner)?,
+            optional: required_json_bool(entry, "optional", &owner)?,
+        });
+    }
+    Ok(SurfaceManifestSnapshot {
+        prefix,
+        entries,
+        requires_parent_gitlink,
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -331,6 +603,9 @@ pub(crate) fn source_path_is_explicitly_excluded(relative_path: &str) -> bool {
         || relative_path.starts_with(".agent-canon/log-archive/")
         || relative_path == ".agent-canon/runtime-event-spool"
         || relative_path.starts_with(".agent-canon/runtime-event-spool/")
+        || relative_path == ".agent-canon/update-state.toml"
+        || relative_path == ".agent-canon/update-lifecycle"
+        || relative_path.starts_with(".agent-canon/update-lifecycle/")
     {
         return true;
     }
@@ -342,6 +617,58 @@ pub(crate) fn source_path_is_explicitly_excluded(relative_path: &str) -> bool {
         return true;
     }
     parts.len() >= 3 && parts[0] == "experiments" && matches!(parts[2], "result" | "report")
+}
+
+fn path_is_surface_or_descendant(relative: &str, surface: &str) -> bool {
+    relative
+        .strip_prefix(surface)
+        .is_some_and(|suffix| suffix.is_empty() || suffix.starts_with('/'))
+}
+
+fn manifest_repo_state_entry<'a>(
+    manifest: &'a SurfaceManifestSnapshot,
+    canonical_locator: &str,
+) -> Option<&'a SurfaceManifestEntry> {
+    let mut selected: Option<&SurfaceManifestEntry> = None;
+    for entry in &manifest.entries {
+        if entry.mode != "repo_state"
+            || !path_is_surface_or_descendant(canonical_locator, &entry.path)
+        {
+            continue;
+        }
+        if selected.is_none_or(|current| {
+            entry.path.len() > current.path.len()
+                || (entry.path.len() == current.path.len() && entry.path < current.path)
+        }) {
+            selected = Some(entry);
+        }
+    }
+    selected
+}
+
+fn manifest_repo_state_target<'a>(
+    manifest: &'a SurfaceManifestSnapshot,
+    authority: Option<&GitlinkAuthority>,
+    relative: &str,
+) -> Option<&'a SurfaceManifestEntry> {
+    let canonical_locator = authority
+        .and_then(|value| {
+            relative
+                .strip_prefix(&value.path)
+                .and_then(|suffix| suffix.strip_prefix('/'))
+        })
+        .unwrap_or(relative);
+    manifest_repo_state_entry(manifest, canonical_locator)
+}
+
+fn source_candidate_is_explicitly_excluded(
+    candidate: &SourceCandidate,
+    manifest: &SurfaceManifestSnapshot,
+) -> bool {
+    source_path_is_explicitly_excluded(&candidate.relative)
+        || (candidate.locator_kind == "submodule-path"
+            && source_path_is_explicitly_excluded(&candidate.canonical_locator))
+        || manifest_repo_state_entry(manifest, &candidate.canonical_locator).is_some()
 }
 
 fn git_bytes(root: &Path, args: &[&str]) -> Result<Vec<u8>, ManifestError> {
@@ -384,16 +711,182 @@ fn git_visible_paths(root: &Path) -> Result<Vec<String>, ManifestError> {
     Ok(paths)
 }
 
+fn staged_gitlink(root: &Path, prefix: &str) -> Result<String, ManifestError> {
+    let bytes = git_bytes(root, &["ls-files", "--stage", "-z"])?;
+    let mut found = None;
+    for record in bytes
+        .split(|byte| *byte == 0)
+        .filter(|record| !record.is_empty())
+    {
+        let (metadata, path) = split_tab_record(record).ok_or_else(|| {
+            ManifestError::Gitlink("gitlink index record is malformed".to_string())
+        })?;
+        let fields = metadata.split(|byte| *byte == b' ').collect::<Vec<_>>();
+        if fields.len() != 3 {
+            return Err(ManifestError::Gitlink(
+                "gitlink index metadata is malformed".to_string(),
+            ));
+        }
+        if path != prefix.as_bytes() {
+            continue;
+        }
+        let stage = String::from_utf8_lossy(fields[2]).to_string();
+        if stage != "0" {
+            return Err(ManifestError::GitlinkIndexState {
+                path: prefix.to_string(),
+                state: GitlinkIndexState::Conflict { stage },
+            });
+        }
+        if fields[0] != b"160000" {
+            return Err(ManifestError::GitlinkIndexState {
+                path: prefix.to_string(),
+                state: GitlinkIndexState::NonGitlinkMode {
+                    mode: String::from_utf8_lossy(fields[0]).to_string(),
+                },
+            });
+        }
+        {
+            let oid = String::from_utf8(fields[1].to_vec()).map_err(|error| {
+                ManifestError::Gitlink(format!("gitlink index OID is not UTF-8: {error}"))
+            })?;
+            if found.replace(oid).is_some() {
+                return Err(ManifestError::Gitlink(
+                    "gitlink index contains duplicate path".to_string(),
+                ));
+            }
+        }
+    }
+    found.ok_or_else(|| ManifestError::GitlinkIndexState {
+        path: prefix.to_string(),
+        state: GitlinkIndexState::Missing,
+    })
+}
+
+fn gitlink_authority(
+    root: &Path,
+    manifest: &SurfaceManifestSnapshot,
+) -> Result<Option<GitlinkAuthority>, ManifestError> {
+    if !manifest.requires_parent_gitlink {
+        return Ok(None);
+    }
+    let staged_oid = staged_gitlink(root, &manifest.prefix)?;
+    let submodule_root = root.join(&manifest.prefix);
+    let submodule_head = git_text(&submodule_root, &["rev-parse", "--verify", "HEAD"])
+        .map_err(|error| ManifestError::Gitlink(format!("submodule HEAD unavailable: {error}")))?;
+    if staged_oid != submodule_head {
+        return Err(ManifestError::GitlinkHeadMismatch {
+            path: manifest.prefix.clone(),
+            staged_oid,
+            head_oid: submodule_head,
+        });
+    }
+    Ok(Some(GitlinkAuthority {
+        path: manifest.prefix.clone(),
+        staged_oid,
+        submodule_head,
+        submodule_root,
+    }))
+}
+
+fn split_tab_record(record: &[u8]) -> Option<(&[u8], &[u8])> {
+    let index = record.iter().position(|byte| *byte == b'\t')?;
+    Some((&record[..index], &record[index + 1..]))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PinnedGitEntry {
+    relative: String,
+    mode: String,
+    object_type: String,
+    object_id: String,
+}
+
+fn pinned_git_entries(authority: &GitlinkAuthority) -> Result<Vec<PinnedGitEntry>, ManifestError> {
+    let args = vec![
+        "ls-tree".to_string(),
+        "--full-tree".to_string(),
+        "-r".to_string(),
+        "-t".to_string(),
+        "-z".to_string(),
+        authority.staged_oid.clone(),
+    ];
+    let bytes = git_bytes_owned(&authority.submodule_root, &args).map_err(|error| {
+        ManifestError::Gitlink(format!("pinned submodule tree unavailable: {error}"))
+    })?;
+    let mut entries = Vec::new();
+    for record in bytes
+        .split(|byte| *byte == 0)
+        .filter(|record| !record.is_empty())
+    {
+        let (metadata, path) = split_tab_record(record).ok_or_else(|| {
+            ManifestError::Gitlink("pinned submodule tree record is malformed".to_string())
+        })?;
+        let fields = metadata.split(|byte| *byte == b' ').collect::<Vec<_>>();
+        if fields.len() != 3 {
+            return Err(ManifestError::Gitlink(
+                "pinned submodule tree metadata is malformed".to_string(),
+            ));
+        }
+        let relative = String::from_utf8(path.to_vec()).map_err(|error| {
+            ManifestError::Gitlink(format!("pinned submodule path is not UTF-8: {error}"))
+        })?;
+        let mode = String::from_utf8(fields[0].to_vec()).map_err(|error| {
+            ManifestError::Gitlink(format!("pinned submodule mode is not UTF-8: {error}"))
+        })?;
+        let object_type = String::from_utf8(fields[1].to_vec()).map_err(|error| {
+            ManifestError::Gitlink(format!(
+                "pinned submodule object type is not UTF-8: {error}"
+            ))
+        })?;
+        let object_id = String::from_utf8(fields[2].to_vec()).map_err(|error| {
+            ManifestError::Gitlink(format!("pinned submodule object OID is not UTF-8: {error}"))
+        })?;
+        if !matches!(object_type.as_str(), "blob" | "tree") {
+            return Err(ManifestError::Gitlink(format!(
+                "pinned submodule object type is unsupported: {object_type}"
+            )));
+        }
+        entries.push(PinnedGitEntry {
+            relative,
+            mode,
+            object_type,
+            object_id,
+        });
+    }
+    entries.sort_by(|left, right| left.relative.cmp(&right.relative));
+    Ok(entries)
+}
+
+fn pinned_git_object_bytes(
+    authority: &GitlinkAuthority,
+    entry: &PinnedGitEntry,
+) -> Result<Vec<u8>, ManifestError> {
+    if entry.object_type == "tree" {
+        return Ok(Vec::new());
+    }
+    let args = vec![
+        "cat-file".to_string(),
+        "blob".to_string(),
+        entry.object_id.clone(),
+    ];
+    git_bytes_owned(&authority.submodule_root, &args).map_err(|error| {
+        ManifestError::Gitlink(format!(
+            "pinned submodule object unavailable for {}: {error}",
+            entry.relative
+        ))
+    })
+}
+
 struct SourcePathRead {
     bytes: Vec<u8>,
-    file_mode: &'static str,
+    file_mode: String,
     exists: bool,
 }
 
 fn missing_source_path() -> SourcePathRead {
     SourcePathRead {
         bytes: Vec::new(),
-        file_mode: "100644",
+        file_mode: "100644".to_string(),
         exists: false,
     }
 }
@@ -417,7 +910,7 @@ fn read_source_path(root: &Path, relative: &str) -> Result<SourcePathRead, Manif
         };
         return Ok(SourcePathRead {
             bytes: target.as_os_str().as_bytes().to_vec(),
-            file_mode: "120000",
+            file_mode: "120000".to_string(),
             exists: true,
         });
     }
@@ -431,7 +924,7 @@ fn read_source_path(root: &Path, relative: &str) -> Result<SourcePathRead, Manif
         };
         return Ok(SourcePathRead {
             bytes,
-            file_mode: "100644",
+            file_mode: "100644".to_string(),
             exists: true,
         });
     }
@@ -441,34 +934,41 @@ fn read_source_path(root: &Path, relative: &str) -> Result<SourcePathRead, Manif
     )))
 }
 
-fn source_fingerprint_for_paths(root: &Path, paths: &[String]) -> Result<String, ManifestError> {
+fn source_fingerprint_for_candidates(
+    candidates: &[SourceCandidate],
+    manifest: &SurfaceManifestSnapshot,
+) -> Result<String, ManifestError> {
     let mut rows = Vec::new();
     let mut processed = BTreeSet::new();
-    for (index, relative) in paths.iter().enumerate() {
-        if !processed.insert(relative.clone()) {
+    for (index, candidate) in candidates.iter().enumerate() {
+        if !processed.insert(candidate.relative.clone()) {
             return Err(ManifestError::SnapshotInconsistent(
                 "candidate source path was processed twice".to_string(),
             ));
         }
-        let remaining_before = paths.len() - index;
-        if !source_path_is_explicitly_excluded(relative) {
-            let source = read_source_path(root, relative)?;
+        let remaining_before = candidates.len() - index;
+        if !source_candidate_is_explicitly_excluded(candidate, manifest) {
             rows.push(format!(
-                "{}\0{}\0{}\0{}\n",
-                relative,
-                source.exists,
-                source.file_mode,
-                hash_bytes(&source.bytes)
+                "{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\n",
+                candidate.authority_id,
+                candidate.canonical_locator,
+                candidate.locator_kind,
+                candidate.relative,
+                candidate.exists,
+                candidate.file_mode,
+                candidate.git_blob_or_gitlink,
+                // Content is an evidence term for freshness, never an identity key.
+                hash_bytes(&candidate.bytes)
             ));
         }
-        let remaining_after = paths.len() - processed.len();
+        let remaining_after = candidates.len() - processed.len();
         if remaining_after >= remaining_before {
             return Err(ManifestError::SnapshotInconsistent(
                 "candidate source measure did not decrease".to_string(),
             ));
         }
     }
-    if processed.len() != paths.len() {
+    if processed.len() != candidates.len() {
         return Err(ManifestError::SnapshotInconsistent(
             "candidate source processed set is incomplete".to_string(),
         ));
@@ -476,7 +976,222 @@ fn source_fingerprint_for_paths(root: &Path, paths: &[String]) -> Result<String,
     Ok(hash_text(&rows.concat()))
 }
 
-fn source_status_bytes(root: &Path) -> Result<Vec<u8>, ManifestError> {
+fn source_candidates(
+    root: &Path,
+    manifest: &SurfaceManifestSnapshot,
+    git_head: &str,
+    authority: Option<&GitlinkAuthority>,
+) -> Result<Vec<SourceCandidate>, ManifestError> {
+    let authority_id = authority
+        .map(|value| format!("parent-gitlink:160000:{}:{}", value.path, value.staged_oid))
+        .unwrap_or_else(|| format!("standalone-git:{git_head}"));
+    let mut candidates = Vec::new();
+    for relative in git_visible_paths(root)? {
+        let source = read_source_path(root, &relative)?;
+        let git_blob_or_gitlink = git_text(root, &["hash-object", "--", &relative])
+            .or_else(|_| git_text(root, &["rev-parse", &format!(":{relative}")]))
+            .unwrap_or_default();
+        candidates.push(SourceCandidate {
+            relative: relative.clone(),
+            authority_id: authority_id.clone(),
+            canonical_locator: relative,
+            locator_kind: "repo-relative".to_string(),
+            path_role: "source".to_string(),
+            file_mode: source.file_mode,
+            exists: source.exists,
+            bytes: source.bytes,
+            git_blob_or_gitlink,
+            submodule_commit: String::new(),
+        });
+    }
+    let Some(authority) = authority else {
+        candidates.sort_by(|left, right| left.relative.cmp(&right.relative));
+        return Ok(candidates);
+    };
+    let root_candidate = SourceCandidate {
+        relative: authority.path.clone(),
+        authority_id: authority_id.clone(),
+        canonical_locator: authority.path.clone(),
+        locator_kind: "gitlink".to_string(),
+        path_role: "gitlink".to_string(),
+        file_mode: "160000".to_string(),
+        exists: true,
+        bytes: authority.staged_oid.as_bytes().to_vec(),
+        git_blob_or_gitlink: authority.staged_oid.clone(),
+        submodule_commit: authority.submodule_head.clone(),
+    };
+    candidates.push(root_candidate);
+    for entry in pinned_git_entries(authority)? {
+        let bytes = pinned_git_object_bytes(authority, &entry)?;
+        let relative = format!("{}/{}", authority.path, entry.relative);
+        let path_role = if entry.object_type == "tree" {
+            "submodule-tree"
+        } else {
+            "source"
+        };
+        candidates.push(SourceCandidate {
+            relative,
+            authority_id: authority_id.clone(),
+            canonical_locator: entry.relative,
+            locator_kind: "submodule-path".to_string(),
+            path_role: path_role.to_string(),
+            file_mode: entry.mode,
+            exists: true,
+            bytes,
+            git_blob_or_gitlink: entry.object_id,
+            submodule_commit: authority.submodule_head.clone(),
+        });
+    }
+    candidates.sort_by(|left, right| left.relative.cmp(&right.relative));
+    for pair in candidates.windows(2) {
+        if pair[0].relative == pair[1].relative {
+            return Err(ManifestError::SnapshotInconsistent(format!(
+                "source candidate path is duplicated: {}",
+                pair[0].relative
+            )));
+        }
+    }
+    let _ = manifest;
+    Ok(candidates)
+}
+
+fn surface_target_path(
+    manifest: &SurfaceManifestSnapshot,
+    entry: &SurfaceManifestEntry,
+    authority: Option<&GitlinkAuthority>,
+) -> Result<Option<String>, ManifestError> {
+    if entry.source.is_empty() || !matches!(entry.mode.as_str(), "symlink" | "copy") {
+        return Ok(None);
+    }
+    let source = Path::new(&entry.source);
+    let normalized = normalize_relative(source).map_err(|error| {
+        ManifestError::SurfaceManifest(format!(
+            "surface_manifest_snapshot: {} source path is invalid: {error:?}",
+            entry.path
+        ))
+    })?;
+    if let Some(authority) = authority {
+        Ok(Some(format!("{}/{}", authority.path, normalized)))
+    } else {
+        let _ = manifest;
+        Ok(Some(normalized))
+    }
+}
+
+fn canonicalize_surface_path(
+    manifest: &SurfaceManifestSnapshot,
+    authority: Option<&GitlinkAuthority>,
+    relative: &str,
+) -> Result<String, ManifestError> {
+    let mut selected: Option<(&SurfaceManifestEntry, &str)> = None;
+    for entry in &manifest.entries {
+        if !matches!(entry.mode.as_str(), "symlink" | "copy") || entry.source.is_empty() {
+            continue;
+        }
+        let view = entry.path.trim_end_matches('/');
+        let Some(suffix) = relative
+            .strip_prefix(view)
+            .filter(|suffix| suffix.is_empty() || suffix.starts_with('/'))
+        else {
+            continue;
+        };
+        let replace = selected.is_none_or(|(selected_entry, _)| {
+            let selected_view = selected_entry.path.trim_end_matches('/');
+            view.len() > selected_view.len()
+                || (view.len() == selected_view.len() && view < selected_view)
+        });
+        if replace {
+            selected = Some((entry, suffix));
+        }
+    }
+    if let Some((entry, suffix)) = selected {
+        let source = if let Some(authority) = authority {
+            format!("{}/{}", authority.path, entry.source)
+        } else {
+            entry.source.clone()
+        };
+        let joined = format!("{source}{suffix}");
+        return normalize_relative(Path::new(&joined)).map_err(|error| {
+            ManifestError::SurfaceManifest(format!(
+                "surface_manifest_snapshot: projected path is invalid: {joined}: {error:?}"
+            ))
+        });
+    }
+    Ok(relative.to_string())
+}
+
+fn manifest_surface_relations(
+    manifest: &SurfaceManifestSnapshot,
+    authority: Option<&GitlinkAuthority>,
+    identities: &[SourceIdentity],
+    excluded: &BTreeSet<String>,
+    snapshot_id: &str,
+) -> Result<Vec<SurfaceRelation>, ManifestError> {
+    let by_path = identities
+        .iter()
+        .map(|identity| (identity.repo_rel_path.as_str(), identity))
+        .collect::<BTreeMap<_, _>>();
+    let mut relations = Vec::new();
+    for entry in &manifest.entries {
+        let Some(target_path) = surface_target_path(manifest, entry, authority)? else {
+            continue;
+        };
+        if excluded.contains(&entry.path) || excluded.contains(&target_path) {
+            continue;
+        }
+        let Some(source) = by_path.get(entry.path.as_str()) else {
+            continue;
+        };
+        let Some(target) = by_path.get(target_path.as_str()) else {
+            continue;
+        };
+        relations.push(SurfaceRelation {
+            relation_id: hash_text(&format!(
+                "surface\0{}\0{}\0{}\0{}",
+                entry.mode, entry.path, target_path, source.authority_id
+            )),
+            relation_type: "view".to_string(),
+            source_identity_id: source.identity_id.clone(),
+            target_identity_id: target.identity_id.clone(),
+            source_path: entry.path.clone(),
+            target_path,
+            owner_class: format!("{}:{}", entry.owner, entry.surface_class),
+            surface_mode: entry.mode.clone(),
+            content_hash_equal: entry.mode == "copy" && source.content_hash == target.content_hash,
+            evidence_id: hash_text(&format!(
+                "surface-evidence\0{}\0{}\0{}",
+                source.content_hash, target.content_hash, snapshot_id
+            )),
+            status: "active".to_string(),
+            snapshot_id: snapshot_id.to_string(),
+        });
+    }
+    Ok(relations)
+}
+
+fn exclusion_metadata(
+    manifest: &SurfaceManifestSnapshot,
+    candidate: &SourceCandidate,
+) -> (&'static str, &'static str) {
+    if manifest_repo_state_entry(manifest, &candidate.canonical_locator).is_some() {
+        ("manifest_owned_state", "surface-manifest-repo-state")
+    } else {
+        ("generated_output", "source-owner-exclusion")
+    }
+}
+
+fn path_is_gitlink_authority_boundary(
+    authority: Option<&GitlinkAuthority>,
+    relative: &str,
+) -> bool {
+    authority.is_some_and(|value| path_is_surface_or_descendant(relative, &value.path))
+}
+
+fn source_status_bytes(
+    root: &Path,
+    manifest: &SurfaceManifestSnapshot,
+    authority: Option<&GitlinkAuthority>,
+) -> Result<Vec<u8>, ManifestError> {
     let raw = git_bytes(root, &["status", "--porcelain=v1", "--untracked-files=all"])?;
     let mut filtered = Vec::new();
     for line in raw
@@ -493,10 +1208,11 @@ fn source_status_bytes(root: &Path) -> Result<Vec<u8>, ManifestError> {
             .split(" -> ")
             .map(|path| path.trim().trim_matches('"'))
             .collect::<Vec<_>>();
-        if paths
-            .iter()
-            .all(|path| source_path_is_explicitly_excluded(path))
-        {
+        if paths.iter().all(|path| {
+            source_path_is_explicitly_excluded(path)
+                || path_is_gitlink_authority_boundary(authority, path)
+                || manifest_repo_state_entry(manifest, path).is_some()
+        }) {
             continue;
         }
         filtered.extend_from_slice(line);
@@ -591,10 +1307,12 @@ pub(crate) fn probe_snapshot_identity(
     profile: &str,
 ) -> Result<SnapshotProbe, ManifestError> {
     let root = fs::canonicalize(root).map_err(|error| ManifestError::Io(error.to_string()))?;
-    let candidate_paths = git_visible_paths(&root)?;
-    let source_fingerprint = source_fingerprint_for_paths(&root, &candidate_paths)?;
-    let status = source_status_bytes(&root)?;
+    let surface_manifest = load_surface_manifest_snapshot(&root)?;
     let head = git_text(&root, &["rev-parse", "--verify", "HEAD"])?;
+    let authority = gitlink_authority(&root, &surface_manifest)?;
+    let candidates = source_candidates(&root, &surface_manifest, &head, authority.as_ref())?;
+    let source_fingerprint = source_fingerprint_for_candidates(&candidates, &surface_manifest)?;
+    let status = source_status_bytes(&root, &surface_manifest, authority.as_ref())?;
     let index_hash = hash_bytes(&git_bytes(&root, &["ls-files", "--stage", "-z"])?);
     let status_hash = hash_bytes(&status);
     let _capture_hash = snapshot_capture_hash(
@@ -622,11 +1340,18 @@ pub(crate) fn capture_snapshot(
             root.display()
         )));
     }
-    let candidate_paths = git_visible_paths(&root)?;
-    let source_fingerprint_before = source_fingerprint_for_paths(&root, &candidate_paths)?;
+    let surface_manifest = load_surface_manifest_snapshot(&root)?;
     let git_head = git_text(&root, &["rev-parse", "--verify", "HEAD"])?;
+    let authority = gitlink_authority(&root, &surface_manifest)?;
+    let candidates = source_candidates(&root, &surface_manifest, &git_head, authority.as_ref())?;
+    let candidate_paths = candidates
+        .iter()
+        .map(|candidate| candidate.relative.clone())
+        .collect::<Vec<_>>();
+    let source_fingerprint_before =
+        source_fingerprint_for_candidates(&candidates, &surface_manifest)?;
     let index_hash = hash_bytes(&git_bytes(&root, &["ls-files", "--stage", "-z"])?);
-    let status_bytes = source_status_bytes(&root)?;
+    let status_bytes = source_status_bytes(&root, &surface_manifest, authority.as_ref())?;
     let status_hash = hash_bytes(&status_bytes);
     let captured_before_hash = snapshot_capture_hash(
         &request.profile,
@@ -640,12 +1365,12 @@ pub(crate) fn capture_snapshot(
         .map(|line| line.get(3..).unwrap_or(line).to_string())
         .collect::<Vec<_>>();
     let dirty_set = dirty_paths.iter().cloned().collect::<BTreeSet<_>>();
-    let excluded_paths = candidate_paths
+    let excluded_set = candidates
         .iter()
-        .filter(|path| source_path_is_explicitly_excluded(path))
-        .cloned()
-        .collect::<Vec<_>>();
-    let excluded_set = excluded_paths.iter().cloned().collect::<BTreeSet<_>>();
+        .filter(|candidate| source_candidate_is_explicitly_excluded(candidate, &surface_manifest))
+        .map(|candidate| candidate.relative.clone())
+        .collect::<BTreeSet<_>>();
+    let excluded_paths = excluded_set.iter().cloned().collect::<Vec<_>>();
     let eligible_paths = candidate_paths
         .iter()
         .filter(|path| !excluded_set.contains(*path))
@@ -657,9 +1382,17 @@ pub(crate) fn capture_snapshot(
         git_head,
         source_fingerprint_before
     ));
-    let identity_by_path = candidate_paths
+    let identity_by_path = candidates
         .iter()
-        .map(|path| (path.clone(), hash_text(&format!("source:{path}"))))
+        .map(|candidate| {
+            (
+                candidate.relative.clone(),
+                hash_text(&format!(
+                    "identity:{}\0{}\0{}",
+                    candidate.authority_id, candidate.canonical_locator, candidate.locator_kind
+                )),
+            )
+        })
         .collect::<BTreeMap<_, _>>();
     let mut source_identities = Vec::new();
     let mut source_exclusions = Vec::new();
@@ -667,43 +1400,42 @@ pub(crate) fn capture_snapshot(
     let mut manifests = BTreeMap::new();
     let mut diagnostics = Vec::new();
     let mut processed = BTreeSet::new();
-    for (index, relative) in candidate_paths.iter().enumerate() {
+    for (index, candidate) in candidates.iter().enumerate() {
+        let relative = &candidate.relative;
         if !processed.insert(relative.clone())
-            || candidate_paths.len() - processed.len() >= candidate_paths.len() - index
+            || candidates.len() - processed.len() >= candidates.len() - index
         {
             return Err(ManifestError::SnapshotInconsistent(
                 "candidate source processing is not monotone".to_string(),
             ));
         }
-        let path = root.join(relative);
-        let source = read_source_path(&root, relative)?;
         let identity_id = identity_by_path.get(relative).cloned().unwrap_or_default();
-        let blob = git_text(&root, &["hash-object", "--", relative])
-            .or_else(|_| git_text(&root, &["rev-parse", &format!(":{relative}")]))
-            .unwrap_or_default();
         source_identities.push(SourceIdentity {
             identity_id: identity_id.clone(),
+            authority_id: candidate.authority_id.clone(),
             logical_id: format!("source:{relative}"),
-            repo_rel_path: relative.clone(),
-            canonical_locator: relative.clone(),
+            repo_rel_path: relative.to_string(),
+            canonical_locator: candidate.canonical_locator.clone(),
             alternate_locators: Vec::new(),
-            locator_kind: "repo-relative".to_string(),
-            path_role: "source".to_string(),
-            file_mode: source.file_mode.to_string(),
-            exists: source.exists,
+            locator_kind: candidate.locator_kind.clone(),
+            path_role: candidate.path_role.clone(),
+            file_mode: candidate.file_mode.clone(),
+            exists: candidate.exists,
             is_dirty: dirty_set.contains(relative),
-            content_hash: hash_bytes(&source.bytes),
-            git_blob_or_gitlink: blob,
-            submodule_commit: String::new(),
+            // Content hash is evidence; identity is the authority/locator key above.
+            content_hash: hash_bytes(&candidate.bytes),
+            git_blob_or_gitlink: candidate.git_blob_or_gitlink.clone(),
+            submodule_commit: candidate.submodule_commit.clone(),
             snapshot_id: snapshot_id.clone(),
         });
         if excluded_set.contains(relative) {
+            let (reason_code, rule_id) = exclusion_metadata(&surface_manifest, candidate);
             source_exclusions.push(SourceExclusion {
                 source_exclusion_id: hash_text(&format!("exclude:{identity_id}")),
                 source_identity_id: identity_id,
                 repo_rel_path: relative.clone(),
-                reason_code: "generated_output".to_string(),
-                rule_id: "source-owner-exclusion".to_string(),
+                reason_code: reason_code.to_string(),
+                rule_id: rule_id.to_string(),
                 scope: relative.clone(),
                 evidence_id: hash_text(relative),
                 covered: true,
@@ -711,9 +1443,18 @@ pub(crate) fn capture_snapshot(
             });
             continue;
         }
-        let Ok(text) = String::from_utf8(source.bytes) else {
+        if authority.is_some()
+            && surface_manifest.entries.iter().any(|entry| {
+                entry.path == relative.as_str() && matches!(entry.mode.as_str(), "symlink" | "copy")
+            })
+        {
+            // Parent root views are projections; parse their pinned canonical source once.
+            continue;
+        }
+        let Ok(text) = String::from_utf8(candidate.bytes.clone()) else {
             continue;
         };
+        let path = root.join(relative);
         let entries = manifest_lines(&path, &text);
         if entries.is_empty() {
             continue;
@@ -755,21 +1496,37 @@ pub(crate) fn capture_snapshot(
                 });
                 continue;
             }
-            let resolved = match resolve_source_relative_target(relative, target) {
+            let (resolved, attestation_key) = match resolve_source_relative_target(relative, target)
+            {
                 Ok(target_path) => {
-                    let resolved = identity_by_path
-                        .get(&target_path)
-                        .filter(|_| !excluded_set.contains(&target_path))
-                        .cloned();
-                    if resolved.is_none() {
-                        diagnostics.push(target_unresolved_diagnostic(
-                            relative,
-                            line_number,
-                            &line,
-                            target,
-                        ));
+                    let canonical_target_path = canonicalize_surface_path(
+                        &surface_manifest,
+                        authority.as_ref(),
+                        &target_path,
+                    )?;
+                    if manifest_repo_state_target(
+                        &surface_manifest,
+                        authority.as_ref(),
+                        &canonical_target_path,
+                    )
+                    .is_some()
+                    {
+                        (None, "surface-manifest-repo-state")
+                    } else {
+                        let resolved = identity_by_path
+                            .get(&canonical_target_path)
+                            .filter(|_| !excluded_set.contains(&canonical_target_path))
+                            .cloned();
+                        if resolved.is_none() {
+                            diagnostics.push(target_unresolved_diagnostic(
+                                relative,
+                                line_number,
+                                &line,
+                                target,
+                            ));
+                        }
+                        (resolved, "dependency-header")
                     }
-                    resolved
                 }
                 Err(error) => {
                     diagnostics.push(target_path_diagnostic(
@@ -779,7 +1536,7 @@ pub(crate) fn capture_snapshot(
                         target,
                         error,
                     ));
-                    None
+                    (None, "dependency-header")
                 }
             };
             declarations.push(DependencyDeclaration {
@@ -800,16 +1557,27 @@ pub(crate) fn capture_snapshot(
                 },
                 reason,
                 raw_line_hash: hash_text(&line),
-                attestation_key: "dependency-header".to_string(),
+                attestation_key: attestation_key.to_string(),
                 snapshot_id: snapshot_id.clone(),
             });
         }
     }
-    let candidate_paths_after = git_visible_paths(&root)?;
-    let source_fingerprint_after = source_fingerprint_for_paths(&root, &candidate_paths_after)?;
     let git_head_after = git_text(&root, &["rev-parse", "--verify", "HEAD"])?;
+    let authority_after = gitlink_authority(&root, &surface_manifest)?;
+    let candidates_after = source_candidates(
+        &root,
+        &surface_manifest,
+        &git_head_after,
+        authority_after.as_ref(),
+    )?;
+    let candidate_paths_after = candidates_after
+        .iter()
+        .map(|candidate| candidate.relative.clone())
+        .collect::<Vec<_>>();
+    let source_fingerprint_after =
+        source_fingerprint_for_candidates(&candidates_after, &surface_manifest)?;
     let index_hash_after = hash_bytes(&git_bytes(&root, &["ls-files", "--stage", "-z"])?);
-    let status_after = source_status_bytes(&root)?;
+    let status_after = source_status_bytes(&root, &surface_manifest, authority_after.as_ref())?;
     let captured_after_hash = snapshot_capture_hash(
         &request.profile,
         &git_head_after,
@@ -822,6 +1590,13 @@ pub(crate) fn capture_snapshot(
             "git/filesystem state changed during snapshot capture".to_string(),
         ));
     }
+    let surface_relations = manifest_surface_relations(
+        &surface_manifest,
+        authority.as_ref(),
+        &source_identities,
+        &excluded_set,
+        &snapshot_id,
+    )?;
     Ok(ManifestSnapshot {
         header: SnapshotHeader {
             snapshot_id: snapshot_id.clone(),
@@ -832,7 +1607,10 @@ pub(crate) fn capture_snapshot(
             git_worktree_dirty: !dirty_paths.is_empty(),
             git_status_hash: status_hash,
             dirty_paths,
-            agentcanon_pin: String::new(),
+            agentcanon_pin: authority
+                .as_ref()
+                .map(|value| value.staged_oid.clone())
+                .unwrap_or_default(),
             schema_version: SNAPSHOT_SCHEMA_VERSION.to_string(),
             tool_version: "agent-canon.graph.v1".to_string(),
             profile: request.profile.clone(),
@@ -845,7 +1623,7 @@ pub(crate) fn capture_snapshot(
         source_identities,
         declarations,
         source_exclusions,
-        surface_relations: Vec::new(),
+        surface_relations,
         source_universe: SourceUniverse {
             candidate_paths,
             excluded_paths,
@@ -863,7 +1641,7 @@ pub(crate) fn write_snapshot_jsonl(
     snapshot: &ManifestSnapshot,
     writer: &mut impl Write,
 ) -> Result<(), ManifestError> {
-    let header = json!({"record_type":"header","schema_version":SNAPSHOT_SCHEMA_VERSION,"snapshot_id":snapshot.header.snapshot_id,"git_head":snapshot.header.git_head,"source_fingerprint":snapshot.header.source_fingerprint,"profile":snapshot.header.profile,"dirty_paths":snapshot.header.dirty_paths});
+    let header = json!({"record_type":"header","schema_version":SNAPSHOT_SCHEMA_VERSION,"snapshot_id":snapshot.header.snapshot_id,"git_head":snapshot.header.git_head,"git_index_tree":snapshot.header.git_index_tree,"agentcanon_pin":snapshot.header.agentcanon_pin,"source_fingerprint":snapshot.header.source_fingerprint,"profile":snapshot.header.profile,"dirty_paths":snapshot.header.dirty_paths});
     writeln!(
         writer,
         "{}",
@@ -871,8 +1649,46 @@ pub(crate) fn write_snapshot_jsonl(
             .map_err(|error| ManifestError::Transport(error.to_string()))?
     )
     .map_err(|error| ManifestError::Io(error.to_string()))?;
+    for identity in &snapshot.source_identities {
+        let value = json!({"record_type":"source_identity","identity_id":identity.identity_id,"authority_id":identity.authority_id,"logical_id":identity.logical_id,"repo_rel_path":identity.repo_rel_path,"canonical_locator":identity.canonical_locator,"alternate_locators":identity.alternate_locators,"locator_kind":identity.locator_kind,"path_role":identity.path_role,"file_mode":identity.file_mode,"exists":identity.exists,"is_dirty":identity.is_dirty,"content_hash":identity.content_hash,"git_blob_or_gitlink":identity.git_blob_or_gitlink,"submodule_commit":identity.submodule_commit,"snapshot_id":identity.snapshot_id});
+        writeln!(
+            writer,
+            "{}",
+            serde_json::to_string(&value)
+                .map_err(|error| ManifestError::Transport(error.to_string()))?
+        )
+        .map_err(|error| ManifestError::Io(error.to_string()))?;
+    }
+    for exclusion in &snapshot.source_exclusions {
+        let value = json!({"record_type":"source_exclusion","source_exclusion_id":exclusion.source_exclusion_id,"source_identity_id":exclusion.source_identity_id,"repo_rel_path":exclusion.repo_rel_path,"reason_code":exclusion.reason_code,"rule_id":exclusion.rule_id,"scope":exclusion.scope,"evidence_id":exclusion.evidence_id,"covered":exclusion.covered,"snapshot_id":exclusion.snapshot_id});
+        writeln!(
+            writer,
+            "{}",
+            serde_json::to_string(&value)
+                .map_err(|error| ManifestError::Transport(error.to_string()))?
+        )
+        .map_err(|error| ManifestError::Io(error.to_string()))?;
+    }
+    for relation in &snapshot.surface_relations {
+        let value = json!({"record_type":"surface_relation","relation_id":relation.relation_id,"relation_type":relation.relation_type,"source_identity_id":relation.source_identity_id,"target_identity_id":relation.target_identity_id,"source_path":relation.source_path,"target_path":relation.target_path,"owner_class":relation.owner_class,"surface_mode":relation.surface_mode,"content_hash_equal":relation.content_hash_equal,"evidence_id":relation.evidence_id,"status":relation.status,"snapshot_id":relation.snapshot_id});
+        writeln!(
+            writer,
+            "{}",
+            serde_json::to_string(&value)
+                .map_err(|error| ManifestError::Transport(error.to_string()))?
+        )
+        .map_err(|error| ManifestError::Io(error.to_string()))?;
+    }
+    let universe = json!({"record_type":"source_universe","candidate_paths":snapshot.source_universe.candidate_paths,"excluded_paths":snapshot.source_universe.excluded_paths,"eligible_paths":snapshot.source_universe.eligible_paths,"eligible_equals_candidate_minus_excluded":snapshot.source_universe.eligible_equals_candidate_minus_excluded,"union_equals_candidate":snapshot.source_universe.union_equals_candidate,"intersection_empty":snapshot.source_universe.intersection_empty});
+    writeln!(
+        writer,
+        "{}",
+        serde_json::to_string(&universe)
+            .map_err(|error| ManifestError::Transport(error.to_string()))?
+    )
+    .map_err(|error| ManifestError::Io(error.to_string()))?;
     for declaration in &snapshot.declarations {
-        let value = json!({"record_type":"dependency_declaration","declaration_id":declaration.declaration_id,"source_identity_id":declaration.source_identity_id,"declared_direction":declaration.declared_direction,"declared_kind":declaration.declared_kind,"declared_target":declaration.declared_target,"resolved_target_identity_id":declaration.resolved_target_identity_id,"source_span": {"path":declaration.source_span.path,"start_line":declaration.source_span.start_line,"start_column":declaration.source_span.start_column,"end_line":declaration.source_span.end_line,"end_column":declaration.source_span.end_column},"reason":declaration.reason,"snapshot_id":declaration.snapshot_id});
+        let value = json!({"record_type":"dependency_declaration","declaration_id":declaration.declaration_id,"source_identity_id":declaration.source_identity_id,"declared_direction":declaration.declared_direction,"declared_kind":declaration.declared_kind,"declared_target":declaration.declared_target,"resolved_target_identity_id":declaration.resolved_target_identity_id,"source_span": {"path":declaration.source_span.path,"start_line":declaration.source_span.start_line,"start_column":declaration.source_span.start_column,"end_line":declaration.source_span.end_line,"end_column":declaration.source_span.end_column},"reason":declaration.reason,"attestation_key":declaration.attestation_key,"snapshot_id":declaration.snapshot_id});
         writeln!(
             writer,
             "{}",

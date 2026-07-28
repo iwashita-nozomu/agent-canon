@@ -15,12 +15,15 @@ from __future__ import annotations
 import argparse
 import re
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 
 try:
     from .graph_client import GraphClient, GraphClientError
+    from .surface_manifest import load_manifest, normalized_snapshot
 except ImportError:  # pragma: no cover - direct CLI execution
     from graph_client import GraphClient, GraphClientError
+    from surface_manifest import load_manifest, normalized_snapshot
 
 CHECKABLE_SUFFIXES = {
     ".bash",
@@ -287,17 +290,59 @@ def graph_manifest_facts(root: Path) -> tuple[dict[str, dict[str, object]], list
         return {}, [f"graph snapshot unavailable: {error}"]
 
 
+def normalized_surface_bindings(root: Path) -> tuple[tuple[tuple[str, str], ...], list[str]]:
+    """Return manifest-owned projection bindings without a second TOML parser."""
+    try:
+        snapshot = normalized_snapshot(
+            load_manifest(root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml")
+        )
+    except (OSError, ValueError) as error:
+        return (), [f"surface manifest snapshot unavailable: {error}"]
+    prefix = snapshot.get("prefix")
+    entries = snapshot.get("entries")
+    if not isinstance(prefix, str) or not prefix or not isinstance(entries, list):
+        return (), ["surface manifest normalized snapshot is malformed"]
+    projected = (root / prefix).is_dir() and (root / ".git").exists()
+    bindings: list[tuple[str, str]] = []
+    for raw_entry in entries:
+        if not isinstance(raw_entry, dict):
+            return (), ["surface manifest normalized entry is malformed"]
+        entry = raw_entry
+        path = entry.get("path")
+        mode = entry.get("mode")
+        source = entry.get("source")
+        if not all(isinstance(value, str) for value in (path, mode, source)):
+            return (), ["surface manifest normalized entry has invalid binding fields"]
+        if mode not in {"symlink", "copy"} or not source:
+            continue
+        target = (Path(prefix) / source).as_posix() if projected else source
+        bindings.append((path, target))
+    bindings.sort(key=lambda binding: (-len(binding[0]), binding[0], binding[1]))
+    return tuple(bindings), []
+
+
+def resolve_surface_binding(relative: str, bindings: Sequence[tuple[str, str]]) -> str:
+    """Resolve exact or projection-directory paths by deterministic longest prefix."""
+    for view, target in bindings:
+        if relative == view or relative.startswith(f"{view}/"):
+            return f"{target}{relative[len(view):]}"
+    return relative
+
+
 def graph_contract_kind_findings(
     root: Path,
     path: Path,
     allowed_kinds: set[str],
     facts: dict[str, dict[str, object]],
+    surface_bindings: Sequence[tuple[str, str]],
 ) -> list[str]:
     """Validate a graph-owned manifest fact without reparsing the source file."""
     relative = repo_relative(root, path)
-    payload = facts.get(relative)
+    canonical_path = resolve_surface_binding(relative, surface_bindings)
+    payload = facts.get(canonical_path)
     if payload is None or payload.get("manifest_present") is not True:
-        return [f"{relative}: missing top dependency manifest block"]
+        owner_path = canonical_path if canonical_path != relative else relative
+        return [f"{owner_path}: missing top dependency manifest block"]
     contract_kind = payload.get("contract_kind")
     if not isinstance(contract_kind, str) or not contract_kind:
         return [f"{relative}: dependency manifest contract kind is absent from graph snapshot"]
@@ -343,13 +388,22 @@ def main() -> int:
             continue
         findings.extend(contract_kind_findings(root, resolved, allowed_kinds))
 
+    surface_bindings: tuple[tuple[str, str], ...] = ()
     if repository_paths:
+        surface_bindings, surface_findings = normalized_surface_bindings(root)
+        findings.extend(surface_findings)
         graph_facts, graph_findings = graph_manifest_facts(root)
         findings.extend(graph_findings)
         if not graph_findings:
             for resolved in repository_paths:
                 findings.extend(
-                    graph_contract_kind_findings(root, resolved, allowed_kinds, graph_facts)
+                    graph_contract_kind_findings(
+                        root,
+                        resolved,
+                        allowed_kinds,
+                        graph_facts,
+                        surface_bindings,
+                    )
                 )
 
     if findings:
