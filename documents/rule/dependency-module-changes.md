@@ -3,6 +3,7 @@
 contract policy
 responsibility Defines the general dependency-module change contract and source-clone lifecycle without owning editor state.
 upstream design ../design/dependency-manifest-design.md dependency ownership and header graph model
+upstream design ../contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace and VS Code workspace boundary
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md parent pin and shared-surface ownership
 downstream implementation ../../tools/agent_tools/dependency_module_change.py enforces clone lifecycle and cleanup gates
 downstream implementation ../../tools/update_agent_canon.sh refuses parent vendor source mutation
@@ -22,33 +23,22 @@ downstream design ../../agents/skills/dependency-module-change.md exposes the sh
 そこには module の `path`、`url`、任意の default `branch` を置きます。`vendor/<module>` はその identity が指す pin と runtime
 projection を提供する場所であり、source branch として直接編集しません。
 
-依存 source を変更する場合の唯一の source edit surface は、task/context/lifecycle
-境界として新規または既存の topic workspace に置く clone です。topic workspace
-は親 repository root直下の `workspace/<topic-slug>` で決まり、中には親 repository cloneと必要な
-dependency source cloneだけを同列に置きます。clone名は module basenameだけ
-（`<module-basename>`）で、branchはclone内部のGit identityです。同じtopicで
-同じmoduleの別branchを併存させず、別責務・別branchは別topicにします。
+依存 source を変更する場合の唯一の source edit surface は、親 repository root
+直下の Git 管理外 `workspace/<topic-slug>/` に置く clone です。topic workspace
+の定義、親 repository の ignore rule、devcontainer mount、VS Code workspace
+運用の禁止、`.vscode/` 共有面との境界は
+[`contracts/github-first-module-and-devcontainer-policy.md`](../contracts/github-first-module-and-devcontainer-policy.md)
+を正本として参照します。この文書は module identity、clone の再利用、branch、
+cleanup、lifecycle command の固有判断だけを持ちます。
+
+clone名は module basenameだけ（`<module-basename>`）で、branchはclone内部の
+Git identityです。同じtopicで同じmoduleの別branchを併存させず、別責務・別branch
+は別topicにします。
 clone の URL は `.gitmodules` の URL、Git-local marker、actual checked-out
 branch と一致しなければ再利用できません。source clone の変更はその
 branch/PR で管理し、親 repository では clean pin と projection だけを扱います。
 `prepare --branch` の task branch が remote にあれば tracking checkout、なければ
 manifest branch（なければ remote HEAD）から新規 branch を作ります。
-
-host layout は `<parent-repo-root>/workspace/<topic-slug>/<clone-basename>` です。
-devcontainer は topic workspace root（選択 repo root の親）を一度だけ
-`/workspace` へ bind mountし、個別 cloneや親 repositoryの二重 mountを作りません。
-container env の `AGENT_CANON_WORKSPACE_ROOT` は `/workspace` 固定です。host
-tool は未指定なら選択 repository の親 directoryから導出し、選択 repository
-rootを越える検索・編集はこの tool の責務外です。
-
-mount target と選択 repo の作業 directory は別の devcontainer 契約です。
-通常の runtime pack の既存 `workdir` schema は変更せず、
-standalone source では `.devcontainer/generate-runtime-compose.sh`、親レポの
-projection では `vendor/agent-canon/.devcontainer/generate-runtime-compose.sh` だけが選択 clone の親である topic
-root (`..`) を一度だけ source にし、選択 repo の working directory を
-`/workspace/<clone-basename>` に materialize します。build context は repo (`..`)
-のままです。通常 Docker/CI runner の `/workspace` 意味はこの devcontainer
-契約から変更しません。
 
 作業結果を保存する report、test result、log、PR evidence は source clone
 や vendor の代替ではありません。各 results owner surface の規約に従って

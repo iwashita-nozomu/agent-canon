@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents the dependency module source-clone lifecycle command.
 upstream design ../rule/dependency-module-changes.md generic dependency module policy
+upstream design ../contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace and VS Code workspace boundary
 upstream implementation ../../tools/agent_tools/dependency_module_change.py lifecycle implementation
 downstream implementation ../../tests/agent_tools/test_dependency_module_change.py validates command behavior
 @dependency-end
@@ -30,9 +31,9 @@ host は `<parent-repo-root>/workspace/<topic-slug>/<parent>` とその同列 mo
 clone名は `<module-basename>` でbranchはGit内部marker/actual branch identityです。
 `.gitmodules` の `branch` は optional な clone base であり、task branch とは別です。
 remote に task branch があれば tracking checkout、なければ clone base から作成します。
-prepare は `PARENT_ROOT`、`SOURCE_CLONE`、`CONTINUE_PATH` を返します。これらの
-clone path は editor-independent な `workspace/<topic-slug>/` 作業領域で使います。
-作業領域の追加メタデータは生成しません。container は topic workspace root 全体を `/workspace` に一度だけ mount
-し、`AGENT_CANON_WORKSPACE_ROOT` は container では `/workspace` 固定です。
+prepare は `PARENT_ROOT`、`SOURCE_CLONE`、`CONTINUE_PATH` を返します。topic workspace
+の filesystem / lifecycle、devcontainer mount、VS Code workspace 運用の禁止、
+`.vscode/` 共有面の境界は [`github-first-module-and-devcontainer-policy.md`](../contracts/github-first-module-and-devcontainer-policy.md)
+だけを参照します。
 `cleanup --apply` は、同じ command segment の authority/reason 環境変数と
 remote 再構成可能性を要求します。

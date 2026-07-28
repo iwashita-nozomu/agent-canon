@@ -810,9 +810,21 @@ def extract_public_surface(root: Path) -> PublicSurfaceReport:
         return PublicSurfaceReport(PUBLIC_SURFACE_PRODUCER_VERSION, (), tuple(findings))
     main_span = token_span(main_path, main_tokens, main_matches[0], len(main_sequence))
     rows: list[PublicSurfaceRow] = []
-    for operation in ("build", "status", "query", "context"):
+    operation_handlers = {
+        "build": "build_graph_with_failure",
+        "status": "read_graph_status",
+        "query": "query_graph",
+        "context": "context_graph",
+    }
+    for operation, handler in operation_handlers.items():
         sequence = (
-            f'"{operation}"', "=>", f"run_{operation}", "(", "&", "args", "[", "1", "..", "]", ")",
+            f'"{operation}"',
+            "=>",
+            handler,
+            "(",
+            "&",
+            "parsed",
+            ")",
         )
         matches = token_sequence_matches(graph_tokens, sequence)
         doc_span = text_phrase_span(cli_path, texts[cli_path], f"graph {operation}")
@@ -971,8 +983,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         for finding in report.findings:
             print(finding.render())
-        print(f"TOOL_CATALOG_FINDINGS={len(report.findings)}")
-        print(f"TOOL_CATALOG={'pass' if not report.findings else 'fail'}")
+        for finding in public.findings:
+            print(finding.render())
+        total_findings = len(report.findings) + len(public.findings)
+        print(f"TOOL_CATALOG_FINDINGS={total_findings}")
+        print(f"TOOL_CATALOG={'pass' if total_findings == 0 else 'fail'}")
     return 1 if report.findings or public.findings else 0
 
 
