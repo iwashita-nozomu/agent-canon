@@ -250,6 +250,24 @@ present, malformed, missing, uncertain, or source-mismatched runtime evidence
 remains a fail-closed runtime boundary. `status`, `query`, and `context` are
 read-only; they never rebuild or fall back to a header scan.
 
+source snapshot の候補 path は、解決先の内容ではなく候補 path 自体の
+filesystem object を読む。`dependency_manifest.rs` の単一 source-path
+byte/mode reader は対象を `symlink_metadata` で判定し、regular file では
+`fs::read` の bytes と mode `100644` を返す。symlink では `read_link` が
+返すリンク先表現の raw bytes（対応する Unix の `OsStrExt::as_bytes`）と
+mode `120000` を返し、target が directory であってもその内容へ展開しない。
+`to_string_lossy` や推測による非 Unix fallback は使わない。missing path は
+従来契約どおり空 bytes と `exists=false` で扱う。broken symlink は
+`symlink_metadata` が取得できる限り path 自体が存在するため `exists=true` とし、
+symlink の target 表現を identity/hash の入力にする。
+
+source fingerprint の各 identity 行は path、exists、file mode、source bytes の
+hash を結合する。したがって、同じ bytes `foo` を持つ regular file (`100644`) と
+target が `foo` の symlink (`120000`) は異なる fingerprint になる。
+
+この reader は source fingerprint と snapshot capture の双方から共有し、
+各経路が symlink / regular file / missing の読み方を二重実装しない。
+
 The canonical machine interface is the four JSON graph operations documented
 in `agents/canonical/CLI_ENTRYPOINTS.md`. A dependency query uses
 `--all --relation dependency --direction both --depth 0` and preserves stable
