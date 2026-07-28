@@ -587,7 +587,7 @@ route_requires_agent_workflow() {
   local submodule_worktree_status="$4"
 
   case "$route" in
-    local_contains_remote|diverged_submodule_history|diverged_local_history|snapshot_import_unsafe_tree_not_in_remote)
+    submodule_detached|submodule_non_default_branch|local_contains_remote|diverged_submodule_history|diverged_local_history|snapshot_import_unsafe_tree_not_in_remote)
       return 0
       ;;
     deferred_branch_pr)
@@ -599,7 +599,7 @@ route_requires_agent_workflow() {
   fi
   if [ "$dirty_update_surface" = "yes" ]; then
     case "$route" in
-      already_current_submodule|local_tree_matches_remote|submodule_update)
+      already_current_submodule|submodule_update)
         return 1
         ;;
       *)
