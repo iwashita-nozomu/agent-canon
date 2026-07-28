@@ -431,16 +431,19 @@ outcome spool before a separate hash-linked receipt is published. The command
 returns success only after the latest committed receipt is durability-
 confirmed; uncertain, malformed, colliding, or unconfirmed records block.
 
-`tools/bin/agent-canon graph build` captures the dependency-manifest snapshot,
-prepared artifact, and latest committed receipt once in one `BuildMaterial`
-transaction. `graph status`, `graph query`, `graph context`,
-`check_dependency_headers.py`, and `check_design_doc_claims.py` consume the
-persisted v2 snapshot. Each graph command performs at most one bounded
-freshness probe; consumers do not reparse repository-scoped dependency
-guarantees or rerun the runtime producer. Explicit files outside a repository
-and non-Git checker fixtures retain their public local parser behavior without
-becoming graph authority. `graph_client.py` is the typed Python adapter for
-these responses, not a CLI entrypoint.
+`tools/bin/agent-canon graph build` は dependency-manifest snapshot、prepared
+artifact、latest committed receipt を一つの `BuildMaterial` transaction で
+取得します。`run_all_checks` は最初の graph-backed consumer より前に
+`WORKSPACE_ROOT` の graph を一度だけ build し、すべての graph-backed consumer
+は同じ fresh snapshot を共有します。build に失敗した場合は graph-backed
+checks を実行せず、一つの CI failure として扱います。
+`graph status/query/context` とその consumer は snapshot の参照専用で、
+`check_design_doc_claims.py` も persisted v2 snapshot を消費します。Each graph
+command performs at most one bounded freshness probe; consumers do not reparse
+repository-scoped dependency guarantees or rerun the runtime producer.
+Explicit files outside a repository and non-Git checker fixtures retain their
+public local parser behavior without becoming graph authority. `graph_client.py`
+is the typed Python adapter for these responses, not a CLI entrypoint.
 
 PostToolUse hook transport is outside the graph producer. `HookLogContext`
 returns `HookAppendResult.status` as `spooled`, `duplicate`, or `failed`; that
