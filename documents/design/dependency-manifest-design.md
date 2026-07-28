@@ -321,14 +321,14 @@ The candidate stores these exact sorted sets in
 and `reverse_projection:R->reverse(R)`. Candidate validation directly decides
 the following equalities and totality conditions:
 
-```text
+$$
 P(S) = U(S) union X(S)
 U(S) intersect X(S) = empty
 domain(source_identity) = U(S)
 domain(reverse_projection) = R
 Vp subset G and, for default, Vp = G
 Unresolved(S,p) = Ambiguous(S,p) = Uncovered(S,p) = empty  iff  status=fresh
-```
+$$
 
 Every relation kind is parsed through the closed `RelationKind` registry. Each
 accepted relation has two existing endpoint IDs, one authoritative producer
@@ -342,10 +342,10 @@ For a seed `s`, relation selector `k`, direction `a`, and requested depth `d`,
 query uses the monotone operator on the finite lattice
 `powerset(V(G) x {0..d})`:
 
-```text
+$$
 F(C) = {(s,0)} union C union
        {(v,n+1) | (u,n) in C, n < d, and a k-typed edge permits u -> v}
-```
+$$
 
 It iterates from the empty set until equality and returns the minimum depth for
 each member of `mu F`. Validation applies `F` once more to decide fixed-point
