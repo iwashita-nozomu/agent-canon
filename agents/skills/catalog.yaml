@@ -1063,12 +1063,12 @@ skill_families:
         - ["formal", "result", "retention"]
         - ["run", "artifact", "preserve"]
   - id: experiment-review
-    purpose: Review experiment topics for direct run.py execution, GPU/JAX environment ownership, artifact schemas, notebook explanations, and README run contracts.
+    purpose: Review experiment topics for the managed runner route and run.py inner entrypoint, GPU/JAX environment ownership, artifact schemas, notebook explanations, and README run contracts.
     canonical_doc: agents/skills/experiment-review.md
     shim: .agents/skills/experiment-review/SKILL.md
     routing:
       stage_policy: active
-      reason: experiment topic review, direct run.py execution, environment ownership, artifact schema, or notebook readiness is in scope
+      reason: experiment topic review, managed runner route, environment ownership, artifact schema, or notebook readiness is in scope
       triggers:
         - ["実験", "レビュー"]
         - ["実験", "review"]

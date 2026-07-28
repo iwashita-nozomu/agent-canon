@@ -405,7 +405,7 @@ copy_path() {
   [ -e "$abs_source" ] || die "copy source '$source' does not exist"
   rm -rf "$abs_path"
   mkdir -p "$(dirname "$abs_path")"
-  project_copy_source "$abs_source" > "$abs_path"
+  project_copy_source "$abs_source" "$abs_path" > "$abs_path"
   chmod --reference="$abs_source" "$abs_path"
 }
 
@@ -417,42 +417,67 @@ parent_copy_projection_enabled() {
 
 project_copy_source() {
   local source="$1"
-  if ! parent_copy_projection_enabled; then
+  local target="${2:-}"
+  local projected=""
+  local github_target=0
+  if [[ "$target" == "$ROOT_DIR/.github/ISSUE_TEMPLATE/"* || "$target" == "$ROOT_DIR/.github/PULL_REQUEST_TEMPLATE/"* ]]; then
+    github_target=1
+  fi
+  if ! parent_copy_projection_enabled && [ "$github_target" -eq 0 ]; then
     cat "$source"
     return
   fi
-
-  perl -ne '
-    if ($in_manifest || /\@dependency-start/) {
+  if parent_copy_projection_enabled; then
+    projected="$(perl -ne '
+      if ($in_manifest || /\@dependency-start/) {
+        print;
+        $in_manifest = 1 if /\@dependency-start/;
+        $in_manifest = 0 if /\@dependency-end/;
+        next;
+      }
+      s{vendor/agent-canon/tools/}{__CANON_TOOLS__/}g;
+      s{vendor/agent-canon/documents/}{__CANON_DOCUMENTS__/}g;
+      s{vendor/agent-canon/issues/}{__CANON_ISSUES__/}g;
+      s{documents/tools/}{__DOCUMENTS_TOOLS__/}g;
+      s{tests/tools/}{__TESTS_TOOLS__/}g;
+      s{tools/agent-canon/}{__PARENT_TOOLS__/}g;
+      s{((?:\.\./)+)documents/}{$1vendor/agent-canon/documents/}g;
+      s{((?:\.\./)+)issues/}{$1vendor/agent-canon/issues/}g;
+      s{((?:\.\./)+)tools/}{$1tools/agent-canon/}g;
+      s{(?<![A-Za-z0-9_./-])tools/}{tools/agent-canon/}g;
+      s{__CANON_TOOLS__}{vendor/agent-canon/tools/}g;
+      s{__CANON_DOCUMENTS__}{vendor/agent-canon/documents/}g;
+      s{__CANON_ISSUES__}{vendor/agent-canon/issues/}g;
+      s{__DOCUMENTS_TOOLS__}{documents/tools/}g;
+      s{__TESTS_TOOLS__}{tests/tools/}g;
+      s{__PARENT_TOOLS__}{tools/agent-canon/}g;
       print;
-      $in_manifest = 1 if /\@dependency-start/;
-      $in_manifest = 0 if /\@dependency-end/;
-      next;
-    }
-    s{vendor/agent-canon/tools/}{__CANON_TOOLS__/}g;
-    s{vendor/agent-canon/documents/}{__CANON_DOCUMENTS__/}g;
-    s{vendor/agent-canon/issues/}{__CANON_ISSUES__/}g;
-    s{documents/tools/}{__DOCUMENTS_TOOLS__/}g;
-    s{tests/tools/}{__TESTS_TOOLS__/}g;
-    s{tools/agent-canon/}{__PARENT_TOOLS__/}g;
-    s{((?:\.\./)+)documents/}{$1vendor/agent-canon/documents/}g;
-    s{((?:\.\./)+)issues/}{$1vendor/agent-canon/issues/}g;
-    s{((?:\.\./)+)tools/}{$1tools/agent-canon/}g;
-    s{(?<![A-Za-z0-9_./-])tools/}{tools/agent-canon/}g;
-    s{__CANON_TOOLS__}{vendor/agent-canon/tools/}g;
-    s{__CANON_DOCUMENTS__}{vendor/agent-canon/documents/}g;
-    s{__CANON_ISSUES__}{vendor/agent-canon/issues/}g;
-    s{__DOCUMENTS_TOOLS__}{documents/tools/}g;
-    s{__TESTS_TOOLS__}{tests/tools/}g;
-    s{__PARENT_TOOLS__}{tools/agent-canon/}g;
-    print;
-  ' "$source"
+    ' "$source")"
+  else
+    projected="$(cat "$source")"
+  fi
+
+  if [ "$github_target" -eq 1 ]; then
+    printf '%s\n' "$projected" | perl -0pe '
+      s{(@dependency-start.*?@dependency-end)}{
+        my $block = $1;
+        $block =~ s{\.\./\.\./\.\./operations/}{../../documents/operations/}g;
+        $block =~ s{\.\./\.\./\.\./\.\./\.github/}{../}g;
+        $block =~ s{\.\./\.\./\.\./\.github/}{../}g;
+        $block =~ s{\.\./\.\./\.\./\.\./(documents|agents|issues|tools)/}{../../$1/}g;
+        $block =~ s{\.\./\.\./README\.md}{../../documents/templates/README.md}g;
+        $block;
+      }gse
+    '
+  else
+    printf '%s\n' "$projected"
+  fi
 }
 
 copy_matches_source() {
   local destination="$1"
   local source="$2"
-  cmp -s "$destination" <(project_copy_source "$source")
+  cmp -s "$destination" <(project_copy_source "$source" "$destination")
 }
 
 regular_path() {
