@@ -105,6 +105,8 @@ QUICK_MODE=0
 VERBOSE_MODE=0
 SKIP_DOCS=0
 SKIP_GITHUB_WORKFLOWS=0
+PR_GATE_RECEIPT=""
+PR_GATE_RECEIPT_VALID=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick)
@@ -119,6 +121,14 @@ while [[ $# -gt 0 ]]; do
       SKIP_GITHUB_WORKFLOWS=1
       shift
       ;;
+    --pr-gate-receipt)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --pr-gate-receipt" >&2
+        exit 2
+      fi
+      PR_GATE_RECEIPT="$2"
+      shift 2
+      ;;
     --verbose)
       VERBOSE_MODE=1
       shift
@@ -129,6 +139,38 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+validate_pr_gate_receipt() {
+  local root_identity=""
+  if [[ ! -f "${PR_GATE_RECEIPT}" ]]; then
+    echo "Invalid PR gate receipt: missing file" >&2
+    return 1
+  fi
+  if ! root_identity="$(realpath -e "${WORKSPACE_ROOT}")"; then
+    echo "Invalid PR gate receipt: workspace root identity unavailable" >&2
+    return 1
+  fi
+  for marker in \
+    "owner=check_agent_canon_pr.sh" \
+    "root_identity=${root_identity}" \
+    "parent_pid=${PPID}" \
+    "strict_dependency=prepared" \
+    "graph=prepared"; do
+    if ! grep -Fqx -- "${marker}" "${PR_GATE_RECEIPT}"; then
+      echo "Invalid PR gate receipt: missing marker ${marker%%=*}" >&2
+      return 1
+    fi
+  done
+  return 0
+}
+
+if [[ -n "${PR_GATE_RECEIPT}" ]]; then
+  if ! validate_pr_gate_receipt; then
+    exit 1
+  fi
+  PR_GATE_RECEIPT_VALID=1
+  echo "PR_GATE_RECEIPT=accepted"
+fi
 
 export PYTHONPATH="${WORKSPACE_ROOT}/python:${PYTHONPATH:-}"
 export JAX_PLATFORMS="${JAX_PLATFORMS:-}"
@@ -169,7 +211,10 @@ fi
 # 0. agent/runtime sync checks
 echo "0️⃣  agent/runtime sync checks を実行中..."
 CANON_GRAPH_READY=0
-if "$CANON_BIN" graph build --root "$WORKSPACE_ROOT" --profile default --format json; then
+if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
+  echo "✅ canonical graph build consumed from validated PR gate receipt"
+  CANON_GRAPH_READY=1
+elif "$CANON_BIN" graph build --root "$WORKSPACE_ROOT" --profile default --format json; then
   CANON_GRAPH_READY=1
 else
   echo "❌ canonical graph build 失敗"
@@ -181,7 +226,9 @@ else
   echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
-if [ "$CANON_GRAPH_READY" -eq 1 ]; then
+if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
+  echo "DEPENDENCY_HEADER_CHECKS=skip reason=validated_strict_pr_gate_receipt"
+elif [ "$CANON_GRAPH_READY" -eq 1 ]; then
   if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_dependency_headers.py" --changed 2>&1; then
     echo "✅ dependency header checks 成功"
   else
@@ -191,17 +238,19 @@ if [ "$CANON_GRAPH_READY" -eq 1 ]; then
 else
   echo "⏭️ dependency header checks skipped: canonical graph build failed"
 fi
-if bash "${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh" --changed 2>&1; then
-  echo "✅ dependency manifest scan 成功"
-else
-  echo "❌ dependency manifest scan 失敗"
-  EXIT_CODE=1
-fi
-if bash "${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh" --changed 2>&1; then
-  echo "✅ dependency manifest format checks 成功"
-else
-  echo "❌ dependency manifest format checks 失敗"
-  EXIT_CODE=1
+if [ "$PR_GATE_RECEIPT_VALID" -eq 0 ]; then
+  if bash "${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh" --changed 2>&1; then
+    echo "✅ dependency manifest scan 成功"
+  else
+    echo "❌ dependency manifest scan 失敗"
+    EXIT_CODE=1
+  fi
+  if bash "${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh" --changed 2>&1; then
+    echo "✅ dependency manifest format checks 成功"
+  else
+    echo "❌ dependency manifest format checks 失敗"
+    EXIT_CODE=1
+  fi
 fi
 if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_hardcoded_numbers.py" --changed --exclude tests --exclude vendor --exclude reports 2>&1; then
   echo "✅ hardcoded numeric literal checks 成功"

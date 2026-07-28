@@ -133,6 +133,27 @@ Runtime alignment, prompt/eval, convention, skill-command, GitHub workflow,
 dependency, docs, and quick-CI work are not called through a second standalone
 loop in the same run.
 
+### One-Judgment-Owner Check Handoff
+
+Each check family has one execution owner in a source PR gate. The direct agent
+check function owns runtime alignment and prompt/eval checks; it does not call
+the research-perspective smoke test, convention compliance, or skill-command
+checks because `run_all_checks.sh` owns those consumers. The strict dependency
+section owns the dependency-header verdict and the canonical graph producer.
+The standalone source path invokes `tool_drift.py` once after that producer;
+the template/derived path leaves `tool_drift.py` to its single `run_all_checks.sh`
+consumer.
+
+After the strict dependency review completes, the PR gate writes a temporary
+receipt containing its owner, root identity, parent PID, and strict
+dependency/graph prepared markers. It passes that receipt to
+`run_all_checks.sh` through the internal `--pr-gate-receipt` argument. The
+consumer accepts the handoff only when the receipt exists, its owner and root
+match, and its recorded parent PID equals the consumer's current PPID. A valid
+receipt sets `CANON_GRAPH_READY=1` and suppresses the three dependency-header
+producers. An absent receipt is the ordinary run_all path; an invalid or
+missing receipt supplied through the internal argument fails closed.
+
 The upstream Materializer hook/archive hot-path defect remains an external
 dependency. This workflow records its evidence/blocker and does not implement a
 second report/archive materializer.

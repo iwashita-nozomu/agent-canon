@@ -39,7 +39,11 @@ if [[ -z "${AGENT_CANON_PR_TEMP_ROOT:-}" ]]; then
   AGENT_CANON_PR_TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"
   AGENT_CANON_PR_TEMP_ROOT_CREATED=1
 fi
+PR_GATE_RECEIPT="${AGENT_CANON_PR_TEMP_ROOT}/pr-gate-prepared.receipt"
 cleanup_agent_canon_pr_temp_root() {
+  if [[ -n "${PR_GATE_RECEIPT:-}" ]]; then
+    rm -f -- "${PR_GATE_RECEIPT}" 2>/dev/null || true
+  fi
   if [[ "${AGENT_CANON_PR_TEMP_ROOT_CREATED}" -eq 1 ]]; then
     rm -rf "${AGENT_CANON_PR_TEMP_ROOT}"
   fi
@@ -79,11 +83,8 @@ run_direct_agent_checks() {
   python3 tools/agent_tools/check_agent_runtime_alignment.py
   AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
     python3 tools/agent_tools/evaluate_codex_agent_roles.py --accumulate
-  python3 tools/agent_tools/smoke_test_research_perspective_pack.py
   AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
     python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate
-  python3 tools/agent_tools/check_convention_compliance.py
-  python3 tools/agent_tools/skill_tool_commands.py check
 }
 
 run_shared_surface_status() {
@@ -173,12 +174,29 @@ run_pr_quick_ci() {
   fi
   if agentcanon_pr_branch_pending; then
     echo "AGENT_CANON_PR_CI_LATEST_GATE=deferred_branch_pr"
-    echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]}"
-    AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}"
+    echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
+    AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
+      bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
     return
   fi
-  echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]}"
-  AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}"
+  echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
+  AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
+    bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
+}
+
+write_pr_gate_receipt() {
+  local root_identity=""
+  if ! root_identity="$(realpath -e "${WORKSPACE_ROOT}")"; then
+    echo "Unable to record PR gate root identity" >&2
+    return 1
+  fi
+  {
+    printf 'owner=check_agent_canon_pr.sh\n'
+    printf 'root_identity=%s\n' "${root_identity}"
+    printf 'parent_pid=%s\n' "$$"
+    printf 'strict_dependency=prepared\n'
+    printf 'graph=prepared\n'
+  } >"${PR_GATE_RECEIPT}"
 }
 
 consume_source_correctness_receipt() {
@@ -345,14 +363,19 @@ run_pr_agent_checks
 echo ""
 
 echo "6️⃣  strict dependency review"
+# This graph build is the producer for the strict dependency review and the
+# prepared graph consumers in the subsequent quick CI invocation.
 tools/bin/agent-canon graph build --root . --profile default --format json
-python3 tools/agent_tools/tool_drift.py
+if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+  python3 tools/agent_tools/tool_drift.py
+fi
 bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
 python3 tools/agent_tools/render_dependency_manifest_graph.py \
   --root . \
   --scope full \
   --markdown-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.md" \
   --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
+write_pr_gate_receipt
 echo ""
 
 echo "7️⃣  documentation checks"
