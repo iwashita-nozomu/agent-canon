@@ -220,8 +220,14 @@ prefix_git_mode() {
   git -C "$ROOT_DIR" ls-tree HEAD "$PREFIX" 2>/dev/null | awk '{print $1}'
 }
 
+prefix_index_mode() {
+  git -C "$ROOT_DIR" ls-files --stage -- "$PREFIX" 2>/dev/null \
+    | awk -v prefix="$PREFIX" '$3 == "0" && $4 == prefix { print $1; exit }'
+}
+
 is_submodule_prefix() {
-  [ "$(prefix_git_mode)" = "160000" ]
+  [ "$(prefix_git_mode)" = "160000" ] \
+    || [ "$(prefix_index_mode)" = "160000" ]
 }
 
 submodule_checkout_initialized() {
@@ -410,9 +416,9 @@ copy_path() {
 }
 
 parent_copy_projection_enabled() {
-  [ -n "$SUPERPROJECT_DIR" ] \
-    && [ -L "$ROOT_DIR/tools/agent-canon" ] \
-    && [ "$(readlink "$ROOT_DIR/tools/agent-canon")" = "../vendor/agent-canon/tools" ]
+  [ -L "$ROOT_DIR/tools/agent-canon" ] \
+    && [ "$(readlink "$ROOT_DIR/tools/agent-canon")" = "../vendor/agent-canon/tools" ] \
+    && is_submodule_prefix
 }
 
 project_copy_source() {
@@ -458,17 +464,34 @@ project_copy_source() {
   fi
 
   if [ "$github_target" -eq 1 ]; then
-    printf '%s\n' "$projected" | perl -0pe '
-      s{(@dependency-start.*?@dependency-end)}{
-        my $block = $1;
-        $block =~ s{\.\./\.\./\.\./operations/}{../../documents/operations/}g;
-        $block =~ s{\.\./\.\./\.\./\.\./\.github/}{../}g;
-        $block =~ s{\.\./\.\./\.\./\.github/}{../}g;
-        $block =~ s{\.\./\.\./\.\./\.\./(documents|agents|issues|tools)/}{../../$1/}g;
-        $block =~ s{\.\./\.\./README\.md}{../../documents/templates/README.md}g;
-        $block;
-      }gse
-    '
+    if parent_copy_projection_enabled; then
+      printf '%s\n' "$projected" | perl -0pe '
+        s{(@dependency-start.*?@dependency-end)}{
+          my $block = $1;
+          $block =~ s{\.\./\.\./\.\./operations/}{../../vendor/agent-canon/documents/operations/}g;
+          $block =~ s{\.\./\.\./\.\./\.\./\.github/}{../}g;
+          $block =~ s{\.\./\.\./\.\./\.github/}{../}g;
+          $block =~ s{\.\./\.\./\.\./\.\./documents/}{../../vendor/agent-canon/documents/}g;
+          $block =~ s{\.\./\.\./\.\./\.\./agents/}{../../agents/}g;
+          $block =~ s{\.\./\.\./\.\./\.\./issues/}{../../vendor/agent-canon/issues/}g;
+          $block =~ s{\.\./\.\./\.\./\.\./tools/}{../../tools/agent-canon/}g;
+          $block =~ s{\.\./\.\./README\.md}{../../vendor/agent-canon/documents/templates/README.md}g;
+          $block;
+        }gse
+      '
+    else
+      printf '%s\n' "$projected" | perl -0pe '
+        s{(@dependency-start.*?@dependency-end)}{
+          my $block = $1;
+          $block =~ s{\.\./\.\./\.\./operations/}{../../documents/operations/}g;
+          $block =~ s{\.\./\.\./\.\./\.\./\.github/}{../}g;
+          $block =~ s{\.\./\.\./\.\./\.github/}{../}g;
+          $block =~ s{\.\./\.\./\.\./\.\./(documents|agents|issues|tools)/}{../../$1/}g;
+          $block =~ s{\.\./\.\./README\.md}{../../documents/templates/README.md}g;
+          $block;
+        }gse
+      '
+    fi
   else
     printf '%s\n' "$projected"
   fi
@@ -1266,7 +1289,7 @@ cmd_submodule_add() {
   local branch="${2:-$DEFAULT_BRANCH}"
   require_clean_worktree
   [ -n "$remote_url" ] || die "submodule-add requires <remote-url>"
-  if [ -e "$ROOT_DIR/$PREFIX" ] || git -C "$ROOT_DIR" ls-tree HEAD "$PREFIX" >/dev/null 2>&1; then
+  if [ -e "$ROOT_DIR/$PREFIX" ] || [ -n "$(prefix_git_mode)" ]; then
     die "prefix '$PREFIX' already exists; remove the subtree snapshot before adding a submodule"
   fi
   git -C "$ROOT_DIR" submodule add -b "$branch" "$remote_url" "$PREFIX"

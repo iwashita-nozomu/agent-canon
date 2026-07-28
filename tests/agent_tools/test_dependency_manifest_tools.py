@@ -1191,8 +1191,8 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
             self.assertNotIn("upstream\tdesign\tAGENTS.md\t", result.stdout)
 
-    def test_root_copy_headers_resolve_in_agentcanon_source_context(self) -> None:
-        """Root-copy GitHub headers should keep valid AgentCanon-source paths."""
+    def test_generated_root_copy_headers_resolve_in_projection_context(self) -> None:
+        """Generated root-copy GitHub headers should resolve in projection context."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             root_copy = root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
@@ -1215,7 +1215,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                     "@dependency-start",
                     "contract test",
                     "responsibility Defines a template AgentCanon PR checklist copy.",
-                    "upstream design ../../issues/README.md durable issue storage",
+                    "upstream design ../../vendor/agent-canon/issues/README.md durable issue storage",
                     "@dependency-end",
                     "-->",
                     "",
