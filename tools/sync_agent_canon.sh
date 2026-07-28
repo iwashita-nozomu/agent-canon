@@ -466,6 +466,10 @@ regular_path() {
     fi
   fi
   if [ -z "$source" ]; then
+    if [ "$path" = ".devcontainer" ] && [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+      prune_parent_devcontainer_artifacts
+      return
+    fi
     rm -rf "$abs_path"
     mkdir -p "$abs_path"
     if [ "$path" = ".devcontainer" ] && parent_copy_projection_enabled; then

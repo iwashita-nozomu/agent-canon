@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -33,6 +34,26 @@ WORKFLOW_MONITOR = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py
 AGENT_TEAM = PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
 REQUIREMENT_SYNC = PROJECT_ROOT / "tools" / "requirement_sync_validator.py"
 DOCKER_VALIDATOR = PROJECT_ROOT / "tools" / "docker_dependency_validator.sh"
+SYNC_SCRIPT = PROJECT_ROOT / "tools" / "sync_agent_canon.sh"
+AGENT_CANON_MANIFEST = PROJECT_ROOT / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE = "evidence:" + ("0" * 64)
+
+
+def authorized_sync_env(**overrides: str) -> dict[str, str]:
+    """Return required protected-authority env for mutating sync commands."""
+    env = dict(os.environ)
+    env.update(
+        {
+            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
+            "AGENT_CANON_BRANCH_WORKTREE_REASON": "test-approved-update",
+            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
+            "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "test-approved-update",
+            "AGENT_CANON_COMMIT_REQUEST_EVIDENCE": AGENT_CANON_COMMIT_REQUEST_EVIDENCE,
+            "AGENT_CANON_PREFIX": "vendor/agent-canon",
+        }
+    )
+    env.update(overrides)
+    return env
 
 
 def run_tool(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
@@ -610,6 +631,81 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "pyproject project dependency 'requests' missing from docker/requirements.txt",
                 result.stdout,
             )
+
+    def test_link_root_preserves_parent_devcontainer_overrides_between_runs(self) -> None:
+        """Parent .devcontainer overrides must be byte-identical after repeated link-root."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "tools").mkdir()
+            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+            sync_path = root / "tools" / "sync_agent_canon.sh"
+            vendor_prefix = root / "vendor" / "agent-canon"
+            vendor_prefix.parent.mkdir(parents=True)
+            subprocess.run(["cp", "-a", str(PROJECT_ROOT), str(vendor_prefix)], check=True)
+            if (vendor_prefix / ".git").exists():
+                import shutil
+
+                shutil.rmtree(vendor_prefix / ".git")
+            subprocess.run(
+                ["cp", "-a", str(SYNC_SCRIPT), str(sync_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            if (root / "tools" / "agent-canon").exists():
+                (root / "tools" / "agent-canon").unlink()
+            os.symlink("../vendor/agent-canon/tools", root / "tools" / "agent-canon")
+
+            devcontainer = root / ".devcontainer"
+            devcontainer.mkdir()
+            custom_hook = devcontainer / "post-create-parent.sh"
+            unknown_file = devcontainer / "parent-local-marker.txt"
+            custom_hook.write_text(
+                '\n'.join(
+                    [
+                        "#!/usr/bin/env bash",
+                        "set -euo pipefail",
+                        'echo "parent hook"',
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            unknown_file.write_text("do-not-drop-me\n", encoding="utf-8")
+
+            first = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "link-root"],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=authorized_sync_env(
+                    AGENT_CANON_SURFACE_MANIFEST=str(
+                        vendor_prefix / "documents/runtime/shared-runtime-surfaces.toml"
+                    ),
+                    AGENT_CANON_FORCE_RELINK="1",
+                ),
+            )
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            first_hook = hashlib.sha256(custom_hook.read_bytes()).hexdigest()
+            first_unknown = hashlib.sha256(unknown_file.read_bytes()).hexdigest()
+            second = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "link-root"],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=authorized_sync_env(
+                    AGENT_CANON_SURFACE_MANIFEST=str(
+                        vendor_prefix / "documents/runtime/shared-runtime-surfaces.toml"
+                    ),
+                    AGENT_CANON_FORCE_RELINK="1",
+                ),
+            )
+
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            self.assertEqual(first_hook, hashlib.sha256(custom_hook.read_bytes()).hexdigest())
+            self.assertEqual(first_unknown, hashlib.sha256(unknown_file.read_bytes()).hexdigest())
 
     def test_docker_validator_accepts_requirement_extras_for_required_packages(self) -> None:
         """The Docker validator should accept valid extras syntax in requirements."""
