@@ -90,12 +90,11 @@ Core runtime surfaces include `AGENTS.md`, `agents/`, `.agents/`,
 `.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, and `tools/`.
 `.vscode/` is a parent-owned regular container whose
 `c_cpp_properties.json`, `extensions.json`, `settings.json`, and `tasks.json`
-children are the four individual AgentCanon symlink surfaces. VS Code folder
-composition is caller-owned: pass `PARENT_ROOT`, `SOURCE_CLONE`, and
-`CONTINUE_PATH` from `prepare` to standard `Add Folder to Workspace` or
-`code --add <parent-clone> <dependency-clone>`. Optional `Save Workspace As...`
-is user-owned; storage, JSON, and workspace artifacts are outside the
-AgentCanon contract.
+children are the four individual AgentCanon symlink surfaces. Work-area
+composition is caller-owned: use `PARENT_ROOT`, `SOURCE_CLONE`, and
+`CONTINUE_PATH` from `prepare` within the editor-independent
+`workspace/<topic-slug>/` contract. Work-area storage and metadata are outside
+the AgentCanon contract.
 These paths are installed capability. The active profile and required checks
 are selected by `documents/runtime-profiles-and-check-matrix.md`.
 
@@ -167,8 +166,8 @@ parser/writer ownership are defined by
 `.vscode/` is also a shared AgentCanon runtime ergonomics surface. The parent
 owns the real directory container; AgentCanon owns the individual
 `c_cpp_properties.json`, `extensions.json`, `settings.json`, and `tasks.json`
-symlink surfaces. VS Code folder composition remains caller-owned and uses the
-paths returned by `dependency_module_change.py prepare`; it is not a shared
+symlink surfaces. The dependency source work area remains caller-owned and uses
+the paths returned by `dependency_module_change.py prepare`; it is not a shared
 surface source.
 Do not store personal editor state, host-specific include paths, workspace-local
 secrets, or product-specific commands in the shared `.vscode/` view. Put
@@ -307,7 +306,7 @@ implementation.
 
 - Read `documents/rule/dependency-module-changes.md` before any dependency
   source edit. Edit generic AgentCanon source in the exact topic clone
-  `workspace-<topic-slug>/<module-basename>`; never use a vendored checkout as a
+  `workspace/<topic-slug>/<module-basename>`; never use a vendored checkout as a
   source branch.
 - Edit template-owned active contracts at the root after they are regular
   files.

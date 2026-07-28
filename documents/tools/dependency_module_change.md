@@ -26,15 +26,13 @@ python3 tools/agent_tools/dependency_module_change.py --root <topic-parent> clea
   [--apply]
 ```
 
-host は `workspace-<topic-slug>/<parent>` とその同列 module cloneだけを保持します。
+host は `<parent-repo-root>/workspace/<topic-slug>/<parent>` とその同列 module cloneだけを保持します。
 clone名は `<module-basename>` でbranchはGit内部marker/actual branch identityです。
 `.gitmodules` の `branch` は optional な clone base であり、task branch とは別です。
 remote に task branch があれば tracking checkout、なければ clone base から作成します。
 prepare は `PARENT_ROOT`、`SOURCE_CLONE`、`CONTINUE_PATH` を返します。これらの
-clone path を VS Code の標準 multi-root 操作（`Add Folder to Workspace` または
-`code --add <parent-clone> <dependency-clone>`）に渡します。利用者は必要なら
-標準の `Save Workspace As...` を使えますが、保存場所と JSON は AgentCanon の
-契約外です。container は topic workspace root 全体を `/workspace` に一度だけ mount
+clone path は editor-independent な `workspace/<topic-slug>/` 作業領域で使います。
+作業領域の追加メタデータは生成しません。container は topic workspace root 全体を `/workspace` に一度だけ mount
 し、`AGENT_CANON_WORKSPACE_ROOT` は container では `/workspace` 固定です。
 `cleanup --apply` は、同じ command segment の authority/reason 環境変数と
 remote 再構成可能性を要求します。

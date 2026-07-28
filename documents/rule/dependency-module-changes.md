@@ -1,7 +1,7 @@
 <!--
 @dependency-start
 contract policy
-responsibility Defines the general dependency-module change contract and source-clone lifecycle without owning VS Code multi-root state.
+responsibility Defines the general dependency-module change contract and source-clone lifecycle without owning editor state.
 upstream design ../dependency-manifest-design.md dependency ownership and header graph model
 upstream design ../SHARED_RUNTIME_SURFACES.md parent pin and shared-surface ownership
 downstream implementation ../../tools/agent_tools/dependency_module_change.py enforces clone lifecycle and cleanup gates
@@ -24,7 +24,7 @@ projection を提供する場所であり、source branch として直接編集�
 
 依存 source を変更する場合の唯一の source edit surface は、task/context/lifecycle
 境界として新規または既存の topic workspace に置く clone です。topic workspace
-は `workspace-<topic-slug>` で決まり、中には親 repository cloneと必要な
+は親 repository root直下の `workspace/<topic-slug>` で決まり、中には親 repository cloneと必要な
 dependency source cloneだけを同列に置きます。clone名は module basenameだけ
 （`<module-basename>`）で、branchはclone内部のGit identityです。同じtopicで
 同じmoduleの別branchを併存させず、別責務・別branchは別topicにします。
@@ -34,7 +34,7 @@ branch/PR で管理し、親 repository では clean pin と projection だけ�
 `prepare --branch` の task branch が remote にあれば tracking checkout、なければ
 manifest branch（なければ remote HEAD）から新規 branch を作ります。
 
-host layout は `<workspace-parent>/workspace-<topic-slug>/<clone-basename>` です。
+host layout は `<parent-repo-root>/workspace/<topic-slug>/<clone-basename>` です。
 devcontainer は topic workspace root（選択 repo root の親）を一度だけ
 `/workspace` へ bind mountし、個別 cloneや親 repositoryの二重 mountを作りません。
 container env の `AGENT_CANON_WORKSPACE_ROOT` は `/workspace` 固定です。host
@@ -42,12 +42,12 @@ tool は未指定なら選択 repository の親 directoryから導出し、選�
 rootを越える検索・編集はこの tool の責務外です。
 
 mount target と選択 repo の作業 directory は別の devcontainer 契約です。
-通常の runtime pack の既存 `workdir` schema は変更せず、VS Code 用の
-`.devcontainer/generate-runtime-compose.sh` だけが `.devcontainer` 基準の topic
-root (`../..`) を一度だけ source にし、選択 repo の working directory を
-`/workspace/${localWorkspaceFolderBasename}` に materialize します。build context は
-repo (`..`) のままです。通常 Docker/CI runner の `/workspace` 意味はこの
-devcontainer 契約から変更しません。
+通常の runtime pack の既存 `workdir` schema は変更せず、
+`.devcontainer/generate-runtime-compose.sh` だけが選択 clone の親である topic
+root (`..`) を一度だけ source にし、選択 repo の working directory を
+`/workspace/<clone-basename>` に materialize します。build context は repo (`..`)
+のままです。通常 Docker/CI runner の `/workspace` 意味はこの devcontainer
+契約から変更しません。
 
 作業結果を保存する report、test result、log、PR evidence は source clone
 や vendor の代替ではありません。各 results owner surface の規約に従って
@@ -73,15 +73,6 @@ pin-only、update-only、read-only の作業では source clone を作りませ�
 module path の basename は sibling path の名前になるため、複数 module が
 同じ basename を持つ `.gitmodules` は拒否します。path、URL、branch の
 identity を曖昧にしたまま clone を作ることも拒否します。
-
-## VS Code multi-root usage
-
-`prepare` は `PARENT_ROOT`、`SOURCE_CLONE`、`CONTINUE_PATH` だけを返します。
-これらの clone path は VS Code の標準 multi-root 操作
-（`Add Folder to Workspace` または
-`code --add <parent-clone> <dependency-clone>`）に渡します。利用者は必要なら
-標準の `Save Workspace As...` を使えますが、保存場所と JSON は AgentCanon の
-契約外です。source visibility は topic-root mount が所有します。
 
 ## cleanup gate
 
@@ -122,14 +113,12 @@ surface の状態だけを完成形として残します。
 - `cleanup --topic <topic> --parent --expected-parent <absolute-path>`: module cloneが
   無い場合だけparent cloneと空topic rootを同じgateで削除する。
 
-VS Code multi-root の保存場所と JSON は caller-owned であり、AgentCanon の契約外です。
-
 ## AgentCanon update の具体例
 
 AgentCanon source を変更するときは、parent の `vendor/agent-canon` を
 source branch として扱いません。owner evidence を確認し、必要なら
 `dependency_module_change.py prepare --topic <topic> --module vendor/agent-canon --branch <branch> --owner-evidence <file>` で
-`workspace-<topic-slug>/<module-basename>` を再利用または作成し、その独立
+`workspace/<topic-slug>/<module-basename>` を再利用または作成し、その独立
 clone で source branch/PR を進めます。parent mode の
 `tools/update_agent_canon.sh merge-main-into-current*` は vendor checkout
 を変更する旧経路ではなく、この source-clone route を案内して停止します。

@@ -1010,6 +1010,10 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 "design_brief.md:abstract_design_frame_missing:canonical_surface_relationships",
                 result.stdout,
             )
+            self.assertIn(
+                "NEXT_ACTION=return_to_design_owner_until_gate_approves",
+                result.stdout,
+            )
 
     def test_design_gate_rejects_term_inventory_abstract_design_frame(self) -> None:
         """Design gate should reject a one-line inventory of ADF terms."""

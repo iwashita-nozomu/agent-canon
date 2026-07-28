@@ -17,13 +17,11 @@ workspace_root="$(cd "${repo_root}/.." && pwd -P)"
   printf 'devcontainer workspace root is unavailable: %s\n' "$workspace_root" >&2
   exit 1
 }
-case "$(basename "$workspace_root")" in
-  workspace-*) ;;
-  *)
-    printf 'devcontainer requires a topic workspace root named workspace-<topic-slug>: %s\n' "$workspace_root" >&2
-    exit 1
-    ;;
-esac
+workspace_parent="$(cd "${workspace_root}/.." && pwd -P)"
+if [ "$(basename "$workspace_parent")" != "workspace" ]; then
+  printf 'devcontainer requires a topic workspace root under workspace/<topic-slug>: %s\n' "$workspace_root" >&2
+  exit 1
+fi
 repo_basename="$(basename "$repo_root")"
 container_repo_root="/workspace/${repo_basename}"
 pack="${repo_root}/docker/packs/default.toml"

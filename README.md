@@ -266,7 +266,7 @@ path constraint のための checked copy に限定します。regular file / di
 topic workspace source-edit shape:
 
 ```text
-<workspace-parent>/workspace-<topic-slug>/
+<parent-repo-root>/workspace/<topic-slug>/
 ├── <parent-repo>/
 └── <module-basename>/
 ```

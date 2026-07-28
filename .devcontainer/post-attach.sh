@@ -17,6 +17,10 @@ repo_root="${AGENT_CANON_REPOSITORY_ROOT:-}"
   exit 1
 }
 case "$repo_root" in
+  /workspace/*/*)
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=repository-root-must-be-direct-child-of-workspace:${repo_root}" >&2
+    exit 1
+    ;;
   /workspace/*) ;;
   *)
     echo "DEPENDENCY_MODULE_CONTAINER_ERROR=repository-root-outside-workspace:${repo_root}" >&2

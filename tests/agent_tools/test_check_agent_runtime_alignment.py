@@ -973,6 +973,14 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             config = load_team_config()
             role = resolve_role(config, "design_reviewer")
             active_design_packet = resolve_active_design_packet_config(config)
+            self.assertEqual(
+                active_design_packet.schema,
+                "waterfall.design_packet.v1",
+            )
+            self.assertEqual(
+                active_design_packet.implementation_source_packet.entry_id,
+                "implementation-source-packet",
+            )
             packet = resolve_role_document_packet(
                 config=config,
                 role=role,

@@ -18,15 +18,14 @@ cleanup を同じ責務境界で扱います。
 
 ## 使う route
 
-詳細な判断は [`documents/rule/dependency-module-changes.md`](../../documents/rule/dependency-module-changes.md) だけを読みます。`.gitmodules` の identity、`vendor/<module>` の clean pin/runtime projection、`workspace-<topic-slug>/<module-basename>` source clone、results owner surface の順に責務を分けます。
+詳細な判断は [`documents/rule/dependency-module-changes.md`](../../documents/rule/dependency-module-changes.md) だけを読みます。`.gitmodules` の identity、`vendor/<module>` の clean pin/runtime projection、`workspace/<topic-slug>/<module-basename>` source clone、results owner surface の順に責務を分けます。
 
 `prepare --topic <topic> --module <path> --branch <task-branch>
 --owner-evidence <file> [--parent-branch <pin-branch>]` は owner evidence がある source-edit のときだけ使い、pin-only・
 update-only・read-only では clone を作りません。返された `PARENT_ROOT`、
-`SOURCE_CLONE`、`CONTINUE_PATH` は VS Code の標準 multi-root 操作（`Add Folder
-to Workspace` または `code --add <parent-clone> <dependency-clone>`）に渡します。
-必要なら利用者が標準の `Save Workspace As...` を使えますが、保存場所と JSON は
-AgentCanon の契約外です。cleanup は dry-run を経て remote に全 state がある場合
+`SOURCE_CLONE`、`CONTINUE_PATH` は `workspace/<topic-slug>/` の
+editor-independent な作業領域で使います。作業領域の追加メタデータはこの tool
+の責務ではありません。cleanup は dry-run を経て remote に全 state がある場合
 だけ apply します。
 
 AgentCanon update はこの一般 route の具体例です。parent mode の vendor

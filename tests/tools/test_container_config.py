@@ -111,7 +111,7 @@ def write_topic_fixture(
     include_runtime_environment: bool = True,
 ) -> Path:
     """Create a parent repo inside one isolated topic workspace."""
-    topic_root = tmp_path / "workspace-dependency-module-change"
+    topic_root = tmp_path / "workspace" / "dependency-module-change"
     repo = topic_root / "agent-canon"
     write_devcontainer(repo)
     write_compose(
@@ -188,7 +188,7 @@ def test_compose_missing_runtime_environment_is_rejected(tmp_path: Path) -> None
 
 def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     """The generator writes the host topic root only into generated Compose."""
-    repo = tmp_path / "workspace-topic" / "agent-canon"
+    repo = tmp_path / "workspace" / "topic" / "agent-canon"
     write_devcontainer(repo)
     write_file(repo, ".devcontainer/generate-runtime-compose.sh", GENERATOR.read_text(encoding="utf-8"))
     (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)

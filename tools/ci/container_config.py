@@ -412,8 +412,8 @@ def validate_generated_compose(devcontainer_dir: Path, pack: PackConfig | None) 
     topic_root = root.parent.resolve()
     repo_target = f"/workspace/{root.name}"
     findings: list[Finding] = []
-    if not topic_root.name.startswith("workspace-"):
-        findings.append(Finding("dependency_contract_violation", relative, "topic-root-name"))
+    if topic_root.parent.name != "workspace":
+        findings.append(Finding("dependency_contract_violation", relative, "topic-root-parent"))
     if service.get("working_dir") != repo_target:
         findings.append(Finding("inconsistency", relative, f"working-dir:{service.get('working_dir')}"))
     build = as_mapping(service.get("build"))

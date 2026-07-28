@@ -355,7 +355,8 @@ task.
 ## Shared Canon Flow
 
 AgentCanon source changes are made in the managed dependency clone inside the
-`workspace-<topic-slug>` lifecycle boundary, reviewed through the AgentCanon
+`workspace/<topic-slug>/` lifecycle boundary directly below the parent repository,
+reviewed through the AgentCanon
 branch / PR workflow, then reflected in the template through the clean
 `vendor/agent-canon` pin and shared root views. Root view repair is owned by:
 
