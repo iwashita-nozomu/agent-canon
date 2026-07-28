@@ -6,7 +6,7 @@ upstream design ../design/dependency-manifest-design.md dependency ownership and
 upstream design ../contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace and VS Code workspace boundary
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md parent pin and shared-surface ownership
 downstream implementation ../../tools/agent_tools/dependency_module_change.py enforces clone lifecycle and cleanup gates
-downstream implementation ../../tools/update_agent_canon.sh refuses parent vendor source mutation
+downstream implementation ../../tools/update_agent_canon.sh routes to vendor-first parent topic branch work with managed workspace fallback
 downstream design ../../agents/skills/dependency-module-change.md exposes the short skill route
 @dependency-end
 -->
@@ -21,10 +21,16 @@ downstream design ../../agents/skills/dependency-module-change.md exposes the sh
 
 依存 module の identity は親 repository の `.gitmodules` が持ちます。
 そこには module の `path`、`url`、任意の default `branch` を置きます。`vendor/<module>` はその identity が指す pin と runtime
-projection を提供する場所であり、source branch として直接編集しません。
+projection を提供し、clean な named topic branch にいるときは source owner にもなります。
+親の pin/root projection が pass になる状態は、`vendor/<module>` が clean な
+`main`（`DEFAULT_BRANCH`）にあり、submodule の worktree `HEAD` が staged index
+gitlink (`:$PREFIX`) と一致する状態です。
 
-依存 source を変更する場合の唯一の source edit surface は、親 repository root
-直下の Git 管理外 `workspace/<topic-slug>/` に置く clone です。topic workspace
+source edit の owner は、clean な named topic branch の `vendor/<module>` です。
+`main` は topic branch を作成する起点であり、source edit の owner にはしません。
+別 topic の dirty vendor state によって親 vendor が占有されている場合のみ、
+`workspace/<topic-slug>/` の standalone clone を source clone として作成/再利用します。
+topic workspace
 の定義、親 repository の ignore rule、devcontainer mount、VS Code workspace
 運用の禁止、`.vscode/` 共有面との境界は
 [`contracts/github-first-module-and-devcontainer-policy.md`](../contracts/github-first-module-and-devcontainer-policy.md)
@@ -35,14 +41,39 @@ clone名は module basenameだけ（`<module-basename>`）で、branchはclone�
 Git identityです。同じtopicで同じmoduleの別branchを併存させず、別責務・別branch
 は別topicにします。
 clone の URL は `.gitmodules` の URL、Git-local marker、actual checked-out
-branch と一致しなければ再利用できません。source clone の変更はその
-branch/PR で管理し、親 repository では clean pin と projection だけを扱います。
+branch と一致しなければ再利用できません。source checkout の変更はその
+topic branch/PR で管理し、source publication 後の親 repository root では clean
+pin と projection だけを扱います。
 `prepare --branch` の task branch が remote にあれば tracking checkout、なければ
 manifest branch（なければ remote HEAD）から新規 branch を作ります。
 
 作業結果を保存する report、test result、log、PR evidence は source clone
 や vendor の代替ではありません。各 results owner surface の規約に従って
 保存し、source identity や cleanup の判定に混ぜません。
+
+## AgentCanon parent state decision table
+
+この表は、parent mode における AgentCanon vendor の owner、projection、dirty
+fallback の判定表であり、`tools/update_agent_canon.sh` と各 runtime shim は
+ここを正本として参照します。`cmd_latest` の更新対象 branch 引数（通常は
+`main`）は topic identity ではありません。requested topic は既存の topic
+owner 引数または topic environment owner を再利用し、他に明示指定がない場合
+だけ `AGENT_CANON_TOPIC_SLUG` を唯一の explicit requested topic とします。
+
+| 親 vendor 状態 | topic identity | owner / next action |
+| --- | --- | --- |
+| clean `main`、かつ worktree `HEAD == :$PREFIX` staged index gitlink | 不要 | parent pin/root projection pass |
+| clean named topic branch | `current_branch` | current `vendor/<module>` が source owner |
+| dirty、requested topic 未指定 | なし | typed stop: `NEXT_ACTION=topic_identity_required` |
+| dirty、requested topic == named `current_branch` | requested topic | fallback clone を作らず `materialize_current_vendor_topic_commit_push_pr_then_resume` |
+| dirty、requested topic != named `current_branch` | requested topic | `workspace/<sanitized-requested-topic>/agent-canon` fallback。`workspace/main` は生成しない |
+| dirty、requested topic の sanitized identity が `main` | `main` | typed stop: `NEXT_ACTION=topic_identity_required` |
+| detached、pin mismatch、merge conflict、または corrupt state | — | source/pin owner を選んだ上で typed repair/rebuild route |
+
+dirty fallback の `current_branch` は named current branch だけを指し、detached
+HEAD は topic identity として扱いません。requested topic と current branch が
+一致する場合の materialize/push/PR は、現在の vendor state を別 workspace に
+複製する route ではありません。
 
 ## clone を作る条件
 
@@ -104,13 +135,61 @@ surface の状態だけを完成形として残します。
 - `cleanup --topic <topic> --parent --expected-parent <absolute-path>`: module cloneが
   無い場合だけparent cloneと空topic rootを同じgateで削除する。
 
+## 再構築ルート（復旧）
+
+状態破損・書込先誤り・競合解消失敗・候補一致不能などの復旧経路では、
+未知diffを逆パッチ/restore で旧状態へ戻そうとしない。`origin/main` から
+clean checkout を再構築し、意図した materialized topic commits を再適用して
+PR を再構築する。
+
+- まず `origin/main` から clean checkout を再構築する。
+- 意図した差分のみを再適用し、`git add -> git commit -> push -> PR` で
+  新しい対象 PR/branch を作る。
+- readback で PR head が一致した時点で、旧 clone を削除する。
+- 未 materialize 差分が残る場合は、そのまま削除せず別 branch へ
+  `commit -> push` してから再構築ルートへ進む。
+- link-root/check の検査対象は「親リポジトリの現在の vendor pin と
+  root projection が ready かどうか」のみとする。
+
 ## AgentCanon update の具体例
 
-AgentCanon source を変更するときは、parent の `vendor/agent-canon` を
-source branch として扱いません。owner evidence を確認し、必要なら
-`dependency_module_change.py prepare --topic <topic> --module vendor/agent-canon --branch <branch> --owner-evidence <file>` で
-`workspace/<topic-slug>/<module-basename>` を再利用または作成し、その独立
-clone で source branch/PR を進めます。parent mode の
-`tools/update_agent_canon.sh merge-main-into-current*` は vendor checkout
-を変更する旧経路ではなく、この source-clone route を案内して停止します。
-standalone AgentCanon source checkout の source mode は維持します。
+AgentCanon source は、原則として consumer repository の `vendor/agent-canon` が
+唯一の source checkout です。`vendor/agent-canon` の local-specific topic
+branch を create/reuse し、`local commit -> 同 commit push -> PR` を行います。
+常に named branch HEAD を使用し、detached HEAD は禁止します。
+ただし、`vendor/agent-canon` が既に別 topic の dirty state を持つ場合のみ、
+`workspace/<topic-slug>/agent-canon` の standalone clone で同じ運用（local
+commit→push→PR）を行います。
+その clone は、PR 作成/更新時点で `local commit == pushed commit == PR head` が
+readback され、同一 PR へ materialize した証拠が得られたら削除します。
+未 materialize 差分がある場合のみ clone 削除を禁止し、先に同一 PR へ
+再materialize します。PR publication receipt は再構築が必要な clone の cleanup
+gate として扱います。
+merge/readback 後は `vendor/agent-canon` の local `main` branch を `origin/main` へ fast-forward し、
+parent の gitlink を merge 済み commit に一致させます。source edit はその前段の
+clean named topic branch で行い、`main` は projection の pass 状態にだけ使います。
+未コミット固有差分の状態で parent の pin/update あるいは projection を進めないでください。
+pin projection は、まず `git add vendor/agent-canon` で stage し、
+`sync check` で staged gitlink(`:$PREFIX`)と実体 `HEAD` が一致することを確認して
+から commit する順で行います。
+parent projection check は、clean な `AGENT_CANON_BRANCH`（既定は `main`）にあり、
+staged gitlink(`:$PREFIX`) と実体 `HEAD` が一致することを pass 条件にします。
+source edit の pass 条件は別であり、clean な named topic branch にいることです。
+detached HEAD、main 上の source edit、gitlink mismatch は pass にしません。
+
+AgentCanon PR 作成・更新前の必須順序は、
+`fetch origin/main の read -> current parent branch へ origin/main を merge -> 衝突解消 ->
+local commit (candidate freeze) -> exact candidate review -> CAS -> review 済み candidate
+push -> PR作成/更新 -> merge/readback` です。
+`parent vendor` が別 topic の dirty state を持つ場合にのみ、`workspace/<topic-slug>/agent-canon`
+の standalone clone を使い、すでに open PR がある場合は、その PR の remote head
+branch を clone/checkout して同一順序で`origin/main` を merge し、衝突解消後に
+local commit を行い、同じ branch へ push して PR head を readback します。
+readback が成功したら clone は削除します。
+すでにその PR が merged/closed で head 更新ができない場合は、
+最新 `origin/main` から linked successor branch/PR を作成し、通常の
+PR publication readback 流れへ移行し、同様に PR head readback 後に clone を削除します。
+merged PR の更新は行いません。
+`origin/main` だけを read するだけの CAS/確認は merge の代替にならず、
+merge conflict が未解消、または `origin/main` merge 済みでない candidate は PR
+禁止です。

@@ -19,7 +19,8 @@ cleanup を同じ責務境界で扱います。
 
 ## 使う route
 
-詳細な source-clone 判断は [`documents/rule/dependency-module-changes.md`](../../documents/rule/dependency-module-changes.md) を読みます。
+詳細な source-clone 判断と AgentCanon parent state decision table は
+[`documents/rule/dependency-module-changes.md`](../../documents/rule/dependency-module-changes.md) を唯一の正本として読みます。
 topic workspace の filesystem / lifecycle、devcontainer mount、VS Code workspace 運用の禁止、
 `.vscode/` 共有面の境界は [`documents/contracts/github-first-module-and-devcontainer-policy.md`](../../documents/contracts/github-first-module-and-devcontainer-policy.md)
 だけを正本として参照します。`.gitmodules` の identity、`vendor/<module>` の clean
@@ -33,6 +34,9 @@ update-only・read-only では clone を作りません。返された `PARENT_R
 使います。cleanup は dry-run を経て remote に全 state がある場合
 だけ apply します。
 
-AgentCanon update はこの一般 route の具体例です。parent mode の vendor
-checkout を source branch として保存・継続・fallback する経路は使わず、
-独立 source clone route へ戻します。
+AgentCanon update はこの一般 route の具体例です。
+
+parent pin/root projection、clean named topic の source owner、requested topic
+identity、dirty fallback の typed next action は、同規約の判定表に従います。
+`main` は topic 作成の起点であり source owner ではありません。runtime shim や
+workflow は `cmd_latest` の更新対象 branch を topic slug に使いません。

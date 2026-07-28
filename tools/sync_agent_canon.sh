@@ -522,6 +522,45 @@ check_agentcanon_root_view_symlink_targets() {
   return "$had_broken"
 }
 
+assert_parent_submodule_projection_ready() {
+  local submodule_status=""
+  local submodule_branch=""
+  local parent_prefix_head=""
+  local submodule_head=""
+
+  if ! is_submodule_prefix; then
+    return 0
+  fi
+  [ -d "$ROOT_DIR/$PREFIX" ] || die "prefix '$PREFIX' does not exist"
+
+  submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all)"
+  if [ -n "$submodule_status" ]; then
+    echo "agent_canon_parent_submodule=dirty"
+    return 1
+  fi
+
+  submodule_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  if [ -z "$submodule_branch" ]; then
+    echo "agent_canon_parent_submodule=detached"
+    return 2
+  fi
+
+  if [ "$submodule_branch" != "$DEFAULT_BRANCH" ]; then
+    echo "agent_canon_parent_submodule=non_default_branch"
+    return 4
+  fi
+
+  parent_prefix_head="$(git -C "$ROOT_DIR" rev-parse ":$PREFIX" 2>/dev/null || true)"
+  submodule_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+  if [ -z "$parent_prefix_head" ] || [ "$submodule_head" != "$parent_prefix_head" ]; then
+    echo "agent_canon_parent_submodule=gitlink_mismatch"
+    return 3
+  fi
+
+  echo "agent_canon_parent_submodule=projection_ready"
+  return 0
+}
+
 ensure_surface_sync_safe() {
   local force="${1:-0}"
   local -a paths=()
@@ -554,6 +593,22 @@ ensure_surface_sync_safe() {
 cmd_link_root() {
   local force="${1:-0}"
   ensure_prefix_exists
+  assert_parent_submodule_projection_ready || {
+    local projection_rc="$?"
+    local next_action=""
+    if [ "$projection_rc" -eq 1 ]; then
+      next_action="materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
+    elif [ "$projection_rc" -eq 2 ]; then
+      next_action="request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
+    elif [ "$projection_rc" -eq 4 ]; then
+      next_action="checkout_${DEFAULT_BRANCH}_at_staged_gitlink_commit"
+    else
+      next_action="request_parent_vendor_source_readiness_and_rerun_link-root"
+    fi
+    echo "NEXT_ACTION=$next_action"
+    echo "agent_canon_projection_requirements=parent_vendor_named_branch_and_gitlink_match_required"
+    die "projection-ready required for link-root: current parent vendor checkout must be clean, on $DEFAULT_BRANCH, and gitlink-matched"
+  }
   ensure_surface_sync_safe "$force"
 
   local spec=""
@@ -596,6 +651,7 @@ cmd_check() {
 
   local spec=""
   local failed=0
+  local projection_rc=0
 
   while IFS= read -r spec; do
     local path="${spec%%:*}"
@@ -669,7 +725,29 @@ cmd_check() {
     failed=1
   fi
 
+  assert_parent_submodule_projection_ready || {
+    projection_rc="$?"
+    if [ "$projection_rc" -eq 1 ]; then
+      failed=1
+      echo "NEXT_ACTION=materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
+      echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
+    elif [ "$projection_rc" -eq 2 ]; then
+      failed=1
+      echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
+      echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
+    elif [ "$projection_rc" -eq 4 ]; then
+      failed=1
+      echo "NEXT_ACTION=checkout_${DEFAULT_BRANCH}_at_staged_gitlink_commit"
+      echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
+    else
+      failed=1
+      echo "NEXT_ACTION=request_parent_vendor_source_readiness_and_rerun_check"
+      echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
+    fi
+  }
+
   if [ "$failed" -ne 0 ]; then
+    [ "$failed" -ne 0 ] || return 0
     die "shared surface drift detected; set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and rerun 'bash tools/sync_agent_canon.sh link-root'"
   fi
 
