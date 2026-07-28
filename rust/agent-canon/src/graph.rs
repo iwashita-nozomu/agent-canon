@@ -10,7 +10,7 @@
 use crate::dependency_manifest::{
     capture_snapshot, diagnostic_category, probe_snapshot_identity, snapshot_completeness,
     write_snapshot_jsonl, DependencyDeclaration, ManifestSnapshot, SnapshotRequest, SourceIdentity,
-    SourceSpan,
+    SourceSpan, SurfaceRelation,
 };
 use crate::structured_analysis::{initialize_graph_schema, validate_graph_connection};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
@@ -1841,7 +1841,25 @@ fn graph_input_fingerprint(
 
 fn source_node(snapshot: &ManifestSnapshot, identity: &SourceIdentity) -> Value {
     let manifest = snapshot.manifests.get(&identity.repo_rel_path);
-    json!({"id":format!("node:source:{}",identity.repo_rel_path),"layer":"source","kind":"file","path":identity.repo_rel_path,"label":identity.repo_rel_path,"payload":{"manifest_present":manifest.is_some(),"contract_kind":manifest.map(|value| value.contract_kind.clone()).unwrap_or_default(),"responsibility":manifest.map(|value| value.responsibility.clone()).unwrap_or_default(),"content_sha256":identity.content_hash,"source_identity_id":identity.identity_id,"git_blob_oid":identity.git_blob_or_gitlink}})
+    let relations = snapshot
+        .surface_relations
+        .iter()
+        .filter(|relation| {
+            relation.source_identity_id == identity.identity_id
+                || relation.target_identity_id == identity.identity_id
+        })
+        .map(surface_relation_json)
+        .collect::<Vec<_>>();
+    let kind = if matches!(identity.file_mode.as_str(), "040000" | "160000") {
+        "directory"
+    } else {
+        "file"
+    };
+    json!({"id":format!("node:source:{}",identity.repo_rel_path),"layer":"source","kind":kind,"path":identity.repo_rel_path,"label":identity.repo_rel_path,"payload":{"manifest_present":manifest.is_some(),"contract_kind":manifest.map(|value| value.contract_kind.clone()).unwrap_or_default(),"responsibility":manifest.map(|value| value.responsibility.clone()).unwrap_or_default(),"content_sha256":identity.content_hash,"source_identity_id":identity.identity_id,"authority_id":identity.authority_id,"canonical_locator":identity.canonical_locator,"locator_kind":identity.locator_kind,"path_role":identity.path_role,"file_mode":identity.file_mode,"git_blob_oid":identity.git_blob_or_gitlink,"submodule_commit":identity.submodule_commit,"surface_relations":relations}})
+}
+
+fn surface_relation_json(relation: &SurfaceRelation) -> Value {
+    json!({"relation_id":relation.relation_id,"relation_type":relation.relation_type,"source_identity_id":relation.source_identity_id,"target_identity_id":relation.target_identity_id,"source_path":relation.source_path,"target_path":relation.target_path,"owner_class":relation.owner_class,"surface_mode":relation.surface_mode,"content_hash_equal":relation.content_hash_equal,"evidence_id":relation.evidence_id,"status":relation.status,"snapshot_id":relation.snapshot_id})
 }
 
 fn source_span_json(span: &SourceSpan) -> Value {
@@ -1869,6 +1887,10 @@ fn dependency_fact(
         })
         .map(|identity| format!("node:source:{}", identity.repo_rel_path));
     to.map(|target| json!({"id":format!("fact:dependency:{}",declaration.declaration_id),"layer":"source","kind":"dependency","inferred":false,"from":from,"to":target,"producer":"source-snapshot","source_path":declaration.source_span.path,"source_span":source_span_json(&declaration.source_span),"evidence_ref":format!("{}:{}",declaration.source_span.path,declaration.source_span.start_line),"authority":"ManifestParser","dependency_detail":{"direction":declaration.declared_direction,"kind":declaration.declared_kind,"reason":declaration.reason}}))
+}
+
+fn surface_relation_fact(relation: &SurfaceRelation) -> Value {
+    json!({"id":format!("fact:surface:{}",relation.relation_id),"layer":"source","kind":relation.relation_type,"inferred":false,"from":format!("node:source:{}",relation.source_path),"to":format!("node:source:{}",relation.target_path),"producer":"surface-manifest-snapshot","source_path":relation.source_path,"evidence_ref":relation.evidence_id,"authority":"SurfaceManifest","surface_detail":surface_relation_json(relation)})
 }
 
 fn graph_fingerprint(
@@ -1927,6 +1949,7 @@ fn collect_build_material_with_mode(
         .declarations
         .iter()
         .filter_map(|declaration| dependency_fact(&snapshot, declaration))
+        .chain(snapshot.surface_relations.iter().map(surface_relation_fact))
         .collect::<Vec<_>>();
     let runtime_fp = runtime_evidence.as_ref().map(runtime_evidence_fingerprint);
     let input_fingerprint = graph_input_fingerprint(
@@ -2169,13 +2192,18 @@ fn build_graph_staging(
     for node in &material.nodes {
         let id = node.get("id").and_then(Value::as_str).unwrap_or_default();
         let path = node.get("path").and_then(Value::as_str).unwrap_or_default();
-        connection.execute("INSERT INTO nodes(id,document_id,layer,kind,label,text,source_start,source_end,confidence,payload_json) VALUES(?1,'doc:source','source','file',?2,?2,0,0,1.0,?3)", params![id, path, serde_json::to_string(node).unwrap_or_default()]).map_err(|error| GraphError::Io(error.to_string()))?;
+        let kind = node.get("kind").and_then(Value::as_str).unwrap_or("file");
+        connection.execute("INSERT INTO nodes(id,document_id,layer,kind,label,text,source_start,source_end,confidence,payload_json) VALUES(?1,'doc:source','source',?2,?3,?3,0,0,1.0,?4)", params![id, kind, path, serde_json::to_string(node).unwrap_or_default()]).map_err(|error| GraphError::Io(error.to_string()))?;
     }
     for fact in &material.facts {
         let id = fact.get("id").and_then(Value::as_str).unwrap_or_default();
+        let kind = fact
+            .get("kind")
+            .and_then(Value::as_str)
+            .unwrap_or("dependency");
         let from = fact.get("from").and_then(Value::as_str).unwrap_or_default();
         let to = fact.get("to").and_then(Value::as_str).unwrap_or_default();
-        connection.execute("INSERT INTO edges(id,layer,kind,from_node_id,to_node_id,order_kind,confidence,evidence_node_id,payload_json) VALUES(?1,'source','dependency',?2,?3,'none',1.0,NULL,?4)", params![id, from, to, serde_json::to_string(fact).unwrap_or_default()]).map_err(|error| GraphError::Io(error.to_string()))?;
+        connection.execute("INSERT INTO edges(id,layer,kind,from_node_id,to_node_id,order_kind,confidence,evidence_node_id,payload_json) VALUES(?1,'source',?2,?3,?4,'none',1.0,NULL,?5)", params![id, kind, from, to, serde_json::to_string(fact).unwrap_or_default()]).map_err(|error| GraphError::Io(error.to_string()))?;
     }
     for diagnostic in &material.snapshot.diagnostics {
         let target_node = diagnostic
