@@ -212,6 +212,14 @@ HTML all use the same full native-plus-derived universe and have exactly equal
 manifest source-identity sets. Formatter ownership remains syntax/layout-only
 and cannot extract, delete, aggregate, or relabel source identities.
 
+この順序では `source read/capture before output mutation` を必須とします。
+canonical graph status/query と generated TSV capture が完了するまで、repository
+tree の出力先、親ディレクトリ、staging directory を作成・変更しません。generated
+TSV は `temporary graph input outside root` として system temp 領域に置きます。
+bundle mode はその capture 後に target parent/staging transaction を開始し、
+staged `dependency_graph.tsv` へ copy します。supplied TSV の identity と atomic
+output publication の契約は維持します。
+
 ## HTML Behavior
 
 - Rendered HTML is a single in-file workbench with static graph/table evidence and
