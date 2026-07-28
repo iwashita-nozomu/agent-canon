@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import subprocess
 import sys
 import tempfile
@@ -24,7 +23,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-import agent_team  # noqa: E402
 from agent_team import (  # noqa: E402
     ACTIVE_DESIGN_PACKET_SCHEMA,
     RunBundleSpec,
