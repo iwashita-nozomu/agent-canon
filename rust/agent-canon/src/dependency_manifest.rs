@@ -619,10 +619,56 @@ pub(crate) fn source_path_is_explicitly_excluded(relative_path: &str) -> bool {
     parts.len() >= 3 && parts[0] == "experiments" && matches!(parts[2], "result" | "report")
 }
 
-fn source_candidate_is_explicitly_excluded(candidate: &SourceCandidate) -> bool {
+fn path_is_surface_or_descendant(relative: &str, surface: &str) -> bool {
+    relative
+        .strip_prefix(surface)
+        .is_some_and(|suffix| suffix.is_empty() || suffix.starts_with('/'))
+}
+
+fn manifest_repo_state_entry<'a>(
+    manifest: &'a SurfaceManifestSnapshot,
+    canonical_locator: &str,
+) -> Option<&'a SurfaceManifestEntry> {
+    let mut selected: Option<&SurfaceManifestEntry> = None;
+    for entry in &manifest.entries {
+        if entry.mode != "repo_state"
+            || !path_is_surface_or_descendant(canonical_locator, &entry.path)
+        {
+            continue;
+        }
+        if selected.is_none_or(|current| {
+            entry.path.len() > current.path.len()
+                || (entry.path.len() == current.path.len() && entry.path < current.path)
+        }) {
+            selected = Some(entry);
+        }
+    }
+    selected
+}
+
+fn manifest_repo_state_target<'a>(
+    manifest: &'a SurfaceManifestSnapshot,
+    authority: Option<&GitlinkAuthority>,
+    relative: &str,
+) -> Option<&'a SurfaceManifestEntry> {
+    let canonical_locator = authority
+        .and_then(|value| {
+            relative
+                .strip_prefix(&value.path)
+                .and_then(|suffix| suffix.strip_prefix('/'))
+        })
+        .unwrap_or(relative);
+    manifest_repo_state_entry(manifest, canonical_locator)
+}
+
+fn source_candidate_is_explicitly_excluded(
+    candidate: &SourceCandidate,
+    manifest: &SurfaceManifestSnapshot,
+) -> bool {
     source_path_is_explicitly_excluded(&candidate.relative)
         || (candidate.locator_kind == "submodule-path"
             && source_path_is_explicitly_excluded(&candidate.canonical_locator))
+        || manifest_repo_state_entry(manifest, &candidate.canonical_locator).is_some()
 }
 
 fn git_bytes(root: &Path, args: &[&str]) -> Result<Vec<u8>, ManifestError> {
@@ -890,6 +936,7 @@ fn read_source_path(root: &Path, relative: &str) -> Result<SourcePathRead, Manif
 
 fn source_fingerprint_for_candidates(
     candidates: &[SourceCandidate],
+    manifest: &SurfaceManifestSnapshot,
 ) -> Result<String, ManifestError> {
     let mut rows = Vec::new();
     let mut processed = BTreeSet::new();
@@ -900,7 +947,7 @@ fn source_fingerprint_for_candidates(
             ));
         }
         let remaining_before = candidates.len() - index;
-        if !source_candidate_is_explicitly_excluded(candidate) {
+        if !source_candidate_is_explicitly_excluded(candidate, manifest) {
             rows.push(format!(
                 "{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\n",
                 candidate.authority_id,
@@ -1124,24 +1171,27 @@ fn manifest_surface_relations(
 
 fn exclusion_metadata(
     manifest: &SurfaceManifestSnapshot,
-    relative: &str,
+    candidate: &SourceCandidate,
 ) -> (&'static str, &'static str) {
-    if manifest.entries.iter().any(|entry| {
-        entry.path == relative
-            && entry.source.is_empty()
-            && (entry.mode == "repo_state"
-                || matches!(
-                    entry.surface_class.as_str(),
-                    "generated_evidence" | "transaction_state" | "projection_view"
-                ))
-    }) {
-        ("generated_state", "surface-manifest-state")
+    if manifest_repo_state_entry(manifest, &candidate.canonical_locator).is_some() {
+        ("manifest_owned_state", "surface-manifest-repo-state")
     } else {
         ("generated_output", "source-owner-exclusion")
     }
 }
 
-fn source_status_bytes(root: &Path) -> Result<Vec<u8>, ManifestError> {
+fn path_is_gitlink_authority_boundary(
+    authority: Option<&GitlinkAuthority>,
+    relative: &str,
+) -> bool {
+    authority.is_some_and(|value| path_is_surface_or_descendant(relative, &value.path))
+}
+
+fn source_status_bytes(
+    root: &Path,
+    manifest: &SurfaceManifestSnapshot,
+    authority: Option<&GitlinkAuthority>,
+) -> Result<Vec<u8>, ManifestError> {
     let raw = git_bytes(root, &["status", "--porcelain=v1", "--untracked-files=all"])?;
     let mut filtered = Vec::new();
     for line in raw
@@ -1158,10 +1208,11 @@ fn source_status_bytes(root: &Path) -> Result<Vec<u8>, ManifestError> {
             .split(" -> ")
             .map(|path| path.trim().trim_matches('"'))
             .collect::<Vec<_>>();
-        if paths
-            .iter()
-            .all(|path| source_path_is_explicitly_excluded(path))
-        {
+        if paths.iter().all(|path| {
+            source_path_is_explicitly_excluded(path)
+                || path_is_gitlink_authority_boundary(authority, path)
+                || manifest_repo_state_entry(manifest, path).is_some()
+        }) {
             continue;
         }
         filtered.extend_from_slice(line);
@@ -1260,8 +1311,8 @@ pub(crate) fn probe_snapshot_identity(
     let head = git_text(&root, &["rev-parse", "--verify", "HEAD"])?;
     let authority = gitlink_authority(&root, &surface_manifest)?;
     let candidates = source_candidates(&root, &surface_manifest, &head, authority.as_ref())?;
-    let source_fingerprint = source_fingerprint_for_candidates(&candidates)?;
-    let status = source_status_bytes(&root)?;
+    let source_fingerprint = source_fingerprint_for_candidates(&candidates, &surface_manifest)?;
+    let status = source_status_bytes(&root, &surface_manifest, authority.as_ref())?;
     let index_hash = hash_bytes(&git_bytes(&root, &["ls-files", "--stage", "-z"])?);
     let status_hash = hash_bytes(&status);
     let _capture_hash = snapshot_capture_hash(
@@ -1297,9 +1348,10 @@ pub(crate) fn capture_snapshot(
         .iter()
         .map(|candidate| candidate.relative.clone())
         .collect::<Vec<_>>();
-    let source_fingerprint_before = source_fingerprint_for_candidates(&candidates)?;
+    let source_fingerprint_before =
+        source_fingerprint_for_candidates(&candidates, &surface_manifest)?;
     let index_hash = hash_bytes(&git_bytes(&root, &["ls-files", "--stage", "-z"])?);
-    let status_bytes = source_status_bytes(&root)?;
+    let status_bytes = source_status_bytes(&root, &surface_manifest, authority.as_ref())?;
     let status_hash = hash_bytes(&status_bytes);
     let captured_before_hash = snapshot_capture_hash(
         &request.profile,
@@ -1313,22 +1365,11 @@ pub(crate) fn capture_snapshot(
         .map(|line| line.get(3..).unwrap_or(line).to_string())
         .collect::<Vec<_>>();
     let dirty_set = dirty_paths.iter().cloned().collect::<BTreeSet<_>>();
-    let mut excluded_set = candidates
+    let excluded_set = candidates
         .iter()
-        .filter(|candidate| source_candidate_is_explicitly_excluded(candidate))
+        .filter(|candidate| source_candidate_is_explicitly_excluded(candidate, &surface_manifest))
         .map(|candidate| candidate.relative.clone())
         .collect::<BTreeSet<_>>();
-    for entry in &surface_manifest.entries {
-        if entry.source.is_empty()
-            && (entry.mode == "repo_state"
-                || matches!(
-                    entry.surface_class.as_str(),
-                    "generated_evidence" | "transaction_state" | "projection_view"
-                ))
-        {
-            excluded_set.insert(entry.path.clone());
-        }
-    }
     let excluded_paths = excluded_set.iter().cloned().collect::<Vec<_>>();
     let eligible_paths = candidate_paths
         .iter()
@@ -1388,7 +1429,7 @@ pub(crate) fn capture_snapshot(
             snapshot_id: snapshot_id.clone(),
         });
         if excluded_set.contains(relative) {
-            let (reason_code, rule_id) = exclusion_metadata(&surface_manifest, relative);
+            let (reason_code, rule_id) = exclusion_metadata(&surface_manifest, candidate);
             source_exclusions.push(SourceExclusion {
                 source_exclusion_id: hash_text(&format!("exclude:{identity_id}")),
                 source_identity_id: identity_id,
@@ -1455,26 +1496,37 @@ pub(crate) fn capture_snapshot(
                 });
                 continue;
             }
-            let resolved = match resolve_source_relative_target(relative, target) {
+            let (resolved, attestation_key) = match resolve_source_relative_target(relative, target)
+            {
                 Ok(target_path) => {
                     let canonical_target_path = canonicalize_surface_path(
                         &surface_manifest,
                         authority.as_ref(),
                         &target_path,
                     )?;
-                    let resolved = identity_by_path
-                        .get(&canonical_target_path)
-                        .filter(|_| !excluded_set.contains(&canonical_target_path))
-                        .cloned();
-                    if resolved.is_none() {
-                        diagnostics.push(target_unresolved_diagnostic(
-                            relative,
-                            line_number,
-                            &line,
-                            target,
-                        ));
+                    if manifest_repo_state_target(
+                        &surface_manifest,
+                        authority.as_ref(),
+                        &canonical_target_path,
+                    )
+                    .is_some()
+                    {
+                        (None, "surface-manifest-repo-state")
+                    } else {
+                        let resolved = identity_by_path
+                            .get(&canonical_target_path)
+                            .filter(|_| !excluded_set.contains(&canonical_target_path))
+                            .cloned();
+                        if resolved.is_none() {
+                            diagnostics.push(target_unresolved_diagnostic(
+                                relative,
+                                line_number,
+                                &line,
+                                target,
+                            ));
+                        }
+                        (resolved, "dependency-header")
                     }
-                    resolved
                 }
                 Err(error) => {
                     diagnostics.push(target_path_diagnostic(
@@ -1484,7 +1536,7 @@ pub(crate) fn capture_snapshot(
                         target,
                         error,
                     ));
-                    None
+                    (None, "dependency-header")
                 }
             };
             declarations.push(DependencyDeclaration {
@@ -1505,7 +1557,7 @@ pub(crate) fn capture_snapshot(
                 },
                 reason,
                 raw_line_hash: hash_text(&line),
-                attestation_key: "dependency-header".to_string(),
+                attestation_key: attestation_key.to_string(),
                 snapshot_id: snapshot_id.clone(),
             });
         }
@@ -1522,9 +1574,10 @@ pub(crate) fn capture_snapshot(
         .iter()
         .map(|candidate| candidate.relative.clone())
         .collect::<Vec<_>>();
-    let source_fingerprint_after = source_fingerprint_for_candidates(&candidates_after)?;
+    let source_fingerprint_after =
+        source_fingerprint_for_candidates(&candidates_after, &surface_manifest)?;
     let index_hash_after = hash_bytes(&git_bytes(&root, &["ls-files", "--stage", "-z"])?);
-    let status_after = source_status_bytes(&root)?;
+    let status_after = source_status_bytes(&root, &surface_manifest, authority_after.as_ref())?;
     let captured_after_hash = snapshot_capture_hash(
         &request.profile,
         &git_head_after,
@@ -1635,7 +1688,7 @@ pub(crate) fn write_snapshot_jsonl(
     )
     .map_err(|error| ManifestError::Io(error.to_string()))?;
     for declaration in &snapshot.declarations {
-        let value = json!({"record_type":"dependency_declaration","declaration_id":declaration.declaration_id,"source_identity_id":declaration.source_identity_id,"declared_direction":declaration.declared_direction,"declared_kind":declaration.declared_kind,"declared_target":declaration.declared_target,"resolved_target_identity_id":declaration.resolved_target_identity_id,"source_span": {"path":declaration.source_span.path,"start_line":declaration.source_span.start_line,"start_column":declaration.source_span.start_column,"end_line":declaration.source_span.end_line,"end_column":declaration.source_span.end_column},"reason":declaration.reason,"snapshot_id":declaration.snapshot_id});
+        let value = json!({"record_type":"dependency_declaration","declaration_id":declaration.declaration_id,"source_identity_id":declaration.source_identity_id,"declared_direction":declaration.declared_direction,"declared_kind":declaration.declared_kind,"declared_target":declaration.declared_target,"resolved_target_identity_id":declaration.resolved_target_identity_id,"source_span": {"path":declaration.source_span.path,"start_line":declaration.source_span.start_line,"start_column":declaration.source_span.start_column,"end_line":declaration.source_span.end_line,"end_column":declaration.source_span.end_column},"reason":declaration.reason,"attestation_key":declaration.attestation_key,"snapshot_id":declaration.snapshot_id});
         writeln!(
             writer,
             "{}",
