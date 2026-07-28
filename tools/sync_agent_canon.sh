@@ -410,8 +410,7 @@ copy_path() {
 }
 
 parent_copy_projection_enabled() {
-  [ -n "$SUPERPROJECT_DIR" ] \
-    && [ -L "$ROOT_DIR/tools/agent-canon" ] \
+  [ -L "$ROOT_DIR/tools/agent-canon" ] \
     && [ "$(readlink "$ROOT_DIR/tools/agent-canon")" = "../vendor/agent-canon/tools" ]
 }
 
@@ -462,11 +461,16 @@ regular_path() {
   local abs_source=""
   if [ -e "$abs_path" ] && [ ! -L "$abs_path" ] \
     && { [ "$path" != ".vscode" ] || [ -d "$abs_path" ]; }; then
-    return
+    if [ "$path" != ".devcontainer" ]; then
+      return
+    fi
   fi
   if [ -z "$source" ]; then
     rm -rf "$abs_path"
     mkdir -p "$abs_path"
+    if [ "$path" = ".devcontainer" ] && parent_copy_projection_enabled; then
+      prune_parent_devcontainer_artifacts
+    fi
     return
   fi
   [ -n "$source" ] || die "regular path '$path' is missing or is a symlink and has no seed source"
@@ -475,6 +479,21 @@ regular_path() {
   rm -rf "$abs_path"
   mkdir -p "$(dirname "$abs_path")"
   cp -a "$abs_source" "$abs_path"
+
+  if [ "$path" = ".devcontainer" ] && parent_copy_projection_enabled && [ -d "$abs_path" ]; then
+    prune_parent_devcontainer_artifacts
+  fi
+}
+
+prune_parent_devcontainer_artifacts() {
+  local abs_path="$ROOT_DIR/.devcontainer"
+  [ -d "$abs_path" ] || return
+  rm -f \
+    "$abs_path/bootstrap-shared-runtime.sh" \
+    "$abs_path/finalize-shared-runtime.sh" \
+    "$abs_path/generate-runtime-compose.sh" \
+    "$abs_path/post-attach.sh" \
+    "$abs_path/post-create.sh"
 }
 
 path_is_tracked() {
@@ -577,6 +596,10 @@ cmd_link_root() {
     local source="${spec#*:}"
     copy_path "$path" "$source"
   done < <(build_copy_specs)
+
+  if parent_copy_projection_enabled; then
+    prune_parent_devcontainer_artifacts
+  fi
 
   while IFS= read -r path; do
     [ -n "$path" ] || continue
@@ -1500,7 +1523,7 @@ cmd_status() {
     local source="${spec#*:}"
     local abs_path="$ROOT_DIR/$path"
     local abs_source="$ROOT_DIR/$source"
-    if [ -f "$abs_path" ] && [ -f "$abs_source" ] && cmp -s "$abs_path" "$abs_source"; then
+    if [ -f "$abs_path" ] && [ -f "$abs_source" ] && copy_matches_source "$abs_path" "$abs_source"; then
       echo "copy[$path]=ok"
     elif [ -e "$abs_path" ]; then
       echo "copy[$path]=drift"

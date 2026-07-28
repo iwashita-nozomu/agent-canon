@@ -2958,9 +2958,12 @@ class StandaloneUpdateLifecycleTest(unittest.TestCase):
         )
         tool_dir = source / "tools" / "agent_tools"
         tool_dir.mkdir(parents=True)
+        repo_lib_dir = source / "tools" / "lib"
+        repo_lib_dir.mkdir(parents=True)
         shutil.copy2(REPO_ROOT / "tools" / "update_agent_canon.sh", source / "tools")
         for name in ("artifact_identity.py", "update_lifecycle_contract.py"):
             shutil.copy2(REPO_ROOT / "tools" / "agent_tools" / name, tool_dir / name)
+        shutil.copy2(REPO_ROOT / "tools" / "lib" / "repo_paths.sh", repo_lib_dir / "repo_paths.sh")
         (source / "ROOT_AGENTS.md").write_text("# fixture\n", encoding="utf-8")
         subprocess.run(["git", "add", "-A"], cwd=source, check=True)
         subprocess.run(["git", "commit", "-m", "fixture source"], cwd=source, check=True)

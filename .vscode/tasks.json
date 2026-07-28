@@ -14,21 +14,21 @@
     {
       "label": "AgentCanon: Docs Check",
       "type": "shell",
-      "command": "tools/bin/agent-canon docs check",
+      "command": "if [ -x \"${workspaceFolder}/tools/agent-canon/bin/agent-canon\" ]; then\n  AGENT_CANON_BIN=\"${workspaceFolder}/tools/agent-canon/bin/agent-canon\"\nelse\n  AGENT_CANON_BIN=\"${workspaceFolder}/tools/bin/agent-canon\"\nfi\n\"$AGENT_CANON_BIN\" docs check",
       "group": "test",
       "problemMatcher": []
     },
     {
       "label": "AgentCanon: Convention Check",
       "type": "shell",
-      "command": "python3 tools/agent_tools/check_convention_compliance.py",
+      "command": "if [ -f \"${workspaceFolder}/tools/agent-canon/agent_tools/check_convention_compliance.py\" ]; then\n  AGENT_CANON_TOOLS=\"${workspaceFolder}/tools/agent-canon/agent_tools\"\nelse\n  AGENT_CANON_TOOLS=\"${workspaceFolder}/tools/agent_tools\"\nfi\npython3 \"${AGENT_CANON_TOOLS}/check_convention_compliance.py\"",
       "group": "test",
       "problemMatcher": []
     },
     {
       "label": "AgentCanon: Dependency Headers",
       "type": "shell",
-      "command": "python3 tools/agent_tools/check_dependency_headers.py --changed && bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing && bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header",
+      "command": "if [ -f \"${workspaceFolder}/tools/agent-canon/agent_tools/check_dependency_headers.py\" ]; then\n  AGENT_CANON_TOOLS=\"${workspaceFolder}/tools/agent-canon/agent_tools\"\nelse\n  AGENT_CANON_TOOLS=\"${workspaceFolder}/tools/agent_tools\"\nfi\npython3 \"${AGENT_CANON_TOOLS}/check_dependency_headers.py\" --changed && bash \"${AGENT_CANON_TOOLS}/scan_dependency_headers.sh\" --changed --fail-missing && bash \"${AGENT_CANON_TOOLS}/check_dependency_header_format.sh\" --changed --require-header",
       "group": "test",
       "problemMatcher": []
     }
