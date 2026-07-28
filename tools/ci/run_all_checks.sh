@@ -168,17 +168,28 @@ fi
 
 # 0. agent/runtime sync checks
 echo "0️⃣  agent/runtime sync checks を実行中..."
+CANON_GRAPH_READY=0
+if "$CANON_BIN" graph build --root "$WORKSPACE_ROOT" --profile default --format json; then
+  CANON_GRAPH_READY=1
+else
+  echo "❌ canonical graph build 失敗"
+  EXIT_CODE=1
+fi
 if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/smoke_test_research_perspective_pack.py" 2>&1; then
   echo "✅ research perspective pack smoke test 成功"
 else
   echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_dependency_headers.py" --changed 2>&1; then
-  echo "✅ dependency header checks 成功"
+if [ "$CANON_GRAPH_READY" -eq 1 ]; then
+  if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_dependency_headers.py" --changed 2>&1; then
+    echo "✅ dependency header checks 成功"
+  else
+    echo "❌ dependency header checks 失敗"
+    EXIT_CODE=1
+  fi
 else
-  echo "❌ dependency header checks 失敗"
-  EXIT_CODE=1
+  echo "⏭️ dependency header checks skipped: canonical graph build failed"
 fi
 if bash "${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh" --changed 2>&1; then
   echo "✅ dependency manifest scan 成功"
@@ -260,11 +271,15 @@ else
   echo "❌ tool proof coverage checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py" 2>&1; then
-  echo "✅ tool/convention drift checks 成功"
+if [ "$CANON_GRAPH_READY" -eq 1 ]; then
+  if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py" 2>&1; then
+    echo "✅ tool/convention drift checks 成功"
+  else
+    echo "❌ tool/convention drift checks 失敗"
+    EXIT_CODE=1
+  fi
 else
-  echo "❌ tool/convention drift checks 失敗"
-  EXIT_CODE=1
+  echo "⏭️ tool/convention drift checks skipped: canonical graph build failed"
 fi
 if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/responsibility_scope.py" 2>&1; then
   echo "✅ responsibility scope checks 成功"
