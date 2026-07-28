@@ -51,11 +51,12 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 ### 1. 準備
 
 実装や run に入る前に、実験名 `<topic>` を固定します。
-新規 topic は AgentCanon template path
-`vendor/agent-canon/experiments/_template/` を `experiments/<topic>/` へコピーして始めます。
+新規 topic は canonical create tool が runnable scaffold、canonical な topic
+`README.md` / `provenance.toml`、registry entry を配置する route から始めます。
+`experiments/_template/` の直接コピーは利用者向けの作成手順にしません。
 
 ```bash
-cp -r vendor/agent-canon/experiments/_template experiments/<topic>
+python3 tools/experiments/create_experiment_topic.py <topic>
 ```
 
 コピー後は次の順で編集します。
@@ -250,7 +251,7 @@ topic、Hook、admission context、互換 wrapper が runner return を result �
 - `ruff check`
   - import、未使用変数、到達不能コード、雑な例外処理を早めに落とす。
 - CLI help
-  - `python experiments/<topic>/run.py --help` または topic README で固定した直接入口が通ることを確認する。
+  - `python3 tools/experiments/run_managed_experiment.py --help` で managed runner の CLI を確認し、topic の実行例は `--topic <topic> --variant formal -- python3 experiments/<topic>/run.py` の managed route と一致させる。
 - import path
   - top-level import と package path が壊れていないことを確認する。
 - 出力 schema

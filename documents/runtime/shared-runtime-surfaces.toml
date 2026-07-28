@@ -167,6 +167,15 @@ paths = [
   "documents/design/README.md",
   "documents/design/protocols.md",
   "documents/templates/README.md",
+  "documents/templates/README.template.md",
+  "documents/templates/design-document.template.md",
+  "documents/templates/github/README.md",
+  "documents/templates/github/issue/config.yml",
+  "documents/templates/github/issue/agentcanon-maintenance.yml",
+  "documents/templates/github/issue/eval-capture.yml",
+  "documents/templates/github/pull-request/agent_canon.md",
+  "documents/templates/experiment/README.template.md",
+  "documents/templates/experiment/experiment-provenance.template.toml",
   "documents/templates/remote_execution_repo.template.toml",
   "documents/templates/remote_execution_target.template.toml",
   "documents/templates/server_host_inventory.template.md",
@@ -327,8 +336,39 @@ local_override_allowed = false
 paths = [
   ".github/workflows/agent-coordination.yml",
   ".github/workflows/agent-improvement-guide.yml",
-  ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
 ]
+
+[[surface]]
+path = ".github/ISSUE_TEMPLATE/config.yml"
+mode = "copy"
+source = "documents/templates/github/issue/config.yml"
+owner = "github-path-constraint"
+class = "github_copy"
+local_override_allowed = false
+
+[[surface]]
+path = ".github/ISSUE_TEMPLATE/agentcanon-maintenance.yml"
+mode = "copy"
+source = "documents/templates/github/issue/agentcanon-maintenance.yml"
+owner = "github-path-constraint"
+class = "github_copy"
+local_override_allowed = false
+
+[[surface]]
+path = ".github/ISSUE_TEMPLATE/eval-capture.yml"
+mode = "copy"
+source = "documents/templates/github/issue/eval-capture.yml"
+owner = "github-path-constraint"
+class = "github_copy"
+local_override_allowed = false
+
+[[surface]]
+path = ".github/PULL_REQUEST_TEMPLATE/agent_canon.md"
+mode = "copy"
+source = "documents/templates/github/pull-request/agent_canon.md"
+owner = "github-path-constraint"
+class = "github_copy"
+local_override_allowed = false
 
 [[surface]]
 path = ".github/workflows/agent-runtime-dashboard.yml"
