@@ -1,0 +1,610 @@
+version: 1
+# @dependency-start
+# contract registry
+# responsibility Owns the canonical public-skill dependency DAG, responsibility groups, order constraints, and parallel-independent relations.
+# upstream design ./catalog.yaml enumerates the complete public skill identity set
+# downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives routing order and related candidates
+# downstream implementation ../../tools/agent_tools/skill_dependency_map.py checks the DAG and generates the Mermaid projection
+# downstream design ../../agents/skills/agent-orchestration.md consumes canonical invocation order
+# downstream design ../../agents/skills/task-routing.md consumes canonical routing order
+# downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py validates cycle, reference, order, and graph contracts
+# @dependency-end
+skill_dependencies:
+  agent-orchestration:
+    responsibility_group: orchestration
+    required_prerequisites: []
+    successors:
+    - task-routing
+    - codex-task-workflow
+    - owner-bounded-routing
+    - subagent-bootstrap
+    - dependency-analysis
+    order_constraints:
+    - before: agent-orchestration
+      after: task-routing
+      reason: routing entry precedes route derivation
+    parallel_independent:
+    - comprehensive-development
+  repo-onboarding:
+    responsibility_group: intake
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  task-routing:
+    responsibility_group: orchestration
+    required_prerequisites:
+    - agent-orchestration
+    successors:
+    - owner-bounded-routing
+    - structure-refactor
+    - dependency-analysis
+    order_constraints: []
+    parallel_independent:
+    - codex-task-workflow
+    - tool-finding-report
+    - issue-finding-report
+    - agent-log-analysis
+    - runtime-log-repair
+    - dependency-module-change
+    - agent-learning
+  start-repository:
+    responsibility_group: intake
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  codex-task-workflow:
+    responsibility_group: orchestration
+    required_prerequisites:
+    - agent-orchestration
+    successors:
+    - subagent-bootstrap
+    order_constraints: []
+    parallel_independent:
+    - task-routing
+    - owner-bounded-routing
+    - change-review
+    - result-artifact-writeout
+    - comprehensive-development
+  owner-bounded-routing:
+    responsibility_group: orchestration
+    required_prerequisites:
+    - agent-orchestration
+    - task-routing
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - codex-task-workflow
+    - change-review
+    - md-style-check
+    - wiki-publication
+  subagent-bootstrap:
+    responsibility_group: orchestration
+    required_prerequisites:
+    - agent-orchestration
+    - codex-task-workflow
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - result-artifact-writeout
+    - runtime-log-repair
+  change-review:
+    responsibility_group: review
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - codex-task-workflow
+    - owner-bounded-routing
+    - tool-finding-report
+    - pr-processing
+    - report-writing
+    - test-design
+    - refactor-loop
+    - comprehensive-development
+  python-review:
+    responsibility_group: review
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - oop-type-design
+  cpp-review:
+    responsibility_group: review
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - oop-type-design
+  oop-readability-check:
+    responsibility_group: design
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - oop-type-design
+    - code-visualization
+    - test-design
+  oop-type-design:
+    responsibility_group: design
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - python-review
+    - cpp-review
+    - oop-readability-check
+  result-artifact-writeout:
+    responsibility_group: evidence
+    required_prerequisites:
+    - report-writing
+    successors:
+    - save-experiment-results
+    order_constraints: []
+    parallel_independent:
+    - codex-task-workflow
+    - subagent-bootstrap
+    - result-visualize
+    - tool-finding-report
+    - issue-finding-report
+    - agent-log-analysis
+    - runtime-log-repair
+    - pr-processing
+    - experiment-lifecycle
+    - gpu-execution
+    - adaptive-improvement-loop
+    - research-workflow
+    - wiki-publication
+  result-visualize:
+    responsibility_group: evidence
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - result-artifact-writeout
+    - report-writing
+    - structure-planning
+    - html-output
+    - html-experiment-report
+    - experiment-lifecycle
+    - experiment-review
+  tool-finding-report:
+    responsibility_group: evidence
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - task-routing
+    - change-review
+    - result-artifact-writeout
+    - agent-log-analysis
+    - dependency-analysis
+  issue-finding-report:
+    responsibility_group: evidence
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - task-routing
+    - result-artifact-writeout
+    - agent-log-analysis
+    - runtime-log-repair
+    - report-writing
+  agent-log-analysis:
+    responsibility_group: evidence
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - task-routing
+    - result-artifact-writeout
+    - tool-finding-report
+    - issue-finding-report
+    - runtime-log-repair
+    - report-writing
+    - agent-learning
+  runtime-log-repair:
+    responsibility_group: evidence
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - task-routing
+    - subagent-bootstrap
+    - result-artifact-writeout
+    - issue-finding-report
+    - agent-log-analysis
+    - agent-eval-accumulation
+    - agent-learning
+  agent-eval-accumulation:
+    responsibility_group: evidence
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - runtime-log-repair
+  agent-canon-update:
+    responsibility_group: lifecycle
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - dependency-module-change
+    - pr-processing
+    - agent-update-branch
+    - structure-refactor
+  dependency-module-change:
+    responsibility_group: lifecycle
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - task-routing
+    - agent-canon-update
+    - structure-refactor
+    - dependency-analysis
+  pr-processing:
+    responsibility_group: lifecycle
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - change-review
+    - result-artifact-writeout
+    - agent-canon-update
+    - agent-update-branch
+  agent-update-branch:
+    responsibility_group: lifecycle
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - agent-canon-update
+    - pr-processing
+  report-writing:
+    responsibility_group: documents
+    required_prerequisites:
+    - prose-reasoning-graph
+    successors:
+    - result-artifact-writeout
+    order_constraints: []
+    parallel_independent:
+    - change-review
+    - result-visualize
+    - issue-finding-report
+    - agent-log-analysis
+    - html-output
+  prose-reasoning-graph:
+    responsibility_group: documents
+    required_prerequisites:
+    - structure-planning
+    successors:
+    - long-form-writing
+    - report-writing
+    order_constraints: []
+    parallel_independent:
+    - code-visualization
+    - md-style-check
+    - document-canon-cleanup
+  structure-planning:
+    responsibility_group: documents
+    required_prerequisites:
+    - structure-refactor
+    successors:
+    - prose-reasoning-graph
+    order_constraints: []
+    parallel_independent:
+    - result-visualize
+    - code-visualization
+    - refactor-loop
+    - document-canon-cleanup
+    - experiment-lifecycle
+  code-visualization:
+    responsibility_group: documents
+    required_prerequisites:
+    - dependency-analysis
+    - structure-refactor
+    successors:
+    - md-style-check
+    order_constraints:
+    - before: code-visualization
+      after: md-style-check
+      reason: diagram projection precedes Markdown formatting/readback
+    parallel_independent:
+    - oop-readability-check
+    - prose-reasoning-graph
+    - structure-planning
+    - html-output
+    - test-design
+    - algorithm-flowchart
+  html-output:
+    responsibility_group: documents
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - result-visualize
+    - report-writing
+    - code-visualization
+  html-experiment-report:
+    responsibility_group: documents
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - result-visualize
+  test-design:
+    responsibility_group: design
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - change-review
+    - oop-readability-check
+    - code-visualization
+    - experiment-lifecycle
+    - gpu-execution
+    - computational-optimization
+    - algorithm-proof-exploration
+  refactor-loop:
+    responsibility_group: design
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - change-review
+    - structure-planning
+    - structure-refactor
+    - dependency-analysis
+    - comprehensive-development
+  structure-refactor:
+    responsibility_group: analysis
+    required_prerequisites:
+    - task-routing
+    successors:
+    - structure-planning
+    - code-visualization
+    order_constraints:
+    - before: structure-refactor
+      after: code-visualization
+      reason: responsibility facts precede architecture projection
+    parallel_independent:
+    - agent-canon-update
+    - dependency-module-change
+    - refactor-loop
+    - document-canon-cleanup
+    - dependency-analysis
+    - comprehensive-development
+  user-guided-debugging:
+    responsibility_group: delivery
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  long-form-writing:
+    responsibility_group: documents
+    required_prerequisites:
+    - prose-reasoning-graph
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - document-canon-cleanup
+  academic-writing:
+    responsibility_group: research
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  paper-writing:
+    responsibility_group: research
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  md-style-check:
+    responsibility_group: documents
+    required_prerequisites:
+    - code-visualization
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - owner-bounded-routing
+    - prose-reasoning-graph
+    - document-canon-cleanup
+  mvp-skeleton:
+    responsibility_group: delivery
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  document-canon-cleanup:
+    responsibility_group: documents
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - prose-reasoning-graph
+    - structure-planning
+    - structure-refactor
+    - long-form-writing
+    - md-style-check
+  dependency-analysis:
+    responsibility_group: analysis
+    required_prerequisites:
+    - agent-orchestration
+    - task-routing
+    successors:
+    - code-visualization
+    order_constraints:
+    - before: dependency-analysis
+      after: code-visualization
+      reason: source dependency facts precede graph projection
+    parallel_independent:
+    - tool-finding-report
+    - dependency-module-change
+    - refactor-loop
+    - structure-refactor
+    - comprehensive-development
+  worktree-start:
+    responsibility_group: lifecycle
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  worktree-health:
+    responsibility_group: lifecycle
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  experiment-lifecycle:
+    responsibility_group: experiments
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - result-artifact-writeout
+    - result-visualize
+    - structure-planning
+    - test-design
+    - save-experiment-results
+    - experiment-review
+    - gpu-execution
+    - adaptive-improvement-loop
+    - research-workflow
+  save-experiment-results:
+    responsibility_group: experiments
+    required_prerequisites:
+    - result-artifact-writeout
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - experiment-lifecycle
+    - experiment-review
+  experiment-review:
+    responsibility_group: experiments
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - result-visualize
+    - experiment-lifecycle
+    - save-experiment-results
+  gpu-execution:
+    responsibility_group: experiments
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - result-artifact-writeout
+    - test-design
+    - experiment-lifecycle
+    - computational-optimization
+    - environment-maintenance
+  computational-optimization:
+    responsibility_group: experiments
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - test-design
+    - gpu-execution
+    - algorithm-proof-exploration
+  adaptive-improvement-loop:
+    responsibility_group: experiments
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - result-artifact-writeout
+    - experiment-lifecycle
+    - research-workflow
+  literature-survey:
+    responsibility_group: research
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - research-workflow
+  formal-proof-workflow:
+    responsibility_group: research
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - algorithm-proof-exploration
+  lean-algorithm-design:
+    responsibility_group: research
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  algorithm-proof-exploration:
+    responsibility_group: research
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - test-design
+    - computational-optimization
+    - formal-proof-workflow
+  algorithm-flowchart:
+    responsibility_group: research
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - code-visualization
+  research-workflow:
+    responsibility_group: research
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - result-artifact-writeout
+    - experiment-lifecycle
+    - adaptive-improvement-loop
+    - literature-survey
+  comprehensive-development:
+    responsibility_group: delivery
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - agent-orchestration
+    - codex-task-workflow
+    - change-review
+    - refactor-loop
+    - structure-refactor
+    - dependency-analysis
+  environment-maintenance:
+    responsibility_group: delivery
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - gpu-execution
+  user-preference-sync:
+    responsibility_group: runtime
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  agent-learning:
+    responsibility_group: runtime
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - task-routing
+    - agent-log-analysis
+    - runtime-log-repair
+  wiki-publication:
+    responsibility_group: lifecycle
+    required_prerequisites: []
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - owner-bounded-routing
+    - result-artifact-writeout

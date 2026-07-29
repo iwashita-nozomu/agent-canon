@@ -34,6 +34,26 @@ update-only・read-only では clone を作りません。返された `PARENT_R
 使います。cleanup は dry-run を経て remote に全 state がある場合
 だけ apply します。
 
+独立した replaceable responsibility を parallel に実行する場合は、vendor の clean
+状態を理由に停止せず、親の DAG packet が disjoint write scope、依存/merge order、
+validation、reviewer ownership を固定した後で、次の typed route を使います。
+
+```bash
+python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare \
+  --placement workspace --topic <topic> --module <path> --branch <branch> \
+  --owner-evidence <file>
+```
+
+この route は `workspace/<topic-slug>/<module-basename>` の computed clone だけを
+fresh create し、親 cloneや代替 pathを作りません。local/remote に requested branch が
+存在する場合は拒否します。既存 remote branch の継続は
+`--placement workspace-continuation` という別の non-fresh route で明示します。新規 branch は最新
+`origin/main` から作られ、`SOURCE_REMOTE`、`SOURCE_BASE_REF`、`SOURCE_BASE_SHA`、
+`SOURCE_OWNER_EVIDENCE_SHA256`、`SOURCE_BRANCH`、`SOURCE_HEAD_SHA` を source identity
+として返します。相対 `.gitmodules` URL は親 origin identity に対して解決されます。
+細粒度の fresh agent や責務単位の過剰分割には使わず、親は ready な独立 stream を
+全て launch し、descendant を monitor し、互換な worker context を再利用します。
+
 AgentCanon update はこの一般 route の具体例です。
 
 parent pin/root projection、clean named topic の source owner、requested topic

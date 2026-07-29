@@ -37,12 +37,20 @@ Execute the required and task-matching conditional commands that the packet prin
    親 vendor は source 編集の開始点とせず、topic branch の作成へ遷移します。
    Parent pin/root projection is a separate pass state: clean `main` with
    submodule worktree `HEAD == :$PREFIX` from the staged index.
+   When the parent packet proves independent replaceable responsibilities with disjoint
+   write scope, dependency/merge order, validation route, and reviewer ownership, the
+   parent may explicitly select `prepare --placement workspace` even when vendor is
+   clean. That typed fresh route creates only the computed
+   `workspace/<topic-slug>/<module-basename>` clone from latest `origin/main`, and
+   refuses an existing local or remote task branch. A continuation must use the separate
+   `--placement workspace-continuation` route; the fresh route does not continue implicitly.
+   Neither route creates a parent clone or a compatibility path.
 1. For dependency source recovery on corrupted state, wrong write target, merge-conflict
    failure, or unexpected delta, do not reverse patch/restore. Rebuild from
    `origin/main` clean checkout, re-apply intended topic commits only, and
    reopen a successor branch/PR if unmaterialized diff remains.
 1. Use `cleanup` as a dry-run first. Apply deletion only with the exact expected clone path and the required same-command authority environment; its remote reconstructibility gate is independent of PR/pin/root-sync state.
 1. If a parent update command proposes to preserve or merge dirty vendor source
-   state, stop. Use the independent clone only when another topic owns that
-   dirty checkout; otherwise use the typed repair/rebuild route. Do not add a
-   compatibility or fallback topology.
+   state, stop. Use the independent clone only through the typed workspace route
+   or the decision table's dirty fallback; otherwise use the typed repair/rebuild
+   route. Do not add a compatibility or fallback topology.
