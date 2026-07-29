@@ -25,6 +25,7 @@ from tools.agent_tools.check_convention_compliance import (
     DOCUMENT_STRUCTURE_ROUTING_MARKERS,
     EXIT_BLOCKER_POLICY_MARKERS,
     EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
+    HOOK_GUARDRAIL_POLICY_MARKERS,
     IMPLEMENTATION_GUARDRAIL_MARKERS,
     LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
     MATHEMATICAL_NECESSITY_MARKERS,
@@ -43,8 +44,6 @@ from tools.agent_tools.check_convention_compliance import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_convention_compliance.py"
-
-
 def skill_fixture(skill: str, body: str) -> str:
     """Return a minimal runtime skill fixture with its tool command packet."""
     return (
@@ -174,7 +173,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "documents/codex/codex-configuration-reference.md": (
         "## Hook Severity Policy\n"
-        "fail-open CRITICAL_BLOCKING_CHILD_HOOKS warning/evidence\n"
+        "fail-open Active dispatcher failures warning/evidence secret\n"
         "*_FORWARDER=deprecated *_FORWARDER_SEVERITY=fix-now "
         "caller chain canonical command\n"
     ),
@@ -686,29 +685,25 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/sync_agent_canon.sh": "surface_manifest.py build_regular_specs regular_path\n",
     "agents/skills/environment-maintenance.md": "container_config.py\n",
     ".codex/README.md": (
-        "dispatcher は fail-open AGENT_CANON_HOOK_STRICT_BLOCKS "
-        "systemMessage hookSpecificOutput.additionalContext branch_worktree_guard.py "
-        "user/other-chat owned proven exact task ownership fail-closed empty stdout "
-        "session restart\n"
+        "active events active/inactive legacy `Stop` fail-open RETIRED_HOOK_ROUTES bounded redacted\n"
     ),
     ".codex/hooks/hook_dispatcher.py": (
-        "CRITICAL_BLOCKING_CHILD_HOOKS STRICT_BLOCKS_ENV STRICT_FAILURES_ENV "
-        "downgraded_block_payload failure_warning_payload direct_rg_context_guard.py "
-        "branch_worktree_guard.py critical_child_invalid critical_child_failure_payload "
-        "PreToolUse\n"
+        "HOOK_EVENT_CONTRACTS HookEventContract ACTIVE_HOOK_HANDLERS "
+        "UserPromptSubmit PreToolUse PostToolUse Stop hook_safety.py "
+        "validate_projection_bytes execution_resource_plan_projection_guard.py "
+        "FORMER_ACTIVE_HOOK_CHILDREN RETIRED_HOOK_ROUTES branch_worktree_guard.py "
+        "if set(RETIRED_HOOK_ROUTES) != FORMER_ACTIVE_HOOK_CHILDREN: "
+        "if set(RETIRED_HOOK_ROUTES).intersection(ACTIVE_HOOK_HANDLERS):\n"
     ),
     ".codex/hooks/branch_worktree_guard.py": (
-        "DESTRUCTIVE_GIT_GUARD=block BRANCH_WORKTREE_CREATION_GUARD=block "
-        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY explicit_user_approval "
-        "AGENT_CANON_DESTRUCTIVE_GIT_REASON same shell segment git restore "
-        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY user_request agent_canon_workflow "
-        "AGENT_CANON_BRANCH_WORKTREE_REASON "
-        "git worktree add git switch -c/-C git checkout -b/-B/--orphan "
-        "git branch <name>/-c/-C/-f/--force\n"
+        "standalone wrapper for destructive Git safety\n"
     ),
-    ".codex/hooks/direct_rg_context_guard.py": (
-        "DIRECT_RG_CONTEXT_RISK=warn repository structure git grep targeted `grep` .agent-canon/log-archive "
-        "reports *.jsonl\n"
+    ".codex/hooks/hook_safety.py": (
+        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
+        "AGENT_CANON_BRANCH_WORKTREE_REASON AGENT_CANON_DESTRUCTIVE_GIT_REASON "
+        "explicit_user_approval user_request agent_canon_workflow same-segment "
+        "branch_block_payload operation command_sha256 DESTRUCTIVE_GIT_GUARD=block "
+        "BRANCH_WORKTREE_CREATION_GUARD=block\n"
     ),
     "tools/agent_tools/task_close.py": (
         "changed_markdown_paths Document Structure Evidence "
@@ -938,36 +933,42 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("missing-marker:.codex/hooks.json", result.stdout)
 
     def test_hook_guardrail_policy_marker_fails(self) -> None:
-        """Hook severity policy must stay wired to docs and dispatcher behavior."""
+        """Every stable dispatcher contract marker remains mechanically required."""
+        path = ".codex/hooks/hook_dispatcher.py"
+        fixture = MINIMAL_REPO_FILES[path]
+        for marker in HOOK_GUARDRAIL_POLICY_MARKERS[path]:
+            with self.subTest(marker=marker), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                self.copy_minimal_repo(root)
+                (root / path).write_text(
+                    fixture.replace(marker, ""),
+                    encoding="utf-8",
+                )
+
+                result = self.run_checker(root)
+
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn(
+                    f"hook_guardrail_policy:{path}:missing-marker:{marker}",
+                    result.stdout,
+                )
+
+    def test_hook_safety_policy_marker_fails(self) -> None:
+        """Safety leaf policy must keep destructive-git authority and redaction context."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / ".codex" / "hooks" / "hook_dispatcher.py").write_text(
-                "CRITICAL_BLOCKING_CHILD_HOOKS STRICT_BLOCKS_ENV\n",
+            (root / ".codex" / "hooks" / "hook_safety.py").write_text(
+                "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
+                "explicit_user_approval\n",
                 encoding="utf-8",
             )
 
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("hook_guardrail_policy:.codex/hooks/hook_dispatcher.py", result.stdout)
-            self.assertIn("missing-marker:STRICT_FAILURES_ENV", result.stdout)
-
-    def test_direct_rg_context_guard_policy_marker_fails(self) -> None:
-        """Direct rg guard policy must stay mechanically checkable."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            (root / ".codex" / "hooks" / "direct_rg_context_guard.py").write_text(
-                "DIRECT_RG_CONTEXT_RISK=warn repository structure\n",
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("hook_guardrail_policy:.codex/hooks/direct_rg_context_guard.py", result.stdout)
-            self.assertIn("missing-marker:git grep", result.stdout)
+            self.assertIn("hook_guardrail_policy:.codex/hooks/hook_safety.py", result.stdout)
+            self.assertIn("missing-marker:operation", result.stdout)
 
     def test_parent_repo_can_keep_shared_docs_only_in_vendor_canon(self) -> None:
         """A parent repo may keep AgentCanon docs out of root documents."""
@@ -1521,10 +1522,12 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
     def test_minimal_fixture_covers_branch_worktree_guard_surfaces(self) -> None:
         """The minimal test fixture includes every branch/worktree guard surface."""
+        fixture = "\n".join(MINIMAL_REPO_FILES.values())
+        fixture_paths = set(MINIMAL_REPO_FILES.keys())
         missing = sorted(
-            path
-            for path in BRANCH_WORKTREE_CREATION_GUARD_MARKERS
-            if path not in MINIMAL_REPO_FILES
+            marker
+            for marker in BRANCH_WORKTREE_CREATION_GUARD_MARKERS
+            if marker not in fixture and marker not in fixture_paths
         )
 
         self.assertEqual(missing, [])
