@@ -16,15 +16,17 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 import json
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from agent_canon_source_root import RootResolution, SourceRootFailure, resolve_agent_canon_source_root
 from route import load_skill_related_map, load_skill_required_tool_commands
 
-DEFAULT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_ROOT = Path.cwd()
 RUNTIME_SKILL_ROOT = Path(".agents/skills")
 HUMAN_SKILL_ROOT = Path("agents/skills")
 SECTION_HEADING = "## Tool Commands"
@@ -119,7 +121,19 @@ class SkillCommandPacket:
     related_skills: tuple[str, ...]
     required_commands: tuple[str, ...]
     discovered_commands: tuple[str, ...]
+    resolved_required_commands: tuple[tuple[str, str, str, tuple[str, ...]], ...]
+    resolved_discovered_commands: tuple[tuple[str, str, str, tuple[str, ...]], ...]
     validation_commands: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CommandPlan:
+    """Typed execution plan for one packet command."""
+
+    logical_command: str
+    source_root: str
+    execution_cwd: str
+    execution_argv: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -235,8 +249,67 @@ def unique_preserve_order(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(result)
 
 
-def packet_for_skill(root: Path, skill: str) -> SkillCommandPacket:
+def build_command_plan(logical_command: str, source_root: Path) -> CommandPlan:
+    """Return a command execution plan with resolved cwd and argv."""
+    normalized = shlex.join(shlex.split(logical_command)) if logical_command else ""
+    resolved_root = str(source_root.resolve())
+    source_root_as_path = source_root.resolve()
+    raw_tokens = shlex.split(logical_command)
+    resolved: list[str] = []
+    skip_next_root = False
+
+    for index, token in enumerate(raw_tokens):
+        if token == "--root" and index + 1 < len(raw_tokens):
+            resolved.append(token)
+            if raw_tokens[index + 1] == ".":
+                resolved.append(resolved_root)
+            else:
+                resolved.append(raw_tokens[index + 1])
+            skip_next_root = True
+            continue
+        if skip_next_root:
+            skip_next_root = False
+            continue
+        if token.startswith("--root=") and token.split("=", maxsplit=1)[1] == ".":
+            resolved.append(f"--root={resolved_root}")
+            continue
+        if index == 0 and token in ("python3", "python"):
+            resolved.append(token)
+            continue
+        if index == 1 and raw_tokens[0] in ("python3", "python"):
+            resolved.append(
+                str((source_root_as_path / token).resolve())
+                if token.startswith((".", "tools/", "agents/", ".agents/", "tests/"))
+                else token
+            )
+            continue
+        if index == 0 and token == "bash":
+            resolved.append(token)
+            continue
+        if index == 1 and raw_tokens[0] == "bash":
+            resolved.append(
+                str((source_root_as_path / token).resolve())
+                if token.startswith((".", "tools/", "agents/", ".agents/", "tests/"))
+                else token
+            )
+            continue
+        if index == 0 and token.startswith(("./", "tools/", "agents/", ".agents/", "tests/")):
+            resolved.append(str((source_root_as_path / token).resolve()))
+            continue
+        resolved.append(token)
+
+    return CommandPlan(
+        logical_command=normalized,
+        source_root=resolved_root,
+        execution_cwd=resolved_root,
+        execution_argv=tuple(resolved),
+    )
+
+
+def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillCommandPacket:
     """Build one command packet from runtime and human-facing skill files."""
+    source_root = root_resolution.source_root
+    root = source_root
     runtime_path = runtime_skill_path(root, skill)
     canon_path = canonical_skill_doc(root, skill)
     texts: list[str] = []
@@ -247,6 +320,13 @@ def packet_for_skill(root: Path, skill: str) -> SkillCommandPacket:
         command for text in texts for command in iter_command_lines(text)
     )
     required = load_skill_required_tool_commands(root).get(skill, ())
+    resolved_required = tuple(
+        build_command_plan(command, source_root) for command in required
+    )
+    resolved_discovered = tuple(
+        build_command_plan(command, source_root)
+        for command in discovered
+    )
     validation = (
         "python3 tools/agent_tools/check_skill_frontmatter.py --root .",
         "python3 tools/agent_tools/skill_tool_commands.py check",
@@ -259,6 +339,24 @@ def packet_for_skill(root: Path, skill: str) -> SkillCommandPacket:
         related_skills=related_skills,
         required_commands=required,
         discovered_commands=discovered,
+        resolved_required_commands=tuple(
+            (
+                plan.logical_command,
+                plan.source_root,
+                plan.execution_cwd,
+                plan.execution_argv,
+            )
+            for plan in resolved_required
+        ),
+        resolved_discovered_commands=tuple(
+            (
+                plan.logical_command,
+                plan.source_root,
+                plan.execution_cwd,
+                plan.execution_argv,
+            )
+            for plan in resolved_discovered
+        ),
         validation_commands=validation,
     )
 
@@ -388,11 +486,31 @@ def render_packet_text(packet: SkillCommandPacket) -> str:
         "SKILL_TOOL_COMMANDS_REQUIRED:",
     ]
     lines.extend(f"- {command}" for command in packet.required_commands)
+    lines.append("SKILL_TOOL_COMMANDS_REQUIRED_RESOLUTION:")
+    for command, source_root, execution_cwd, argv in packet.resolved_required_commands:
+        lines.extend(
+            (
+                f"- logical={command}",
+                f"- source_root={source_root}",
+                f"- execution_cwd={execution_cwd}",
+                f"- execution_argv={json.dumps(list(argv))}",
+            )
+        )
     lines.append("SKILL_TOOL_COMMANDS_CONDITIONAL:")
     if packet.discovered_commands:
         lines.extend(f"- {command}" for command in packet.discovered_commands)
     else:
         lines.append(f"- python3 tools/agent_tools/route.py --prompt \"{PROMPT_PLACEHOLDER}\" --format json")
+    lines.append("SKILL_TOOL_COMMANDS_CONDITIONAL_RESOLUTION:")
+    for command, source_root, execution_cwd, argv in packet.resolved_discovered_commands:
+        lines.extend(
+            (
+                f"- logical={command}",
+                f"- source_root={source_root}",
+                f"- execution_cwd={execution_cwd}",
+                f"- execution_argv={json.dumps(list(argv))}",
+            )
+        )
     lines.append("SKILL_TOOL_COMMANDS_MAINTENANCE_ONLY:")
     lines.append("- Run these only when editing skill command sections or checking skill-tool drift.")
     lines.extend(f"- {command}" for command in packet.validation_commands)
@@ -403,9 +521,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the selected subcommand."""
     parser = build_parser()
     args = parser.parse_args(argv)
-    root = Path(args.root).resolve()
+    try:
+        root_resolution = resolve_agent_canon_source_root(Path(args.root))
+    except SourceRootFailure as exc:
+        print(f"SKILL_TOOL_COMMANDS_SOURCE_ROOT_FAILURE={exc.code}:{exc.detail}")
+        return 2
+
+    root = root_resolution.source_root
     if args.command == "show":
-        packet = packet_for_skill(root, args.skill)
+        packet = packet_for_skill(root_resolution, args.skill)
         if args.format == "json":
             print(json.dumps(asdict(packet), indent=2, sort_keys=True))
         else:

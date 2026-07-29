@@ -5,7 +5,8 @@
 # responsibility Tests skill tool-command packet sync and validation.
 # upstream implementation ../../tools/agent_tools/skill_tool_commands.py command packet tool
 # upstream design ../../agents/skills/task-routing.md deterministic skill routing contract
-# upstream design ../../agents/skills/catalog.yaml public skill related-skill metadata
+# upstream design ../../agents/skills/catalog.yaml public skill identity and trigger catalog
+# upstream design ../../agents/skills/skill-dependencies.yaml canonical dependency-derived candidates
 # @dependency-end
 
 from __future__ import annotations
@@ -19,6 +20,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "skill_tool_commands.py"
+STANDALONE_CATALOG = """version: 1
+skill_families:
+"""
 
 
 class SkillToolCommandsTest(unittest.TestCase):
@@ -29,6 +33,20 @@ class SkillToolCommandsTest(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(TOOL), "--root", str(root), *args],
             cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def run_tool_from_cwd(
+        self,
+        cwd: Path,
+        *args: str,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run the skill command tool from a specific working directory."""
+        return subprocess.run(
+            [sys.executable, str(TOOL), *args],
+            cwd=str(cwd),
             check=False,
             capture_output=True,
             text=True,
@@ -45,6 +63,35 @@ class SkillToolCommandsTest(unittest.TestCase):
             f"# {skill}\n\n```bash\npython3 tools/agent_tools/example.py\n```\n",
             encoding="utf-8",
         )
+        self.write_dependency_map(
+            root,
+            [
+                f"  {skill}:",
+                "    responsibility_group: fixture",
+                "    required_prerequisites: []",
+                "    successors: []",
+                "    order_constraints: []",
+                "    parallel_independent: []",
+            ],
+        )
+        catalog = root / "agents" / "skills" / "catalog.yaml"
+        catalog.parent.mkdir(parents=True, exist_ok=True)
+        catalog.write_text(
+            "\n".join(
+                [
+                    "version: 1",
+                    "skill_families:",
+                    f"  - id: {skill}",
+                    f"    canonical_doc: agents/skills/{skill}.md",
+                    f"    shim: .agents/skills/{skill}/SKILL.md",
+                    "    routing:",
+                    "      stage_policy: active",
+                    "      reason: test fixture",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         return runtime
 
     def write_catalog(self, root: Path, entries: list[str]) -> None:
@@ -53,6 +100,33 @@ class SkillToolCommandsTest(unittest.TestCase):
         catalog.parent.mkdir(parents=True, exist_ok=True)
         catalog.write_text(
             "\n".join(["version: 1", "skill_families:", *entries]),
+            encoding="utf-8",
+        )
+        skill_ids = [
+            line.strip()[len("- id: ") :]
+            for line in entries
+            if line.startswith("  - id: ")
+        ]
+        dependency_lines = ["version: 1", "skill_dependencies:"]
+        for skill_id in skill_ids:
+            dependency_lines.extend(
+                [
+                    f"  {skill_id}:",
+                    "    responsibility_group: fixture",
+                    "    required_prerequisites: []",
+                    "    successors: []",
+                    "    order_constraints: []",
+                    "    parallel_independent: []",
+                ]
+            )
+        self.write_dependency_map(root, dependency_lines[2:])
+
+    def write_dependency_map(self, root: Path, lines: list[str]) -> None:
+        """Create one dependency dictionary fixture."""
+        path = root / "agents" / "skills" / "skill-dependencies.yaml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "\n".join(["version: 1", "skill_dependencies:", *lines]),
             encoding="utf-8",
         )
 
@@ -87,14 +161,275 @@ class SkillToolCommandsTest(unittest.TestCase):
             result = self.run_tool(root, "show", "--skill", "example-skill", "--format", "json")
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            payload = json.loads(result.stdout)
-            self.assertEqual(payload["skill"], "example-skill")
-            self.assertEqual(payload["required_commands"], [])
-            self.assertIn("make check-matrix", payload["discovered_commands"])
-            self.assertIn(
-                "python3 tools/agent_tools/example.py",
-                payload["discovered_commands"],
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["skill"], "example-skill")
+        self.assertEqual(payload["required_commands"], [])
+        self.assertIn("make check-matrix", payload["discovered_commands"])
+        self.assertIn(
+            "python3 tools/agent_tools/example.py",
+            payload["discovered_commands"],
+        )
+
+    def test_show_includes_resolved_command_plans(self) -> None:
+        """Resolved command plans include cwd and argv for direct execution."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
+            (root / "agents" / "skills" / "catalog.yaml").write_text(
+                STANDALONE_CATALOG,
+                encoding="utf-8",
             )
+            self.write_skill(
+                root,
+                "example-skill",
+                (
+                    "```bash\n"
+                    "python3 tools/agent_tools/example.py --root .\n"
+                    "bash ./tools/agent_tools/example.sh --root .\n"
+                    "python3 tools/agent_tools/example.py .\n"
+                    "bash ./tools/agent_tools/example.sh .\n"
+                    "python3 tools/agent_tools/example.py --root /tmp/explicit\n"
+                    "python3 tools/agent_tools/example.py --root=.\n"
+                    "python3 tools/agent_tools/example.py --root=. .\n"
+                    "```\n"
+                ),
+            )
+
+            result = self.run_tool(
+                root,
+                "show",
+                "--skill",
+                "example-skill",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            resolved = {
+                row[0]: row for row in payload["resolved_discovered_commands"]
+            }
+            expected_root = str(root.resolve())
+            self.assertIn(
+                "python3 tools/agent_tools/example.py --root .",
+                resolved,
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root ."][0],
+                "python3 tools/agent_tools/example.py --root .",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root ."][1],
+                expected_root,
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root ."][2],
+                expected_root,
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root ."][3][0],
+                "python3",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root ."][3][1],
+                f"{expected_root}/tools/agent_tools/example.py",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root ."][3][2],
+                "--root",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root ."][3][3],
+                expected_root,
+            )
+            self.assertEqual(
+                resolved["bash ./tools/agent_tools/example.sh --root ."][3][0],
+                "bash",
+            )
+            self.assertEqual(
+                resolved["bash ./tools/agent_tools/example.sh --root ."][3][1],
+                f"{expected_root}/tools/agent_tools/example.sh",
+            )
+            self.assertIn(
+                "python3 tools/agent_tools/example.py --root /tmp/explicit",
+                resolved,
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][3][0],
+                "python3",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][3][1],
+                f"{expected_root}/tools/agent_tools/example.py",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][3][2],
+                "--root",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][3][3],
+                "/tmp/explicit",
+            )
+            self.assertEqual(
+                len(resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][3]),
+                4,
+            )
+            self.assertIn(
+                "python3 tools/agent_tools/example.py --root=.",
+                resolved,
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root=."][3][0],
+                "python3",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root=."][3][1],
+                f"{expected_root}/tools/agent_tools/example.py",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root=."][3][2],
+                f"--root={expected_root}",
+            )
+            self.assertIn(
+                "python3 tools/agent_tools/example.py --root=. .",
+                resolved,
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root=. ."][3][0],
+                "python3",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root=. ."][3][1],
+                f"{expected_root}/tools/agent_tools/example.py",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root=. ."][3][2],
+                f"--root={expected_root}",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py --root=. ."][3][3],
+                ".",
+            )
+            self.assertIn(
+                "python3 tools/agent_tools/example.py .",
+                resolved,
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py ."][3][0],
+                "python3",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py ."][3][1],
+                f"{expected_root}/tools/agent_tools/example.py",
+            )
+            self.assertEqual(
+                resolved["python3 tools/agent_tools/example.py ."][3][2],
+                ".",
+            )
+            self.assertIn(
+                "bash ./tools/agent_tools/example.sh .",
+                resolved,
+            )
+            self.assertEqual(
+                resolved["bash ./tools/agent_tools/example.sh ."][3][0],
+                "bash",
+            )
+            self.assertEqual(
+                resolved["bash ./tools/agent_tools/example.sh ."][3][1],
+                f"{expected_root}/tools/agent_tools/example.sh",
+            )
+            self.assertEqual(
+                resolved["bash ./tools/agent_tools/example.sh ."][3][2],
+                ".",
+            )
+
+    def test_resolve_source_root_fails_with_missing_catalog(self) -> None:
+        """The command tool returns typed failure when no source root is detectable."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            result = self.run_tool(
+                root,
+                "show",
+                "--skill",
+                "example-skill",
+                "--format",
+                "text",
+            )
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn(
+                "SKILL_TOOL_COMMANDS_SOURCE_ROOT_FAILURE=agent_canon_source_root_missing",
+                result.stdout + result.stderr,
+            )
+
+    def test_resolve_source_root_rejects_ambiguous_catalogs(self) -> None:
+        """Ambiguous standalone and vendored catalog roots are rejected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
+            (root / "agents" / "skills" / "catalog.yaml").write_text(
+                STANDALONE_CATALOG,
+                encoding="utf-8",
+            )
+            (root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            (root / "vendor" / "agent-canon" / "agents" / "skills").mkdir(parents=True, exist_ok=True)
+            (root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").write_text(
+                STANDALONE_CATALOG,
+                encoding="utf-8",
+            )
+
+            result = self.run_tool(
+                root,
+                "show",
+                "--skill",
+                "example-skill",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn(
+                "SKILL_TOOL_COMMANDS_SOURCE_ROOT_FAILURE=agent_canon_source_root_ambiguous",
+                result.stdout + result.stderr,
+            )
+
+    def test_show_resolves_source_root_from_cwd(self) -> None:
+        """show command resolves source root from parent root and child directories."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").touch()
+            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
+            (root / "agents" / "skills" / "catalog.yaml").write_text(
+                STANDALONE_CATALOG,
+                encoding="utf-8",
+            )
+            (root / "agents" / "skills" / "skill-dependencies.yaml").write_text(
+                "version: 1\nskill_dependencies: {}\n",
+                encoding="utf-8",
+            )
+            self.write_skill(
+                root,
+                "example-skill",
+                "```bash\nmake check-matrix\n```\n",
+            )
+            child = root / "workspace" / "subdir"
+            child.mkdir(parents=True, exist_ok=True)
+            standalone_child = root / "agents" / "standalone" / "child"
+            standalone_child.mkdir(parents=True, exist_ok=True)
+
+            for cwd in (root, child, standalone_child):
+                result = self.run_tool_from_cwd(
+                    cwd,
+                    "show",
+                    "--skill",
+                    "example-skill",
+                    "--format",
+                    "json",
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_code_visualization_packet_contains_only_renderer_variants(self) -> None:
         """The code-visualization packet exposes exactly its two graph renderers."""
@@ -160,8 +495,8 @@ class SkillToolCommandsTest(unittest.TestCase):
             self.assertIn("SKILL_TOOL_COMMANDS_MAINTENANCE_ONLY:", result.stdout)
             self.assertIn("Run these only when editing skill command sections", result.stdout)
 
-    def test_show_returns_related_skills_from_catalog(self) -> None:
-        """Show prints related skills from the public skill catalog."""
+    def test_show_returns_dependency_derived_related_skills(self) -> None:
+        """Show prints candidates projected from the dependency dictionary."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_skill(root, "example-skill", "Use the canon.\n")
@@ -172,11 +507,27 @@ class SkillToolCommandsTest(unittest.TestCase):
                     "  - id: example-skill",
                     "    canonical_doc: agents/skills/example-skill.md",
                     "    shim: .agents/skills/example-skill/SKILL.md",
-                    "    related_skills:",
-                    "      - review-skill",
                     "  - id: review-skill",
                     "    canonical_doc: agents/skills/review-skill.md",
                     "    shim: .agents/skills/review-skill/SKILL.md",
+                ],
+            )
+            self.write_dependency_map(
+                root,
+                [
+                    "  example-skill:",
+                    "    responsibility_group: fixture",
+                    "    required_prerequisites: []",
+                    "    successors:",
+                    "      - review-skill",
+                    "    order_constraints: []",
+                    "    parallel_independent: []",
+                    "  review-skill:",
+                    "    responsibility_group: fixture",
+                    "    required_prerequisites: []",
+                    "    successors: []",
+                    "    order_constraints: []",
+                    "    parallel_independent: []",
                 ],
             )
 
