@@ -172,7 +172,7 @@ class SkillToolCommandsTest(unittest.TestCase):
         )
 
     def test_show_includes_resolved_command_plans(self) -> None:
-        """Resolved command plans include cwd and argv for direct execution."""
+        """Start-repository plans resolve scripts without pathifying Bash options."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
@@ -182,9 +182,11 @@ class SkillToolCommandsTest(unittest.TestCase):
             )
             self.write_skill(
                 root,
-                "example-skill",
+                "start-repository",
                 (
                     "```bash\n"
+                    "bash scripts/start_repository.sh --validate-only\n"
+                    "bash -c 'scripts/start_repository.sh --validate-only'\n"
                     "python3 tools/agent_tools/example.py --root .\n"
                     "bash ./tools/agent_tools/example.sh --root .\n"
                     "python3 tools/agent_tools/example.py .\n"
@@ -200,7 +202,7 @@ class SkillToolCommandsTest(unittest.TestCase):
                 root,
                 "show",
                 "--skill",
-                "example-skill",
+                "start-repository",
                 "--format",
                 "json",
             )
@@ -211,6 +213,18 @@ class SkillToolCommandsTest(unittest.TestCase):
                 row[0]: row for row in payload["resolved_discovered_commands"]
             }
             expected_root = str(root.resolve())
+            self.assertEqual(
+                resolved["bash scripts/start_repository.sh --validate-only"][3],
+                [
+                    "bash",
+                    f"{expected_root}/scripts/start_repository.sh",
+                    "--validate-only",
+                ],
+            )
+            self.assertEqual(
+                resolved["bash -c 'scripts/start_repository.sh --validate-only'"][3],
+                ["bash", "-c", "scripts/start_repository.sh --validate-only"],
+            )
             self.assertIn(
                 "python3 tools/agent_tools/example.py --root .",
                 resolved,
@@ -345,7 +359,7 @@ class SkillToolCommandsTest(unittest.TestCase):
             )
 
     def test_show_resolves_fallback_only_skill_with_command_plan(self) -> None:
-        """Fallback-only skills still emit a complete resolved CommandPlan."""
+        """Fallback packets preserve complete Python script resolution."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_skill(root, "fallback-skill", "No executable command is documented.\n")

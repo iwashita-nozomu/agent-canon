@@ -50,6 +50,22 @@ COMMON_RESOLUTION_WORDING = (
     "fallback-only skill を含む script entry の script path は絶対 path にします。"
 )
 FORMAT_VALUES = ("text", "json")
+SCRIPT_INTERPRETERS = ("python3", "python", "bash")
+SOURCE_ROOT_SCRIPT_PREFIXES = (
+    ".",
+    "tools/",
+    "agents/",
+    ".agents/",
+    "tests/",
+    "scripts/",
+)
+SOURCE_ROOT_COMMAND_PREFIXES = (
+    "./",
+    "tools/",
+    "agents/",
+    ".agents/",
+    "tests/",
+)
 COMMAND_PREFIXES = (
     "agent-canon ",
     "bash ",
@@ -285,27 +301,17 @@ def build_command_plan(logical_command: str, source_root: Path) -> CommandPlan:
         if token.startswith("--root=") and token.split("=", maxsplit=1)[1] == ".":
             resolved.append(f"--root={resolved_root}")
             continue
-        if index == 0 and token in ("python3", "python"):
+        if index == 0 and token in SCRIPT_INTERPRETERS:
             resolved.append(token)
             continue
-        if index == 1 and raw_tokens[0] in ("python3", "python"):
+        if index == 1 and raw_tokens[0] in SCRIPT_INTERPRETERS:
             resolved.append(
                 str((source_root_as_path / token).resolve())
-                if token.startswith((".", "tools/", "agents/", ".agents/", "tests/"))
+                if token.startswith(SOURCE_ROOT_SCRIPT_PREFIXES)
                 else token
             )
             continue
-        if index == 0 and token == "bash":
-            resolved.append(token)
-            continue
-        if index == 1 and raw_tokens[0] == "bash":
-            resolved.append(
-                str((source_root_as_path / token).resolve())
-                if token.startswith((".", "tools/", "agents/", ".agents/", "tests/"))
-                else token
-            )
-            continue
-        if index == 0 and token.startswith(("./", "tools/", "agents/", ".agents/", "tests/")):
+        if index == 0 and token.startswith(SOURCE_ROOT_COMMAND_PREFIXES):
             resolved.append(str((source_root_as_path / token).resolve()))
             continue
         resolved.append(token)
