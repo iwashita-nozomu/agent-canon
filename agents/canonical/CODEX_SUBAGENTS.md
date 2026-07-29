@@ -112,6 +112,8 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - active runtime が explicit user request を spawn 条件にする場合、parent は handoff plan と artifact packet を作って `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を記録し、authorization が揃った時点で spawn します
 - active な subagent 数は spawn budget で縛ります
 - spawn budget は同時 active 数の上限です。Intake Responsibility Wave は active role set と catalog の `intake` stage から materialize し、`explorer` と `execution_planner` は evidence-gated dynamic wave として追加します。独立 workstream が複数ある場合は、workstream ごとの stage owner が vertical dynamic wave を起こします
+- 独立 source workstream を選択する parent packet は、各 stream の substantial replaceable responsibility unit、computed `workspace/<topic-slug>/<module-basename>` clone、disjoint write scope、dependency/merge order、validation route、reviewer ownership を固定します。vendor が clean でも fresh な `dependency_module_change.py prepare --placement workspace` を使えますが、local/remote の既存 branch は拒否し、継続は `--placement workspace-continuation` に分けます。ready な非衝突 stream は全て launch し、parent / delegated stage owner は全 descendants を monitor します。
+- 同じ responsibility unit の follow-up は compatible な worker context を再利用します。file-sized slice、細粒度の fresh agent、または同じ oracle を共有する断片化は parallel source workstream として起動しません。依存または衝突する stream は記録済み merge order の ordered wave にします。
 - Wave は frontier-driven adaptive loop です。parent は checker / graph / review
   output から次 frontier queue を作り、必要な subagent を適応的に追加し、結果を
   integrate して同じ validation を再実行します。frontier が

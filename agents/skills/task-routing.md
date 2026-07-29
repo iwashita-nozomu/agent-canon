@@ -7,6 +7,9 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/design/tool-skill-routing-refactor.md short tool and skill naming policy
 upstream design ./agent-orchestration.md owns Decision Sufficiency policy and verdict validation
 downstream implementation ../../tools/agent_tools/route.py selects short routing areas
+upstream design ./skill-dependencies.yaml owns typed skill prerequisites, successors, order, and parallel relations
+downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives the invocation order from that dictionary
+downstream implementation ../../tools/agent_tools/skill_dependency_map.py statically validates and generates the dependency graph
 downstream implementation ../../tools/agent_tools/agent_team.py materializes route ToolCall tokens
 @dependency-end
 -->
@@ -110,6 +113,16 @@ Runtime route tokens are materialized by `agent_team.py` under
 `run.repo_tool_routing_policy`. Related skill candidates remain dynamic
 triggers; activation materializes a new token and retains the same owner DSV
 verdict unless changed input creates a successor decision.
+
+### Canonical Skill Dependency Order
+
+`catalog.yaml` is the complete public-skill identity and trigger catalog;
+`skill-dependencies.yaml` is the sole source for prerequisite expansion,
+successor/parallel candidates, responsibility groups, and explicit ordering.
+The routing implementation derives the call order from the validated map, so
+keywords and prose do not maintain a second scheduling table. Validate it with
+`python3 tools/agent_tools/skill_dependency_map.py check --root .` and generate
+the user-facing graph with its `graph` subcommand.
 
 ## Official System Skill Delegation
 

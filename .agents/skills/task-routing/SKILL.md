@@ -8,7 +8,9 @@ description: Use when choosing short AgentCanon tool, skill, profile, check, run
 contract skill
 responsibility Documents Task Routing skill shim.
 upstream design ../../../agents/skills/task-routing.md human-facing task routing skill
+upstream design ../../../agents/skills/skill-dependencies.yaml owns typed prerequisites, successors, order, and parallel relations
 upstream implementation ../../../tools/agent_tools/route.py selects short routing areas
+upstream implementation ../../../tools/agent_tools/skill_route_catalog.py derives invocation order from the dependency map
 @dependency-end
 -->
 
