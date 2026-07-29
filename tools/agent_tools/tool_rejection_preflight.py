@@ -115,7 +115,7 @@ AGENT_PROTOCOL_PATHS = frozenset(
         "agents/canonical/CODEX_WORKFLOW.md",
         "agents/canonical/CODEX_SUBAGENTS.md",
         "evidence/agent-evals/README.md",
-        "agents/templates/workflow_monitoring.md",
+        "templates/agents/workflow_monitoring.md",
         "agents/workflows/agent-learning-workflow.md",
     }
 )

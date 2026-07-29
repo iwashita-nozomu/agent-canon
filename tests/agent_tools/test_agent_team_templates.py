@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests agent team template rendering behavior.
-# upstream design ../../agents/templates/README.md template partial contract
+# upstream design ../../templates/agents/README.md template partial contract
 # downstream implementation ../../tools/agent_tools/agent_team.py renders templates and partials
 # @dependency-end
 

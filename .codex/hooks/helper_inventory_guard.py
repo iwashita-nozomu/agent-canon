@@ -2,7 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Runs helper-inventory hook checks using AgentCanon default and repo-local policy thresholds.
-# upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this standalone inventory route.
 # upstream implementation ../../tools/agent_tools/helper_function_inventory.py provides changed/baseline helper findings.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates guard output.
 # @dependency-end

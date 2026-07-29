@@ -938,6 +938,10 @@ fn is_ephemeral_path(path: &Path) -> bool {
         .collect::<Vec<_>>();
     components.first().copied() == Some("reports".as_ref())
         || (components.len() >= 4 && components[0] == "experiments" && components[2] == "result")
+        || (components.len() >= 5
+            && components[0] == "templates"
+            && components[1] == "experiments"
+            && components[3] == "result")
 }
 
 fn is_document_path(path: &Path) -> bool {
@@ -3211,7 +3215,7 @@ mod tests {
         write_fixture(&root, "reports/run-output.md", "# Generated\n\nBody.");
         write_fixture(
             &root,
-            "experiments/_template/result/run/file-surface-inventory.md",
+            "templates/experiments/_template/result/run/file-surface-inventory.md",
             "# Managed Result\n\nBody.",
         );
 
@@ -3224,7 +3228,9 @@ mod tests {
 
         assert!(paths.contains("documents/missing.md"));
         assert!(!paths.contains("reports/run-output.md"));
-        assert!(!paths.contains("experiments/_template/result/run/file-surface-inventory.md"));
+        assert!(
+            !paths.contains("templates/experiments/_template/result/run/file-surface-inventory.md")
+        );
         assert!(!report
             .findings
             .iter()

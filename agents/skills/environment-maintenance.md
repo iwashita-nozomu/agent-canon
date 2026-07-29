@@ -45,11 +45,11 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - `docker/codex-container-profiles.toml`
 - `docker/python-execution-rules.toml`
 - `documents/contracts/server-host-contract.md`
-- `documents/templates/server_runtime_layout.template.toml`
+- `templates/documents/server_runtime_layout.template.toml`
 - `docker/`
 - `.devcontainer/`
 - `README.md`
-- `agents/templates/environment_change_proposal.md`
+- `templates/agents/environment_change_proposal.md`
 
 ## Required Proposal Fields
 
@@ -73,7 +73,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - Treat `CONTAINER_OPERATIONS.md` as the source of truth for Dockerfile,
   `docker/`, `.devcontainer/`, validator, and Makefile target ownership. This
   skill is only the routing checklist.
-- Docker / runtime を変える task は、先に `agents/templates/environment_change_proposal.md` に code requirement と blocked command を書きます。
+- Docker / runtime を変える task は、先に `templates/agents/environment_change_proposal.md` に code requirement と blocked command を書きます。
 - 「何となく便利だから」で repo 正本の環境を変えません。必ず code path、command、run profile のどれが詰まっているかを残します。
 - code requirement を host-only の手元 install で回避できても、repo-wide に必要なものは Docker / CI / docs の正本へ入れます。
 - repo の共通環境に入れる tool は、個人環境前提の host-global install を正本にしません。

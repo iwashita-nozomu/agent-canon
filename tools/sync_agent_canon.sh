@@ -443,6 +443,7 @@ project_copy_source() {
       }
       s{vendor/agent-canon/tools/}{__CANON_TOOLS__/}g;
       s{vendor/agent-canon/documents/}{__CANON_DOCUMENTS__/}g;
+      s{vendor/agent-canon/templates/}{__CANON_TEMPLATES__/}g;
       s{vendor/agent-canon/issues/}{__CANON_ISSUES__/}g;
       s{documents/tools/}{__DOCUMENTS_TOOLS__/}g;
       s{tests/tools/}{__TESTS_TOOLS__/}g;
@@ -450,9 +451,11 @@ project_copy_source() {
       s{((?:\.\./)+)documents/}{$1vendor/agent-canon/documents/}g;
       s{((?:\.\./)+)issues/}{$1vendor/agent-canon/issues/}g;
       s{((?:\.\./)+)tools/}{$1tools/agent-canon/}g;
+      s{(?<![A-Za-z0-9_./-])templates/}{vendor/agent-canon/templates/}g;
       s{(?<![A-Za-z0-9_./-])tools/}{tools/agent-canon/}g;
       s{__CANON_TOOLS__}{vendor/agent-canon/tools/}g;
       s{__CANON_DOCUMENTS__}{vendor/agent-canon/documents/}g;
+      s{__CANON_TEMPLATES__}{vendor/agent-canon/templates/}g;
       s{__CANON_ISSUES__}{vendor/agent-canon/issues/}g;
       s{__DOCUMENTS_TOOLS__}{documents/tools/}g;
       s{__TESTS_TOOLS__}{tests/tools/}g;
@@ -475,7 +478,7 @@ project_copy_source() {
           $block =~ s{\.\./\.\./\.\./\.\./agents/}{../../agents/}g;
           $block =~ s{\.\./\.\./\.\./\.\./issues/}{../../vendor/agent-canon/issues/}g;
           $block =~ s{\.\./\.\./\.\./\.\./tools/}{../../tools/agent-canon/}g;
-          $block =~ s{\.\./\.\./README\.md}{../../vendor/agent-canon/documents/templates/README.md}g;
+          $block =~ s{\.\./\.\./README\.md}{../../vendor/agent-canon/templates/documents/README.md}g;
           $block;
         }gse
       '
@@ -487,7 +490,7 @@ project_copy_source() {
           $block =~ s{\.\./\.\./\.\./\.\./\.github/}{../}g;
           $block =~ s{\.\./\.\./\.\./\.github/}{../}g;
           $block =~ s{\.\./\.\./\.\./\.\./(documents|agents|issues|tools)/}{../../$1/}g;
-          $block =~ s{\.\./\.\./README\.md}{../../documents/templates/README.md}g;
+          $block =~ s{\.\./\.\./README\.md}{../../templates/documents/README.md}g;
           $block;
         }gse
       '

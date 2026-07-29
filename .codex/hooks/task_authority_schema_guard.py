@@ -4,7 +4,7 @@
 # responsibility Validates request-local task authority before repo-changing hook events proceed.
 # upstream implementation ../../tools/agent_tools/task_authority.py defines the shared schema.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
-# downstream implementation ./hook_dispatcher.py invokes this hook for PostToolUse and Stop.
+# downstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns explicit authority validation.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates schema guard behavior.
 # @dependency-end
 """Validate task_authority.yaml for edit-like hook events."""

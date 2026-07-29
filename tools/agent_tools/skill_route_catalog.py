@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Owns public skill-route catalog parsing, frozen rule/index values, root errors, and related-skill projections.
+# responsibility Owns public skill-route catalog parsing, typed dependency-map validation, frozen rule/index values, root errors, and related-skill projections.
 # upstream design ../../agents/skills/oop-type-design.md approved OOP/type-design owner and module contract
 # upstream implementation ../../agents/skills/catalog.yaml complete public skill-route catalog and capability metadata
+# upstream implementation ../../agents/skills/skill-dependencies.yaml canonical public-skill dependency dictionary
 # upstream implementation ./visualization_contract.py owns the canonical visualization ToolCall schemas
 # downstream implementation ./capability_route.py immutable capability decision consumer
 # downstream implementation ./route.py public route composition and compatibility facade
@@ -41,6 +42,8 @@ __all__ = (
     "CapabilityRoute",
     "CapabilityIndex",
     "SkillRoutingRule",
+    "SkillDependencyRule",
+    "SkillOrderConstraint",
     "VisualizationOwnerSkill",
     "VisualizationRejection",
     "VISUALIZATION_OWNER_SKILL",
@@ -56,6 +59,9 @@ __all__ = (
     "freeze_skill_rule_mapping",
     "load_skill_route_rules",
     "load_skill_route_rules_from_root",
+    "load_skill_dependency_map",
+    "build_skill_dependency_edges",
+    "derive_skill_invocation_order",
     "load_skill_related_map",
     "load_skill_required_tool_commands",
     "build_capability_index",
@@ -66,6 +72,7 @@ __all__ = (
 JsonMapping = Mapping[str, object]
 CapabilityId = str
 SKILL_CATALOG_PATH = Path("agents/skills/catalog.yaml")
+SKILL_DEPENDENCY_MAP_PATH = Path("agents/skills/skill-dependencies.yaml")
 STAGE_POLICY_VALUES = ("active", "deferred")
 PRIVATE_SKILL_PREFIX = "_"
 CAPABILITY_ID_RE = re.compile(r"^[a-z0-9_]+$")
@@ -186,13 +193,39 @@ class SkillRoutingRule:
     triggers: tuple[tuple[str, ...], ...]
     capabilities: tuple[CapabilityRoute, ...]
     related_skills: tuple[str, ...]
-    prerequisites: tuple[str, ...] = ()
     visualization_owner_skill: VisualizationOwnerSkill | None = None
     visualization_tool_call: ToolCall | None = None
     visualization_rejection: VisualizationRejection | None = None
     visualization_role: str = ""
     tool_id: str = ""
     argument_schema: str = ""
+    required_prerequisites: tuple[str, ...] = ()
+    successors: tuple[str, ...] = ()
+    order_constraints: tuple[SkillOrderConstraint, ...] = ()
+    parallel_independent: tuple[str, ...] = ()
+    responsibility_group: str = ""
+
+
+@dataclass(frozen=True)
+class SkillOrderConstraint:
+    """One explicit ordering edge in the canonical skill dependency map."""
+
+    before: str
+    after: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class SkillDependencyRule:
+    """One public skill's canonical dependency and parallel-work contract."""
+
+    skill: str
+    responsibility_group: str
+    required_prerequisites: tuple[str, ...]
+    routing_candidates: tuple[str, ...]
+    successors: tuple[str, ...]
+    order_constraints: tuple[SkillOrderConstraint, ...]
+    parallel_independent: tuple[str, ...]
 
 
 class CapabilityCatalogError(ValueError):
@@ -294,6 +327,279 @@ def optional_metadata_string(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field} must be a non-empty string")
     return value
+
+
+def _skill_ids_from_catalog(data: JsonMapping) -> tuple[str, ...]:
+    """Return the complete public skill identity sequence from the catalog."""
+    families = object_sequence(data.get("skill_families"), "skill_families")
+    ids: list[str] = []
+    for index, entry in enumerate(families):
+        mapping = object_mapping(entry, f"skill_families[{index}]")
+        skill_id = mapping.get("id")
+        if not isinstance(skill_id, str) or not skill_id.strip():
+            raise ValueError(f"skill_families[{index}].id must be a non-empty string")
+        if skill_id.startswith(PRIVATE_SKILL_PREFIX):
+            raise ValueError(f"skill_families[{index}].id must be public: {skill_id}")
+        if skill_id in ids:
+            raise ValueError(f"duplicate skill catalog id: {skill_id}")
+        ids.append(skill_id)
+    return tuple(ids)
+
+
+def _dependency_error(skill: str, field: str) -> ValueError:
+    """Return one stable dependency-map schema error."""
+    return ValueError(f"skill-dependency-map-invalid:{skill}:{field}")
+
+
+def _dependency_string_list(value: object, field: str) -> tuple[str, ...]:
+    """Parse one required dependency-map string list."""
+    try:
+        return string_list(value, field)
+    except ValueError as exc:
+        raise ValueError(f"skill-dependency-map-invalid:{field}") from exc
+
+
+def _dependency_order_constraints(
+    value: object, skill: str
+) -> tuple[SkillOrderConstraint, ...]:
+    """Parse explicit before/after constraints from the canonical map."""
+    if not isinstance(value, list):
+        raise _dependency_error(skill, "order_constraints")
+    result: list[SkillOrderConstraint] = []
+    for index, raw in enumerate(value):
+        if not isinstance(raw, Mapping):
+            raise _dependency_error(skill, f"order_constraints[{index}]")
+        before = raw.get("before")
+        after = raw.get("after")
+        reason = raw.get("reason", "")
+        if (
+            not isinstance(before, str)
+            or not before.strip()
+            or not isinstance(after, str)
+            or not after.strip()
+            or not isinstance(reason, str)
+        ):
+            raise _dependency_error(skill, f"order_constraints[{index}]")
+        result.append(SkillOrderConstraint(before, after, reason))
+    return tuple(result)
+
+
+def _dependency_edges(
+    rules: Mapping[str, SkillDependencyRule],
+) -> dict[str, set[str]]:
+    """Build the directed dependency/order graph from one canonical map."""
+    edges = {skill: set() for skill in rules}
+    for rule in rules.values():
+        for prerequisite in rule.required_prerequisites:
+            edges[prerequisite].add(rule.skill)
+        for successor in rule.successors:
+            edges[rule.skill].add(successor)
+        for constraint in rule.order_constraints:
+            edges[constraint.before].add(constraint.after)
+    return edges
+
+
+def _reachable(edges: Mapping[str, set[str]], source: str, target: str) -> bool:
+    """Return whether target is reachable from source in the directed graph."""
+    pending = list(edges[source])
+    seen: set[str] = set()
+    while pending:
+        current = pending.pop()
+        if current == target:
+            return True
+        if current in seen:
+            continue
+        seen.add(current)
+        pending.extend(edges[current])
+    return False
+
+
+def _validate_dependency_graph(rules: Mapping[str, SkillDependencyRule]) -> None:
+    """Reject cycles, contradictory order, and conflicting parallel relations."""
+    edges = _dependency_edges(rules)
+    for rule in rules.values():
+        for constraint in rule.order_constraints:
+            if constraint.before == constraint.after or _reachable(
+                edges, constraint.after, constraint.before
+            ):
+                raise ValueError(
+                    "skill-dependency-map-order-contradiction:"
+                    f"{constraint.before}:{constraint.after}"
+                )
+    indegree = {skill: 0 for skill in rules}
+    for targets in edges.values():
+        for target in targets:
+            indegree[target] += 1
+    ready = [skill for skill, degree in indegree.items() if degree == 0]
+    visited = 0
+    while ready:
+        current = ready.pop()
+        visited += 1
+        for target in edges[current]:
+            indegree[target] -= 1
+            if indegree[target] == 0:
+                ready.append(target)
+    if visited != len(rules):
+        raise ValueError("skill-dependency-map-cycle")
+    for rule in rules.values():
+        for parallel in rule.parallel_independent:
+            if parallel == rule.skill or _reachable(edges, rule.skill, parallel) or _reachable(
+                edges, parallel, rule.skill
+            ):
+                raise ValueError(
+                    "skill-dependency-map-parallel-contradiction:"
+                    f"{rule.skill}:{parallel}"
+                )
+            if rule.skill not in rules[parallel].parallel_independent:
+                raise ValueError(
+                    "skill-dependency-map-parallel-not-symmetric:"
+                    f"{rule.skill}:{parallel}"
+                )
+
+
+def load_skill_dependency_map(
+    root: Path, public_skill_ids: Sequence[str] | None = None
+) -> Mapping[str, SkillDependencyRule]:
+    """Load and validate the complete public-skill dependency dictionary."""
+    path = root / SKILL_DEPENDENCY_MAP_PATH
+    try:
+        raw: object = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise ValueError("skill-dependency-map-unavailable") from exc
+    data = object_mapping(raw, str(SKILL_DEPENDENCY_MAP_PATH))
+    dependency_data = object_mapping(
+        data.get("skill_dependencies"), "skill_dependencies"
+    )
+    expected_ids = tuple(public_skill_ids or _skill_ids_from_catalog(load_skill_catalog(root)))
+    observed_ids = tuple(str(key) for key in dependency_data)
+    missing = tuple(skill for skill in expected_ids if skill not in dependency_data)
+    extra = tuple(skill for skill in observed_ids if skill not in expected_ids)
+    if missing or extra:
+        raise ValueError(
+            "skill-dependency-map-key-mismatch:"
+            f"missing={','.join(missing) or '-'}:extra={','.join(extra) or '-'}"
+        )
+    rules: dict[str, SkillDependencyRule] = {}
+    for skill in expected_ids:
+        mapping = object_mapping(dependency_data[skill], f"skill_dependencies.{skill}")
+        group = mapping.get("responsibility_group")
+        if not isinstance(group, str) or not group.strip():
+            raise _dependency_error(skill, "responsibility_group")
+        rules[skill] = SkillDependencyRule(
+            skill=skill,
+            responsibility_group=group,
+            required_prerequisites=_dependency_string_list(
+                mapping.get("required_prerequisites"),
+                f"{skill}.required_prerequisites",
+            ),
+            routing_candidates=(
+                _dependency_string_list(
+                    mapping.get("routing_candidates"),
+                    f"{skill}.routing_candidates",
+                )
+                if mapping.get("routing_candidates") is not None
+                else ()
+            ),
+            successors=_dependency_string_list(
+                mapping.get("successors"), f"{skill}.successors"
+            ),
+            order_constraints=_dependency_order_constraints(
+                mapping.get("order_constraints"), skill
+            ),
+            parallel_independent=_dependency_string_list(
+                mapping.get("parallel_independent"),
+                f"{skill}.parallel_independent",
+            ),
+        )
+    for rule in rules.values():
+        for field, references in (
+            ("required_prerequisites", rule.required_prerequisites),
+            ("routing_candidates", rule.routing_candidates),
+            ("successors", rule.successors),
+            ("parallel_independent", rule.parallel_independent),
+        ):
+            for reference in references:
+                if reference not in rules:
+                    raise ValueError(
+                        "skill-dependency-map-unknown-reference:"
+                        f"{rule.skill}:{field}:{reference}"
+                    )
+                if reference == rule.skill:
+                    raise ValueError(
+                        f"skill-dependency-map-self-reference:{rule.skill}:{field}"
+                    )
+        for constraint in rule.order_constraints:
+            for reference in (constraint.before, constraint.after):
+                if reference not in rules:
+                    raise ValueError(
+                        "skill-dependency-map-unknown-reference:"
+                        f"{rule.skill}:order_constraints:{reference}"
+                    )
+    _validate_dependency_graph(rules)
+    return rules
+
+
+def build_skill_dependency_edges(
+    rules: Mapping[str, SkillDependencyRule],
+) -> Mapping[str, tuple[str, ...]]:
+    """Return catalog-ordered directed prerequisite and ordering edges."""
+    edges = _dependency_edges(rules)
+    return MappingProxyType(
+        {
+            skill: tuple(target for target in rules if target in edges[skill])
+            for skill in rules
+        }
+    )
+
+
+def derive_skill_invocation_order(
+    skills: Sequence[str], rules: Sequence[SkillRoutingRule]
+) -> tuple[str, ...]:
+    """Expand required prerequisites and topologically order selected skills."""
+    by_skill = {rule.skill: rule for rule in rules}
+    selected = set(skills)
+    pending = list(selected)
+    while pending:
+        skill = pending.pop()
+        if skill not in by_skill:
+            raise ValueError(f"unknown-skill:{skill}")
+        for prerequisite in by_skill[skill].required_prerequisites:
+            if prerequisite not in selected:
+                selected.add(prerequisite)
+                pending.append(prerequisite)
+    order_index = {rule.skill: index for index, rule in enumerate(rules)}
+    edges = {skill: set() for skill in selected}
+    for skill in selected:
+        rule = by_skill[skill]
+        for prerequisite in rule.required_prerequisites:
+            if prerequisite in selected:
+                edges[prerequisite].add(skill)
+        for successor in rule.successors:
+            if successor in selected:
+                edges[skill].add(successor)
+        for constraint in rule.order_constraints:
+            if constraint.before in selected and constraint.after in selected:
+                edges[constraint.before].add(constraint.after)
+    indegree = {skill: 0 for skill in selected}
+    for targets in edges.values():
+        for target in targets:
+            indegree[target] += 1
+    ready = sorted(
+        (skill for skill, degree in indegree.items() if degree == 0),
+        key=order_index.__getitem__,
+    )
+    result: list[str] = []
+    while ready:
+        current = ready.pop(0)
+        result.append(current)
+        for target in sorted(edges[current], key=order_index.__getitem__):
+            indegree[target] -= 1
+            if indegree[target] == 0:
+                ready.append(target)
+        ready.sort(key=order_index.__getitem__)
+    if len(result) != len(selected):
+        raise ValueError("skill-dependency-map-cycle")
+    return tuple(result)
 
 
 def validate_visualization_metadata(rules: Sequence[SkillRoutingRule]) -> None:
@@ -474,6 +780,8 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
     """Load prompt-routing rules from the public skill catalog."""
     data = load_skill_catalog(root)
     families = object_sequence(data.get("skill_families"), "skill_families")
+    public_skill_ids = _skill_ids_from_catalog(data)
+    dependency_rules = load_skill_dependency_map(root, public_skill_ids)
     rules: list[SkillRoutingRule] = []
     observed_skill_ids: set[str] = set()
     for index, entry in enumerate(families):
@@ -486,6 +794,11 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
         if skill_id in observed_skill_ids:
             raise ValueError(f"duplicate skill catalog id: {skill_id}")
         observed_skill_ids.add(skill_id)
+        if "related_skills" in entry_mapping:
+            raise ValueError(
+                f"{skill_id}.related_skills must be declared in "
+                f"{SKILL_DEPENDENCY_MAP_PATH}"
+            )
         routing = entry_mapping.get("routing")
         if routing is None:
             routing_mapping: JsonMapping = {}
@@ -532,13 +845,8 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
                     "routing.capabilities",
                     skill_id,
                 ),
-                related_skills=optional_string_list(
-                    entry_mapping.get("related_skills"),
-                    f"{skill_id}.related_skills",
-                ),
-                prerequisites=optional_string_list(
-                    entry_mapping.get("prerequisites"),
-                    f"{skill_id}.prerequisites",
+                related_skills=ordered_unique(
+                    dependency_rules[skill_id].routing_candidates
                 ),
                 visualization_owner_skill=(
                     cast(VisualizationOwnerSkill, visualization_owner)
@@ -557,42 +865,14 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
                 visualization_role=visualization_role,
                 tool_id=tool_id,
                 argument_schema=argument_schema,
+                required_prerequisites=dependency_rules[skill_id].required_prerequisites,
+                successors=dependency_rules[skill_id].successors,
+                order_constraints=dependency_rules[skill_id].order_constraints,
+                parallel_independent=dependency_rules[skill_id].parallel_independent,
+                responsibility_group=dependency_rules[skill_id].responsibility_group,
             )
         )
     validate_visualization_metadata(rules)
-    for rule in rules:
-        for field, related_skills in (
-            ("related_skills", rule.related_skills),
-            ("prerequisites", rule.prerequisites),
-        ):
-            for related_skill in related_skills:
-                if related_skill == rule.skill:
-                    raise ValueError(f"{rule.skill}.{field} must not include itself")
-                if related_skill.startswith(PRIVATE_SKILL_PREFIX):
-                    raise ValueError(
-                        f"{rule.skill}.{field} must be public: {related_skill}"
-                    )
-                if related_skill not in observed_skill_ids:
-                    raise ValueError(
-                        f"{rule.skill}.{field} unknown skill: {related_skill}"
-                    )
-    prerequisites = {rule.skill: rule.prerequisites for rule in rules}
-    visiting: set[str] = set()
-    visited: set[str] = set()
-
-    def visit(skill: str) -> None:
-        if skill in visiting:
-            raise ValueError(f"{skill}.prerequisites must not contain a cycle")
-        if skill in visited:
-            return
-        visiting.add(skill)
-        for prerequisite in prerequisites[skill]:
-            visit(prerequisite)
-        visiting.remove(skill)
-        visited.add(skill)
-
-    for skill in prerequisites:
-        visit(skill)
     return tuple(rules)
 
 
@@ -616,8 +896,7 @@ def load_skill_route_rules_from_root(
 def load_skill_related_map(root: Path) -> dict[str, tuple[str, ...]]:
     """Return catalog-backed related-skill candidates keyed by public skill id."""
     return {
-        rule.skill: ordered_unique((*rule.prerequisites, *rule.related_skills))
-        for rule in load_skill_route_rules(root)
+        rule.skill: rule.related_skills for rule in load_skill_route_rules(root)
     }
 
 

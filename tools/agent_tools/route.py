@@ -27,6 +27,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
 
+from agent_canon_source_root import SourceRootFailure, resolve_agent_canon_source_root
+
 from capability_route import (
     FORMAT_VALUES,
     MODE_VALUES,
@@ -51,6 +53,7 @@ from skill_route_catalog import (
     VisualizationRejection,
     build_capability_index,
     build_visualization_owner_tool_call,
+    derive_skill_invocation_order,
     load_skill_related_map as _load_skill_related_map,
     load_skill_required_tool_commands as _load_skill_required_tool_commands,
     load_skill_route_rules,
@@ -76,7 +79,7 @@ SKILL_NAME = "task-routing"
 TOOL_NAME = "route.py"
 
 AreaData = tuple[str, str, str, str, tuple[str, ...], tuple[str, ...]]
-DEFAULT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_ROOT = Path.cwd()
 SUBAGENT_BOOTSTRAP_SKILL = "subagent-bootstrap"
 VISUALIZATION_PROSE_TERMS = (
     "visualization",
@@ -690,6 +693,11 @@ def validation_failure_repair_rules(
             triggers=(),
             capabilities=(),
             related_skills=related_skills,
+            required_prerequisites=(catalog_rule.required_prerequisites if catalog_rule else ()),
+            successors=(catalog_rule.successors if catalog_rule else ()),
+            order_constraints=(catalog_rule.order_constraints if catalog_rule else ()),
+            parallel_independent=(catalog_rule.parallel_independent if catalog_rule else ()),
+            responsibility_group=(catalog_rule.responsibility_group if catalog_rule else "orchestration"),
         ),
     )
 
@@ -1015,31 +1023,6 @@ def is_current_stage_skill(
     return rule is not None and rule.stage_policy == "active"
 
 
-def prerequisite_closure(
-    skills: Sequence[str], rules_by_skill: Mapping[str, SkillRoutingRule]
-) -> tuple[str, ...]:
-    """Return selected skills with catalog prerequisites before their consumers."""
-    ordered: list[str] = []
-    visiting: set[str] = set()
-
-    def visit(skill: str) -> None:
-        if skill in visiting:
-            raise ValueError(f"skill prerequisite cycle: {skill}")
-        if skill in ordered:
-            return
-        visiting.add(skill)
-        rule = rules_by_skill.get(skill)
-        if rule is not None:
-            for prerequisite in rule.prerequisites:
-                visit(prerequisite)
-        visiting.remove(skill)
-        ordered.append(skill)
-
-    for skill in skills:
-        visit(skill)
-    return tuple(ordered)
-
-
 def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> SkillRouteDecision:
     """Create a prompt-derived public skill route decision."""
     public_prompt = strip_private_route_aliases(prompt)
@@ -1088,8 +1071,11 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
     prompt_skills = matched_skills
     if handoff_required:
         prompt_skills = ordered_unique((*prompt_skills, SUBAGENT_BOOTSTRAP_SKILL))
-    skills = prerequisite_closure(
-        ordered_unique((*base_skills, *prompt_skills)), rules_by_skill
+    selected_skill_inputs = ordered_unique((*base_skills, *prompt_skills))
+    skills = (
+        derive_skill_invocation_order(selected_skill_inputs, effective_rules)
+        if effective_rules
+        else selected_skill_inputs
     )
     active_skill_inputs = ["agent-orchestration"]
     if handoff_required:
@@ -1103,14 +1089,16 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
         )
         or is_current_stage_skill(match.skill, rules_by_skill, public_prompt, active_mode)
     )
-    active_skills = prerequisite_closure(
-        ordered_unique(active_skill_inputs), rules_by_skill
+    active_skills = (
+        derive_skill_invocation_order(active_skill_inputs, effective_rules)
+        if effective_rules
+        else ordered_unique(active_skill_inputs)
     )
     deferred_skills = tuple(skill for skill in skills if skill not in active_skills)
     related_by_source, related_candidates = related_skill_candidates(
         matched_skills,
         rules_by_skill,
-        skills,
+        matched_skills,
     )
     evidence = (
         f"mode={active_mode};matched={','.join(matched_skills) if matched_skills else 'none'};"
@@ -1447,11 +1435,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return 2
         try:
-            catalog = (
-                RouteCatalog.default()
-                if preflight.root is None
-                else RouteCatalog.from_root(preflight.root)
-            )
+            catalog_root = preflight.root or DEFAULT_ROOT
+            source_root = resolve_agent_canon_source_root(catalog_root)
+            catalog = RouteCatalog.from_root(source_root.source_root)
         except CapabilityRootError as exc:
             print(
                 render_capability_error(
@@ -1461,6 +1447,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     preflight.mode,
                 )
             )
+            return 2
+        except SourceRootFailure as exc:
+            print(f"ROUTE_SOURCE_ROOT_FAILURE={exc.code}:{exc.detail}", file=sys.stderr)
             return 2
         parser = build_parser(catalog)
         args = parser.parse_args(raw_argv)
@@ -1474,26 +1463,35 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(RouteRenderer(preflight.output_format).render_capability_decision(decision))
         return 0 if decision.status == "pass" else 2
 
-    catalog = RouteCatalog.default()
-    parser = build_parser(catalog)
+    parser = build_parser(RouteCatalog(build_default_areas()))
     args = parser.parse_args(raw_argv)
     renderer = RouteRenderer(args.format)
 
-    root = Path(args.root).resolve()
+    root = Path(args.root or DEFAULT_ROOT).resolve()
     try:
+        source_root = resolve_agent_canon_source_root(root)
         prompt_text = prompt_text_from_args(args, root)
     except OSError as exc:
         print(f"SKILL_ROUTER_ERROR={exc}", file=sys.stderr)
         return 2
+    except SourceRootFailure as exc:
+        print(f"ROUTE_SOURCE_ROOT_FAILURE={exc.code}:{exc.detail}", file=sys.stderr)
+        return 2
 
     if prompt_text:
         try:
-            rules = load_skill_route_rules(root)
+            rules = load_skill_route_rules(source_root.source_root)
         except (OSError, ValueError) as exc:
             print(f"SKILL_ROUTER_ERROR={exc}", file=sys.stderr)
             return 2
         print(renderer.render_skill_decision(decide_skills(prompt_text, str(args.mode), rules)))
         return 0
+
+    try:
+        catalog = RouteCatalog.from_root(source_root.source_root)
+    except CapabilityRootError as exc:
+        print(f"SKILL_ROUTER_ERROR={exc.code}", file=sys.stderr)
+        return 2
 
     if args.name:
         resolutions = [catalog.resolve_name(name) for name in args.name]

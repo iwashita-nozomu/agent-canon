@@ -1674,15 +1674,15 @@
         },
         {
           "clause_id": "CANON-SOURCE-PACKET",
-          "source_ref": "repo:agents/templates/design_brief.md#section:implementation-source-packet"
+          "source_ref": "repo:templates/agents/design_brief.md#section:implementation-source-packet"
         },
         {
           "clause_id": "CANON-SIDE-EFFECT",
-          "source_ref": "repo:agents/templates/design_brief.md#section:design-side-effect-map"
+          "source_ref": "repo:templates/agents/design_brief.md#section:design-side-effect-map"
         },
         {
           "clause_id": "CANON-TRACE",
-          "source_ref": "repo:agents/templates/design_brief.md#section:design-to-implementation-trace"
+          "source_ref": "repo:templates/agents/design_brief.md#section:design-to-implementation-trace"
         }
       ],
       "abstract_design_frame": {
@@ -1692,10 +1692,10 @@
         "owner_refs": ["role:designer"],
         "source_refs": [
           "repo:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate",
-          "repo:agents/templates/design_brief.md#section:abstract-design-frame"
+          "repo:templates/agents/design_brief.md#section:abstract-design-frame"
         ],
         "dependency_refs": [
-          "header:upstream:design:repo:agents/templates/design_brief.md->repo:documents/design/dependency-manifest-design.md"
+          "header:upstream:design:repo:templates/agents/design_brief.md->repo:documents/design/dependency-manifest-design.md"
         ],
         "output_refs": ["artifact:design_brief.md"],
         "reviewer_refs": ["role:design_reviewer", "role:document_flow_reviewer"]
@@ -1706,12 +1706,12 @@
         "clause_refs": ["CANON-SOURCE-PACKET"],
         "owner_refs": ["role:designer"],
         "source_refs": [
-          "repo:agents/templates/design_brief.md#section:implementation-source-packet",
+          "repo:templates/agents/design_brief.md#section:implementation-source-packet",
           "repo:agents/workflows/implementation-waterfall-workflow.md#section:active-design-packet"
         ],
         "dependency_refs": [
           "entry:abstract-design-frame",
-          "header:upstream:design:repo:agents/templates/design_brief.md->repo:documents/design/dependency-manifest-design.md"
+          "header:upstream:design:repo:templates/agents/design_brief.md->repo:documents/design/dependency-manifest-design.md"
         ],
         "output_refs": ["artifact:design_brief.md"],
         "reviewer_refs": ["role:design_reviewer"]
@@ -1722,12 +1722,12 @@
         "clause_refs": ["CANON-SIDE-EFFECT"],
         "owner_refs": ["role:designer"],
         "source_refs": [
-          "repo:agents/templates/design_brief.md#section:design-side-effect-map",
+          "repo:templates/agents/design_brief.md#section:design-side-effect-map",
           "repo:agents/workflows/implementation-waterfall-workflow.md#section:active-design-packet"
         ],
         "dependency_refs": [
           "entry:abstract-design-frame",
-          "header:upstream:design:repo:agents/templates/design_brief.md->repo:documents/design/dependency-manifest-design.md"
+          "header:upstream:design:repo:templates/agents/design_brief.md->repo:documents/design/dependency-manifest-design.md"
         ],
         "output_refs": ["artifact:design_brief.md"],
         "reviewer_refs": ["role:design_reviewer", "role:document_flow_reviewer"]
@@ -1738,7 +1738,7 @@
         "clause_refs": ["CANON-TRACE"],
         "owner_refs": ["role:designer"],
         "source_refs": [
-          "repo:agents/templates/design_brief.md#section:design-to-implementation-trace",
+          "repo:templates/agents/design_brief.md#section:design-to-implementation-trace",
           "repo:agents/canonical/CODEX_WORKFLOW.md#section:5.-implementation"
         ],
         "dependency_refs": [

@@ -2,7 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Blocks hook/tool/skill log-surface drift not reflected in the generated inventory baseline.
-# upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this standalone inventory route.
 # upstream implementation ../../tools/agent_tools/log_surface_inventory.py inventories emitted log fields.
 # upstream design ../../documents/runtime/runtime-log-archive.md defines durable hook result fields.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates hook wiring and quiet pass behavior.

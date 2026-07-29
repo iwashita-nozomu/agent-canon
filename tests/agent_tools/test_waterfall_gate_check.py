@@ -1065,7 +1065,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
 
     def test_implementation_checkpoint_contract_requires_abstract_trace(self) -> None:
         """Checkpoint review surfaces should reject file-local-only justification."""
-        template_text = (PROJECT_ROOT / "agents" / "templates" / "change_review.md").read_text(
+        template_text = (PROJECT_ROOT / "templates" / "agents" / "change_review.md").read_text(
             encoding="utf-8"
         )
         workflow_text = (

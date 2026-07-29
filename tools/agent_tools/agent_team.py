@@ -38,11 +38,13 @@ if __package__:
     from . import implementation_route
     from . import model_profile_registry
     from .artifact_identity import canonical_json_bytes
+    from .agent_canon_source_root import resolve_agent_canon_source_root
 else:
     import capacity_handshake
     import implementation_route
     import model_profile_registry
     from artifact_identity import canonical_json_bytes
+    from agent_canon_source_root import resolve_agent_canon_source_root
 from route import decide_skills, implementation_handoff_required, load_skill_route_rules
 from skill_tool_commands import SkillCommandPacket, packet_for_skill
 from task_authority import AUTHORITY_FILE_NAME, build_default_task_authority
@@ -61,7 +63,7 @@ from update_lifecycle_contract import (
 ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
 DEFAULT_REPORT_ROOT = Path("reports") / "agents"
-TEMPLATE_ROOT = ROOT / "agents" / "templates"
+TEMPLATE_ROOT = ROOT / "templates" / "agents"
 TEMPLATE_PARTIAL_ROOT = TEMPLATE_ROOT / "_partials"
 TEMPLATE_PARTIAL_RE = re.compile(r"\{\{>\s*([A-Za-z0-9_-]+)\s*\}\}")
 GIT_STATUS_SHORT_MIN_LINE_LENGTH = 4
@@ -1456,8 +1458,10 @@ def selected_skill_command_packets(
     selected_skills: tuple[str, ...],
 ) -> tuple[SkillCommandPacket, ...]:
     """Build repo tool command packets for selected public skills."""
+    root_resolution = resolve_agent_canon_source_root(ROOT)
     return tuple(
-        packet_for_skill(ROOT, skill) for skill in selected_skill_names(selected_skills)
+        packet_for_skill(root_resolution, skill)
+        for skill in selected_skill_names(selected_skills)
     )
 
 
@@ -3351,7 +3355,7 @@ def apply_template_replacements(content: str, replacements: dict[str, str]) -> s
 
 
 def render_template(template_name: str, replacements: dict[str, str]) -> str:
-    """Load and fill a text template from agents/templates."""
+    """Load and fill a text template from templates/agents."""
     content = (TEMPLATE_ROOT / template_name).read_text(encoding="utf-8")
     content = expand_template_partials(content)
     content = apply_template_replacements(content, replacements)
@@ -3368,7 +3372,7 @@ def required_output_templates_missing(
     roles: tuple[Role, ...],
     allowed_missing: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
-    """Return required output templates that are missing from agents/templates."""
+    """Return required output templates that are missing from templates/agents."""
     return tuple(
         dict.fromkeys(
             output

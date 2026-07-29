@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Validates AgentCanon responsibility scopes and their protecting tools.
 # upstream design ../../responsibility-scope.toml machine-readable repo-local scope manifest
-# upstream design ../../documents/templates/responsibility-scope.template.toml starter manifest for template-derived repositories
+# upstream design ../../templates/documents/responsibility-scope.template.toml starter manifest for template-derived repositories
 # upstream design ../../documents/design/responsibility-scope-management.md scope ownership policy
 # upstream design ../../tools/catalog.yaml structured tool ownership
 # upstream design ../../tools/README.md tool entrypoint index

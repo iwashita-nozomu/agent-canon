@@ -38,6 +38,7 @@ required_coverage = [
   ".vscode",
   ".github",
   "agents",
+  "templates",
   "evidence",
   "documents",
   "issues",
@@ -131,6 +132,7 @@ paths = [
   ".vscode/**",
   "agent-canon-environment.toml",
   "agents/**",
+  "templates/**",
 ]
 exclude_paths = [
   ".codex/hooks/log_archive_mount_warning.py",

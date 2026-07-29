@@ -59,7 +59,7 @@ Completion judgment comes first. This checklist defines what must exist before a
 
 ### [ ] P-1-005: artifact schemas
 
-- Target surface: `agents/templates/artifact_schema.yaml`
+- Target surface: `templates/agents/artifact_schema.yaml`
 - Problem: file existence is not content completeness.
 - Violation that currently passes: `schedule.md` exists but has no work units.
 - Action: define required sections, fields, and minimum rows for each artifact.
@@ -67,7 +67,7 @@ Completion judgment comes first. This checklist defines what must exist before a
 
 ### [ ] P-1-006: validation evidence schema
 
-- Target surface: `agents/templates/validation_evidence.schema.yaml`
+- Target surface: `templates/agents/validation_evidence.schema.yaml`
 - Problem: pasted command output is not trustworthy.
 - Violation that currently passes: old `make ci` output is pasted as current evidence.
 - Action: require command, cwd, runtime profile, timestamps, exit code, stdout/stderr hashes, and evidence path.
@@ -75,7 +75,7 @@ Completion judgment comes first. This checklist defines what must exist before a
 
 ### [ ] P-1-007: behavior event schema
 
-- Target surface: `agents/templates/behavior_event.schema.yaml`
+- Target surface: `templates/agents/behavior_event.schema.yaml`
 - Problem: behavior monitoring uses weak text tokens.
 - Violation that currently passes: `tool_call=make ci static_analysis=pass` with no command evidence.
 - Action: define event types such as `tool_call`, `skill_invocation`, `runtime_feedback`, `review_decision`, `subagent_lifecycle`.

@@ -1999,7 +1999,7 @@ required_regex = ["workflow_monitor\\.py --runtime-feedback", "runtime_feedback=
 
 [[evals]]
 id = "workflow-monitoring-template-behavior-events"
-target = "agents/templates/workflow_monitoring.md"
+target = "templates/agents/workflow_monitoring.md"
 kind = "workflow"
 description = "The monitoring template must expose a behavior-event section for trace-like evals."
 

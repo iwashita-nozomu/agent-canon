@@ -72,7 +72,7 @@ def seed_workspace_config(workspace_root: Path) -> None:
     )
     for relative_path in (
         "agents/canonical/CODEX_WORKFLOW.md",
-        "agents/templates/design_brief.md",
+        "templates/agents/design_brief.md",
         "agents/workflows/implementation-waterfall-workflow.md",
         "documents/design/dependency-manifest-design.md",
     ):

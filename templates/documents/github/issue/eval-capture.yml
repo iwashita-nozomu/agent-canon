@@ -1,0 +1,122 @@
+# @dependency-start
+# contract configuration
+# responsibility Defines issue form for converting agent failures into eval cases.
+# upstream design ../../../../documents/codex/prompt-skill-evaluation-checklist.md eval capture checklist.
+# upstream design ../../../../agents/evals/README.md eval evidence storage contract.
+# upstream design ../../../../documents/operations/issue-label-taxonomy.md issue labels and template routing.
+# upstream design ../../../../.github/AGENTS.md GitHub subtree instructions.
+# upstream design ../../README.md canonical template owner.
+# downstream implementation ../../../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
+# @dependency-end
+
+# Canonical source: templates/documents/github/issue/eval-capture.yml. Generated projection targets .github/ISSUE_TEMPLATE/eval-capture.yml; edit this source only.
+
+name: Agent behavior eval capture
+description: Convert an observed agent/workflow failure into a reusable eval case.
+title: "[eval] "
+labels: ["agent-quality", "eval"]
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: Failure category
+      options:
+        - scope-creep
+        - helper-sprawl
+        - upstream-mutation
+        - api-surface-miss
+        - responsibility-boundary
+        - workflow-bypass
+        - doc-drift
+        - insufficient-evidence
+        - wrong-artifact
+        - non-reproducible-review
+    validations:
+      required: true
+  - type: textarea
+    id: trigger
+    attributes:
+      label: Trigger
+      value: |
+        user request:
+        repo state / relevant files:
+        likely bad assumption:
+    validations:
+      required: true
+  - type: textarea
+    id: observed_evidence
+    attributes:
+      label: Observed evidence and impact
+      description: Identify the observed artifact/path, reproducibility, affected owner, and practical impact.
+      value: |
+        observed facts:
+        evidence paths:
+        owner:
+        impact:
+    validations:
+      required: true
+  - type: textarea
+    id: bad_behavior
+    attributes:
+      label: Bad behavior to catch
+      value: |
+        forbidden action 1:
+        forbidden action 2:
+    validations:
+      required: true
+  - type: textarea
+    id: required_behavior
+    attributes:
+      label: Required behavior
+      value: |
+        must inspect:
+        must ask / must not ask:
+        allowed outputs:
+        disallowed outputs:
+    validations:
+      required: true
+  - type: textarea
+    id: eval_shape
+    attributes:
+      label: Eval shape
+      value: |
+        input prompt:
+        fixtures / repo snapshot:
+        expected route:
+        assertions:
+        negative assertions:
+        oracle type: machine / rubric / human-reviewed
+    validations:
+      required: true
+  - type: textarea
+    id: options_and_non_goals
+    attributes:
+      label: Options, rejected rationale, and non-goals
+      value: |
+        option A:
+        option B:
+        selected / rejected rationale:
+        non-goals:
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance and close condition
+      value: |
+        acceptance oracle:
+        validation:
+        close condition:
+    validations:
+      required: true
+  - type: textarea
+    id: close_condition
+    attributes:
+      label: Close condition
+      value: |
+        eval added:
+        eval fails before fix:
+        eval passes after fix:
+        linked rule / workflow / tool updated:
+    validations:
+      required: true

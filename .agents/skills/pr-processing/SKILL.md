@@ -34,13 +34,15 @@ downstream implementation ../../../tools/agent_tools/check_convention_compliance
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Use the command packet before applying this skill's workflow:
+この skill の workflow を適用する前に、次の command packet を使用してください。
 
 ```bash
 python3 tools/agent_tools/skill_tool_commands.py show --skill pr-processing --format text
 ```
 
-Execute the required and task-matching conditional commands that the packet prints.
+論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
+
+packet が出力した必須 command と、task に該当する conditional command を実行してください。
 <!-- skill-tool-commands:end -->
 
 After the approved source PR is merged, run the exact predecessor sequence from
