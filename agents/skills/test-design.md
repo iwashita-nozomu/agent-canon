@@ -25,6 +25,12 @@ formatter、dependency review、type checker、lint、docs check、targeted
 validation が所有しない具体的な oracle / specification / regression /
 failure-mode risk を分類します。既存 tests は contract、symptom、regression
 placement の evidence であり、最初に tests を書き換える根拠ではありません。
+`activation=required` では、owning design / contract の該当する設計条項と
+code-side implementation mechanism（public entrypoint、分岐、parser、error
+path、state transition、return projection）を同じ調査記録に結び付けます。各
+候補 case は、`Design Clause -> Reachable Implementation Mechanism -> Concrete
+Breaking Input/State Sequence -> Observable Outcome -> Decidable Oracle` の trace
+を持ち、tests だけから contract や oracle を推測しません。
 
 ## Activation Decision
 
@@ -58,6 +64,8 @@ placement の evidence であり、最初に tests を書き換える根拠で�
 - 常に `Activation Decision`、根拠、次の owner route を返す
 - `activation=not_needed` または `activation=deferred` では `test_plan.md` と test-design tool run を必須にしない
 - `activation=required` の場合だけ、static path survey、contract source、observation level、observable outcome、oracle、input space、adequacy evidence、nasty case、regression case、placement notes を具体化する
+- `activation=required` の各 nasty / regression case は、設計条項、到達可能な実装機構、具体的な破綻入力または state sequence、observable outcome、判定可能な oracle の trace を持つ。いずれかが欠ける case は test-design の evidence として受理しない
+- 各候補 case について、契約・型制約・既存 checker が「その case は起きない」とする null hypothesis を先に明記し、公開入力面または公開 state sequence から reachability witness を探す。witness が null hypothesis を反証しない、または存在しない場合は test 化せず、checker / static validation / owning design の境界へ戻す
 - checker-owned property は canonical static validation evidence に戻す
 - tests は concrete behavior regression oracle がある場合だけ作成または編集する
 
@@ -75,9 +83,12 @@ placement の evidence であり、最初に tests を書き換える根拠で�
 `activation=required` の場合だけ実行します。
 
 - code path と関連 test path を survey / placement evidence として記録し、API shape、private helper、return shape、error prose、mock order、internal call sequence を勝手に固定しない
+- owning design / contract の該当条項と code-side implementation mechanism を結び付け、public entrypoint から分岐・parser・error path・state transition・return projection までを確認する。tests だけから contract や oracle を推測しない
 - 関連 tests がある場合、既存の test-design checker を必要な範囲で実行し、finding を behavior contract と照合する。activation が false の場合は実行しない
 - contract source、behavior contract、observation level、observable outcome、oracle、input space、adequacy evidence、Do Not Freeze を分ける
 - malformed input、boundary value、empty / null-ish input、error path、state transition、再発しやすい regression を、安定した観測レベルで列挙する
+- 各 nasty / regression case は、設計条項から到達可能な実装機構を経て、具体的な breaking input / state sequence が observable outcome と decidable oracle に至る一つの trace として固定する。テスト件数や coverage を増やすこと自体を adequacy としない
+- 各候補 case の null hypothesis と、その根拠である契約・型制約・checker を記録し、公開入力または公開 state sequence の reachability witness が null hypothesis を反証することを確認する。反証できない case は test-design の候補から外し、所有する checker / static validation / design route に返す
 - parser / formatter / graph / router / mapping では property または metamorphic relation を検討するが、checker-owned property は test oracle に昇格させない
 - numerical、randomized、tolerance、solver、convergence、residual、benchmark、experiment-style test は、`documents/conventions/coding-conventions-testing.md` の Numerical Test Admission Gate を owner とし、`activation=required` かつ数値 trigger、non-numerical alternative、oracle、budget が approved route にある場合だけ提案する
 - existing test style、fixture layout、naming を mirror し、test の追加・編集は concrete behavior regression oracle に限定する
