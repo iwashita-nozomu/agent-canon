@@ -9,13 +9,13 @@ downstream implementation ../../tools/ci/check_github_workflows.py validates PR 
 downstream implementation ../../tools/agent_tools/tool_drift.py validates PR/tool trace contracts
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local/GitHub issue sync state
 downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates PR Essence checklist wiring
-upstream design ../../documents/templates/README.md canonical template owner and projection boundary
+upstream design ../../templates/documents/README.md canonical template owner and projection boundary
 upstream design ../../documents/operations/issue-label-taxonomy.md issue/eval routing taxonomy
 upstream design ../AGENTS.md GitHub subtree instructions
 @dependency-end
 -->
 
-<!-- Canonical source: documents/templates/github/pull-request/agent_canon.md. Generated projections target .github/PULL_REQUEST_TEMPLATE/agent_canon.md; edit this source only. -->
+<!-- Canonical source: templates/documents/github/pull-request/agent_canon.md. Generated projections target .github/PULL_REQUEST_TEMPLATE/agent_canon.md; edit this source only. -->
 
 ## Reader Map
 

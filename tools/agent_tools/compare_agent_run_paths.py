@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Compares two agent run paths and flags inefficient route selection.
 # upstream design ../../agents/workflows/adaptive-improvement-workflow.md rerun comparison  # noqa: E501
-# upstream design ../../agents/templates/workflow_monitoring.md records path events
+# upstream design ../../templates/agents/workflow_monitoring.md records path events
 # downstream implementation ../../tests/agent_tools/test_compare_agent_run_paths.py tests it  # noqa: E501
 # @dependency-end
 """Compare two workflow-monitoring paths for route efficiency feedback."""

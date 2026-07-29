@@ -37,7 +37,7 @@ research workflow, and adaptive backlog tuning.
 - `agents/internal-routines/report-review.md`
 - `agents/workflows/experiment-workflow.md`
 - `agents/workflows/research-workflow.md`
-- `agents/templates/experiment_change_loop.md`
+- `templates/agents/experiment_change_loop.md`
 
 ## Inputs
 
@@ -102,9 +102,9 @@ research workflow, and adaptive backlog tuning.
 
 ## Suggested Templates
 
-- `agents/templates/experiment_change_loop.md`
-- `agents/templates/experiment_log.md`
-- `agents/templates/decision_log.md`
+- `templates/agents/experiment_change_loop.md`
+- `templates/agents/experiment_log.md`
+- `templates/agents/decision_log.md`
 
 ## Boundary
 

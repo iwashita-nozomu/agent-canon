@@ -33,7 +33,9 @@ handshake, and closeout owners; they are not independent policy sources.
 ## Reader Map
 
 Use this document to answer who owns each shared runtime surface exposed from
-`vendor/agent-canon/` into a template or derived repository root. Start with
+`vendor/agent-canon/` into a template or derived repository root. The centralized
+template source is exposed as the managed root symlink
+`templates -> vendor/agent-canon/templates`. Start with
 Owner Classes and Manifest Contract, then read the symlink, active-contract,
 durable-state, GitHub copy, documents, evidence, memory, notes, and tests
 sections for path-specific ownership. Editing Rule and Validation close the
@@ -225,7 +227,7 @@ are reviewed and committed as template or derived-repo content.
 derived repo roots. If a legacy symlink or copy remains at such a path,
 `bash tools/sync_agent_canon.sh check` reports it and `link-root` removes it.
 
-AgentCanon may provide generic templates under `documents/templates/`, such as
+AgentCanon may provide generic templates under `templates/documents/`, such as
 `server_host_inventory.template.md`, `server_runtime_layout.template.toml`,
 `remote_execution_repo.template.toml`, and
 `remote_execution_target.template.toml`. Those are shared policy/template

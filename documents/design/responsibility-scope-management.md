@@ -7,7 +7,7 @@ responsibility Documents machine-readable responsibility scope management for ea
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
 upstream design ../runtime/shared-runtime-surfaces.toml shared surface manifest
 upstream design ../../responsibility-scope.toml machine-readable repo-local scope manifest
-downstream design ../templates/responsibility-scope.template.toml starter manifest for template-derived repositories
+downstream design ../../templates/documents/responsibility-scope.template.toml starter manifest for template-derived repositories
 upstream design ../../tools/catalog.yaml structured tool ownership
 downstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope coverage
 downstream implementation ../../tools/agent_tools/import_responsibility.py validates local import ownership

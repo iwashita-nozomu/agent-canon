@@ -97,7 +97,7 @@ python3 tools/ci/run_codex_in_repo_container.py --profile host-docker --print-on
 
 - repo-local `docker/Dockerfile`、`docker/requirements.txt`、AgentCanon-owned `.devcontainer/` の責務境界が同期している
 - `docker/README.md`、`README.md`、`QUICK_START.md` が更新されている
-- `agents/templates/environment_change_proposal.md` に proposal が残っている
+- `templates/agents/environment_change_proposal.md` に proposal が残っている
 
 ## 5. closeout
 

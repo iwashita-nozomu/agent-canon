@@ -5,7 +5,7 @@
 # downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py production contract checker
 # downstream implementation ../../tools/agent_tools/skill_tool_commands.py required selected-skill command route
 # downstream design pr-processing.md PR queue specialization consumer
-# downstream design ../templates/schedule.md schedule projection consumer
+# downstream design ../../templates/agents/schedule.md schedule projection consumer
 # downstream implementation ../task_catalog.yaml task routing projection consumer
 # downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md runtime discovery consumer
 # @dependency-end
@@ -109,11 +109,11 @@ reference_mode = "yaml"
 owner_ref_path = ["execution_time_policy", "owner_ref"]
 fields_path = ["execution_time_policy", "executable_fields"]
 projection_path = ["execution_time_policy", "projection"]
-projection_ref = "agents/templates/schedule.md#Execution-Time-Aware Plan"
+projection_ref = "templates/agents/schedule.md#Execution-Time-Aware Plan"
 
 [[consumers]]
 id = "schedule"
-path = "agents/templates/schedule.md"
+path = "templates/agents/schedule.md"
 kind = "schedule_projection"
 reference_mode = "text"
 required_markers = [

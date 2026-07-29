@@ -604,7 +604,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "## Design Artifact Shape\n\n"
         "Implementation design uses the four-entry active design packet.\n"
     ),
-    "agents/templates/test_plan.md": "validation route behavior-owned cases\n",
+    "templates/agents/test_plan.md": "validation route behavior-owned cases\n",
     "evidence/agent-evals/skill_workflow_prompt_eval.toml": (
         "check_convention_compliance.py CONVENTION-WORKFLOW CONVENTION-SKILL "
         "write-capable handoff ORCH-SHIM-TOOLCALL-1 WORKFLOW-GENERIC-1\n"
@@ -616,14 +616,14 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "Document Structure Evidence structure_contract=skipped "
         "existing tool targeted validation 読了 gate なし\n"
     ),
-    "agents/templates/closeout_gate.md": (
+    "templates/agents/closeout_gate.md": (
         "evaluate_agent_run.py run_repo_dependency_review.sh\n"
         "Document Structure Evidence document_structure_status structure_planning "
         "prose_graph md_style_check format_only_reason document_split_decision "
         "keep:<reason> split:<new-owner-boundary> "
         "not_applicable:format-only:<reason>\n"
     ),
-    "agents/templates/workflow_monitoring.md": (
+    "templates/agents/workflow_monitoring.md": (
         "tool_warning_exit_status resolved deferred_with_issue "
         "accepted_with_reason explicit_approval_evidence\n"
     ),

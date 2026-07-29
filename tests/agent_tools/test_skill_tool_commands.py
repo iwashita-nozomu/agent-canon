@@ -771,7 +771,7 @@ class SkillToolCommandsTest(unittest.TestCase):
                 "tool-finding-report",
                 (
                     "Register warnings in `reports/agents/123/workflow_monitoring.md` "
-                    "using template `agents/templates/workflow_monitoring.md`.\n"
+                    "using template `templates/agents/workflow_monitoring.md`.\n"
                 ),
             )
             sync = self.run_tool(root, "sync")

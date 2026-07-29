@@ -63,7 +63,7 @@ from update_lifecycle_contract import (
 ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
 DEFAULT_REPORT_ROOT = Path("reports") / "agents"
-TEMPLATE_ROOT = ROOT / "agents" / "templates"
+TEMPLATE_ROOT = ROOT / "templates" / "agents"
 TEMPLATE_PARTIAL_ROOT = TEMPLATE_ROOT / "_partials"
 TEMPLATE_PARTIAL_RE = re.compile(r"\{\{>\s*([A-Za-z0-9_-]+)\s*\}\}")
 GIT_STATUS_SHORT_MIN_LINE_LENGTH = 4
@@ -3355,7 +3355,7 @@ def apply_template_replacements(content: str, replacements: dict[str, str]) -> s
 
 
 def render_template(template_name: str, replacements: dict[str, str]) -> str:
-    """Load and fill a text template from agents/templates."""
+    """Load and fill a text template from templates/agents."""
     content = (TEMPLATE_ROOT / template_name).read_text(encoding="utf-8")
     content = expand_template_partials(content)
     content = apply_template_replacements(content, replacements)
@@ -3372,7 +3372,7 @@ def required_output_templates_missing(
     roles: tuple[Role, ...],
     allowed_missing: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
-    """Return required output templates that are missing from agents/templates."""
+    """Return required output templates that are missing from templates/agents."""
     return tuple(
         dict.fromkeys(
             output

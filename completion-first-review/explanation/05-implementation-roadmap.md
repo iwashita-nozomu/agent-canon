@@ -34,9 +34,9 @@ Create the completion-first surfaces:
 
 - `agents/canonical/DEFINITION_OF_DONE.md`
 - `agents/canonical/closeout_profiles.yaml`
-- `agents/templates/artifact_schema.yaml`
-- `agents/templates/behavior_event.schema.yaml`
-- `agents/templates/validation_evidence.schema.yaml`
+- `templates/agents/artifact_schema.yaml`
+- `templates/agents/behavior_event.schema.yaml`
+- `templates/agents/validation_evidence.schema.yaml`
 
 Acceptance:
 

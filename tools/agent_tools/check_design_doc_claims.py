@@ -218,7 +218,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--changed",
         action="store_true",
-        help="Check changed Markdown files under documents/design or agents/templates.",
+        help="Check changed Markdown files under documents/design or templates/agents.",
     )
     parser.add_argument("--format", choices=("text", "json"), default="text")
     parser.add_argument("paths", nargs="*", type=Path)
@@ -422,8 +422,8 @@ def is_design_doc_path(path: str) -> bool:
     return normalized.endswith(".md") and (
         normalized.startswith("documents/design/")
         or normalized.startswith("vendor/agent-canon/documents/design/")
-        or normalized == "agents/templates/design_brief.md"
-        or normalized == "vendor/agent-canon/agents/templates/design_brief.md"
+        or normalized == "templates/agents/design_brief.md"
+        or normalized == "vendor/agent-canon/templates/agents/design_brief.md"
     )
 
 

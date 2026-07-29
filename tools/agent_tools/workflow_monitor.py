@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Appends workflow monitoring evidence to run bundles.
-# upstream design ../../agents/templates/workflow_monitoring.md defines monitor sections
+# upstream design ../../templates/agents/workflow_monitoring.md defines monitor sections
 # upstream implementation ./work_log.py owns canonical semantic-ledger append/read
 # upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
 # upstream implementation ./work_log.py appends canonical logical-ledger events
@@ -466,7 +466,7 @@ def default_monitoring_text(report_dir: Path) -> str:
             "<!--",
             "@dependency-start",
             "responsibility Records workflow monitoring for this run bundle.",
-            "upstream design ../../../agents/templates/"
+            "upstream design ../../../templates/agents/"
             "workflow_monitoring.md template",
             "@dependency-end",
             "-->",

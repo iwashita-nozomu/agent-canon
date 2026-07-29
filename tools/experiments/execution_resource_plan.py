@@ -12,7 +12,7 @@
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
 # downstream implementation ../../.codex/hooks/execution_resource_plan_projection_guard.py validates exact coarse PostToolUse projection constants
 # downstream implementation ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
-# downstream implementation ../../experiments/_template/run.py direct GPU launch is statically prohibited
+# downstream implementation ../../templates/experiments/_template/run.py direct GPU launch is statically prohibited
 # downstream environment ../../.devcontainer/devcontainer.json selects the shared runtime receipt stages
 # @dependency-end
 
@@ -79,7 +79,7 @@ MANAGED_RUN_ADAPTER_PATH = "tools/experiments/run_managed_experiment.py"
 PARENT_LINEAGE_ARTIFACT = "reports/agents/w1-tool-env-routing-20260716/control_topology_ledger.md"
 ALTERNATE_GPU_ROUTE_STATIC_CONTRACT = (
     "tools/agent_tools/jit_canonical_ir.py",
-    "experiments/_template/run.py",
+    "templates/experiments/_template/run.py",
     MANAGED_RUN_ADAPTER_PATH,
 )
 CALLER_ALLOCATION_PROVENANCE = "caller_scheduler_allocated_uuid_set"

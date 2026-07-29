@@ -4,7 +4,7 @@ contract workflow
 responsibility Documents 実装ウォーターフォールワークフロー for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md defines canonical Codex task gates
 upstream design ../../documents/design/dependency-manifest-design.md defines dependency manifest gates
-downstream design ../templates/closeout_gate.md records closeout evidence required by this workflow
+downstream design ../../templates/agents/closeout_gate.md records closeout evidence required by this workflow
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py verifies design-doc evidence claims
 upstream design ../skills/code-visualization.md sole public visualization owner and canonical projection gate
 upstream implementation ../../tools/agent_tools/visualization_contract.py typed visualization coverage checker

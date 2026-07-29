@@ -216,4 +216,4 @@ agent-canon python-structure-hash-scope-plan \
 - `documents/design/dependency-manifest-design.md`
 - `agents/workflows/hypothesis-validation-workflow.md`
 - `agents/canonical/CODEX_WORKFLOW.md`
-- `agents/templates/closeout_gate.md`
+- `templates/agents/closeout_gate.md`

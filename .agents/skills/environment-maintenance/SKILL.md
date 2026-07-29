@@ -32,7 +32,7 @@ packet が出力した必須 command と、task に該当する conditional comm
 1. Treat `CONTAINER_OPERATIONS.md` as the source of truth for Dockerfile, `docker/`, `.devcontainer/`, validator, and Makefile target ownership. This skill is only the routing checklist.
 1. Update `docker/packs/*.toml`, `docker/codex-container-profiles.toml`, and `docker/python-execution-rules.toml` when runtime selection behavior changes.
 1. When the main server host assumptions change, update `documents/contracts/server-host-contract.md` and the server layout templates in the same change.
-1. Start from `agents/templates/environment_change_proposal.md` when proposing a new repo-wide tool or dependency.
+1. Start from `templates/agents/environment_change_proposal.md` when proposing a new repo-wide tool or dependency.
 1. Update dependency definitions and related docs in the same change.
 1. Check CI and local validation commands together.
 1. Use `CONTAINER_OPERATIONS.md`, `documents/conventions/coding-conventions-project.md`, `documents/contracts/github-first-module-and-devcontainer-policy.md`, `documents/tools/README.md`, `documents/contracts/server-host-contract.md`, and `docker/README.md`.

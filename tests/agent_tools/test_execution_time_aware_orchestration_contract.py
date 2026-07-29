@@ -7,7 +7,7 @@
 # upstream design ../../agents/skills/agent-orchestration.md canonical work-conservation owner
 # upstream design ../../agents/skills/pr-processing.md PR queue specialization
 # upstream design ../../agents/task_catalog.yaml task routing projection
-# upstream design ../../agents/templates/schedule.md schedule projection
+# upstream design ../../templates/agents/schedule.md schedule projection
 # upstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py production contract checker
 # upstream implementation ../../tools/agent_tools/skill_tool_commands.py selected-skill command packet
 # downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md runtime discovery shim
@@ -35,7 +35,7 @@ CONTRACT_FIXTURE_PATHS = (
     "agents/skills/pr-processing.md",
     "agents/skills/catalog.yaml",
     "agents/task_catalog.yaml",
-    "agents/templates/schedule.md",
+    "templates/agents/schedule.md",
     ".agents/skills/agent-orchestration/SKILL.md",
     "tools/agent_tools/check_execution_time_aware_orchestration.py",
 )
@@ -132,7 +132,7 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
         """A schedule cannot use a budget or timeout to cut responsibility."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
-            self.append(root, "agents/templates/schedule.md", "\n- Duration budget: cut scope after timeout.\n")
+            self.append(root, "templates/agents/schedule.md", "\n- Duration budget: cut scope after timeout.\n")
             self.assert_rejected(root, "duration_or_timeout_scope_cutoff")
 
     def test_rejects_keyword_based_routing(self) -> None:
@@ -186,10 +186,10 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
     def test_runtime_catalog_and_schedule_project_the_owner(self) -> None:
         """Projections point to the owner without becoming policy copies."""
         self.assertIn(OWNER_REF, self.read("agents/task_catalog.yaml"))
-        self.assertIn(OWNER_REF, self.read("agents/templates/schedule.md"))
+        self.assertIn(OWNER_REF, self.read("templates/agents/schedule.md"))
         self.assertIn(OWNER_REF, self.read(".agents/skills/agent-orchestration/SKILL.md"))
 
-        schedule = " ".join(self.read("agents/templates/schedule.md").lower().split())
+        schedule = " ".join(self.read("templates/agents/schedule.md").lower().split())
         for marker in (
             "execution-time-aware plan",
             "dependency dag / closure",
