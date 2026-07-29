@@ -49,14 +49,23 @@ checker-retest rule is a completion gate.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Use the command packet before applying this skill's workflow:
+この skill の workflow を適用する前に、次の command packet を使用してください。
 
 ```bash
 python3 tools/agent_tools/skill_tool_commands.py show --skill codex-task-workflow --format text
 ```
 
-Execute the required and task-matching conditional commands that the packet prints.
+論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
+
+packet が出力した必須 command と、task に該当する conditional command を実行してください。
 <!-- skill-tool-commands:end -->
+
+Treat the approved design packet as the complete four-entry
+`waterfall.design_packet.v1` value materialized through `create_run_bundle`.
+The implementation slice is the full replaceable responsibility unit, executed
+by one writer in dependency order; file, finding, test, or review-area splits
+are not slices. Pause the whole unit only for an actual write conflict or an
+unresolved predecessor.
 
 1. Read `agents/canonical/CODEX_WORKFLOW.md`.
 1. Route skill selection through `$agent-orchestration` first; this skill executes the selected Codex task flow after routing is selected.

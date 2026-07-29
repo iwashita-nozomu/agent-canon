@@ -103,42 +103,47 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 | Tool | Command | Purpose | Writes | License Status |
 | --- | --- | --- | --- | --- |
 | `run-repo-dependency-review` | `bash tools/agent_tools/run_repo_dependency_review.sh` | dependency manifest の scan、format、graph review をまとめて実行します。 | no | local: Apache-2.0 |
-| `scan-dependency-headers` | `bash tools/agent_tools/scan_dependency_headers.sh` | text file に `@dependency-start` manifest があるか棚卸しします。 | no | local: Apache-2.0 |
-| `check-dependency-header-format` | `bash tools/agent_tools/check_dependency_header_format.sh` | manifest marker、field、path、kind、placement を検証します。 | no | local: Apache-2.0 |
+| `scan-dependency-headers` | `bash tools/agent_tools/scan_dependency_headers.sh` | canonical graph の parser-owned manifest coverage を棚卸しします。 | no | local: Apache-2.0 |
+| `check-dependency-header-format` | `bash tools/agent_tools/check_dependency_header_format.sh` | selected path の manifest context projection を検証します。 | no | local: Apache-2.0 |
 | `check-dependency-headers` | `python3 tools/agent_tools/check_dependency_headers.py` | changed file に required dependency manifest があるか検証します。 | no | local: Apache-2.0 |
 | `check-dependency-graph` | `bash tools/agent_tools/check_dependency_graph.sh` | dependency manifest graph、self reference、cycle、edit-scope expansion を検証します。 | no | local: Apache-2.0 |
 | `scan-code-dependencies` | `bash tools/agent_tools/scan_code_dependencies.sh` | Python import、C/C++ include、shell source など code-level dependency edge を抽出します。 | no | local: Apache-2.0 |
-| `check-design-doc-claims` | `python3 tools/agent_tools/check_design_doc_claims.py` | design document の claim、dependency header evidence、implementation text、parent document alignment を検査します。 | no | local: Apache-2.0 |
-| `render-dependency-manifest-graph` | `python3 tools/agent_tools/render_dependency_manifest_graph.py` | dependency graph TSV から Markdown / DOT review artifact を生成します。 | yes | local: Apache-2.0 |
+| `check-design-doc-claims` | `python3 tools/agent_tools/check_design_doc_claims.py` | design document の claim を bounded graph context と parent evidence で検査します。 | no | local: Apache-2.0 |
+| `render-dependency-manifest-graph` | `python3 tools/agent_tools/render_dependency_manifest_graph.py` | canonical dependency query から TSV / Graph IR / Markdown / DOT / HTML projection を生成します。 | yes | local: Apache-2.0 |
 
 ## AgentCanon Runtime And Environment Tools
 
 この表は shared devcontainer や AgentCanon local tooling が利用する外部 tool を
-まとめます。`agent-canon-environment.toml` と `.devcontainer/post-create.sh`
-に現れる tool を中心にしています。
+まとめます。`agent-canon-environment.toml`、固定 bootstrap、
+`.devcontainer/dependencies.toml` に現れる tool を中心にしています。
 
 | Tool | Purpose | AgentCanon Surface | License Status |
 | --- | --- | --- | --- |
 | `agent-canon` Rust CLI | docs check、semantic index、structured analysis などの統一 CLI。 | `rust/agent-canon/Cargo.toml`, `tools/bin/agent-canon` | local: Apache-2.0 |
-| Rust toolchain: `rustup`, `cargo`, `rustc`, `rustfmt`, `clippy`, `rust-analyzer` | AgentCanon Rust CLI の build、format、lint、editor support。 | `agent-canon-environment.toml`, `.devcontainer/post-create.sh` | upstream: Apache-2.0 OR MIT for official Rust projects; verify component repository |
-| `clang-format` (Ubuntu 22.04 meta-package `1:14.0-55~exp2` -> `clang-format-14`) | Shared C/C++ source formatting. | `agent-canon-environment.toml`, `.devcontainer/post-create.sh`; distro copyright: `/usr/share/doc/clang-format/copyright`, `/usr/share/doc/clang-format-14/copyright`; package: <https://packages.ubuntu.com/jammy/clang-format>; upstream license: <https://llvm.org/LICENSE.txt> | distro: Ubuntu 22.04 package copyright files; upstream: Apache-2.0 WITH LLVM-exception |
-| `jq` | JSON / JSONL の compact extraction と CI evidence 整形。 | `agent-canon-environment.toml`, `.devcontainer/post-create.sh` | upstream: MIT for `jq`; docs are CC BY 3.0 |
-| Node.js | `npm` と Codex CLI install の runtime。 | `.devcontainer/post-create.sh` | upstream: MIT for Node.js core, with bundled third-party notices |
-| `npm` CLI | `@openai/codex` の install に使う JavaScript package manager。 | `.devcontainer/post-create.sh` | upstream: Artistic-2.0 |
-| Codex CLI: `@openai/codex` | local Codex runtime entrypoint。 | `.devcontainer/post-create.sh` | upstream: Apache-2.0 |
-| GitHub CLI: `gh` | GitHub repo 確認、branch publish、PR evidence 作成。 | `.devcontainer/post-create.sh`, `tools/agent_tools/github_publish.py` | upstream: MIT |
-| `gitleaks` | secret scanning。 | `.devcontainer/post-create.sh`, `tools/ci/scan_secrets.sh` | upstream: MIT |
-| `trufflehog` | secret discovery / verification。 | `.devcontainer/post-create.sh`, `tools/ci/scan_secrets.sh` | upstream: AGPL-3.0 |
-| `detect-secrets` | current tree / baseline 型の secret scanning。 | `.devcontainer/post-create.sh`, `tools/ci/scan_secrets.sh` | upstream: Apache-2.0 |
+| Rust toolchain: `rustup`, `cargo`, `rustc`, `rustfmt`, `clippy`, `rust-analyzer` | AgentCanon Rust CLI の build、format、lint、editor support。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: Apache-2.0 OR MIT for official Rust projects; verify component repository |
+| `clang-format` (Ubuntu 24.04 package `1:18.0-59~exp2`, executable `18.1.3`) | Shared C/C++ source formatting。 | `.devcontainer/dependencies.toml` (`clang-format`) | distro: `/usr/share/doc/clang-format/copyright` in the pinned Ubuntu image; upstream: Apache-2.0 WITH LLVM-exception; package metadata: <https://packages.ubuntu.com/noble/clang-format> |
+| `jq` | JSON / JSONL の compact extraction と CI evidence 整形。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: MIT for `jq`; docs are CC BY 3.0 |
+| Node.js | `npm` と Codex CLI install の runtime。 | `.devcontainer/bootstrap-dependencies.sh` | upstream: MIT for Node.js core, with bundled third-party notices |
+| `npm` CLI | `@openai/codex` の install に使う JavaScript package manager。 | `.devcontainer/dependencies.toml` | upstream: Artistic-2.0 |
+| Codex CLI: `@openai/codex` | local Codex runtime entrypoint。 | `.devcontainer/dependencies.toml` | upstream: Apache-2.0 |
+| GitHub CLI: `gh` | GitHub repo 確認、branch publish、PR evidence 作成。 | `.devcontainer/dependencies.toml`, `tools/agent_tools/github_publish.py` | upstream: MIT |
+| `gitleaks` | secret scanning。 | `.devcontainer/dependencies.toml`, `tools/ci/scan_secrets.sh` | upstream: MIT |
+| `trufflehog` | secret discovery / verification。 | `.devcontainer/dependencies.toml`, `tools/ci/scan_secrets.sh` | upstream: AGPL-3.0 |
+| `detect-secrets` | current tree / baseline 型の secret scanning。 | `.devcontainer/dependencies.toml`, `tools/ci/scan_secrets.sh` | upstream: Apache-2.0 |
 | `git` | source checkout、submodule、branch / PR workflow。 | `.devcontainer/post-create.sh`, update tools | upstream: GPL-2.0 |
 | `cmake` | native tool build。 | `.devcontainer/post-create.sh` | upstream: BSD-3-Clause |
 | `curl` | installer、release asset、license source fetch。 | `.devcontainer/post-create.sh` | upstream: curl license |
-| `python3`, `python3-pip` | Python helper execution and `detect-secrets` install. | `.devcontainer/post-create.sh` | upstream: Python Software Foundation License for Python; package licenses vary |
-| `tar`, `xz-utils`, `ca-certificates`, `build-essential`, `pkg-config` | archive extraction, package bootstrap, native build support。 | `.devcontainer/post-create.sh` | distro: verify package copyright files |
-| TeX Live packages, `latexmk`, pdfLaTeX, XeLaTeX | academic-writing PDF / TeX rendering support。 | `.devcontainer/post-create.sh` | mixed free software; `latexmk` is GPL-2.0; verify TeX Live package notices |
-| `dvisvgm` | DVI / EPS / PDF to SVG conversion for document assets。 | `.devcontainer/post-create.sh` | upstream: GPL-3.0-or-later |
-| `ghostscript` | PDF / PostScript processing support。 | `.devcontainer/post-create.sh` | upstream: AGPL or commercial license |
-| `poppler-utils` | PDF inspection / conversion helper tools。 | `.devcontainer/post-create.sh` | distro: mixed GPL / LGPL / MIT package metadata; verify exact package |
+| `python3`, `python3-pip`, `python3-packaging` | Python helper execution、structured PEP 508 parsing、`detect-secrets` install。 | `.devcontainer/bootstrap-dependencies.sh`, `.devcontainer/dependencies.toml` | Python: Python Software Foundation License; Packaging: Apache-2.0 OR BSD-2-Clause; distro package licenses vary |
+| `tar`, `xz-utils`, `ca-certificates`, `build-essential`, `pkg-config` | archive extraction, package bootstrap, native build support。 | `.devcontainer/bootstrap-dependencies.sh`, `.devcontainer/dependencies.toml` | distro: verify package copyright files |
+| `texlive-latex-base` (pdfLaTeX) | pdfLaTeX document rendering。 | `.devcontainer/dependencies.toml` (`pdflatex`) | TeX Live: mixed free software; verify distro copyright files |
+| `latexmk` | Academic-writing PDF build orchestration。 | `.devcontainer/dependencies.toml` | upstream: GPL-2.0 |
+| `texlive-latex-recommended`, `texlive-latex-extra` | LaTeX packages used by academic-writing documents。 | `.devcontainer/dependencies.toml` | TeX Live: mixed free software; verify distro copyright files |
+| `texlive-fonts-recommended`, `texlive-pictures` | Fonts, TikZ, and picture support。 | `.devcontainer/dependencies.toml` | TeX Live: mixed free software; verify distro copyright files |
+| `texlive-xetex` (XeLaTeX) | XeLaTeX document rendering。 | `.devcontainer/dependencies.toml` (`xelatex`) | TeX Live: mixed free software; verify distro copyright files |
+| `texlive-extra-utils` (pdfcrop) | PDF cropping for generated figures。 | `.devcontainer/dependencies.toml` (`pdfcrop`) | TeX Live: mixed free software; verify distro copyright files |
+| `dvisvgm` | DVI / EPS / PDF to SVG conversion for document assets。 | `.devcontainer/dependencies.toml` | upstream: GPL-3.0-or-later |
+| `ghostscript` | PDF / PostScript processing support。 | `.devcontainer/dependencies.toml` | upstream: AGPL or commercial license |
+| `poppler-utils` | PDF inspection / conversion helper tools。 | `.devcontainer/dependencies.toml` (`poppler`) | distro: mixed GPL / LGPL / MIT package metadata; verify exact package |
 
 ## Rust Crate Dependency Snapshot
 
@@ -179,7 +184,7 @@ a binary distribution or container image.
 - Rust license policy: <https://www.rust-lang.org/policies/licenses/>
 - rustfmt license: <https://github.com/rust-lang/rustfmt>
 - rust-analyzer license: <https://github.com/rust-lang/rust-analyzer>
-- clang-format Ubuntu 22.04 package: <https://packages.ubuntu.com/jammy/clang-format>
+- Ubuntu package metadata for the current image contract: <https://packages.ubuntu.com/noble/clang-format>
 - LLVM license: <https://llvm.org/LICENSE.txt>
 - jq license: <https://github.com/jqlang/jq>
 - Node.js license: <https://github.com/nodejs/node/blob/main/LICENSE>
@@ -197,3 +202,4 @@ a binary distribution or container image.
 - latexmk package page: <https://ctan.org/tex-archive/support/latexmk>
 - dvisvgm package page: <https://ctan.org/pkg/dvisvgm/>
 - Ghostscript licensing: <https://ghostscript.com/licensing>
+- Poppler license and source: <https://poppler.freedesktop.org/>

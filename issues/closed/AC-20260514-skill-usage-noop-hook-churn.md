@@ -5,7 +5,7 @@
 contract issue
 responsibility Records the workflow defect where skill usage hooks dirtied AgentCanon logs for no-skill events.
 upstream implementation ../../.codex/hooks/skill_usage_logger.py filters no-skill hook payloads.
-upstream design ../../documents/runtime-log-archive.md defines durable hook result artifact handling.
+upstream design ../../documents/runtime/runtime-log-archive.md defines durable hook result artifact handling.
 downstream implementation ../../tests/agent_tools/test_codex_hooks.py verifies no-skill payloads do not dirty logs.
 @dependency-end
 -->

@@ -67,19 +67,6 @@ post_create_validation_commands = [
 ]
 dockerfile_policy = "forbidden for agent-only JSON inspection helpers; use shared post-create"
 
-[cpp_formatting_tools]
-owner = "agent-canon"
-install_surface = "vendor/agent-canon/.devcontainer/post-create.sh"
-install_function = "install_cpp_formatting_tools"
-required_binaries = [
-  "clang-format",
-]
-install_command = "apt-get install -y --no-install-recommends clang-format"
-post_create_validation_commands = [
-  "clang-format --version",
-]
-dockerfile_policy = "forbidden for shared agent tooling; use shared post-create"
-
 
 [container_local_runtime]
 owner = "ExecutionResourcePlan and environment owner"

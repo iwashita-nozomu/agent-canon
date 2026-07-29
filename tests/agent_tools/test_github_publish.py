@@ -988,6 +988,44 @@ class GithubPublishTest(unittest.TestCase):
 
         self.assertIn("rebind_cas_base_identity_mismatch", str(raised.exception))
 
+    def test_publication_packet_carries_predecessor_graph_materialization(self) -> None:
+        """G3 binds the predecessor graph projection to the CAS base identity."""
+        lifecycle = self.lifecycle_fixture()
+        rebind, cas, upstream = self.publication_components(lifecycle)
+        predecessor = {
+            "schema": "waterfall.active_design_packet_materialization.v1",
+            "packet_sha256": "e" * 64,
+            "predecessor_source_oid": BASE_SHA,
+            "source_results": [{"declared_ref": "repo:agents/TASK_WORKFLOWS.md"}],
+            "dependency_results": [{"declared_ref": "header:upstream:design:repo:a->repo:b"}],
+        }
+
+        packet = github_publish.materialize_github_publication_packet(
+            lifecycle=lifecycle,
+            candidate_cas_receipt=cas,
+            source_main_rebind_receipt=rebind,
+            upstream_gate_verdicts=upstream,
+            predecessor_graph_materialization=predecessor,
+        )
+
+        self.assertEqual(packet["predecessor_graph_materialization"], predecessor)
+        validated = github_publish.validate_github_publication_packet(packet)
+        self.assertEqual(
+            validated["predecessor_graph_materialization"],
+            predecessor,
+        )
+        mismatched = copy.deepcopy(predecessor)
+        mismatched["predecessor_source_oid"] = "f" * 40
+        with self.assertRaises(github_publish.UserVisibleFailure) as raised:
+            github_publish.materialize_github_publication_packet(
+                lifecycle=lifecycle,
+                candidate_cas_receipt=cas,
+                source_main_rebind_receipt=rebind,
+                upstream_gate_verdicts=upstream,
+                predecessor_graph_materialization=mismatched,
+            )
+        self.assertIn("does not match the CAS base", raised.exception.message)
+
     def test_reviewable_state_requires_verified_permission(self) -> None:
         """Review/merge-authorizing states cannot retain false permission."""
         with self.assertRaises(ValueError) as raised:

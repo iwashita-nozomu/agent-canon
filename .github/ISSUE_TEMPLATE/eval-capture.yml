@@ -3,8 +3,13 @@
 # responsibility Defines issue form for converting agent failures into eval cases.
 # upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md eval capture checklist.
 # upstream design ../../agents/evals/README.md eval evidence storage contract.
+# upstream design ../../documents/operations/issue-label-taxonomy.md issue labels and template routing.
+# upstream design ../AGENTS.md GitHub subtree instructions.
+# upstream design ../../templates/documents/README.md canonical template owner.
 # downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
 # @dependency-end
+
+# Canonical source: templates/documents/github/issue/eval-capture.yml. Generated projection targets .github/ISSUE_TEMPLATE/eval-capture.yml; edit this source only.
 
 name: Agent behavior eval capture
 description: Convert an observed agent/workflow failure into a reusable eval case.
@@ -39,6 +44,18 @@ body:
     validations:
       required: true
   - type: textarea
+    id: observed_evidence
+    attributes:
+      label: Observed evidence and impact
+      description: Identify the observed artifact/path, reproducibility, affected owner, and practical impact.
+      value: |
+        observed facts:
+        evidence paths:
+        owner:
+        impact:
+    validations:
+      required: true
+  - type: textarea
     id: bad_behavior
     attributes:
       label: Bad behavior to catch
@@ -69,6 +86,27 @@ body:
         assertions:
         negative assertions:
         oracle type: machine / rubric / human-reviewed
+    validations:
+      required: true
+  - type: textarea
+    id: options_and_non_goals
+    attributes:
+      label: Options, rejected rationale, and non-goals
+      value: |
+        option A:
+        option B:
+        selected / rejected rationale:
+        non-goals:
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance and close condition
+      value: |
+        acceptance oracle:
+        validation:
+        close condition:
     validations:
       required: true
   - type: textarea

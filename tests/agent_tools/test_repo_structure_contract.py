@@ -18,7 +18,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "repo_structure_contract.py"
-CONTRACT = PROJECT_ROOT / "documents" / "repo-structure-contract.toml"
+CONTRACT = PROJECT_ROOT / "documents" / "structure" / "repo-structure-contract.toml"
 
 
 class RepoStructureContractTest(unittest.TestCase):
@@ -54,6 +54,45 @@ class RepoStructureContractTest(unittest.TestCase):
             self.assertIn("REPO_STRUCTURE=pass", result.stdout)
             self.assertIn("REPO_STRUCTURE_PROFILE=agent_canon_standalone", result.stdout)
             self.assertIn("REPO_STRUCTURE_TREE_SOURCE=tree-command:", result.stdout)
+
+    def test_managed_results_are_excluded_by_exact_path(self) -> None:
+        """Managed result bytes do not broaden into a global result-directory ignore."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_standalone_fixture(root)
+            managed_artifact = root / "experiments" / "topic" / "result" / "run" / "artifact.json"
+            source_artifact = root / "notes" / "result" / "source.md"
+            self.write_file(root, str(managed_artifact.relative_to(root)), "generated\n")
+            self.write_file(root, str(source_artifact.relative_to(root)), "source\n")
+
+            with_source = self.run_checker(
+                root,
+                "--profile",
+                "agent_canon_standalone",
+                "--format",
+                "json",
+            )
+            source_artifact.unlink()
+            without_source = self.run_checker(
+                root,
+                "--profile",
+                "agent_canon_standalone",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(with_source.returncode, 0, with_source.stdout + with_source.stderr)
+            self.assertEqual(
+                without_source.returncode,
+                0,
+                without_source.stdout + without_source.stderr,
+            )
+            with_report = json.loads(with_source.stdout)
+            without_report = json.loads(without_source.stdout)
+            self.assertEqual(
+                with_report["checked_paths"],
+                without_report["checked_paths"],
+            )
 
     def test_missing_required_path_fails(self) -> None:
         """Missing required paths should be reported as errors."""
@@ -248,8 +287,20 @@ class RepoStructureContractTest(unittest.TestCase):
                             ],
                         },
                         {"type": "directory", "name": "tools"},
-                        {"type": "file", "name": "shared-runtime-surfaces.toml"},
-                        {"type": "file", "name": "repo-structure-contract.toml"},
+                        {
+                            "type": "directory",
+                            "name": "runtime",
+                            "contents": [
+                                {"type": "file", "name": "shared-runtime-surfaces.toml"}
+                            ],
+                        },
+                        {
+                            "type": "directory",
+                            "name": "structure",
+                            "contents": [
+                                {"type": "file", "name": "repo-structure-contract.toml"}
+                            ],
+                        },
                     ],
                 },
                 {

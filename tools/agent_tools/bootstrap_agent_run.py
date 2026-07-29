@@ -189,7 +189,7 @@ def build_parser(
         metavar="JSON",
         help=(
             f"Atomic {ACTIVE_DESIGN_PACKET_SCHEMA} JSON object. All schema, path, "
-            "and document_flow_required fields are required."
+            "document_flow_required, clause_registry, and graph-entry fields are required."
         ),
     )
     parser.add_argument(

@@ -2,6 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents Shared Runtime Surfaces for this repository.
+upstream design ../contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace and VS Code workspace boundary
 downstream design ./shared-runtime-surfaces.toml machine-readable surface manifest
 downstream design ../experiments/gpu-admission-r5-source-packet.md exact shared runtime identity contract
 downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
@@ -32,7 +33,9 @@ handshake, and closeout owners; they are not independent policy sources.
 ## Reader Map
 
 Use this document to answer who owns each shared runtime surface exposed from
-`vendor/agent-canon/` into a template or derived repository root. Start with
+`vendor/agent-canon/` into a template or derived repository root. The centralized
+template source is exposed as the managed root symlink
+`templates -> vendor/agent-canon/templates`. Start with
 Owner Classes and Manifest Contract, then read the symlink, active-contract,
 durable-state, GitHub copy, documents, evidence, memory, notes, and tests
 sections for path-specific ownership. Editing Rule and Validation close the
@@ -91,10 +94,11 @@ Core runtime surfaces include `AGENTS.md`, `agents/`, `.agents/`,
 `.vscode/` is a parent-owned regular container whose
 `c_cpp_properties.json`, `extensions.json`, `settings.json`, and `tasks.json`
 children are the four individual AgentCanon symlink surfaces. Work-area
-composition is caller-owned: use `PARENT_ROOT`, `SOURCE_CLONE`, and
-`CONTINUE_PATH` from `prepare` within the editor-independent
-`workspace/<topic-slug>/` contract. Work-area storage and metadata are outside
-the AgentCanon contract.
+composition follows the canonical filesystem/lifecycle and VS Code workspace
+boundary in [`contracts/github-first-module-and-devcontainer-policy.md`](../contracts/github-first-module-and-devcontainer-policy.md):
+use `PARENT_ROOT`, `SOURCE_CLONE`, and `CONTINUE_PATH` within the Git-ignored
+`workspace/<topic-slug>/` clone lifecycle. This document owns the shared `.vscode/`
+surface, not dependency clone composition.
 These paths are installed capability. The active profile and required checks
 are selected by `documents/runtime/runtime-profiles-and-check-matrix.md`.
 
@@ -187,9 +191,9 @@ receipt paths and parser/writer ownership are defined by
 `.vscode/` is also a shared AgentCanon runtime ergonomics surface. The parent
 owns the real directory container; AgentCanon owns the individual
 `c_cpp_properties.json`, `extensions.json`, `settings.json`, and `tasks.json`
-symlink surfaces. The dependency source work area remains caller-owned and uses
-the paths returned by `dependency_module_change.py prepare`; it is not a shared
-surface source.
+symlink surfaces. The dependency source work area follows the canonical
+filesystem/lifecycle and VS Code workspace boundary and uses the paths returned
+by `dependency_module_change.py prepare`; it is not a shared surface source.
 Do not store personal editor state, host-specific include paths, workspace-local
 secrets, or product-specific commands in the shared `.vscode/` view. Put
 project-specific editor guidance in repo-local docs or project-owned scripts
@@ -223,7 +227,7 @@ are reviewed and committed as template or derived-repo content.
 derived repo roots. If a legacy symlink or copy remains at such a path,
 `bash tools/sync_agent_canon.sh check` reports it and `link-root` removes it.
 
-AgentCanon may provide generic templates under `documents/templates/`, such as
+AgentCanon may provide generic templates under `templates/documents/`, such as
 `server_host_inventory.template.md`, `server_runtime_layout.template.toml`,
 `remote_execution_repo.template.toml`, and
 `remote_execution_target.template.toml`. Those are shared policy/template

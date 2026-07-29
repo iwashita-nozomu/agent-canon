@@ -48,7 +48,16 @@ class Finding:
 
 
 def repo_root_from_script() -> Path:
-    """Return the repository root from the script path."""
+    """Return the repository root from the checkout or script path."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=Path.cwd(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        return Path(result.stdout.strip())
     return Path(__file__).absolute().parents[2]
 
 

@@ -1,12 +1,13 @@
 version: 1
 # @dependency-start
 # contract registry
-# responsibility Catalogs canonical agent skills and their descriptions.
+# responsibility Catalogs the complete public skill identity set and descriptions.
 # upstream design code-visualization.md sole public visualization owner and typed projection contract
+# downstream design ./skill-dependencies.yaml owns prerequisites, successors, order constraints, and parallel-independent relations
 # downstream design ../canonical/CODEX_WORKFLOW.md consumes the skill catalog during task routing
 # downstream implementation ../../tools/agent_tools/skill_route_catalog.py parses complete rule and capability metadata
-# downstream implementation ../../tools/agent_tools/route.py consumes routing and related-skill metadata
-# downstream implementation ../../tools/agent_tools/skill_tool_commands.py prints skill command packets with related skills
+# downstream implementation ../../tools/agent_tools/route.py consumes routing and dependency-derived skill order
+# downstream implementation ../../tools/agent_tools/skill_tool_commands.py prints skill command packets with dependency-derived candidates
 # downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates public skill catalog consistency
 # downstream implementation ../../tests/agent_tools/test_route.py tests canonical visualization capability routing
 # @dependency-end
@@ -18,12 +19,6 @@ skill_families:
     purpose: Mandatory routing skill for repository tasks; selects workflow family, skills, review roles, and runtime entrypoints before execution.
     canonical_doc: agents/skills/agent-orchestration.md
     shim: .agents/skills/agent-orchestration/SKILL.md
-    related_skills:
-      - task-routing
-      - codex-task-workflow
-      - owner-bounded-routing
-      - subagent-bootstrap
-      - dependency-analysis
     tool_commands:
       required:
         - python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root .
@@ -50,15 +45,6 @@ skill_families:
     purpose: Resolve long proposed tool or skill names into short routing areas and compact commands.
     canonical_doc: agents/skills/task-routing.md
     shim: .agents/skills/task-routing/SKILL.md
-    related_skills:
-      - agent-orchestration
-      - owner-bounded-routing
-      - structure-refactor
-      - agent-log-analysis
-      - issue-finding-report
-      - tool-finding-report
-      - result-artifact-writeout
-      - agent-learning
     routing:
       stage_policy: active
       reason: skill/tool routing architecture or route contract design is in scope
@@ -144,20 +130,10 @@ skill_families:
     purpose: Execute repository tasks with a context-independent Codex flow.
     canonical_doc: agents/skills/codex-task-workflow.md
     shim: .agents/skills/codex-task-workflow/SKILL.md
-    related_skills:
-      - agent-orchestration
-      - task-routing
-      - owner-bounded-routing
-      - result-artifact-writeout
-      - change-review
   - id: owner-bounded-routing
     purpose: Route owner-bounded repository edits through existing tool use, lightweight preflight, and targeted validation.
     canonical_doc: agents/skills/owner-bounded-routing.md
     shim: .agents/skills/owner-bounded-routing/SKILL.md
-    related_skills:
-      - task-routing
-      - md-style-check
-      - change-review
     routing:
       stage_policy: active
       reason: owner-bounded repository edit needs an existing-tool route and targeted-validation evidence
@@ -178,10 +154,6 @@ skill_families:
     purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
     canonical_doc: agents/skills/subagent-bootstrap.md
     shim: .agents/skills/subagent-bootstrap/SKILL.md
-    related_skills:
-      - agent-orchestration
-      - codex-task-workflow
-      - result-artifact-writeout
     routing:
       stage_policy: deferred
       reason: repo-changing implementation, patch, doc-edit, or explicit subagent execution requires write-capable handoff routing
@@ -277,10 +249,6 @@ skill_families:
     purpose: Write pre-implementation OOP designs with explicit types, invariants, state transitions, ownership, composition, and API/external boundaries.
     canonical_doc: agents/skills/oop-type-design.md
     shim: .agents/skills/oop-type-design/SKILL.md
-    related_skills:
-      - oop-readability-check
-      - python-review
-      - cpp-review
     routing:
       stage_policy: active
       reason: explicit pre-implementation OOP/type design capability owns responsibility and boundary modeling
@@ -294,10 +262,6 @@ skill_families:
     purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
     canonical_doc: agents/skills/result-artifact-writeout.md
     shim: .agents/skills/result-artifact-writeout/SKILL.md
-    related_skills:
-      - tool-finding-report
-      - report-writing
-      - save-experiment-results
     routing:
       stage_policy: active
       reason: raw results, reports, manifests, or accumulated evidence must be written out
@@ -320,14 +284,6 @@ skill_families:
     purpose: Design reusable result visualizations by binding each figure to explicit calculations, coverage rules, denominators, and chart geometry.
     canonical_doc: agents/skills/result-visualize.md
     shim: .agents/skills/result-visualize/SKILL.md
-    related_skills:
-      - structure-planning
-      - report-writing
-      - html-output
-      - html-experiment-report
-      - result-artifact-writeout
-      - experiment-review
-      - experiment-lifecycle
     routing:
       stage_policy: active
       reason: result figure design, metric calculation, coverage denominator handling, or reusable visualization planning is in scope
@@ -349,10 +305,6 @@ skill_families:
     purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
     canonical_doc: agents/skills/tool-finding-report.md
     shim: .agents/skills/tool-finding-report/SKILL.md
-    related_skills:
-      - result-artifact-writeout
-      - change-review
-      - dependency-analysis
     routing:
       stage_policy: active
       reason: tool warning, checker finding, hardcoded guard, or static-analysis finding must become a typed finding packet
@@ -377,10 +329,6 @@ skill_families:
     purpose: Convert accumulated prompt, run-bundle, hook, skill/tool/workflow routing, and eval evidence into durable AgentCanon skill issues by abstract cause with multi-agent review partitions.
     canonical_doc: agents/skills/issue-finding-report.md
     shim: .agents/skills/issue-finding-report/SKILL.md
-    related_skills:
-      - agent-log-analysis
-      - result-artifact-writeout
-      - report-writing
     routing:
       stage_policy: active
       reason: accumulated runtime evidence should become durable skill or workflow issues
@@ -399,13 +347,6 @@ skill_families:
     purpose: Analyze accumulated skill, tool, workflow, hook, and eval logs through a compact generated summary before reading raw evidence.
     canonical_doc: agents/skills/agent-log-analysis.md
     shim: .agents/skills/agent-log-analysis/SKILL.md
-    related_skills:
-      - issue-finding-report
-      - result-artifact-writeout
-      - tool-finding-report
-      - agent-learning
-      - report-writing
-      - runtime-log-repair
     routing:
       stage_policy: active
       reason: skill/tool/workflow routing misses or selection coverage require runtime log analysis
@@ -454,14 +395,6 @@ skill_families:
     purpose: Turn AgentCanon runtime dashboard priority repair evidence into owner-routed Runtime Log Repair Packets and closeout verification.
     canonical_doc: agents/skills/runtime-log-repair.md
     shim: .agents/skills/runtime-log-repair/SKILL.md
-    related_skills:
-      - agent-log-analysis
-      - agent-eval-accumulation
-      - result-artifact-writeout
-      - issue-finding-report
-      - subagent-bootstrap
-      - task-routing
-      - agent-learning
     routing:
       stage_policy: active
       reason: structured runtime dashboard evidence needs owner-routed repair work
@@ -495,11 +428,6 @@ skill_families:
     purpose: Update AgentCanon source, parent submodule pins, root runtime views, and parent update TODO state through the canonical high-level route.
     canonical_doc: agents/skills/agent-canon-update.md
     shim: .agents/skills/agent-canon-update/SKILL.md
-    related_skills:
-      - dependency-module-change
-      - pr-processing
-      - agent-update-branch
-      - structure-refactor
     routing:
       stage_policy: active
       reason: AgentCanon submodule, pin, checkout, or ensure-latest workflow is in scope
@@ -528,11 +456,6 @@ skill_families:
     purpose: Manage independent dependency source clones and reconstructibility-based cleanup without editing vendored source checkouts.
     canonical_doc: agents/skills/dependency-module-change.md
     shim: .agents/skills/dependency-module-change/SKILL.md
-    related_skills:
-      - agent-canon-update
-      - dependency-analysis
-      - structure-refactor
-      - task-routing
     routing:
       stage_policy: active
       reason: dependency source clone, module lifecycle, or reconstructibility cleanup is in scope
@@ -549,11 +472,6 @@ skill_families:
     purpose: Process GitHub pull request and issue queues by inventorying state, preserving PR Essence in bodies and run bundles, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
     canonical_doc: agents/skills/pr-processing.md
     shim: .agents/skills/pr-processing/SKILL.md
-    related_skills:
-      - agent-canon-update
-      - agent-update-branch
-      - result-artifact-writeout
-      - change-review
     routing:
       stage_policy: active
       reason: pull request, merge queue, conflict repair, or issue triage processing is in scope
@@ -599,12 +517,6 @@ skill_families:
     purpose: Draft reader-facing reports, experiment summaries, decision briefs, and presentation/PPT storyboards from evidence with explicit source packets, visual asset plans, limitations, actionability, and quality checklist gates.
     canonical_doc: agents/skills/report-writing.md
     shim: .agents/skills/report-writing/SKILL.md
-    related_skills:
-      - result-artifact-writeout
-      - structure-planning
-      - prose-reasoning-graph
-      - html-output
-      - change-review
     routing:
       stage_policy: active
       reason: reader-facing report, decision brief, evaluation summary, or presentation narrative is in scope
@@ -638,10 +550,6 @@ skill_families:
     purpose: Convert prose into a SQLite-backed structure graph, diagnose discourse/argument/evidence/experiment gaps, explain findings, and emit writing-skill handoff packets.
     canonical_doc: agents/skills/prose-reasoning-graph.md
     shim: .agents/skills/prose-reasoning-graph/SKILL.md
-    related_skills:
-      - structure-planning
-      - long-form-writing
-      - report-writing
     routing:
       stage_policy: deferred
       reason: prose structure graphing, diagnostics, or rewrite handoff is in scope
@@ -663,10 +571,6 @@ skill_families:
     purpose: Build structure contracts for reports, experiments, presentations/PPT decks, documents, papers, HTML views, and refactors before prose, rendering, interpretation, runs, or edits.
     canonical_doc: agents/skills/structure-planning.md
     shim: .agents/skills/structure-planning/SKILL.md
-    related_skills:
-      - prose-reasoning-graph
-      - report-writing
-      - refactor-loop
     routing:
       stage_policy: active
       reason: nontrivial design or document structure must be fixed before edits
@@ -684,16 +588,6 @@ skill_families:
     purpose: Infer the context question and embedding context, then select the appropriate diagram type, source evidence, owner skill or tool, and renderer for code, repository, or document-embedded visualization.
     canonical_doc: agents/skills/code-visualization.md
     shim: .agents/skills/code-visualization/SKILL.md
-    related_skills:
-      - dependency-analysis
-      - structure-planning
-      - structure-refactor
-      - algorithm-flowchart
-      - prose-reasoning-graph
-      - html-output
-      - md-style-check
-      - test-design
-      - oop-readability-check
     routing:
       stage_policy: active
       reason: Codex skill metadata selection or an explicit public skill id owns route activation; prose remains context evidence
@@ -729,9 +623,6 @@ skill_families:
     purpose: After the owning implementation mechanism exists, classify explicit unresolved oracle, specification, regression, or failure-mode risk beyond static analysis, existing checkers, and targeted validation.
     canonical_doc: agents/skills/test-design.md
     shim: .agents/skills/test-design/SKILL.md
-    related_skills:
-      - oop-readability-check
-      - change-review
     routing:
       stage_policy: active
       reason: explicit unresolved oracle, specification, regression, or failure-mode risk remains after the owning implementation mechanism exists
@@ -759,10 +650,6 @@ skill_families:
     purpose: Run large refactors as behavior-preserving looped structural change with explicit safety contracts and repair slices.
     canonical_doc: agents/skills/refactor-loop.md
     shim: .agents/skills/refactor-loop/SKILL.md
-    related_skills:
-      - dependency-analysis
-      - structure-refactor
-      - change-review
     routing:
       stage_policy: active
       reason: behavior-preserving refactor work needs an explicit loop and review gates
@@ -796,11 +683,6 @@ skill_families:
     purpose: Refactor repository directory structure from recursive directory README responsibilities, dependency manifests, path mappings, and responsibility-scope validation.
     canonical_doc: agents/skills/structure-refactor.md
     shim: .agents/skills/structure-refactor/SKILL.md
-    related_skills:
-      - dependency-analysis
-      - document-canon-cleanup
-      - refactor-loop
-      - md-style-check
     routing:
       stage_policy: active
       reason: repository structure, source ownership, path responsibility, or Codex runtime surface boundaries are in scope
@@ -931,9 +813,6 @@ skill_families:
     purpose: Check Markdown formatting, heading structure, and link hygiene for format-only docs work; pair substantive document edits with prose-reasoning-graph and structure-planning.
     canonical_doc: agents/skills/md-style-check.md
     shim: .agents/skills/md-style-check/SKILL.md
-    related_skills:
-      - document-canon-cleanup
-      - prose-reasoning-graph
     routing:
       stage_policy: active
       reason: Markdown style, links, headings, or docs lint are in scope
@@ -965,11 +844,6 @@ skill_families:
     purpose: Find non-canonical documents and route edits to source canon instead of mirrors, generated evidence, or stale copies.
     canonical_doc: agents/skills/document-canon-cleanup.md
     shim: .agents/skills/document-canon-cleanup/SKILL.md
-    related_skills:
-      - prose-reasoning-graph
-      - structure-planning
-      - md-style-check
-      - long-form-writing
     routing:
       stage_policy: active
       reason: Document-canon cleanup, stale docs, old docs, or generated-report/document inventory cleanup is in scope
@@ -1016,12 +890,6 @@ skill_families:
     purpose: Run a single experiment protocol, then branch through review, rewrite, extra validation, or rerun.
     canonical_doc: agents/skills/experiment-lifecycle.md
     shim: .agents/skills/experiment-lifecycle/SKILL.md
-    related_skills:
-      - result-artifact-writeout
-      - save-experiment-results
-      - structure-planning
-      - experiment-review
-      - test-design
     routing:
       stage_policy: active
       reason: experiment run, lifecycle, artifacts, results, or rerun workflow is in scope
@@ -1043,11 +911,6 @@ skill_families:
     purpose: Save experiment run results with raw artifacts, manifests, reports, and branch-safe publication to dedicated experiment result branches.
     canonical_doc: agents/skills/save-experiment-results.md
     shim: .agents/skills/save-experiment-results/SKILL.md
-    related_skills:
-      - experiment-lifecycle
-      - result-artifact-writeout
-      - report-writing
-      - experiment-review
     routing:
       stage_policy: active
       reason: experiment result retention, manifest writeout, overwrite prevention, or result-branch publication is in scope
@@ -1063,12 +926,12 @@ skill_families:
         - ["formal", "result", "retention"]
         - ["run", "artifact", "preserve"]
   - id: experiment-review
-    purpose: Review experiment topics for direct run.py execution, GPU/JAX environment ownership, artifact schemas, notebook explanations, and README run contracts.
+    purpose: Review experiment topics for the managed runner route and run.py inner entrypoint, GPU/JAX environment ownership, artifact schemas, notebook explanations, and README run contracts.
     canonical_doc: agents/skills/experiment-review.md
     shim: .agents/skills/experiment-review/SKILL.md
     routing:
       stage_policy: active
-      reason: experiment topic review, direct run.py execution, environment ownership, artifact schema, or notebook readiness is in scope
+      reason: experiment topic review, managed runner route, environment ownership, artifact schema, or notebook readiness is in scope
       triggers:
         - ["実験", "レビュー"]
         - ["実験", "review"]
@@ -1083,12 +946,6 @@ skill_families:
     purpose: Route GPU/CUDA/JAX/XLA/IREE execution through managed ExperimentRunner-backed runs with preallocation disabled and GPU blocker evidence preserved.
     canonical_doc: agents/skills/gpu-execution.md
     shim: .agents/skills/gpu-execution/SKILL.md
-    related_skills:
-      - experiment-lifecycle
-      - computational-optimization
-      - result-artifact-writeout
-      - environment-maintenance
-      - test-design
     routing:
       stage_policy: active
       reason: GPU/CUDA/JAX/XLA execution, ExperimentRunner Python execution, or preallocation-disabled validation is in scope
@@ -1138,17 +995,10 @@ skill_families:
         - ["アルゴリズム", "テストから"]
         - ["algorithm", "repair"]
         - ["algorithm", "test", "first"]
-    related_skills:
-      - test-design
-      - algorithm-proof-exploration
   - id: adaptive-improvement-loop
     purpose: Manage experiments, research, tuning, and iterative code changes as one backlog-driven outer loop.
     canonical_doc: agents/skills/adaptive-improvement-loop.md
     shim: .agents/skills/adaptive-improvement-loop/SKILL.md
-    related_skills:
-      - experiment-lifecycle
-      - research-workflow
-      - result-artifact-writeout
     routing:
       stage_policy: active
       reason: backlog-driven iterative experiment, tuning, or code improvement loop is in scope
@@ -1192,10 +1042,6 @@ skill_families:
     purpose: Explore algorithm choices under proof obligations by building JIT-canonical IR, theorem graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
     canonical_doc: agents/skills/algorithm-proof-exploration.md
     shim: .agents/skills/algorithm-proof-exploration/SKILL.md
-    related_skills:
-      - formal-proof-workflow
-      - computational-optimization
-      - test-design
     routing:
       stage_policy: active
       reason: algorithm repair, proof obligations, theorem frontiers, or algorithm-change guidance are in scope
@@ -1218,10 +1064,6 @@ skill_families:
     purpose: Manage the outer loop of question framing, external research, iterative changes, runs, and explicit review decisions.
     canonical_doc: agents/skills/research-workflow.md
     shim: .agents/skills/research-workflow/SKILL.md
-    related_skills:
-      - literature-survey
-      - experiment-lifecycle
-      - result-artifact-writeout
     routing:
       stage_policy: active
       reason: research-backed, prior-art, benchmark, or external research workflow is in scope
@@ -1240,13 +1082,6 @@ skill_families:
     purpose: Run repo-wide integrated delivery across code, docs, tools, workflows, and runtime with explicit subagent routing.
     canonical_doc: agents/skills/comprehensive-development.md
     shim: .agents/skills/comprehensive-development/SKILL.md
-    related_skills:
-      - agent-orchestration
-      - codex-task-workflow
-      - structure-refactor
-      - refactor-loop
-      - dependency-analysis
-      - change-review
     routing:
       stage_policy: deferred
       reason: repo-wide architecture redesign spans workflow, tools, docs, runtime, or validation
@@ -1264,6 +1099,28 @@ skill_families:
         - ["agent", "growth"]
         - ["すべてのスキル", "修正"]
         - ["all", "skills", "command"]
+  - id: dependency-design
+    purpose: Define and validate the typed declarative devcontainer dependency design packet before environment maintenance.
+    canonical_doc: agents/skills/dependency-design.md
+    shim: .agents/skills/dependency-design/SKILL.md
+    tool_commands:
+      required:
+        - python3 tools/agent_tools/devcontainer_dependencies.py validate --workspace . --format text
+      conditional:
+        - python3 tools/agent_tools/devcontainer_dependencies.py dry-run --workspace . --format json
+        - bash tools/docker_dependency_validator.sh
+    routing:
+      stage_policy: active
+      reason: declarative devcontainer dependency design must precede environment maintenance
+      triggers:
+        - ["dependency", "design"]
+        - ["dependency", "manifest"]
+        - ["dependencies.toml"]
+        - ["devcontainer", "dependency"]
+        - ["developer", "tools", "manifest"]
+        - ["agent", "tools", "manifest"]
+        - ["依存", "設計"]
+        - ["依存", "manifest"]
   - id: environment-maintenance
     purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
     canonical_doc: agents/skills/environment-maintenance.md
@@ -1317,6 +1174,3 @@ skill_families:
     purpose: Publishes AgentCanon wiki pages only through the dedicated wiki sidecar using default-branch-only pushes and source commit binding.
     canonical_doc: agents/skills/wiki-publication.md
     shim: .agents/skills/wiki-publication/SKILL.md
-    related_skills:
-      - owner-bounded-routing
-      - result-artifact-writeout

@@ -112,6 +112,8 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - active runtime が explicit user request を spawn 条件にする場合、parent は handoff plan と artifact packet を作って `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を記録し、authorization が揃った時点で spawn します
 - active な subagent 数は spawn budget で縛ります
 - spawn budget は同時 active 数の上限です。Intake Responsibility Wave は active role set と catalog の `intake` stage から materialize し、`explorer` と `execution_planner` は evidence-gated dynamic wave として追加します。独立 workstream が複数ある場合は、workstream ごとの stage owner が vertical dynamic wave を起こします
+- 独立 source workstream を選択する parent packet は、各 stream の substantial replaceable responsibility unit、computed `workspace/<topic-slug>/<module-basename>` clone、disjoint write scope、dependency/merge order、validation route、reviewer ownership を固定します。vendor が clean でも fresh な `dependency_module_change.py prepare --placement workspace` を使えますが、local/remote の既存 branch は拒否し、継続は `--placement workspace-continuation` に分けます。ready な非衝突 stream は全て launch し、parent / delegated stage owner は全 descendants を monitor します。
+- 同じ responsibility unit の follow-up は compatible な worker context を再利用します。file-sized slice、細粒度の fresh agent、または同じ oracle を共有する断片化は parallel source workstream として起動しません。依存または衝突する stream は記録済み merge order の ordered wave にします。
 - Wave は frontier-driven adaptive loop です。parent は checker / graph / review
   output から次 frontier queue を作り、必要な subagent を適応的に追加し、結果を
   integrate して同じ validation を再実行します。frontier が
@@ -405,7 +407,7 @@ The evaluator's `gpt-5.4-mini/medium` setting is reserved for this explicit T14
 lane; no permanent team role uses that model assignment.
 
 1. Parent Iteration 0 freezes one answer-free Scenario Packet for each frozen
-   scenario: `full`, `changed`, and the supplied-TSV hold-out. The packet carries
+   scenario: `full` and `changed`. The packet carries
    the full Prompt Under Test text and path, Canonical Target Files, Prompt
    Dependency Files, the frozen scenario, requirements/checklist, method, and
    fixed report grammar. Expected commands, expected artifacts, answers, prior
@@ -414,14 +416,9 @@ lane; no permanent team role uses that model assignment.
    scenario. Every scenario, iteration, and malformed-report rerun receives a
    new instance. Fresh provenance includes a unique instance ID,
    iteration ID, and Scenario Packet digest.
-3. The supplied-TSV hold-out explicitly supplies a TSV path. The evaluator
-   keeps the exact command skeleton
-   `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json`
-   and may replace only the values after `--graph-tsv` and `--bundle-dir`. It
-   does not call a separate raw checker.
-4. A malformed report is unscored and rerun with a new fresh evaluator on the
+3. A malformed report is unscored and rerun with a new fresh evaluator on the
    same frozen packet. It is neither a pass nor a convergence iteration.
-5. After every return, the parent scores the observed `Output` and requirement
+4. After every return, the parent scores the observed `Output` and requirement
    observations against the frozen checklist. The evaluator emits report
    validity through `evaluation_status` and initializes feedback / learning
    fields as unresolved. It emits no parent score or convergence status; the

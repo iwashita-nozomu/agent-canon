@@ -3,8 +3,12 @@
 # responsibility Defines AgentCanon maintenance issue capture form.
 # upstream design ../../documents/operations/issue-label-taxonomy.md issue labels and template routing.
 # upstream design ../../issues/README.md durable operational issue storage policy.
+# upstream design ../AGENTS.md GitHub subtree instructions.
+# upstream design ../../templates/documents/README.md canonical template owner.
 # downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
 # @dependency-end
+
+# Canonical source: templates/documents/github/issue/agentcanon-maintenance.yml. Generated projection targets .github/ISSUE_TEMPLATE/agentcanon-maintenance.yml; edit this source only.
 
 name: AgentCanon maintenance issue
 description: Track an AgentCanon runtime, tool, workflow, docs, or propagation defect.
@@ -37,14 +41,77 @@ body:
   - type: textarea
     id: current_behavior
     attributes:
-      label: Current behavior
-      description: Include observed command, hook, CI, or workflow evidence.
+      label: Observed facts / current behavior
+      description: Record only observed command, hook, CI, workflow, or artifact facts with paths and timestamps.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Give the smallest clean-state command, fixture, branch, and expected versus actual result.
+      value: |
+        preconditions:
+        command:
+        expected:
+        actual:
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Canonical owner / responsible unit
+      placeholder: "documents/..., agents/..., tools/..."
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and failure semantics
+      description: State who is blocked, what becomes unsafe or non-reproducible, and what remains preserved.
     validations:
       required: true
   - type: textarea
     id: expected_behavior
     attributes:
       label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options considered
+      description: Record at least two viable repair options and the selected mechanism.
+      value: |
+        option A:
+        option B:
+        selected:
+    validations:
+      required: true
+  - type: textarea
+    id: rejected_rationale
+    attributes:
+      label: Rejected options and rationale
+      description: Explain why each rejected option violates the contract, ownership, safety, or validation oracle.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance conditions
+      description: Define the observable contract, evidence oracle, validation command, and close condition.
+      value: |
+        observable contract:
+        evidence / oracle:
+        validation command:
+        close condition:
+    validations:
+      required: true
+  - type: textarea
+    id: non_goal
+    attributes:
+      label: Non-goals
+      description: Name adjacent cleanup or behavior that this finding deliberately does not change.
     validations:
       required: true
   - type: textarea

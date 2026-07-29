@@ -102,7 +102,7 @@ Intent preservation routes:
 | --- | --- |
 | Markdown docs only | `tools/bin/agent-canon docs check`; changed-file dependency header checks |
 | Python code/tests | targeted `pytest`; `python3 -m pyright`; `python3 -m ruff check ...` |
-| AgentCanon docs/workflows/skills/tools/hooks | `make agent-canon-pr-check`; shared-surface sync; workflow/PR checks; dependency review; docs check; generated-artifact guard; broad quick CI with already-run docs/workflow gates skipped |
+| AgentCanon docs/workflows/skills/tools/hooks | `make agent-canon-pr-check`; shared-surface sync; workflow/PR checks; strict dependency review as the dependency-header/graph judgment owner; standalone-source tool_drift coverage once; docs check; generated-artifact guard; broad quick CI with docs/workflow gates skipped; validated PR-gate receipt suppresses repeated graph/dependency-header producers; ordinary run_all runs them |
 | Root shared views or submodule pin | `bash tools/sync_agent_canon.sh check`; `git submodule status vendor/agent-canon` evidence |
 | Docker/devcontainer/runtime pack | `bash tools/docker_dependency_validator.sh`; `make docker-build-check` when build behavior changes |
 | GitHub workflow/PR | `python3 tools/ci/check_github_workflows.py`; relevant GitHub Actions evidence when available |

@@ -4,17 +4,24 @@
 # contract test
 # responsibility Tests vector search indexing exclusions and context expansion.
 # upstream implementation ../../tools/agent_tools/vector_search.py searches text surfaces
+# upstream implementation ../../tools/agent_tools/graph_client.py supplies canonical dependency context
 # upstream design ../../tools/README.md documents vector search usage
 # @dependency-end
 
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
+
+from tools.agent_tools import vector_search as vector_tool
+from tools.agent_tools.graph_client import GraphResponse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 VECTOR_SEARCH = PROJECT_ROOT / "tools" / "agent_tools" / "vector_search.py"
@@ -33,6 +40,90 @@ def run_search(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 class VectorSearchTest(unittest.TestCase):
     """Verify vector search index hygiene."""
+
+    @staticmethod
+    def graph_response(*, include_dependencies: bool) -> GraphResponse:
+        """Return one fresh canonical dependency projection."""
+        facts: list[dict[str, object]] = []
+        if include_dependencies:
+            facts.extend(
+                [
+                    {
+                        "id": "fact-upstream",
+                        "kind": "dependency",
+                        "inferred": False,
+                        "from": "tool",
+                        "to": "design",
+                        "producer": "source-snapshot",
+                        "source_path": "tools/search_tool.py",
+                        "source_span": None,
+                        "evidence_ref": "tools/search_tool.py:3",
+                        "authority": "ManifestParser",
+                        "dependency_detail": {
+                            "direction": "upstream",
+                            "kind": "design",
+                            "reason": "alpha search design",
+                        },
+                    },
+                    {
+                        "id": "fact-downstream",
+                        "kind": "dependency",
+                        "inferred": False,
+                        "from": "tool",
+                        "to": "test",
+                        "producer": "source-snapshot",
+                        "source_path": "tools/search_tool.py",
+                        "source_span": None,
+                        "evidence_ref": "tools/search_tool.py:4",
+                        "authority": "ManifestParser",
+                        "dependency_detail": {
+                            "direction": "downstream",
+                            "kind": "implementation",
+                            "reason": "validates search",
+                        },
+                    },
+                ]
+            )
+        return GraphResponse(
+            schema="agent-canon.graph.query.v1",
+            command="query",
+            status="fresh",
+            payload={
+                "nodes": [
+                    {"id": "tool", "path": "tools/search_tool.py"},
+                    {"id": "design", "path": "documents/search.md"},
+                    {"id": "test", "path": "tests/test_search_tool.py"},
+                ],
+                "facts": facts,
+                "graph_fingerprint": "fixture",
+            },
+            exit_code=0,
+        )
+
+    def run_context_search(
+        self,
+        root: Path,
+        response: GraphResponse,
+        *arguments: str,
+    ) -> tuple[int, str, str]:
+        """Run context mode with one canonical graph adapter fake."""
+        client = mock.Mock()
+        client.query.return_value = response
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(vector_tool, "GraphClient", return_value=client),
+            redirect_stdout(stdout),
+            redirect_stderr(stderr),
+        ):
+            return_code = vector_tool.main(["--root", str(root), *arguments])
+        client.query.assert_called_once_with(
+            all=True,
+            relation="dependency",
+            direction="both",
+            depth=0,
+        )
+        return return_code, stdout.getvalue(), stderr.getvalue()
 
     def test_git_directory_is_not_indexed(self) -> None:
         """Root .git files must not be indexed even when the surface is broad."""
@@ -179,8 +270,9 @@ class VectorSearchTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = run_search(
+            return_code, stdout, stderr = self.run_context_search(
                 root,
+                self.graph_response(include_dependencies=True),
                 "--surface",
                 ".",
                 "--query",
@@ -190,8 +282,8 @@ class VectorSearchTest(unittest.TestCase):
                 "json",
             )
 
-            self.assertEqual(result.returncode, 0, result.stderr)
-            payload = json.loads(result.stdout)
+            self.assertEqual(return_code, 0, stderr)
+            payload = json.loads(stdout)
             context_paths = {
                 (item["role"], item["path"]) for item in payload["context"]["paths"]
             }
@@ -221,8 +313,9 @@ class VectorSearchTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = run_search(
+            return_code, stdout, stderr = self.run_context_search(
                 root,
+                self.graph_response(include_dependencies=False),
                 "--surface",
                 "python",
                 "--query",
@@ -234,8 +327,8 @@ class VectorSearchTest(unittest.TestCase):
                 "json",
             )
 
-            self.assertEqual(result.returncode, 0, result.stderr)
-            payload = json.loads(result.stdout)
+            self.assertEqual(return_code, 0, stderr)
+            payload = json.loads(stdout)
             edge_pairs = {
                 (item["direction"], item["caller"], item["callee"])
                 for item in payload["context"]["python_edges"]

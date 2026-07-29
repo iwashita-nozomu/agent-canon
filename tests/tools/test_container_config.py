@@ -120,7 +120,7 @@ def write_topic_fixture(
     topic_root: Path | None = None,
 ) -> Path:
     """Create a parent repo inside one isolated topic workspace."""
-    topic_root = topic_root or tmp_path / "workspace" / "workspace-topic"
+    topic_root = topic_root or tmp_path / "workspace" / "dependency-module-change"
     repo = topic_root / "agent-canon"
     write_devcontainer(repo)
     write_compose(
@@ -224,7 +224,7 @@ def test_compose_missing_runtime_environment_is_rejected(tmp_path: Path) -> None
 
 def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     """The generator writes the host topic root only into generated Compose."""
-    repo = tmp_path / "workspace" / "workspace-topic" / "agent-canon"
+    repo = tmp_path / "workspace" / "topic" / "agent-canon"
     write_devcontainer(repo)
     write_file(
         repo,
@@ -254,7 +254,7 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
 
 def test_generator_accepts_explicit_output_path(tmp_path: Path) -> None:
     """Generator writes compose output to an explicit caller-provided destination."""
-    repo = tmp_path / "workspace" / "workspace-topic" / "agent-canon"
+    repo = tmp_path / "workspace" / "topic" / "agent-canon"
     write_devcontainer(repo)
     write_file(
         repo,

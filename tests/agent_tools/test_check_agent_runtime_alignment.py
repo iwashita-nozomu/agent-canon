@@ -59,6 +59,26 @@ def loaded_task_catalog_raw() -> dict[str, object]:
 class AgentRuntimeAlignmentTest(unittest.TestCase):
     """Verify that the runtime alignment checker passes on the checked-in canon."""
 
+    @staticmethod
+    def write_minimal_dependency_map(root: Path) -> None:
+        """Write the typed dependency record required by route catalog loading."""
+        (root / "agents" / "skills" / "skill-dependencies.yaml").write_text(
+            "\n".join(
+                [
+                    "version: 1",
+                    "skill_dependencies:",
+                    "  example:",
+                    "    responsibility_group: fixture",
+                    "    required_prerequisites: []",
+                    "    routing_candidates: []",
+                    "    successors: []",
+                    "    order_constraints: []",
+                    "    parallel_independent: []",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
     def test_alignment_script_passes(self) -> None:
         """The runtime alignment checker should succeed without findings."""
         result = subprocess.run(
@@ -780,6 +800,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
+            self.write_minimal_dependency_map(root)
             (root / "agents" / "internal-routines" / "README.md").write_text(
                 "# Internal\n",
                 encoding="utf-8",
@@ -823,6 +844,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
+            self.write_minimal_dependency_map(root)
             (root / "agents" / "internal-routines" / "README.md").write_text(
                 "# Internal\n",
                 encoding="utf-8",
@@ -965,7 +987,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir)
             entries = resolve_cross_cutting_document_packet(workspace_root)
-            review_process = (PROJECT_ROOT / "documents" / "REVIEW_PROCESS.md").resolve()
+            review_process = (
+                PROJECT_ROOT / "documents" / "conventions" / "REVIEW_PROCESS.md"
+            ).resolve()
 
             self.assertIn(review_process, {entry.path for entry in entries})
             self.assertTrue(all(entry.path.exists() for entry in entries))
@@ -973,6 +997,14 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             config = load_team_config()
             role = resolve_role(config, "design_reviewer")
             active_design_packet = resolve_active_design_packet_config(config)
+            self.assertEqual(
+                active_design_packet.schema,
+                "waterfall.design_packet.v1",
+            )
+            self.assertEqual(
+                active_design_packet.implementation_source_packet.entry_id,
+                "implementation-source-packet",
+            )
             packet = resolve_role_document_packet(
                 config=config,
                 role=role,

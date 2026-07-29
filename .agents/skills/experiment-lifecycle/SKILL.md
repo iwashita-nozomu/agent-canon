@@ -20,22 +20,24 @@ upstream implementation ../../../tools/experiments/create_experiment_topic.py cr
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Use the command packet before applying this skill's workflow:
+この skill の workflow を適用する前に、次の command packet を使用してください。
 
 ```bash
 python3 tools/agent_tools/skill_tool_commands.py show --skill experiment-lifecycle --format text
 ```
 
-Execute the required and task-matching conditional commands that the packet prints.
+論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
+
+packet が出力した必須 command と、task に該当する conditional command を実行してください。
 <!-- skill-tool-commands:end -->
 
 
 1. Read `agents/skills/experiment-lifecycle.md`.
 1. Keep execution steps, result paths, and report locations consistent with the canonical experiment workflow.
-1. For a new experiment topic, fix the topic name first, run `python3 tools/experiments/create_experiment_topic.py <topic>` to copy `vendor/agent-canon/experiments/_template/` into project-root `experiments/<topic>/` and append the project registry entry, then edit `run.py` `main::main`, `cases.py`, `config.yaml`, `visualize.ipynb`, and `README.md` in that order.
+1. For a new experiment topic, fix the topic name first and run `python3 tools/experiments/create_experiment_topic.py <topic>`; the tool owns scaffold placement and registry registration. Then edit `run.py` `main::main`, `cases.py`, `config.yaml`, `visualize.ipynb`, and `README.md` in that order. Do not copy `templates/experiments/_template/` directly.
 1. Treat project-root `experiments/registry.toml` as the project-owned topic registry for entrypoints and registered smoke/formal commands. AgentCanon source owns the registry contract in `documents/experiments/experiment-registry.md`; from a template or derived repo root, read that contract as `vendor/agent-canon/documents/experiments/experiment-registry.md`.
 1. When a project registry exists, validate registry schema and registered command placeholders with `python3 tools/ci/check_experiment_registry.py` before formal execution.
-1. Treat `/usr/bin/python experiments/<topic>/run.py` with no CLI options as the canonical experiment entrypoint. The topic `run.py` owns run directory creation, config snapshotting, artifact writing, and notebook execution.
+1. Treat `python3 tools/experiments/run_managed_experiment.py --topic <topic> --variant formal -- python3 experiments/<topic>/run.py` as the user-facing run route. The topic `run.py` is an inner entrypoint called by the managed runner and owns run directory creation, config snapshotting, artifact writing, and notebook execution.
 1. After a canonical run from the source checkout, usually `main`, use
    `$save-experiment-results` before publishing generated result/report
    artifacts. The dedicated save skill owns retention plan, dirty-source
@@ -50,9 +52,9 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Require each nontrivial experiment README to include an implementation source map that lists the reused `python/` files, classes, and functions by name, plus a separate object-flow section that shows which objects each step creates, mutates, passes downstream, and writes as artifacts. If an experiment compares variants, identify the single shared execution path and the exact factory/function boundary where variants differ.
 1. Put the visualization notebook at `experiments/<topic>/visualize.ipynb`; notebooks read run artifacts and render figures/tables, but they must not be the formal run launcher, fine-grained test surface, or config source of truth.
 1. For each notebook visualization item, add a Markdown cell immediately above the code cell in Japanese explaining the input artifact, the plotted quantity, and how to read the figure in one or two sentences.
-1. When reviewing an experiment topic, add `$experiment-review` and check direct `run.py` execution, GPU/JAX environment ownership, artifact schema, and notebook readiness.
+1. When reviewing an experiment topic, add `$experiment-review` and check the managed runner route, GPU/JAX environment ownership, artifact schema, and notebook readiness.
 1. Ensure every run has `result/<run_name>/`; put additional stdout, stderr, startup, tool, or diagnostic logs under `result/<run_name>/logs/` when the topic emits them.
-1. Treat `summary.json`, `cases.jsonl`, the topic config snapshot, case artifacts, and `visualize_executed.ipynb` as standard topic run artifacts. If a run lacks them, rerun `/usr/bin/python experiments/<topic>/run.py` or record that the run is not fully reproducible.
+1. Treat `summary.json`, `cases.jsonl`, the topic config snapshot, case artifacts, and `visualize_executed.ipynb` as standard topic run artifacts. If a run lacks them, rerun through the managed runner route or record that the run is not fully reproducible.
 1. For planned edits to experiment execution surfaces, run `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and resolve the `experiment_execution_surface_guard` handoff before patching. This surface includes `tools/ci/check_experiment_registry.py`, `documents/experiments/experiment-registry.md`, `agents/workflows/experiment-workflow.md`, `experiments/registry.toml`, and topic `run.py` entrypoints. Pair this skill with `$test-design`; run `python3 tools/ci/check_experiment_registry.py` when project `experiments/registry.toml` exists, use `python3 -m pytest tests/tools/test_run_managed_experiment.py -q` for runner or registry checker behavior changes, and reserve long experiment runs for an explicit run plan.
 1. Use `$structure-planning` before experiment planning, rerun planning, result report generation, or HTML view generation when the structure is nontrivial; fix first artifact, source-to-structure map, OOP structure contract, metric contract, invalid interpretations, and validation gate before running or writing.
 1. For experiment plans and reports, require the OOP structure contract to list reused modules/classes/functions/protocols, objects created/mutated/passed/written by each step, the factory/function boundary where variants differ, and dependency direction across orchestration, domain logic, metrics, visualization, and artifact I/O before section order is drafted.

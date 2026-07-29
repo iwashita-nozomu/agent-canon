@@ -4300,7 +4300,7 @@ fn is_alignment_or_log_surface(path: &str) -> bool {
         || path.starts_with("reports/")
         || path.starts_with(".agent-canon/")
         || path.starts_with(".agents/skills/")
-        || path.starts_with("agents/templates/_partials/")
+        || path.starts_with("templates/agents/_partials/")
         || path.starts_with("codex-cli-guide/source/")
         || path.starts_with("codex-cli-guide/sections/")
 }
@@ -4324,7 +4324,7 @@ fn is_thin_doc_protected_surface(path: &str) -> bool {
 }
 
 fn is_thin_doc_non_candidate_surface(path: &str) -> bool {
-    path.starts_with("agents/templates/") || path.starts_with("tests/fixtures/")
+    path.starts_with("templates/agents/") || path.starts_with("tests/fixtures/")
 }
 
 fn best_thin_doc_neighbor(
@@ -6964,7 +6964,7 @@ mod tests {
         fs::create_dir_all(root.join("documents")).unwrap();
         fs::create_dir_all(root.join(".agents/skills/example")).unwrap();
         fs::create_dir_all(root.join("agents/evals/results/example")).unwrap();
-        fs::create_dir_all(root.join("agents/templates/_partials")).unwrap();
+        fs::create_dir_all(root.join("templates/agents/_partials")).unwrap();
         fs::create_dir_all(root.join("codex-cli-guide/source")).unwrap();
         fs::create_dir_all(root.join("codex-cli-guide/sections")).unwrap();
         let mergeable_duplicate =
@@ -6987,7 +6987,7 @@ mod tests {
         )
         .unwrap();
         fs::write(
-            root.join("agents/templates/_partials").join("table.md"),
+            root.join("templates/agents/_partials").join("table.md"),
             mergeable_duplicate,
         )
         .unwrap();
@@ -7037,7 +7037,7 @@ mod tests {
             !paths.iter().any(|path| {
                 path.starts_with(".agents/")
                     || path.starts_with("agents/evals/results/")
-                    || path.starts_with("agents/templates/_partials/")
+                    || path.starts_with("templates/agents/_partials/")
                     || path.starts_with("codex-cli-guide/source/")
                     || path.starts_with("codex-cli-guide/sections/")
             })

@@ -7,6 +7,7 @@
 # upstream design ../../issues/README.md durable operational issue conventions
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR checklist
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
+# upstream design ../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
 # upstream design ../../.github/workflows/agent-coordination.yml workflow source
 # upstream design ../../.github/workflows/agent-improvement-guide.yml PR and push improvement guide workflow
 # upstream design ../../.github/workflows/agent-runtime-dashboard.yml standalone AgentCanon runtime dashboard workflow
@@ -34,6 +35,7 @@ import yaml
 HELPER_PATHS = (
     ".github/scripts/checkout_agent_canon_submodule.sh",
     "tools/ci/checkout_agent_canon_submodule.sh",
+    "tools/agent-canon/ci/checkout_agent_canon_submodule.sh",
 )
 AGENT_CANON_INDEPENDENT_WORKFLOWS: set[str] = {
     "agent-runtime-dashboard.yml",
@@ -404,7 +406,11 @@ def agent_canon_checkout_command_steps(workflow: dict[str, object]) -> list[Step
 
 def referenced_agent_canon_checkout_script_available(root: Path, workflow_text: str) -> bool:
     """Return whether at least one helper path referenced by the workflow exists."""
-    return any(path in workflow_text and (root / path).is_file() for path in HELPER_PATHS)
+    roots = (root, agent_canon_root(root))
+    return any(
+        path in workflow_text and any((candidate_root / path).is_file() for candidate_root in roots)
+        for path in HELPER_PATHS
+    )
 
 
 def workflow_declared_findings(path: Path, workflow: dict[str, object]) -> list[Finding]:
@@ -552,11 +558,27 @@ def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
     if not path.exists():
         return [Finding("error", path, "missing_file")]
     text = read_text(path)
+    normalized_text = re.sub(r"/{2,}", "/", text)
     return [
         Finding("error", path, f"missing_text:{item}")
         for item in required
-        if item not in text
+        if item not in text and item not in normalized_text
     ]
+
+
+def projected_template_requirements(
+    root: Path, required: Sequence[str]
+) -> tuple[str, ...]:
+    """Map standalone tool commands to the parent projection view."""
+    if not is_template_or_derived_repo(root):
+        return tuple(required)
+    return tuple(
+        item.replace("tools/agent_tools/", "tools/agent-canon/agent_tools/")
+        .replace("tools/ci/", "tools/agent-canon/ci/")
+        .replace("tools/sync_agent_canon.sh", "tools/agent-canon/sync_agent_canon.sh")
+        .replace("tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh")
+        for item in required
+    )
 
 
 def check_root_copy_headers(root: Path) -> list[Finding]:
@@ -642,7 +664,9 @@ def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]
         specs: list[tuple[Path, Sequence[str]]] = [
             (
                 root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
-                TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS,
+                projected_template_requirements(
+                    root, TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS
+                ),
             ),
             (
                 root / "vendor" / "agent-canon" / ".github" / "PULL_REQUEST_TEMPLATE.md",
@@ -680,12 +704,10 @@ def submodule_checkout_script_findings(root: Path) -> list[Finding]:
             SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS,
         )
     )
-    findings.extend(
-        require_text(
-            root / "tools" / "ci" / "checkout_agent_canon_submodule.sh",
-            SUBMODULE_CHECKOUT_WRAPPER_REQUIREMENTS,
-        )
-    )
+    wrapper_path = root / "tools" / "ci" / "checkout_agent_canon_submodule.sh"
+    if not wrapper_path.is_file():
+        wrapper_path = root / "tools" / "agent-canon" / "ci" / "checkout_agent_canon_submodule.sh"
+    findings.extend(require_text(wrapper_path, SUBMODULE_CHECKOUT_WRAPPER_REQUIREMENTS))
     return findings
 
 

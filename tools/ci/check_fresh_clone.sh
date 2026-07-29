@@ -18,6 +18,7 @@ CANON_TOOLS_ROOT="$(agent_canon_tools_root "$ROOT_DIR")"
 TMP_DIR="$(mktemp -d -t template-fresh-clone-XXXXXX)"
 TOPIC_ROOT="${TMP_DIR}/workspace/fresh-clone"
 CLONE_DIR="${TOPIC_ROOT}/agent-canon"
+CLONE_TOOLS_ROOT=""
 trap 'rm -rf "${TMP_DIR}"' EXIT
 
 mkdir -p "${TOPIC_ROOT}"
@@ -35,13 +36,73 @@ overlay_current_tree() {
   rsync -a --delete --exclude .git --exclude .state "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
 }
 
+attach_submodule_main_to_staged_pin() {
+  local submodule_path="$1"
+  local index_entry=""
+  local pinned_mode="" pinned_oid="" pinned_stage="" pinned_path=""
+  local branch="" head_oid="" main_oid="" upstream="" status=""
+
+  [[ -z "$(git ls-files --unmerged -- "$submodule_path")" ]] || {
+    echo "fresh_clone_submodule_attach=unmerged_parent_prefix" >&2
+    return 1
+  }
+  index_entry="$(git ls-files --stage -- "$submodule_path")"
+  read -r pinned_mode pinned_oid pinned_stage pinned_path <<<"$index_entry"
+  if [[ "$(printf '%s\n' "$index_entry" | awk 'NF { count += 1 } END { print count + 0 }')" -ne 1 \
+    || "$pinned_mode" != "160000" || "$pinned_stage" != "0" \
+    || "$pinned_path" != "$submodule_path" ]]; then
+    echo "fresh_clone_submodule_attach=missing_stage0_gitlink" >&2
+    return 1
+  fi
+  status="$(git -C "$submodule_path" status --short --untracked-files=all)"
+  branch="$(git -C "$submodule_path" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  head_oid="$(git -C "$submodule_path" rev-parse HEAD)"
+  if [[ -n "$status" || -n "$branch" || "$head_oid" != "$pinned_oid" ]]; then
+    echo "fresh_clone_submodule_attach=invalid_initial_state" >&2
+    return 1
+  fi
+  if ! git -C "$submodule_path" show-ref --verify --quiet refs/remotes/origin/main; then
+    echo "fresh_clone_submodule_attach=missing_origin_main" >&2
+    return 1
+  fi
+  main_oid="$(git -C "$submodule_path" rev-parse --verify refs/heads/main 2>/dev/null || true)"
+  if [[ -n "$main_oid" && "$main_oid" != "$pinned_oid" ]]; then
+    echo "fresh_clone_submodule_attach=main_pin_mismatch" >&2
+    return 1
+  fi
+
+  if [[ -n "$main_oid" ]]; then
+    git -C "$submodule_path" switch main >/dev/null
+  else
+    git -C "$submodule_path" switch -c main "$pinned_oid" >/dev/null
+  fi
+  git -C "$submodule_path" branch --set-upstream-to=origin/main main >/dev/null
+
+  branch="$(git -C "$submodule_path" symbolic-ref --quiet --short HEAD)"
+  head_oid="$(git -C "$submodule_path" rev-parse HEAD)"
+  upstream="$(git -C "$submodule_path" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}')"
+  status="$(git -C "$submodule_path" status --short --untracked-files=all)"
+  echo "FRESH_CLONE_SUBMODULE_BRANCH=${branch}"
+  echo "FRESH_CLONE_SUBMODULE_HEAD=${head_oid}"
+  echo "FRESH_CLONE_SUBMODULE_PIN=${pinned_oid}"
+  echo "FRESH_CLONE_SUBMODULE_UPSTREAM=${upstream}"
+  if [[ "$branch" != "main" || "$head_oid" != "$pinned_oid" || "$upstream" != "origin/main" \
+    || -n "$status" ]]; then
+    echo "fresh_clone_submodule_attach=readback_mismatch" >&2
+    return 1
+  fi
+  echo "FRESH_CLONE_SUBMODULE_STATUS=clean"
+}
+
 git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
 git config --global --add safe.directory "${CLONE_DIR}"
 overlay_current_tree
 cd "${CLONE_DIR}"
+CLONE_TOOLS_ROOT="$(agent_canon_tools_root "${CLONE_DIR}")"
 if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1; then
   rm -rf vendor/agent-canon
   git -c protocol.file.allow=always submodule update --init --recursive vendor/agent-canon
+  attach_submodule_main_to_staged_pin "vendor/agent-canon"
 fi
 if [[ -n "$(git status --short)" ]]; then
   git config user.name "Fresh Clone Check"
@@ -92,7 +153,7 @@ if [ "$parent_projection_mode" = false ]; then
   exit 0
 fi
 
-bash "${CANON_TOOLS_ROOT}/sync_agent_canon.sh" check
+bash "${CLONE_TOOLS_ROOT}/sync_agent_canon.sh" check
 AGENT_CANON_TEST_REMOTE="${TMP_DIR}/agent-canon-upstream.git"
 AGENT_CANON_TEST_WORK="${TMP_DIR}/agent-canon-work"
 git init --bare "${AGENT_CANON_TEST_REMOTE}" >/dev/null
@@ -191,7 +252,7 @@ for lifecycle_path in \
   cp "${source_namespace}/${lifecycle_path}" "${target_namespace}/${lifecycle_path}"
 done
 
-PYTHONPATH="${CANON_TOOLS_ROOT}/agent_tools" \
+PYTHONPATH="${CLONE_TOOLS_ROOT}/agent_tools" \
   python3 - "${target_namespace}" <<'PY'
 import json
 import sys
@@ -239,14 +300,14 @@ PY
 git config user.name "Fresh Clone Check"
 git config user.email "fresh-clone-check@example.invalid"
 materialize_current_lifecycle_projection
-bash "${CANON_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-canon-plan.txt"
-grep -Eq "agent_canon_plan_route=(subtree_pull|submodule_update)" "${TMP_DIR}/agent-canon-plan.txt"
+bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-canon-plan.txt"
+grep -Eq "agent_canon_plan_route=(already_current_submodule|subtree_pull|submodule_update)" "${TMP_DIR}/agent-canon-plan.txt"
 AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
 AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
 AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
 AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
-  bash "${CANON_TOOLS_ROOT}/update_agent_canon.sh" apply
+  bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 (
   cd "${AGENT_CANON_TEST_WORK}"
@@ -256,7 +317,7 @@ test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
   git push origin main >/dev/null
 )
 mkdir -p "${TMP_DIR}/missing-git-exec"
-GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash "${CANON_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
+GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
 grep -Eq "agent_canon_plan_route=(snapshot_import_tree_match|snapshot_import_no_subtree|submodule_update)" "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
 AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
 AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
@@ -264,7 +325,7 @@ AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
 AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
 GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" \
-  bash "${CANON_TOOLS_ROOT}/update_agent_canon.sh" apply
+  bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-no-subtree-marker
 make -C "${CLONE_DIR}" agent-checks
 echo "FRESH_CLONE_REPOSITORY_CI_OWNER=repository_ci_job"

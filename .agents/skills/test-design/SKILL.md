@@ -16,13 +16,15 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Use the command packet before applying this skill's workflow:
+この skill の workflow を適用する前に、次の command packet を使用してください。
 
 ```bash
 python3 tools/agent_tools/skill_tool_commands.py show --skill test-design --format text
 ```
 
-Execute the required and task-matching conditional commands that the packet prints.
+論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
+
+packet が出力した必須 command と、task に該当する conditional command を実行してください。
 <!-- skill-tool-commands:end -->
 
 
@@ -33,15 +35,13 @@ Execute the required and task-matching conditional commands that the packet prin
 1. Confirm a concrete unresolved oracle, specification, regression, or failure-mode risk remains outside static analysis, existing checkers, and targeted validation. Ordinary code changes, bug fixes, parser changes, and validation failures alone do not justify unlimited test creation.
 1. If the risk is absent or checker-owned, return `activation=not_needed` with the canonical validation route; do not run test-design tools or require `test_plan.md`.
 1. Only for `activation=required`, record code paths and related test paths as survey and placement evidence, inspect branches/parsing/error/state transitions, and design a concrete behavior-regression oracle.
+1. For `activation=required`, bind the owning design / contract clause to the reachable code-side implementation mechanism: public entrypoint, branches, parser and error paths, state transitions, and return projection. Do not infer the contract or oracle from tests alone.
+1. Every nasty or regression case must carry one complete trace: `Design Clause -> Reachable Implementation Mechanism -> Concrete Breaking Input/State Sequence -> Observable Outcome -> Decidable Oracle`. A case is not test-design evidence until all five links are explicit.
+1. Before implementation or handoff, state the contract-, type-, or checker-based null hypothesis that the candidate case cannot occur. Search for a reachability witness from the public input surface or a public state sequence; accept the case only when that witness rebuts the null hypothesis and supports a stable, decidable oracle. Without such a witness, return the candidate to the checker, static-validation, or owning-design boundary rather than turning it into a test.
 1. `activation=required` does not mean exhaustive test generation. Choose one
    stable observation level per unresolved risk, reuse one case when it covers
    multiple risks, and omit duplicate contract checks, no-crash checks, and
    internal-shape checks already owned by static validation or existing tests.
-1. Only for `activation=required`, read both the owning design / contract document and the code-side implementation mechanism. Record the design clause, public entrypoint, branches, parsing and error paths, state transitions, and return projection that implement the claim; do not infer the contract from tests alone.
-1. For every nasty or regression case under `activation=required`, require one complete trace: `Design Clause -> Code Mechanism -> Breaking Input/Sequence -> Observation Level / Observable Outcome -> Oracle`. A case is not evidence until the design clause, mechanism, concrete breaking input or state sequence, stable observation, and decidable oracle are all explicit.
-1. During the mechanism survey, actively search for implementation assumptions that the contract does not guarantee. Include cases where inputs have the same element count but different shape, axis, or layout, as well as ordering or aliasing differences, empty or singleton values, boundary values, history-dependent state sequences, and retry-after-failure paths. Record the assumption challenged, the concrete input or sequence, and the observable divergence.
-1. Before implementation or handoff, state a non-occurrence claim / null hypothesis for every candidate case: why the contract, type constraints, or an existing checker allegedly makes the case impossible.
-1. Search for a reachability witness from the public input surface or a public state sequence. If no witness exists, do not turn the candidate into a test; return it to the checker, static-validation, or owning-design boundary. If a witness exists, record the evidence that refutes the null hypothesis and the observable oracle, and allow implementation or handoff only after this gate passes.
 1. For algorithm fixes, enter through the algorithm contract and code-side
    repair route before changing tests. Read the public entrypoint, recurrence or
    state transition, invariant, stopping or acceptance rule, failure semantics,
@@ -71,5 +71,5 @@ Execute the required and task-matching conditional commands that the packet prin
    fallback for numerical validation.
 1. Prefer behavior examples for concrete regressions, property tests for broad input spaces, metamorphic tests when exact expected output is hard, and mutation testing when oracle strength is doubtful.
 1. Record nasty edge cases and regression cases in `test_plan.md` only when `activation=required`.
-1. Keep cases concrete at the stable observation level: `Design Clause`, `Code Mechanism`, `Breaking Input/Sequence`, `Observation Level`, `Observable Outcome`, `Oracle`, `Input Space`, `Adequacy Evidence`, `Do Not Freeze`, and why the case is nasty. Do not add tests merely to increase test count or coverage without this trace.
+1. Keep cases concrete at the stable observation level: `Design Clause`, `Reachable Implementation Mechanism`, `Breaking Input/State Sequence`, `Observation Level`, `Observable Outcome`, `Decidable Oracle`, `Input Space`, `Adequacy Evidence`, `Do Not Freeze`, and why the case is nasty. Do not add tests merely to increase test count or coverage without this trace.
 1. Mirror existing test style, fixture layout, and naming before suggesting anything new.

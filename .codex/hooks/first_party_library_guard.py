@@ -4,7 +4,7 @@
 # responsibility Blocks first-party library and public API edits without task authority.
 # upstream implementation ../../tools/agent_tools/task_authority.py defines first-party library authority matching.
 # upstream design ../../responsibility-scope.toml defines reusable first-party surfaces.
-# downstream implementation ./hook_dispatcher.py invokes this hook for PostToolUse and Stop.
+# downstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns explicit authority review.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates first-party guard behavior.
 # @dependency-end
 """Guard first-party reusable library/API surfaces from unauthorized edits."""

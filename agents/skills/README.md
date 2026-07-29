@@ -5,10 +5,12 @@
 contract skill
 responsibility Documents Shared Skill Canon for this repository.
 upstream design ./catalog.yaml enumerates public skill families
+# upstream design ./skill-dependencies.yaml owns the typed public-skill dependency dictionary
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
 downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates public and official skill boundaries
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 downstream implementation ../../tools/agent_tools/skill_route_catalog.py validates visualization owner and adapter metadata
+downstream implementation ../../tools/agent_tools/skill_dependency_map.py validates the dependency dictionary and generates its Mermaid projection
 @dependency-end
 -->
 
@@ -64,14 +66,20 @@ review の細粒度 checklist、CLI adapter、artifact placement、validation he
 workflow selection は task 開始時に使い忘れると実害が出るため、`agent-orchestration` を routing entry skill として public surface の先頭に置きます。
 subagent bootstrap は repo-changing task の stage 分離に必要なため public skill として出します。
 
-公開 skill の id、purpose、canonical doc、discovery shim、related skills、
-prompt routing trigger は `agents/skills/catalog.yaml` が唯一の列挙正本です。
-この README には catalog の行を複製しません。
+公開 skill の id、purpose、canonical doc、discovery shim、prompt routing trigger は
+`agents/skills/catalog.yaml` が唯一の列挙正本です。必須前提、後続、順序制約、
+並列可能な独立関係、責務階層は `agents/skills/skill-dependencies.yaml` が唯一の
+依存関係正本です。routing はこの辞書から呼び出し順を導出し、関連候補も同じ辞書から
+投影します。ユーザー向けの単一グラフは
+`documents/runtime/skill-dependency-graph.md` に tool 生成します。図を手で編集せず、
+辞書を変更して `skill_dependency_map.py graph` を再実行します。
 
 確認入口:
 - public skill の一覧と shim/doc/config の整合: `python3 tools/agent_tools/check_agent_runtime_alignment.py`
 - prompt からの skill 選択: `python3 tools/agent_tools/route.py --prompt "<user request>" --format json`
 - skill ごとの command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text`
+- 依存辞書の静的検査: `python3 tools/agent_tools/skill_dependency_map.py check --root .`
+- Mermaid グラフ生成: `python3 tools/agent_tools/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md`
 
 ## Internal Review And Runtime Routines
 
@@ -153,7 +161,7 @@ in the Codex host runtime.
 - GPU / CUDA / JAX / XLA / IREE backend 実行、`CUDA_VISIBLE_DEVICES`、`nvidia-smi`、JAX preallocation 無効化、GPU validation blocker を扱うときは `gpu-execution` を使い、Python 実行は ExperimentRunner に委譲します。
 - JIT-canonical IR、生成済み Lean 実装定義、theorem graph overlay から、反復法と証明状態を Mermaid block chart にしたいときは `algorithm-flowchart` を使います。図は proof navigation であり、証明済み判定は formal proof checker に戻します。
 - repo-wide な実装・文書・tooling・runtime の統合変更では、上の `comprehensive-development` route を使います。
-- repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `agents/templates/environment_change_proposal.md` を使います。
+- repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `templates/agents/environment_change_proposal.md` を使います。
 - `memory/USER_PREFERENCES.md` の整理や `AGENTS.md` への昇格では `user-preference-sync` を使います。
 - `memory/AGENT_PHILOSOPHY.md` の更新や agent-side learning の整理では `agent-learning` を使います。
 

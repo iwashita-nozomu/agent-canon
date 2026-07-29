@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Validates AgentCanon responsibility scopes and their protecting tools.
 # upstream design ../../responsibility-scope.toml machine-readable repo-local scope manifest
-# upstream design ../../documents/templates/responsibility-scope.template.toml starter manifest for template-derived repositories
+# upstream design ../../templates/documents/responsibility-scope.template.toml starter manifest for template-derived repositories
 # upstream design ../../documents/design/responsibility-scope-management.md scope ownership policy
 # upstream design ../../tools/catalog.yaml structured tool ownership
 # upstream design ../../tools/README.md tool entrypoint index
@@ -122,6 +122,8 @@ def load_catalog_paths(root: Path) -> tuple[set[str], list[Finding]]:
     """Return paths listed in the structured tool catalog."""
     path = root / CATALOG_PATH
     if not path.is_file():
+        path = root / "vendor" / "agent-canon" / CATALOG_PATH
+    if not path.is_file():
         return set(), [Finding("catalog", CATALOG_PATH, "missing-file")]
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, Mapping):
@@ -130,11 +132,18 @@ def load_catalog_paths(root: Path) -> tuple[set[str], list[Finding]]:
     if not isinstance(entries, list):
         return set(), [Finding("catalog", CATALOG_PATH, "missing-entries")]
     paths = {
-        entry.get("path")
+        logical_tool_path(entry.get("path"))
         for entry in cast(list[object], entries)
         if isinstance(entry, Mapping) and isinstance(entry.get("path"), str)
     }
     return {cast(str, path) for path in paths}, []
+
+
+def logical_tool_path(path: object) -> object:
+    """Normalize a parent projection path to AgentCanon's logical tool path."""
+    if isinstance(path, str) and path.startswith("tools/agent-canon/"):
+        return "tools/" + path.removeprefix("tools/agent-canon/")
+    return path
 
 
 def scope_from_mapping(raw_scope: Mapping[str, object]) -> Scope:
@@ -234,9 +243,16 @@ def validate_protecting_tools(
     """Validate that scope protecting tools exist and are cataloged."""
     findings: list[Finding] = []
     for tool in scope.protecting_tools:
-        if not (root / tool).exists():
+        logical_tool = cast(str, logical_tool_path(tool))
+        candidates = (root / logical_tool,)
+        if logical_tool.startswith("tools/"):
+            candidates += (
+                root / "tools" / "agent-canon" / logical_tool.removeprefix("tools/"),
+                root / "vendor" / "agent-canon" / logical_tool,
+            )
+        if not any(candidate.exists() for candidate in candidates):
             findings.append(Finding("scope_tool", scope.scope_id, f"missing:{tool}"))
-        if tool not in catalog_paths:
+        if logical_tool not in catalog_paths:
             findings.append(Finding("scope_tool", scope.scope_id, f"uncataloged:{tool}"))
     return findings
 

@@ -401,6 +401,36 @@ def atomic_write_text(path: Path, text: str) -> None:
         raise
 
 
+def temporary_graph_tsv_path() -> Path:
+    """Create a system-temporary path for a generated graph TSV."""
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        newline="\n",
+        prefix="dependency_graph.tsv.tmp-",
+        delete=False,
+    ) as handle:
+        return Path(handle.name)
+
+
+def temporary_supplied_snapshot_path(path: Path) -> Path:
+    """Create a repository-agnostic snapshot of supplied graph TSV."""
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        newline="\n",
+        prefix="dependency_graph.supplied.tsv.tmp-",
+        delete=False,
+    ) as handle:
+        source_path = Path(handle.name)
+    try:
+        shutil.copyfile(path, source_path)
+    except BaseException:
+        source_path.unlink(missing_ok=True)
+        raise
+    return source_path
+
+
 def generate_graph_tsv(root: Path, target_path: Path, *, scope: str) -> GraphInput:
     """Generate a temporary graph TSV by calling the canonical graph checker."""
     command = [
@@ -410,6 +440,7 @@ def generate_graph_tsv(root: Path, target_path: Path, *, scope: str) -> GraphInp
         str(root),
         "--graph-tsv",
         str(target_path),
+        "--cycle-report-only",
     ]
     if scope == "changed":
         command.append("--changed")
@@ -3088,27 +3119,23 @@ def write_bundle(
     if target_dir.exists():
         print(f"bundle target already exists: {target_dir}", file=sys.stderr)
         raise SystemExit(2)
-    parent_dir = target_dir.parent
-    parent_dir.mkdir(parents=True, exist_ok=True)
-    if target_dir.exists():
-        print(f"bundle target already exists: {target_dir}", file=sys.stderr)
-        raise SystemExit(2)
-
-    staging_dir = Path(tempfile.mkdtemp(prefix=f".{target_dir.name}.staging-", dir=parent_dir))
+    generated_tsv: Path | None = None
+    supplied_tsv: Path | None = None
+    staging_dir: Path | None = None
     try:
-        staged_tsv = staging_dir / "dependency_graph.tsv"
         if graph_tsv is None:
-            graph_input = generate_graph_tsv(root, staged_tsv, scope=scope)
+            generated_tsv = temporary_graph_tsv_path()
+            graph_input = generate_graph_tsv(root, generated_tsv, scope=scope)
         else:
             supplied = graph_tsv.resolve()
-            shutil.copyfile(supplied, staged_tsv)
+            supplied_tsv = temporary_supplied_snapshot_path(supplied)
             graph_input = GraphInput(
-                path=staged_tsv,
+                path=supplied_tsv,
                 source_returncode=None,
                 origin_kind="supplied",
                 origin_locator=normalized_cli_token(supplied),
             )
-        report = build_report(root, load_edges(staged_tsv))
+        report = build_report(root, load_edges(graph_input.path))
         ir_payload = graph_ir(
             report,
             source_locator=BUNDLE_GRAPH_TSV_LOCATOR,
@@ -3125,13 +3152,25 @@ def write_bundle(
             artifact_id="dependency_graph.html",
             artifact_format="html",
         )
-        visualization_coverage: dict[str, VisualizationArtifactCoverage] = {}
-        for artifact_name, body in render_outputs(
+        rendered_outputs = render_outputs(
             report,
             title=title,
             source_locator=BUNDLE_GRAPH_TSV_LOCATOR,
             ir_payload=ir_payload,
-        ).items():
+        )
+
+        parent_dir = target_dir.parent
+        parent_dir.mkdir(parents=True, exist_ok=True)
+        if target_dir.exists():
+            print(f"bundle target already exists: {target_dir}", file=sys.stderr)
+            raise SystemExit(2)
+        staging_dir = Path(
+            tempfile.mkdtemp(prefix=f".{target_dir.name}.staging-", dir=parent_dir)
+        )
+        staged_tsv = staging_dir / "dependency_graph.tsv"
+        shutil.copyfile(graph_input.path, staged_tsv)
+        visualization_coverage: dict[str, VisualizationArtifactCoverage] = {}
+        for artifact_name, body in rendered_outputs.items():
             visualization_coverage[artifact_name] = _finalize_text_coverage(
                 staging_dir / artifact_name,
                 body,
@@ -3156,10 +3195,16 @@ def write_bundle(
             print(f"bundle target already exists: {target_dir}", file=sys.stderr)
             raise SystemExit(2)
         os.replace(staging_dir, target_dir)
+        staging_dir = None
     except BaseException:
-        if staging_dir.exists():
+        if staging_dir is not None and staging_dir.exists():
             shutil.rmtree(staging_dir)
         raise
+    finally:
+        if generated_tsv is not None:
+            generated_tsv.unlink(missing_ok=True)
+        if supplied_tsv is not None:
+            supplied_tsv.unlink(missing_ok=True)
 
     committed_manifest_path = target_dir / "manifest.json"
     committed_payload: object = json.loads(
@@ -3289,23 +3334,16 @@ def write_projection(
 ) -> tuple[OutputEnvelope, GraphReport]:
     """Write selected named projections through sibling atomic replaces."""
     temp_tsv: Path | None = None
+    supplied_tsv: Path | None = None
     try:
         if graph_tsv is None:
-            handle = tempfile.NamedTemporaryFile(
-                "w",
-                encoding="utf-8",
-                newline="\n",
-                prefix=".dependency_graph.tsv.tmp-",
-                dir=root,
-                delete=False,
-            )
-            temp_tsv = Path(handle.name)
-            handle.close()
+            temp_tsv = temporary_graph_tsv_path()
             graph_input = generate_graph_tsv(root, temp_tsv, scope=scope)
         else:
             supplied = graph_tsv.resolve()
+            supplied_tsv = temporary_supplied_snapshot_path(supplied)
             graph_input = GraphInput(
-                path=supplied,
+                path=supplied_tsv,
                 source_returncode=None,
                 origin_kind="supplied",
                 origin_locator=normalized_cli_token(supplied),
@@ -3356,6 +3394,8 @@ def write_projection(
     finally:
         if temp_tsv is not None:
             temp_tsv.unlink(missing_ok=True)
+        if supplied_tsv is not None:
+            supplied_tsv.unlink(missing_ok=True)
 
 
 def print_text_envelope(envelope: OutputEnvelope) -> None:

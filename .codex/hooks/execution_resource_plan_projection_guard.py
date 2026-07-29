@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Validates and forwards the exact R5 PostToolUse projection only.
+# responsibility Validates and forwards the exact PostToolUse execution-resource projection only.
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md U-14/U-15 projection consumer contract and composition graph
-# downstream implementation hook_dispatcher.py PostToolUse child registration and selective forwarding
+# downstream implementation hook_dispatcher.py validates this module in-process for active PostToolUse.
 # @dependency-end
 
 """Validate one canonical PostToolUse projection without becoming an authority."""
@@ -37,6 +37,7 @@ NORMALIZED_INPUT_KEYS = {
     "tool_response",
 }
 NORMALIZED_INPUT_SCHEMA = "agent-canon-post-tool-use-input/v1"
+MAX_PROJECTION_BYTES = 64 * 1024
 ADMISSION_KEYS = {
     "admission_fingerprint",
     "guarantee",
@@ -44,7 +45,12 @@ ADMISSION_KEYS = {
     "provision_receipt_fingerprint",
     "selected_uuids",
 }
-ERROR_KEYS = {"kind", "message", "operation"}
+ERROR_KEYS = {"kind"}
+PROJECTION_ERROR_CONSTANTS = frozenset(
+    {"managed_gpu_failure", "managed_gpu_execution", "see_execution_resource_plan"}
+)
+ADMISSION_GUARANTEE = "run-level-opaque-uuid-admission"
+OPAQUE_NAMESPACE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:\[\]-]{0,63}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 UUID_RE = re.compile(r"^(?:GPU|MIG)-[A-Za-z0-9-]+$")
@@ -124,10 +130,10 @@ def validate_admission(value: object) -> None:
         raise ProjectionError("admission fields are not exact")
     require_sha256(value["admission_fingerprint"], "admission_fingerprint")
     require_sha256(value["provision_receipt_fingerprint"], "provision_receipt_fingerprint")
-    if not isinstance(value["guarantee"], str) or not value["guarantee"]:
-        raise ProjectionError("admission guarantee is not a non-empty string")
-    if not isinstance(value["namespace_id"], str) or not value["namespace_id"]:
-        raise ProjectionError("admission namespace_id is not a non-empty string")
+    if value["guarantee"] != ADMISSION_GUARANTEE:
+        raise ProjectionError("admission guarantee is not exact")
+    if not isinstance(value["namespace_id"], str) or OPAQUE_NAMESPACE_RE.fullmatch(value["namespace_id"]) is None:
+        raise ProjectionError("admission namespace_id is not bounded opaque text")
     selected = value["selected_uuids"]
     if not isinstance(selected, list) or any(
         not isinstance(item, str) or UUID_RE.fullmatch(item) is None for item in selected
@@ -140,11 +146,13 @@ def validate_error(value: object) -> None:
         return
     if not isinstance(value, dict) or set(value) != ERROR_KEYS:
         raise ProjectionError("error fields are not exact")
-    if any(not isinstance(value[field], str) for field in ERROR_KEYS):
-        raise ProjectionError("error fields must be strings")
+    if set(value) != ERROR_KEYS or value["kind"] not in PROJECTION_ERROR_CONSTANTS:
+        raise ProjectionError("error kind is not an exact coarse projection constant")
 
 
 def validate_projection_bytes(stdout: str) -> dict[str, Any]:
+    if len(stdout.encode("utf-8")) > MAX_PROJECTION_BYTES:
+        raise ProjectionError("projection exceeds bounded output size")
     if not stdout.endswith("\n") or stdout.count("\n") != 1 or "\r" in stdout:
         raise ProjectionError("projection must be exactly one LF-terminated line")
     line = stdout[:-1]
@@ -185,6 +193,17 @@ def reject(reason: str) -> int:
     return 0
 
 
+def projection_context_payload(stdout: str) -> dict[str, object]:
+    """Return the official wrapper for already validated projection bytes."""
+    return {
+        "schema": OFFICIAL_HOOK_SCHEMA,
+        "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": stdout,
+        },
+    }
+
+
 def main() -> int:
     try:
         raw = sys.stdin.buffer.read()
@@ -211,13 +230,7 @@ def main() -> int:
         validate_projection_bytes(stdout)
     except (ProjectionError, UnicodeDecodeError, json.JSONDecodeError, TypeError) as exc:
         return reject(str(exc))
-    wrapper = {
-        "schema": OFFICIAL_HOOK_SCHEMA,
-        "hookSpecificOutput": {
-            "hookEventName": "PostToolUse",
-            "additionalContext": stdout,
-        },
-    }
+    wrapper = projection_context_payload(stdout)
     json.dump(wrapper, sys.stdout, sort_keys=True)
     sys.stdout.write("\n")
     return 0

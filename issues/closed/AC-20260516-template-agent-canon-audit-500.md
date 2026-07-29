@@ -5,8 +5,8 @@
 contract issue
 responsibility Records resolution of the 2026-05-16 Template / AgentCanon 500 item audit.
 upstream design ../README.md defines durable AgentCanon operational issue storage.
-upstream design ../../documents/template-agent-canon-audit-resolution.md records the audit coverage ledger.
-upstream design ../../documents/runtime-profiles-and-check-matrix.md defines profile and risk-based validation routing.
+upstream design ../../documents/agent-canon/template-agent-canon-audit-resolution.md records the audit coverage ledger.
+upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md defines profile and risk-based validation routing.
 downstream design ../../README.md exposes the profile policy in the AgentCanon overview.
 @dependency-end
 -->

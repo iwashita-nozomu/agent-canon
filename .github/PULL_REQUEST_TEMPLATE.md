@@ -6,6 +6,7 @@ responsibility Documents the standalone AgentCanon pull request checklist.
 upstream design ../ROOT_AGENTS.md defines AgentCanon closeout requirements
 upstream design ../agents/workflows/agent-canon-pr-workflow.md defines shared canon PR flow
 upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md defines synced root surfaces
+upstream design ../templates/documents/github/README.md defines canonical GitHub template sources and projection boundaries
 upstream design ../issues/README.md defines durable operational issue storage
 upstream design ../tools/catalog.yaml defines structured tool catalog
 downstream implementation ../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
@@ -13,6 +14,7 @@ downstream implementation ../tools/agent_tools/tool_drift.py validates PR/tool t
 downstream implementation ../tools/agent_tools/issue_sync.py validates local/GitHub issue sync state
 downstream implementation ../tools/agent_tools/check_convention_compliance.py validates PR Essence checklist wiring
 downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side AgentCanon PRs
+downstream design ../templates/documents/github/pull-request/agent_canon.md owns the template-side canonical source
 @dependency-end
 -->
 
@@ -123,8 +125,9 @@ Issue / edit-scope evidence:
 
 - [ ] Validation failure response, if any, cites `documents/runtime/runtime-profiles-and-check-matrix.json` as the canonical taxonomy owner; `documents/runtime/runtime-profiles-and-check-matrix.md` is the generated reader projection. PR evidence records the required evidence and same-intent repair / escalation result.
 - [ ] `PR_CHECK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"` and dependency review reports were written under `$PR_CHECK_TMP`, not `reports/`
+- [ ] `tools/bin/agent-canon graph build --root . --profile default --format json`
 - [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "$PR_CHECK_TMP/dependency-review/agent-canon-pr"`
-- [ ] `python3 tools/agent_tools/render_dependency_manifest_graph.py --graph-tsv "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_graph.tsv" --markdown-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.md" --dot-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.dot"`
+- [ ] `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --markdown-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.md" --dot-out "$PR_CHECK_TMP/dependency-review/agent-canon-pr/dependency_manifest_graph.dot"`
 - [ ] `python3 tools/agent_tools/check_agent_runtime_alignment.py`
 - [ ] `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml`
 - [ ] `python3 tools/agent_tools/check_convention_compliance.py`

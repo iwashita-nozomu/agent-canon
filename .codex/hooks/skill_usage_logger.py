@@ -2,7 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Logs Codex skill, workflow, tool, and subagent routing signals from hook payloads.
-# upstream implementation ../hooks.json invokes this hook at prompt and stop boundaries.
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this standalone monitoring route.
 # upstream design ../../evidence/agent-evals/README.md requires skill-use eval evidence.
 # upstream design ../../agents/skills/codex-task-workflow.md Codex task workflow routing boundary.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
@@ -1486,6 +1486,24 @@ def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
             "workflow": list(signals.selected_workflows),
             "workflow_family": signals.selected_workflows[0] if signals.selected_workflows else "",
             "workflow_selection_kind": inputs.workflow_context_kind,
+            "workflow_attribution_kind": (
+                "owner"
+                if inputs.workflow_context_kind == "declared_workflow"
+                else "context"
+                if signals.selected_workflows
+                else "missing"
+            ),
+            "workflow_owner": (
+                signals.selected_workflows[0]
+                if inputs.workflow_context_kind == "declared_workflow"
+                and signals.selected_workflows
+                else ""
+            ),
+            "workflow_owner_workflows": (
+                list(signals.selected_workflows)
+                if inputs.workflow_context_kind == "declared_workflow"
+                else []
+            ),
             "workflow_context_kind": inputs.workflow_context_kind,
             "workflow_context_source": (
                 "recent_log" if inputs.workflow_context_kind == "context_workflow" else ""

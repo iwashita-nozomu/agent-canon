@@ -4,9 +4,10 @@
 # responsibility Runs repo dependency review agent workflow automation.
 # upstream design ../../documents/design/dependency-manifest-design.md dependency review policy
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout requires dependency evidence
-# upstream design ../../agents/templates/closeout_gate.md closeout dependency evidence gate
+# upstream design ../../templates/agents/closeout_gate.md closeout dependency evidence gate
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR dependency checklist
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template PR dependency checklist
+# upstream design ../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
 # upstream implementation ./scan_dependency_headers.sh scans repo-wide manifest coverage
 # upstream implementation ./check_dependency_header_format.sh validates repo-wide manifest syntax
 # upstream implementation ./check_dependency_graph.sh validates repo-wide dependency graph
@@ -118,6 +119,46 @@ done
 
 ROOT_DIR="$(realpath -m "$ROOT_DIR")"
 cd "$ROOT_DIR"
+
+if [[ -d "$ROOT_DIR/vendor/agent-canon" ]]; then
+  GRAPH_CLI="$ROOT_DIR/vendor/agent-canon/tools/bin/agent-canon"
+else
+  GRAPH_CLI="$ROOT_DIR/tools/bin/agent-canon"
+fi
+if [[ ! -x "$GRAPH_CLI" ]]; then
+  echo "canonical graph executable is missing for root: $ROOT_DIR" >&2
+  exit 1
+fi
+
+status_file="$(mktemp)"
+dependency_query_file="$(mktemp)"
+owner_query_file="$(mktemp)"
+trap 'rm -f "$status_file" "$dependency_query_file" "$owner_query_file"' EXIT
+
+set +e
+"$GRAPH_CLI" graph status --root "$ROOT_DIR" --profile default --format json >"$status_file"
+status_exit=$?
+set -e
+if [[ "$status_exit" -ne 0 || "$(jq -r '.status // "invalid"' "$status_file" 2>/dev/null)" != "fresh" ]]; then
+  echo "REPO_DEPENDENCY_REVIEW=fail"
+  cat "$status_file"
+  exit 1
+fi
+
+set +e
+"$GRAPH_CLI" graph query --root "$ROOT_DIR" --profile default --format json --all --relation dependency --direction both --depth 0 >"$dependency_query_file"
+dependency_exit=$?
+"$GRAPH_CLI" graph query --root "$ROOT_DIR" --profile default --format json --all --relation owner --direction both --depth 0 >"$owner_query_file"
+owner_exit=$?
+set -e
+if [[ "$dependency_exit" -ne 0 || "$owner_exit" -ne 0 ]] \
+  || [[ "$(jq -r '.status // "invalid"' "$dependency_query_file" 2>/dev/null)" != "fresh" ]] \
+  || [[ "$(jq -r '.status // "invalid"' "$owner_query_file" 2>/dev/null)" != "fresh" ]]; then
+  echo "REPO_DEPENDENCY_REVIEW=fail"
+  cat "$dependency_query_file"
+  cat "$owner_query_file"
+  exit 1
+fi
 
 mapfile -t checkable_paths < <(
   git ls-files | awk '

@@ -152,7 +152,7 @@ second command manual.
 ## よく使うもの
 
 - `tools/ci/run_all_checks.sh`
-  - full confidence が必要な時に主要なチェックをまとめて実行します。docs-focused / focused code では check matrix に従って個別 check を選びます。
+  - full confidence が必要な時に主要なチェックをまとめて実行します。docs-focused / focused code では check matrix に従って個別 check を選びます。AgentCanon PR gate は strict dependency review 後に内部 receipt を渡し、検証済みなら graph/dependency-header producer を省略します。receipt のない通常経路は全 producer を実行します。
 - `tools/ci/pre_review.sh`
   - review 前の基礎 gate をまとめて実行します。
 - `tools/bin/agent-canon docs check`
@@ -194,6 +194,8 @@ second command manual.
   - main server host の readiness を確認します。
 - `tools/ci/check_experiment_registry.py`
   - shared experiment registry contract の entrypoint と command を確認します。
+- `tools/ci/check_experiment_template.py`
+  - centralized template source を一時 parent-shaped repo へ copy し、`experiments/template-smoke/` の registry、path、Python compile、notebook structure を GPU 実行なしで確認します。source registry と canonical scaffold は変更しません。
 - `tools/validation/notebook_quality.py`
   - default notebook directories の `.ipynb` を、細かい test ではなく、説明付きで部分実行しやすい実用 demo として読めるか検査します。
   - Codex hook では changed notebook だけを見て、`assert`、`pytest`、`test_` 関数、保存済み error output、可視化 code 不在を block します。
@@ -431,16 +433,25 @@ outcome spool before a separate hash-linked receipt is published. The command
 returns success only after the latest committed receipt is durability-
 confirmed; uncertain, malformed, colliding, or unconfirmed records block.
 
-`tools/bin/agent-canon graph build` captures the dependency-manifest snapshot,
-prepared artifact, and latest committed receipt once in one `BuildMaterial`
-transaction. `graph status`, `graph query`, `graph context`,
-`check_dependency_headers.py`, and `check_design_doc_claims.py` consume the
-persisted v2 snapshot. Each graph command performs at most one bounded
-freshness probe; consumers do not reparse repository-scoped dependency
-guarantees or rerun the runtime producer. Explicit files outside a repository
-and non-Git checker fixtures retain their public local parser behavior without
-becoming graph authority. `graph_client.py` is the typed Python adapter for
-these responses, not a CLI entrypoint.
+`tools/bin/agent-canon graph build` は dependency-manifest snapshot、prepared
+artifact、latest committed receipt を一つの `BuildMaterial` transaction で
+取得します。通常の `run_all_checks` は最初の graph-backed consumer より前に
+`WORKSPACE_ROOT` の graph を一度だけ build し、すべての graph-backed consumer
+は同じ fresh snapshot を共有します。AgentCanon PR gate は strict dependency
+review で作った graph と dependency-header verdict を owner、root identity、
+parent PID、prepared markers 付きの一時 receipt で quick CI に渡します。
+`run_all_checks` はその receipt を検証できた場合だけ `CANON_GRAPH_READY=1`
+として snapshot を消費し、graph/dependency-header producer を省略します。
+receipt が無い通常経路は全 producer を実行し、不正な receipt は fail closed
+です。build に失敗した場合は graph-backed checks を実行せず、一つの CI
+failure として扱います。
+`graph status/query/context` とその consumer は snapshot の参照専用で、
+`check_design_doc_claims.py` も persisted v2 snapshot を消費します。Each graph
+command performs at most one bounded freshness probe; consumers do not reparse
+repository-scoped dependency guarantees or rerun the runtime producer.
+Explicit files outside a repository and non-Git checker fixtures retain their
+public local parser behavior without becoming graph authority. `graph_client.py`
+is the typed Python adapter for these responses, not a CLI entrypoint.
 
 PostToolUse hook transport is outside the graph producer. `HookLogContext`
 returns `HookAppendResult.status` as `spooled`, `duplicate`, or `failed`; that

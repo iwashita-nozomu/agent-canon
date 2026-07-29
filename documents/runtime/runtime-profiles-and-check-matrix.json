@@ -194,10 +194,12 @@
         "`make agent-canon-pr-check`",
         "shared-surface sync",
         "workflow/PR checks",
-        "dependency review",
+        "strict dependency review as the dependency-header/graph judgment owner",
+        "standalone-source tool_drift coverage once",
         "docs check",
         "generated-artifact guard",
-        "broad quick CI with already-run docs/workflow gates skipped"
+        "broad quick CI with docs/workflow gates skipped",
+        "validated PR-gate receipt suppresses repeated graph/dependency-header producers; ordinary run_all runs them"
       ]
     },
     {

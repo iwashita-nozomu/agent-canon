@@ -2,7 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Prevents user-facing completion when goal.md still requires another iteration.
-# upstream implementation ../hooks.json invokes this hook for Stop.
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns explicit goal workflow status.
 # upstream implementation ../../tools/agent_tools/goal_loop.py reports goal loop NEXT_ACTION.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates guard decisions.
 # @dependency-end

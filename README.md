@@ -52,7 +52,11 @@ AgentCanon 自体の source、shared runtime、sync、PR 運用、責務 scope �
 ## 構造モデル
 
 この repo の全体構造は、top-level directory 名だけではなく、
-`responsibility-scope.toml` と各 file の dependency manifest で読む。
+`responsibility-scope.toml` と canonical graph で読む。dependency manifest は
+Rust `ManifestParser` が一度だけ source snapshot に取り込み、parent-owned
+`.agent-canon/knowledge-graph/graph.sqlite` へ他の producer facts と共に
+materialize される。consumer は `agent-canon graph status/query/context` を使い、
+source header を再解析しない。
 
 2026-07-08 の機械解析では、repo structure contract 対象 path は 1024、
 import responsibility 対象 file は 285、document inventory 対象 document は
@@ -100,7 +104,8 @@ Top-level surface は次のように読む。`Tracked` は `git ls-files`、`Man
 | `.devcontainer/` | 6 | 6 | AgentCanon source の devcontainer script と linked parent config が使う共有 runtime surface。 |
 | `.vscode/` | 4 | 4 | shared VS Code defaults and validation tasks。 |
 | `.github/` | 12 | 12 | GitHub workflow、Issue / PR template、GitHub agent entrypoint。 |
-| `agents/` | 143 | 143 | workflow、skill canon、template、task catalog の human-facing hub。`agents/evals/` は旧 manifest path の compatibility stub。 |
+| `agents/` | 143 | 143 | workflow、skill canon、task catalog の human-facing hub。`agents/evals/` は旧 manifest path の compatibility stub。 |
+| `templates/` | — | — | centralized AgentCanon template source: agent artifacts、documents、experiment scaffold、GitHub source。 |
 | `evidence/` | 8 | 8 | tracked eval manifest source と evidence contract。run output は `.agent-canon/log-archive/` に置き、legacy `agents/evals/results/` は migration input としてだけ扱う。 |
 | `codex-cli-guide/` | 14 | 14 | OpenAI Codex CLI 日本語 guide の分割 source。 |
 | `completion-first-review/` | 14 | 14 | completion-first 改善 review の index と説明。 |
@@ -128,10 +133,10 @@ historical filename の inventory です。これらは active rule や現行 wo
 
 | Parent | Main children |
 | --- | --- |
-| `agents/` | `skills/`, `templates/`, `workflows/`, `canonical/`, compatibility `evals/` |
+| `agents/` | `skills/`, `workflows/`, `canonical/`, compatibility `evals/` |
 | `evidence/` | `agent-evals/` |
 | `tools/` | `agent_tools/`, `ci/`, `docs/`, `oop/`, `experiments/`, `static_analysis/`, `validation/` |
-| `documents/` | `tools/`, `conventions/`, `templates/`, `structured-analysis/`, `prose-reasoning-graph/`, `design/` |
+| `documents/` | `tools/`, `conventions/`, `structured-analysis/`, `prose-reasoning-graph/`, `design/` |
 | `.codex/` | `agents/`, `hooks/`, shared `config.toml` |
 | `.github/` | `workflows/`, `ISSUE_TEMPLATE/`, `PULL_REQUEST_TEMPLATE/` |
 | `tests/` | `agent_tools/`, `tools/`, `fixtures/` |

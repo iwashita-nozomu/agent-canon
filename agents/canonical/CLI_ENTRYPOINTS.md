@@ -187,8 +187,9 @@ deduplicates, projects, publishes, reads back, and only then removes certified
 spool files. `archive_transaction_busy`, `partial_retained`, `failed`, and
 `uncertain` states leave source events for a later checkpoint.
 
-The Rust graph uses one build transaction and one prepared-artifact/committed-
-receipt pair:
+The Rust graph uses one build transaction. When an active runtime event exists,
+that transaction also captures one prepared-artifact/committed-receipt pair;
+the pair is optional for source-only graph availability:
 
 ```bash
 tools/bin/agent-canon graph build --root <repo-root> --format json
@@ -198,7 +199,10 @@ tools/bin/agent-canon graph context --root <repo-root> --path <repo-relative-pat
 ```
 
 `status`, `query`, and `context` are read-only consumers. They reuse the
-persisted v2 snapshot and return stale/unavailable state when the artifact,
-receipt, live source identity, worktree manifest identity, or profile changes;
-each command performs one bounded freshness probe and does not regenerate
-runtime evidence.
+persisted v2 snapshot and return stale/unavailable state when present runtime
+artifact, receipt, live source identity, worktree manifest identity, or profile
+changes. A source snapshot with unresolved, ambiguous, or uncovered diagnostics
+is `incomplete` and cannot authorize query or context evidence; only an empty
+completeness set is `fresh`. If no active runtime pointer existed at build time,
+they consume the complete source-only snapshot as fresh. Each command performs
+one bounded freshness probe and does not regenerate runtime evidence.

@@ -66,6 +66,8 @@ agent report の置き場を決めます。まず `置き場ルール` と `Task
 - `experiment_change_loop.md`
 - `environment_change_proposal.md`
 - `verification.txt`
+- `predecessor_integration.<unit_id>.json`（approved source unit の merge 後に
+  canonical producer が生成する場合だけ）
 - specialist 用 artifact
 
 補足:
@@ -91,6 +93,12 @@ agent report の置き場を決めます。まず `置き場ルール` と `Task
   producer を再実行します。知見を残す場合は report file ではなく、
   `documents/` / `agents/` / `notes/` へ責務と dependency manifest 付きで
   昇格します。
+- predecessor record の filename は unit ID から一意に導出し、通常の run-local
+  memo 名として再利用しません。`knowledge_graph` と
+  `active_design_packet_materialization` は同じ complete run bundle を一度だけ
+  immutable snapshot へ archive し、successor は archive locator、各
+  `artifact_sha256`、manifest complete-file SHA-256、共通 integrated source OID を
+ 参照します。merge 前の placeholder、手書き record、aggregate set file は置きません。
 
 ### `documents/`
 

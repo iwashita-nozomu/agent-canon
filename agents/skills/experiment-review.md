@@ -10,23 +10,23 @@ upstream design experiment-lifecycle.md experiment lifecycle workflow
 
 ## Purpose
 
-experiment topic を review し、`run.py` 直実行、GPU/JAX 環境の所有境界、
-artifact / notebook / README の契約が崩れていないかを確認します。
+experiment topic を review し、managed runner route と topic `run.py` inner entrypoint、
+GPU/JAX 環境の所有境界、artifact / notebook / README の契約が崩れていないかを確認します。
 
 ## Use When
 
 - `experiments/<topic>/run.py`、`config.yaml`、`visualize.ipynb`、README を review する
-- `run.py` オプションなし直実行 entrypoint と topic 構築 tooling の責務が混同されていないか確認する
+- managed runner route、topic `run.py` inner entrypoint、topic 構築 tooling の責務が混同されていないか確認する
 - GPU preallocation、JAX platform、GPU visibility、worker 並列度の混入を確認する
 - 実験結果 artifact、notebook、registered command の整合を確認する
 
 ## Review Checklist
 
-- `experiments/registry.toml` に topic があり、registered command は topic
-  `run.py` entrypoint を直接呼んでいる
-- README の standard command は `/usr/bin/python experiments/<topic>/run.py`
-  のオプションなし直実行を明示している
-- direct `run.py` は既定 run directory を作り、必要に応じて
+- `experiments/registry.toml` に topic があり、registered command は managed runner
+  が呼ぶ topic `run.py` inner command になっている
+- README の standard command は `python3 tools/experiments/run_managed_experiment.py
+  --topic <topic> --variant formal -- python3 experiments/<topic>/run.py` と一致している
+- managed run は既定 run directory を作り、topic `run.py` は必要に応じて
   `EXPERIMENT_RUN_DIR` を尊重して同じ artifact schema を書く
 - topic code と checked-in config は GPU visibility、JAX platform、allocator、
   preallocation、`max_workers: 1`、単一 GPU 固定、serial throttle を持たない
@@ -48,7 +48,7 @@ git grep -n -E "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREAL
 
 ## Findings Policy
 
-- `fix now`: registered command が topic `run.py` を直接呼ばない、
+- `fix now`: managed runner の inner command が topic `run.py` を呼ばない、
   topic-side environment hard-code、child subprocess environment reset、
   missing registry command、artifact path outside run dir.
 - `follow-up`: README / notebook explanation gap, optional artifact schema gap,

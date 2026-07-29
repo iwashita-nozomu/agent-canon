@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -25,6 +26,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROUTE = PROJECT_ROOT / "tools" / "agent_tools" / "route.py"
 AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+import agent_canon_source_root  # noqa: E402
 import capability_route as capability_module  # noqa: E402
 import route as route_module  # noqa: E402
 import skill_route_catalog as catalog_module  # noqa: E402
@@ -38,6 +40,20 @@ class RouteToolTest(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(ROUTE), *args],
             cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def run_route_from_cwd(
+        self,
+        cwd: Path,
+        *args: str,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run route.py from a given working directory."""
+        return subprocess.run(
+            [sys.executable, str(ROUTE), *args],
+            cwd=str(cwd),
             check=False,
             capture_output=True,
             text=True,
@@ -92,6 +108,306 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("SKILL=task-routing", result.stdout)
         self.assertIn("COMMANDS=make check-matrix", result.stdout)
         self.assertIn("changed=README.md", result.stdout)
+
+    def test_route_resolves_standalone_source_root(self) -> None:
+        """Prompt mode resolves standalone AgentCanon sources from parent and child dirs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").touch()
+            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
+            (root / "agents" / "skills" / "catalog.yaml").write_text(
+                "version: 1\nskill_families: []\n",
+                encoding="utf-8",
+            )
+            (root / "agents" / "skills" / "skill-dependencies.yaml").write_text(
+                "version: 1\nskill_dependencies: {}\n",
+                encoding="utf-8",
+            )
+            child = root / "workspace" / "subdir"
+            child.mkdir(parents=True, exist_ok=True)
+            standalone_child = root / "agents" / "standalone" / "child"
+            standalone_child.mkdir(parents=True, exist_ok=True)
+
+            for root_candidate in (root, child):
+                result = self.run_route(
+                    "--root",
+                    str(root_candidate),
+                    "--prompt",
+                    "小さなルーティング改善を提案してください",
+                )
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_route_resolves_standalone_from_cwd(self) -> None:
+        """Prompt mode resolves from parent root, any child dir, and standalone child dirs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").touch()
+            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
+            (root / "agents" / "skills" / "catalog.yaml").write_text(
+                "version: 1\nskill_families: []\n",
+                encoding="utf-8",
+            )
+            (root / "agents" / "skills" / "skill-dependencies.yaml").write_text(
+                "version: 1\nskill_dependencies: {}\n",
+                encoding="utf-8",
+            )
+            parent_child = root / "workspace" / "subdir"
+            parent_child.mkdir(parents=True, exist_ok=True)
+            standalone_child = root / "agents" / "standalone" / "child"
+            standalone_child.mkdir(parents=True, exist_ok=True)
+
+            for cwd in (root, parent_child, standalone_child):
+                result = self.run_route_from_cwd(
+                    cwd,
+                    "--prompt",
+                    "小さなルーティング改善を提案してください",
+                )
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_route_resolves_vendored_source_root(self) -> None:
+        """Prompt mode resolves vendored AgentCanon sources when standalone is absent."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "vendor" / "agent-canon"
+            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
+            (root / "agents" / "skills" / "catalog.yaml").write_text(
+                "version: 1\nskill_families: []\n",
+                encoding="utf-8",
+            )
+            (root / "agents" / "skills" / "skill-dependencies.yaml").write_text(
+                "version: 1\nskill_dependencies: {}\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_route(
+                "--root",
+                str(root.parent.parent),
+                "--prompt",
+                "小さなルーティング改善を提案してください",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_route_resolves_vendored_from_cwd(self) -> None:
+        """Prompt mode resolves vendored sources from multiple cwd under the parent root."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent_root = Path(tmp_dir)
+            (parent_root / ".git").touch()
+            root = parent_root / "vendor" / "agent-canon"
+            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
+            (root / "agents" / "skills" / "catalog.yaml").write_text(
+                "version: 1\nskill_families: []\n",
+                encoding="utf-8",
+            )
+            (root / "agents" / "skills" / "skill-dependencies.yaml").write_text(
+                "version: 1\nskill_dependencies: {}\n",
+                encoding="utf-8",
+            )
+            parent_child = parent_root / "workspace" / "subdir"
+            parent_child.mkdir(parents=True, exist_ok=True)
+
+            for cwd in (parent_root, parent_child):
+                result = self.run_route_from_cwd(
+                    cwd,
+                    "--prompt",
+                    "小さなルーティング改善を提案してください",
+                )
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_route_deduplicates_parent_agents_symlink_view(self) -> None:
+        """A parent root view symlink to its vendor source resolves as vendored."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent_root = Path(tmp_dir)
+            (parent_root / ".git").touch()
+            source_root = parent_root / "source" / "agent-canon"
+            catalog = source_root / "agents" / "skills" / "catalog.yaml"
+            catalog.parent.mkdir(parents=True, exist_ok=True)
+            catalog.write_text("version: 1\nskill_families: []\n", encoding="utf-8")
+            (source_root / "agents" / "skills" / "skill-dependencies.yaml").write_text(
+                "version: 1\nskill_dependencies: {}\n",
+                encoding="utf-8",
+            )
+            vendor_link = parent_root / "vendor" / "agent-canon"
+            vendor_link.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(source_root, vendor_link, target_is_directory=True)
+            os.symlink(
+                vendor_link / "agents",
+                parent_root / "agents",
+                target_is_directory=True,
+            )
+
+            resolution = agent_canon_source_root.resolve_agent_canon_source_root(parent_root)
+
+            self.assertEqual(resolution.layout, "vendored")
+            self.assertEqual(resolution.current_repository_root, parent_root.resolve())
+            self.assertEqual(resolution.source_root, source_root.resolve())
+            result = self.run_route(
+                "--root",
+                str(parent_root),
+                "--prompt",
+                "ルーティング改善を提案してください",
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_route_rejects_different_symlink_view_entity_as_ambiguous(self) -> None:
+        """A root view symlink to another AgentCanon entity stays ambiguous."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent_root = Path(tmp_dir)
+            (parent_root / ".git").touch()
+            standalone_root = parent_root / "standalone"
+            standalone_catalog = standalone_root / "agents" / "skills" / "catalog.yaml"
+            standalone_catalog.parent.mkdir(parents=True, exist_ok=True)
+            standalone_catalog.write_text(
+                "version: 1\nskill_families: []\n",
+                encoding="utf-8",
+            )
+            vendor_root = parent_root / "vendor" / "agent-canon"
+            vendor_catalog = vendor_root / "agents" / "skills" / "catalog.yaml"
+            vendor_catalog.parent.mkdir(parents=True, exist_ok=True)
+            vendor_catalog.write_text("version: 1\nskill_families: []\n", encoding="utf-8")
+            os.symlink(
+                standalone_root / "agents",
+                parent_root / "agents",
+                target_is_directory=True,
+            )
+
+            with self.assertRaises(agent_canon_source_root.SourceRootFailure) as raised:
+                agent_canon_source_root.resolve_agent_canon_source_root(parent_root)
+
+            self.assertEqual(raised.exception.code, "agent_canon_source_root_ambiguous")
+
+    def test_route_rejects_vendor_symlink_outside_repository(self) -> None:
+        """A vendor symlink escaping the parent repository fails typed resolution."""
+        with tempfile.TemporaryDirectory() as tmp_dir, tempfile.TemporaryDirectory() as outside_dir:
+            parent_root = Path(tmp_dir)
+            (parent_root / ".git").touch()
+            outside_root = Path(outside_dir) / "agent-canon"
+            catalog = outside_root / "agents" / "skills" / "catalog.yaml"
+            catalog.parent.mkdir(parents=True, exist_ok=True)
+            catalog.write_text("version: 1\nskill_families: []\n", encoding="utf-8")
+            vendor_link = parent_root / "vendor" / "agent-canon"
+            vendor_link.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(outside_root, vendor_link, target_is_directory=True)
+
+            with self.assertRaises(agent_canon_source_root.SourceRootFailure) as raised:
+                agent_canon_source_root.resolve_agent_canon_source_root(parent_root)
+
+            self.assertEqual(
+                raised.exception.code,
+                "agent_canon_source_root_vendor_outside_repository",
+            )
+            result = self.run_route(
+                "--root",
+                str(parent_root),
+                "--prompt",
+                "ルーティング改善を提案してください",
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn(raised.exception.code, result.stderr)
+
+    def test_route_rejects_ambiguous_source_root(self) -> None:
+        """Two discoverable roots return a deterministic typed failure."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
+            (root / "agents" / "skills" / "catalog.yaml").write_text(
+                "version: 1\nskill_families: []\n",
+                encoding="utf-8",
+            )
+            (root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            (root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").write_text(
+                "version: 1\nskill_families: []\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_route(
+                "--root",
+                str(root),
+                "--prompt",
+                "小さなルーティング改善を提案してください",
+            )
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn(
+                "ROUTE_SOURCE_ROOT_FAILURE=agent_canon_source_root_ambiguous",
+                result.stderr,
+            )
+
+    def test_route_rejects_missing_source_root(self) -> None:
+        """A root without any AgentCanon catalog emits typed source-root failure."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = self.run_route(
+                "--root",
+                tmp_dir,
+                "--prompt",
+                "小さなルーティング改善を提案してください",
+            )
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn(
+                "ROUTE_SOURCE_ROOT_FAILURE=agent_canon_source_root_missing",
+                result.stderr,
+            )
+
+    def test_source_root_resolution_utils_cover_shapes(self) -> None:
+        """Unit tests cover direct source-root resolution edge cases."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
+            standalone = root / "agents" / "skills" / "catalog.yaml"
+            standalone.parent.mkdir(parents=True, exist_ok=True)
+            standalone.write_text("version: 1\nskill_families:\n", encoding="utf-8")
+            resolution = agent_canon_source_root.resolve_agent_canon_source_root(root)
+            self.assertEqual(resolution.layout, "standalone")
+            self.assertEqual(resolution.source_root, root.resolve())
+            self.assertEqual(resolution.current_repository_root, root.resolve())
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "vendor" / "agent-canon"
+            (root / "agents" / "skills" / "catalog.yaml").parent.mkdir(parents=True, exist_ok=True)
+            (root / "agents" / "skills" / "catalog.yaml").write_text(
+                "version: 1\nskill_families:\n",
+                encoding="utf-8",
+            )
+            resolution = agent_canon_source_root.resolve_agent_canon_source_root(root.parent.parent)
+            self.assertEqual(resolution.layout, "vendored")
+            self.assertEqual(resolution.source_root, root.resolve())
+            self.assertEqual(
+                resolution.current_repository_root,
+                root.parent.parent.resolve(),
+            )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with self.assertRaises(agent_canon_source_root.SourceRootFailure) as exc:
+                agent_canon_source_root.resolve_agent_canon_source_root(Path(tmp_dir))
+            self.assertEqual(exc.exception.code, "agent_canon_source_root_missing")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "agents" / "skills" / "catalog.yaml").parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            (root / "agents" / "skills" / "catalog.yaml").write_text(
+                "version: 1\nskill_families:\n",
+                encoding="utf-8",
+            )
+            (root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            (root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").write_text(
+                "version: 1\nskill_families:\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(agent_canon_source_root.SourceRootFailure) as exc:
+                agent_canon_source_root.resolve_agent_canon_source_root(root)
+            self.assertEqual(exc.exception.code, "agent_canon_source_root_ambiguous")
 
     def test_long_proposed_tool_name_resolves_to_short_area(self) -> None:
         """Long candidate-list tool names should become aliases."""
@@ -736,7 +1052,6 @@ class RouteToolTest(unittest.TestCase):
         for command in (
             "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
             "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
-            "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json",
         ):
             self.assertIn(command, direct_text)
         self.assertNotIn("<path>", direct_text)
@@ -745,21 +1060,19 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("`--json` is invalid", direct_text)
         direct_flat = " ".join(direct_text.split())
         for invariant in (
-            "Treat these three commands as immutable flag templates.",
-            "`--root .` and `--format json` are mandatory in all three routes.",
+            "Treat these two commands as immutable flag templates.",
+            "`--root .` and `--format json` are mandatory in both routes.",
             "Do not remove, add, or rename any flag.",
-            "For a supplied TSV, only the path value after `--graph-tsv` and the path value after `--bundle-dir` may be replaced with user-provided paths; keep every other token unchanged.",
         ):
             self.assertIn(invariant, direct_flat)
         for boundary in (
-            "`check_dependency_graph.sh` owns dependency pass/fail authority.",
-            "In generated mode, the renderer invokes that checker for the generated TSV and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
-            "For a supplied TSV, checker status is `not_run`: the supplied TSV producer owns source facts and the renderer owns only projections.",
+            "The canonical graph owns dependency status and facts.",
+            "The renderer performs one typed dependency query through `GraphClient` and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
         ):
             self.assertIn(boundary, direct_flat)
         self.assertNotIn("tools/agent_tools/check_dependency_graph.sh", direct_flat)
         self.assertIn(
-            "does not call a separate raw checker, scan, helper, or Mermaid route because the renderer invokes that checker in generated mode",
+            "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
             direct_flat,
         )
         packet_result = subprocess.run(
@@ -787,7 +1100,6 @@ class RouteToolTest(unittest.TestCase):
             [
                 "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
                 "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
-                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --graph-tsv reports/dependency_graph.tsv --bundle-dir reports/dependency-graph --format json",
             ],
         )
         for forbidden in ("route.py", "scan_code_dependencies.py", "helper_function_inventory.py"):
@@ -809,35 +1121,32 @@ class RouteToolTest(unittest.TestCase):
         )
 
     def test_code_visualization_canonical_skill_mirrors_renderer_invariant(self) -> None:
-        """The canonical owner keeps generated and supplied-TSV routes synchronized."""
+        """The canonical owner keeps full and changed graph routes synchronized."""
         canonical_text = (PROJECT_ROOT / "agents" / "skills" / "code-visualization.md").read_text(
             encoding="utf-8"
         )
         source_start = canonical_text.index("## Source Evidence Routes")
         source_text = canonical_text[source_start:]
         self.assertIn("changed-scope command only when changed scope is explicit", source_text)
-        self.assertIn("--graph-tsv reports/dependency_graph.tsv", source_text)
         self.assertIn("--bundle-dir reports/dependency-graph", source_text)
         self.assertNotIn("<path>", source_text)
         self.assertNotIn("<provided-path>", source_text)
         self.assertIn("`--json` is invalid", source_text)
         source_flat = " ".join(source_text.split())
         for invariant in (
-            "Treat these three commands as immutable flag templates.",
-            "`--root .` and `--format json` are mandatory in all three routes.",
+            "Treat these two commands as immutable flag templates.",
+            "`--root .` and `--format json` are mandatory in both routes.",
             "Do not remove, add, or rename any flag.",
-            "For a supplied TSV, only the path value after `--graph-tsv` and the path value after `--bundle-dir` may be replaced with user-provided paths; keep every other token unchanged.",
         ):
             self.assertIn(invariant, source_flat)
         for boundary in (
-            "`check_dependency_graph.sh` owns dependency pass/fail authority.",
-            "In generated mode, the renderer invokes that checker for the generated TSV and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
-            "For a supplied TSV, checker status is `not_run`: the supplied TSV producer owns source facts and the renderer owns only projections.",
+            "The canonical graph owns dependency status and facts.",
+            "The renderer performs one typed dependency query through `GraphClient` and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
         ):
             self.assertIn(boundary, source_flat)
         self.assertNotIn("tools/agent_tools/check_dependency_graph.sh", source_flat)
         self.assertIn(
-            "does not call a separate raw checker, scan, helper, or Mermaid route because the renderer invokes that checker in generated mode",
+            "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
             source_flat,
         )
         self.assertNotIn(
@@ -940,7 +1249,10 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("report-writing", decision["matched_skills"])
         self.assertIn("report-writing", decision["active_skills"])
-        self.assertIn("structure-planning", decision["related_skill_candidates"])
+        self.assertLess(
+            decision["skills"].index("structure-planning"),
+            decision["skills"].index("report-writing"),
+        )
         self.assertIn("result-artifact-writeout", decision["related_skill_candidates"])
 
     def test_prompt_router_rejects_private_skill_in_public_catalog(self) -> None:
@@ -1189,6 +1501,28 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=skills", result.stdout)
         self.assertIn("CANONICAL_SKILL=runtime-log-repair", result.stdout)
 
+    def test_environment_maintenance_activates_dependency_design_prerequisite(self) -> None:
+        """Environment maintenance must route through dependency design first."""
+        result = self.run_route(
+            "--prompt",
+            "environment-maintenance Docker runtime update",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("dependency-design", decision["skills"])
+        self.assertIn("environment-maintenance", decision["skills"])
+        self.assertLess(
+            decision["skills"].index("dependency-design"),
+            decision["skills"].index("environment-maintenance"),
+        )
+        self.assertLess(
+            decision["active_skills"].index("dependency-design"),
+            decision["active_skills"].index("environment-maintenance"),
+        )
+
     def test_prompt_does_not_route_ordinary_url_or_report_text_to_runtime_log_repair(
         self,
     ) -> None:
@@ -1254,7 +1588,10 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("experiment-lifecycle", decision["matched_skills"])
         self.assertIn("experiment-lifecycle", decision["active_skills"])
-        self.assertIn("result-artifact-writeout", decision["related_skill_candidates"])
+        self.assertLess(
+            decision["skills"].index("result-artifact-writeout"),
+            decision["skills"].index("experiment-lifecycle"),
+        )
 
     def test_prompt_routes_result_save_export_to_writeout(self) -> None:
         """Result save/export prompts should activate result-artifact-writeout."""
@@ -1686,8 +2023,8 @@ class RouteToolTest(unittest.TestCase):
         )
         self.assertNotIn("Traceback", result.stderr)
 
-    def test_prompt_route_unknown_related_skill_fails_structured(self) -> None:
-        """Related skill metadata should reference public catalog entries."""
+    def test_prompt_route_unknown_dependency_reference_fails_structured(self) -> None:
+        """Dependency metadata should reference public catalog entries."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             catalog = root / "agents" / "skills" / "catalog.yaml"
@@ -1698,8 +2035,23 @@ class RouteToolTest(unittest.TestCase):
                         "version: 1",
                         "skill_families:",
                         "  - id: task-routing",
-                        "    related_skills:",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            dependency_map = root / "agents" / "skills" / "skill-dependencies.yaml"
+            dependency_map.write_text(
+                "\n".join(
+                    [
+                        "version: 1",
+                        "skill_dependencies:",
+                        "  task-routing:",
+                        "    responsibility_group: orchestration",
+                        "    required_prerequisites: []",
+                        "    successors:",
                         "      - missing-skill",
+                        "    order_constraints: []",
+                        "    parallel_independent: []",
                     ]
                 ),
                 encoding="utf-8",
@@ -1715,7 +2067,8 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn(
-            "task-routing.related_skills unknown skill: missing-skill", result.stderr
+            "skill-dependency-map-unknown-reference:task-routing:successors:missing-skill",
+            result.stderr,
         )
         self.assertNotIn("Traceback", result.stderr)
 
@@ -1925,6 +2278,34 @@ class CapabilityRouteTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        skill_ids = [
+            line.strip()[len("- id: ") :]
+            for line in entries.splitlines()
+            if line.startswith("  - id: ")
+        ]
+        dependency_lines = ["version: 1", "skill_dependencies:"]
+        for skill_id in skill_ids:
+            dependency_lines.extend(
+                [
+                    f"  {skill_id}:",
+                    "    responsibility_group: fixture",
+                    "    required_prerequisites: []",
+                    "    successors: []",
+                    "    order_constraints: []",
+                    "    parallel_independent: []",
+                ]
+            )
+        self.write_dependency_map(root, "\n".join(dependency_lines[2:]))
+        return path
+
+    def write_dependency_map(self, root: Path, body: str) -> Path:
+        """Write one dependency dictionary fixture."""
+        path = root / "agents" / "skills" / "skill-dependencies.yaml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "\n".join(["version: 1", "skill_dependencies:", body]),
+            encoding="utf-8",
+        )
         return path
 
     def capability_entry(
@@ -1977,6 +2358,15 @@ class CapabilityRouteTest(unittest.TestCase):
             self.assertIn(f"CAPABILITY_ERROR_CODE={code}", result.stdout)
         return result.stdout
 
+    def assert_route_source_root_failure(
+        self,
+        result: subprocess.CompletedProcess[str],
+        code: str,
+    ) -> None:
+        """Assert typed root-resolution failure from route entry."""
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn(f"ROUTE_SOURCE_ROOT_FAILURE={code}", result.stderr)
+
     def test_skill_routing_schema_rejects_unknown_stage_policy(self) -> None:
         """Catalog owner rejects stage-policy values outside its schema."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -2023,8 +2413,8 @@ class CapabilityRouteTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "routing.reason"):
                 catalog_module.load_skill_route_rules(root)
 
-    def test_skill_related_schema_rejects_unknown_skill(self) -> None:
-        """Catalog owner rejects related skills absent from the catalog."""
+    def test_skill_dependency_schema_rejects_unknown_skill(self) -> None:
+        """Dependency owner rejects references absent from the catalog."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_catalog(
@@ -2035,16 +2425,30 @@ class CapabilityRouteTest(unittest.TestCase):
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
                         "    shim: .agents/skills/task-routing/SKILL.md",
-                        "    related_skills:",
-                        "      - missing-skill",
                     ]
                 ),
             )
-            with self.assertRaisesRegex(ValueError, "unknown skill: missing-skill"):
+            self.write_dependency_map(
+                root,
+                "\n".join(
+                    [
+                        "  task-routing:",
+                        "    responsibility_group: fixture",
+                        "    required_prerequisites: []",
+                        "    successors:",
+                        "      - missing-skill",
+                        "    order_constraints: []",
+                        "    parallel_independent: []",
+                    ]
+                ),
+            )
+            with self.assertRaisesRegex(
+                ValueError, "skill-dependency-map-unknown-reference"
+            ):
                 catalog_module.load_skill_route_rules(root)
 
-    def test_skill_related_schema_rejects_self_reference(self) -> None:
-        """Catalog owner rejects self-referential related skills."""
+    def test_skill_dependency_schema_rejects_self_reference(self) -> None:
+        """Dependency owner rejects self-referential relations."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_catalog(
@@ -2055,12 +2459,26 @@ class CapabilityRouteTest(unittest.TestCase):
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
                         "    shim: .agents/skills/task-routing/SKILL.md",
-                        "    related_skills:",
+                    ]
+                ),
+            )
+            self.write_dependency_map(
+                root,
+                "\n".join(
+                    [
+                        "  task-routing:",
+                        "    responsibility_group: fixture",
+                        "    required_prerequisites: []",
+                        "    successors: []",
+                        "    order_constraints: []",
+                        "    parallel_independent:",
                         "      - task-routing",
                     ]
                 ),
             )
-            with self.assertRaisesRegex(ValueError, "must not include itself"):
+            with self.assertRaisesRegex(
+                ValueError, "skill-dependency-map-self-reference"
+            ):
                 catalog_module.load_skill_route_rules(root)
 
     def test_capability_route_selects_oop_type_design(self) -> None:
@@ -2287,19 +2705,19 @@ class CapabilityRouteTest(unittest.TestCase):
             "--capability",
             "oop_type_design",
         )
-        self.assert_failure_code(result, "capability-root-not-found")
+        self.assert_route_source_root_failure(result, "agent_canon_source_root_missing")
 
     def test_capability_root_rejects_non_directory(self) -> None:
         """A file root is not accepted as a repository root."""
         with tempfile.NamedTemporaryFile() as file:
             result = self.run_route("--root", file.name, "--capability", "oop_type_design")
-        self.assert_failure_code(result, "capability-root-not-directory")
+        self.assert_route_source_root_failure(result, "agent_canon_source_root_missing")
 
     def test_capability_root_rejects_missing_catalog(self) -> None:
         """A custom root without a catalog fails closed."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             result = self.run_route("--root", tmp_dir, "--capability", "oop_type_design")
-        self.assert_failure_code(result, "capability-root-catalog-missing")
+        self.assert_route_source_root_failure(result, "agent_canon_source_root_missing")
 
     def test_capability_root_rejects_invalid_catalog(self) -> None:
         """Malformed YAML at a custom root is a typed root failure."""
@@ -2389,9 +2807,9 @@ class CapabilityRouteTest(unittest.TestCase):
         )
         payload = route_module.capability_decision_to_json_data(decision)
         self.assertEqual(payload["related_skills"]["oop-type-design"], [
-            "oop-readability-check",
             "python-review",
             "cpp-review",
+            "oop-readability-check",
         ])
 
 

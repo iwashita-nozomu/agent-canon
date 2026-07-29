@@ -3,6 +3,8 @@
 # contract test
 # responsibility Exercises public ExecutionResourcePlan resource, environment, certificate, lock, readback, terminal, cleanup, and completion observables.
 # upstream implementation ../../tools/experiments/execution_resource_plan.py canonical resource-plan owner
+# downstream implementation ../../.codex/hooks/execution_resource_plan_projection_guard.py validates exact projected bytes
+# downstream implementation ../../.codex/hooks/hook_dispatcher.py forwards only validator-approved projection output
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 test frame
 # upstream design ../../documents/design/experiment_runner.md ExperimentRunner lifecycle and scheduler boundary
 # downstream implementation ../../documents/experiments/gpu-admission-r5-ordered-integration-interface.json selects this contract source without executing it
@@ -169,6 +171,13 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             self.assertFalse(coverage.all_planned_chunks_complete)
             self.assertFalse(coverage.overall_delivery_complete)
             projection = PostToolUseProjectionReducer().project(outcome, coverage)
+            projection_payload = json.loads(projection)
+            self.assertEqual(
+                projection_payload["admission"]["guarantee"],
+                "run-level-opaque-uuid-admission",
+            )
+            self.assertEqual(projection_payload["error"], None)
+            self.assertLessEqual(len(projection_payload["admission"]["namespace_id"]), 64)
             hook = (
                 Path(__file__).resolve().parents[2]
                 / ".codex"

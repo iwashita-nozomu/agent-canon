@@ -30,9 +30,13 @@ TODO state up to date.
   documents; Route contains the operational rules; Closeout Evidence names the
   required validation and PR evidence.
 - Boundary: use `dependency-module-change` first when an AgentCanon source edit
-  is required. Parent pin updates project a clean vendor checkout and never
-  preserve a vendor source checkout as a working branch; parent source changes
-  go through the managed topic workspace source clone and return as a clean pin.
+  is required. Parent projection passes only with a clean named `main` checkout
+  whose worktree `HEAD` equals the staged index gitlink. Source edits use the
+  clean named topic branch in `vendor/agent-canon`; a managed workspace clone is
+  a fallback only when another topic already owns the parent vendor dirty state.
+  Parent state, requested topic identity, and dirty fallback next actions are
+  defined only by the [`AgentCanon parent state decision table`](../../documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table).
+  The `cmd_latest` update-target branch is never a topic slug.
 
 ## Use When
 
@@ -42,9 +46,9 @@ TODO state up to date.
   entrypoint.
 - A parent repo has AgentCanon submodule pin drift, root-view drift, safe
   dirty checkout state, or pending `.agent-canon/update-state.toml` TODOs.
-- `vendor/agent-canon/` contains local AgentCanon source commits that need a
-  standalone AgentCanon source clone and branch/PR before the parent pin can
-  move. A dirty vendor checkout is not a source-work surface.
+- `vendor/agent-canon/` contains a clean named topic branch for current source
+  work, or another topic's dirty state requires the managed workspace fallback.
+  A `main` checkout is the topic-creation starting point, not a source-edit owner.
 
 ## Core References
 
@@ -68,15 +72,21 @@ TODO state up to date.
    fix the target structure, owner graph, and namespace. Evidence reads are
    permitted only when the imported Decision Sufficiency packet names the
    downstream structure/owner decision they can change.
-1. Read `documents/rule/dependency-module-changes.md` first. Accept exactly two
+1. Read the `AgentCanon parent state decision table` in
+   `documents/rule/dependency-module-changes.md` first. Accept exactly two
    repository shapes: the standalone AgentCanon source namespace, or a parent
    consumer with the `vendor/agent-canon` submodule. Legacy subtree/snapshot
    placement is rejected; it is not a compatibility route.
-1. Enter source edits through a topic workspace branch clone. In standalone mode
-   `tools/update_agent_canon.sh` owns source-main rebind and branch publication;
-   in parent mode it owns only clean pin/root projection. Parent mode refuses
-   `merge-main-into-current*` in parent mode; source changes use the managed
-   topic workspace clone and return as a clean vendor pin.
+1. Enter parent source edits through the clean named topic branch in the current
+   `vendor/agent-canon` checkout. A parent checkout on `main` stops at the topic
+   creation action; it is not a source-edit owner. If another topic has dirty
+   state in that vendor checkout, apply the decision table's requested-topic
+   identity rule: a missing identity stops, a matching named current branch
+   materializes the current vendor topic, and only a differing topic uses the
+   managed workspace clone fallback.
+   Parent pin/root projection resumes only from clean `main` with the staged
+   gitlink matching worktree `HEAD`. In standalone mode
+   `tools/update_agent_canon.sh` owns source-main rebind and branch publication.
    Every mutating wrapper or low-level sync invocation must carry the validated
    branch/destructive authority fields and
    `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` in the same

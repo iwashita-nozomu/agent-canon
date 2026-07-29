@@ -7,8 +7,9 @@ upstream design ../experiments/result-log-retention-and-visualization.md retenti
 downstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves archive paths
 downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages clone, branch, status, and push operations
 downstream design runtime-log-archive-migration.md documents in-tree hook JSONL migration into the archive
-downstream implementation ../../.codex/hooks/log_archive_mount_warning.py warns when the archive mount is absent
-downstream implementation ../../.codex/hooks/runtime_log_auto_sync.py runs best-effort Stop-time archive sync
+downstream design ../../.codex/hooks/hook_dispatcher.py records the active fingerprint-only local spool contract
+downstream implementation ../../.codex/hooks/log_archive_mount_warning.py remains a standalone explicit mount check
+downstream implementation ../../.codex/hooks/runtime_log_auto_sync.py remains a standalone explicit archive checkpoint
 downstream implementation ../../.codex/hooks/hook_event_log.py writes atomic per-event files into the repository-owned spool
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates archive JSONL and eval reports when mounted
 downstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py reads mounted archive JSONL and eval reports
@@ -119,15 +120,21 @@ python3 tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
   --base-ref <base-ref>
 ```
 
-The Rust graph command consumes the prepared artifact plus the latest confirmed
-committed receipt during one `graph build`. Its v2 persisted runtime-evidence
-snapshot retains the exact artifact/receipt bytes, their hashes, the live
-source identity fingerprint, and the validated observation. `graph status`,
-`graph query`, `graph context`, and dependency-review consumers reuse that one
-snapshot and perform only one bounded freshness probe per command. They never
-rerun the runtime producer. Missing, uncertain, invalid, stale, or mismatched
-runtime evidence makes the graph unavailable or stale instead of regenerating
-an event.
+When an active runtime pointer exists, the Rust graph command consumes the
+prepared artifact plus the latest confirmed committed receipt during one
+`graph build`. Its v2 persisted runtime-evidence snapshot retains the exact
+artifact/receipt bytes, their hashes, the live source identity fingerprint,
+and the validated observation. Without an active runtime pointer, the same
+builder publishes the source facts and completeness diagnostics without a
+runtime producer snapshot. `graph status`, `graph query`, `graph context`, and
+dependency-review consumers reuse that one snapshot and perform only one
+bounded freshness probe per command. They never rerun the runtime producer.
+Nonempty source completeness diagnostics produce `incomplete` rather than
+`fresh`; status remains inspectable, while query and context refuse to
+authorize evidence until the diagnostic sets are empty.
+Once a runtime pointer is present, missing, uncertain, invalid, stale, or
+mismatched runtime evidence remains unavailable or stale instead of being
+regenerated.
 
 ## Layout
 
@@ -153,7 +160,7 @@ from `AGENT_CANON_LOG_ENV`, devcontainer / Compose / Codespace metadata, or a
 host fallback. `<chat-key>` comes from `CODEX_THREAD_ID`, `CODEX_SESSION_ID`,
 or `CODEX_CONVERSATION_ID`; Codex lifecycle hooks also promote top-level
 payload trace fields such as `session_id`, `conversation_id`, and `thread_id`
-to `CODEX_THREAD_ID` before child hooks run. Non-chat CLI / CI runs use the
+to `CODEX_THREAD_ID` before active hook telemetry is spooled. Non-chat CLI / CI runs use the
 explicit fallback `no-chat-<repo-key>`. The source isolation key remains
 `<repo-key>` inside the branch tree, so one chat branch can still separate
 parent repo and standalone AgentCanon evidence by path.
@@ -280,10 +287,10 @@ An explicit legacy `*.jsonl` hook override maps to sibling directory
 `<override>.events/`; the hot path never appends a shared JSONL file and never
 falls back to host `~/.codex` state.
 
-`hooks/log_archive_mount_warning.py` runs at prompt and pre-tool boundaries. It
-does not block; it emits a visible warning that asks the agent to prepare the
-archive before an explicit checkpoint or accumulated eval write when the mount
-is missing or not a Git clone. Local hook spooling remains available.
+`hooks/log_archive_mount_warning.py` is a standalone explicit mount check, not
+an active lifecycle hook. Run it when preparing an archive checkpoint; the
+active dispatcher only writes bounded fingerprint events to the local spool
+and never inspects or mounts an archive.
 
 ## Push
 
@@ -378,12 +385,11 @@ RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH=logs/<environment-key>-<chat-key>
 RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR=<agent-canon>/.agent-canon/log-archive/agent-reports/<repo-key>
 ```
 
-`hooks/runtime_log_auto_sync.py` runs the same `sync` path from the Codex Stop
-hook on a best-effort, fail-open basis. It emits no output on success and does
-not block repository work on network, SSH, or archive availability failures.
-Use `AGENT_CANON_DISABLE_RUNTIME_LOG_AUTO_SYNC=1` to disable it for explicit
-hook-development tests, or `AGENT_CANON_RUNTIME_LOG_AUTO_SYNC_NO_PUSH=1` to copy
-artifacts locally without pushing.
+`hooks/runtime_log_auto_sync.py` is a standalone compatibility route for an
+explicit archive checkpoint; it is not registered for `Stop`. Run
+`python3 tools/agent_tools/runtime_log_archive_git.py sync` from the
+administrative checkpoint owner. The active dispatcher has no archive, Git,
+network, SSH, or auto-sync dependency.
 
 ## Legacy In-Tree Migration
 

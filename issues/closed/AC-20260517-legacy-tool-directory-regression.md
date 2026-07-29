@@ -5,7 +5,7 @@
 contract issue
 responsibility Records the resolved regression where retired tools/legacy paths returned to AgentCanon main.
 upstream design ../README.md defines durable AgentCanon operational issue storage.
-upstream design ../../documents/repo-local-tool-imports.md retires tools/legacy provenance paths.
+upstream design ../../documents/tools/repo-local-tool-imports.md retires tools/legacy provenance paths.
 upstream design ../../tools/README.md defines canonical shared tool families.
 downstream implementation ../../tools/agent_tools/tool_drift.py rejects tools/legacy directories.
 @dependency-end

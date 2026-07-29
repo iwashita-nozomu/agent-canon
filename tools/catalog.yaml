@@ -137,7 +137,7 @@ entries:
     command: python3 tools/agent_tools/tool_catalog.py
     writes: false
     default_wiring:
-      ci: false
+      ci: true
       pr_check: false
     docs:
       - tools/README.md
@@ -154,7 +154,7 @@ entries:
     command: python3 tools/agent_tools/tool_drift.py
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md
@@ -178,7 +178,7 @@ entries:
       - documents/tools/README.md
       - documents/design/responsibility-scope-management.md
       - responsibility-scope.toml
-      - documents/templates/responsibility-scope.template.toml
+      - templates/documents/responsibility-scope.template.toml
     tests:
       - tests/agent_tools/test_responsibility_scope.py
 
@@ -629,7 +629,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - agents/canonical/ARTIFACT_PLACEMENT.md
-      - agents/templates/closeout_gate.md
+      - templates/agents/closeout_gate.md
     tests:
       - tests/agent_tools/test_generated_artifact_guard.py
 
@@ -675,7 +675,7 @@ entries:
       - tests/agent_tools/test_runtime_log_archive_git.py
 
   - id: agent-canon-graph
-    summary: Builds and serves the one-build dependency graph with a persisted runtime-evidence snapshot.
+    summary: Builds and serves the one-build dependency graph with an optional persisted runtime-evidence snapshot.
     path: rust/agent-canon/src/graph.rs
     family: root
     role: runner
@@ -1471,6 +1471,25 @@ entries:
       - documents/experiments/experiment-registry.md
     tests: []
     test_exempt_reason: Registry contract is exercised through repo-wide CI smoke checks.
+
+  - id: check-experiment-template
+    summary: Creates a temporary parent-shaped topic from centralized experiment templates and validates its registry, Python, and notebook structure without executing it.
+    path: tools/ci/check_experiment_template.py
+    family: ci
+    role: checker
+    status: canonical
+    command: python3 tools/ci/check_experiment_template.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - templates/README.md
+      - documents/experiments/experiment-registry.md
+    tests:
+      - tests/tools/test_check_experiment_template.py
 
   - id: check-hardcoded-numbers
     summary: Rejects unexplained numeric literals in Python and C++ sources.

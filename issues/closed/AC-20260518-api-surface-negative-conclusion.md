@@ -8,7 +8,7 @@ upstream design ../README.md defines durable AgentCanon operational issue conven
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md defines the executable Codex workflow.
 upstream design ../../agents/workflows/implementation-waterfall-workflow.md requires installed-library and existing-API sweeps before implementation.
 upstream design ../../agents/skills/codex-task-workflow.md requires dependency surface review before implementation.
-upstream design ../../documents/dependency-manifest-design.md defines dependency-expanded search evidence.
+upstream design ../../documents/design/dependency-manifest-design.md defines dependency-expanded search evidence.
 downstream design ../../agents/workflows/implementation-waterfall-workflow.md should require public API traversal evidence before negative capability claims.
 downstream design ../../agents/skills/codex-task-workflow.md should route API-surface misses into workflow gates.
 downstream implementation ../../tools/agent_tools/route.py may expose an API-surface search route.

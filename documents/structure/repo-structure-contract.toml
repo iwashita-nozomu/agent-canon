@@ -27,6 +27,8 @@ ignore_names = [
   "target",
 ]
 ignore_globs = [
+  "experiments/*/result",
+  "experiments/*/result/**",
   "*/__pycache__",
   "rust/agent-canon/target",
   "rust/agent-canon/target/**",
@@ -61,6 +63,7 @@ allowed_top_level = [
   "ROOT_AGENTS.md",
   "agent-canon-environment.toml",
   "agents",
+  "templates",
   "codex-cli-guide",
   "completion-first-review",
   "documents",
@@ -98,6 +101,16 @@ category = "agent_instruction"
 path = "agents"
 kind = "dir"
 category = "agent_runtime"
+
+[[profile.required]]
+path = "templates"
+kind = "dir"
+category = "template_source"
+
+[[profile.required]]
+path = "templates/README.md"
+kind = "file"
+category = "template_source"
 
 [[profile.required]]
 path = "agents/skills"
@@ -279,6 +292,7 @@ allowed_top_level = [
   "QUICK_START.md",
   "README.md",
   "agents",
+  "templates",
   "cmake",
   "docker",
   "documents",
@@ -328,6 +342,11 @@ category = "shared_runtime_view"
 
 [[profile.required]]
 path = "agents"
+kind = "any"
+category = "shared_runtime_view"
+
+[[profile.required]]
+path = "templates"
 kind = "any"
 category = "shared_runtime_view"
 
