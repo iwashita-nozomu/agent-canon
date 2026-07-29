@@ -28,8 +28,11 @@ from tools.agent_tools.devcontainer_dependencies import (
     DependencyError,
     Installer,
     LoadedManifest,
+    ManifestRole,
+    ManifestSource,
     build_plan,
-    manifest_paths,
+    load_plan,
+    manifest_sources,
     parse_record,
     safe_extract_tar,
 )
@@ -135,13 +138,26 @@ def render_toml(value: object) -> str:
 def write_manifest(path: Path, records: list[dict[str, Any]]) -> None:
     """Write a small TOML fixture without depending on a TOML writer."""
     lines = ['schema = "agent-canon.devcontainer-dependencies"', "schema_version = 2", ""]
-    for item in records:
-        lines.append("[[records]]")
-        for key, value in item.items():
-            lines.append(f"{key} = {render_toml(value)}")
-        lines.append("")
+    if records:
+        for item in records:
+            lines.append("[[records]]")
+            for key, value in item.items():
+                lines.append(f"{key} = {render_toml(value)}")
+            lines.append("")
+    else:
+        lines.append("records = []")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def loaded_manifest(
+    path: Path,
+    records: tuple[Any, ...],
+    *,
+    role: ManifestRole = ManifestRole.CANONICAL,
+) -> LoadedManifest:
+    """Build a loaded fixture with an explicit structural manifest role."""
+    return LoadedManifest(ManifestSource(path, role), records)
 
 
 class FakeRunner:
@@ -241,13 +257,14 @@ class DependencyModelTests(unittest.TestCase):
     def test_repository_manifest_validates_and_dry_run_has_stable_order(self) -> None:
         plan = build_plan(
             (
-                LoadedManifest(
+                loaded_manifest(
                     Path("parent.toml"),
                     (
                         parse_record(record("parent"), path=Path("parent.toml"), index=0),
                     ),
+                    role=ManifestRole.PARENT_OVERLAY,
                 ),
-                LoadedManifest(
+                loaded_manifest(
                     Path("vendor.toml"),
                     (
                         parse_record(
@@ -443,8 +460,12 @@ class DependencyModelTests(unittest.TestCase):
         )
         merged = build_plan(
             (
-                LoadedManifest(Path("parent.toml"), (parent,)),
-                LoadedManifest(Path("vendor.toml"), (vendor,)),
+                loaded_manifest(
+                    Path("parent.toml"),
+                    (parent,),
+                    role=ManifestRole.PARENT_OVERLAY,
+                ),
+                loaded_manifest(Path("vendor.toml"), (vendor,)),
             )
         ).records[0]
         self.assertEqual(merged.version, "1.0.0")
@@ -462,18 +483,22 @@ class DependencyModelTests(unittest.TestCase):
         with self.assertRaisesRegex(DependencyError, "incompatible duplicate"):
             build_plan(
                 (
-                    LoadedManifest(Path("parent.toml"), (parent,)),
-                    LoadedManifest(Path("vendor.toml"), (incompatible,)),
+                    loaded_manifest(
+                        Path("parent.toml"),
+                        (parent,),
+                        role=ManifestRole.PARENT_OVERLAY,
+                    ),
+                    loaded_manifest(Path("vendor.toml"), (incompatible,)),
                 )
             )
         with self.assertRaisesRegex(DependencyError, "provider ambiguity"):
             build_plan(
                 (
-                    LoadedManifest(
+                    loaded_manifest(
                         Path("a.toml"),
                         (parse_record(record("a", provides=["same"]), path=Path("a.toml"), index=0),),
                     ),
-                    LoadedManifest(
+                    loaded_manifest(
                         Path("b.toml"),
                         (parse_record(record("b", provides=["same"]), path=Path("b.toml"), index=0),),
                     ),
@@ -482,7 +507,7 @@ class DependencyModelTests(unittest.TestCase):
         with self.assertRaisesRegex(DependencyError, "missing dependency"):
             build_plan(
                 (
-                    LoadedManifest(
+                    loaded_manifest(
                         Path("missing.toml"),
                         (parse_record(record("missing", deps=["absent"]), path=Path("missing.toml"), index=0),),
                     ),
@@ -491,18 +516,77 @@ class DependencyModelTests(unittest.TestCase):
         cycle_a = parse_record(record("a", deps=["b"]), path=Path("cycle.toml"), index=0)
         cycle_b = parse_record(record("b", deps=["a"]), path=Path("cycle.toml"), index=1)
         with self.assertRaisesRegex(DependencyError, "cycle"):
-            build_plan((LoadedManifest(Path("cycle.toml"), (cycle_a, cycle_b)),))
+            build_plan((loaded_manifest(Path("cycle.toml"), (cycle_a, cycle_b)),))
 
-    def test_manifest_paths_parent_first_and_standalone_once(self) -> None:
+    def test_manifest_sources_parent_first_and_standalone_once(self) -> None:
+        """Resolve structural roles parent-first and canonicalize standalone use."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             parent = root / ".devcontainer" / "dependencies.toml"
             vendor = root / "vendor" / "agent-canon" / ".devcontainer" / "dependencies.toml"
             write_manifest(parent, [record("parent")])
             write_manifest(vendor, [record("vendor")])
-            self.assertEqual(manifest_paths(root), (parent, vendor))
+            self.assertEqual(
+                manifest_sources(root),
+                (
+                    ManifestSource(parent, ManifestRole.PARENT_OVERLAY),
+                    ManifestSource(vendor, ManifestRole.CANONICAL),
+                ),
+            )
             agent_root = vendor.parents[1]
-            self.assertEqual(manifest_paths(agent_root, agent_root), (vendor,))
+            self.assertEqual(
+                manifest_sources(agent_root, agent_root),
+                (ManifestSource(vendor, ManifestRole.CANONICAL),),
+            )
+
+    def test_empty_parent_overlay_merges_with_nonempty_vendor_manifest(self) -> None:
+        """Allow an empty parent overlay when the canonical vendor is non-empty."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            write_manifest(root / ".devcontainer" / "dependencies.toml", [])
+            write_manifest(
+                root / "vendor" / "agent-canon" / ".devcontainer" / "dependencies.toml",
+                [record("vendor")],
+            )
+
+            plan = load_plan(root)
+
+        self.assertEqual(tuple(record.id for record in plan.records), ("vendor",))
+
+    def test_standalone_empty_manifest_is_rejected(self) -> None:
+        """Reject an empty standalone canonical manifest."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = root / ".devcontainer" / "dependencies.toml"
+            write_manifest(manifest, [])
+
+            with self.assertRaisesRegex(DependencyError, "non-empty"):
+                load_plan(root, root)
+
+    def test_vendor_empty_manifest_is_rejected(self) -> None:
+        """Reject an empty vendor canonical manifest."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            write_manifest(
+                root / "vendor" / "agent-canon" / ".devcontainer" / "dependencies.toml",
+                [],
+            )
+
+            with self.assertRaisesRegex(DependencyError, "non-empty"):
+                load_plan(root)
+
+    def test_empty_merged_plan_is_rejected(self) -> None:
+        """Reject an aggregate plan with no dependency records."""
+        with self.assertRaisesRegex(DependencyError, "merged dependency plan"):
+            build_plan(
+                (
+                    loaded_manifest(
+                        Path("parent.toml"),
+                        (),
+                        role=ManifestRole.PARENT_OVERLAY,
+                    ),
+                )
+            )
 
     def test_verification_rejects_legacy_commands_and_shell_executables(self) -> None:
         legacy = record("unsafe", commands=[["unsafe", "--version"]])
@@ -542,7 +626,7 @@ class DependencyModelTests(unittest.TestCase):
             path=Path("x.toml"),
             index=0,
         )
-        plan = build_plan((LoadedManifest(Path("x.toml"), (parsed,)),))
+        plan = build_plan((loaded_manifest(Path("x.toml"), (parsed,)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             runner = FakeRunner()
@@ -591,7 +675,7 @@ class DependencyModelTests(unittest.TestCase):
             path=Path("x.toml"),
             index=1,
         )
-        plan = build_plan((LoadedManifest(Path("x.toml"), (provider, dependent)),))
+        plan = build_plan((loaded_manifest(Path("x.toml"), (provider, dependent)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             runner = FakeRunner(fail_on="apt-get")
@@ -625,7 +709,7 @@ class DependencyModelTests(unittest.TestCase):
             executable.write_text("#!/usr/bin/env true\n", encoding="utf-8")
             executable.chmod(0o755)
             browser = replace(browser, browser_cache_path=str(cache))
-            plan = build_plan((LoadedManifest(Path("x.toml"), (browser,)),))
+            plan = build_plan((loaded_manifest(Path("x.toml"), (browser,)),))
             runner = FakeRunner(emulate_non_root_sudo=True)
             Installer(runner).install(plan, workspace=root, receipts=root / "receipts")
             privileged_install = (
@@ -685,7 +769,7 @@ class DependencyModelTests(unittest.TestCase):
             path=Path("fixture.toml"),
             index=2,
         )
-        plan = build_plan((LoadedManifest(Path("fixture.toml"), (rust, lean, cargo)),))
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (rust, lean, cargo)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "rust" / "agent-canon").mkdir(parents=True)

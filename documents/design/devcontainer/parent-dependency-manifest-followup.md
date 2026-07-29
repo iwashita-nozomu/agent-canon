@@ -39,6 +39,18 @@ standalone AgentCanon では `.devcontainer/dependencies.toml` 自身を一度�
 scalar の不一致、重複 provider、missing dependency、cycle は fail です。
 manifest の全体 validation が pass するまで、derived install に進めません。
 
+## Manifest source の role と cardinality
+
+schema v2 の manifest source role は filename の推測ではなく構造から解決します。
+親と vendor がある構成では
+`<workspace>/.devcontainer/dependencies.toml` を `parent-overlay` とし、親
+Template が親所有の derived tool を持たない場合は `records = []` を明示できます。
+`vendor/agent-canon/.devcontainer/dependencies.toml` は `canonical` であり、
+空にはできません。standalone AgentCanon の workspace manifest も
+`canonical` であり、空にはできません。source を読み込んだ後の merge 済み plan
+には 1 件以上の record が必要です。provider、missing dependency、cycle、
+typed verification の不変条件は変更しません。
+
 success receipt は plan/record fingerprint の一致だけでは再利用しません。
 record owner の typed verification を毎回実行し、package-owned state、
 apt repository の key/source、exact executable、toolchain/components、
