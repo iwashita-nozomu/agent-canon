@@ -422,10 +422,43 @@ def test_validate_requirements_accepts_pep508_direct_reference(tmp_path: Path) -
                 "pydeps",
                 "snakeviz",
                 "pyyaml",
-                "custom-visualizer @ git+ssh://git@github.com/org/custom-visualizer.git@v1.0.0",
+                'custom-visualizer @ https://example.invalid/custom-visualizer.whl#sha256=abc123 ; python_version >= "3.11"',
                 "",
             ]
         ),
     )
 
     assert module.validate_requirements(tmp_path) == []
+
+
+def test_validate_requirements_rejects_invalid_direct_reference_boundaries(
+    tmp_path: Path,
+) -> None:
+    """URL references cannot also carry version specifiers or malformed syntax."""
+    module = load_container_config_module()
+    write_file(
+        tmp_path,
+        "docker/requirements.txt",
+        "\n".join(
+            [
+                "jupyterlab",
+                "notebook",
+                "ipykernel",
+                "pydeps",
+                "snakeviz",
+                "pyyaml",
+                "custom-visualizer @ https://example.invalid/custom-visualizer.whl ==1",
+                "custom-visualizer @ https://example.invalid/custom-visualizer.whl#sha256=abc123 ==1",
+                "not a requirement",
+                "",
+            ]
+        ),
+    )
+
+    findings = module.validate_requirements(tmp_path)
+
+    assert [finding.detail for finding in findings] == [
+        "invalid-line:7",
+        "invalid-line:8",
+        "invalid-line:9",
+    ]

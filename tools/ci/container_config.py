@@ -39,6 +39,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
 
+from packaging.requirements import InvalidRequirement, Requirement
+
 AGENT_TOOLS_DIR = Path(__file__).resolve().parents[1] / "agent_tools"
 if str(AGENT_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_DIR))
@@ -52,11 +54,6 @@ REQUIRED_REQUIREMENTS = (
     "pydeps",
     "snakeviz",
     "pyyaml",
-)
-REQUIREMENT_RE = re.compile(
-    r"^[A-Za-z0-9_.-]+(?:\[[A-Za-z0-9_,.-]+\])?"
-    r"(?:\s*@\s*[^#\s]+)?"
-    r"(?:\s*(?:==|>=|<=|~=|!=|>|<).+)?$"
 )
 
 
@@ -251,8 +248,12 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
 
 
 def trim_requirement_line(line: str) -> str:
-    """Strip comments and surrounding whitespace from one requirement line."""
-    return line.split("#", 1)[0].strip()
+    """Strip comments while preserving URL fragments in one requirement line."""
+    line = line.strip()
+    for index, character in enumerate(line):
+        if character == "#" and (index == 0 or line[index - 1].isspace()):
+            return line[:index].rstrip()
+    return line
 
 
 def validate_requirements(root: Path) -> list[Finding]:
@@ -267,13 +268,14 @@ def validate_requirements(root: Path) -> list[Finding]:
         line = trim_requirement_line(raw_line)
         if not line:
             continue
-        if not REQUIREMENT_RE.fullmatch(line):
+        try:
+            requirement = Requirement(line)
+        except InvalidRequirement:
             findings.append(
                 Finding("dependency_contract_violation", relative, f"invalid-line:{line_number}")
             )
             continue
-        name = re.split(r"[\[<>=~!\s]", line, maxsplit=1)[0].lower()
-        requirements.add(name)
+        requirements.add(requirement.name.lower())
     for requirement in REQUIRED_REQUIREMENTS:
         if requirement not in requirements:
             findings.append(
