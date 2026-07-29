@@ -35,6 +35,9 @@ packet が出力した必須 command と、task に該当する conditional comm
 1. Confirm a concrete unresolved oracle, specification, regression, or failure-mode risk remains outside static analysis, existing checkers, and targeted validation. Ordinary code changes, bug fixes, parser changes, and validation failures alone do not justify unlimited test creation.
 1. If the risk is absent or checker-owned, return `activation=not_needed` with the canonical validation route; do not run test-design tools or require `test_plan.md`.
 1. Only for `activation=required`, record code paths and related test paths as survey and placement evidence, inspect branches/parsing/error/state transitions, and design a concrete behavior-regression oracle.
+1. For `activation=required`, bind the owning design / contract clause to the reachable code-side implementation mechanism: public entrypoint, branches, parser and error paths, state transitions, and return projection. Do not infer the contract or oracle from tests alone.
+1. Every nasty or regression case must carry one complete trace: `Design Clause -> Reachable Implementation Mechanism -> Concrete Breaking Input/State Sequence -> Observable Outcome -> Decidable Oracle`. A case is not test-design evidence until all five links are explicit.
+1. Before implementation or handoff, state the contract-, type-, or checker-based null hypothesis that the candidate case cannot occur. Search for a reachability witness from the public input surface or a public state sequence; accept the case only when that witness rebuts the null hypothesis and supports a stable, decidable oracle. Without such a witness, return the candidate to the checker, static-validation, or owning-design boundary rather than turning it into a test.
 1. `activation=required` does not mean exhaustive test generation. Choose one
    stable observation level per unresolved risk, reuse one case when it covers
    multiple risks, and omit duplicate contract checks, no-crash checks, and
@@ -68,5 +71,5 @@ packet が出力した必須 command と、task に該当する conditional comm
    fallback for numerical validation.
 1. Prefer behavior examples for concrete regressions, property tests for broad input spaces, metamorphic tests when exact expected output is hard, and mutation testing when oracle strength is doubtful.
 1. Record nasty edge cases and regression cases in `test_plan.md` only when `activation=required`.
-1. Keep cases concrete at the stable observation level: contract source, input, observable outcome, oracle, `Do Not Freeze`, and why the case is nasty.
+1. Keep cases concrete at the stable observation level: `Design Clause`, `Reachable Implementation Mechanism`, `Breaking Input/State Sequence`, `Observation Level`, `Observable Outcome`, `Decidable Oracle`, `Input Space`, `Adequacy Evidence`, `Do Not Freeze`, and why the case is nasty. Do not add tests merely to increase test count or coverage without this trace.
 1. Mirror existing test style, fixture layout, and naming before suggesting anything new.
