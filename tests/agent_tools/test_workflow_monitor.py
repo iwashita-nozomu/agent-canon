@@ -164,7 +164,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
             self.assertIn(
-                "upstream design ../../../agents/templates/workflow_monitoring.md",
+                "upstream design ../../../templates/agents/workflow_monitoring.md",
                 text,
             )
             self.assertIn("skills=$agent-orchestration", text)

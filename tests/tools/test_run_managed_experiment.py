@@ -83,6 +83,7 @@ def create_fake_repo_dirs(repo_root: Path) -> None:
         repo_root
         / "vendor"
         / "agent-canon"
+        / "templates"
         / "experiments"
         / "_template"
         / "result"
@@ -94,7 +95,7 @@ def create_fake_repo_dirs(repo_root: Path) -> None:
 
 def write_template_topic(repo_root: Path) -> None:
     """Write the fake template experiment topic."""
-    template_dir = repo_root / "vendor" / "agent-canon" / "experiments" / "_template"
+    template_dir = repo_root / "vendor" / "agent-canon" / "templates" / "experiments" / "_template"
     (template_dir / "README.md").write_text(
         "# Experiment Topic Template\n\n"
         "registered command: `python3 tools/experiments/run_managed_experiment.py "
@@ -115,6 +116,18 @@ def write_template_topic(repo_root: Path) -> None:
     )
     (template_dir / "result" / "README.md").write_text(
         "# Result Directory\n",
+        encoding="utf-8",
+    )
+    document_template_dir = (
+        repo_root / "vendor" / "agent-canon" / "templates" / "documents" / "experiment"
+    )
+    document_template_dir.mkdir(parents=True, exist_ok=True)
+    (document_template_dir / "README.template.md").write_text(
+        "# Experiment Topic Template\n\n<topic>\n",
+        encoding="utf-8",
+    )
+    (document_template_dir / "experiment-provenance.template.toml").write_text(
+        "[experiment]\ntopic = \"<topic>\"\n",
         encoding="utf-8",
     )
 
@@ -158,7 +171,7 @@ def write_demo_registry(repo_root: Path) -> None:
                 'managed_runner = "tools/experiments/run_managed_experiment.py"',
                 'report_root = "experiments/report"',
                 'integration_branch = "main"',
-                'topic_template_dir = "vendor/agent-canon/experiments/_template"',
+                'topic_template_dir = "vendor/agent-canon/templates/experiments/_template"',
                 'required_eval_artifacts = ["summary.json", "cases.jsonl"]',
                 "",
                 "[[topics]]",
@@ -510,7 +523,7 @@ def test_normal_cli_binds_frozen_topic_to_ff97_lifecycle() -> None:
 def test_public_alternate_gpu_routes_are_typed_or_managed() -> None:
     """Template and JIT entrypoints cannot launch GPU work beside the managed owner."""
     template_source = (
-        Path(__file__).resolve().parents[2] / "experiments" / "_template" / "run.py"
+        Path(__file__).resolve().parents[2] / "templates" / "experiments" / "_template" / "run.py"
     ).read_text(encoding="utf-8")
     jit_source = (
         Path(__file__).resolve().parents[2]

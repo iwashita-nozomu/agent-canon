@@ -72,7 +72,7 @@ EXPECTED_CONSUMERS = {
         "reference_mode": "yaml",
     },
     "schedule": {
-        "path": "agents/templates/schedule.md",
+        "path": "templates/agents/schedule.md",
         "kind": "schedule_projection",
         "reference_mode": "text",
     },

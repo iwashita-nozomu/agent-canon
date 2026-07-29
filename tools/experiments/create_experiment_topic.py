@@ -3,9 +3,9 @@
 # contract tool
 # responsibility Provides create experiment topic experiment workflow tooling.
 # upstream design ../README.md shared automation index
-# upstream design ../../documents/templates/experiment/README.template.md canonical topic README template.
-# upstream design ../../documents/templates/experiment/experiment-provenance.template.toml canonical provenance template.
-# downstream implementation ../../experiments/_template/run.py runnable topic scaffold.
+# upstream design ../../templates/documents/experiment/README.template.md canonical topic README template.
+# upstream design ../../templates/documents/experiment/experiment-provenance.template.toml canonical provenance template.
+# downstream implementation ../../templates/experiments/_template/run.py runnable topic scaffold.
 # upstream design ../../documents/experiments/experiment-registry.md project experiment registry contract.
 # @dependency-end
 
@@ -19,8 +19,8 @@ from pathlib import Path
 
 from registry_lib import find_topic, load_registry, write_registry
 
-AGENT_CANON_TEMPLATE_DIR = "vendor/agent-canon/experiments/_template"
-CANONICAL_EXPERIMENT_TEMPLATE_DIR = "documents/templates/experiment"
+AGENT_CANON_TEMPLATE_DIR = "vendor/agent-canon/templates/experiments/_template"
+CANONICAL_EXPERIMENT_TEMPLATE_DIR = "vendor/agent-canon/templates/documents/experiment"
 CANONICAL_README_TEMPLATE = "README.template.md"
 CANONICAL_PROVENANCE_TEMPLATE = "experiment-provenance.template.toml"
 
@@ -111,13 +111,16 @@ def resolve_topic_template_dir(repo_root: Path, configured_path: str) -> Path:
     configured = resolve_canon_path(repo_root, configured_path.removeprefix("vendor/agent-canon/"))
     if configured.is_dir():
         return configured
-    fallback = resolve_canon_path(repo_root, "experiments/_template")
+    fallback = resolve_canon_path(repo_root, "templates/experiments/_template")
     return fallback
 
 
 def resolve_document_templates(repo_root: Path) -> tuple[Path, Path]:
     """Resolve the canonical topic README and provenance templates."""
-    template_dir = resolve_canon_path(repo_root, CANONICAL_EXPERIMENT_TEMPLATE_DIR)
+    template_dir = resolve_canon_path(
+        repo_root,
+        CANONICAL_EXPERIMENT_TEMPLATE_DIR.removeprefix("vendor/agent-canon/"),
+    )
     return (
         template_dir / CANONICAL_README_TEMPLATE,
         template_dir / CANONICAL_PROVENANCE_TEMPLATE,
@@ -188,7 +191,10 @@ def main() -> int:
         "result_root": f"experiments/{args.topic}/result",
         "report_root": "experiments/report",
         "default_variant": args.default_variant,
-        "default_inner_command": f"/usr/bin/python /workspace/experiments/{args.topic}/run.py",
+        "default_inner_command": (
+            f"/usr/bin/python /workspace/experiments/{args.topic}/run.py "
+            "--config {config_path}"
+        ),
     }
     if args.primary_note:
         new_entry["primary_note"] = args.primary_note

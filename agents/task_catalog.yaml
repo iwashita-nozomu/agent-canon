@@ -4,7 +4,7 @@
 # upstream design skills/agent-orchestration.md execution-time-aware work-conservation owner
 # downstream design canonical/CODEX_WORKFLOW.md workflow consumes task routing catalog
 # downstream design canonical/CODEX_SUBAGENTS.md Codex subagent inventory consumes task routing
-# downstream design templates/schedule.md execution-time-aware schedule projection
+# downstream design ../templates/agents/schedule.md execution-time-aware schedule projection
 # downstream implementation ../.codex/config.toml Codex runtime config consumes task routing
 # @dependency-end
 version: 2
@@ -33,7 +33,7 @@ review_activation_policy:
 execution_time_policy:
   owner_ref: "agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract"
   applies_to: repo-changing execution
-  projection: agents/templates/schedule.md#Execution-Time-Aware Plan
+  projection: templates/agents/schedule.md#Execution-Time-Aware Plan
   executable_fields:
     - dependency_dag
     - makespan_objective

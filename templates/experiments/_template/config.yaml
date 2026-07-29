@@ -1,0 +1,15 @@
+# @dependency-start
+# contract configuration
+# responsibility Stores template experiment topic configuration.
+# upstream design ../../../documents/experiments/experiment-registry.md defines managed experiment expectations.
+# downstream implementation run.py consumes managed run configuration.
+# @dependency-end
+
+# IMPLEMENT HERE: define the experiment case set or sweep space.
+cases: {}
+
+# IMPLEMENT HERE: define the evaluation metric and comparison direction.
+metric: {}
+
+# IMPLEMENT HERE: define execution-only controls such as throttling or debug behavior.
+runtime: {}

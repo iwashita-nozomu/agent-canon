@@ -70,7 +70,7 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 
 ## 4.5 環境依存ツール導入提案のルール
 
-- repo-wide に使う環境依存ツールの導入提案では、`agents/templates/environment_change_proposal.md` を使って理由、影響範囲、validation、rollback を記録します。
+- repo-wide に使う環境依存ツールの導入提案では、`templates/agents/environment_change_proposal.md` を使って理由、影響範囲、validation、rollback を記録します。
 - host-global install 由来の要件は、必要時に `CONTAINER_OPERATIONS.md` または `docker/` の運用境界へ反映します。
 - repo-wide に必要な Python tool は、原則として `CONTAINER_OPERATIONS.md` の Python dependency rule と repo-local installer contract に反映します。Dockerfile へ入れるのは OS package、runtime library、build tool、image-level helper だけです。
 - CI でも使う tool は手元だけの補助 install に留めず、共有運用手順へ反映してから利用します。
@@ -89,7 +89,7 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 - Docker 変更で agent convenience tool が必要になった場合は、`CONTAINER_OPERATIONS.md` の devcontainer boundary に従って AgentCanon-owned `vendor/agent-canon/.devcontainer/post-create.sh` を更新します。
 - Docker runtime の再利用 surface は `docker/packs/*.toml`、`docker/codex-container-profiles.toml`、`docker/python-execution-rules.toml` を正本にし、path 分岐は各 surface の契約へ集約します。
 - Docker runtime、runtime pack、devcontainer 生成導線を変えた場合は `python3 tools/ci/container_config.py` を通し、`docker/Dockerfile`、`docker/packs/*.toml`、`.devcontainer/` の整合を確認します。
-- main server host の path、mount、builder 前提は `documents/contracts/server-host-contract.md` と `documents/templates/server_runtime_layout.template.toml` を正本にし、実行経路を都度記録して共有します。
+- main server host の path、mount、builder 前提は `documents/contracts/server-host-contract.md` と `templates/documents/server_runtime_layout.template.toml` を正本にし、実行経路を都度記録して共有します。
 - C++ を使う場合の canonical CMake entrypoint は root `CMakeLists.txt` です。`src/` や `include/` の下に別 root を増やす場合は、まず `CMakeLists.txt` を維持したままの代替設計が成立するかを確認し、追加 root が必要な場合は run bundle で理由を示します。
 - template 既定では C++ 実装を持ちません。C++ を追加する project では `include/` を実装の主置き場にし、`src/` は特例実装だけに使います。
 - C++ build は out-of-source とし、`build/cpp/<profile>/` を使います。

@@ -3,9 +3,9 @@
 contract reference
 responsibility Defines AgentCanon issue templates and label taxonomy.
 upstream design ../../issues/README.md defines durable local issue storage.
-downstream implementation ../templates/github/issue/agentcanon-maintenance.yml captures maintenance issues.
-downstream implementation ../templates/github/issue/eval-capture.yml captures eval issues.
-downstream implementation ../templates/github/pull-request/agent_canon.md links issue/eval closeout evidence.
+downstream implementation ../../templates/documents/github/issue/agentcanon-maintenance.yml captures maintenance issues.
+downstream implementation ../../templates/documents/github/issue/eval-capture.yml captures eval issues.
+downstream implementation ../../templates/documents/github/pull-request/agent_canon.md links issue/eval closeout evidence.
 @dependency-end
 -->
 

@@ -1,0 +1,154 @@
+# @dependency-start
+# contract reference
+# responsibility Provides a starter top-level responsibility-scope.toml for template-derived repositories.
+# upstream design ../../documents/design/responsibility-scope-management.md responsibility scope policy
+# downstream implementation ../../tools/agent_tools/responsibility_scope.py validates responsibility scopes
+# @dependency-end
+
+catalog_kind = "agent_canon_responsibility_scope"
+version = 1
+
+owner_values = [
+  "agent-canon",
+  "template",
+  "derived-project",
+  "github",
+  "external-vendor",
+]
+
+class_values = [
+  "shared_runtime",
+  "shared_policy",
+  "active_contract",
+  "durable_state",
+  "evidence",
+  "tooling",
+  "github_surface",
+  "external_dependency",
+]
+
+required_coverage = [
+  ".agents",
+  ".codex",
+  ".devcontainer",
+  ".github",
+  ".vscode",
+  "documents",
+  "docker",
+  "evidence",
+  "experiments",
+  "python",
+  "scripts",
+  "tests",
+  "vendor/agent-canon",
+  "README.md",
+  "QUICK_START.md",
+  "responsibility-scope.toml",
+]
+
+[[import_rule]]
+source = "agent-canon-runtime-view"
+targets = [
+  "agent-canon-runtime-view",
+  "parent-repo-active-contract",
+  "github-automation",
+  "project-durable-state",
+]
+
+[[import_rule]]
+source = "parent-repo-active-contract"
+targets = [
+  "parent-repo-active-contract",
+  "agent-canon-runtime-view",
+  "github-automation",
+  "project-durable-state",
+]
+
+[[import_rule]]
+source = "github-automation"
+targets = [
+  "github-automation",
+  "agent-canon-runtime-view",
+  "parent-repo-active-contract",
+]
+
+[[import_rule]]
+source = "project-durable-state"
+targets = [
+  "project-durable-state",
+  "parent-repo-active-contract",
+]
+
+[[scope]]
+id = "agent-canon-runtime-view"
+owner = "agent-canon"
+class = "shared_runtime"
+description = "AgentCanon submodule pin and root runtime views into that pin."
+paths = [
+  "vendor/agent-canon/**",
+  "agents/**",
+  ".agents/**",
+  ".codex/**",
+  ".devcontainer/**",
+  ".vscode/**",
+  "evidence",
+  "evidence/**",
+  "tools/**",
+  "AGENTS.md",
+]
+# Optional:
+# exclude_paths = [
+#   "evidence/agent-evals/**",
+# ]
+protecting_tools = [
+  "tools/agent_tools/responsibility_scope.py",
+  "tools/sync_agent_canon.sh",
+]
+issues = []
+
+[[scope]]
+id = "parent-repo-active-contract"
+owner = "template"
+class = "active_contract"
+description = "Parent repository entrypoints, bootstrap contracts, Docker runtime, implementation, tests, and project docs."
+paths = [
+  "README.md",
+  "QUICK_START.md",
+  "responsibility-scope.toml",
+  "documents/**",
+  "docker/**",
+  "scripts/**",
+  "python/**",
+  "tests/**",
+]
+protecting_tools = [
+  "tools/agent_tools/responsibility_scope.py",
+]
+issues = []
+
+[[scope]]
+id = "github-automation"
+owner = "github"
+class = "github_surface"
+description = "Repository-local GitHub Actions, PR templates, and GitHub-facing automation."
+paths = [
+  ".github/**",
+]
+protecting_tools = [
+  "tools/ci/check_github_workflows.py",
+]
+issues = []
+
+[[scope]]
+id = "project-durable-state"
+owner = "derived-project"
+class = "durable_state"
+description = "Project-specific checked-in experiments, notes, and durable state."
+paths = [
+  "experiments/**",
+  "notes/**",
+]
+protecting_tools = [
+  "tools/agent_tools/responsibility_scope.py",
+]
+issues = []

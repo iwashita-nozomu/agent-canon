@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Checks changed-file dependency headers and registered contract kind metadata.
-# upstream design ../../agents/templates/closeout_gate.md closeout requires dependency evidence
+# upstream design ../../templates/agents/closeout_gate.md closeout requires dependency evidence
 # upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL design
 # upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # downstream implementation ./check_dependency_header_format.sh validates manifest syntax

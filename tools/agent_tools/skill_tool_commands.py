@@ -89,7 +89,7 @@ ISSUE_CONTRACT_MARKERS: dict[str, tuple[tuple[str, str], ...]] = {
         ),
         (
             "workflow-monitoring-template-path",
-            "agents/templates/workflow_monitoring.md",
+            "templates/agents/workflow_monitoring.md",
         ),
     ),
 }

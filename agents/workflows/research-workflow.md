@@ -81,7 +81,7 @@ decision は次の 4 つに固定します。
 
 この loop は 1 回で終える前提にしません。`report_rewrite_required`、`extra_validation_required`、`rerun_required` が残る限り、結論を閉じることを禁止します。
 
-agent がこの loop を自律実行する場合は、単一 run の実行と rerun 分岐には `agents/skills/experiment-lifecycle.md` を使い、改善 backlog を持つ outer loop には `agents/skills/adaptive-improvement-loop.md` を使います。iteration の記録は `agents/templates/experiment_change_loop.md` を起点にします。
+agent がこの loop を自律実行する場合は、単一 run の実行と rerun 分岐には `agents/skills/experiment-lifecycle.md` を使い、改善 backlog を持つ outer loop には `agents/skills/adaptive-improvement-loop.md` を使います。iteration の記録は `templates/agents/experiment_change_loop.md` を起点にします。
 
 ## 3. 文献ベースの要点
 
@@ -291,7 +291,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 - どの結果や判断をどこへ反映したか
 - 例外的に branch / worktree を使った場合は、その理由と carry-over 方針
 
-agent が反復を自律実行する場合は、これに加えて iteration ごとの `Decision:` と `Next Action:` を `agents/templates/experiment_change_loop.md` に沿って残します。
+agent が反復を自律実行する場合は、これに加えて iteration ごとの `Decision:` と `Next Action:` を `templates/agents/experiment_change_loop.md` に沿って残します。
 
 ## 6.5 集計と定量的考察の作法
 

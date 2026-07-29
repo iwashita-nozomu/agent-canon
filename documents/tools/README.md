@@ -194,6 +194,8 @@ second command manual.
   - main server host の readiness を確認します。
 - `tools/ci/check_experiment_registry.py`
   - shared experiment registry contract の entrypoint と command を確認します。
+- `tools/ci/check_experiment_template.py`
+  - centralized template source を一時 parent-shaped repo へ copy し、`experiments/template-smoke/` の registry、path、Python compile、notebook structure を GPU 実行なしで確認します。source registry と canonical scaffold は変更しません。
 - `tools/validation/notebook_quality.py`
   - default notebook directories の `.ipynb` を、細かい test ではなく、説明付きで部分実行しやすい実用 demo として読めるか検査します。
   - Codex hook では changed notebook だけを見て、`assert`、`pytest`、`test_` 関数、保存済み error output、可視化 code 不在を block します。

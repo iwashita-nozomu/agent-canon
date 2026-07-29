@@ -41,7 +41,7 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 - この repo の実験運用正本は `agents/workflows/experiment-workflow.md` です。
 - 実験結果を見ながら code change、調査、チューニングまで含めた loop を回す場合は `adaptive-improvement-loop` を追加します。
 - topic の entrypoint と formal command は project-root `experiments/registry.toml` を project-owned 正本にします。AgentCanon source は registry 契約を `documents/experiments/experiment-registry.md` で定義します。template / derived repo root からは `vendor/agent-canon/documents/experiments/experiment-registry.md` として読みます。
-- 新規 topic は最初に実験名を固定し、`python3 tools/experiments/create_experiment_topic.py <topic>` を実行します。create tool が内部の runnable scaffold owner を解決し、project-root `experiments/<topic>/`、canonical な topic `README.md` / `provenance.toml`、および project registry の topic entry を配置します。`experiments/_template/` の直接コピーは行いません。
+- 新規 topic は最初に実験名を固定し、`python3 tools/experiments/create_experiment_topic.py <topic>` を実行します。create tool が内部の runnable scaffold owner を解決し、project-root `experiments/<topic>/`、canonical な topic `README.md` / `provenance.toml`、および project registry の topic entry を配置します。`templates/experiments/_template/` の直接コピーは行いません。
 - topic 作成後は `run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
 - project registry がある場合は、formal 実行前に `python3 tools/ci/check_experiment_registry.py` で registry schema と registered command placeholder を確認します。
 - 実験の利用者向け入口は `python3 tools/experiments/run_managed_experiment.py --topic <topic> --variant formal -- python3 experiments/<topic>/run.py` です。`run.py` は managed runner から呼ばれる inner entrypoint として、run directory 作成、設定 snapshot、artifact 書き出し、notebook 実行を所有します。

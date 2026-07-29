@@ -22,7 +22,7 @@ upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md fi
 
 さらに、実験を進めながらコード自体を改造する必要がある場合は、結果とレポートを毎回生成し、サブエージェントによる批判的レビューを挟んで反復する workflow を標準にします。外部調査つき実装、性能改善、比較検証では、この文書を `Research-Driven Change` の inner loop として使います。outer loop の正本は [research-workflow.md](research-workflow.md) です。
 
-agent がこの反復を自律実行する場合、単一 run と rerun 分岐は `agents/skills/experiment-lifecycle.md`、改善 backlog を持つ継続反復は `agents/skills/adaptive-improvement-loop.md` を入口にします。loop 記録テンプレートは `agents/templates/experiment_change_loop.md` です。
+agent がこの反復を自律実行する場合、単一 run と rerun 分岐は `agents/skills/experiment-lifecycle.md`、改善 backlog を持つ継続反復は `agents/skills/adaptive-improvement-loop.md` を入口にします。loop 記録テンプレートは `templates/agents/experiment_change_loop.md` です。
 
 ## この文書の読み方
 
@@ -53,7 +53,7 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 実装や run に入る前に、実験名 `<topic>` を固定します。
 新規 topic は canonical create tool が runnable scaffold、canonical な topic
 `README.md` / `provenance.toml`、registry entry を配置する route から始めます。
-`experiments/_template/` の直接コピーは利用者向けの作成手順にしません。
+`templates/experiments/_template/` の直接コピーは利用者向けの作成手順にしません。
 
 ```bash
 python3 tools/experiments/create_experiment_topic.py <topic>
@@ -458,7 +458,7 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 1. `experimenter`
    - `report_rewrite_required` の場合、同じ result を使って report を書き直す。
 
-この反復を agent が自律実行する場合は、1 iteration ごとに `Change:`、`Validation Plan:`、`Run Name / Path:`、`Decision:`、`Next Action:` を `agents/templates/experiment_change_loop.md` に記録します。
+この反復を agent が自律実行する場合は、1 iteration ごとに `Change:`、`Validation Plan:`、`Run Name / Path:`、`Decision:`、`Next Action:` を `templates/agents/experiment_change_loop.md` に記録します。
    - `extra_validation_required` の場合、同じ比較方針で追加検証を行う。
    - `rerun_required` の場合、新しい run_name で fresh rerun を行う。
 1. `implementer`

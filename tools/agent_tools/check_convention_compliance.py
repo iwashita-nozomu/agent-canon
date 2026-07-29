@@ -24,8 +24,8 @@
 # upstream design ../../.agents/skills/pr-processing/SKILL.md runtime PR processing skill
 # upstream design ../../.agents/skills/md-style-check/SKILL.md runtime Markdown small-edit skill route
 # upstream design ../../.agents/skills/long-form-writing/SKILL.md runtime document claim grounding skill route
-# upstream design ../../agents/templates/workflow_monitoring.md tool warning closeout ledger
-# upstream design ../../agents/templates/closeout_gate.md closeout gate policy
+# upstream design ../../templates/agents/workflow_monitoring.md tool warning closeout ledger
+# upstream design ../../templates/agents/closeout_gate.md closeout gate policy
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared surface manifest
@@ -117,7 +117,7 @@ TOOL_GATES = {
         "tools/agent_tools/run_repo_dependency_review.sh",
         (
             "agents/canonical/CODEX_WORKFLOW.md",
-            "agents/templates/closeout_gate.md",
+            "templates/agents/closeout_gate.md",
         ),
     ),
     "code_dependency_scan": (
@@ -183,7 +183,7 @@ TOOL_GATES = {
     ),
     "behavior_eval": (
         "tools/agent_tools/evaluate_agent_run.py",
-        ("evidence/agent-evals/agent_behavior_eval.toml", "agents/templates/closeout_gate.md"),
+        ("evidence/agent-evals/agent_behavior_eval.toml", "templates/agents/closeout_gate.md"),
     ),
     "skill_frontmatter": (
         "tools/agent_tools/check_skill_frontmatter.py",
@@ -334,7 +334,7 @@ EXIT_BLOCKER_POLICY_MARKERS = {
         "accepted_with_reason",
         "explicit_approval_evidence",
     ),
-    "agents/templates/workflow_monitoring.md": (
+    "templates/agents/workflow_monitoring.md": (
         "tool_warning_exit_status",
         "resolved",
         "deferred_with_issue",
@@ -414,7 +414,7 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "Document Structure Evidence",
         "structure_contract=skipped",
     ),
-    "agents/templates/closeout_gate.md": (
+    "templates/agents/closeout_gate.md": (
         "Document Structure Evidence",
         "document_structure_status",
         "structure_planning",
@@ -468,7 +468,7 @@ DOCUMENT_SPLIT_DECISION_MARKERS = {
         "validation route",
         "chunking convenience",
     ),
-    "agents/templates/closeout_gate.md": (
+    "templates/agents/closeout_gate.md": (
         "document_split_decision",
         "keep:<reason>",
         "split:<new-owner-boundary>",
@@ -572,7 +572,7 @@ TEST_CONTRACT_ROUTING_MARKERS = {
         "canonical command evidence",
         "validation tool",
     ),
-    "agents/templates/test_plan.md": (
+    "templates/agents/test_plan.md": (
         "validation route",
         "behavior-owned cases",
     ),

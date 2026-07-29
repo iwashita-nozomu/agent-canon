@@ -1515,7 +1515,7 @@ def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
         "agents/model_profiles.toml",
         "agents/capacity_policy.toml",
         "agents/canonical/CODEX_WORKFLOW.md",
-        "agents/templates/design_brief.md",
+        "templates/agents/design_brief.md",
         "agents/workflows/implementation-waterfall-workflow.md",
         "documents/design/dependency-manifest-design.md",
     ):
