@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -105,6 +106,10 @@ class FakeRunner:
         self.environments.append(env)
         if self.fail_on and command[0] == self.fail_on:
             raise subprocess.CalledProcessError(1, command)
+        if command == (sys.executable, "-c", "import site; print(site.getuserbase())"):
+            return subprocess.CompletedProcess(
+                command, 0, "/tmp/fake-python-user-base\n", ""
+            )
         return subprocess.CompletedProcess(command, 0, "", "")
 
 
