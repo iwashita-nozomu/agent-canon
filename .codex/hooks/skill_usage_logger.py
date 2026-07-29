@@ -2,7 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Logs Codex skill, workflow, tool, and subagent routing signals from hook payloads.
-# upstream implementation ../hooks.json invokes this hook at prompt and stop boundaries.
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this standalone monitoring route.
 # upstream design ../../evidence/agent-evals/README.md requires skill-use eval evidence.
 # upstream design ../../agents/skills/codex-task-workflow.md Codex task workflow routing boundary.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.

@@ -5,34 +5,19 @@
 # responsibility Tests test codex hooks behavior.
 # upstream implementation ../../.codex/config.toml enables hooks
 # upstream implementation ../../.codex/hooks.json declares active guardrail hooks
-# upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
-# upstream implementation ../../.codex/hooks/module_boundary_guard.py blocks forced module rewrites
-# upstream implementation ../../.codex/hooks/library_implementation_guard.py blocks library implementation rewrites
-# upstream implementation ../../.codex/hooks/first_party_library_guard.py blocks first-party API rewrites
-# upstream implementation ../../.codex/hooks/task_authority_schema_guard.py validates task authority
-# upstream implementation ../../.codex/hooks/role_write_policy_guard.py enforces role write policy
-# upstream implementation ../../.codex/hooks/helper_first_guard.py blocks helper-first implementation drift
-# upstream implementation ../../.codex/hooks/cause_investigation_guard.py blocks code edits without cause evidence
-# upstream implementation ../../.codex/hooks/notebook_quality_guard.py blocks notebook quality findings
-# upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and warns on OOP findings
-# upstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks log surface drift
-# upstream implementation ../../.codex/hooks/style_checker_guard.py logs style checker coverage
-# upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
-# upstream implementation ../../.codex/hooks/codex_runtime_summary_logger.py exports bounded Codex runtime summaries
-# upstream implementation ../../.codex/hooks/runtime_log_auto_sync.py runs unattended runtime log archive sync
-# upstream implementation ../../.codex/hooks/completion_review_guard.py blocks unresolved automatic review at Stop
-# upstream implementation ../../.codex/hooks/log_archive_mount_warning.py warns when log archive is not mounted
-# upstream implementation ../../.codex/hooks/branch_worktree_guard.py blocks unconfirmed shared-checkout Git mutations
-# upstream implementation ../../.codex/hooks/direct_rg_context_guard.py warns on context-polluting direct rg usage
-# upstream implementation ../../.codex/hooks/reference_capture_guard.py logs reference capture coverage
-# upstream implementation ../../.codex/hooks/hook_dispatcher.py dispatches hook events and skips read-only GitStatus checks
+# upstream implementation ../../.codex/hooks/hook_safety.py owns pure active safety leaves
+# upstream implementation ../../.codex/hooks/hook_dispatcher.py owns the active typed event contract
+# upstream implementation ../../.codex/hooks/execution_resource_plan_projection_guard.py validates exact projection bytes
+# upstream design ../../.codex/hooks/hook_dispatcher.py RETIRED_HOOK_ROUTES records migrated standalone owners
 # @dependency-end
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -101,7 +86,7 @@ REFERENCE_CAPTURE_GUARD = (
 NOTEBOOK_MAJOR_VERSION = 4
 NOTEBOOK_MINOR_VERSION = 5
 EXPECTED_PROMPT_FEEDBACK_MIN = 3
-EXPECTED_HOOK_EVENT_COUNT = 4
+EXPECTED_HOOK_EVENT_COUNT = 3
 
 
 def write_sha256_baseline(path: Path, baseline_path: Path) -> None:
@@ -491,21 +476,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(set(hooks), {"hooks"})
         self.assertIsInstance(hooks["hooks"], dict)
 
-    def _dispatcher_scripts(self, event: str) -> list[str]:
-        """Return the child hook scripts configured for one dispatcher event."""
-        result = subprocess.run(
-            [sys.executable, str(HOOK_DISPATCHER), "--list", event],
-            cwd=PROJECT_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        payload = cast("dict[str, object]", json.loads(result.stdout))
-        events = cast("dict[str, list[dict[str, object]]]", payload["events"])
-        return [cast(str, row["script"]) for row in events[event]]
-
     def test_hooks_json_does_not_wire_mcp_context_hook(self) -> None:
-        """MCP context is not a startup hook; active hooks stay guardrail-only."""
+        """The hook file exposes only the bounded active dispatcher contract."""
         hooks = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))
 
         session_start_hooks = hooks["hooks"].get("SessionStart", [])
@@ -520,12 +492,15 @@ class CodexHooksTest(unittest.TestCase):
         pre_tool_commands = [hook["command"] for hook in pre_tool["hooks"]]
         post_tool = hooks["hooks"]["PostToolUse"][0]
         post_tool_commands = [hook["command"] for hook in post_tool["hooks"]]
-        stop_hooks = hooks["hooks"]["Stop"][0]["hooks"]
-        stop_commands = [hook["command"] for hook in stop_hooks]
-        prompt_scripts = self._dispatcher_scripts("UserPromptSubmit")
-        pre_tool_scripts = self._dispatcher_scripts("PreToolUse")
-        post_tool_scripts = self._dispatcher_scripts("PostToolUse")
-        stop_scripts = self._dispatcher_scripts("Stop")
+        contract_result = subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), "--contract"],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        contract = cast("dict[str, object]", json.loads(contract_result.stdout))
+        events = cast("dict[str, dict[str, object]]", contract["events"])
 
         self.assertFalse(
             any(
@@ -538,75 +513,70 @@ class CodexHooksTest(unittest.TestCase):
         )
         self.assertEqual(len(prompt_commands), 1)
         self.assertIn("hook_dispatcher.py", prompt_commands[0])
-        self.assertEqual(
-            prompt_scripts,
-            [
-                "log_archive_mount_warning.py",
-                "prompt_secret_guard.py",
-                "skill_usage_logger.py",
-                "reference_capture_guard.py",
-            ],
-        )
         self.assertIn("apply_patch", pre_tool["matcher"])
         self.assertEqual(len(pre_tool_commands), 1)
         self.assertIn("hook_dispatcher.py", pre_tool_commands[0])
-        self.assertEqual(
-            pre_tool_scripts,
-            [
-                "log_archive_mount_warning.py",
-                "branch_worktree_guard.py",
-                "direct_rg_context_guard.py",
-                "cause_investigation_guard.py",
-            ],
-        )
         self.assertIn("apply_patch", post_tool["matcher"])
         self.assertIn("spawn_agent", post_tool["matcher"])
         self.assertIn("close_agent", post_tool["matcher"])
         self.assertEqual(len(post_tool_commands), 1)
         self.assertIn("hook_dispatcher.py", post_tool_commands[0])
+        self.assertNotIn("Stop", hooks["hooks"])
         self.assertEqual(
-            post_tool_scripts,
-            [
-                "task_authority_schema_guard.py",
-                "execution_resource_plan_projection_guard.py",
-                "skill_usage_logger.py",
-                "reference_capture_guard.py",
-                "role_write_policy_guard.py",
-                "oop_readability_guard.py",
-                "module_boundary_guard.py",
-                "library_implementation_guard.py",
-                "first_party_library_guard.py",
-                "helper_inventory_guard.py",
-                "helper_first_guard.py",
-                "style_checker_guard.py",
-                "log_surface_inventory_guard.py",
-                "notebook_quality_guard.py",
-            ],
+            set(contract["active_events"]),
+            {"UserPromptSubmit", "PreToolUse", "PostToolUse"},
         )
-        self.assertEqual(len(stop_commands), 1)
-        self.assertIn("hook_dispatcher.py", stop_commands[0])
+        self.assertEqual(set(contract["inactive_events"]), {"Stop"})
+        self.assertTrue(all(events[name]["active"] for name in contract["active_events"]))
+        self.assertFalse(events["Stop"]["active"])
+        for event_contract in events.values():
+            self.assertIsInstance(event_contract["matchers"], list)
+            self.assertTrue(event_contract["failure"])
+            self.assertTrue(event_contract["telemetry"])
+        for command in prompt_commands + pre_tool_commands + post_tool_commands:
+            self.assertNotIn("$(", command)
+            self.assertNotIn("git ", command)
+
+    def test_retired_hook_routes_resolve_to_repo_command_or_skill(self) -> None:
+        """Every retired route must resolve to an installed skill or repo command."""
+        result = subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), "--contract"],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        contract = cast("dict[str, object]", json.loads(result.stdout))
+        routes = cast(
+            "dict[str, dict[str, object]]",
+            contract["retired_hook_routes"],
+        )
         self.assertEqual(
-            stop_scripts,
-            [
-                "completion_review_guard.py",
-                "goal_completion_guard.py",
-                "task_authority_schema_guard.py",
-                "role_write_policy_guard.py",
-                "oop_readability_guard.py",
-                "module_boundary_guard.py",
-                "library_implementation_guard.py",
-                "first_party_library_guard.py",
-                "helper_inventory_guard.py",
-                "helper_first_guard.py",
-                "style_checker_guard.py",
-                "log_surface_inventory_guard.py",
-                "notebook_quality_guard.py",
-                "reference_capture_guard.py",
-                "skill_usage_logger.py",
-                "codex_runtime_summary_logger.py",
-                "runtime_log_auto_sync.py",
-            ],
+            routes["cause_investigation_guard.py"]["command_or_skill"],
+            "$dependency-analysis",
         )
+        for child, route in routes.items():
+            target = cast(str, route["command_or_skill"])
+            with self.subTest(child=child, target=target):
+                if target.startswith("$"):
+                    self.assertTrue(
+                        (
+                            PROJECT_ROOT
+                            / ".agents"
+                            / "skills"
+                            / target[1:]
+                            / "SKILL.md"
+                        ).is_file()
+                    )
+                    continue
+                tokens = shlex.split(target)
+                target_index = (
+                    1
+                    if tokens[0] in {"bash", "python", "python3", "sh"}
+                    else 0
+                )
+                self.assertGreater(len(tokens), target_index)
+                self.assertTrue((PROJECT_ROOT / tokens[target_index]).is_file())
 
     def test_execution_resource_plan_projection_guard_dispatch(self) -> None:
         """The guard accepts only the normalized six-field input and exact projection."""
@@ -670,6 +640,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(rejected.stdout, "")
         self.assertIn("fields are not exact", rejected.stderr)
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_post_tool_projection_dispatch(self) -> None:
         """Only the projection child receives canonical normalization and owns stdout."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -783,6 +754,180 @@ class CodexHooksTest(unittest.TestCase):
             self.assertEqual(rejected.stdout, b"")
             self.assertFalse((payload_dir / projection_script).exists())
             self.assertIn(b"raw PostToolUse keys are not exact", rejected.stderr)
+
+    def test_dispatcher_forwards_only_valid_execution_projection(self) -> None:
+        """The active PostToolUse path forwards one validator-approved projection."""
+        run_id = "r5-dispatch"
+        projection = {
+            "admission": None,
+            "completion_coverage_path": f"reports/agents/{run_id}/runtime/completion_coverage.json",
+            "error": None,
+            "exit_code": 0,
+            "plan_fingerprint": "b" * 64,
+            "plan_path": f"reports/agents/{run_id}/runtime/execution_resource_plan.json",
+            "projection": "post_tool_use",
+            "run_id": run_id,
+            "schema_version": "execution-resource-plan/v1",
+        }
+        projection_stdout = json.dumps(projection, sort_keys=True, separators=(",", ":")) + "\n"
+        raw = {
+            "hookEventName": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "python3 experiments/demo_topic/run.py"},
+            "tool_response": {"exit_code": 0, "stderr": "", "stdout": projection_stdout},
+        }
+        result = subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+            cwd=PROJECT_ROOT,
+            input=json.dumps(raw),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = cast("dict[str, object]", json.loads(result.stdout))
+        self.assertEqual(payload["schema"], "agent-canon.posttooluse-stop.v1")
+        self.assertEqual(payload["hookSpecificOutput"]["hookEventName"], "PostToolUse")
+        self.assertEqual(payload["hookSpecificOutput"]["additionalContext"], projection_stdout)
+
+        malformed = {**raw, "unexpected": True}
+        rejected = subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+            cwd=PROJECT_ROOT,
+            input=json.dumps(malformed),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(rejected.stdout, "")
+        self.assertEqual(rejected.stderr, "")
+
+    def test_dispatcher_legacy_stop_and_malformed_payload_are_noop(self) -> None:
+        """Stop is inactive and malformed active input fails open without output."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            spool_root = Path(temp_dir)
+            stop = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "Stop"],
+                cwd=PROJECT_ROOT,
+                input="not-json",
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(spool_root / "stop"),
+                },
+            )
+            malformed = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "UserPromptSubmit"],
+                cwd=PROJECT_ROOT,
+                input="{\"prompt\":",
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(
+                        spool_root / "malformed"
+                    ),
+                },
+            )
+            oversized = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "UserPromptSubmit"],
+                cwd=PROJECT_ROOT,
+                input="x" * (256 * 1024 + 1),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(
+                        spool_root / "oversized"
+                    ),
+                },
+            )
+            deeply_nested = (
+                '{"prompt":' + "[" * 16384 + "0" + "]" * 16384 + "}"
+            )
+            self.assertLessEqual(len(deeply_nested.encode("utf-8")), 256 * 1024)
+            for event in ("UserPromptSubmit", "PreToolUse", "PostToolUse"):
+                event_spool = spool_root / "deeply-nested" / event
+                deep_result = subprocess.run(
+                    [sys.executable, str(HOOK_DISPATCHER), event],
+                    cwd=PROJECT_ROOT,
+                    input=deeply_nested,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(event_spool),
+                    },
+                )
+                self.assertEqual(deep_result.stdout, "", event)
+                self.assertEqual(deep_result.stderr, "", event)
+                spool_entries = list(event_spool.rglob("*.json"))
+                self.assertEqual(len(spool_entries), 1, event)
+                spool_entry = json.loads(spool_entries[0].read_text(encoding="utf-8"))
+                self.assertEqual(spool_entry["hook_event_name"], event)
+                self.assertEqual(spool_entry["status"], "malformed_payload")
+
+        self.assertEqual(stop.stdout, "")
+        self.assertEqual(stop.stderr, "")
+        self.assertEqual(malformed.stdout, "")
+        self.assertEqual(malformed.stderr, "")
+        self.assertEqual(oversized.stdout, "")
+        self.assertEqual(oversized.stderr, "")
+
+    def test_dispatcher_branch_payload_is_redacted(self) -> None:
+        """Destructive Git output contains only operation and command fingerprint."""
+        command = "git -C vendor/agent-canon restore --worktree ."
+        result = subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), "PreToolUse"],
+            cwd=PROJECT_ROOT,
+            input=json.dumps(
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "Bash",
+                    "tool_input": {"cmd": command},
+                }
+            ),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = cast("dict[str, object]", json.loads(result.stdout))
+        self.assertEqual(payload["decision"], "block")
+        self.assertEqual(payload["operation"], "destructive_git:restore")
+        self.assertEqual(payload["command_sha256"], hashlib.sha256(command.encode()).hexdigest())
+        self.assertNotIn(command, result.stdout)
+        self.assertNotIn("cmd", payload)
+
+    def test_dispatcher_hot_path_has_no_child_process_or_network_calls(self) -> None:
+        """The active dispatcher must remain in-process and local-only."""
+        tree = ast.parse(HOOK_DISPATCHER.read_text(encoding="utf-8"))
+        imported = {
+            alias.name.split(".", 1)[0]
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        imported.update(
+            alias.name.split(".", 1)[0]
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom)
+            for alias in node.names
+        )
+        self.assertNotIn("subprocess", imported)
+        self.assertNotIn("socket", imported)
+        self.assertNotIn("urllib", imported)
+        forbidden_calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in {"run", "Popen", "check_call", "check_output", "urlopen"}
+        ]
+        self.assertEqual(forbidden_calls, [])
 
     def test_log_archive_mount_warning_is_non_blocking_when_missing(self) -> None:
         """Missing log archive mount should warn without blocking the hook chain."""
@@ -1148,7 +1293,6 @@ class CodexHooksTest(unittest.TestCase):
                 "UserPromptSubmit": 1,
                 "PreToolUse": 1,
                 "PostToolUse": 1,
-                "Stop": 1,
             },
         )
         self.assertEqual(sum(counts.values()), EXPECTED_HOOK_EVENT_COUNT)
@@ -1158,6 +1302,7 @@ class CodexHooksTest(unittest.TestCase):
                 all("hook_dispatcher.py" in command for command in commands)
             )
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_runs_all_children_and_returns_first_block(self) -> None:
         """Dispatcher should preserve order while still giving every child a log chance."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1227,6 +1372,7 @@ class CodexHooksTest(unittest.TestCase):
             ],
         )
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_promotes_trace_alias_to_child_thread_env(self) -> None:
         """Dispatcher should make trace aliases available to child hooks."""
         cases: tuple[tuple[str, dict[str, object], dict[str, str], str], ...] = (
@@ -1328,6 +1474,7 @@ class CodexHooksTest(unittest.TestCase):
                 ],
             )
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_downgrades_noncritical_child_blocks(self) -> None:
         """Dispatcher should keep non-secret guard findings from stopping work."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1384,6 +1531,7 @@ class CodexHooksTest(unittest.TestCase):
             "register the reference", cast("list[str]", payload["remediation"])
         )
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_preserves_branch_worktree_guard_blocks(self) -> None:
         """Dispatcher should preserve the branch/worktree creation stop."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1438,6 +1586,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(payload["decision"], "block")
         self.assertEqual(payload["reason"], "branch worktree stop")
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_critical_launch_failure_blocks_after_later_hooks(
         self,
     ) -> None:
@@ -1503,6 +1652,7 @@ class CodexHooksTest(unittest.TestCase):
             ],
         )
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_post_tool_failure_is_quiet(self) -> None:
         """Verify PostToolUse fail-open diagnostics do not emit schema-sensitive stdout."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1542,6 +1692,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout, "")
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_combines_non_blocking_visible_outputs(self) -> None:
         """Dispatcher should not drop later non-blocking child diagnostics."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1599,6 +1750,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("plain diagnostic", cast(str, payload["systemMessage"]))
         self.assertEqual(payload["next_action"], "first_action")
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_skips_git_status_tool_payloads(self) -> None:
         """GitStatus-style tool checks should not run blocking hook children."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1642,6 +1794,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertFalse(log_path.exists())
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_skips_read_only_git_status_bash_commands(self) -> None:
         """Read-only git status Bash commands should not trigger blocking children."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1797,15 +1950,69 @@ class CodexHooksTest(unittest.TestCase):
             with self.subTest(command=command):
                 payload = self._run_shared_checkout_guard(command)
                 self.assertIsNotNone(payload)
-                self.assertIn(
-                    "opaque protected Git mutation",
-                    cast(str, cast("dict[str, object]", payload)["reason"]),
+                self.assertEqual(
+                    cast("dict[str, object]", payload)["operation"],
+                    "destructive_git:opaque",
                 )
         self.assertIsNotNone(
             self._run_shared_checkout_guard(
                 "git --config-env=core.editor=EDITOR reset --hard HEAD"
             )
         )
+
+    def test_shared_checkout_guard_classifies_backtick_substitutions(self) -> None:
+        """Executable or uncertain protected Git backticks block without broad matches."""
+        blocked = (
+            "echo `git reset --hard`",
+            'echo "`git reset --hard`"',
+            "echo `git reset --hard",
+        )
+        for command in blocked:
+            with self.subTest(command=command):
+                payload = self._run_shared_checkout_guard(command)
+                self.assertIsNotNone(payload)
+                self.assertEqual(
+                    cast("dict[str, object]", payload)["operation"],
+                    "destructive_git:reset",
+                )
+        benign = (
+            "echo `date`",
+            'echo "`date`"',
+            "echo '`git reset --hard`'",
+            "echo `git status`",
+            "echo `date",
+            "echo \\`git reset --hard\\`",
+        )
+        for command in benign:
+            with self.subTest(command=command):
+                self.assertIsNone(self._run_shared_checkout_guard(command))
+
+    def test_shared_checkout_guard_ignores_backticks_in_shell_comments(self) -> None:
+        """Only unquoted shell-comment boundaries suppress backtick execution."""
+        comments = (
+            "echo safe # `git reset --hard`",
+            "echo safe # `git reset --hard",
+            "echo safe;# `git reset --hard`",
+            "echo '# `git reset --hard`'",
+        )
+        for command in comments:
+            with self.subTest(command=command):
+                self.assertIsNone(self._run_shared_checkout_guard(command))
+
+        executable = (
+            "echo safe#`git reset --hard`",
+            'echo "# `git reset --hard`"',
+            "echo \\#`git reset --hard`",
+            "echo safe # `date`\necho `git reset --hard`",
+        )
+        for command in executable:
+            with self.subTest(command=command):
+                payload = self._run_shared_checkout_guard(command)
+                self.assertIsNotNone(payload)
+                self.assertEqual(
+                    cast("dict[str, object]", payload)["operation"],
+                    "destructive_git:reset",
+                )
 
     def test_shared_checkout_guard_allows_explicit_read_only_table(self) -> None:
         """Read-only diagnostics and combined clean dry-run forms stay quiet."""
@@ -2037,6 +2244,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(payload["decision"], "block")
         self.assertIn("DESTRUCTIVE_GIT_GUARD=block", cast(str, payload["reason"]))
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_critical_child_failures_fail_closed_but_empty_allows(
         self,
     ) -> None:
@@ -2153,6 +2361,7 @@ class CodexHooksTest(unittest.TestCase):
 
                 self.assertEqual(result.stdout, "")
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_surfaces_direct_rg_warning(self) -> None:
         """Dispatcher should not bypass risky direct rg commands."""
         result = subprocess.run(
@@ -2176,6 +2385,7 @@ class CodexHooksTest(unittest.TestCase):
         )
         self.assertIn("hookSpecificOutput", payload)
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_skips_git_push_tool_payloads(self) -> None:
         """GitPush-style publish tools should not run blocking hook children."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2219,6 +2429,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertFalse(log_path.exists())
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_skips_github_publish_commands(self) -> None:
         """Gh PR and github_publish.py commands are publish work, not hook-stop points."""
         commands = [
@@ -2272,6 +2483,7 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertEqual(result.stdout, "")
                 self.assertFalse(log_path.exists())
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_skips_read_only_file_inspection_commands(self) -> None:
         """Read-only file inspection should not require disabling hook config."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2316,6 +2528,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertFalse(log_path.exists())
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_skips_validation_commands(self) -> None:
         """Validation commands should not be blocked by post-tool hook children."""
         commands = [
@@ -2374,6 +2587,7 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertEqual(result.stdout, "")
                 self.assertFalse(log_path.exists())
 
+    @unittest.skip("retired child-process dispatcher contract")
     def test_hook_dispatcher_runs_children_for_mutating_lookalikes(self) -> None:
         """Write-capable lookalikes should not use the read-only bypass."""
         commands = [
