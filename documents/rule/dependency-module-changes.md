@@ -26,10 +26,17 @@ projection を提供し、clean な named topic branch にいるときは source
 `main`（`DEFAULT_BRANCH`）にあり、submodule の worktree `HEAD` が staged index
 gitlink (`:$PREFIX`) と一致する状態です。
 
-source edit の owner は、clean な named topic branch の `vendor/<module>` です。
-`main` は topic branch を作成する起点であり、source edit の owner にはしません。
-別 topic の dirty vendor state によって親 vendor が占有されている場合のみ、
-`workspace/<topic-slug>/` の standalone clone を source clone として作成/再利用します。
+source edit の vendor-first owner は、clean な named topic branch の
+`vendor/<module>` です。`main` は topic branch を作成する起点であり、source
+edit の owner にはしません。これは独立した並列 workstream の workspace clone
+を禁止する規約ではありません。parent が、十分な責務単位、disjoint な write
+scope、依存/merge order、validation、reviewer ownership を明示した独立 stream
+を選択した場合は、vendor が clean でも `--placement workspace` により
+`workspace/<topic-slug>/<module-basename>` の fresh clone を作成できます。
+fresh route は local/remote に同名 branch が既にあれば拒否します。既存 branch の
+継続は `--placement workspace-continuation` という別の non-fresh route だけで行います。
+別 topic の dirty vendor state による従来の fallback も、この明示 route とは
+別に保持します。
 topic workspace
 の定義、親 repository の ignore rule、devcontainer mount、VS Code workspace
 運用の禁止、`.vscode/` 共有面との境界は
@@ -63,6 +70,7 @@ owner 引数または topic environment owner を再利用し、他に明示指�
 | 親 vendor 状態 | topic identity | owner / next action |
 | --- | --- | --- |
 | clean `main`、かつ worktree `HEAD == :$PREFIX` staged index gitlink | 不要 | parent pin/root projection pass |
+| clean `main`、明示された独立 parallel stream | requested topic | `--placement workspace` で computed clone のみを fresh create。vendor は clean のまま保持 |
 | clean named topic branch | `current_branch` | current `vendor/<module>` が source owner |
 | dirty、requested topic 未指定 | なし | typed stop: `NEXT_ACTION=topic_identity_required` |
 | dirty、requested topic == named `current_branch` | requested topic | fallback clone を作らず `materialize_current_vendor_topic_commit_push_pr_then_resume` |
@@ -79,11 +87,22 @@ HEAD は topic identity として扱いません。requested topic と current b
 
 clone を作成できるのは、owner evidence により「依存 source の変更が必要」
 と確定し、正しい topic workspace と branch-specific clone が存在しない場合だけです。
-`prepare --topic <topic> --module <path> --branch <branch> --owner-evidence <file>` は、現在 repoが
-既存 topic workspace内ならその親 rootを再利用します。外側なら workspaceの
-隣に topic rootを作り、親 remoteから親 cloneを作成し、`.gitmodules` URLから
-module cloneを作成または再利用して継続 pathを返します。既存 clone の
-computed path、marker、actual branch、URL が一致する場合は再利用します。
+標準の `prepare --topic <topic> --module <path> --branch <branch>
+--owner-evidence <file>` は、現在 repoが既存 topic workspace内ならその親 rootを
+再利用します。外側なら workspaceの隣に topic rootを作り、親 remoteから親 cloneを
+作成し、`.gitmodules` URLから module cloneを作成または再利用して継続 pathを返します。
+既存 clone の computed path、marker、actual branch、URL が一致する場合は再利用します。
+独立 parallel stream は `prepare --placement workspace --topic <topic> --module <path>
+--branch <branch> --owner-evidence <file>` を使います。この typed route は親 cloneを
+作らず、`<parent-root>/workspace/<sanitized-topic>/<module-basename>` という一つの
+computed clone とその包含 directory だけを作成します。topic、module、branch、owner
+evidence の SHA、placement marker が一致しない既存 path は拒否し、別 pathへ退避しません。
+local/remote に requested branch が存在する場合も拒否します。新規 branch は clone 後に
+`git fetch origin main` を実行し、最新の `origin/main` から作成します。既存 remote branch
+の継続が必要な場合だけ `--placement workspace-continuation` を使います。相対
+`.gitmodules` URL は親 repository の `origin` identity に対する Git-compatible relative
+resolution 後の URL を source identity として使います。prepare は source remote、
+`origin/main`、base SHA、owner evidence SHA、task branch、HEAD SHA を返します。
 親の pin PR branch は `--parent-branch <branch>` で明示し、同じ marker/actual
 branch の parent clone を再利用します。
 
@@ -130,8 +149,11 @@ surface の状態だけを完成形として残します。
 
 - `status --topic <topic>`: topic membershipと`.gitmodules` identityを読む。
 - `prepare --topic <topic> --module <path> --branch <branch> --owner-evidence <file> [--parent-branch <branch>]`: 条件を検証してtopic parent/module cloneを作成または再利用し、`PARENT_ROOT`、`SOURCE_CLONE`、`CONTINUE_PATH` を返す。
+- `prepare --placement workspace --topic <topic> --module <path> --branch <branch> --owner-evidence <file>`: 明示された独立 stream 用の computed source clone だけを fresh create し、local/remote branch collision を拒否して `SOURCE_REMOTE`、`SOURCE_BASE_REF`、`SOURCE_BASE_SHA`、`SOURCE_OWNER_EVIDENCE_SHA256`、`SOURCE_BRANCH`、`SOURCE_HEAD_SHA` を返す。
+- `prepare --placement workspace-continuation --topic <topic> --module <path> --branch <branch> --owner-evidence <file>`: 既存 remote branch の継続を明示的に行う non-fresh route。
 - `cleanup --topic <topic> --module <path> --expected-clone <absolute-path>`: dry-run で
   判定し、`--apply` のときだけ cleanup gate を満たす clone を削除する。
+- `cleanup --placement workspace[{-continuation}] --topic <topic> --module <path> --expected-clone <absolute-path> --owner-evidence-sha256 <sha256>`: workspace placement の computed clone だけを扱い、exact expected evidence SHA と marker identity を検証してから同じ cleanup gate を適用する。
 - `cleanup --topic <topic> --parent --expected-parent <absolute-path>`: module cloneが
   無い場合だけparent cloneと空topic rootを同じgateで削除する。
 
@@ -153,13 +175,16 @@ PR を再構築する。
 
 ## AgentCanon update の具体例
 
-AgentCanon source は、原則として consumer repository の `vendor/agent-canon` が
-唯一の source checkout です。`vendor/agent-canon` の local-specific topic
+AgentCanon source は、vendor-first の非並列 single-stream では consumer repository
+の `vendor/agent-canon` が source checkout です。`vendor/agent-canon` の local-specific topic
 branch を create/reuse し、`local commit -> 同 commit push -> PR` を行います。
 常に named branch HEAD を使用し、detached HEAD は禁止します。
-ただし、`vendor/agent-canon` が既に別 topic の dirty state を持つ場合のみ、
-`workspace/<topic-slug>/agent-canon` の standalone clone で同じ運用（local
-commit→push→PR）を行います。
+独立した replaceable responsibility を parent が parallel に選択した場合は、
+vendor の dirty/clean に関係なく `dependency_module_change.py prepare
+--placement workspace` で `workspace/<topic-slug>/agent-canon` の standalone clone
+を fresh create し、同名 local/remote branch は拒否します。既存 branch の継続は
+`--placement workspace-continuation` で明示して同じ運用（local commit→push→PR）を行います。別 topic の dirty vendor state
+による fallback も引き続き同じ standalone clone topology を使います。
 その clone は、PR 作成/更新時点で `local commit == pushed commit == PR head` が
 readback され、同一 PR へ materialize した証拠が得られたら削除します。
 未 materialize 差分がある場合のみ clone 削除を禁止し、先に同一 PR へ
@@ -177,10 +202,12 @@ staged gitlink(`:$PREFIX`) と実体 `HEAD` が一致することを pass 条件
 source edit の pass 条件は別であり、clean な named topic branch にいることです。
 detached HEAD、main 上の source edit、gitlink mismatch は pass にしません。
 
-AgentCanon PR 作成・更新前の必須順序は、
+AgentCanon PR 作成・更新前の必須順序は、各 branch について
 `fetch origin/main の read -> current parent branch へ origin/main を merge -> 衝突解消 ->
 local commit (candidate freeze) -> exact candidate review -> CAS -> review 済み candidate
-push -> PR作成/更新 -> merge/readback` です。
+push -> PR作成/更新 -> merge/readback` です。parallel stream は ready set の全てを
+launch しますが、candidate review/PR の前に各 branch が最新 `origin/main` を merge
+済みであることを確認し、dependency DAG が指定した明示的な merge order を保持します。
 `parent vendor` が別 topic の dirty state を持つ場合にのみ、`workspace/<topic-slug>/agent-canon`
 の standalone clone を使い、すでに open PR がある場合は、その PR の remote head
 branch を clone/checkout して同一順序で`origin/main` を merge し、衝突解消後に

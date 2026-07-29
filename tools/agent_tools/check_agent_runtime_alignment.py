@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import subprocess
 import tempfile
 import shutil
@@ -460,8 +461,41 @@ def is_project_skill_lane_path(path: Path) -> bool:
         return False
 
 
+def validate_retired_command_or_skill(value: str, child: str) -> None:
+    """Require one retired route to name an installed skill or repo-owned command."""
+    if value.startswith("$"):
+        skill_id = value[1:]
+        ensure(
+            bool(re.fullmatch(r"[a-z0-9][a-z0-9-]*", skill_id)),
+            f"retired route {child} has invalid skill id: {value}",
+        )
+        ensure(
+            (ROOT / ".agents" / "skills" / skill_id / "SKILL.md").is_file(),
+            f"retired route {child} skill does not resolve: {value}",
+        )
+        return
+    try:
+        tokens = shlex.split(value)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"retired route {child} command is malformed: {value}"
+        ) from exc
+    ensure(bool(tokens), f"retired route {child} command must be non-empty")
+    command_path_index = 1 if tokens[0] in {"bash", "python", "python3", "sh"} else 0
+    ensure(
+        len(tokens) > command_path_index,
+        f"retired route {child} command lacks a repo-owned target: {value}",
+    )
+    command_path = Path(tokens[command_path_index])
+    ensure(
+        not command_path.is_absolute()
+        and (ROOT / command_path).is_file(),
+        f"retired route {child} command does not resolve: {value}",
+    )
+
+
 def validate_project_hooks() -> None:
-    """Check that project hooks cover active safety and completion guardrails."""
+    """Check the active/inactive in-process hook contract and wiring."""
     raw_hooks_payload: object = json.loads(HOOKS_JSON_PATH.read_text(encoding="utf-8"))
     hooks_payload = require_mapping(
         raw_hooks_payload, "hooks.json top-level must be a mapping"
@@ -471,9 +505,10 @@ def validate_project_hooks() -> None:
         hooks_payload.get("hooks", {}), "hooks.json hooks must be a mapping"
     )
 
-    for event in ("UserPromptSubmit", "PostToolUse", "Stop"):
+    for event in ("UserPromptSubmit", "PreToolUse", "PostToolUse"):
         entries = require_list(hooks.get(event, []), f"{event} hook must be configured")
         ensure(bool(entries), f"{event} hook must be configured")
+    ensure("Stop" not in hooks, "hooks.json must omit inactive Stop")
 
     hooks_text = HOOKS_JSON_PATH.read_text(encoding="utf-8")
     ensure(
@@ -481,57 +516,44 @@ def validate_project_hooks() -> None:
         "mcp_session_context.sh must not be wired as a startup hook",
     )
     ensure("hook_dispatcher.py" in hooks_text, "hooks.json must invoke hook_dispatcher.py")
-    dispatcher_scripts = configured_dispatcher_scripts()
-    for hook_script in (
-        "log_archive_mount_warning.py",
-        "prompt_secret_guard.py",
-        "branch_worktree_guard.py",
-        "goal_completion_guard.py",
-        "oop_readability_guard.py",
-        "log_surface_inventory_guard.py",
-        "notebook_quality_guard.py",
-        "style_checker_guard.py",
-        "skill_usage_logger.py",
-    ):
-        ensure(hook_script in dispatcher_scripts, f"{hook_script} must be wired through hook_dispatcher.py")
-        ensure((ROOT / ".codex" / "hooks" / hook_script).is_file(), f"{hook_script} must exist")
+    for event, entries in hooks.items():
+        for group in require_list(entries, f"{event} hook groups must be a list"):
+            group_map = require_mapping(group, f"{event} hook group must be a mapping")
+            for hook in require_list(group_map.get("hooks", []), f"{event} hooks must be a list"):
+                hook_map = require_mapping(hook, f"{event} hook must be a mapping")
+                command = hook_map.get("command")
+                ensure(isinstance(command, str) and "hook_dispatcher.py" in command, f"{event} must invoke hook_dispatcher.py")
+                ensure("$(" not in command and "git " not in command, f"{event} hook command must not shell out to Git")
 
-
-def configured_dispatcher_scripts() -> set[str]:
-    """Return hook scripts declared by the project dispatcher."""
-    scripts: set[str] = set()
     dispatcher = ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
+    result = subprocess.run(
+        ["python3", str(dispatcher), "--contract"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    contract = require_mapping(json.loads(result.stdout), "hook contract must be a mapping")
+    ensure(contract.get("schema") == "agent-canon.hook-contract.v1", "hook contract schema must be exact")
+    event_contracts = require_mapping(contract.get("events", {}), "hook contract events must be a mapping")
+    ensure(set(contract.get("active_events", [])) == {"UserPromptSubmit", "PreToolUse", "PostToolUse"}, "hook contract active events must be exact")
+    ensure(set(contract.get("inactive_events", [])) == {"Stop"}, "hook contract inactive events must expose legacy Stop")
     for event in ("UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"):
-        result = subprocess.run(
-            ["python3", str(dispatcher), "--list", event],
-            cwd=ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
+        event_contract = require_mapping(event_contracts.get(event), f"hook contract missing {event}")
+        ensure(isinstance(event_contract.get("active"), bool), f"hook contract {event} active must be boolean")
+        ensure(isinstance(event_contract.get("matchers"), list), f"hook contract {event} matchers must be a list")
+        ensure(isinstance(event_contract.get("failure"), str) and event_contract["failure"], f"hook contract {event} failure must be non-empty")
+        ensure(isinstance(event_contract.get("telemetry"), str) and event_contract["telemetry"], f"hook contract {event} telemetry must be non-empty")
+    retired = require_mapping(contract.get("retired_hook_routes", {}), "retired hook routes must be a mapping")
+    ensure(not set(contract.get("active_handlers", [])).intersection(retired), "active and retired hook sets must be disjoint")
+    for child, route in retired.items():
+        route_map = require_mapping(route, f"retired route {child} must be a mapping")
+        for field in ("owner", "command_or_skill", "profile_trigger", "decision_semantics", "artifact"):
+            ensure(isinstance(route_map.get(field), str) and route_map[field], f"retired route {child} missing {field}")
+        validate_retired_command_or_skill(
+            cast(str, route_map["command_or_skill"]),
+            child,
         )
-        raw_payload: object = json.loads(result.stdout)
-        payload = require_mapping(
-            raw_payload, f"dispatcher list output for {event} must be a mapping"
-        )
-        events = require_mapping(
-            payload.get("events", {}),
-            f"dispatcher list output for {event} must contain events",
-        )
-        entries = require_list(
-            events.get(event, []),
-            f"dispatcher list output for {event} must be a list",
-        )
-        for entry in entries:
-            entry = require_mapping(
-                entry, f"dispatcher entry for {event} must be a mapping"
-            )
-            script = entry.get("script", "")
-            ensure(
-                isinstance(script, str) and bool(script),
-                f"dispatcher entry for {event} must name a script",
-            )
-            scripts.add(require_string(script, f"dispatcher entry for {event} must name a script"))
-    return scripts
 
 
 def validate_generated_role_views() -> None:

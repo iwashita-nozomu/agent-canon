@@ -4,7 +4,7 @@
 # responsibility Enforces active role write policy against current repository changes.
 # upstream implementation ../../tools/agent_tools/task_authority.py locates request-local authority.
 # upstream implementation ../../tools/agent_tools/agent_team.py validates role write scope.
-# downstream implementation ./hook_dispatcher.py invokes this hook for PostToolUse and Stop.
+# downstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns explicit write-scope validation.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates role write policy behavior.
 # @dependency-end
 """Enforce AgentCanon role write policies for edit-like hook events."""

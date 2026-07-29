@@ -548,7 +548,8 @@ Hooks can be configured inline under `[hooks]` or in `hooks.json`. Official even
 - `PreToolUse`
 - `PostToolUse`
 - `PermissionRequest`
-- `Stop`
+- `Stop` is a legacy event accepted by the dispatcher as an inactive no-op; it
+  is not registered in this repository's `hooks.json`.
 
 Use hooks for deterministic runtime checks, not for replacing workflow policy:
 
@@ -577,17 +578,13 @@ severity rules:
   findings are warning/evidence by default. They should be fixed before
   closeout, but they must not require moving hook config aside or disabling
   hooks to keep working.
-- Child hook failures are fail-open by default. They surface as warning context
-  with repair commands. Use `AGENT_CANON_HOOK_STRICT_FAILURES=1` only while
-  explicitly developing or validating the hook itself.
-- Child `decision=block` output is downgraded to official warning context unless
-  the child script is listed in `CRITICAL_BLOCKING_CHILD_HOOKS` or
-  `AGENT_CANON_HOOK_STRICT_BLOCKS=1` is set for explicit enforcement tests.
-- GitPush, GitHub branch publish, safe `gh pr` create/edit/view/list/checks/comment
-  operations, and `github_publish.py` are publish/evidence work owned by the
-  GitHub publish tool and PR gate. Hook dispatcher child guards skip these
-  operations so non-critical style, OOP, log-surface, planning, or closeout
-  findings cannot block branch publication or PR evidence updates.
+- Active dispatcher failures are fail-open except for the high-confidence
+  secret and unauthorized destructive-Git decisions. Local spool failure never
+  changes either safety decision. Retired analyzer findings are produced by
+  their explicit owner command or skill, not downgraded child-hook output.
+- GitHub publication, review, planning, style, OOP, log-surface, notebook, and
+  closeout evidence remain owned by their explicit tools and workflow gates;
+  they are not active hook work.
 - AGENTS / ROOT_AGENTS policy prose should first ask whether a rule belongs in
   a checker, warning hook, closeout gate, role TOML, workflow eval, or PR gate
   before adding more prompt-only prohibitions.
@@ -601,58 +598,32 @@ configuration reference owns the operator-facing routing policy.
 
 Template-specific hook behavior:
 
-- `hooks.json` wires one `hook_dispatcher.py` command per active lifecycle
-  event. The dispatcher replays the original stdin payload to the child guard
-  scripts in the configured order, preserves log opportunities, and normalizes
-  non-critical child findings into official warning context.
-- The dispatcher bypasses child guards for `GitStatus`, read-only file / Git
-  inspection, and known validation commands including AgentCanon
-  plan/status/latest-check inspection. Do not rename, move, or temporarily
-  disable `hooks.json` to inspect hook state or run validation.
-- The dispatcher also bypasses child guards for GitHub publish/PR commands.
-  Publish tools must still verify the GitHub remote and user task explicitly;
-  the bypass only prevents unrelated hook findings from stopping the write.
-- `UserPromptSubmit` runs prompt secret scanning, skill usage logging, and
-  reference capture checks.
-- `PreToolUse` runs `direct_rg_context_guard.py` to emit
-  `DIRECT_RG_CONTEXT_RISK=warn` when a shell command uses broad direct
-  broad text-search output. It does not block the tool call; it asks the agent to replace
-  broad output with bounded paths, `--max-count`, or exclusions for
-  `.agent-canon/log-archive/**`, `reports/**`, and `*.jsonl`.
-- `PostToolUse` runs tool/subagent logging, reference capture, OOP readability,
-  module boundary, library implementation, helper inventory, helper-first,
-  style, log-surface inventory, and notebook quality checks as warning/evidence
-  guardrails by default.
-- `Stop` runs goal completion, the post-edit guard suite, reference capture,
-  and final skill usage logging as closeout repair context by default.
-- The OOP hook emits warning/approve output for readability findings and keeps
-  explicit OOP validation available as a closeout gate. Use
-  `AGENT_CANON_OOP_HOOK_MODE=diff` only when the user explicitly requests
-  baseline-only checking; `AGENT_CANON_OOP_HOOK_BASELINE_REF` overrides the
-  diff baseline when needed.
-- Notebook quality checks block notebook-as-test misuse: fine-grained assertions,
-  pytest/unittest imports, `test_` helpers, stored error output, missing narrative,
-  missing code, or missing visualization. Detailed test coverage belongs in `tests/`.
-- Style checker logs record selected Python / C++ / notebook / Markdown checkers and `unchecked_files` for changed paths with no automatic checker.
-- Hook logs append to the mounted runtime log archive
-  `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`.
-  Accumulated eval reports append under
-  `.agent-canon/log-archive/eval-results/<family>/`, Codex runtime summaries
-  under `.agent-canon/log-archive/codex-runtime/<repo-key>/chats/<conversation-id>/summary.jsonl`
-  with `.agent-canon/log-archive/codex-runtime/<repo-key>/index.jsonl`, and agent run
-  reports under `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/`.
-  `log_archive_mount_warning.py` warns, without blocking, when that archive is
-  missing and asks the agent to run `runtime_log_archive_git.py ensure` first.
-  `runtime_log_auto_sync.py` runs `runtime_log_archive_git.py sync` from Stop
-  so normal accumulation does not require a separate agent action.
-  The archive remote and branch policy are documented in
-  `documents/runtime/runtime-log-archive.md`; source-tree `agents/evals/results/`
-  paths are not normal read or write locations.
-- Hook log entries include `hook_run_id`, `payload_fingerprint`, `mode`,
-  `baseline_ref`, and status fields. Local log paths can be overridden with
-  `AGENT_CANON_HOOK_ARCHIVE_DIR`, `AGENT_CANON_HOOK_RESULTS_DIR`,
-  `AGENT_CANON_OOP_HOOK_LOG_PATH`, `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH`,
-  `AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH`, and `AGENT_CANON_SKILL_LOG_PATH`.
+- `hooks.json` registers one relative `hook_dispatcher.py` command for each of
+  `UserPromptSubmit`, `PreToolUse`, and `PostToolUse`. The dispatcher performs
+  one bounded parse and stays in-process: it does not spawn children, invoke
+  Git, inspect a repository root, or use a network.
+- `HOOK_EVENT_CONTRACTS` is the canonical typed table for active/inactive
+  events, matchers, failure semantics, and telemetry. Read it with
+  `python3 .codex/hooks/hook_dispatcher.py --contract`.
+- `UserPromptSubmit` uses the pure `hook_safety.py` leaf for high-confidence
+  secret matching. `PreToolUse` uses the same leaf for destructive Git intent;
+  a blocked payload exposes only `operation` and `command_sha256` as command
+  information.
+- `PostToolUse` forwards only a validator-approved exact execution-resource
+  projection from the managed producer. Invalid or malformed input is quiet
+  and fail-open. The producer uses only the coarse error constants
+  `managed_gpu_failure`, `managed_gpu_execution`, and
+  `see_execution_resource_plan`, plus the exact admission guarantee and
+  bounded opaque namespace required by the validator.
+- Each active event creates one `HookLogContext` and writes one bounded,
+  fingerprint-only local spool record. Prompt, command, stdout, and stderr
+  are not stored; spool failure is independent of the safety decision.
+- Former active child routes remain available as standalone analyzers or
+  wrappers. `RETIRED_HOOK_ROUTES` maps each one exactly once to its owner,
+  explicit command or skill, profile trigger, decision semantics, and artifact.
+- Former OOP, notebook, style, log-archive, summary, and auto-sync behavior is
+  still available through the explicit owner routes recorded in
+  `RETIRED_HOOK_ROUTES`; it is not part of active hook telemetry or blocking.
 
 ## Skills
 

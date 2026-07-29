@@ -8,7 +8,10 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../workflows/hypothesis-validation-workflow.md analysis-prioritized overlay routing
 upstream design ../COMMUNICATION_PROTOCOL.md pre-edit investigation and fresh subagent context packets
 upstream design agent-orchestration.execution-contract.toml machine-readable execution contract
+upstream design ./skill-dependencies.yaml typed public-skill prerequisites, successors, ordering, and parallel relations
 downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py execution contract checker
+downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives canonical invocation order
+downstream implementation ../../tools/agent_tools/skill_dependency_map.py validates and projects the dependency graph
 @dependency-end
 -->
 
@@ -34,6 +37,8 @@ downstream implementation ../../tools/agent_tools/check_execution_time_aware_orc
 task 開始時の mandatory routing skill です。
 task を workflow family に分類し、skill set、handoff、review、runtime entrypoint を一貫した形にそろえます。
 
+すべての skill tool command entry は単一の source-root contract を使います。論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
+
 ## Use When
 
 - repository task を開始する
@@ -55,6 +60,7 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 - `agents/canonical/ARTIFACT_PLACEMENT.md`
 - `agents/canonical/CLI_ENTRYPOINTS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
+- `agents/skills/skill-dependencies.yaml`
 
 ## Decision Order
 
@@ -192,6 +198,45 @@ including its review, validation, and publication evidence. This contract is
 state- and dependency-driven; prompt keywords, arbitrary serial waits, and
 hard-coded durations cannot replace the DAG, ready-set, critical-path, or
 closure decisions.
+
+### Canonical Skill Invocation Order
+
+`agents/skills/catalog.yaml` enumerates public skill identities and owns prompt
+triggers. The typed dictionary `agents/skills/skill-dependencies.yaml` owns
+required prerequisites, successors, explicit order constraints, responsibility
+groups, and parallel-independent relations. `route.py` expands selected skills
+with required prerequisites and derives their topological invocation order from
+that dictionary. Prompt keywords select candidates only; they do not encode a
+second call order or related-skill list.
+
+### Parallel Fresh-Clone Workstreams
+
+Vendor-first is the default for one nonparallel source stream. It is not a
+prohibition on explicitly requested parallel independent work. A parent may
+select `workspace/<topic-slug>/<module-basename>` fresh clones from latest
+`origin/main` when the remaining DAG contains substantial replaceable
+responsibility units with disjoint write scopes, explicit dependency and merge
+order, independent validation routes, and distinct reviewer ownership. The
+typed lifecycle route is
+`dependency_module_change.py prepare --placement workspace`; its exact topic,
+module, branch, owner evidence, computed clone path, and source identity are
+part of the handoff evidence. Fresh mode always creates the requested branch
+from fetched `origin/main` and refuses an existing local or remote branch;
+continuation uses the separately typed
+`dependency_module_change.py prepare --placement workspace-continuation` route.
+
+For an eligible parallel set, the parent must launch every ready non-conflicting
+stream under actual capacity, preserve each stream's full responsibility unit,
+monitor all descendants and wave state, and reuse a compatible worker context
+for follow-up work. Splitting a responsibility into fine-grained fresh agents,
+file-sized clones, or timed fragments is not an independent workstream and is
+not admissible. Colliding or dependent streams remain ordered by the recorded
+dependency/merge order.
+
+Every stream branch must fetch and merge the latest `origin/main` before its
+candidate review or PR. The parent preserves the explicit merge order when
+integrating candidates; a base-read or CAS check without the merge is
+insufficient.
 
 ## Decision Sufficiency Packet
 

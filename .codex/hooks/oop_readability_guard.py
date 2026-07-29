@@ -2,7 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Runs OOP readability hook checks after source-editing tool calls.
-# upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this standalone OOP route.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
 # upstream implementation ../../tools/oop/python/readability.py checks Python OOP readability.
 # upstream implementation ../../tools/oop/cpp/readability.py checks C++ OOP readability.

@@ -215,33 +215,70 @@ class HookEventLogHotPathTest(unittest.TestCase):
             self.assertEqual(append_stdout.getvalue(), "")
             self.assertEqual(append_stderr.getvalue(), "")
 
-            spec = hook_dispatcher.HookCommandSpec("fixture.py", 1)
-
-            def child_result(*_args: object, **_kwargs: object) -> hook_dispatcher.HookResult:
-                with patch.object(
+            dispatcher_stdout = io.StringIO()
+            with (
+                patch.object(
                     hook_event_log,
                     "publish_hook_event_noreplace",
                     return_value=("failed", "spool_io_failure"),
-                ):
-                    context.append(hook_entry("event-dispatch"))
-                return hook_dispatcher.HookResult(
-                    spec,
-                    0,
-                    json.dumps({"decision": "approve", "reason": "fixture"}),
-                    "",
-                )
-
-            dispatcher_stdout = io.StringIO()
-            with (
-                patch.dict(hook_dispatcher.EVENT_COMMANDS, {"PostToolUse": (spec,)}),
-                patch.object(hook_dispatcher, "run_hook_command", side_effect=child_result),
-                patch.object(hook_dispatcher, "repo_root", return_value=root),
-                patch.object(hook_dispatcher, "hook_directory", return_value=HOOKS_DIR),
+                ),
                 contextlib.redirect_stdout(dispatcher_stdout),
             ):
-                result = hook_dispatcher.dispatch_event("PostToolUse", b'{"tool_name":"fixture"}')
+                result = hook_dispatcher.dispatch_event(
+                    "UserPromptSubmit",
+                    json.dumps(
+                        {
+                            "hookEventName": "UserPromptSubmit",
+                            "prompt": "-----BEGIN PRIVATE KEY-----",
+                        }
+                    ).encode("utf-8"),
+                )
             self.assertEqual(result, 0)
-            self.assertIsInstance(json.loads(dispatcher_stdout.getvalue()), dict)
+            self.assertEqual(json.loads(dispatcher_stdout.getvalue())["decision"], "block")
+
+    def test_h05_dispatch_spool_is_fingerprint_only(self) -> None:
+        raw = json.dumps(
+            {
+                "hookEventName": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"cmd": "git restore secret.py"},
+            }
+        ).encode("utf-8")
+        captured: dict[str, object] = {}
+        dispatcher_stdout = io.StringIO()
+
+        def capture(entry: dict[str, object]) -> None:
+            captured.update(entry)
+
+        with (
+            patch.object(
+                hook_dispatcher.HookLogContext,
+                "append",
+                side_effect=capture,
+            ) as append,
+            contextlib.redirect_stdout(dispatcher_stdout),
+        ):
+            result = hook_dispatcher.dispatch_event("PreToolUse", raw)
+
+        self.assertEqual(result, 0)
+        append.assert_called_once()
+        self.assertEqual(json.loads(dispatcher_stdout.getvalue())["decision"], "block")
+        self.assertEqual(
+            set(captured),
+            {
+                "hook_run_id",
+                "timestamp",
+                "payload_fingerprint",
+                "status",
+                "hook_event_name",
+                "safety_decision",
+                "operation",
+            },
+        )
+        self.assertNotIn("prompt", captured)
+        self.assertNotIn("command", captured)
+        self.assertNotIn("stdout", captured)
+        self.assertNotIn("stderr", captured)
 
 
 if __name__ == "__main__":

@@ -22,9 +22,15 @@ python3 tools/agent_tools/dependency_module_change.py --root <repo> status --top
 python3 tools/agent_tools/dependency_module_change.py --root <repo> prepare \
   --topic <topic> --module vendor/agent-canon --branch <task-branch> \
   --owner-evidence <evidence-file> [--parent-branch <pin-branch>]
+python3 tools/agent_tools/dependency_module_change.py --root <repo> prepare \
+  --placement workspace --topic <topic> --module vendor/agent-canon \
+  --branch <task-branch> --owner-evidence <evidence-file>
 python3 tools/agent_tools/dependency_module_change.py --root <topic-parent> cleanup \
   --topic <topic> --module vendor/agent-canon --expected-clone <absolute-clone> \
   [--apply]
+python3 tools/agent_tools/dependency_module_change.py --root <repo> cleanup \
+  --placement workspace --topic <topic> --module vendor/agent-canon \
+  --expected-clone <absolute-clone> --owner-evidence-sha256 <sha256> [--apply]
 ```
 
 host は `<parent-repo-root>/workspace/<topic-slug>/<parent>` とその同列 module cloneだけを保持します。
@@ -37,3 +43,11 @@ prepare は `PARENT_ROOT`、`SOURCE_CLONE`、`CONTINUE_PATH` を返します。t
 だけを参照します。
 `cleanup --apply` は、同じ command segment の authority/reason 環境変数と
 remote 再構成可能性を要求します。
+`--placement workspace` は独立 parallel stream 用の typed fresh route です。親 cloneを
+作らず、`<repo>/workspace/<topic-slug>/<module-basename>` だけを computed source clone
+として作成し、local/remote に既存の task branch があれば拒否して最新 `origin/main`
+から task branch を作成します。既存 remote branch の継続は
+`--placement workspace-continuation` で明示します。出力の `SOURCE_REMOTE`、
+`SOURCE_BASE_REF`、`SOURCE_BASE_SHA`、`SOURCE_OWNER_EVIDENCE_SHA256`、
+`SOURCE_BRANCH`、`SOURCE_HEAD_SHA` が source identity です。workspace cleanup は
+`--owner-evidence-sha256` の exact match と marker validation を要求します。

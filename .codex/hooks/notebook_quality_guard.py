@@ -2,7 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Blocks changed notebooks that behave like fine-grained tests instead of readable demos.
-# upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this standalone notebook route.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
 # upstream implementation ../../tools/validation/notebook_quality.py validates notebook quality.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates notebook hook behavior.

@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract agent-runtime
-# responsibility Dispatches Codex lifecycle hook events to the configured guard scripts.
-# upstream implementation ../hooks.json invokes this dispatcher once per active hook event.
-# upstream implementation ../../tools/agent_tools/runtime_log_paths.py owns Codex trace environment names.
-# upstream design ../README.md documents dispatcher-based hook wiring.
-# downstream implementation ./codex_runtime_summary_logger.py exports bounded Codex runtime summaries on Stop
-# downstream implementation ./runtime_log_auto_sync.py syncs mounted runtime logs and agent reports on Stop
-# downstream implementation ./branch_worktree_guard.py blocks unconfirmed shared-checkout Git mutations.
-# downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates dispatch order and hook count.
+# responsibility Dispatches the bounded active hook contract in-process without child processes, Git, or network access.
+# upstream implementation ../hooks.json invokes this dispatcher once per active event.
+# upstream implementation ./hook_safety.py owns pure secret and destructive Git safety leaves.
+# upstream implementation ./execution_resource_plan_projection_guard.py validates producer projection bytes.
+# upstream implementation ./hook_event_log.py provides one bounded local spool context per event.
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates the active/inactive contract.
+# downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates dispatch, redaction, malformed input, and no-subprocess behavior.
 # @dependency-end
 
-"""Run the configured child hooks for one Codex lifecycle event."""
+"""Run the canonical in-process Codex lifecycle hook contract."""
 
 from __future__ import annotations
 
@@ -19,264 +18,151 @@ import argparse
 import hashlib
 import json
 import os
-import re
-import shlex
-import subprocess
 import sys
-from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
-TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools" / "agent_tools"
-if TOOLS_DIR.is_dir():
-    sys.path.insert(0, str(TOOLS_DIR))
-
-from runtime_log_paths import CODEX_TRACE_ENV_NAMES  # noqa: E402
-
-DISPATCHER_DIR_ENV = "AGENT_CANON_HOOK_DISPATCHER_DIR"
-GIT_ROOT_TIMEOUT_SECONDS = 5
-MAX_REASON_LINES = 20
-READ_ONLY_TOOL_NAMES = {"gitstatus", "read", "grep", "glob", "list", "ls"}
-PUBLISH_TOOL_NAMES = {"gitpush", "githubpublish", "githubpr", "pullrequest"}
-SAFE_GIT_GLOBAL_OPTIONS_WITH_VALUES = {
-    "-C",
-    "-c",
-    "--git-dir",
-    "--work-tree",
-    "--namespace",
-}
-SAFE_GIT_GLOBAL_OPTION_PREFIXES = (
-    "--git-dir=",
-    "--work-tree=",
-    "--namespace=",
+from execution_resource_plan_projection_guard import (  # noqa: E402
+    ProjectionError,
+    validate_normalized_input,
+    validate_projection_bytes,
 )
-SHELL_COMPOUND_MARKERS = ("\n", "&&", "||", ";", "|", "`", "$(", ">", "<")
-READ_ONLY_COMMANDS = {
-    "cat",
-    "head",
-    "tail",
-    "wc",
-    "ls",
-    "pwd",
-    "nl",
-    "stat",
-    "rg",
-    "grep",
+from hook_event_log import HookLogContext, utc_now  # noqa: E402
+from hook_safety import (  # noqa: E402
+    SHELL_TOOL_NAMES,
+    branch_block_payload,
+    first_block,
+    payload_prompt,
+    payload_tool_command,
+    payload_tool_name,
+    secret_block_payload,
+    secret_kind,
+)
+
+OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
+HOOK_CONTRACT_SCHEMA = "agent-canon.hook-contract.v1"
+POST_TOOL_USE_INPUT_SCHEMA = "agent-canon-post-tool-use-input/v1"
+DISPATCHER_SOURCE_ROOT_ENV = "AGENT_CANON_HOOK_SOURCE_ROOT"
+MAX_HOOK_PAYLOAD_BYTES = 256 * 1024
+
+
+@dataclass(frozen=True)
+class HookEventContract:
+    """Typed contract for one lifecycle event, including legacy inactive events."""
+
+    active: bool
+    matchers: tuple[str, ...]
+    failure: str
+    telemetry: str
+
+
+HOOK_EVENT_CONTRACTS: dict[str, HookEventContract] = {
+    "UserPromptSubmit": HookEventContract(
+        active=True,
+        matchers=(),
+        failure="secret_match=block; malformed_payload=fail_open; spool_failure=fail_open",
+        telemetry="one bounded fingerprint-only local spool event",
+    ),
+    "PreToolUse": HookEventContract(
+        active=True,
+        matchers=("Bash|apply_patch|python|python3",),
+        failure="unauthorized_destructive_git=block; malformed_payload=fail_open; spool_failure=fail_open",
+        telemetry="one bounded fingerprint-only local spool event",
+    ),
+    "PostToolUse": HookEventContract(
+        active=True,
+        matchers=("Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent",),
+        failure="invalid_projection=fail_open; malformed_payload=fail_open; spool_failure=fail_open",
+        telemetry="one bounded fingerprint-only local spool event",
+    ),
+    "Stop": HookEventContract(
+        active=False,
+        matchers=(),
+        failure="legacy_event_inactive_no_op",
+        telemetry="no active hook telemetry",
+    ),
 }
-SAFE_GH_PR_SUBCOMMANDS = {"checks", "comment", "create", "edit", "list", "view"}
-STRICT_BLOCKS_ENV = "AGENT_CANON_HOOK_STRICT_BLOCKS"
-STRICT_FAILURES_ENV = "AGENT_CANON_HOOK_STRICT_FAILURES"
-# Most policy hooks are advisory by default so a bad guardrail cannot freeze
-# ordinary shell/read/validation work. CI and hook development can opt into
-# strict blocking with AGENT_CANON_HOOK_STRICT_BLOCKS=1.
-CRITICAL_BLOCKING_CHILD_HOOKS = frozenset(
+
+ACTIVE_HOOK_HANDLERS = frozenset(
     {
-        "prompt_secret_guard.py",
-        "branch_worktree_guard.py",
-        "completion_review_guard.py",
+        "UserPromptSubmit.secret_safety",
+        "PreToolUse.destructive_git_safety",
+        "PostToolUse.execution_resource_projection",
     }
 )
-OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
-POST_TOOL_USE_INPUT_SCHEMA = "agent-canon-post-tool-use-input/v1"
-PROJECTION_GUARD_SCRIPT = "execution_resource_plan_projection_guard.py"
-ADDITIONAL_CONTEXT_EVENTS = frozenset(
-    {"UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"}
-)
-SAFE_GIT_READ_SUBCOMMANDS = {"log", "ls-files", "rev-parse", "show", "status"}
-SAFE_GIT_BRANCH_LIST_OPTIONS = {
-    "--all",
-    "--color",
-    "--list",
-    "--no-color",
-    "--remotes",
-    "--show-current",
-    "--verbose",
-    "-a",
-    "-r",
-    "-v",
-    "-vv",
-}
-GIT_BRANCH_MUTATING_OPTIONS = {
-    "--copy",
-    "--delete",
-    "--edit-description",
-    "--move",
-    "--set-upstream-to",
-    "--unset-upstream",
-    "-C",
-    "-D",
-    "-M",
-    "-c",
-    "-d",
-    "-m",
-}
-GIT_BRANCH_MUTATING_OPTION_PREFIXES = ("--set-upstream-to=",)
-GIT_WRITE_OUTPUT_OPTIONS = {"--output", "-o"}
-GIT_WRITE_OUTPUT_OPTION_PREFIXES = ("--output=",)
-SAFE_PYTHON_MODULE_CHECKS = {
-    "json.tool",
-    "pydocstyle",
-    "py_compile",
-    "pyright",
-    "pytest",
-    "ruff",
-}
-SAFE_MAKE_VALIDATION_TARGETS = {
-    "agent-canon-pr-check",
-    "agent-canon-latest-check",
-    "agent-checks",
-    "agent-surface-checks",
-    "ci",
-    "ci-quick",
-    "docs-check",
-    "github-workflow-check",
-    "test",
-}
-SAFE_TOOL_SCRIPT_PREFIXES = (
-    "check_",
-    "evaluate_",
-    "run_repo_dependency_review",
-    "scan_dependency_headers",
-    "tool_rejection_preflight",
-)
-SAFE_TOOL_SCRIPT_SUBCOMMANDS = {
-    "runtime_log_archive_git.py": {"repo-key", "status", "check-clean"},
-}
-SAFE_SED_PRINT_SCRIPT = re.compile(r"^(?:\d+|\$)(?:,(?:\d+|\$))?p$")
-FAST_HOOK_TIMEOUT_SECONDS = 10
-REFERENCE_CAPTURE_TIMEOUT_SECONDS = 15
-CAUSE_INVESTIGATION_TIMEOUT_SECONDS = 30
-STANDARD_GUARD_TIMEOUT_SECONDS = 60
-STYLE_CHECKER_TIMEOUT_SECONDS = 90
-HOOK_CHILD_NOT_FOUND_RETURN_CODE = 127
-HOOK_CHILD_TIMEOUT_RETURN_CODE = 124
-PYTHON_MODULE_MIN_TOKENS = 3
-PYTHON_MODULE_NAME_INDEX = 2
-PYTHON_RUFF_CHECK_MIN_TOKENS = 4
-PYTHON_RUFF_SUBCOMMAND_INDEX = 3
-SCRIPT_MIN_TOKENS = 2
-SCRIPT_PATH_INDEX = 1
-SCRIPT_SUBCOMMAND_MIN_TOKENS = 3
-SCRIPT_SUBCOMMAND_INDEX = 2
-CODEX_TRACE_PAYLOAD_FIELDS = (
-    "codex_trace_key",
-    "codex_thread_id",
-    "thread_id",
-    "session_id",
-    "conversation_id",
+
+FORMER_ACTIVE_HOOK_CHILDREN = frozenset(
+    {
+        "log_archive_mount_warning.py",
+        "prompt_secret_guard.py",
+        "skill_usage_logger.py",
+        "reference_capture_guard.py",
+        "branch_worktree_guard.py",
+        "direct_rg_context_guard.py",
+        "cause_investigation_guard.py",
+        "task_authority_schema_guard.py",
+        "execution_resource_plan_projection_guard.py",
+        "role_write_policy_guard.py",
+        "oop_readability_guard.py",
+        "module_boundary_guard.py",
+        "library_implementation_guard.py",
+        "first_party_library_guard.py",
+        "helper_inventory_guard.py",
+        "helper_first_guard.py",
+        "style_checker_guard.py",
+        "log_surface_inventory_guard.py",
+        "notebook_quality_guard.py",
+        "completion_review_guard.py",
+        "goal_completion_guard.py",
+        "codex_runtime_summary_logger.py",
+        "runtime_log_auto_sync.py",
+    }
 )
 
 
 @dataclass(frozen=True)
-class HookCommandSpec:
-    """One child hook command and its legacy timeout."""
+class RetiredHookRoute:
+    """Explicit owner and migration route for one former child hook."""
 
-    script: str
-    timeout: int
-
-
-@dataclass(frozen=True)
-class HookResult:
-    """Captured result from one child hook command."""
-
-    spec: HookCommandSpec
-    returncode: int
-    stdout: str
-    stderr: str
-    timed_out: bool = False
-
-    def json_stdout(self) -> dict[str, object] | None:
-        """Return parsed JSON stdout when the child emitted a hook payload."""
-        text = self.stdout.strip()
-        if not text:
-            return None
-        try:
-            loaded = json.loads(text)
-        except json.JSONDecodeError:
-            return None
-        return loaded if isinstance(loaded, dict) else None
-
-    def blocks(self) -> bool:
-        """Return whether this result is a Codex blocking hook payload."""
-        payload = self.json_stdout()
-        return payload is not None and payload.get("decision") == "block"
-
-    def visible(self) -> bool:
-        """Return whether this child emitted output Codex should see."""
-        return bool(self.stdout.strip())
-
-    def failed(self) -> bool:
-        """Return whether the child command failed outside normal hook output."""
-        return self.returncode != 0 or self.timed_out
+    owner: str
+    command_or_skill: str
+    profile_trigger: str
+    decision_semantics: str
+    artifact: str
 
 
-EVENT_COMMANDS: dict[str, tuple[HookCommandSpec, ...]] = {
-    "UserPromptSubmit": (
-        HookCommandSpec("log_archive_mount_warning.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec("prompt_secret_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec("reference_capture_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
-    ),
-    "PreToolUse": (
-        HookCommandSpec("log_archive_mount_warning.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec("branch_worktree_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec("direct_rg_context_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec(
-            "cause_investigation_guard.py", CAUSE_INVESTIGATION_TIMEOUT_SECONDS
-        ),
-    ),
-    "PostToolUse": (
-        HookCommandSpec("task_authority_schema_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec(PROJECTION_GUARD_SCRIPT, FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec(
-            "reference_capture_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS
-        ),
-        HookCommandSpec("role_write_policy_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("oop_readability_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("module_boundary_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec(
-            "library_implementation_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS
-        ),
-        HookCommandSpec("first_party_library_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("helper_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("helper_first_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("style_checker_guard.py", STYLE_CHECKER_TIMEOUT_SECONDS),
-        HookCommandSpec(
-            "log_surface_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS
-        ),
-        HookCommandSpec("notebook_quality_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-    ),
-    "Stop": (
-        HookCommandSpec(
-            "completion_review_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS
-        ),
-        HookCommandSpec("goal_completion_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS),
-        HookCommandSpec("task_authority_schema_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec("role_write_policy_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("oop_readability_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("module_boundary_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec(
-            "library_implementation_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS
-        ),
-        HookCommandSpec("first_party_library_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("helper_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("helper_first_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec("style_checker_guard.py", STYLE_CHECKER_TIMEOUT_SECONDS),
-        HookCommandSpec(
-            "log_surface_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS
-        ),
-        HookCommandSpec("notebook_quality_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-        HookCommandSpec(
-            "reference_capture_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS
-        ),
-        HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec("codex_runtime_summary_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
-        HookCommandSpec("runtime_log_auto_sync.py", STANDARD_GUARD_TIMEOUT_SECONDS),
-    ),
+RETIRED_HOOK_ROUTES: dict[str, RetiredHookRoute] = {
+    "log_archive_mount_warning.py": RetiredHookRoute("runtime-log-archive owner", "python3 tools/agent_tools/runtime_log_archive_git.py ensure", "explicit archive checkpoint", "fail-open mount preparation warning", "runtime log archive checkpoint evidence"),
+    "prompt_secret_guard.py": RetiredHookRoute("hook_safety.py", "python3 .codex/hooks/prompt_secret_guard.py", "UserPromptSubmit compatibility invocation", "standalone wrapper delegates pure secret block", "hook safety decision"),
+    "skill_usage_logger.py": RetiredHookRoute("workflow_monitor.py", "python3 tools/agent_tools/workflow_monitor.py --behavior-event", "explicit workflow monitoring", "route observation, not hook blocking", "behavior-event record"),
+    "reference_capture_guard.py": RetiredHookRoute("reference_materializer.py", "python3 tools/agent_tools/reference_materializer.py", "literature-survey or reference capture", "reference registration belongs to source materialization", "references/ materialized artifact"),
+    "branch_worktree_guard.py": RetiredHookRoute("hook_safety.py", "python3 .codex/hooks/branch_worktree_guard.py", "PreToolUse compatibility invocation", "standalone wrapper delegates pure destructive Git block", "redacted safety payload"),
+    "direct_rg_context_guard.py": RetiredHookRoute("task-routing", "$task-routing", "pre-edit repository investigation", "warning is owned by context construction", "Pre-Edit Repository Investigation Packet"),
+    "cause_investigation_guard.py": RetiredHookRoute("dependency-analysis", "$dependency-analysis", "hypothesis-validation workflow", "cause evidence is implementation intake, not a hook stop", "cause investigation note"),
+    "task_authority_schema_guard.py": RetiredHookRoute("task_authority.py", "python3 tools/agent_tools/task_authority.py", "implementation handoff", "authority schema is validated at the write route", "task authority packet"),
+    "execution_resource_plan_projection_guard.py": RetiredHookRoute("hook_dispatcher.py", "python3 .codex/hooks/execution_resource_plan_projection_guard.py", "explicit projection validation", "standalone wrapper validates bytes; active dispatch calls it in-process", "validated execution-resource projection"),
+    "role_write_policy_guard.py": RetiredHookRoute("agent_team.py", "python3 tools/agent_tools/agent_team.py", "write-capable handoff", "write scope is enforced at handoff and closeout", "write-scope manifest"),
+    "oop_readability_guard.py": RetiredHookRoute("oop-readability-check", "python3 tools/oop/python/readability.py", "explicit OOP review", "review signal is non-blocking evidence", "OOP readability report"),
+    "module_boundary_guard.py": RetiredHookRoute("import_responsibility.py", "python3 tools/agent_tools/import_responsibility.py", "dependency boundary review", "import ownership is checked by the owner tool", "import responsibility report"),
+    "library_implementation_guard.py": RetiredHookRoute("dependency-module-change", "$dependency-module-change", "dependency source change", "library edits use the dependency source route", "dependency source packet"),
+    "first_party_library_guard.py": RetiredHookRoute("task_authority.py", "python3 tools/agent_tools/task_authority.py", "first-party surface change", "public reusable surface authority is explicit", "authority evidence"),
+    "helper_inventory_guard.py": RetiredHookRoute("helper inventory tool", "python3 tools/agent_tools/helper_function_inventory.py", "helper inventory review", "inventory findings are review evidence", "helper inventory report"),
+    "helper_first_guard.py": RetiredHookRoute("owner-bounded-routing", "python3 tools/agent_tools/responsibility_scope.py --root .", "owner boundary selection", "helper placement follows responsibility evidence", "responsibility-scope evidence"),
+    "style_checker_guard.py": RetiredHookRoute("md-style-check", "tools/bin/agent-canon docs check", "changed Markdown or docs", "style is a targeted validation result", "docs check result"),
+    "log_surface_inventory_guard.py": RetiredHookRoute("log-surface inventory", "python3 tools/agent_tools/log_surface_inventory.py", "log field contract change", "telemetry fields are reviewed at the surface owner", "log-surface inventory"),
+    "notebook_quality_guard.py": RetiredHookRoute("experiment-review", "python3 tools/validation/notebook_quality.py", "experiment notebook review", "notebook quality is explicit experiment evidence", "notebook quality report"),
+    "completion_review_guard.py": RetiredHookRoute("change-review", "python3 tools/agent_tools/review_dispatch.py", "review gate", "review approval is a closeout gate, not an active hook", "change review packet"),
+    "goal_completion_guard.py": RetiredHookRoute("codex-goals-workflow", "python3 tools/agent_tools/goal_loop.py status", "goal-driven task", "goal continuation is workflow state", "goal.md / goal-loop status"),
+    "codex_runtime_summary_logger.py": RetiredHookRoute("runtime summary exporter", "python3 tools/agent_tools/export_codex_runtime_summary.py", "explicit runtime summary export", "summary is bounded derived evidence", "Codex runtime summary"),
+    "runtime_log_auto_sync.py": RetiredHookRoute("runtime-log-archive owner", "python3 tools/agent_tools/runtime_log_archive_git.py sync", "explicit log archive checkpoint", "archive sync is administrative and fail-open outside hooks", "hook archive checkpoint"),
 }
 
-EVENT_ALIASES = {event.casefold(): event for event in EVENT_COMMANDS} | {
+if set(RETIRED_HOOK_ROUTES) != FORMER_ACTIVE_HOOK_CHILDREN:
+    raise RuntimeError("retired hook route table must cover each former child exactly once")
+if set(RETIRED_HOOK_ROUTES).intersection(ACTIVE_HOOK_HANDLERS):
+    raise RuntimeError("active and retired hook route sets must be disjoint")
+
+EVENT_ALIASES = {event.casefold(): event for event in HOOK_EVENT_CONTRACTS} | {
     "user-prompt-submit": "UserPromptSubmit",
     "pre-tool-use": "PreToolUse",
     "post-tool-use": "PostToolUse",
@@ -284,590 +170,72 @@ EVENT_ALIASES = {event.casefold(): event for event in EVENT_COMMANDS} | {
 }
 
 
-def load_raw_payload() -> bytes:
-    """Read the hook payload once so every child receives identical stdin."""
-    return sys.stdin.buffer.read()
-
-
 def unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
-    """Reject duplicate keys while decoding a Hook payload."""
     value: dict[str, object] = {}
     for key, item in pairs:
         if key in value:
-            raise ValueError(f"duplicate JSON key: {key}")
+            raise ValueError("duplicate JSON key")
         value[key] = item
     return value
 
 
 def reject_json_constant(value: str) -> None:
-    """Reject non-finite JSON constants in normalized Hook input."""
     raise ValueError(f"non-finite JSON constant: {value}")
 
 
 def canonical_json_bytes(value: object) -> bytes:
-    """Serialize one JSON value in the exact Hook canonical form."""
-    try:
-        return json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=True,
-            allow_nan=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
-        raise ValueError("Hook JSON value is not canonicalizable") from exc
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode("utf-8")
 
 
-def _normalize_post_tool_use_input(raw_payload: bytes) -> bytes:
-    """Convert raw runtime keys to the exact six-field projection-guard input."""
+def parse_payload(raw_payload: bytes) -> dict[str, object] | None:
+    """Parse the bounded lifecycle payload exactly once."""
+    if len(raw_payload) > MAX_HOOK_PAYLOAD_BYTES:
+        return None
+    if not raw_payload.strip():
+        return {}
     try:
         loaded = json.loads(
             raw_payload.decode("utf-8"),
             object_pairs_hook=unique_json_object,
             parse_constant=reject_json_constant,
         )
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError("raw PostToolUse payload is not valid JSON") from exc
-    if not isinstance(loaded, dict) or set(loaded) != {
-        "hookEventName",
-        "tool_name",
-        "tool_input",
-        "tool_response",
-    }:
-        raise ValueError("raw PostToolUse keys are not exact")
-    if loaded["hookEventName"] != "PostToolUse":
-        raise ValueError("raw Hook event is not PostToolUse")
-    tool_name = loaded["tool_name"]
-    tool_input = loaded["tool_input"]
-    tool_response = loaded["tool_response"]
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError):
+        return None
+    return loaded if isinstance(loaded, dict) else None
+
+
+def normalize_post_tool_use_input(payload: dict[str, object]) -> dict[str, object]:
+    """Build the exact projection-validator input from the one parsed payload."""
+    if set(payload) != {"hookEventName", "tool_name", "tool_input", "tool_response"}:
+        raise ProjectionError("raw PostToolUse keys are not exact")
+    if payload["hookEventName"] != "PostToolUse":
+        raise ProjectionError("raw Hook event is not PostToolUse")
+    tool_name = payload["tool_name"]
+    tool_input = payload["tool_input"]
+    tool_response = payload["tool_response"]
     if not isinstance(tool_name, str) or not isinstance(tool_input, dict):
-        raise ValueError("raw PostToolUse tool fields have invalid types")
-    if not isinstance(tool_response, dict) or set(tool_response) != {
-        "exit_code",
-        "stderr",
-        "stdout",
-    }:
-        raise ValueError("raw PostToolUse response keys are not exact")
+        raise ProjectionError("raw PostToolUse tool fields have invalid types")
+    if not isinstance(tool_response, dict) or set(tool_response) != {"exit_code", "stderr", "stdout"}:
+        raise ProjectionError("raw PostToolUse response keys are not exact")
     if (
-        isinstance(tool_response["exit_code"], bool)
-        or not isinstance(tool_response["exit_code"], int)
+        type(tool_response["exit_code"]) is not int
         or not isinstance(tool_response["stderr"], str)
         or not isinstance(tool_response["stdout"], str)
     ):
-        raise ValueError("raw PostToolUse response fields have invalid types")
+        raise ProjectionError("raw PostToolUse response fields have invalid types")
     normalized = {
         "hook_event_name": "PostToolUse",
         "schema_version": POST_TOOL_USE_INPUT_SCHEMA,
-        "tool_input_fingerprint": hashlib.sha256(
-            canonical_json_bytes(tool_input)
-        ).hexdigest(),
+        "tool_input_fingerprint": hashlib.sha256(canonical_json_bytes(tool_input)).hexdigest(),
         "tool_name": tool_name,
         "tool_input": tool_input,
         "tool_response": tool_response,
     }
-    return canonical_json_bytes(normalized) + b"\n"
+    validate_normalized_input(normalized)
+    return normalized
 
 
-def json_payload(raw_payload: bytes) -> dict[str, object]:
-    """Return decoded hook payload JSON when available."""
-    if not raw_payload.strip():
-        return {}
-    try:
-        loaded = json.loads(raw_payload.decode("utf-8", errors="replace"))
-    except json.JSONDecodeError:
-        return {}
-    return loaded if isinstance(loaded, dict) else {}
-
-
-def payload_trace_key(payload: dict[str, object]) -> str:
-    """Return the Codex trace key carried by one hook payload."""
-    for field in CODEX_TRACE_PAYLOAD_FIELDS:
-        value = payload.get(field)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return ""
-
-
-def child_hook_environment(payload: dict[str, object]) -> dict[str, str]:
-    """Return the environment shared by child hooks."""
-    env = os.environ.copy()
-    canonical_trace_env = CODEX_TRACE_ENV_NAMES[0]
-    if env.get(canonical_trace_env, "").strip():
-        return env
-    trace_key = payload_trace_key(payload) or next(
-        (
-            env.get(name, "").strip()
-            for name in CODEX_TRACE_ENV_NAMES[1:]
-            if env.get(name, "").strip()
-        ),
-        "",
-    )
-    if trace_key:
-        env[canonical_trace_env] = trace_key
-    return env
-
-
-def tool_name(payload: dict[str, object]) -> str:
-    """Return the tool name from a hook payload."""
-    value = payload.get("tool_name")
-    return value if isinstance(value, str) else ""
-
-
-def tool_command(payload: dict[str, object]) -> str:
-    """Return command text from a hook payload."""
-    tool_input = payload.get("tool_input")
-    if isinstance(tool_input, dict):
-        command = tool_input.get("command") or tool_input.get("cmd")
-        if isinstance(command, str):
-            return command
-    for key in ("command", "cmd"):
-        value = payload.get(key)
-        if isinstance(value, str):
-            return value
-    return ""
-
-
-def compact_tool_name(name: str) -> str:
-    """Return a comparison key for tool names across runtime spellings."""
-    return "".join(character for character in name.casefold() if character.isalnum())
-
-
-def git_subcommand_tokens(command: str) -> tuple[str, ...]:
-    """Return Git subcommand tokens for simple one-command invocations."""
-    stripped = command.strip()
-    if not stripped or any(marker in stripped for marker in SHELL_COMPOUND_MARKERS):
-        return ()
-    try:
-        tokens = shlex.split(stripped)
-    except ValueError:
-        return ()
-    if not tokens or tokens[0] != "git":
-        return ()
-    index = 1
-    while index < len(tokens):
-        token = tokens[index]
-        if token in SAFE_GIT_GLOBAL_OPTIONS_WITH_VALUES:
-            index += 2
-            continue
-        if any(token.startswith(prefix) for prefix in SAFE_GIT_GLOBAL_OPTION_PREFIXES):
-            index += 1
-            continue
-        break
-    return tuple(tokens[index:])
-
-
-def simple_shell_tokens(command: str) -> tuple[str, ...]:
-    """Return tokens for a simple one-command shell payload."""
-    stripped = command.strip()
-    if not stripped or any(marker in stripped for marker in SHELL_COMPOUND_MARKERS):
-        return ()
-    try:
-        return tuple(shlex.split(stripped))
-    except ValueError:
-        return ()
-
-
-def read_only_git_command(command: str) -> bool:
-    """Return whether a Bash command is only Git inspection."""
-    tokens = git_subcommand_tokens(command)
-    if not tokens:
-        return False
-    subcommand = tokens[0]
-    arguments = tokens[1:]
-    if any(git_write_output_argument(argument) for argument in arguments):
-        return False
-    if subcommand == "status":
-        return True
-    if subcommand == "diff":
-        return "--ext-diff" not in arguments
-    if subcommand == "branch":
-        return read_only_git_branch_arguments(arguments)
-    if subcommand == "remote":
-        return read_only_git_remote_arguments(arguments)
-    if len(tokens) >= 2 and tokens[:2] == ("submodule", "status"):
-        return True
-    return subcommand in SAFE_GIT_READ_SUBCOMMANDS
-
-
-def git_write_output_argument(argument: str) -> bool:
-    """Return whether a Git argument writes command output to a file."""
-    return (
-        argument in GIT_WRITE_OUTPUT_OPTIONS
-        or argument.startswith(GIT_WRITE_OUTPUT_OPTION_PREFIXES)
-        or (argument.startswith("-o") and not argument.startswith("--"))
-    )
-
-
-def read_only_git_branch_arguments(arguments: tuple[str, ...]) -> bool:
-    """Return whether `git branch` arguments only list branch state."""
-    if any(git_branch_mutating_argument(argument) for argument in arguments):
-        return False
-    if not arguments:
-        return True
-    if arguments == ("--show-current",):
-        return True
-    if arguments[0] == "--list":
-        return all(git_branch_list_argument(argument) for argument in arguments)
-    return all(
-        argument in SAFE_GIT_BRANCH_LIST_OPTIONS or argument.startswith("--format=")
-        for argument in arguments
-    )
-
-
-def git_branch_mutating_argument(argument: str) -> bool:
-    """Return whether a `git branch` argument mutates branch metadata."""
-    return argument in GIT_BRANCH_MUTATING_OPTIONS or argument.startswith(
-        GIT_BRANCH_MUTATING_OPTION_PREFIXES
-    )
-
-
-def git_branch_list_argument(argument: str) -> bool:
-    """Return whether a `git branch --list` argument is list-only."""
-    return (
-        argument in SAFE_GIT_BRANCH_LIST_OPTIONS
-        or argument.startswith("--format=")
-        or not argument.startswith("-")
-    )
-
-
-def read_only_git_remote_arguments(arguments: tuple[str, ...]) -> bool:
-    """Return whether `git remote` arguments only inspect remote state."""
-    if not arguments or arguments in {("-v",), ("--verbose",)}:
-        return True
-    return arguments[0] in {"get-url", "show"}
-
-
-def read_only_shell_command(command: str) -> bool:
-    """Return whether a Bash command is a simple read-only inspection."""
-    if read_only_git_command(command):
-        return True
-    tokens = simple_shell_tokens(command)
-    if not tokens:
-        return False
-    if tokens[0] == "sed":
-        return read_only_sed_arguments(tokens[1:])
-    if tokens[0] == "rg":
-        return False
-    return tokens[0] in READ_ONLY_COMMANDS
-
-
-def publish_shell_command(command: str) -> bool:
-    """Return whether a Bash command is a GitHub publish/PR operation.
-
-    Publish operations are owned by `github_publish.py` and PR workflow gates,
-    not by edit-time guard hooks. This keeps hook findings from blocking branch
-    publication while preserving explicit tool-level remote verification.
-    """
-    git_tokens = git_subcommand_tokens(command)
-    if git_tokens and git_tokens[0] == "push":
-        return True
-    tokens = simple_shell_tokens(command)
-    if not tokens:
-        return False
-    if tokens[0] == "gh" and len(tokens) >= 3 and tokens[1] == "pr":
-        return tokens[2] in SAFE_GH_PR_SUBCOMMANDS
-    if tokens[0] in {"python", "python3"} and len(tokens) >= SCRIPT_MIN_TOKENS:
-        script = Path(tokens[SCRIPT_PATH_INDEX])
-        return script.as_posix() == "tools/agent_tools/github_publish.py"
-    if tokens[0] == "bash" and len(tokens) >= SCRIPT_MIN_TOKENS:
-        script = Path(tokens[SCRIPT_PATH_INDEX])
-        return script.as_posix() == "tools/push_origin.sh"
-    return False
-
-
-def read_only_sed_arguments(arguments: tuple[str, ...]) -> bool:
-    """Return whether `sed` arguments are limited to range printing."""
-    if any(sed_in_place_argument(argument) for argument in arguments):
-        return False
-    script_candidates = [
-        argument
-        for argument in arguments
-        if argument not in {"-n", "--quiet", "--silent", "--"}
-    ]
-    return bool(script_candidates) and bool(
-        SAFE_SED_PRINT_SCRIPT.fullmatch(script_candidates[0])
-    )
-
-
-def sed_in_place_argument(argument: str) -> bool:
-    """Return whether a sed argument enables in-place writes."""
-    if argument == "--in-place" or argument.startswith("--in-place="):
-        return True
-    return (
-        argument.startswith("-")
-        and not argument.startswith("--")
-        and "i" in argument[1:]
-    )
-
-
-def safe_python_validation(tokens: tuple[str, ...]) -> bool:
-    """Return whether tokens invoke a Python validation command."""
-    if len(tokens) >= PYTHON_MODULE_MIN_TOKENS and tokens[SCRIPT_PATH_INDEX] == "-m":
-        module = tokens[PYTHON_MODULE_NAME_INDEX]
-        if module == "ruff":
-            return (
-                len(tokens) >= PYTHON_RUFF_CHECK_MIN_TOKENS
-                and tokens[PYTHON_RUFF_SUBCOMMAND_INDEX] == "check"
-            )
-        return module in SAFE_PYTHON_MODULE_CHECKS
-    if len(tokens) >= SCRIPT_MIN_TOKENS:
-        script = Path(tokens[SCRIPT_PATH_INDEX])
-        if safe_tool_script_subcommand(script, tokens[SCRIPT_SUBCOMMAND_INDEX:]):
-            return True
-        if script.parts[:2] == ("tools", "agent_tools"):
-            return script.name.startswith(SAFE_TOOL_SCRIPT_PREFIXES)
-        if script.parts[:2] == ("tools", "docs") and script.name.startswith("check_"):
-            return True
-        if script.parts[:2] in {("tools", "validation"), ("tools", "oop")}:
-            return True
-    return False
-
-
-def safe_bash_validation(tokens: tuple[str, ...]) -> bool:
-    """Return whether tokens invoke a Bash validation script."""
-    if len(tokens) < SCRIPT_MIN_TOKENS:
-        return False
-    script = Path(tokens[SCRIPT_PATH_INDEX])
-    if script.as_posix() == "tools/sync_agent_canon.sh":
-        return len(tokens) >= SCRIPT_SUBCOMMAND_MIN_TOKENS and tokens[
-            SCRIPT_SUBCOMMAND_INDEX
-        ] in {"check", "plan", "status"}
-    if script.as_posix() == "tools/update_agent_canon.sh":
-        return len(tokens) >= SCRIPT_SUBCOMMAND_MIN_TOKENS and tokens[
-            SCRIPT_SUBCOMMAND_INDEX
-        ] in {"plan", "status"}
-    if safe_tool_script_subcommand(script, tokens[SCRIPT_SUBCOMMAND_INDEX:]):
-        return True
-    if script.parts[:2] == ("tools", "agent_tools"):
-        return script.name.startswith(SAFE_TOOL_SCRIPT_PREFIXES)
-    if script.parts[:2] == ("tools", "ci"):
-        return script.name.startswith(("check_", "run_"))
-    return False
-
-
-def safe_tool_script_subcommand(script: Path, arguments: tuple[str, ...]) -> bool:
-    """Return whether one repo tool subcommand is a read-only validation command."""
-    allowed = SAFE_TOOL_SCRIPT_SUBCOMMANDS.get(script.name)
-    if not allowed:
-        return False
-    if script.parts[:2] != ("tools", "agent_tools"):
-        return False
-    subcommand = first_non_option_argument(arguments)
-    return subcommand in allowed
-
-
-def first_non_option_argument(arguments: tuple[str, ...]) -> str:
-    """Return the first positional token after leading CLI options."""
-    index = 0
-    while index < len(arguments):
-        argument = arguments[index]
-        if argument == "--":
-            return arguments[index + 1] if index + 1 < len(arguments) else ""
-        if not argument.startswith("-"):
-            return argument
-        if argument in {"--source-root", "--canon-root", "--remote", "--archive-root"}:
-            index += 2
-            continue
-        index += 1
-    return ""
-
-
-def validation_command(command: str) -> bool:
-    """Return whether a Bash command is a known validation/check command."""
-    tokens = simple_shell_tokens(command)
-    if not tokens:
-        return False
-    if tokens[0] in {"pytest", "pyright", "pydocstyle"}:
-        return True
-    if tokens[0] == "ruff":
-        return len(tokens) >= 2 and tokens[1] == "check"
-    if tokens[0] in {"python", "python3"}:
-        return safe_python_validation(tokens)
-    if tokens[0] == "bash":
-        return safe_bash_validation(tokens)
-    if tokens[0] == "make":
-        return bool(tokens[1:]) and all(
-            token in SAFE_MAKE_VALIDATION_TARGETS for token in tokens[1:]
-        )
-    return False
-
-
-def bypass_child_guards_payload(raw_payload: bytes) -> bool:
-    """Return whether this hook payload should skip child guard execution."""
-    payload = json_payload(raw_payload)
-    compact_name = compact_tool_name(tool_name(payload))
-    if compact_name in READ_ONLY_TOOL_NAMES or compact_name in PUBLISH_TOOL_NAMES:
-        return True
-    command = tool_command(payload)
-    return (
-        read_only_shell_command(command)
-        or validation_command(command)
-        or publish_shell_command(command)
-    )
-
-
-def env_truthy(name: str) -> bool:
-    """Return whether an environment flag is truthy."""
-    return os.environ.get(name, "").strip().casefold() in {"1", "true", "yes", "on"}
-
-
-def repo_root() -> Path:
-    """Return the active repository root for child hook execution."""
-    result = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=GIT_ROOT_TIMEOUT_SECONDS,
-    )
-    if result.returncode == 0 and result.stdout.strip():
-        return Path(result.stdout.strip())
-    return Path.cwd()
-
-
-def hook_directory() -> Path:
-    """Return the directory containing child hook scripts."""
-    override = os.environ.get(DISPATCHER_DIR_ENV, "").strip()
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parent
-
-
-def normalize_event(raw_event: str) -> str:
-    """Return the canonical lifecycle event name."""
-    event = EVENT_ALIASES.get(raw_event.casefold())
-    if event:
-        return event
-    choices = ", ".join(EVENT_COMMANDS)
-    raise SystemExit(f"unknown hook event {raw_event!r}; expected one of: {choices}")
-
-
-def run_hook_command(
-    spec: HookCommandSpec,
-    *,
-    raw_payload: bytes,
-    root: Path,
-    hooks_dir: Path,
-    env: dict[str, str],
-) -> HookResult:
-    """Run one child hook script with its selected canonical payload."""
-    script = hooks_dir / spec.script
-    try:
-        result = subprocess.run(
-            [sys.executable, str(script)],
-            input=raw_payload,
-            cwd=root,
-            check=False,
-            capture_output=True,
-            env=env,
-            timeout=spec.timeout,
-        )
-    except OSError as exc:
-        return HookResult(
-            spec=spec,
-            returncode=HOOK_CHILD_NOT_FOUND_RETURN_CODE,
-            stdout="",
-            stderr=f"{type(exc).__name__}: {exc}",
-        )
-    except subprocess.TimeoutExpired as exc:
-        stdout = bytes(exc.stdout or b"").decode("utf-8", errors="replace")
-        stderr = bytes(exc.stderr or b"").decode("utf-8", errors="replace")
-        timeout_message = f"{spec.script} timed out after {spec.timeout} seconds"
-        return HookResult(
-            spec=spec,
-            returncode=HOOK_CHILD_TIMEOUT_RETURN_CODE,
-            stdout=stdout,
-            stderr="\n".join(part for part in (stderr, timeout_message) if part),
-            timed_out=True,
-        )
-    return HookResult(
-        spec=spec,
-        returncode=result.returncode,
-        stdout=result.stdout.decode("utf-8", errors="replace"),
-        stderr=result.stderr.decode("utf-8", errors="replace"),
-    )
-
-
-def failure_payload(result: HookResult) -> dict[str, object]:
-    """Return a blocking payload for child process failures."""
-    detail_lines = [
-        line
-        for text in (result.stderr, result.stdout)
-        for line in text.splitlines()
-        if line.strip()
-    ][:MAX_REASON_LINES]
-    detail = "\n".join(detail_lines)
-    return {
-        "schema": OFFICIAL_HOOK_SCHEMA,
-        "decision": "block",
-        "reason": (
-            "Hook dispatcher child command failed. Fix the child hook or rerun "
-            f"the original hook directly.\n{result.spec.script}\n{detail}"
-        ).strip(),
-        "next_action": "fix_child_hook_failure_then_retry",
-        "remediation": [
-            f"Run `.codex/hooks/{result.spec.script}` directly with the same payload.",
-            "Fix the child hook failure before continuing the tool action.",
-        ],
-    }
-
-
-def visible_context_payload(
-    event: str,
-    *,
-    reason: str,
-    remediation: Sequence[str] = (),
-    child_outputs: Sequence[dict[str, str]] = (),
-    next_action: str | None = None,
-) -> dict[str, object]:
-    """Return an official non-blocking context payload for a hook event."""
-    context_parts = [reason.strip()] if reason.strip() else []
-    if remediation:
-        context_parts.append(
-            "Remediation:\n" + "\n".join(f"- {item}" for item in remediation)
-        )
-    payload: dict[str, object] = {
-        "schema": OFFICIAL_HOOK_SCHEMA,
-        "systemMessage": reason.strip(),
-    }
-    if event in ADDITIONAL_CONTEXT_EVENTS:
-        payload["hookSpecificOutput"] = {
-            "hookEventName": event,
-            "additionalContext": "\n\n".join(context_parts),
-        }
-    if next_action is not None:
-        payload["next_action"] = next_action
-    if remediation:
-        payload["remediation"] = list(remediation)
-    if child_outputs:
-        payload["child_output_count"] = len(child_outputs)
-        payload["child_outputs"] = list(child_outputs)
-    return payload
-
-
-def failure_warning_payload(event: str, result: HookResult) -> dict[str, object]:
-    """Return a non-blocking warning payload for child process failures."""
-    blocking = failure_payload(result)
-    reason = (
-        "Hook child command failed, but AgentCanon hook policy is fail-open by default. "
-        "Continue the requested work and repair the hook/checker before closeout.\n"
-        f"{blocking['reason']}"
-    )
-    remediation = [
-        f"Run `.codex/hooks/{result.spec.script}` directly with the same payload.",
-        "Fix the child hook failure before closeout or record a durable follow-up.",
-        f"Set `{STRICT_FAILURES_ENV}=1` only in explicit hook-development validation.",
-    ]
-    return visible_context_payload(
-        event,
-        reason=reason,
-        remediation=remediation,
-        next_action="repair_child_hook_failure_without_blocking_current_work",
-    )
-
-
-def official_event_payload(event: str, payload: dict[str, object]) -> dict[str, object]:
-    """Normalize one dispatcher-owned payload to the official wire schema."""
+def official_payload(event: str, payload: dict[str, object]) -> dict[str, object]:
     normalized = dict(payload)
     normalized["schema"] = OFFICIAL_HOOK_SCHEMA
     reason = normalized.get("reason") or normalized.get("systemMessage") or ""
@@ -878,261 +246,144 @@ def official_event_payload(event: str, payload: dict[str, object]) -> dict[str, 
     return normalized
 
 
-def should_preserve_block(result: HookResult) -> bool:
-    """Return whether a child block is critical enough to keep blocking."""
-    return result.spec.script in CRITICAL_BLOCKING_CHILD_HOOKS or env_truthy(
-        STRICT_BLOCKS_ENV
-    )
-
-
-def critical_child_invalid(result: HookResult) -> bool:
-    """Return whether a critical child failed or emitted a non-block payload."""
-    if result.spec.script not in CRITICAL_BLOCKING_CHILD_HOOKS:
-        return False
-    if result.failed():
-        return True
-    return bool(result.stdout.strip()) and not result.blocks()
-
-
-def critical_child_failure_payload(result: HookResult) -> dict[str, object]:
-    """Fail closed when a critical child cannot provide a trustworthy decision."""
-    if result.failed():
-        return failure_payload(result)
+def projection_payload(stdout: str) -> dict[str, object]:
     return {
         "schema": OFFICIAL_HOOK_SCHEMA,
-        "decision": "block",
-        "reason": (
-            "Critical hook child emitted nonempty output other than a valid "
-            "decision=block payload; fail closed before "
-            f"the requested tool action.\n{result.spec.script}\n{result.stdout.strip()}"
-        ),
-        "next_action": "fix_critical_child_output_then_retry",
-        "remediation": [
-            f"Run `.codex/hooks/{result.spec.script}` directly with the same payload.",
-            "Fix the critical child so it emits empty stdout to allow or one valid JSON decision=block payload.",
-        ],
+        "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": stdout,
+        },
     }
 
 
-def downgraded_block_payload(event: str, result: HookResult) -> dict[str, object]:
-    """Return a non-blocking warning for a non-critical child block."""
-    payload = result.json_stdout() or {}
-    reason = payload.get("reason")
-    reason_text = (
-        reason if isinstance(reason, str) and reason.strip() else result.stdout.strip()
-    )
-    remediation_raw = payload.get("remediation")
-    remediation = (
-        [str(item) for item in remediation_raw]
-        if isinstance(remediation_raw, list)
-        else []
-    )
-    remediation.extend(
-        [
-            "Treat this as a guardrail finding, not a tool-stop condition.",
-            "Run the named checker or hook directly before closeout if the finding affects the change.",
-            f"Set `{STRICT_BLOCKS_ENV}=1` only for explicit hook enforcement tests.",
-        ]
-    )
-    return visible_context_payload(
-        event,
-        reason=(
-            "Non-critical hook requested a block, but AgentCanon hook policy "
-            "downgraded it to a warning so repository work can continue.\n"
-            f"child_hook={result.spec.script}\n{reason_text}"
-        ).strip(),
-        remediation=remediation,
-        child_outputs=[{"script": result.spec.script, "stdout": result.stdout.strip()}],
-        next_action="address_guardrail_finding_before_closeout",
-    )
+def root_for_spool() -> Path:
+    override = os.environ.get(DISPATCHER_SOURCE_ROOT_ENV, "").strip()
+    return Path(override).resolve() if override else Path.cwd().resolve()
 
 
-def non_block_payload(result: HookResult) -> dict[str, object] | None:
-    """Return a non-blocking JSON payload emitted by a child hook."""
-    payload = result.json_stdout()
-    if payload is None or payload.get("decision") == "block":
-        return None
-    return payload
-
-
-def visible_output_payload(
-    event: str, results: list[HookResult]
-) -> dict[str, object] | None:
-    """Combine non-blocking child outputs into one visible approve payload."""
-    visible_results = [result for result in results if result.visible()]
-    if not visible_results:
-        return None
-    payloads = [
-        payload
-        for result in visible_results
-        if (payload := non_block_payload(result)) is not None
-    ]
-    text_outputs = [
-        result.stdout.strip()
-        for result in visible_results
-        if non_block_payload(result) is None and result.stdout.strip()
-    ]
-    reason_parts: list[str] = []
-    remediation: list[str] = []
-    for payload in payloads:
-        reason = payload.get("reason")
-        if isinstance(reason, str) and reason.strip():
-            reason_parts.append(reason.strip())
-        raw_remediation = payload.get("remediation")
-        if isinstance(raw_remediation, list):
-            remediation.extend(str(item) for item in raw_remediation)
-    reason_parts.extend(text_outputs)
-    next_action = next(
-        (
-            payload.get("next_action")
-            for payload in payloads
-            if isinstance(payload.get("next_action"), str)
-        ),
-        None,
-    )
-    return visible_context_payload(
-        event,
-        reason="\n\n".join(reason_parts),
-        remediation=remediation,
-        child_outputs=[
-            {
-                "script": result.spec.script,
-                "stdout": result.stdout.strip(),
-            }
-            for result in visible_results
-        ],
-        next_action=next_action,
-    )
-
-
-def emit_json_payload(payload: dict[str, object]) -> None:
-    """Write one JSON hook payload."""
-    json.dump(payload, sys.stdout, sort_keys=True)
-    sys.stdout.write("\n")
+def spool_event(event: str, raw_payload: bytes, status: str, **telemetry: str) -> None:
+    """Write one bounded fingerprint-only event; telemetry never changes safety."""
+    timestamp = utc_now()
+    payload_fingerprint = hashlib.sha256(raw_payload).hexdigest()
+    context = HookLogContext(root_for_spool(), event)
+    entry: dict[str, object] = {
+        "hook_run_id": context.run_id(timestamp, payload_fingerprint),
+        "timestamp": timestamp,
+        "payload_fingerprint": payload_fingerprint,
+        "status": status,
+        "hook_event_name": event,
+    }
+    entry.update({key: value for key, value in telemetry.items() if value})
+    try:
+        context.append(entry)
+    except Exception:
+        # Local spool transport is deliberately fail-open and cannot alter the decision.
+        return
 
 
 def dispatch_event(event: str, raw_payload: bytes) -> int:
-    """Run every child hook for one event and emit the highest-priority output."""
-    if bypass_child_guards_payload(raw_payload):
+    """Dispatch one active event after one bounded parse; legacy Stop is a no-op."""
+    if event == "Stop":
         return 0
-    payload = json_payload(raw_payload)
-    child_env = child_hook_environment(payload)
-    root = repo_root()
-    hooks_dir = hook_directory()
-    normalized_projection_payload: bytes | None = None
-    if event == "PostToolUse":
-        try:
-            normalized_projection_payload = _normalize_post_tool_use_input(raw_payload)
-        except ValueError as exc:
-            print(f"hook_dispatcher: {exc}", file=sys.stderr)
-    results: list[HookResult] = []
-    for spec in EVENT_COMMANDS[event]:
-        if spec.script == PROJECTION_GUARD_SCRIPT:
-            if normalized_projection_payload is None:
-                continue
-            child_payload = normalized_projection_payload
-        else:
-            child_payload = raw_payload
-        results.append(
-            run_hook_command(
-                spec,
-                raw_payload=child_payload,
-                root=root,
-                hooks_dir=hooks_dir,
-                env=child_env,
-            )
-        )
-    if event == "PostToolUse":
-        projection_result = next(
-            (
-                result
-                for result in results
-                if result.spec.script == PROJECTION_GUARD_SCRIPT
-            ),
-            None,
-        )
-        if (
-            projection_result is not None
-            and projection_result.returncode == 0
-            and projection_result.stdout
-        ):
-            sys.stdout.write(projection_result.stdout)
-        return 0
-    critical_failure = next(
-        (result for result in results if critical_child_invalid(result)), None
-    )
-    blocking = next((result for result in results if result.blocks()), None)
-    failure = next((result for result in results if result.failed()), None)
-    visible_payload = visible_output_payload(event, results)
-
-    if critical_failure is not None:
-        emit_json_payload(
-            official_event_payload(
-                event,
-                critical_child_failure_payload(critical_failure),
-            )
-        )
-        return 0
-    if blocking is not None:
-        if should_preserve_block(blocking):
-            blocking_payload = blocking.json_stdout() or failure_payload(blocking)
-            emit_json_payload(official_event_payload(event, blocking_payload))
-        else:
-            emit_json_payload(downgraded_block_payload(event, blocking))
-        return 0
-    if failure is not None:
-        if event == "PostToolUse" and not env_truthy(STRICT_FAILURES_ENV):
-            return 0
-        if env_truthy(STRICT_FAILURES_ENV):
-            emit_json_payload(official_event_payload(event, failure_payload(failure)))
-        else:
-            emit_json_payload(failure_warning_payload(event, failure))
-        return 0
-    if visible_payload is not None:
-        emit_json_payload(visible_payload)
+    payload = parse_payload(raw_payload)
+    output: dict[str, object] | None = None
+    status = "malformed_payload" if payload is None else "pass"
+    telemetry: dict[str, str] = {}
+    if payload is not None:
+        if event == "UserPromptSubmit":
+            matched_kind = secret_kind(payload_prompt(payload))
+            if matched_kind is not None:
+                output = official_payload(event, secret_block_payload(matched_kind))
+                status = "blocked_secret"
+                telemetry["safety_decision"] = "block"
+        elif event == "PreToolUse":
+            if payload_tool_name(payload) in SHELL_TOOL_NAMES:
+                command = payload_tool_command(payload)
+                intent = first_block(command)
+                if intent is not None:
+                    safety = branch_block_payload(command, intent)
+                    output = official_payload(event, safety)
+                    status = "blocked_destructive_git"
+                    telemetry["safety_decision"] = "block"
+                    telemetry["operation"] = str(safety["operation"])
+        elif event == "PostToolUse":
+            try:
+                normalized = normalize_post_tool_use_input(payload)
+                if normalized["tool_name"] == "Bash":
+                    response = normalized["tool_response"]
+                    assert isinstance(response, dict)
+                    if response["exit_code"] == 0:
+                        stdout = response["stdout"]
+                        assert isinstance(stdout, str)
+                        validate_projection_bytes(stdout)
+                        output = projection_payload(stdout)
+                        status = "projection_forwarded"
+                    else:
+                        status = "unsuccessful_tool_response"
+            except (ProjectionError, TypeError, ValueError, AssertionError):
+                status = "invalid_projection"
+    spool_event(event, raw_payload, status, **telemetry)
+    if output is not None:
+        json.dump(output, sys.stdout, sort_keys=True)
+        sys.stdout.write("\n")
     return 0
 
 
-def command_list_payload(event: str | None) -> dict[str, object]:
-    """Return a JSON-visible dispatch matrix for tests and reviews."""
-    events = [event] if event is not None else list(EVENT_COMMANDS)
+def normalize_event(raw_event: str) -> str:
+    event = EVENT_ALIASES.get(raw_event.casefold())
+    if event is None:
+        choices = ", ".join(HOOK_EVENT_CONTRACTS)
+        raise SystemExit(f"unknown hook event {raw_event!r}; expected one of: {choices}")
+    return event
+
+
+def contract_payload(event: str | None = None) -> dict[str, object]:
+    names = [event] if event is not None else list(HOOK_EVENT_CONTRACTS)
     return {
+        "schema": HOOK_CONTRACT_SCHEMA,
         "events": {
-            name: [
-                {"script": spec.script, "timeout": spec.timeout}
-                for spec in EVENT_COMMANDS[name]
-            ]
-            for name in events
+            name: {
+                "active": HOOK_EVENT_CONTRACTS[name].active,
+                "matchers": list(HOOK_EVENT_CONTRACTS[name].matchers),
+                "failure": HOOK_EVENT_CONTRACTS[name].failure,
+                "telemetry": HOOK_EVENT_CONTRACTS[name].telemetry,
+            }
+            for name in names
         },
-        "event_count": len(events),
-        "command_count": sum(len(EVENT_COMMANDS[name]) for name in events),
+        "active_events": [name for name in names if HOOK_EVENT_CONTRACTS[name].active],
+        "inactive_events": [name for name in names if not HOOK_EVENT_CONTRACTS[name].active],
+        "active_handlers": sorted(ACTIVE_HOOK_HANDLERS),
+        "retired_hook_routes": {
+            name: asdict(route) for name, route in sorted(RETIRED_HOOK_ROUTES.items())
+        },
     }
 
 
+def command_list_payload(event: str | None = None) -> dict[str, object]:
+    """Keep --list as a contract-compatible read-only alias."""
+    return contract_payload(event)
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    """Parse dispatcher command-line arguments."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("event", nargs="?", help="Codex hook event to dispatch")
     parser.add_argument("--group", dest="group", help="Alias for the event argument")
-    parser.add_argument(
-        "--list", action="store_true", help="Print the child hook matrix"
-    )
+    parser.add_argument("--list", action="store_true", help="Print the active/inactive hook contract")
+    parser.add_argument("--contract", action="store_true", help="Print the canonical typed hook contract")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entrypoint."""
     args = parse_args(sys.argv[1:] if argv is None else argv)
     raw_event = args.group or args.event
-    if args.list:
+    if args.list or args.contract:
         event = normalize_event(raw_event) if raw_event else None
-        json.dump(command_list_payload(event), sys.stdout, sort_keys=True)
+        json.dump(contract_payload(event), sys.stdout, sort_keys=True)
         sys.stdout.write("\n")
         return 0
     if not raw_event:
         raise SystemExit("hook event is required")
-    event = normalize_event(raw_event)
-    return dispatch_event(event, load_raw_payload())
+    return dispatch_event(normalize_event(raw_event), sys.stdin.buffer.read())
 
 
 if __name__ == "__main__":
