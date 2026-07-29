@@ -5,9 +5,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/hook_dispatcher.py\" UserPromptSubmit",
+            "command": "python3 .codex/hooks/hook_dispatcher.py UserPromptSubmit",
             "timeout": 40,
-            "statusMessage": "Running prompt guard suite"
+            "statusMessage": "Running prompt safety contract"
           }
         ]
       }
@@ -18,9 +18,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/hook_dispatcher.py\" PreToolUse",
+            "command": "python3 .codex/hooks/hook_dispatcher.py PreToolUse",
             "timeout": 35,
-            "statusMessage": "Running pre-tool guard suite"
+            "statusMessage": "Running destructive Git safety contract"
           }
         ]
       }
@@ -31,21 +31,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/hook_dispatcher.py\" PostToolUse",
+            "command": "python3 .codex/hooks/hook_dispatcher.py PostToolUse",
             "timeout": 600,
-            "statusMessage": "Running post-tool guard suite"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/hook_dispatcher.py\" Stop",
-            "timeout": 600,
-            "statusMessage": "Running stop guard suite"
+            "statusMessage": "Running execution-resource projection contract"
           }
         ]
       }

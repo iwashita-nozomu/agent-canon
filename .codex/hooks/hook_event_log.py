@@ -6,14 +6,9 @@
 # upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
 # upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves archive paths
 # downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py checkpoints immutable per-event spool files
-# downstream implementation ./oop_readability_guard.py records OOP hook outcomes
-# downstream implementation ./module_boundary_guard.py records module boundary outcomes
-# downstream implementation ./library_implementation_guard.py records protected library rewrite outcomes
-# downstream implementation ./helper_first_guard.py records helper-first implementation outcomes
-# downstream implementation ./cause_investigation_guard.py records cause investigation outcomes
-# downstream implementation ./notebook_quality_guard.py records notebook hook outcomes
-# downstream implementation ./style_checker_guard.py records changed-file style outcomes
-# downstream implementation ./skill_usage_logger.py records skill hook outcomes
+# downstream implementation ./hook_dispatcher.py creates one bounded context per active event
+# downstream design ./hook_safety.py keeps prompt/command values out of spool telemetry
+# downstream design ../../documents/runtime/runtime-log-archive.md assigns archive work to explicit checkpoints
 # @dependency-end
 
 # PostToolUse must append to the repo-owned spool without invoking Git,

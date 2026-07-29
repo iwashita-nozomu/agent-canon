@@ -2,8 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Warns on context-polluting direct rg usage before shell execution.
-# upstream implementation ../hooks.json invokes hook dispatcher for PreToolUse.
-# upstream implementation ./hook_dispatcher.py dispatches this guard before read-only bypass.
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this standalone context route.
 # upstream design ../../documents/codex/codex-configuration-reference.md documents hook warning policy.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates direct rg context-risk warnings.
 # @dependency-end

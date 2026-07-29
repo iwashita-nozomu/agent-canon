@@ -4,7 +4,7 @@
 # responsibility Warns when the AgentCanon log archive mount is absent without blocking hook execution.
 # upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and mount policy
 # upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves archive mount paths
-# upstream implementation ../hooks.json invokes this hook at prompt and pre-tool boundaries
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this explicit checkpoint route
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates non-blocking warning behavior
 # @dependency-end
 

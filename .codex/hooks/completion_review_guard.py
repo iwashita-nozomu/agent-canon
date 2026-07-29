@@ -3,7 +3,7 @@
 # contract agent-runtime
 # responsibility Blocks completion while the current W2 candidate lacks an explicit independent-review APPROVE.
 # upstream implementation ../../tools/agent_tools/review_dispatch.py reconciles the canonical candidate and review state.
-# downstream implementation ./hook_dispatcher.py dispatches this critical Stop guard.
+# downstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this explicit review route.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates hook wiring and decisions.
 # @dependency-end
 

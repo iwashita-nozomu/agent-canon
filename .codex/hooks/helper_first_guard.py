@@ -2,7 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Blocks helper-function-first edits before ownership or boundary evidence exists.
-# upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this standalone owner route.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
 # upstream implementation ../../tools/agent_tools/helper_function_inventory.py classifies helper symbols.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates helper-first hook behavior.
