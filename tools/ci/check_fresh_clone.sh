@@ -36,6 +36,64 @@ overlay_current_tree() {
   rsync -a --delete --exclude .git --exclude .state "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
 }
 
+attach_submodule_main_to_staged_pin() {
+  local submodule_path="$1"
+  local index_entry=""
+  local pinned_mode="" pinned_oid="" pinned_stage="" pinned_path=""
+  local branch="" head_oid="" main_oid="" upstream="" status=""
+
+  [[ -z "$(git ls-files --unmerged -- "$submodule_path")" ]] || {
+    echo "fresh_clone_submodule_attach=unmerged_parent_prefix" >&2
+    return 1
+  }
+  index_entry="$(git ls-files --stage -- "$submodule_path")"
+  read -r pinned_mode pinned_oid pinned_stage pinned_path <<<"$index_entry"
+  if [[ "$(printf '%s\n' "$index_entry" | awk 'NF { count += 1 } END { print count + 0 }')" -ne 1 \
+    || "$pinned_mode" != "160000" || "$pinned_stage" != "0" \
+    || "$pinned_path" != "$submodule_path" ]]; then
+    echo "fresh_clone_submodule_attach=missing_stage0_gitlink" >&2
+    return 1
+  fi
+  status="$(git -C "$submodule_path" status --short --untracked-files=all)"
+  branch="$(git -C "$submodule_path" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  head_oid="$(git -C "$submodule_path" rev-parse HEAD)"
+  if [[ -n "$status" || -n "$branch" || "$head_oid" != "$pinned_oid" ]]; then
+    echo "fresh_clone_submodule_attach=invalid_initial_state" >&2
+    return 1
+  fi
+  if ! git -C "$submodule_path" show-ref --verify --quiet refs/remotes/origin/main; then
+    echo "fresh_clone_submodule_attach=missing_origin_main" >&2
+    return 1
+  fi
+  main_oid="$(git -C "$submodule_path" rev-parse --verify refs/heads/main 2>/dev/null || true)"
+  if [[ -n "$main_oid" && "$main_oid" != "$pinned_oid" ]]; then
+    echo "fresh_clone_submodule_attach=main_pin_mismatch" >&2
+    return 1
+  fi
+
+  if [[ -n "$main_oid" ]]; then
+    git -C "$submodule_path" switch main >/dev/null
+  else
+    git -C "$submodule_path" switch -c main "$pinned_oid" >/dev/null
+  fi
+  git -C "$submodule_path" branch --set-upstream-to=origin/main main >/dev/null
+
+  branch="$(git -C "$submodule_path" symbolic-ref --quiet --short HEAD)"
+  head_oid="$(git -C "$submodule_path" rev-parse HEAD)"
+  upstream="$(git -C "$submodule_path" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}')"
+  status="$(git -C "$submodule_path" status --short --untracked-files=all)"
+  echo "FRESH_CLONE_SUBMODULE_BRANCH=${branch}"
+  echo "FRESH_CLONE_SUBMODULE_HEAD=${head_oid}"
+  echo "FRESH_CLONE_SUBMODULE_PIN=${pinned_oid}"
+  echo "FRESH_CLONE_SUBMODULE_UPSTREAM=${upstream}"
+  if [[ "$branch" != "main" || "$head_oid" != "$pinned_oid" || "$upstream" != "origin/main" \
+    || -n "$status" ]]; then
+    echo "fresh_clone_submodule_attach=readback_mismatch" >&2
+    return 1
+  fi
+  echo "FRESH_CLONE_SUBMODULE_STATUS=clean"
+}
+
 git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
 git config --global --add safe.directory "${CLONE_DIR}"
 overlay_current_tree
@@ -44,6 +102,7 @@ CLONE_TOOLS_ROOT="$(agent_canon_tools_root "${CLONE_DIR}")"
 if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1; then
   rm -rf vendor/agent-canon
   git -c protocol.file.allow=always submodule update --init --recursive vendor/agent-canon
+  attach_submodule_main_to_staged_pin "vendor/agent-canon"
 fi
 if [[ -n "$(git status --short)" ]]; then
   git config user.name "Fresh Clone Check"
