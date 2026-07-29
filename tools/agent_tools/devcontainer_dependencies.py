@@ -977,7 +977,9 @@ class EnvironmentBoundaryModel:
     def _requirements(path: Path) -> frozenset[str]:
         """Parse pinned or constrained requirement names for ownership checks."""
         names: set[str] = set()
-        requirement_re = re.compile(r"^([A-Za-z0-9][A-Za-z0-9_.-]*)(?:\[[^]]+\])?(?:[<>=!~].*)?$")
+        requirement_re = re.compile(
+            r"^([A-Za-z0-9][A-Za-z0-9_.-]*)(?:[<>=!~].*)?$"
+        )
         for raw_line in path.read_text(encoding="utf-8").splitlines():
             line = raw_line.split("#", 1)[0].strip()
             if not line:
@@ -1212,7 +1214,7 @@ class Installer:
     def install(
         self, plan: DependencyPlan, *, workspace: Path, receipts: Path
     ) -> tuple[str, ...]:
-        """Install records in order, resuming only from matching success receipts."""
+        """Install records in order, resuming only after live receipt verification."""
         receipts.mkdir(parents=True, exist_ok=True)
         completed: list[str] = []
         by_id = plan.by_id()
@@ -1237,10 +1239,16 @@ class Installer:
                     continue
                 raise error
             if self._receipt_matches(receipt, plan, record):
-                completed.append(record.id)
-                continue
+                try:
+                    self._verify_record(record, workspace=workspace)
+                except Exception:
+                    receipt.unlink(missing_ok=True)
+                else:
+                    completed.append(record.id)
+                    continue
             try:
                 self._install_record(record, workspace=workspace)
+                self._verify_record(record, workspace=workspace)
                 self._write_receipt(receipt, plan, record)
             except Exception as exc:
                 receipt.unlink(missing_ok=True)
@@ -1515,6 +1523,11 @@ class Installer:
             )
         else:  # pragma: no cover - Method is a closed enum.
             raise DependencyError(f"unsupported installation method: {method}")
+
+    def _verify_record(
+        self, record: DependencyRecord, *, workspace: Path
+    ) -> None:
+        """Verify that one record's installed tools are available now."""
         for command in record.commands:
             command_env = self._with_tool_paths(None)
             self._run(command, workspace=workspace, env=command_env)

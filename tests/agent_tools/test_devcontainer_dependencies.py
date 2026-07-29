@@ -88,10 +88,15 @@ def write_manifest(path: Path, records: list[dict[str, Any]]) -> None:
 class FakeRunner:
     """Capture argv calls without performing installs or network work."""
 
-    def __init__(self, fail_on: str | None = None) -> None:
+    def __init__(
+        self,
+        fail_on: str | None = None,
+        fail_once_on: str | None = None,
+    ) -> None:
         self.calls: list[tuple[str, ...]] = []
         self.environments: list[dict[str, str] | None] = []
         self.fail_on = fail_on
+        self.fail_once_on = fail_once_on
 
     def run(
         self,
@@ -106,6 +111,9 @@ class FakeRunner:
         command = tuple(argv)
         self.calls.append(command)
         self.environments.append(dict(env) if env is not None else None)
+        if self.fail_once_on and command[0] == self.fail_once_on:
+            self.fail_once_on = None
+            raise subprocess.CalledProcessError(1, command)
         if self.fail_on and command[0] == self.fail_on:
             raise subprocess.CalledProcessError(1, command)
         if command == (sys.executable, "-c", "import site; print(site.getuserbase())"):
@@ -397,8 +405,16 @@ class DependencyModelTests(unittest.TestCase):
             with self.assertRaisesRegex(DependencyError, "escapes"):
                 safe_extract_tar(traversal, root / "extract")
 
-    def test_success_receipt_resumes_and_failure_has_no_success_receipt(self) -> None:
-        parsed = parse_record(record("tool", method="apt-package"), path=Path("x.toml"), index=0)
+    def test_receipt_hit_verifies_live_state_and_reinstalls_after_rebuild(self) -> None:
+        parsed = parse_record(
+            record(
+                "tool",
+                method="apt-package",
+                commands=[["tool", "--version"]],
+            ),
+            path=Path("x.toml"),
+            index=0,
+        )
         plan = build_plan((LoadedManifest(Path("x.toml"), (parsed,)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -406,9 +422,29 @@ class DependencyModelTests(unittest.TestCase):
             installer = Installer(runner)
             receipts = root / "receipts"
             self.assertEqual(installer.install(plan, workspace=root, receipts=receipts), ("tool",))
-            first_call_count = len(runner.calls)
-            self.assertEqual(installer.install(plan, workspace=root, receipts=receipts), ("tool",))
-            self.assertEqual(len(runner.calls), first_call_count)
+
+            resumed = FakeRunner()
+            self.assertEqual(
+                Installer(resumed).install(plan, workspace=root, receipts=receipts),
+                ("tool",),
+            )
+            self.assertIn(("tool", "--version"), resumed.calls)
+            self.assertFalse(any(command[0] == "apt-get" for command in resumed.calls))
+
+            rebuilt = FakeRunner(fail_once_on="tool")
+            self.assertEqual(
+                Installer(rebuilt).install(plan, workspace=root, receipts=receipts),
+                ("tool",),
+            )
+            self.assertEqual(
+                sum(command[0] == "apt-get" for command in rebuilt.calls),
+                1,
+            )
+            self.assertEqual(
+                rebuilt.calls.count(("tool", "--version")),
+                2,
+            )
+
             failing = FakeRunner(fail_on="apt-get")
             with self.assertRaises(DependencyError):
                 Installer(failing).install(

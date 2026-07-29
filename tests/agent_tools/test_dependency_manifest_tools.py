@@ -611,18 +611,27 @@ class DependencyManifestToolTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_docker_validator_accepts_requirement_extras_for_required_packages(self) -> None:
-        """The Docker validator should accept valid extras syntax in requirements."""
+    def test_docker_validator_rejects_requirement_extras_in_parent_layout(self) -> None:
+        """The parent boundary should reject extras in Docker requirements."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
+            vendor = root / "vendor" / "agent-canon"
             (root / "python").mkdir()
             (root / "docker").mkdir()
             (root / ".devcontainer").mkdir()
             (root / "tools" / "ci").mkdir(parents=True)
-            (root / "tools" / "agent_tools").mkdir(parents=True)
-            (root / "tools" / "agent_tools" / "devcontainer_dependencies.py").symlink_to(
+            (vendor / "tools" / "agent_tools").mkdir(parents=True)
+            (vendor / ".devcontainer").mkdir()
+            (vendor / "tools" / "agent_tools" / "devcontainer_dependencies.py").symlink_to(
                 PROJECT_ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
             )
+            for relative in (
+                ".devcontainer/bootstrap-dependencies.sh",
+                ".devcontainer/dependencies.toml",
+                ".devcontainer/post-create.sh",
+                "CONTAINER_OPERATIONS.md",
+            ):
+                (vendor / relative).symlink_to(PROJECT_ROOT / relative)
             (root / ".devcontainer" / "dependencies.toml").write_text(
                 "\n".join(
                     [
@@ -644,6 +653,11 @@ class DependencyManifestToolTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            (root / ".devcontainer" / "post-create-parent.sh").write_text(
+                "#!/usr/bin/env bash\n",
+                encoding="utf-8",
+            )
+            os.chmod(root / ".devcontainer" / "post-create-parent.sh", 0o755)
             (root / "pyproject.toml").write_text(
                 "[project]\ndependencies = []\n",
                 encoding="utf-8",
@@ -677,49 +691,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (root / ".devcontainer" / "post-create.sh").write_text(
-                "\n".join(
-                    [
-                        "run_as_root",
-                        "docker/register_safe_directories.sh",
-                        "docker/install_python_dependencies.sh",
-                        'git config --global --add safe.directory "$workspace"',
-                        "repo-local Python dependency installer absent",
-                        "cli.github.com/packages",
-                        "apt_install gh",
-                        "npm install -g @openai/codex",
-                        "gh --version",
-                        "codex --version",
-                        "rustup toolchain install",
-                        "rustfmt",
-                        "clippy",
-                        "rust-analyzer",
-                        "cargo build --release",
-                        "AGENT_CANON_TOOLS_HOME",
-                        "${tools_home}/agent-canon/bin/agent-canon",
-                        "/usr/local/bin/agent-canon",
-                        "AGENT_CANON_RUNTIME_ROOT",
-                        "AGENT_CANON_SOURCE_PROJECTION_ROOT",
-                        "tool-availability.json",
-                        "tree --version",
-                        "/etc/profile.d/agent-canon-rust.sh",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            os.chmod(root / ".devcontainer" / "post-create.sh", 0o755)
-            (root / ".devcontainer" / "bootstrap-dependencies.sh").write_text(
-                "#!/usr/bin/env bash\n",
-                encoding="utf-8",
-            )
-            os.chmod(root / ".devcontainer" / "bootstrap-dependencies.sh", 0o755)
-            (root / "CONTAINER_OPERATIONS.md").write_text(
-                "## Product Image And Mounted Tool Boundary\n",
-                encoding="utf-8",
-            )
             (root / ".devcontainer" / "devcontainer.json").write_text(
-                '{"postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace"}\n',
+                '{"postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace && bash .devcontainer/post-create-parent.sh"}\n',
                 encoding="utf-8",
             )
             (root / ".dockerignore").write_text(
@@ -729,6 +702,10 @@ class DependencyManifestToolTest(unittest.TestCase):
             (root / ".gitignore").write_text(".venv/\nvenv/\n", encoding="utf-8")
             (root / "README.md").write_text(
                 "PYTHONPATH=/workspace/python\nUse docker run for execution.\n",
+                encoding="utf-8",
+            )
+            (root / "docker" / "README.md").write_text(
+                "Parent product image dependencies.\n",
                 encoding="utf-8",
             )
             (root / "tools" / "ci" / "python_env_policy.py").write_text(
@@ -747,9 +724,13 @@ class DependencyManifestToolTest(unittest.TestCase):
                 text=True,
             )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DEVCONTAINER_DEPENDENCY=pass", result.stdout)
-            self.assertIn("DEVCONTAINER_DEPENDENCY_ORDER=fixture", result.stdout)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("DEVCONTAINER_DEPENDENCY=fail", result.stdout)
+            self.assertIn(
+                "unsupported requirement syntax: pyyaml[secure]>=6",
+                result.stdout,
+            )
+            self.assertNotIn("missing-file", result.stdout)
 
     def test_format_accepts_line_comment_manifest(self) -> None:
         """Line-comment manifests are valid for Python-like files."""
