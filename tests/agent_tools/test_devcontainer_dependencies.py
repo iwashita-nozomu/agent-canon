@@ -151,11 +151,13 @@ class FakeRunner:
         self,
         fail_on: str | None = None,
         fail_once_on: str | None = None,
+        emulate_non_root_sudo: bool = False,
     ) -> None:
         self.calls: list[tuple[str, ...]] = []
         self.environments: list[dict[str, str] | None] = []
         self.fail_on = fail_on
         self.fail_once_on = fail_once_on
+        self.emulate_non_root_sudo = emulate_non_root_sudo
 
     def run(
         self,
@@ -166,8 +168,10 @@ class FakeRunner:
         capture_output: bool = False,
         env: Mapping[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
-        del cwd, privileged, capture_output
+        del cwd, capture_output
         command = tuple(argv)
+        if self.emulate_non_root_sudo and privileged:
+            command = ("sudo", *command)
         self.calls.append(command)
         self.environments.append(dict(env) if env is not None else None)
         if self.fail_once_on and command[0] == self.fail_once_on:
@@ -622,13 +626,30 @@ class DependencyModelTests(unittest.TestCase):
             executable.chmod(0o755)
             browser = replace(browser, browser_cache_path=str(cache))
             plan = build_plan((LoadedManifest(Path("x.toml"), (browser,)),))
-            runner = FakeRunner()
+            runner = FakeRunner(emulate_non_root_sudo=True)
             Installer(runner).install(plan, workspace=root, receipts=root / "receipts")
-            self.assertIn(
-                {"PLAYWRIGHT_BROWSERS_PATH": str(cache)},
-                runner.environments,
+            privileged_install = (
+                "sudo",
+                "env",
+                f"PLAYWRIGHT_BROWSERS_PATH={cache}",
+                "playwright",
+                "install",
+                "--with-deps",
+                "chromium",
             )
-            self.assertIn((str(executable), "--version"), runner.calls)
+            self.assertIn(privileged_install, runner.calls)
+            self.assertIsNone(
+                runner.environments[runner.calls.index(privileged_install)]
+            )
+            verifier = (str(executable), "--version")
+            self.assertIn(verifier, runner.calls)
+            verifier_environment = runner.environments[runner.calls.index(verifier)]
+            self.assertIsNotNone(verifier_environment)
+            assert verifier_environment is not None
+            self.assertEqual(
+                verifier_environment["PLAYWRIGHT_BROWSERS_PATH"],
+                str(cache),
+            )
 
     def test_toolchain_installers_bootstrap_and_publish_home_paths(self) -> None:
         rust = parse_record(

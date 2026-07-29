@@ -1812,10 +1812,16 @@ class Installer:
                 privileged=True,
             )
             self._run(
-                ["playwright", "install", "--with-deps", record.browser],
+                [
+                    "env",
+                    f"PLAYWRIGHT_BROWSERS_PATH={record.browser_cache_path}",
+                    "playwright",
+                    "install",
+                    "--with-deps",
+                    record.browser,
+                ],
                 workspace=workspace,
                 privileged=True,
-                env={"PLAYWRIGHT_BROWSERS_PATH": record.browser_cache_path},
             )
         else:  # pragma: no cover - Method is a closed enum.
             raise DependencyError(f"unsupported installation method: {method}")
