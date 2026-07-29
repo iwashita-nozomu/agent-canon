@@ -32,7 +32,9 @@
   "python.analysis.extraPaths": [
     "./python",
     "./src",
-    "./tools"
+    "./tools",
+    "./tools/agent-canon",
+    "./tools/agent-canon/agent_tools"
   ],
   "python-envs.defaultEnvManager": "ms-python.python:system",
   "python-envs.pythonProjects": [],

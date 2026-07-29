@@ -62,7 +62,14 @@ mode = "regular"
 owner = "template-or-derived-repo"
 class = "active_contract"
 local_override_allowed = true
-source = ".devcontainer"
+
+[[surface]]
+path = ".devcontainer/post-create-parent.sh"
+mode = "regular"
+source = ".devcontainer/post-create-parent.sh"
+owner = "template-or-derived-repo"
+class = "active_contract"
+local_override_allowed = true
 
 [[surface]]
 path = ".devcontainer/devcontainer.json"
@@ -443,6 +450,7 @@ paths = [
   "documents/workflow-references.md",
   "notes/themes/AGENT_PHILOSOPHY.md",
   "notes/themes/USER_PREFERENCES.md",
+  "tests/tools/test_fix_markdown_math.py",
   "memory/global",
   "memory/methods",
   "memory/candidates",
