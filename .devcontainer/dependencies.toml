@@ -205,6 +205,17 @@ provides = ["tree"]
 failure_policy = "fail"
 
 [[records]]
+id = "clang-format"
+package = "clang-format"
+method = "apt-package"
+version = "1:18.0-59~exp2"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package", executable = "clang-format", args = ["--version"], output_contains = "Ubuntu clang-format version 18.1.3" }
+deps = []
+provides = ["clang-format"]
+failure_policy = "fail"
+
+[[records]]
 id = "gitleaks"
 package = "gitleaks"
 method = "release-asset"

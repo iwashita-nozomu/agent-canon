@@ -166,7 +166,7 @@ class PythonRequirementSpec:
     url: str | None
 
     @classmethod
-    def parse(cls, value: str) -> "PythonRequirementSpec":
+    def parse(cls, value: str) -> PythonRequirementSpec:
         """Parse a PEP 508 requirement without rejecting extras or URLs."""
         try:
             requirement = Requirement(value)
@@ -508,8 +508,12 @@ def _parse_verification(
 ) -> VerificationSpec:
     if not isinstance(value, dict) or not value:
         raise DependencyError(f"{record_id}.verification must be a non-empty table")
-    allowed_by_kind = {
-        VerificationKind.APT_PACKAGE: set(),
+    allowed_by_kind: dict[VerificationKind, set[str]] = {
+        VerificationKind.APT_PACKAGE: {
+            "executable",
+            "args",
+            "output_contains",
+        },
         VerificationKind.APT_REPOSITORY: set(),
         VerificationKind.NPM_PACKAGE: {
             "executable",
@@ -568,14 +572,32 @@ def _parse_verification(
         if "executable_globs" in value
         else ()
     )
-    if kind in {
+    if kind is VerificationKind.APT_PACKAGE:
+        record_owned_fields = {"executable", "args", "output_contains"}
+        provided_record_owned_fields = record_owned_fields & value.keys()
+        if provided_record_owned_fields not in (set(), record_owned_fields):
+            raise DependencyError(
+                f"{record_id}.verification requires executable, args, and output_contains"
+            )
+        if provided_record_owned_fields and (
+            executable is None or not args or output_contains is None
+        ):
+            raise DependencyError(
+                f"{record_id}.verification requires executable, args, and output_contains"
+            )
+        if executable is not None and (
+            Path(executable).name != executable or executable in SHELL_EXECUTABLES
+        ):
+            raise DependencyError(
+                f"{record_id}.verification.executable must be one command name"
+            )
+    elif kind in {
         VerificationKind.NPM_PACKAGE,
         VerificationKind.PYTHON_DISTRIBUTION,
     }:
         if executable is None or not args or output_contains is None:
             raise DependencyError(
-                f"{record_id}.verification requires executable, args, and "
-                "output_contains"
+                f"{record_id}.verification requires executable, args, and output_contains"
             )
         if Path(executable).name != executable or executable in SHELL_EXECUTABLES:
             raise DependencyError(
@@ -1905,6 +1927,12 @@ class Installer:
             )
 
     def _verify_apt_package(self, record: DependencyRecord, *, workspace: Path) -> None:
+        """Verify the dpkg database and any record-owned executable contract.
+
+        The installed dpkg database is the container trust boundary. Official
+        Ubuntu images may exclude documentation and manpage payloads, so raw
+        ``dpkg --verify`` output is not a blocking receipt oracle.
+        """
         result = self._capture(
             [
                 "dpkg-query",
@@ -1917,12 +1945,18 @@ class Installer:
         fields = result.stdout.strip().split("\t")
         if fields != ["install ok installed", record.version, record.package]:
             raise DependencyError(f"{record.id}: dpkg package/version/owned state mismatch")
-        verification = self._capture(
-            ["dpkg", "--verify", record.package],
-            workspace=workspace,
-        )
-        if verification.stdout.strip() or verification.stderr.strip():
-            raise DependencyError(f"{record.id}: dpkg-owned artifact verification failed")
+        executable = record.verification.executable
+        if executable is not None:
+            assert record.verification.output_contains is not None
+            result = self._capture(
+                [executable, *record.verification.args],
+                workspace=workspace,
+            )
+            self._require_output(
+                result,
+                record.verification.output_contains,
+                record.id,
+            )
 
     def _verify_apt_repository(
         self, record: DependencyRecord, *, workspace: Path

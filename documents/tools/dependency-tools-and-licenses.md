@@ -121,6 +121,7 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 | --- | --- | --- | --- |
 | `agent-canon` Rust CLI | docs check、semantic index、structured analysis などの統一 CLI。 | `rust/agent-canon/Cargo.toml`, `tools/bin/agent-canon` | local: Apache-2.0 |
 | Rust toolchain: `rustup`, `cargo`, `rustc`, `rustfmt`, `clippy`, `rust-analyzer` | AgentCanon Rust CLI の build、format、lint、editor support。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: Apache-2.0 OR MIT for official Rust projects; verify component repository |
+| `clang-format` (Ubuntu 24.04 package `1:18.0-59~exp2`, executable `18.1.3`) | Shared C/C++ source formatting。 | `.devcontainer/dependencies.toml` (`clang-format`) | distro: `/usr/share/doc/clang-format/copyright` in the pinned Ubuntu image; upstream: Apache-2.0 WITH LLVM-exception; package metadata: <https://packages.ubuntu.com/noble/clang-format> |
 | `jq` | JSON / JSONL の compact extraction と CI evidence 整形。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: MIT for `jq`; docs are CC BY 3.0 |
 | Node.js | `npm` と Codex CLI install の runtime。 | `.devcontainer/bootstrap-dependencies.sh` | upstream: MIT for Node.js core, with bundled third-party notices |
 | `npm` CLI | `@openai/codex` の install に使う JavaScript package manager。 | `.devcontainer/dependencies.toml` | upstream: Artistic-2.0 |
@@ -183,6 +184,8 @@ a binary distribution or container image.
 - Rust license policy: <https://www.rust-lang.org/policies/licenses/>
 - rustfmt license: <https://github.com/rust-lang/rustfmt>
 - rust-analyzer license: <https://github.com/rust-lang/rust-analyzer>
+- Ubuntu package metadata for the current image contract: <https://packages.ubuntu.com/noble/clang-format>
+- LLVM license: <https://llvm.org/LICENSE.txt>
 - jq license: <https://github.com/jqlang/jq>
 - Node.js license: <https://github.com/nodejs/node/blob/main/LICENSE>
 - npm CLI package metadata: <https://github.com/npm/cli/blob/latest/package.json>
