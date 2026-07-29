@@ -2632,6 +2632,241 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(client.query(all_nodes=True).status, "fresh")
             self.assertEqual(client.context("documents/design/example.md").status, "stale")
 
+    def test_ingest_hook_event_spool_materializes_projection_once(self) -> None:
+        """Ingest should read and parse one shared projection once for all events."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            archive = root / "archive"
+            source.mkdir()
+            canon.mkdir()
+            archive.mkdir()
+            key = repo_log_key(source)
+            context = runtime_log_archive_git.ArchiveContext(
+                source_root=source,
+                canon_root=canon,
+                archive_root=archive,
+                repo_key=key,
+                env_key="test-env",
+                branch_key="test-branch",
+                branch="logs/test-branch",
+                remote="unused",
+            )
+            lock_path = source / ".archive-transaction.lock"
+            spool_root = (
+                source
+                / ".agent-canon"
+                / "runtime-event-spool"
+                / "hook-events"
+                / key
+            )
+            events: list[runtime_log_archive_git.HookSpoolEvent] = []
+            event_bytes: list[bytes] = []
+            for event_id in ("hook-20260718-linear-a", "hook-20260718-linear-b"):
+                event = {
+                    "hook_log_namespace": "test-runtime",
+                    "hook_run_id": event_id,
+                    "payload_fingerprint": event_id,
+                    "source_repo_key": key,
+                    "status": "pass",
+                    "timestamp": "2026-07-18T00:00:00Z",
+                }
+                payload = runtime_log_archive_git._canonical_compact_json(event) + b"\n"
+                path = spool_root / "test-runtime" / "posttooluse" / f"{event_id}.json"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(payload)
+                events.append(
+                    runtime_log_archive_git.HookSpoolEvent(
+                        path=path,
+                        size=len(payload),
+                        bytes_sha256=hashlib.sha256(payload).hexdigest(),
+                    )
+                )
+                event_bytes.append(payload)
+
+            projection_path = archive / "hook-runs" / key / "test-runtime" / "posttooluse-no-git-head.jsonl"
+            existing_event = {
+                "hook_log_namespace": "test-runtime",
+                "hook_run_id": "hook-20260718-linear-existing",
+                "payload_fingerprint": "existing",
+                "source_repo_key": key,
+                "status": "pass",
+                "timestamp": "2026-07-18T00:00:00Z",
+            }
+            existing_bytes = runtime_log_archive_git._canonical_compact_json(existing_event) + b"\n"
+            projection_path.parent.mkdir(parents=True, exist_ok=True)
+            projection_path.write_bytes(existing_bytes)
+            transaction = runtime_log_archive_git.PreparedArchiveTransaction(
+                context=context,
+                lock_path=lock_path,
+                lock_handle=lock_path.open("a+b"),
+                archive_head_before="archive-head",
+                ensured_branch=context.branch,
+            )
+            original_read_bytes = Path.read_bytes
+            try:
+                with patch.object(
+                    Path,
+                    "read_bytes",
+                    autospec=True,
+                    side_effect=original_read_bytes,
+                ) as read_bytes:
+                    result = runtime_log_archive_git.ingest_hook_event_spool(
+                        transaction, tuple(events)
+                    )
+                projection_reads = [
+                    call.args[0]
+                    for call in read_bytes.call_args_list
+                    if call.args and call.args[0] == projection_path
+                ]
+            finally:
+                transaction.lock_handle.close()
+
+            self.assertEqual(len(result.accepted_events), 2)
+            self.assertEqual(projection_reads, [projection_path])
+            self.assertEqual(projection_path.read_bytes(), existing_bytes + b"".join(event_bytes))
+
+    def test_finalize_hook_spool_readback_loads_each_projection_once(self) -> None:
+        """Readback should load each indexed projection once across covered events."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            archive = root / "archive"
+            source.mkdir()
+            canon.mkdir()
+            archive.mkdir()
+            key = repo_log_key(source)
+            context = runtime_log_archive_git.ArchiveContext(
+                source_root=source,
+                canon_root=canon,
+                archive_root=archive,
+                repo_key=key,
+                env_key="test-env",
+                branch_key="test-branch",
+                branch="logs/test-branch",
+                remote="unused",
+            )
+            lock_path = source / ".archive-transaction.lock"
+            spool_root = (
+                source
+                / ".agent-canon"
+                / "runtime-event-spool"
+                / "hook-events"
+                / key
+            )
+            projection_specs = (
+                ("runtime-a", "posttooluse", "hook-20260718-readback-a1"),
+                ("runtime-a", "posttooluse", "hook-20260718-readback-a2"),
+                ("runtime-b", "posttooluse", "hook-20260718-readback-b1"),
+                ("runtime-b", "posttooluse", "hook-20260718-readback-b2"),
+            )
+            events: list[runtime_log_archive_git.HookSpoolEvent] = []
+            projection_bytes: dict[Path, bytes] = {}
+            index_rows: list[bytes] = []
+            for runtime_namespace, hook_name, event_id in projection_specs:
+                event = {
+                    "hook_log_namespace": runtime_namespace,
+                    "hook_run_id": event_id,
+                    "payload_fingerprint": event_id,
+                    "source_repo_key": key,
+                    "status": "pass",
+                    "timestamp": "2026-07-18T00:00:00Z",
+                }
+                payload = runtime_log_archive_git._canonical_compact_json(event) + b"\n"
+                path = spool_root / runtime_namespace / hook_name / f"{event_id}.json"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(payload)
+                event_snapshot = runtime_log_archive_git.HookSpoolEvent(
+                    path=path,
+                    size=len(payload),
+                    bytes_sha256=hashlib.sha256(payload).hexdigest(),
+                )
+                events.append(event_snapshot)
+                projection_relative = (
+                    Path("hook-runs")
+                    / key
+                    / runtime_namespace
+                    / f"{hook_name}-projection.jsonl"
+                )
+                projection_path = archive / projection_relative
+                projection_bytes[projection_path] = projection_bytes.get(projection_path, b"") + payload
+                index_rows.append(
+                    runtime_log_archive_git._canonical_compact_json(
+                        {
+                            "schema": runtime_log_archive_git.HOOK_SPOOL_INDEX_SCHEMA,
+                            "event_id": event_id,
+                            "event_sha256": event_snapshot.bytes_sha256,
+                            "runtime_namespace": runtime_namespace,
+                            "hook_name": hook_name,
+                            "projection_path": projection_relative.as_posix(),
+                            "transaction_id": "transaction",
+                        }
+                    )
+                    + b"\n"
+                )
+
+            index_relative = Path("hook-runs") / key / runtime_log_archive_git.HOOK_SPOOL_INDEX_NAME
+            index_bytes = b"".join(index_rows)
+            ingest_result = runtime_log_archive_git.HookSpoolIngestResult(
+                transaction_id="transaction",
+                spool_snapshot=tuple(events),
+                accepted_events=tuple(events),
+                duplicate_events=(),
+                failed_event_count=0,
+                source_set_sha256="source-set",
+                dedup_index_path=archive / index_relative,
+                dedup_index_sha256=hashlib.sha256(index_bytes).hexdigest(),
+                cursor_path=archive / "hook-runs" / key / runtime_log_archive_git.HOOK_SPOOL_CURSOR_NAME,
+                cursor_sha256="cursor-sha",
+            )
+            receipt = runtime_log_archive_git.ArchivePublicationReceipt(
+                status="committed",
+                commit_created=True,
+                pushed=True,
+                archive_commit_oid="commit",
+                archive_tree_oid="tree",
+                dedup_index_sha256=ingest_result.dedup_index_sha256,
+                cursor_sha256=ingest_result.cursor_sha256,
+            )
+            transaction = runtime_log_archive_git.PreparedArchiveTransaction(
+                context=context,
+                lock_path=lock_path,
+                lock_handle=lock_path.open("a+b"),
+                archive_head_before="archive-head",
+                ensured_branch=context.branch,
+            )
+            archive_calls: list[Path] = []
+
+            def fake_archive_blob(
+                _context: runtime_log_archive_git.ArchiveContext,
+                _commit_oid: str,
+                relative_path: Path,
+            ) -> bytes:
+                archive_calls.append(relative_path)
+                if relative_path == index_relative:
+                    return index_bytes
+                return projection_bytes[archive / relative_path]
+
+            try:
+                with patch.object(
+                    runtime_log_archive_git,
+                    "_archive_blob_at",
+                    side_effect=fake_archive_blob,
+                ):
+                    removed = runtime_log_archive_git.finalize_hook_spool_readback(
+                        transaction, receipt, ingest_result
+                    )
+            finally:
+                transaction.lock_handle.close()
+
+            self.assertEqual(removed, len(events))
+            self.assertEqual(archive_calls.count(index_relative), 1)
+            for projection_path in projection_bytes:
+                self.assertEqual(archive_calls.count(projection_path.relative_to(archive)), 1)
+            self.assertTrue(all(not event.path.exists() for event in events))
+
     def test_h03_sync_materializes_projection_cursor_and_replay_dedup(self) -> None:
         """One checkpoint publishes each identity once and finalizes replay."""
         with tempfile.TemporaryDirectory() as tmp_dir:

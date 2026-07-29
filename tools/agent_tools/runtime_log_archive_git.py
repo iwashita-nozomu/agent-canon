@@ -4941,6 +4941,8 @@ def ingest_hook_event_spool(
     accepted: list[tuple[HookSpoolEvent, str, str, str, bytes, Path]] = []
     duplicates: list[HookSpoolEvent] = []
     projection_cache: dict[Path, dict[str, str]] = {}
+    projection_bytes: dict[Path, bytes] = {}
+    projection_original_bytes: dict[Path, bytes | None] = {}
     pending_identities: dict[str, tuple[str, str, str]] = {}
     agent_canon_head = agent_canon_git_commit_key(context.canon_root)
 
@@ -4989,9 +4991,12 @@ def ingest_hook_event_spool(
         projection_path = context.archive_root / projection_relative
         projection_entries = projection_cache.get(projection_path)
         if projection_entries is None:
-            existing = projection_path.read_bytes() if projection_path.exists() else b""
+            projection_exists = projection_path.exists()
+            existing = projection_path.read_bytes() if projection_exists else b""
             projection_entries = _projection_event_hashes(existing)
             projection_cache[projection_path] = projection_entries
+            projection_bytes[projection_path] = existing
+            projection_original_bytes[projection_path] = existing if projection_exists else None
         projected_sha = projection_entries.get(event_id)
         if projected_sha is not None and projected_sha != event_sha256:
             raise ArchiveGitError("spool_conflict")
@@ -5007,6 +5012,7 @@ def ingest_hook_event_spool(
         )
         pending_identities[event_id] = (event_sha256, runtime_namespace, hook_name)
         projection_entries[event_id] = event_sha256
+        projection_bytes[projection_path] += canonical
 
     source_set_sha256 = _hash_bytes(_canonical_compact_json(source_rows))
     prior_cursor_sha256 = _hash_bytes(cursor_before) if cursor_before else HOOK_SPOOL_ZERO_SHA256
@@ -5021,17 +5027,14 @@ def ingest_hook_event_spool(
         )
     )
 
-    projection_updates: dict[Path, bytes] = {}
+    projection_updates: dict[Path, bytes] = {
+        context.archive_root / projection_relative: projection_bytes[
+            context.archive_root / projection_relative
+        ]
+        for *_, projection_relative in accepted
+    }
     index_bytes_after = index_bytes_before
-    for snapshot_event, event_id, runtime_namespace, hook_name, canonical, projection_relative in accepted:
-        projection_path = context.archive_root / projection_relative
-        existing_bytes = projection_updates.get(
-            projection_path,
-            projection_path.read_bytes() if projection_path.exists() else b"",
-        )
-        existing_projection = _projection_event_hashes(existing_bytes)
-        if event_id not in existing_projection:
-            projection_updates[projection_path] = existing_bytes + canonical
+    for snapshot_event, event_id, runtime_namespace, hook_name, _canonical, projection_relative in accepted:
         index_row = {
             "schema": HOOK_SPOOL_INDEX_SCHEMA,
             "event_id": event_id,
@@ -5065,9 +5068,10 @@ def ingest_hook_event_spool(
         cursor_bytes_after = _canonical_compact_json(cursor_body) + b"\n"
 
         prior_files: dict[Path, bytes | None] = {
-            path: path.read_bytes() if path.exists() else None
-            for path in (*projection_updates.keys(), index_path, cursor_path)
+            path: projection_original_bytes[path] for path in projection_updates
         }
+        prior_files[index_path] = index_bytes_before if index_present else None
+        prior_files[cursor_path] = cursor_before if cursor_path.exists() else None
         touched: list[Path] = []
         try:
             for projection_path in sorted(
@@ -5145,13 +5149,19 @@ def finalize_hook_spool_readback(
     index_relative = ingest_result.dedup_index_path.relative_to(context.archive_root)
     committed_index = _archive_blob_at(context, receipt.archive_commit_oid, index_relative)
     index_entries = _parse_spool_index_bytes(committed_index)
+    projection_cache: dict[Path, dict[str, str]] = {}
     for event in covered:
         event_id = event.path.stem
         indexed = index_entries.get(event_id)
         if indexed is None or indexed[0] != event.bytes_sha256:
             raise ArchiveGitError("archive_readback_mismatch:index")
-        projection = _archive_blob_at(context, receipt.archive_commit_oid, Path(indexed[3]))
-        if _projection_event_hashes(projection).get(event_id) != event.bytes_sha256:
+        projection_path = Path(indexed[3])
+        projection_entries = projection_cache.get(projection_path)
+        if projection_entries is None:
+            projection = _archive_blob_at(context, receipt.archive_commit_oid, projection_path)
+            projection_entries = _projection_event_hashes(projection)
+            projection_cache[projection_path] = projection_entries
+        if projection_entries.get(event_id) != event.bytes_sha256:
             raise ArchiveGitError("archive_readback_mismatch:projection")
 
     removed = 0
