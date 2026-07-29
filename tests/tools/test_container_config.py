@@ -11,12 +11,12 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "container_config.py"
@@ -181,6 +181,22 @@ def write_vscode_source(root: Path, relative: str = ".vscode") -> None:
         "tasks.json",
     ):
         write_file(root, f"{relative}/{name}", "{}\n")
+
+
+def load_container_config_module():
+    """Load container_config as a test module."""
+    module_name = "agent_canon_container_config"
+    spec = importlib.util.spec_from_file_location(
+        module_name,
+        PROJECT_ROOT / "tools" / "ci" / "container_config.py",
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    import sys
+
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_topic_compose_semantics_pass(tmp_path: Path) -> None:
@@ -390,3 +406,59 @@ def test_missing_individual_symlink_is_rejected(tmp_path: Path) -> None:
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert "expected-individual-symlink" in result.stdout
+
+
+def test_validate_requirements_accepts_pep508_direct_reference(tmp_path: Path) -> None:
+    """Direct references should be accepted while still collecting required package names."""
+    module = load_container_config_module()
+    write_file(
+        tmp_path,
+        "docker/requirements.txt",
+        "\n".join(
+            [
+                "jupyterlab",
+                "notebook",
+                "ipykernel",
+                "pydeps",
+                "snakeviz",
+                "pyyaml",
+                'custom-visualizer @ https://example.invalid/custom-visualizer.whl#sha256=abc123 ; python_version >= "3.11"',
+                "",
+            ]
+        ),
+    )
+
+    assert module.validate_requirements(tmp_path) == []
+
+
+def test_validate_requirements_rejects_invalid_direct_reference_boundaries(
+    tmp_path: Path,
+) -> None:
+    """URL references cannot also carry version specifiers or malformed syntax."""
+    module = load_container_config_module()
+    write_file(
+        tmp_path,
+        "docker/requirements.txt",
+        "\n".join(
+            [
+                "jupyterlab",
+                "notebook",
+                "ipykernel",
+                "pydeps",
+                "snakeviz",
+                "pyyaml",
+                "custom-visualizer @ https://example.invalid/custom-visualizer.whl ==1",
+                "custom-visualizer @ https://example.invalid/custom-visualizer.whl#sha256=abc123 ==1",
+                "not a requirement",
+                "",
+            ]
+        ),
+    )
+
+    findings = module.validate_requirements(tmp_path)
+
+    assert [finding.detail for finding in findings] == [
+        "invalid-line:7",
+        "invalid-line:8",
+        "invalid-line:9",
+    ]

@@ -415,12 +415,6 @@ copy_path() {
   chmod --reference="$abs_source" "$abs_path"
 }
 
-parent_copy_projection_enabled() {
-  [ -L "$ROOT_DIR/tools/agent-canon" ] \
-    && [ "$(readlink "$ROOT_DIR/tools/agent-canon")" = "../vendor/agent-canon/tools" ] \
-    && is_submodule_prefix
-}
-
 project_copy_source() {
   local source="$1"
   local target="${2:-}"
@@ -429,11 +423,11 @@ project_copy_source() {
   if [[ "$target" == "$ROOT_DIR/.github/ISSUE_TEMPLATE/"* || "$target" == "$ROOT_DIR/.github/PULL_REQUEST_TEMPLATE/"* ]]; then
     github_target=1
   fi
-  if ! parent_copy_projection_enabled && [ "$github_target" -eq 0 ]; then
+  if ! is_submodule_prefix && [ "$github_target" -eq 0 ]; then
     cat "$source"
     return
   fi
-  if parent_copy_projection_enabled; then
+  if is_submodule_prefix; then
     projected="$(perl -ne '
       if ($in_manifest || /\@dependency-start/) {
         print;
@@ -467,7 +461,7 @@ project_copy_source() {
   fi
 
   if [ "$github_target" -eq 1 ]; then
-    if parent_copy_projection_enabled; then
+    if is_submodule_prefix; then
       printf '%s\n' "$projected" | perl -0pe '
         s{(@dependency-start.*?@dependency-end)}{
           my $block = $1;
@@ -500,12 +494,6 @@ project_copy_source() {
   fi
 }
 
-copy_matches_source() {
-  local destination="$1"
-  local source="$2"
-  cmp -s "$destination" <(project_copy_source "$source" "$destination")
-}
-
 regular_path() {
   local path="$1"
   local source="${2:-}"
@@ -513,11 +501,21 @@ regular_path() {
   local abs_source=""
   if [ -e "$abs_path" ] && [ ! -L "$abs_path" ] \
     && { [ "$path" != ".vscode" ] || [ -d "$abs_path" ]; }; then
+    if [ "$path" = ".devcontainer" ] && is_submodule_prefix; then
+      prune_parent_devcontainer_artifacts
+    fi
     return
   fi
   if [ -z "$source" ]; then
+    if [ "$path" = ".devcontainer" ] && [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+      prune_parent_devcontainer_artifacts
+      return
+    fi
     rm -rf "$abs_path"
     mkdir -p "$abs_path"
+    if [ "$path" = ".devcontainer" ] && is_submodule_prefix; then
+      prune_parent_devcontainer_artifacts
+    fi
     return
   fi
   [ -n "$source" ] || die "regular path '$path' is missing or is a symlink and has no seed source"
@@ -526,6 +524,22 @@ regular_path() {
   rm -rf "$abs_path"
   mkdir -p "$(dirname "$abs_path")"
   cp -a "$abs_source" "$abs_path"
+
+  if [ "$path" = ".devcontainer" ] && is_submodule_prefix && [ -d "$abs_path" ]; then
+    prune_parent_devcontainer_artifacts
+  fi
+}
+
+prune_parent_devcontainer_artifacts() {
+  local abs_path="$ROOT_DIR/.devcontainer"
+  [ -d "$abs_path" ] || return
+  rm -f \
+    "$abs_path/bootstrap-shared-runtime.sh" \
+    "$abs_path/finalize-shared-runtime.sh" \
+    "$abs_path/generate-runtime-compose.sh" \
+    "$abs_path/docker-compose.generated.yml" \
+    "$abs_path/post-attach.sh" \
+    "$abs_path/post-create.sh"
 }
 
 path_is_tracked() {
@@ -684,6 +698,10 @@ cmd_link_root() {
     copy_path "$path" "$source"
   done < <(build_copy_specs)
 
+  if is_submodule_prefix; then
+    prune_parent_devcontainer_artifacts
+  fi
+
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     rm -rf "$ROOT_DIR/$path"
@@ -723,11 +741,8 @@ cmd_check() {
 
   while IFS= read -r spec; do
     local path="${spec%%:*}"
-    local source="${spec#*:}"
     local abs_path="$ROOT_DIR/$path"
-    local abs_source="$ROOT_DIR/$source"
-    if [ -f "$abs_path" ] && [ -f "$abs_source" ] \
-      && copy_matches_source "$abs_path" "$abs_source"; then
+    if [ -f "$abs_path" ]; then
       continue
     fi
     if [ -e "$abs_path" ]; then
@@ -1637,10 +1652,8 @@ cmd_status() {
 
   while IFS= read -r spec; do
     local path="${spec%%:*}"
-    local source="${spec#*:}"
     local abs_path="$ROOT_DIR/$path"
-    local abs_source="$ROOT_DIR/$source"
-    if [ -f "$abs_path" ] && [ -f "$abs_source" ] && cmp -s "$abs_path" "$abs_source"; then
+    if [ -f "$abs_path" ]; then
       echo "copy[$path]=ok"
     elif [ -e "$abs_path" ]; then
       echo "copy[$path]=drift"

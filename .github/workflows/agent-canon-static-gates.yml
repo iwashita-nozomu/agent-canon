@@ -58,7 +58,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install static gate dependencies
-        run: python3 -m pip install --upgrade pyyaml tomli
+        run: python3 -m pip install --upgrade pyyaml tomli packaging
 
       - name: Prepare runtime log archive
         run: mkdir -p .agent-canon/log-archive
