@@ -10,6 +10,7 @@
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md validation failure reader projection
 # upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
+# downstream implementation ../../.codex/hooks/execution_resource_plan_projection_guard.py validates exact coarse PostToolUse projection constants
 # downstream implementation ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
 # downstream implementation ../../experiments/_template/run.py direct GPU launch is statically prohibited
 # downstream environment ../../.devcontainer/devcontainer.json selects the shared runtime receipt stages
@@ -6651,6 +6652,27 @@ class CompletionCoverageAdapter:
             ) from exc
 
 
+PROJECTION_ADMISSION_GUARANTEE = "run-level-opaque-uuid-admission"
+PROJECTION_ERROR_CONSTANTS = frozenset(
+    {"managed_gpu_failure", "managed_gpu_execution", "see_execution_resource_plan"}
+)
+
+
+def _projection_error_constant(failure: FailureRecord | None, exit_code: int) -> str | None:
+    """Reduce detailed terminal state to the three public Hook error constants."""
+    if failure is None and exit_code == 0:
+        return None
+    if failure is None:
+        return "managed_gpu_execution"
+    kind = failure.kind.casefold()
+    operation = failure.operation.casefold()
+    if kind.startswith(("gpu_", "nvidia_", "runtime_", "reservation_", "lock_", "source_")):
+        return "managed_gpu_failure"
+    if any(token in operation for token in ("execute", "runner", "launch", "run")):
+        return "managed_gpu_execution"
+    return "see_execution_resource_plan"
+
+
 class PostToolUseProjectionReducer:
     """Produce the exact nine-key projection; the Hook only validates it."""
 
@@ -6673,18 +6695,13 @@ class PostToolUseProjectionReducer:
                 )
             admission = {
                 "admission_fingerprint": outcome.admission_fingerprint,
-                "guarantee": "run-level-opaque-uuid-admission",
+                "guarantee": PROJECTION_ADMISSION_GUARANTEE,
                 "namespace_id": admission_source.namespace_id,
                 "provision_receipt_fingerprint": admission_source.provision_receipt_fingerprint,
                 "selected_uuids": selected,
             }
-        error = None
-        if outcome.primary_failure is not None:
-            error = {
-                "kind": outcome.primary_failure.kind,
-                "message": outcome.primary_failure.message,
-                "operation": outcome.primary_failure.operation,
-            }
+        coarse_error = _projection_error_constant(outcome.primary_failure, outcome.exit_code)
+        error = {"kind": coarse_error} if coarse_error is not None else None
         projection = {
             "admission": admission,
             "completion_coverage_path": (
