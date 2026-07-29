@@ -128,7 +128,7 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 
 Behavior evals inspect `workflow_monitoring.md`, `agent_evaluation.md`, review artifacts,
 closeout evidence, and validation logs. `agent_behavior_eval.toml` and
-`agents/templates/workflow_monitoring.md` are the source packet for the
+`templates/agents/workflow_monitoring.md` are the source packet for the
 required behavior-event fields.
 
 | Behavior event family | Required evidence |
