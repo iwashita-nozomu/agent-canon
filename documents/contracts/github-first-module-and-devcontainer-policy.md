@@ -93,15 +93,14 @@ repos expose it as a root symlink view into `vendor/agent-canon/.devcontainer`.
 
 The shared devcontainer owns:
 
-- post-create installation of Codex, npm/Node when needed for Codex, and
-  GitHub CLI / `gh`;
-- post-create installation of agent-side JSON inspection helpers such as `jq`;
-- post-create installation of the Rust toolchain, rustfmt, clippy,
-  rust-analyzer, and the AgentCanon CLI when the AgentCanon source tree contains
+- declarative `.devcontainer/dependencies.toml` records for Codex, npm/Node
+  when needed for Codex, and GitHub CLI / `gh`;
+- declarative records for agent-side JSON inspection helpers such as `jq`;
+- exact Rust toolchain and locked cargo source-build records for rustfmt,
+  clippy, rust-analyzer, and the AgentCanon CLI when the source tree contains
   `rust/agent-canon/Cargo.toml`;
-- post-create installation of TeX / LaTeX document and image tooling used by the
-  Academic Writing skill, including `latexmk`, pdfLaTeX, XeLaTeX, TikZ support,
-  `dvisvgm`, `pdfcrop`, Ghostscript, and PDF inspection helpers;
+- declarative release/package records for shared TeX / LaTeX document and image
+  tooling when the Academic Writing environment requires them;
 - repository-specific devcontainer and Docker Compose project names, so template
   clones do not all create the same visible container names;
 - host auth mount conventions for Codex, GitHub CLI, and SSH;

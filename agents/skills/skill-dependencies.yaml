@@ -768,9 +768,18 @@ skill_dependencies:
     - refactor-loop
     - structure-refactor
     - dependency-analysis
-  environment-maintenance:
+  dependency-design:
     responsibility_group: delivery
     required_prerequisites: []
+    routing_candidates:
+    - environment-maintenance
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  environment-maintenance:
+    responsibility_group: delivery
+    required_prerequisites:
+    - dependency-design
     routing_candidates: []
     successors: []
     order_constraints: []

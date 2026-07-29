@@ -8,6 +8,7 @@ contract skill
 responsibility Documents Environment Maintenance for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
+upstream design ../../../documents/design/devcontainer/parent-dependency-manifest-followup.md dependency-design packet and parent follow-up contract
 @dependency-end
 -->
 
@@ -29,7 +30,11 @@ packet が出力した必須 command と、task に該当する conditional comm
 <!-- skill-tool-commands:end -->
 
 
-1. Treat `CONTAINER_OPERATIONS.md` as the source of truth for Dockerfile, `docker/`, `.devcontainer/`, validator, and Makefile target ownership. This skill is only the routing checklist.
+1. Consume the passing `dependency-design` packet before changing dependency
+   manifests, bootstrap, install order, or related validators. Then treat
+   `CONTAINER_OPERATIONS.md` as the source of truth for Dockerfile, `docker/`,
+   `.devcontainer/`, validator, and Makefile target ownership. This skill is
+   only the routing checklist.
 1. Update `docker/packs/*.toml`, `docker/codex-container-profiles.toml`, and `docker/python-execution-rules.toml` when runtime selection behavior changes.
 1. When the main server host assumptions change, update `documents/contracts/server-host-contract.md` and the server layout templates in the same change.
 1. Start from `templates/agents/environment_change_proposal.md` when proposing a new repo-wide tool or dependency.

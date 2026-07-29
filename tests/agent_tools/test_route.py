@@ -1501,6 +1501,28 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=skills", result.stdout)
         self.assertIn("CANONICAL_SKILL=runtime-log-repair", result.stdout)
 
+    def test_environment_maintenance_activates_dependency_design_prerequisite(self) -> None:
+        """Environment maintenance must route through dependency design first."""
+        result = self.run_route(
+            "--prompt",
+            "environment-maintenance Docker runtime update",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("dependency-design", decision["skills"])
+        self.assertIn("environment-maintenance", decision["skills"])
+        self.assertLess(
+            decision["skills"].index("dependency-design"),
+            decision["skills"].index("environment-maintenance"),
+        )
+        self.assertLess(
+            decision["active_skills"].index("dependency-design"),
+            decision["active_skills"].index("environment-maintenance"),
+        )
+
     def test_prompt_does_not_route_ordinary_url_or_report_text_to_runtime_log_repair(
         self,
     ) -> None:

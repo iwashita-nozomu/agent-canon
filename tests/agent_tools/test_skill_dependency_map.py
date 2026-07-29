@@ -11,12 +11,12 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
 import yaml
 
@@ -62,7 +62,7 @@ class SkillDependencyMapTest(unittest.TestCase):
         rules = catalog_module.load_skill_dependency_map(PROJECT_ROOT, public_ids)
 
         self.assertEqual(tuple(rules), public_ids)
-        self.assertEqual(len(rules), 59)
+        self.assertEqual(len(rules), 60)
         self.assertTrue(all(rule.responsibility_group for rule in rules.values()))
 
     def test_check_cli_validates_canonical_map(self) -> None:
@@ -72,7 +72,7 @@ class SkillDependencyMapTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("SKILL_DEPENDENCY_MAP=pass", result.stdout)
         self.assertIn("source=agents/skills/skill-dependencies.yaml", result.stdout)
-        self.assertIn("skills=59", result.stdout)
+        self.assertIn("skills=60", result.stdout)
 
     def test_cycle_is_rejected(self) -> None:
         """Mutually successor-linked skills fail the static DAG check."""
@@ -172,7 +172,7 @@ class SkillDependencyMapTest(unittest.TestCase):
             public_ids = catalog_module._skill_ids_from_catalog(
                 catalog_module.load_skill_catalog(PROJECT_ROOT)
             )
-            self.assertEqual(sum(f'"{skill}"' in graph for skill in public_ids), 59)
+            self.assertEqual(sum(f'"{skill}"' in graph for skill in public_ids), 60)
 
 
 if __name__ == "__main__":

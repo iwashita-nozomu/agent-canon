@@ -104,6 +104,10 @@ path = "../.agents/skills/document-canon-cleanup/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/dependency-design/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/environment-maintenance/SKILL.md"
 enabled = true
 
