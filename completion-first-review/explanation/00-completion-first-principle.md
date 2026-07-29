@@ -69,9 +69,9 @@ In practical terms, P-1 means adding or formalizing the following surfaces:
 - `agents/canonical/DEFINITION_OF_DONE.md`
 - `agents/canonical/closeout_profiles.yaml`
 - `tools/agent_tools/completion_verifier.py`
-- `agents/templates/artifact_schema.yaml`
-- `agents/templates/behavior_event.schema.yaml`
-- `agents/templates/validation_evidence.schema.yaml`
+- `templates/agents/artifact_schema.yaml`
+- `templates/agents/behavior_event.schema.yaml`
+- `templates/agents/validation_evidence.schema.yaml`
 - `evidence/agent-evals/negative_cases/`
 - generated `completion_verification_report.json`
 - generated `completion_report.md`

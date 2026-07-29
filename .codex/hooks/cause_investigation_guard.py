@@ -2,7 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Blocks code edits before cause investigation evidence exists.
-# upstream implementation ../hooks.json invokes this hook for PreToolUse.
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this standalone route.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
 # upstream design ../../agents/workflows/hypothesis-validation-workflow.md defines analysis-first evidence fields.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates cause investigation hook behavior.

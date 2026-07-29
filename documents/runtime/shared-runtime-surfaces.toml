@@ -33,6 +33,7 @@ class = "runtime_surface"
 paths = [
   "agents",
   ".agents",
+  "templates",
   ".codex/config.toml",
   ".codex/README.md",
   ".codex/agents",
@@ -68,6 +69,7 @@ mode = "regular"
 source = ".devcontainer/post-create-parent.sh"
 owner = "template-or-derived-repo"
 class = "active_contract"
+local_override_allowed = true
 
 [[surface]]
 path = ".devcontainer/devcontainer.json"
@@ -172,11 +174,6 @@ paths = [
   "documents/conventions/python/30_experiment_directory_structure.md",
   "documents/design/README.md",
   "documents/design/protocols.md",
-  "documents/templates/README.md",
-  "documents/templates/remote_execution_repo.template.toml",
-  "documents/templates/remote_execution_target.template.toml",
-  "documents/templates/server_host_inventory.template.md",
-  "documents/templates/server_runtime_layout.template.toml",
   "documents/tools/README.md",
   "documents/tools/tool-docs.toml",
   "documents/tools/route.md",
@@ -333,8 +330,39 @@ local_override_allowed = false
 paths = [
   ".github/workflows/agent-coordination.yml",
   ".github/workflows/agent-improvement-guide.yml",
-  ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
 ]
+
+[[surface]]
+path = ".github/ISSUE_TEMPLATE/config.yml"
+mode = "copy"
+source = "templates/documents/github/issue/config.yml"
+owner = "github-path-constraint"
+class = "github_copy"
+local_override_allowed = false
+
+[[surface]]
+path = ".github/ISSUE_TEMPLATE/agentcanon-maintenance.yml"
+mode = "copy"
+source = "templates/documents/github/issue/agentcanon-maintenance.yml"
+owner = "github-path-constraint"
+class = "github_copy"
+local_override_allowed = false
+
+[[surface]]
+path = ".github/ISSUE_TEMPLATE/eval-capture.yml"
+mode = "copy"
+source = "templates/documents/github/issue/eval-capture.yml"
+owner = "github-path-constraint"
+class = "github_copy"
+local_override_allowed = false
+
+[[surface]]
+path = ".github/PULL_REQUEST_TEMPLATE/agent_canon.md"
+mode = "copy"
+source = "templates/documents/github/pull-request/agent_canon.md"
+owner = "github-path-constraint"
+class = "github_copy"
+local_override_allowed = false
 
 [[surface]]
 path = ".github/workflows/agent-runtime-dashboard.yml"

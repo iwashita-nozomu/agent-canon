@@ -42,34 +42,66 @@ modify a parent checkout or pin.
 
 ## Source And Branch Ownership
 
-- Canonical source is the standalone AgentCanon clone. A parent submodule
-  worktree may be a working copy but the parent is not a source owner.
+- Canonical source is the parent repository `vendor/agent-canon` on a
+  topic-named branch. A managed `workspace/<topic>/agent-canon` clone is a
+  fallback only when that parent vendor checkout is already occupied by another
+  topic's dirty state.
+- Parent vendor state and requested-topic selection follow the
+  [`AgentCanon parent state decision table`](../../documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table).
+  The `latest` update-target branch is never a topic slug.
+- `vendor/agent-canon` が `main` のみの状態のまま source 編集へ進まない。まず
+  topic branch を用意して同一トピックの source lane を再開する。
+- Parent pin/root projection is a separate state and passes only with clean
+  `main` plus `worktree HEAD == staged index gitlink`; it does not authorize
+  source editing. A clean named topic branch is the source owner.
 - Source branch names use `canon/<topic>-YYYYMMDD`.
 - Reuse the current branch/lifecycle while its immutable identity and push
   authority remain valid. A closed head, conflict, identity drift, or unrelated
   owner surface creates an explicitly linked successor.
+- `workspace/<topic>/agent-canon` standalone clone created for a dirty
+  `vendor/agent-canon` fallback route is allowed only for PR-source
+  materialization. It must be deleted at the point where PR creation/update is
+  performed with `local commit == pushed commit == PR head` and readback of that
+  PR head succeeds. After successful readback, the local clone is deleted.
+- If unmaterialized diff remains, deletion is prohibited until those changes are
+  materialized to the same PR and the PR head readback confirms identity.
+- For open PR repair work in this lane, always check out the PR remote head
+  branch in the source clone, merge latest `origin/main`, and resolve conflicts.
+  Then make a local commit on the same branch, push to that same branch,
+  read back the PR head, and delete the local clone after successful readback.
+- If the PR is already merged or closed and its head can no longer be updated,
+  create a successor topic branch from latest `origin/main`, open a successor PR,
+  and continue the normal sequence for publication readback; do not update the
+  merged/closed PR.
 - Root projection views, parent gitlinks, unknown shared state, and upstream
   Materializer implementation are not edited in the source PR lane.
+  Branch/repo match checks (`readback` identity, branch remote matching,
+  merge-base invariants, permission evidence) belong to the source PR readback
+  owner route and are not duplicated in `link-root`.
 
 ## Candidate Sequence
 
 The only valid append-only order is:
 
-`SourceMainRebindReceipt -> CandidateFreezeReceipt ->
-CandidateReviewReceipt -> CandidateCasReceipt -> PullRequestLifecycle open ->
-source merge -> PublicationReadbackReceipt/source-main readback`.
+`SourceMainRebindReceipt -> CandidateFreezeReceipt -> CandidateReviewReceipt ->
+CandidateCasReceipt -> PullRequestLifecycle open -> source merge ->
+PublicationReadbackReceipt/source-main readback`.
 
-1. Read `origin/main` immediately before freeze and record immutable old/new
-   base, transaction, snapshot, input, and evidence identity. Later fields are
-   absent from this pre-freeze record.
-1. Freeze exact candidate commit/tree and append the rebind predecessor.
-1. Obtain one independent exact-SHA/tree review. APPROVE binds the same
-   candidate; REVISE repairs the same context and appends a new review receipt.
-1. CAS against the exact `SourceMainRebindReceipt` new origin/main commit/tree.
-   G3 consumes G1/G2 evidence and proves repository, ref, fork/contributor,
-   permission, review, and expected-old identity once.
-1. Push and PR publication consume that G3 receipt. They do not repeat local
-   candidate/tree verification.
+1. Fetch `origin/main` / read identity immediately before freeze.
+1. Merge `origin/main` into the topic branch.
+1. Resolve conflicts using explicit ownership intent and dependency-edge
+   requirements from the parent scope.
+1. Record one local exact candidate commit and freeze both candidate hash and
+   tree as `CandidateFreezeReceipt`.
+1. Obtain one independent exact-SHA/tree review of the frozen candidate.
+   APPROVE binds that exact candidate state; REVISE repairs the same context and
+   appends a new review receipt.
+1. Record one CAS for the merge context of that frozen reviewed candidate
+   (`CandidateCasReceipt`). Base-read-only CAS or base read is not an
+   acceptable substitute for merge in this lane.
+1. exact reviewed commit push.
+1. PR create/update.
+1. source merge -> PublicationReadbackReceipt/source-main readback.
 
 Non-sequential predecessor, stale rebind, candidate/tree mismatch, or moved
 base fails closed. Changed immutable input requires a successor transaction.
@@ -196,5 +228,8 @@ second report/archive materializer.
 - assumed permission or inferred remote selection;
 - separate push, PR, checks, and main-push candidate/tree verdicts;
 - merging a stale or unreviewed candidate;
+- creating or updating PR before merge conflicts are fully resolved or before
+  `origin/main` is merged into the topic candidate;
+- updating a merged or closed PR head branch instead of creating a successor;
 - parent pin/root sync before accepted frontier;
 - cleanup before remote readback or prose-only agent closeout.

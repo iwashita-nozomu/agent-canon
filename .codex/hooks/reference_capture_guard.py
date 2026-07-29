@@ -2,7 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Logs and blocks unregistered external reference URLs.
-# upstream implementation ../hooks.json invokes this hook at prompt, tool, and stop boundaries.
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this standalone reference route.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
 # upstream implementation ../../tools/agent_tools/reference_materializer.py materializes PDF/HTML references as Markdown.
 # upstream design ../../references/README.md defines reference capture policy.

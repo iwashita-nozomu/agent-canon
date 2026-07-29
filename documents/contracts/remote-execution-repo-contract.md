@@ -48,5 +48,5 @@ target host のセットアップ自体は利用者責務にしつつ、repo 側
 
 登録 template の正本は次です。
 
-- `documents/templates/remote_execution_repo.template.toml`
-- `documents/templates/remote_execution_target.template.toml`
+- `templates/documents/remote_execution_repo.template.toml`
+- `templates/documents/remote_execution_target.template.toml`

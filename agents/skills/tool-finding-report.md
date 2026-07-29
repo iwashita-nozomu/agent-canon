@@ -138,7 +138,7 @@ excerpt、実際に修正する対象の取捨選択は、この packet を使�
 1. tool、hook、checker、migration wrapper が warning を出したら、その場で
    run-local `reports/agents/<run-id>/workflow_monitoring.md` の `## Tool Warnings`
    に登録します。再利用する template は
-   `agents/templates/workflow_monitoring.md` です。warning は
+   `templates/agents/workflow_monitoring.md` です。warning は
    stdout / stderr の一時表示ではなく、owner / status / repair command 付きの
    closeout obligation です。
 

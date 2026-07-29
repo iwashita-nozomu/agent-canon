@@ -8,6 +8,7 @@ upstream design ../../contracts/github-first-module-and-devcontainer-policy.md d
 downstream implementation ../../../tools/agent_tools/surface_manifest.py materializes and checks shared surface entries
 downstream implementation ../../../tools/sync_agent_canon.sh materializes AgentCanon root views
 downstream implementation ../../../tools/agent_tools/parent_repo_readiness.py checks the minimum parent structure
+downstream design parent-dependency-manifest-followup.md declares the parent manifest, pin, and ordering follow-up
 @dependency-end
 -->
 
@@ -49,6 +50,14 @@ Compose の生成先は親レポの `.agent-canon/docker-compose.generated.yml` 
 `postCreateCommand` は AgentCanon の共有 `post-create.sh` を先に呼び、成功した
 後に親固有の `post-create-parent.sh` を直接呼ぶ。共有処理が失敗した場合は親固有
 処理へ進まない。親固有処理の失敗も devcontainer 作成の失敗として扱う。
+
+shared post-create の内部順序は
+fixed bootstrap、親 manifest、vendor manifest、全体 validation、
+topological derived execution、親の
+docker/install_python_dependencies.sh、AgentCanon build/cache/projection の順です。
+この shared command の完了後に、devcontainer.json の直接参照が親の
+post-create-parent.sh を最後に実行します。詳細な親側 follow-up は
+parent-dependency-manifest-followup.md に従います。
 
 ## 禁止する重複
 

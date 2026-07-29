@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Rejects mechanically regenerated report artifacts left in the source tree.
 # upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md canonical artifact placement policy
-# upstream design ../../agents/templates/closeout_gate.md closeout evidence template
+# upstream design ../../templates/agents/closeout_gate.md closeout evidence template
 # upstream design ../../tools/README.md shared tool index
 # upstream design ../../documents/tools/README.md user-facing tool index
 # upstream design ../../tools/catalog.yaml structured tool catalog

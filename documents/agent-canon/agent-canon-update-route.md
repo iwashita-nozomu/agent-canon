@@ -41,17 +41,25 @@ formal `AgentCanon-*` trailers for the automation actor, validated authority
 source, destructive authority, request evidence, remote, update method, and
 prefix. The trailers must remain readable by `git interpret-trailers --parse`.
 
-The standalone AgentCanon clone is the source owner. A template or derived
-repository is a parent projection consumer and never becomes a second source
-namespace.
+The parent repository has two distinct AgentCanon states. Parent pin/root
+projection is ready only when `vendor/agent-canon` is clean on named `main` and
+its worktree `HEAD` equals the staged index gitlink. Source editing is owned by
+a clean named topic branch in the current `vendor/agent-canon` checkout; `main`
+is only the topic-creation starting point. A managed workspace clone is a
+fallback only when another topic already occupies the parent vendor with dirty
+state.
 
-For any dependency source edit, first apply
-`document../rule/dependency-module-changes.md`: prepare or reuse the exact
-topic workspace branch clone, edit there, publish the source result, and project a
-clean vendor pin. Parent mode is not a source branch. Its
-`merge-main-into-current*` routes refuse vendor mutation in parent mode and
-route source work to the managed topic clone. Standalone source mode remains
-the source-branch route.
+The complete parent-state, requested-topic, and dirty-fallback decision is owned
+by [`documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table`](../rule/dependency-module-changes.md#agentcanon-parent-state-decision-table).
+The `latest` update-target branch is not a topic identity; reuse an existing topic
+owner or use `AGENT_CANON_TOPIC_SLUG` when an explicit requested topic is needed.
+
+For any dependency source edit, apply
+`documents/rule/dependency-module-changes.md`: default route uses the current
+`vendor/agent-canon` checkout for direct source work when it is a clean named
+topic branch; route to the managed topic workspace clone only when another
+active topic makes that checkout dirty, publish there, and then project a clean
+vendor pin.
 
 ## Owner Namespace
 
@@ -147,13 +155,29 @@ identity and ordering only; they do not rerun the owned check.
 | Entry | Responsibility |
 | --- | --- |
 | `tools/update_agent_canon.sh plan` | optional read-only projection only when its result can change the owner/structure decision; never a required preflight |
-| `tools/update_agent_canon.sh latest` | standalone source-main rebind; after typed publication readback, internal queue/frontier advance; in a parent, accepted-frontier projection |
-| `tools/update_agent_canon.sh apply` | strict clean source rebind or accepted parent projection |
-| `tools/update_agent_canon.sh merge-main-into-current` | clean standalone/source-branch rebind |
-| `tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` | standalone source-mode merge route; parent mode refuses vendor mutation |
+| `tools/update_agent_canon.sh latest` | standalone source-main rebind; in a parent, clean named topic source-owner merge route first, then accepted-frontier projection after publication |
+| `tools/update_agent_canon.sh apply` | strict clean source rebind on parent vendor topic branch or accepted parent projection |
+| `tools/update_agent_canon.sh merge-main-into-current` | clean rebind on current source branch in parent vendor or standalone |
+| `tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` | standalone source-mode preserve-dirty rebind; parent mode classifies dirty state and stops or uses the dependency fallback only for another topic's dirty vendor occupancy |
 | `tools/ci/check_agent_canon_pr.sh` | consume G1, run the one source PR gate, then invoke the G2 owner |
 | `tools/ci/check_agent_canon_pr.py` | materialize/replay G2 from the ordered passing generated-completeness checks |
 | `tools/ci/check_agent_canon_latest.sh` | consume G4-G5 without a second source-main check |
+
+## Centralized Template Parent Follow-Up
+
+When a source update moves template owners under `templates/`, the parent
+projection packet is incomplete until it records all of the following:
+
+- root managed symlink `templates -> vendor/agent-canon/templates`;
+- deletion of parent `experiments/_template/`;
+- deletion of only the `_template` entry in the parent project registry;
+- deletion of parent docs/tests that only exercise that removed scaffold; and
+- regeneration and validation of GitHub Issue/PR projections from
+  `vendor/agent-canon/templates/documents/github/`.
+
+The parent registry remains project-owned. AgentCanon source validation uses a
+temporary parent-shaped registry fixture and never mutates a source or parent
+registry during the template smoke check.
 
 ## Failure And Cleanup Semantics
 
@@ -165,6 +189,9 @@ identity and ordering only; they do not rerun the owned check.
 - Parent projection before accepted frontier: fail closed.
 - Remote readback mismatch: no cleanup; retry the same identity only when the
   failure is typed transient.
+- Link-root/check coverage is explicitly limited to the current parent checkoutの
+  pin/root projection readiness; do not use them to assert remote branch
+  ownership, other-workspace clone status, or PR lifecycle invariants.
 - Completed-but-open or unknown descendant, reservation leak, malformed token,
   or cleanup before G5: G6 failure.
 - Cleanup deletes only enumerated task-owned paths after readback. Unknown

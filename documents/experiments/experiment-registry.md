@@ -117,12 +117,13 @@ branch 固有の探索コード、notebook、生成結果を持ちません。
 - branch にだけ残す実験は、main から implementation tree を削除し、
   `[[branch_topics]]` だけで辿れるようにします。
 
-新規 topic は、実験名を固定してから AgentCanon template path
-`vendor/agent-canon/experiments/_template/` をコピーし、registry entry を追加します。
+新規 topic は、実験名を固定してから canonical create tool を実行します。
+tool が runnable scaffold、canonical な `README.md` / `provenance.toml`、および
+registry entry を一つの route で配置します。`templates/experiments/_template/` の直接コピーは
+利用者向けの作成手順にしません。
 
 ```bash
-cp -r vendor/agent-canon/experiments/_template experiments/<topic>
-python3 tools/experiments/sync_experiment_registry_context.py --topic <topic>
+python3 tools/experiments/create_experiment_topic.py <topic>
 ```
 
 ## server 実行ルール

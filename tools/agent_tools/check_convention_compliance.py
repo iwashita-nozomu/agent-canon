@@ -24,8 +24,8 @@
 # upstream design ../../.agents/skills/pr-processing/SKILL.md runtime PR processing skill
 # upstream design ../../.agents/skills/md-style-check/SKILL.md runtime Markdown small-edit skill route
 # upstream design ../../.agents/skills/long-form-writing/SKILL.md runtime document claim grounding skill route
-# upstream design ../../agents/templates/workflow_monitoring.md tool warning closeout ledger
-# upstream design ../../agents/templates/closeout_gate.md closeout gate policy
+# upstream design ../../templates/agents/workflow_monitoring.md tool warning closeout ledger
+# upstream design ../../templates/agents/closeout_gate.md closeout gate policy
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared surface manifest
@@ -117,7 +117,7 @@ TOOL_GATES = {
         "tools/agent_tools/run_repo_dependency_review.sh",
         (
             "agents/canonical/CODEX_WORKFLOW.md",
-            "agents/templates/closeout_gate.md",
+            "templates/agents/closeout_gate.md",
         ),
     ),
     "code_dependency_scan": (
@@ -183,7 +183,7 @@ TOOL_GATES = {
     ),
     "behavior_eval": (
         "tools/agent_tools/evaluate_agent_run.py",
-        ("evidence/agent-evals/agent_behavior_eval.toml", "agents/templates/closeout_gate.md"),
+        ("evidence/agent-evals/agent_behavior_eval.toml", "templates/agents/closeout_gate.md"),
     ),
     "skill_frontmatter": (
         "tools/agent_tools/check_skill_frontmatter.py",
@@ -334,7 +334,7 @@ EXIT_BLOCKER_POLICY_MARKERS = {
         "accepted_with_reason",
         "explicit_approval_evidence",
     ),
-    "agents/templates/workflow_monitoring.md": (
+    "templates/agents/workflow_monitoring.md": (
         "tool_warning_exit_status",
         "resolved",
         "deferred_with_issue",
@@ -414,7 +414,7 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "Document Structure Evidence",
         "structure_contract=skipped",
     ),
-    "agents/templates/closeout_gate.md": (
+    "templates/agents/closeout_gate.md": (
         "Document Structure Evidence",
         "document_structure_status",
         "structure_planning",
@@ -468,7 +468,7 @@ DOCUMENT_SPLIT_DECISION_MARKERS = {
         "validation route",
         "chunking convenience",
     ),
-    "agents/templates/closeout_gate.md": (
+    "templates/agents/closeout_gate.md": (
         "document_split_decision",
         "keep:<reason>",
         "split:<new-owner-boundary>",
@@ -572,7 +572,7 @@ TEST_CONTRACT_ROUTING_MARKERS = {
         "canonical command evidence",
         "validation tool",
     ),
-    "agents/templates/test_plan.md": (
+    "templates/agents/test_plan.md": (
         "validation route",
         "behavior-owned cases",
     ),
@@ -843,33 +843,46 @@ SURFACE_SYNC_MARKERS = (
 )
 HOOK_GUARDRAIL_POLICY_MARKERS = {
     ".codex/hooks/hook_dispatcher.py": (
-        "CRITICAL_BLOCKING_CHILD_HOOKS",
-        "STRICT_BLOCKS_ENV",
-        "STRICT_FAILURES_ENV",
-        "downgraded_block_payload",
-        "failure_warning_payload",
-        "direct_rg_context_guard.py",
+        "HOOK_EVENT_CONTRACTS",
+        "HookEventContract",
+        "ACTIVE_HOOK_HANDLERS",
+        "UserPromptSubmit",
+        "PreToolUse",
+        "PostToolUse",
+        "Stop",
+        "hook_safety.py",
+        "validate_projection_bytes",
+        "execution_resource_plan_projection_guard.py",
+        "FORMER_ACTIVE_HOOK_CHILDREN",
+        "RETIRED_HOOK_ROUTES",
+        "if set(RETIRED_HOOK_ROUTES) != FORMER_ACTIVE_HOOK_CHILDREN:",
+        "if set(RETIRED_HOOK_ROUTES).intersection(ACTIVE_HOOK_HANDLERS):",
     ),
-    ".codex/hooks/direct_rg_context_guard.py": (
-        "DIRECT_RG_CONTEXT_RISK=warn",
-        "repository structure",
-        "git grep",
-        "targeted `grep`",
-        ".agent-canon/log-archive",
-        "reports",
-        "*.jsonl",
+    ".codex/hooks/hook_safety.py": (
+        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY",
+        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY",
+        "branch_block_payload",
+        "command_sha256",
+        "operation",
+        "same-segment",
+        "DESTRUCTIVE_GIT_GUARD=block",
+        "BRANCH_WORKTREE_CREATION_GUARD=block",
     ),
     ".codex/README.md": (
-        "dispatcher は fail-open",
-        "AGENT_CANON_HOOK_STRICT_BLOCKS",
-        "systemMessage",
-        "hookSpecificOutput.additionalContext",
+        "active events",
+        "active/inactive",
+        "legacy `Stop`",
+        "fail-open",
+        "RETIRED_HOOK_ROUTES",
+        "bounded",
+        "redacted",
     ),
     "documents/codex/codex-configuration-reference.md": (
         "Hook Severity Policy",
         "fail-open",
-        "CRITICAL_BLOCKING_CHILD_HOOKS",
         "warning/evidence",
+        "secret",
+        "Active dispatcher failures",
     ),
 }
 OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {

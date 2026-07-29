@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 
@@ -26,6 +27,7 @@ from typing import cast
 
 DEFAULT_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
 DEFAULT_DOC = Path("documents/runtime/SHARED_RUNTIME_SURFACES.md")
+NORMALIZED_SNAPSHOT_SCHEMA = "agent-canon.surface-manifest.v1"
 ALLOWED_MODES = frozenset(
     {
         "symlink",
@@ -137,6 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
         "regular-specs",
         "removed-legacy-paths",
         "root-absent-paths",
+        "normalized-snapshot",
         "check-doc",
     ):
         subcommands.add_parser(command)
@@ -336,6 +339,36 @@ def render_root_absent_paths(entries: Iterable[SurfaceEntry]) -> str:
     return "\n".join(lines)
 
 
+def normalized_snapshot(manifest: SurfaceManifest) -> Mapping[str, object]:
+    """Return the strict DTO consumed by non-Python graph producers.
+
+    The TOML manifest remains the source of truth.  Projection modes use the
+    existing ``source_or_default`` path semantics, while non-projection modes
+    preserve an omitted source as an empty string so consumers can distinguish
+    a binding from a state/exclusion entry.
+    """
+    return {
+        "schema": NORMALIZED_SNAPSHOT_SCHEMA,
+        "prefix": manifest.prefix,
+        "entries": [
+            {
+                "path": entry.path,
+                "mode": entry.mode,
+                "source": (
+                    entry.source_or_default()
+                    if entry.mode in {"symlink", "copy"}
+                    else entry.source
+                ),
+                "owner": entry.owner,
+                "class": entry.surface_class,
+                "local_override_allowed": entry.local_override_allowed,
+                "optional": entry.optional,
+            }
+            for entry in manifest.entries
+        ],
+    }
+
+
 def check_doc(root: Path, prefix: str, manifest: SurfaceManifest) -> list[str]:
     """Return doc consistency findings."""
     findings: list[str] = []
@@ -374,6 +407,12 @@ def render_command_outputs(manifest: SurfaceManifest, root: Path) -> Mapping[str
         "regular-specs": render_regular_specs(manifest.entries, manifest.prefix),
         "removed-legacy-paths": render_removed_legacy(manifest.entries),
         "root-absent-paths": render_root_absent_paths(manifest.entries),
+        "normalized-snapshot": json.dumps(
+            normalized_snapshot(manifest),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
     }
 
 

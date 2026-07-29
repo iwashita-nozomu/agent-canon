@@ -1,54 +1,110 @@
 """Tests for AgentCanon shared surface migration correctness."""
 
+# @dependency-start
+# contract test
+# responsibility Verifies parent submodule readiness and non-destructive root-surface migration.
+# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
+# upstream implementation ../../tools/sync_agent_canon.sh root-surface synchronization
+# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py RootResolution contract
+# @dependency-end
+
 from __future__ import annotations
 
+import importlib.util
 import os
+import shutil
 import subprocess
+import sys
 import tempfile
-from pathlib import Path
 import unittest
-
+from pathlib import Path
+from types import ModuleType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SYNC = PROJECT_ROOT / "tools" / "sync_agent_canon.sh"
+ROOT_RESOLUTION = PROJECT_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py"
+
+
+def load_root_resolution_module() -> ModuleType:
+    """Load the current RootResolution implementation."""
+    spec = importlib.util.spec_from_file_location("agent_canon_source_root", ROOT_RESOLUTION)
+    if spec is None or spec.loader is None:
+        raise AssertionError(f"could not load {ROOT_RESOLUTION}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 class SurfaceMigrationTest(unittest.TestCase):
     """Verify migration behavior for legacy parent root surfaces."""
 
-    def clone_parent_fixture(self) -> Path:
-        """Return a temporary parent-like fixture with vendor symlink projection."""
-        tmp_root = Path(tempfile.mkdtemp())
-        parent = tmp_root / "parent"
-        subprocess.run(
-            ["git", "clone", "--no-local", str(PROJECT_ROOT), str(parent)],
-            check=True,
+    def git(self, root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+        """Run one Git command in a fixture repository."""
+        return subprocess.run(
+            ["git", *args],
+            cwd=root,
+            check=check,
             capture_output=True,
             text=True,
         )
-        (parent / "vendor").mkdir(parents=True, exist_ok=True)
-        (parent / "tools").mkdir(parents=True, exist_ok=True)
-        if (parent / "tools" / "agent-canon").exists():
-            (parent / "tools" / "agent-canon").unlink()
-        if (parent / "tools" / "agent-canon").is_symlink():
-            (parent / "tools" / "agent-canon").unlink()
-        os.symlink(
-            "../vendor/agent-canon/tools",
-            str(parent / "tools" / "agent-canon"),
-            target_is_directory=True,
+
+    def configure_git(self, root: Path) -> None:
+        """Configure an isolated fixture repository."""
+        self.git(root, "config", "user.email", "agent-canon-test@example.invalid")
+        self.git(root, "config", "user.name", "AgentCanon test")
+
+    def clone_parent_fixture(self) -> Path:
+        """Return a parent fixture with a real main-branch AgentCanon submodule."""
+        tmp_root = Path(tempfile.mkdtemp())
+        source = tmp_root / "source"
+        parent = tmp_root / "parent"
+
+        shutil.copytree(
+            PROJECT_ROOT,
+            source,
+            symlinks=True,
+            ignore=shutil.ignore_patterns(
+                ".git",
+                ".agent-canon",
+                "__pycache__",
+                ".pytest_cache",
+                ".ruff_cache",
+            ),
         )
-        os.symlink(
-            str(PROJECT_ROOT),
-            str(parent / "vendor" / "agent-canon"),
-            target_is_directory=True,
+        self.git(source, "init")
+        self.configure_git(source)
+        self.git(source, "branch", "-M", "main")
+        self.git(source, "add", "-A")
+        self.git(source, "commit", "-m", "fixture AgentCanon source")
+
+        parent.mkdir()
+        self.git(parent, "init")
+        self.configure_git(parent)
+        (parent / "tools").mkdir()
+        shutil.copy2(SYNC, parent / "tools" / "sync_agent_canon.sh")
+        os.chmod(parent / "tools" / "sync_agent_canon.sh", 0o755)
+
+        self.git(
+            parent,
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            "--branch",
+            "main",
+            str(source),
+            "vendor/agent-canon",
         )
+        self.git(parent / "vendor" / "agent-canon", "checkout", "-B", "main")
+        self.git(parent, "add", ".gitmodules", "tools", "vendor/agent-canon")
+        self.git(parent, "commit", "-m", "fixture parent submodule")
         return parent
 
     def run_sync(self, root: Path, *commands: str) -> subprocess.CompletedProcess[str]:
         """Run one sync command in the fixture root."""
-        sync_script = root / "tools" / "sync_agent_canon.sh"
         return subprocess.run(
-            ["bash", str(sync_script), *commands],
+            ["bash", str(root / "tools" / "sync_agent_canon.sh"), *commands],
             cwd=root,
             check=False,
             capture_output=True,
@@ -59,7 +115,7 @@ class SurfaceMigrationTest(unittest.TestCase):
                 "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
                 "AGENT_CANON_BRANCH_WORKTREE_REASON": "AgentCanon root surface repair requested by user",
                 "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
-                "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "Remove temporary clone after pushed PR and verified remote refs",
+                "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "Fixture-only legacy surface pruning",
                 "AGENT_CANON_FORCE_RELINK": "1",
             },
         )
@@ -69,117 +125,81 @@ class SurfaceMigrationTest(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
 
-    def test_parent_link_root_rebuilds_devcontainer_shape(self) -> None:
-        """Legacy .devcontainer materialization should become explicit minimal parent shape."""
+    def test_parent_root_resolution_and_devcontainer_migration(self) -> None:
+        """RootResolution and link-root must agree on a ready parent submodule."""
         root = self.clone_parent_fixture()
+        root_resolution = load_root_resolution_module()
+        resolution = root_resolution.resolve_agent_canon_source_root(root)
+        self.assertEqual(resolution.layout, root_resolution.LAYOUT_VENDORED)
+        self.assertEqual(resolution.current_repository_root, root.resolve())
+        self.assertEqual(
+            resolution.source_root,
+            (root / "vendor" / "agent-canon").resolve(),
+        )
 
-        legacy_devcontainer = root / ".devcontainer"
-        if legacy_devcontainer.exists() or legacy_devcontainer.is_symlink():
-            if legacy_devcontainer.is_symlink() or legacy_devcontainer.is_file():
-                legacy_devcontainer.unlink()
-            else:
-                for child in legacy_devcontainer.iterdir():
-                    if child.is_file() or child.is_symlink():
-                        child.unlink()
-                    else:
-                        # best-effort for fixture cleanup; not expected today.
-                        if child.is_dir():
-                            for item in child.rglob("*"):
-                                if item.is_file() or item.is_symlink():
-                                    item.unlink()
-                                else:
-                                    item.rmdir()
-                            child.rmdir()
-                legacy_devcontainer.rmdir()
-        legacy_devcontainer.mkdir()
+        devcontainer = root / ".devcontainer"
+        devcontainer.mkdir()
+        custom_hook = devcontainer / "post-create-parent.sh"
+        unknown_file = devcontainer / "parent-local-marker.txt"
+        custom_hook.write_text("#!/usr/bin/env bash\necho parent hook\n", encoding="utf-8")
+        custom_hook.chmod(0o755)
+        unknown_file.write_text("keep this parent-owned file\n", encoding="utf-8")
         for name in (
             "bootstrap-shared-runtime.sh",
             "finalize-shared-runtime.sh",
             "generate-runtime-compose.sh",
+            "docker-compose.generated.yml",
             "post-attach.sh",
             "post-create.sh",
         ):
-            self.write_file(legacy_devcontainer / name, "legacy\n")
-            os.chmod(legacy_devcontainer / name, 0o755)
+            self.write_file(devcontainer / name, "legacy wrapper\n")
 
         result = self.run_sync(root, "link-root")
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-        self.assertTrue(legacy_devcontainer.is_dir() and not legacy_devcontainer.is_symlink())
-        self.assertTrue((legacy_devcontainer / "devcontainer.json").is_symlink())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("agent_canon_parent_submodule=projection_ready", result.stdout)
+        self.assertTrue(devcontainer.is_dir() and not devcontainer.is_symlink())
+        self.assertTrue((devcontainer / "devcontainer.json").is_symlink())
         self.assertEqual(
-            os.readlink(legacy_devcontainer / "devcontainer.json"),
+            os.readlink(devcontainer / "devcontainer.json"),
             "../vendor/agent-canon/.devcontainer/devcontainer.json",
         )
-        self.assertTrue((legacy_devcontainer / "post-create-parent.sh").is_file())
-        self.assertTrue(os.access(str(legacy_devcontainer / "post-create-parent.sh"), os.X_OK))
+        self.assertEqual(custom_hook.read_text(encoding="utf-8"), "#!/usr/bin/env bash\necho parent hook\n")
+        self.assertTrue(os.access(custom_hook, os.X_OK))
+        self.assertEqual(unknown_file.read_text(encoding="utf-8"), "keep this parent-owned file\n")
         for name in (
             "bootstrap-shared-runtime.sh",
             "finalize-shared-runtime.sh",
             "generate-runtime-compose.sh",
+            "docker-compose.generated.yml",
             "post-attach.sh",
             "post-create.sh",
         ):
-            self.assertFalse((legacy_devcontainer / name).exists())
+            self.assertFalse((devcontainer / name).exists(), name)
 
         check = self.run_sync(root, "check")
-        self.assertEqual(check.returncode, 0, check.stderr)
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        self.assertIn("shared surface is in sync", check.stdout)
 
-    def test_parent_status_uses_projected_copy_comparison(self) -> None:
-        """status and check should agree for parent-projected GitHub copy surfaces."""
+    def test_removed_legacy_surface_preserves_unknown_mirror(self) -> None:
+        """Known retired mirrors are removed while unknown mirrors remain untouched."""
         root = self.clone_parent_fixture()
-
-        result = self.run_sync(root, "link-root")
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-        status = self.run_sync(root, "status")
-        self.assertEqual(status.returncode, 0, status.stderr)
-
-        for path in (
-            ".github/workflows/agent-coordination.yml",
-            ".github/workflows/agent-improvement-guide.yml",
-            ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
-            ".github/scripts/checkout_agent_canon_submodule.sh",
-        ):
-            self.assertNotIn(f"copy[{path}]=drift", status.stdout, status.stdout)
-
-        check = self.run_sync(root, "check")
-        self.assertEqual(check.returncode, 0, check.stderr)
-
-    def test_removed_legacy_surface_is_retired_without_pruning_unknown(self) -> None:
-        """Known retired mirrors must be removed; unknown symlinks remain untouched."""
-        root = self.clone_parent_fixture()
-
         retired = root / "tests" / "tools" / "test_fix_markdown_math.py"
         retired.parent.mkdir(parents=True, exist_ok=True)
-        if retired.exists() or retired.is_symlink():
-            retired.unlink()
         retired.symlink_to(
-            str(root / "vendor" / "agent-canon" / "tests" / "tools" / "test_fix_markdown_math.py")
+            root / "vendor" / "agent-canon" / "tests" / "tools" / "test_fix_markdown_math.py"
         )
-
         unknown = root / "tests" / "tools" / "test_unknown_mirror.py"
-        unknown.parent.mkdir(parents=True, exist_ok=True)
-        if unknown.exists() or unknown.is_symlink():
-            unknown.unlink()
         unknown.symlink_to(
-            str(
-                root
-                / "vendor"
-                / "agent-canon"
-                / "tests"
-                / "tools"
-                / "test_fix_markdown_math.py"
-            )
+            root / "vendor" / "agent-canon" / "tests" / "tools" / "test_fix_markdown_math.py"
         )
 
         result = self.run_sync(root, "link-root")
-        self.assertEqual(result.returncode, 0, result.stderr)
-
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertFalse(retired.exists(), "retired mirror must be removed")
         self.assertTrue(unknown.is_symlink(), "unknown mirror must not be removed")
+
         check = self.run_sync(root, "check")
-        self.assertEqual(check.returncode, 0, check.stderr)
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
 
 
 if __name__ == "__main__":

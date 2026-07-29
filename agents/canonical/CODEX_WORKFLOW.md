@@ -7,7 +7,7 @@ upstream design ./CODEX_SUBAGENTS.md subagent routing contract
 upstream design ../workflows/derived-agent-canon-diff-workflow.md shared canon diff workflow
 upstream design ../../issues/README.md durable AgentCanon operational finding storage
 downstream design ../workflows/token-efficient-codex-workflow.md token-aware runtime mode overlay
-downstream design ../templates/closeout_gate.md closeout gate contract
+downstream design ../../templates/agents/closeout_gate.md closeout gate contract
 upstream design ../../documents/design/dependency-manifest-design.md dependency manifest design
 upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md runtime profile and risk-based validation routing
 upstream design ../../documents/operations/BRANCH_SCOPE.md commit correctness and push contract
@@ -102,6 +102,8 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
 - branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に creation authority/reason と destructive authority/reason の全 4 値を置いた場合だけ実行できます。
 - AgentCanon source 変更は `dependency-module-change` で exact topic workspace clone を prepare/reuse し、その standalone source branch / AgentCanon PR を継続します。parent repo の `canon-pin` branch は source publication 後の clean parent pin projection だけを担います。
+- vendor-first は非並列 single-stream の既定です。parent packet が十分な replaceable responsibility unit、disjoint write scope、依存/merge order、validation route、reviewer ownership を固定した独立 stream を含む場合は、vendor が clean でも `dependency_module_change.py prepare --placement workspace` を明示選択できます。parent は ready な全 stream を launch し、全 descendant を monitor し、互換な worker context を再利用します。細粒度の fresh-agent fan-out は独立 stream とみなしません。
+- `--placement workspace` で作成する fresh source branch は local/remote の既存 branch を拒否し、最新 `origin/main` から作成します。既存 branch の継続は `--placement workspace-continuation` で明示します。各 source branch は candidate review / PR 前に最新 `origin/main` を merge し、parent は packet の明示 merge order を保持します。`origin/main` の read/CAS だけでは merge 済みの代替になりません。
 
 ### Runtime Profile And Risk Selection
 

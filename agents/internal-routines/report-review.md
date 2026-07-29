@@ -22,7 +22,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 - `documents/experiments/experiment-report-style.md`
 - `documents/experiments/experiment-critical-review.md`
-- `agents/templates/experiment_report.md`
+- `templates/agents/experiment_report.md`
 
 ## Expected Outcome
 

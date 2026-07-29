@@ -3,7 +3,7 @@
 # contract agent-runtime
 # responsibility Runs a non-blocking Codex runtime summary export at hook boundaries.
 # upstream implementation ../../tools/agent_tools/export_codex_runtime_summary.py exports bounded runtime summaries
-# upstream implementation ./hook_dispatcher.py invokes this hook from Stop
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns explicit summary export.
 # upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and mount policy
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates hook wiring
 # @dependency-end

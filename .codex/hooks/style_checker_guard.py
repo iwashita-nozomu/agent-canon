@@ -2,7 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Runs changed-file style checks after editing tool calls and logs unchecked edits.
-# upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
+# upstream design ./hook_dispatcher.py RETIRED_HOOK_ROUTES assigns this standalone style route.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
 # upstream implementation ../../tools/ci/run_all_checks.sh runs Python ruff style checks.
 # upstream implementation ../../rust/agent-canon/src/docs.rs checks Markdown style and math notation.

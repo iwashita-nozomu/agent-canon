@@ -480,6 +480,7 @@ Current promoted helpers:
 - `tools/docs/find_similar_designs.py`
 - `tools/docs/organize_designs.py`
 - `tools/docs/tfidf_similar_docs.py`
+- `tools/ci/check_experiment_template.py`
 
 Legacy tool imports are retired in AgentCanon. Historical disposition remains
 in `documents/tools/repo-local-tool-imports.md`; live tooling must be represented as

@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import os
-import hashlib
 import subprocess
 import sys
 import tempfile
@@ -34,26 +33,6 @@ WORKFLOW_MONITOR = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py
 AGENT_TEAM = PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
 REQUIREMENT_SYNC = PROJECT_ROOT / "tools" / "requirement_sync_validator.py"
 DOCKER_VALIDATOR = PROJECT_ROOT / "tools" / "docker_dependency_validator.sh"
-SYNC_SCRIPT = PROJECT_ROOT / "tools" / "sync_agent_canon.sh"
-AGENT_CANON_MANIFEST = PROJECT_ROOT / "documents" / "runtime" / "shared-runtime-surfaces.toml"
-AGENT_CANON_COMMIT_REQUEST_EVIDENCE = "evidence:" + ("0" * 64)
-
-
-def authorized_sync_env(**overrides: str) -> dict[str, str]:
-    """Return required protected-authority env for mutating sync commands."""
-    env = dict(os.environ)
-    env.update(
-        {
-            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
-            "AGENT_CANON_BRANCH_WORKTREE_REASON": "test-approved-update",
-            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
-            "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "test-approved-update",
-            "AGENT_CANON_COMMIT_REQUEST_EVIDENCE": AGENT_CANON_COMMIT_REQUEST_EVIDENCE,
-            "AGENT_CANON_PREFIX": "vendor/agent-canon",
-        }
-    )
-    env.update(overrides)
-    return env
 
 
 def run_tool(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
@@ -632,93 +611,53 @@ class DependencyManifestToolTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_link_root_preserves_parent_devcontainer_overrides_between_runs(self) -> None:
-        """Parent .devcontainer overrides must be byte-identical after repeated link-root."""
+    def test_docker_validator_accepts_requirement_extras_in_parent_layout(self) -> None:
+        """The parent boundary should preserve valid PEP 508 extras."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            (root / "tools").mkdir()
-            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
-            sync_path = root / "tools" / "sync_agent_canon.sh"
-            vendor_prefix = root / "vendor" / "agent-canon"
-            vendor_prefix.parent.mkdir(parents=True)
-            subprocess.run(["cp", "-a", str(PROJECT_ROOT), str(vendor_prefix)], check=True)
-            if (vendor_prefix / ".git").exists():
-                import shutil
-
-                shutil.rmtree(vendor_prefix / ".git")
-            subprocess.run(
-                ["cp", "-a", str(SYNC_SCRIPT), str(sync_path)],
-                check=True,
-                capture_output=True,
-                text=True,
+            vendor = root / "vendor" / "agent-canon"
+            (root / "python").mkdir()
+            (root / "docker").mkdir()
+            (root / ".devcontainer").mkdir()
+            (root / "tools" / "ci").mkdir(parents=True)
+            (vendor / "tools" / "agent_tools").mkdir(parents=True)
+            (vendor / ".devcontainer").mkdir()
+            (vendor / "tools" / "agent_tools" / "devcontainer_dependencies.py").symlink_to(
+                PROJECT_ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
             )
-            if (root / "tools" / "agent-canon").exists():
-                (root / "tools" / "agent-canon").unlink()
-            os.symlink("../vendor/agent-canon/tools", root / "tools" / "agent-canon")
-
-            devcontainer = root / ".devcontainer"
-            devcontainer.mkdir()
-            custom_hook = devcontainer / "post-create-parent.sh"
-            unknown_file = devcontainer / "parent-local-marker.txt"
-            old_generated = devcontainer / "docker-compose.generated.yml"
-            custom_hook.write_text(
-                '\n'.join(
+            for relative in (
+                ".devcontainer/bootstrap-dependencies.sh",
+                ".devcontainer/dependencies.toml",
+                ".devcontainer/post-create.sh",
+                "CONTAINER_OPERATIONS.md",
+            ):
+                (vendor / relative).symlink_to(PROJECT_ROOT / relative)
+            (root / ".devcontainer" / "dependencies.toml").write_text(
+                "\n".join(
                     [
-                        "#!/usr/bin/env bash",
-                        "set -euo pipefail",
-                        'echo "parent hook"',
+                        'schema = "agent-canon.devcontainer-dependencies"',
+                        "schema_version = 2",
+                        "",
+                        "[[records]]",
+                        'id = "fixture"',
+                        'package = "fixture"',
+                        'method = "apt-package"',
+                        'version = "1.0"',
+                        'source = "fixture"',
+                        'verification = { kind = "apt-package" }',
+                        "deps = []",
+                        'provides = ["fixture"]',
+                        'failure_policy = "fail"',
                         "",
                     ]
                 ),
                 encoding="utf-8",
             )
-            unknown_file.write_text("do-not-drop-me\n", encoding="utf-8")
-            old_generated.write_text("version: 3\n", encoding="utf-8")
-
-            first = subprocess.run(
-                ["bash", "tools/sync_agent_canon.sh", "link-root"],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-                env=authorized_sync_env(
-                    AGENT_CANON_SURFACE_MANIFEST=str(
-                        vendor_prefix / "documents/runtime/shared-runtime-surfaces.toml"
-                    ),
-                    AGENT_CANON_FORCE_RELINK="1",
-                ),
+            (root / ".devcontainer" / "post-create-parent.sh").write_text(
+                "#!/usr/bin/env bash\n",
+                encoding="utf-8",
             )
-            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
-            first_hook = hashlib.sha256(custom_hook.read_bytes()).hexdigest()
-            first_unknown = hashlib.sha256(unknown_file.read_bytes()).hexdigest()
-            self.assertFalse(old_generated.exists())
-            second = subprocess.run(
-                ["bash", "tools/sync_agent_canon.sh", "link-root"],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-                env=authorized_sync_env(
-                    AGENT_CANON_SURFACE_MANIFEST=str(
-                        vendor_prefix / "documents/runtime/shared-runtime-surfaces.toml"
-                    ),
-                    AGENT_CANON_FORCE_RELINK="1",
-                ),
-            )
-
-            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
-            self.assertEqual(first_hook, hashlib.sha256(custom_hook.read_bytes()).hexdigest())
-            self.assertEqual(first_unknown, hashlib.sha256(unknown_file.read_bytes()).hexdigest())
-            self.assertFalse(old_generated.exists())
-
-    def test_docker_validator_accepts_requirement_extras_for_required_packages(self) -> None:
-        """The Docker validator should accept valid extras syntax in requirements."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            (root / "python").mkdir()
-            (root / "docker").mkdir()
-            (root / ".devcontainer").mkdir()
-            (root / "tools" / "ci").mkdir(parents=True)
+            os.chmod(root / ".devcontainer" / "post-create-parent.sh", 0o755)
             (root / "pyproject.toml").write_text(
                 "[project]\ndependencies = []\n",
                 encoding="utf-8",
@@ -752,39 +691,9 @@ class DependencyManifestToolTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (root / ".devcontainer" / "post-create.sh").write_text(
-                "\n".join(
-                    [
-                        "run_as_root",
-                        "docker/register_safe_directories.sh",
-                        "docker/install_python_dependencies.sh",
-                        'git config --global --add safe.directory "$workspace"',
-                        "repo-local Python dependency installer absent",
-                        "cli.github.com/packages",
-                        "apt_install gh",
-                        "npm install -g @openai/codex",
-                        "gh --version",
-                        "codex --version",
-                        "rustup toolchain install",
-                        "rustfmt",
-                        "clippy",
-                        "rust-analyzer",
-                        "cargo build --release",
-                        "AGENT_CANON_TOOLS_HOME",
-                        "${tools_home}/agent-canon/bin/agent-canon",
-                        "/usr/local/bin/agent-canon",
-                        "AGENT_CANON_RUNTIME_ROOT",
-                        "AGENT_CANON_SOURCE_PROJECTION_ROOT",
-                        "tool-availability.json",
-                        "tree --version",
-                        "/etc/profile.d/agent-canon-rust.sh",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
+            os.chmod(root / "docker" / "install_python_dependencies.sh", 0o755)
             (root / ".devcontainer" / "devcontainer.json").write_text(
-                '{"postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace"}\n',
+                '{"postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace && bash .devcontainer/post-create-parent.sh"}\n',
                 encoding="utf-8",
             )
             (root / ".dockerignore").write_text(
@@ -794,6 +703,10 @@ class DependencyManifestToolTest(unittest.TestCase):
             (root / ".gitignore").write_text(".venv/\nvenv/\n", encoding="utf-8")
             (root / "README.md").write_text(
                 "PYTHONPATH=/workspace/python\nUse docker run for execution.\n",
+                encoding="utf-8",
+            )
+            (root / "docker" / "README.md").write_text(
+                "Parent product image dependencies.\n",
                 encoding="utf-8",
             )
             (root / "tools" / "ci" / "python_env_policy.py").write_text(
@@ -813,64 +726,10 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("result-log / visualization requirements present", result.stdout)
-            self.assertIn("Summary: 0 issues found", result.stdout)
-
-    def test_docker_validator_supports_parent_tool_projection_and_direct_git_refs(self) -> None:
-        """Portable Docker validator checks should work via tools/agent-canon path."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            (root / "python").mkdir()
-            (root / "docker").mkdir()
-            (root / "tools").mkdir()
-            (root / "tools" / "ci").mkdir(parents=True)
-            (root / "vendor").mkdir()
-            (root / "vendor" / "agent-canon").symlink_to(PROJECT_ROOT)
-            (root / "tools" / "agent-canon").symlink_to("../vendor/agent-canon/tools")
-            (root / "pyproject.toml").write_text(
-                "[project]\ndependencies = []\n",
-                encoding="utf-8",
-            )
-            (root / "docker" / "requirements.txt").write_text(
-                "\n".join(
-                    [
-                        "jupyterlab",
-                        "notebook",
-                        "ipykernel",
-                        "pydeps",
-                        "snakeviz",
-                        "pyyaml",
-                        "custom-visualizer @ git+ssh://git@github.com/org/custom-visualizer.git@v1.0.0",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            (root / "docker" / "Dockerfile").write_text(
-                "RUN apt-get update && apt-get install -y rsync openssh-client graphviz python3.11-venv\n",
-                encoding="utf-8",
-            )
-            (root / ".dockerignore").write_text("vendor/agent-canon\n.git\n.state\n", encoding="utf-8")
-            (root / ".gitignore").write_text(".venv/\nvenv/\n", encoding="utf-8")
-            (root / "README.md").write_text(
-                "PYTHONPATH=/workspace/python\nUse docker run for execution.\n",
-                encoding="utf-8",
-            )
-            (root / "tools" / "ci" / "python_env_policy.py").symlink_to(
-                PROJECT_ROOT / "tools" / "ci" / "python_env_policy.py"
-            )
-
-            result = subprocess.run(
-                ["bash", str(root / "tools" / "agent-canon" / "docker_dependency_validator.sh")],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("result-log / visualization requirements present", result.stdout)
-            self.assertIn("Summary: 0 issues found", result.stdout)
+            self.assertIn("DEVCONTAINER_DEPENDENCY=pass", result.stdout)
+            self.assertIn("DEVCONTAINER_DEPENDENCY_ORDER=fixture,", result.stdout)
+            self.assertNotIn("missing-file", result.stdout)
+            self.assertNotIn("unsupported requirement syntax", result.stdout)
 
     def test_format_accepts_line_comment_manifest(self) -> None:
         """Line-comment manifests are valid for Python-like files."""
@@ -1347,8 +1206,8 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
             self.assertNotIn("upstream\tdesign\tAGENTS.md\t", result.stdout)
 
-    def test_root_copy_headers_resolve_in_agentcanon_source_context(self) -> None:
-        """Root-copy GitHub headers should keep valid AgentCanon-source paths."""
+    def test_generated_root_copy_headers_resolve_in_projection_context(self) -> None:
+        """Generated root-copy GitHub headers should resolve in projection context."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             root_copy = root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
@@ -1371,7 +1230,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                     "@dependency-start",
                     "contract test",
                     "responsibility Defines a template AgentCanon PR checklist copy.",
-                    "upstream design ../../issues/README.md durable issue storage",
+                    "upstream design ../../vendor/agent-canon/issues/README.md durable issue storage",
                     "@dependency-end",
                     "-->",
                     "",
