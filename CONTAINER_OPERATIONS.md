@@ -109,6 +109,18 @@ The shared post-create validates and merges the parent manifest before the
 AgentCanon manifest, validates the complete graph, and executes it only after
 that validation succeeds.
 
+## Manifest Source Roles And Cardinality
+
+Schema v2 uses structured manifest-source roles rather than filename guesses.
+In a parent-plus-vendor layout, `<workspace>/.devcontainer/dependencies.toml`
+is the `parent-overlay` source and may explicitly declare `records = []` when
+the parent Template has no parent-owned derived tools. The
+`vendor/agent-canon/.devcontainer/dependencies.toml` source is `canonical` and
+must remain non-empty. In standalone AgentCanon, the workspace manifest is
+also `canonical` and must remain non-empty. After source loading, the merged
+plan must contain at least one record. Provider, missing-dependency, cycle, and
+typed-verification invariants are unchanged.
+
 The parent-owned `docker/install_python_dependencies.sh` remains the owner of
 workspace Python packages. It runs after the shared dependency plan and before
 AgentCanon build/cache/projection. The parent-owned post-create command remains

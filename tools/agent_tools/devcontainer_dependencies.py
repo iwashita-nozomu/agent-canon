@@ -106,6 +106,26 @@ class DependencyError(ValueError):
     """Base error for schema, merge, plan, and execution failures."""
 
 
+# StrEnum is unavailable on supported tomli/Python <3.11 runtimes.
+class ManifestRole(str, Enum):  # noqa: UP042
+    """Closed set of manifest roles used during source resolution."""
+
+    PARENT_OVERLAY = "parent-overlay"
+    CANONICAL = "canonical"
+
+
+@dataclass(frozen=True)
+class ManifestSource:
+    """A resolved manifest path with its structural role."""
+
+    path: Path
+    role: ManifestRole
+
+    def __post_init__(self) -> None:
+        """Normalize the source path for stable comparisons and projections."""
+        object.__setattr__(self, "path", self.path.resolve())
+
+
 class Method(str, Enum):
     """Closed set of supported dependency installation mechanisms."""
 
@@ -235,10 +255,15 @@ class DependencyRecord:
 
 @dataclass(frozen=True)
 class LoadedManifest:
-    """A manifest and its source location."""
+    """A manifest and its structured source."""
 
-    path: Path
+    source: ManifestSource
     records: tuple[DependencyRecord, ...]
+
+    @property
+    def path(self) -> Path:
+        """Return the source path for diagnostics and plan projections."""
+        return self.source.path
 
 
 @dataclass(frozen=True)
@@ -882,8 +907,9 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
     return record
 
 
-def load_manifest(path: Path) -> LoadedManifest:
+def load_manifest(source: ManifestSource) -> LoadedManifest:
     """Load one manifest with tomllib/tomli and validate every record."""
+    path = source.path
     try:
         with path.open("rb") as stream:
             raw = tomllib.load(stream)
@@ -905,7 +931,9 @@ def load_manifest(path: Path) -> LoadedManifest:
             f"{path}: schema must be {SCHEMA!r} version {SCHEMA_VERSION}"
         )
     records = raw.get("records")
-    if not isinstance(records, list) or not records:
+    if not isinstance(records, list):
+        raise DependencyError(f"{path}: records must be an array of tables")
+    if not records and source.role is not ManifestRole.PARENT_OVERLAY:
         raise DependencyError(f"{path}: records must be a non-empty array of tables")
     parsed = tuple(
         parse_record(item, path=path, index=index)
@@ -914,25 +942,31 @@ def load_manifest(path: Path) -> LoadedManifest:
     ids = [record.id for record in parsed]
     if len(set(ids)) != len(ids):
         raise DependencyError(f"{path}: record ids must be unique")
-    return LoadedManifest(path=path.resolve(), records=parsed)
+    return LoadedManifest(source=source, records=parsed)
 
 
-def manifest_paths(workspace: Path, vendor_root: Path | None = None) -> tuple[Path, ...]:
-    """Return parent-first manifest paths, reading standalone AgentCanon once."""
+def manifest_sources(
+    workspace: Path, vendor_root: Path | None = None
+) -> tuple[ManifestSource, ...]:
+    """Resolve parent-first manifest sources with structural roles."""
     workspace = workspace.resolve()
     vendor = (vendor_root or workspace / "vendor" / "agent-canon").resolve()
     parent_path = workspace / ".devcontainer" / "dependencies.toml"
     vendor_path = vendor / ".devcontainer" / "dependencies.toml"
     if vendor == workspace and parent_path == vendor_path:
-        return (parent_path,) if parent_path.is_file() else ()
-    paths: list[Path] = []
+        return (
+            (ManifestSource(vendor_path, ManifestRole.CANONICAL),)
+            if vendor_path.is_file()
+            else ()
+        )
+    sources: list[ManifestSource] = []
     if parent_path.is_file():
-        paths.append(parent_path)
+        sources.append(ManifestSource(parent_path, ManifestRole.PARENT_OVERLAY))
     if vendor_path.is_file() and vendor_path.resolve() not in {
-        path.resolve() for path in paths
+        source.path for source in sources
     }:
-        paths.append(vendor_path)
-    return tuple(paths)
+        sources.append(ManifestSource(vendor_path, ManifestRole.CANONICAL))
+    return tuple(sources)
 
 
 def _merge_optional_scalar(
@@ -1025,6 +1059,8 @@ def build_plan(
 ) -> DependencyPlan:
     """Validate providers, dependencies, and cycles before any side effect."""
     records = merge_records(manifests)
+    if not records:
+        raise DependencyError("merged dependency plan must contain at least one record")
     by_id = {record.id: record for record in records}
     providers: dict[str, list[str]] = {}
     for record in records:
@@ -1108,10 +1144,10 @@ def build_plan(
 
 def load_plan(workspace: Path, vendor_root: Path | None = None) -> DependencyPlan:
     """Load, merge, and fully validate the plan for a workspace."""
-    paths = manifest_paths(workspace, vendor_root)
-    if not paths:
+    sources = manifest_sources(workspace, vendor_root)
+    if not sources:
         raise DependencyError("no devcontainer dependency manifest found")
-    return build_plan(tuple(load_manifest(path) for path in paths))
+    return build_plan(tuple(load_manifest(source) for source in sources))
 
 
 @dataclass(frozen=True)
