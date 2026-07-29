@@ -211,12 +211,24 @@ id = "branch_worktree_creation_guard"
 description = "Shared-checkout Git mutations and branch/worktree creation stay routed through explicit authority and the critical PreToolUse guard."
 
 [[contracts.surfaces]]
-path = ".codex/hooks/branch_worktree_guard.py"
-markers = ["DESTRUCTIVE_GIT_GUARD=block", "BRANCH_WORKTREE_CREATION_GUARD=block", "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY", "explicit_user_approval", "AGENT_CANON_DESTRUCTIVE_GIT_REASON", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY", "user_request", "agent_canon_workflow", "AGENT_CANON_BRANCH_WORKTREE_REASON", "git worktree add", "git restore", "same shell segment"]
+path = ".codex/hooks/hook_safety.py"
+markers = [
+    "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY",
+    "AGENT_CANON_BRANCH_WORKTREE_REASON",
+    "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY",
+    "AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+    "agent_canon_workflow",
+    "branch_block_payload",
+    "command_sha256",
+    "explicit_user_approval",
+    "operation",
+    "same-segment",
+    "user_request",
+]
 
 [[contracts.surfaces]]
 path = ".codex/hooks/hook_dispatcher.py"
-markers = ["branch_worktree_guard.py", "CRITICAL_BLOCKING_CHILD_HOOKS", "critical_child_invalid", "critical_child_failure_payload", "PreToolUse"]
+markers = ["HOOK_EVENT_CONTRACTS", "HookEventContract", "ACTIVE_HOOK_HANDLERS", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "hook_safety.py", "validate_projection_bytes", "execution_resource_plan_projection_guard.py", "FORMER_ACTIVE_HOOK_CHILDREN", "RETIRED_HOOK_ROUTES", "if set(RETIRED_HOOK_ROUTES) != FORMER_ACTIVE_HOOK_CHILDREN:", "if set(RETIRED_HOOK_ROUTES).intersection(ACTIVE_HOOK_HANDLERS):", "branch_worktree_guard.py"]
 
 [[contracts.surfaces]]
 path = "agents/canonical/CODEX_WORKFLOW.md"
@@ -232,7 +244,7 @@ markers = ["Multiple chats or sessions", "unknown dirty", "Proven exact task own
 
 [[contracts.surfaces]]
 path = ".codex/README.md"
-markers = ["branch_worktree_guard.py", "user/other-chat owned", "proven exact task ownership", "fail-closed", "empty stdout", "session restart"]
+markers = ["active events", "legacy `Stop`", "fail-open", "RETIRED_HOOK_ROUTES", "bounded", "redacted"]
 
 [[contracts.surfaces]]
 path = ".agents/skills/worktree-health/SKILL.md"
