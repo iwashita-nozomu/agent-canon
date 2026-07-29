@@ -611,8 +611,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_docker_validator_rejects_requirement_extras_in_parent_layout(self) -> None:
-        """The parent boundary should reject extras in Docker requirements."""
+    def test_docker_validator_accepts_requirement_extras_in_parent_layout(self) -> None:
+        """The parent boundary should preserve valid PEP 508 extras."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             vendor = root / "vendor" / "agent-canon"
@@ -636,7 +636,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         'schema = "agent-canon.devcontainer-dependencies"',
-                        "schema_version = 1",
+                        "schema_version = 2",
                         "",
                         "[[records]]",
                         'id = "fixture"',
@@ -644,7 +644,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         'method = "apt-package"',
                         'version = "1.0"',
                         'source = "fixture"',
-                        'commands = [["true"]]',
+                        'verification = { kind = "apt-package" }',
                         "deps = []",
                         'provides = ["fixture"]',
                         'failure_policy = "fail"',
@@ -691,6 +691,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            os.chmod(root / "docker" / "install_python_dependencies.sh", 0o755)
             (root / ".devcontainer" / "devcontainer.json").write_text(
                 '{"postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace && bash .devcontainer/post-create-parent.sh"}\n',
                 encoding="utf-8",
@@ -724,13 +725,11 @@ class DependencyManifestToolTest(unittest.TestCase):
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("DEVCONTAINER_DEPENDENCY=fail", result.stdout)
-            self.assertIn(
-                "unsupported requirement syntax: pyyaml[secure]>=6",
-                result.stdout,
-            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEVCONTAINER_DEPENDENCY=pass", result.stdout)
+            self.assertIn("DEVCONTAINER_DEPENDENCY_ORDER=fixture,", result.stdout)
             self.assertNotIn("missing-file", result.stdout)
+            self.assertNotIn("unsupported requirement syntax", result.stdout)
 
     def test_format_accepts_line_comment_manifest(self) -> None:
         """Line-comment manifests are valid for Python-like files."""

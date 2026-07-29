@@ -30,22 +30,24 @@ bash tools/docker_dependency_validator.sh
 
 次を owner、replaceable unit、実装機構、validation route として記録します。
 
-- fixed shell bootstrap が python3 + tomllib/tomli、Node/npm 22.14.0 の
-  arch-specific SHA256、ninja-build だけを確立すること
+- fixed shell bootstrap が python3 + tomllib/tomli + python3-packaging、
+  Node/npm 22.14.0 の arch-specific SHA256、ninja-build だけを確立すること
 - parent manifest を先、vendor manifest を後に読み、standalone は自身を
   一度だけ読むこと
 - record の closed method、必須 scalar、method-specific security fields、
-  argv-only commands、failure policy を型付きで定義すること
+  method-compatible typed verification、failure policy を定義すること
 - duplicate merge の parent-value retention、compatible union、provider
   ambiguity、missing dependency、cycle の failure semantics
 - full-plan validation と topological order が derived side effect より先に
-  あること、成功 receipt のみが rerun resume を可能にすること
+  あること、fingerprint と owner-specific live verification の両方が pass
+  した成功 receipt のみが rerun resume を可能にすること
 - parent Python installer、AgentCanon build/cache/projection、parent final
   post-create の順序と ownership
 
 Manifest を読むときは `tools/agent_tools/devcontainer_dependencies.py` の
 `load_manifest`、`merge_records`、`build_plan` を正本として使います。manifest
-文字列を eval せず、command は非空の argv 配列として検証します。
+文字列を eval せず、verification kind と method-specific field を closed
+schema として検証します。
 `--workspace .` は parent root を検査し、`vendor/agent-canon/` があれば
 parent manifest を先、vendor manifest を後に読む。standalone AgentCanon では
 同じコマンドが自身の manifest を一度だけ読むため、packet に `--vendor-root .`

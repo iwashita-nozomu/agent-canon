@@ -19,6 +19,7 @@ import tarfile
 import tempfile
 import unittest
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest import mock
@@ -37,6 +38,59 @@ ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
 
 
+def default_verification(
+    record_id: str,
+    method: str,
+    version: str,
+    fields: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return one valid owner-specific verification fixture."""
+    if method == "apt-package":
+        return {"kind": "apt-package"}
+    if method == "apt-repository":
+        return {"kind": "apt-repository"}
+    if method == "npm-global":
+        return {
+            "kind": "npm-package",
+            "executable": record_id,
+            "args": ["--version"],
+            "output_contains": version,
+        }
+    if method == "pip-user":
+        return {
+            "kind": "python-distribution",
+            "executable": record_id,
+            "args": ["--version"],
+            "output_contains": version,
+        }
+    if method == "release-asset":
+        return {
+            "kind": "absolute-executable",
+            "path": fields.get("destination", f"/usr/local/bin/{record_id}"),
+            "args": ["--version"],
+            "output_contains": version.lstrip("v"),
+        }
+    if method == "rust-toolchain":
+        return {"kind": "rust-toolchain"}
+    if method == "lean-toolchain":
+        return {"kind": "lean-toolchain"}
+    if method == "cargo-source-build":
+        return {
+            "kind": "cargo-binary",
+            "path": f"target/release/{record_id}",
+            "args": ["--version"],
+            "output_contains": version,
+        }
+    if method == "browser-install":
+        return {
+            "kind": "browser-executable",
+            "executable_globs": ["chromium-*/chrome-linux/chrome"],
+            "args": ["--version"],
+            "output_contains": "Chromium",
+        }
+    raise AssertionError(f"unsupported fixture method: {method}")
+
+
 def record(
     record_id: str,
     *,
@@ -53,33 +107,38 @@ def record(
         "method": method,
         "version": version,
         "source": source,
-        "commands": [["true"]],
         "deps": deps or [],
         "provides": provides or [record_id],
         "failure_policy": "fail",
     }
     value.update(extra)
+    value.setdefault(
+        "verification",
+        default_verification(record_id, method, version, value),
+    )
     return value
+
+
+def render_toml(value: object) -> str:
+    """Render the small TOML value subset used by these fixtures."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, dict):
+        return "{ " + ", ".join(
+            f"{key} = {render_toml(item)}" for key, item in value.items()
+        ) + " }"
+    if isinstance(value, list):
+        return "[" + ", ".join(render_toml(item) for item in value) + "]"
+    return json.dumps(value)
 
 
 def write_manifest(path: Path, records: list[dict[str, Any]]) -> None:
     """Write a small TOML fixture without depending on a TOML writer."""
-    lines = ['schema = "agent-canon.devcontainer-dependencies"', "schema_version = 1", ""]
+    lines = ['schema = "agent-canon.devcontainer-dependencies"', "schema_version = 2", ""]
     for item in records:
         lines.append("[[records]]")
         for key, value in item.items():
-            if isinstance(value, bool):
-                rendered = "true" if value else "false"
-            elif isinstance(value, list):
-                rendered = "[" + ", ".join(
-                    "[" + ", ".join(json.dumps(part) for part in command) + "]"
-                    if command and isinstance(command, list)
-                    else json.dumps(command)
-                    for command in value
-                ) + "]" if key == "commands" else "[" + ", ".join(json.dumps(part) for part in value) + "]"
-            else:
-                rendered = json.dumps(value)
-            lines.append(f"{key} = {rendered}")
+            lines.append(f"{key} = {render_toml(value)}")
         lines.append("")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
@@ -120,7 +179,56 @@ class FakeRunner:
             return subprocess.CompletedProcess(
                 command, 0, "/tmp/fake-python-user-base\n", ""
             )
-        return subprocess.CompletedProcess(command, 0, "", "")
+        if command[:2] == ("dpkg-query", "--show"):
+            package = command[-1]
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                f"install ok installed\t1.0.0\t{package}\n",
+                "",
+            )
+        if command[:2] == ("dpkg", "--verify"):
+            return subprocess.CompletedProcess(command, 0, "", "")
+        if command[:4] == ("npm", "ls", "--global", "--json"):
+            package = command[-1]
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                json.dumps({"dependencies": {package: {"version": "1.0.0"}}}),
+                "",
+            )
+        if command[:4] == ("python3", "-m", "pip", "show"):
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                f"Name: {command[-1]}\nVersion: 1.0.0\n",
+                "",
+            )
+        if command[:2] == ("git", "-C"):
+            return subprocess.CompletedProcess(command, 0, "", "")
+        if command[:4] == ("rustup", "show", "active-toolchain"):
+            return subprocess.CompletedProcess(command, 0, "1.89.0 (default)\n", "")
+        if command[:3] == ("rustup", "toolchain", "list"):
+            return subprocess.CompletedProcess(command, 0, "1.89.0 (default)\n", "")
+        if command[:3] == ("rustup", "component", "list"):
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                "rustfmt-x86_64-unknown-linux-gnu (installed)\n"
+                "clippy-x86_64-unknown-linux-gnu (installed)\n",
+                "",
+            )
+        if command[:2] == ("elan", "default"):
+            return subprocess.CompletedProcess(
+                command, 0, "leanprover/lean4:v4.30.0\n", ""
+            )
+        if command[:3] == ("elan", "toolchain", "list"):
+            return subprocess.CompletedProcess(
+                command, 0, "leanprover/lean4:v4.30.0\n", ""
+            )
+        if Path(command[0]).name == "chrome":
+            return subprocess.CompletedProcess(command, 0, "Chromium 123\n", "")
+        return subprocess.CompletedProcess(command, 0, "1.0.0\n", "")
 
 
 class DependencyModelTests(unittest.TestCase):
@@ -148,7 +256,13 @@ class DependencyModelTests(unittest.TestCase):
             )
         )
         self.assertEqual(plan.order, ("parent", "child"))
-        self.assertEqual(Installer().dry_run(plan)["order"], ["parent", "child"])
+        dry_run = Installer().dry_run(plan)
+        self.assertEqual(dry_run["order"], ["parent", "child"])
+        self.assertEqual(
+            dry_run["actions"][0]["verification"]["kind"],
+            "npm-package",
+        )
+        self.assertNotIn("commands", dry_run["actions"][0])
 
     def test_schema_rejects_missing_and_unknown_fields(self) -> None:
         value = record("invalid")
@@ -161,7 +275,6 @@ class DependencyModelTests(unittest.TestCase):
 
     def test_all_methods_and_method_specific_security_fields_are_typed(self) -> None:
         common = {
-            "commands": [["true"]],
             "deps": [],
             "provides": ["tool"],
             "failure_policy": "fail",
@@ -212,6 +325,10 @@ class DependencyModelTests(unittest.TestCase):
             value.update(common)
             parsed = parse_record(value, path=Path("fixture.toml"), index=index)
             self.assertEqual(parsed.method.value, value["method"])
+            self.assertEqual(
+                parsed.verification.kind.value,
+                value["verification"]["kind"],
+            )
 
     def test_binary_release_asset_accepts_pinned_architecture_paths(self) -> None:
         parsed = parse_record(
@@ -277,7 +394,6 @@ class DependencyModelTests(unittest.TestCase):
             path=Path("fixture.toml"),
             index=0,
         )
-        plan = build_plan((LoadedManifest(Path("fixture.toml"), (parsed,)),))
         runner = FakeRunner()
 
         def download(url: str, destination: Path) -> None:
@@ -300,9 +416,7 @@ class DependencyModelTests(unittest.TestCase):
                     side_effect=download,
                 ),
             ):
-                Installer(runner).install(
-                    plan, workspace=root, receipts=root / "receipts"
-                )
+                Installer(runner).install_record(parsed, workspace=root)
 
         install_call = next(call for call in runner.calls if call[0] == "install")
         self.assertEqual(install_call[1:4], ("-D", "-m", "0755"))
@@ -319,7 +433,6 @@ class DependencyModelTests(unittest.TestCase):
                 "shared",
                 deps=["ninja-build"],
                 provides=["shared-cli"],
-                commands=[["true"], ["printf", "ok"]],
             ),
             path=Path("vendor.toml"),
             index=0,
@@ -333,7 +446,7 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(merged.version, "1.0.0")
         self.assertEqual(merged.deps, ("node", "ninja-build"))
         self.assertEqual(merged.provides, ("codex", "shared-cli"))
-        self.assertEqual(merged.commands[0], ("true",))
+        self.assertEqual(merged.verification.kind.value, "npm-package")
 
     def test_incompatible_duplicate_provider_missing_and_cycle_fail(self) -> None:
         parent = parse_record(record("shared"), path=Path("parent.toml"), index=0)
@@ -387,9 +500,20 @@ class DependencyModelTests(unittest.TestCase):
             agent_root = vendor.parents[1]
             self.assertEqual(manifest_paths(agent_root, agent_root), (vendor,))
 
-    def test_commands_reject_shell_evaluation(self) -> None:
-        unsafe = record("unsafe", commands=[["sh", "-c", "echo unsafe"]])
-        with self.assertRaisesRegex(DependencyError, "shell interpreter"):
+    def test_verification_rejects_legacy_commands_and_shell_executables(self) -> None:
+        legacy = record("unsafe", commands=[["unsafe", "--version"]])
+        with self.assertRaisesRegex(DependencyError, "unknown fields: commands"):
+            parse_record(legacy, path=Path("fixture.toml"), index=0)
+        unsafe = record(
+            "unsafe",
+            verification={
+                "kind": "npm-package",
+                "executable": "sh",
+                "args": ["--version"],
+                "output_contains": "1.0.0",
+            },
+        )
+        with self.assertRaisesRegex(DependencyError, "one command name"):
             parse_record(unsafe, path=Path("fixture.toml"), index=0)
         self.assertNotIn("shell=True", ENGINE.read_text(encoding="utf-8"))
         self.assertNotIn("eval(", ENGINE.read_text(encoding="utf-8"))
@@ -410,7 +534,6 @@ class DependencyModelTests(unittest.TestCase):
             record(
                 "tool",
                 method="apt-package",
-                commands=[["tool", "--version"]],
             ),
             path=Path("x.toml"),
             index=0,
@@ -428,10 +551,10 @@ class DependencyModelTests(unittest.TestCase):
                 Installer(resumed).install(plan, workspace=root, receipts=receipts),
                 ("tool",),
             )
-            self.assertIn(("tool", "--version"), resumed.calls)
+            self.assertIn(("dpkg", "--verify", "tool"), resumed.calls)
             self.assertFalse(any(command[0] == "apt-get" for command in resumed.calls))
 
-            rebuilt = FakeRunner(fail_once_on="tool")
+            rebuilt = FakeRunner(fail_once_on="dpkg")
             self.assertEqual(
                 Installer(rebuilt).install(plan, workspace=root, receipts=receipts),
                 ("tool",),
@@ -440,10 +563,9 @@ class DependencyModelTests(unittest.TestCase):
                 sum(command[0] == "apt-get" for command in rebuilt.calls),
                 1,
             )
-            self.assertEqual(
-                rebuilt.calls.count(("tool", "--version")),
-                2,
-            )
+            self.assertEqual(rebuilt.calls.count(("dpkg", "--verify", "tool")), 2)
+            apt_install = next(command for command in rebuilt.calls if command[0] == "apt-get")
+            self.assertIn("--reinstall", apt_install)
 
             failing = FakeRunner(fail_on="apt-get")
             with self.assertRaises(DependencyError):
@@ -491,15 +613,22 @@ class DependencyModelTests(unittest.TestCase):
             path=Path("x.toml"),
             index=0,
         )
-        plan = build_plan((LoadedManifest(Path("x.toml"), (browser,)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            cache = root / "ms-playwright"
+            executable = cache / "chromium-123" / "chrome-linux" / "chrome"
+            executable.parent.mkdir(parents=True)
+            executable.write_text("#!/usr/bin/env true\n", encoding="utf-8")
+            executable.chmod(0o755)
+            browser = replace(browser, browser_cache_path=str(cache))
+            plan = build_plan((LoadedManifest(Path("x.toml"), (browser,)),))
             runner = FakeRunner()
             Installer(runner).install(plan, workspace=root, receipts=root / "receipts")
             self.assertIn(
-                {"PLAYWRIGHT_BROWSERS_PATH": "/usr/local/share/ms-playwright"},
+                {"PLAYWRIGHT_BROWSERS_PATH": str(cache)},
                 runner.environments,
             )
+            self.assertIn((str(executable), "--version"), runner.calls)
 
     def test_toolchain_installers_bootstrap_and_publish_home_paths(self) -> None:
         rust = parse_record(
@@ -507,7 +636,6 @@ class DependencyModelTests(unittest.TestCase):
                 "rust",
                 method="rust-toolchain",
                 version="1.89.0",
-                commands=[["rustc", "--version"], ["cargo", "--version"]],
                 provides=["rust", "cargo"],
                 components=["rustfmt", "clippy"],
             ),
@@ -519,7 +647,6 @@ class DependencyModelTests(unittest.TestCase):
                 "lean",
                 method="lean-toolchain",
                 version="leanprover/lean4:v4.30.0",
-                commands=[["lean", "--version"], ["lake", "--version"]],
             ),
             path=Path("fixture.toml"),
             index=1,
@@ -532,7 +659,6 @@ class DependencyModelTests(unittest.TestCase):
                 repo="https://example.test/agent-canon.git",
                 commit="a" * 40,
                 locked=True,
-                commands=[["cargo", "--version"]],
                 deps=["cargo"],
             ),
             path=Path("fixture.toml"),
@@ -542,6 +668,10 @@ class DependencyModelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "rust" / "agent-canon").mkdir(parents=True)
+            binary = root / "rust" / "agent-canon" / "target" / "release" / "agent-cli"
+            binary.parent.mkdir(parents=True)
+            binary.write_text("#!/usr/bin/env true\n", encoding="utf-8")
+            binary.chmod(0o755)
             runner = FakeRunner()
             with mock.patch.dict(
                 os.environ, {"HOME": str(root), "PATH": "/usr/bin"}, clear=False
@@ -639,6 +769,8 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("NODE_AARCH64_SHA256", bootstrap)
         self.assertIn("ninja-build", bootstrap)
         self.assertIn("python3-pip", bootstrap)
+        self.assertIn("python3-packaging", bootstrap)
+        self.assertIn("packaging.requirements", bootstrap)
         self.assertIn("NODE_BOOTSTRAP_RECEIPT", bootstrap)
         self.assertIn('NODE_NPM_VERSION="10.9.2"', bootstrap)
         self.assertIn("tomllib", bootstrap)

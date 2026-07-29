@@ -20,10 +20,12 @@ downstream implementation ../../../tools/sync_agent_canon.sh pin and root projec
 
 親 root に `.devcontainer/dependencies.toml` を作成し、親固有の
 developer/agent tool record だけを置きます。schema は
-`agent-canon.devcontainer-dependencies` version `1`、record は
-`id/package/method/version/source/commands/deps/provides/failure_policy` を
+`agent-canon.devcontainer-dependencies` version `2`、record は
+`id/package/method/version/source/verification/deps/provides/failure_policy` を
 必須とし、method-specific な key fingerprint、checksum、repo/commit/locked、
-browser fields も型付きで記録します。
+browser fields も型付きで記録します。`verification` は method と一致する
+closed kind と owner-specific fields を持ち、generic command 配列や
+container identity を receipt の十分条件にしません。
 
 共有 post-create は次の順で一度だけ読みます。
 
@@ -32,9 +34,16 @@ browser fields も型付きで記録します。
 
 standalone AgentCanon では `.devcontainer/dependencies.toml` 自身を一度だけ
 読みます。親 record の値は常に保持し、vendor は欠落値を補い、互換な
-`commands/deps/provides/components/checksums/assets` だけを union します。
+`deps/provides/components/checksums/assets` だけを union します。
+`verification` は同一でなければ incompatible duplicate として fail します。
 scalar の不一致、重複 provider、missing dependency、cycle は fail です。
 manifest の全体 validation が pass するまで、derived install に進めません。
+
+success receipt は plan/record fingerprint の一致だけでは再利用しません。
+record owner の typed verification を毎回実行し、package-owned state、
+apt repository の key/source、exact executable、toolchain/components、
+browser cache executable、または source-local Cargo binary が欠落・不一致
+なら receipt を削除して repair installation と再 verification を行います。
 
 ## pin と root projection
 

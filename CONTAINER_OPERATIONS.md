@@ -101,8 +101,9 @@ developer convenience.
 
 The mounted workspace devcontainer contract is separate. The fixed
 `.devcontainer/bootstrap-dependencies.sh` establishes only the base capabilities
-needed to read a manifest: `python3` with `tomllib` or `tomli`, pinned Node/npm
-22.14.0 with architecture-specific SHA256 verification, and `ninja-build`.
+needed to read a manifest: `python3` with `tomllib` or `tomli` and
+`python3-packaging` for structured PEP 508 parsing, pinned Node/npm 22.14.0
+with architecture-specific SHA256 verification, and `ninja-build`.
 `.devcontainer/dependencies.toml` then describes mounted developer/agent tools.
 The shared post-create validates and merges the parent manifest before the
 AgentCanon manifest, validates the complete graph, and executes it only after
@@ -155,7 +156,13 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   shape; do not require parent repositories to commit generated `tree` output
   unless a task-specific design explicitly asks for that artifact.
 - Codex CLI setup is a pinned `npm-global` record for `@openai/codex` 0.145.0
-  with an argv verification command.
+  with an exact npm package identity and executable verification contract.
+- Every dependency record has one method-compatible typed verification
+  contract. A matching receipt is reusable only while that contract proves the
+  current owner artifact. Missing package files, apt repository key/source
+  files, executables, toolchains, browser cache targets, or built Cargo
+  binaries invalidate the receipt and enter method-specific repair installation
+  before a new receipt is written.
 - Public-repository security scanners used by agents, including `gitleaks`,
   `trufflehog`, and `detect-secrets`, belong in the typed manifest.
   They are audit tooling, not project runtime dependencies, and must not be
@@ -166,10 +173,14 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   dependent `browser-install` records. The browser record owns the typed shared
   cache `/usr/local/share/ms-playwright` and exports it through
   `PLAYWRIGHT_BROWSERS_PATH` for non-root devcontainer commands. It is
-  report-validation infrastructure, not a project runtime dependency.
+  report-validation infrastructure, not a project runtime dependency. Receipt
+  verification resolves and executes a declared browser target inside that
+  cache; the Playwright CLI version alone is not sufficient.
 - Rust, cargo, rustfmt, clippy, rust-analyzer, and the AgentCanon Rust CLI
   belong in typed `rust-toolchain` and `cargo-source-build` records when they
-  are only needed for shared AgentCanon tooling.
+  are only needed for shared AgentCanon tooling. The Cargo record verifies the
+  exact source-local `target/release/agent-canon` binary rather than ambient
+  `cargo`.
 - Lean theorem-proving tooling used by formal-proof skills, including
   `elan`, Lean, and Lake, belongs in `.devcontainer/post-create.sh` when it is
   only needed for AgentCanon proof tooling and is declared by exact

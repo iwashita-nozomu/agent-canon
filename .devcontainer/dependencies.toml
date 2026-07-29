@@ -8,7 +8,7 @@
 # @dependency-end
 
 schema = "agent-canon.devcontainer-dependencies"
-schema_version = 1
+schema_version = 2
 
 # This file contains mounted developer/agent tools only. Product image and
 # project Python dependencies remain parent-owned.
@@ -21,7 +21,7 @@ version = "2.93.0"
 source = "https://cli.github.com/packages"
 key_url = "https://cli.github.com/packages/githubcli-archive-keyring.gpg"
 key_fingerprint = "2C6106201985B60E6C7AC87323F3D4EA75716059"
-commands = [["gh", "--version"]]
+verification = { kind = "apt-repository" }
 deps = ["ca-certificates", "curl"]
 provides = ["gh"]
 failure_policy = "fail"
@@ -32,7 +32,7 @@ package = "@openai/codex"
 method = "npm-global"
 version = "0.145.0"
 source = "https://registry.npmjs.org/@openai%2fcodex"
-commands = [["codex", "--version"]]
+verification = { kind = "npm-package", executable = "codex", args = ["--version"], output_contains = "0.145.0" }
 deps = ["node"]
 provides = ["codex"]
 failure_policy = "fail"
@@ -43,7 +43,7 @@ package = "playwright"
 method = "npm-global"
 version = "1.61.0"
 source = "https://registry.npmjs.org/playwright"
-commands = [["playwright", "--version"]]
+verification = { kind = "npm-package", executable = "playwright", args = ["--version"], output_contains = "1.61.0" }
 deps = ["node"]
 provides = ["playwright"]
 failure_policy = "fail"
@@ -56,7 +56,7 @@ version = "1.61.0"
 source = "https://playwright.dev"
 browser = "chromium"
 browser_cache_path = "/usr/local/share/ms-playwright"
-commands = [["playwright", "--version"]]
+verification = { kind = "browser-executable", executable_globs = ["chromium-*/chrome-linux/chrome", "chromium-*/chrome-linux64/chrome", "chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell"], args = ["--version"], output_contains = "Chromium" }
 deps = ["playwright"]
 provides = ["playwright-chromium"]
 failure_policy = "fail"
@@ -67,7 +67,7 @@ package = "texlive-latex-base"
 method = "apt-package"
 version = "2023.20240207-1"
 source = "ubuntu:24.04"
-commands = [["pdflatex", "--version"]]
+verification = { kind = "apt-package" }
 deps = []
 provides = ["pdflatex"]
 failure_policy = "fail"
@@ -78,7 +78,7 @@ package = "latexmk"
 method = "apt-package"
 version = "1:4.83-1"
 source = "ubuntu:24.04"
-commands = [["latexmk", "--version"]]
+verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["latexmk"]
 failure_policy = "fail"
@@ -89,7 +89,7 @@ package = "texlive-latex-recommended"
 method = "apt-package"
 version = "2023.20240207-1"
 source = "ubuntu:24.04"
-commands = [["pdflatex", "--version"]]
+verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["texlive-latex-recommended"]
 failure_policy = "fail"
@@ -100,7 +100,7 @@ package = "texlive-latex-extra"
 method = "apt-package"
 version = "2023.20240207-1"
 source = "ubuntu:24.04"
-commands = [["pdflatex", "--version"]]
+verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["texlive-latex-extra"]
 failure_policy = "fail"
@@ -111,7 +111,7 @@ package = "texlive-fonts-recommended"
 method = "apt-package"
 version = "2023.20240207-1"
 source = "ubuntu:24.04"
-commands = [["pdflatex", "--version"]]
+verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["texlive-fonts-recommended"]
 failure_policy = "fail"
@@ -122,7 +122,7 @@ package = "texlive-pictures"
 method = "apt-package"
 version = "2023.20240207-1"
 source = "ubuntu:24.04"
-commands = [["pdflatex", "--version"]]
+verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["texlive-pictures"]
 failure_policy = "fail"
@@ -133,7 +133,7 @@ package = "texlive-xetex"
 method = "apt-package"
 version = "2023.20240207-1"
 source = "ubuntu:24.04"
-commands = [["xelatex", "--version"]]
+verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["xelatex"]
 failure_policy = "fail"
@@ -144,7 +144,7 @@ package = "texlive-extra-utils"
 method = "apt-package"
 version = "2023.20240207-1"
 source = "ubuntu:24.04"
-commands = [["pdfcrop", "--version"]]
+verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["pdfcrop"]
 failure_policy = "fail"
@@ -155,7 +155,7 @@ package = "dvisvgm"
 method = "apt-package"
 version = "3.2.1+ds-1build1"
 source = "ubuntu:24.04"
-commands = [["dvisvgm", "--version"]]
+verification = { kind = "apt-package" }
 deps = []
 provides = ["dvisvgm"]
 failure_policy = "fail"
@@ -166,7 +166,7 @@ package = "ghostscript"
 method = "apt-package"
 version = "10.02.1~dfsg1-0ubuntu7.8"
 source = "ubuntu:24.04"
-commands = [["gs", "--version"]]
+verification = { kind = "apt-package" }
 deps = []
 provides = ["ghostscript"]
 failure_policy = "fail"
@@ -177,7 +177,7 @@ package = "poppler-utils"
 method = "apt-package"
 version = "24.02.0-1ubuntu9.9"
 source = "ubuntu:24.04"
-commands = [["pdfinfo", "-v"]]
+verification = { kind = "apt-package" }
 deps = []
 provides = ["poppler"]
 failure_policy = "fail"
@@ -188,7 +188,7 @@ package = "jq"
 method = "apt-package"
 version = "1.7.1-3build1"
 source = "ubuntu:24.04"
-commands = [["jq", "--version"]]
+verification = { kind = "apt-package" }
 deps = []
 provides = ["jq"]
 failure_policy = "fail"
@@ -199,7 +199,7 @@ package = "tree"
 method = "apt-package"
 version = "2.1.1-2"
 source = "ubuntu:24.04"
-commands = [["tree", "--version"]]
+verification = { kind = "apt-package" }
 deps = []
 provides = ["tree"]
 failure_policy = "fail"
@@ -217,7 +217,7 @@ extract = "gitleaks"
 destination = "/usr/local/bin/gitleaks"
 checksum = "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
 checksums = { aarch64 = "e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080", x86_64 = "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb" }
-commands = [["gitleaks", "version"]]
+verification = { kind = "absolute-executable", path = "/usr/local/bin/gitleaks", args = ["version"], output_contains = "8.30.1" }
 deps = ["ca-certificates", "curl", "tar"]
 provides = ["gitleaks"]
 failure_policy = "fail"
@@ -235,7 +235,7 @@ extract = "trufflehog"
 destination = "/usr/local/bin/trufflehog"
 checksum = "5d836eae522540a32ca0f1a1e00efd4c3153a52462466a4b4008fac1e6c1a548"
 checksums = { aarch64 = "8e205da06172db049129101d475dc4f7f43904d315384e4e32b9c5009cac27c8", x86_64 = "5d836eae522540a32ca0f1a1e00efd4c3153a52462466a4b4008fac1e6c1a548" }
-commands = [["trufflehog", "--version"]]
+verification = { kind = "absolute-executable", path = "/usr/local/bin/trufflehog", args = ["--version"], output_contains = "3.95.3" }
 deps = ["ca-certificates", "curl", "tar"]
 provides = ["trufflehog"]
 failure_policy = "fail"
@@ -246,7 +246,7 @@ package = "detect-secrets"
 method = "pip-user"
 version = "1.5.0"
 source = "https://pypi.org/project/detect-secrets/1.5.0/"
-commands = [["detect-secrets", "--version"]]
+verification = { kind = "python-distribution", executable = "detect-secrets", args = ["--version"], output_contains = "1.5.0" }
 deps = ["python3-pip"]
 provides = ["detect-secrets"]
 failure_policy = "fail"
@@ -264,7 +264,7 @@ extract = "elan-init"
 destination = "/usr/local/bin/elan-init"
 checksum = "df0b2b3a439961ffcbb3985214365ffe40f49bc871df04dff268c7d8e21ca8b2"
 checksums = { aarch64 = "cb69af0803b04157bc30201c29c12fca882bb3ad8b43476b8d2d3064810bc3ac", x86_64 = "df0b2b3a439961ffcbb3985214365ffe40f49bc871df04dff268c7d8e21ca8b2" }
-commands = [["elan-init", "--version"]]
+verification = { kind = "absolute-executable", path = "/usr/local/bin/elan-init", args = ["--version"], output_contains = "4.2.3" }
 deps = ["ca-certificates", "curl", "tar"]
 provides = ["elan"]
 failure_policy = "fail"
@@ -282,7 +282,7 @@ extract = "none"
 destination = "/usr/local/bin/rustup-init"
 checksum = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c"
 checksums = { aarch64 = "e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c", x86_64 = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c" }
-commands = [["rustup-init", "--version"]]
+verification = { kind = "absolute-executable", path = "/usr/local/bin/rustup-init", args = ["--version"], output_contains = "1.28.2" }
 deps = ["ca-certificates", "curl"]
 provides = ["rustup-init"]
 failure_policy = "fail"
@@ -294,7 +294,7 @@ method = "rust-toolchain"
 version = "1.89.0"
 source = "https://static.rust-lang.org"
 components = ["rustfmt", "clippy", "rust-analyzer"]
-commands = [["rustc", "--version"], ["cargo", "--version"]]
+verification = { kind = "rust-toolchain" }
 deps = ["rustup-init", "build-essential", "curl"]
 provides = ["rust", "cargo", "rustfmt", "clippy", "rust-analyzer"]
 failure_policy = "fail"
@@ -305,7 +305,7 @@ package = "lean"
 method = "lean-toolchain"
 version = "leanprover/lean4:v4.30.0"
 source = "https://github.com/leanprover/elan"
-commands = [["lean", "--version"], ["lake", "--version"]]
+verification = { kind = "lean-toolchain" }
 deps = ["elan"]
 provides = ["lean", "lake"]
 failure_policy = "fail"
@@ -317,9 +317,9 @@ method = "cargo-source-build"
 version = "0.1.0"
 source = "rust/agent-canon"
 repo = "https://github.com/iwashita-nozomu/agent-canon.git"
-commit = "87e85889462ff3eeb27bde9f516eb6b862f0780d"
+commit = "ec2cae45a57875bfbfcae2148a7d639692fb2934"
 locked = true
-commands = [["cargo", "--version"]]
+verification = { kind = "cargo-binary", path = "target/release/agent-canon", args = ["--version"], output_contains = "agent-canon 0.1.0" }
 deps = ["cargo"]
 provides = ["agent-canon"]
 failure_policy = "fail"

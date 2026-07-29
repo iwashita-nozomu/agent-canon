@@ -132,7 +132,7 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 | `git` | source checkout、submodule、branch / PR workflow。 | `.devcontainer/post-create.sh`, update tools | upstream: GPL-2.0 |
 | `cmake` | native tool build。 | `.devcontainer/post-create.sh` | upstream: BSD-3-Clause |
 | `curl` | installer、release asset、license source fetch。 | `.devcontainer/post-create.sh` | upstream: curl license |
-| `python3`, `python3-pip` | Python helper execution and `detect-secrets` install. | `.devcontainer/bootstrap-dependencies.sh`, `.devcontainer/dependencies.toml` | upstream: Python Software Foundation License for Python; package licenses vary |
+| `python3`, `python3-pip`, `python3-packaging` | Python helper execution、structured PEP 508 parsing、`detect-secrets` install。 | `.devcontainer/bootstrap-dependencies.sh`, `.devcontainer/dependencies.toml` | Python: Python Software Foundation License; Packaging: Apache-2.0 OR BSD-2-Clause; distro package licenses vary |
 | `tar`, `xz-utils`, `ca-certificates`, `build-essential`, `pkg-config` | archive extraction, package bootstrap, native build support。 | `.devcontainer/bootstrap-dependencies.sh`, `.devcontainer/dependencies.toml` | distro: verify package copyright files |
 | `texlive-latex-base` (pdfLaTeX) | pdfLaTeX document rendering。 | `.devcontainer/dependencies.toml` (`pdflatex`) | TeX Live: mixed free software; verify distro copyright files |
 | `latexmk` | Academic-writing PDF build orchestration。 | `.devcontainer/dependencies.toml` | upstream: GPL-2.0 |

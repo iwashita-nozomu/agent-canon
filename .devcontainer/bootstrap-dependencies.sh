@@ -67,6 +67,17 @@ check_python_pip_capability() {
   python3 -m pip --version >/dev/null 2>&1
 }
 
+check_python_requirement_capability() {
+  python3 - <<'PY'
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
+
+requirement = Requirement("pyyaml[secure]>=6")
+assert canonicalize_name(requirement.name) == "pyyaml"
+assert requirement.extras == {"secure"}
+PY
+}
+
 node_receipt_matches() {
   [ -f "$NODE_BOOTSTRAP_RECEIPT" ] || return 1
   python3 - "$NODE_BOOTSTRAP_RECEIPT" "$(node_sha256)" <<'PY'
@@ -105,6 +116,7 @@ check_bootstrap() {
   command -v python3 >/dev/null 2>&1 || fail "python3 is unavailable"
   check_python_toml_capability || fail "python3 has neither tomllib nor tomli"
   check_python_pip_capability || fail "python3-pip capability is unavailable"
+  check_python_requirement_capability || fail "python3-packaging capability is unavailable"
   check_node_activation
   node_receipt_matches || fail "verified Node bootstrap receipt is unavailable or stale"
   command -v ninja >/dev/null 2>&1 || fail "ninja-build capability is unavailable"
@@ -171,6 +183,7 @@ install_base() {
   run_as_root apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
+    python3-packaging \
     ca-certificates \
     curl \
     xz-utils \

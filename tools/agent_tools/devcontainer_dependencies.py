@@ -11,9 +11,8 @@
 # @dependency-end
 """Declarative, typed devcontainer dependency planning and installation.
 
-The module deliberately has no third-party runtime dependency. Python 3.11+
-provide tomllib; older supported images use the already bootstrapped tomli
-module instead.
+The fixed bootstrap provides ``packaging`` plus Python 3.11's ``tomllib``;
+older supported images use the bootstrapped ``tomli`` module instead.
 """
 
 from __future__ import annotations
@@ -41,6 +40,10 @@ from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
+from packaging.markers import Marker
+from packaging.requirements import InvalidRequirement, Requirement
+from packaging.utils import canonicalize_name
+
 try:  # pragma: no cover - the branch depends on the interpreter image.
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - covered with a subprocess test.
@@ -48,7 +51,7 @@ except ModuleNotFoundError:  # pragma: no cover - covered with a subprocess test
 
 
 SCHEMA = "agent-canon.devcontainer-dependencies"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 METHODS = frozenset(
     {
         "apt-package",
@@ -89,6 +92,7 @@ BASE_CAPABILITIES = frozenset(
         "npm",
         "python3",
         "python3-pip",
+        "python3-packaging",
         "pip",
         "tar",
         "tomli",
@@ -116,6 +120,77 @@ class Method(str, Enum):
     BROWSER_INSTALL = "browser-install"
 
 
+class VerificationKind(str, Enum):
+    """Closed set of owner-specific live verification mechanisms."""
+
+    APT_PACKAGE = "apt-package"
+    APT_REPOSITORY = "apt-repository"
+    NPM_PACKAGE = "npm-package"
+    PYTHON_DISTRIBUTION = "python-distribution"
+    ABSOLUTE_EXECUTABLE = "absolute-executable"
+    RUST_TOOLCHAIN = "rust-toolchain"
+    LEAN_TOOLCHAIN = "lean-toolchain"
+    CARGO_BINARY = "cargo-binary"
+    BROWSER_EXECUTABLE = "browser-executable"
+
+
+@dataclass(frozen=True)
+class PythonRequirementSpec:
+    """Normalized PEP 508 requirement identity used by ownership checks."""
+
+    raw: str
+    normalized_name: str
+    extras: tuple[str, ...]
+    specifier: str
+    marker: str | None
+    url: str | None
+
+    @classmethod
+    def parse(cls, value: str) -> "PythonRequirementSpec":
+        """Parse a PEP 508 requirement without rejecting extras or URLs."""
+        try:
+            requirement = Requirement(value)
+        except InvalidRequirement as exc:
+            raise DependencyError(f"unsupported requirement syntax: {value}") from exc
+        return cls(
+            raw=value,
+            normalized_name=canonicalize_name(requirement.name),
+            extras=tuple(sorted(requirement.extras)),
+            specifier=str(requirement.specifier),
+            marker=str(requirement.marker) if requirement.marker is not None else None,
+            url=requirement.url,
+        )
+
+    def is_active(self) -> bool:
+        """Return whether a marker applies to the current Python environment."""
+        if self.marker is None:
+            return True
+        return Marker(self.marker).evaluate()
+
+
+@dataclass(frozen=True)
+class VerificationSpec:
+    """Frozen typed owner-specific verification identity."""
+
+    kind: VerificationKind
+    executable: str | None = None
+    path: str | None = None
+    args: tuple[str, ...] = ()
+    output_contains: str | None = None
+    executable_globs: tuple[str, ...] = ()
+
+    def payload(self) -> dict[str, Any]:
+        """Return the manifest-safe JSON representation."""
+        return {
+            "kind": self.kind.value,
+            "executable": self.executable,
+            "path": self.path,
+            "args": list(self.args),
+            "output_contains": self.output_contains,
+            "executable_globs": list(self.executable_globs),
+        }
+
+
 @dataclass(frozen=True)
 class DependencyRecord:
     """One fully typed dependency record."""
@@ -125,7 +200,7 @@ class DependencyRecord:
     method: Method
     version: str
     source: str
-    commands: tuple[tuple[str, ...], ...]
+    verification: VerificationSpec
     deps: tuple[str, ...]
     provides: tuple[str, ...]
     failure_policy: str
@@ -147,7 +222,10 @@ class DependencyRecord:
 
     def payload(self) -> dict[str, Any]:
         """Return a canonical JSON-compatible representation."""
-        return dataclasses.asdict(self) | {"method": self.method.value}
+        return dataclasses.asdict(self) | {
+            "method": self.method.value,
+            "verification": self.verification.payload(),
+        }
 
     def fingerprint(self) -> str:
         """Return the stable identity hash used by receipts."""
@@ -276,29 +354,37 @@ def _bool(value: object, field: str) -> bool:
     return value
 
 
-def _commands(value: object) -> tuple[tuple[str, ...], ...]:
+def _argv_args(value: object, field: str) -> tuple[str, ...]:
+    """Validate non-empty argv arguments without allowing control data."""
     if not isinstance(value, list) or not value:
-        raise DependencyError("commands must be a non-empty array of argv arrays")
-    result: list[tuple[str, ...]] = []
-    for index, command in enumerate(value):
-        if not isinstance(command, list) or not command:
-            raise DependencyError(f"commands[{index}] must be a non-empty argv array")
-        if any(
-            not isinstance(item, str)
-            or not item
-            or item != item.strip()
-            or CONTROL_RE.search(item)
-            or TRAVERSAL_RE.search(item)
-            for item in command
-        ):
-            raise DependencyError(f"commands[{index}] must contain non-empty strings")
-        executable = Path(command[0]).name
-        if command[0].startswith("-") or executable in SHELL_EXECUTABLES:
-            raise DependencyError(f"commands[{index}] must not invoke a shell interpreter")
-        if executable in {"python", "python3", "node", "perl", "ruby"} and "-c" in command:
-            raise DependencyError(f"commands[{index}] must not use code-evaluation flags")
-        result.append(tuple(command))
-    return tuple(result)
+        raise DependencyError(f"{field} must be a non-empty argv array")
+    result = tuple(value)
+    if any(
+        not isinstance(item, str)
+        or not item
+        or item != item.strip()
+        or CONTROL_RE.search(item)
+        for item in result
+    ):
+        raise DependencyError(f"{field} must contain non-empty argv-safe strings")
+    return result
+
+
+def _validate_safe_glob(value: str, field: str) -> None:
+    path = PurePosixPath(value)
+    if (
+        path.is_absolute()
+        or str(path) != value
+        or not value
+        or TRAVERSAL_RE.search(value)
+        or any(
+            not part
+            or CONTROL_RE.search(part)
+            or not re.fullmatch(r"[A-Za-z0-9._*?\[\]-]+", part)
+            for part in path.parts
+        )
+    ):
+        raise DependencyError(f"{field} must be a safe relative cache glob")
 
 
 def _checksums(value: object) -> tuple[tuple[str, str], ...]:
@@ -368,6 +454,157 @@ def _validate_absolute_path(value: str, field: str, *, prefix: str) -> None:
         raise DependencyError(f"{field} must be an absolute path below {prefix}")
 
 
+def _validate_absolute_executable_path(value: str, field: str) -> None:
+    path = PurePosixPath(value)
+    if (
+        not value.startswith("/")
+        or path.is_absolute() is False
+        or str(path) != value
+        or TRAVERSAL_RE.search(value)
+    ):
+        raise DependencyError(f"{field} must be a normalized absolute executable path")
+
+
+VERIFICATION_KIND_BY_METHOD = {
+    Method.APT_PACKAGE: VerificationKind.APT_PACKAGE,
+    Method.APT_REPOSITORY: VerificationKind.APT_REPOSITORY,
+    Method.NPM_GLOBAL: VerificationKind.NPM_PACKAGE,
+    Method.PIP_USER: VerificationKind.PYTHON_DISTRIBUTION,
+    Method.RELEASE_ASSET: VerificationKind.ABSOLUTE_EXECUTABLE,
+    Method.RUST_TOOLCHAIN: VerificationKind.RUST_TOOLCHAIN,
+    Method.LEAN_TOOLCHAIN: VerificationKind.LEAN_TOOLCHAIN,
+    Method.CARGO_SOURCE_BUILD: VerificationKind.CARGO_BINARY,
+    Method.BROWSER_INSTALL: VerificationKind.BROWSER_EXECUTABLE,
+}
+
+
+def _parse_verification(
+    value: object, *, record_id: str, method: Method
+) -> VerificationSpec:
+    if not isinstance(value, dict) or not value:
+        raise DependencyError(f"{record_id}.verification must be a non-empty table")
+    allowed_by_kind = {
+        VerificationKind.APT_PACKAGE: set(),
+        VerificationKind.APT_REPOSITORY: set(),
+        VerificationKind.NPM_PACKAGE: {
+            "executable",
+            "args",
+            "output_contains",
+        },
+        VerificationKind.PYTHON_DISTRIBUTION: {
+            "executable",
+            "args",
+            "output_contains",
+        },
+        VerificationKind.ABSOLUTE_EXECUTABLE: {"path", "args", "output_contains"},
+        VerificationKind.RUST_TOOLCHAIN: set(),
+        VerificationKind.LEAN_TOOLCHAIN: set(),
+        VerificationKind.CARGO_BINARY: {"path", "args", "output_contains"},
+        VerificationKind.BROWSER_EXECUTABLE: {"args", "output_contains", "executable_globs"},
+    }
+    if "kind" not in value:
+        raise DependencyError(f"{record_id}.verification missing fields: kind")
+    kind_value = _string(value["kind"], f"{record_id}.verification.kind")
+    try:
+        kind = VerificationKind(kind_value)
+    except ValueError as exc:
+        raise DependencyError(
+            f"{record_id}.verification: unsupported kind {kind_value}"
+        ) from exc
+    expected = VERIFICATION_KIND_BY_METHOD[method]
+    if kind is not expected:
+        raise DependencyError(
+            f"{record_id}.verification.kind {kind.value} is incompatible with "
+            f"method {method.value}; expected {expected.value}"
+        )
+    unsupported = sorted(set(value) - {"kind"} - allowed_by_kind[kind])
+    if unsupported:
+        raise DependencyError(
+            f"{record_id}.verification: unsupported fields: {', '.join(unsupported)}"
+        )
+    executable = _optional_string(
+        value.get("executable"), f"{record_id}.verification.executable"
+    )
+    path = _optional_string(value.get("path"), f"{record_id}.verification.path")
+    output_contains = _optional_string(
+        value.get("output_contains"), f"{record_id}.verification.output_contains"
+    )
+    args = (
+        _argv_args(value["args"], f"{record_id}.verification.args")
+        if "args" in value
+        else ()
+    )
+    executable_globs = (
+        _string_list(
+            value["executable_globs"],
+            f"{record_id}.verification.executable_globs",
+            allow_empty=False,
+        )
+        if "executable_globs" in value
+        else ()
+    )
+    if kind in {
+        VerificationKind.NPM_PACKAGE,
+        VerificationKind.PYTHON_DISTRIBUTION,
+    }:
+        if executable is None or not args or output_contains is None:
+            raise DependencyError(
+                f"{record_id}.verification requires executable, args, and "
+                "output_contains"
+            )
+        if Path(executable).name != executable or executable in SHELL_EXECUTABLES:
+            raise DependencyError(
+                f"{record_id}.verification.executable must be one command name"
+            )
+    elif kind is VerificationKind.ABSOLUTE_EXECUTABLE:
+        if path is None or not args or output_contains is None:
+            raise DependencyError(
+                f"{record_id}.verification requires path, args, and output_contains"
+            )
+        _validate_absolute_executable_path(path, f"{record_id}.verification.path")
+    elif kind is VerificationKind.CARGO_BINARY:
+        if path is None or not args or output_contains is None:
+            raise DependencyError(
+                f"{record_id}.verification requires path, args, and output_contains"
+            )
+        if (
+            PurePosixPath(path).is_absolute()
+            or str(PurePosixPath(path)) != path
+            or any(part in {"", "."} for part in PurePosixPath(path).parts)
+            or TRAVERSAL_RE.search(path)
+        ):
+            raise DependencyError(
+                f"{record_id}.verification.path must be a safe relative cargo binary path"
+            )
+    elif kind is VerificationKind.BROWSER_EXECUTABLE:
+        if not executable_globs or not args or output_contains is None:
+            raise DependencyError(
+                f"{record_id}.verification requires executable_globs, args, and output_contains"
+            )
+        for glob in executable_globs:
+            _validate_safe_glob(
+                glob, f"{record_id}.verification.executable_globs"
+            )
+    elif (
+        executable is not None
+        or path is not None
+        or args
+        or output_contains is not None
+        or executable_globs
+    ):
+        raise DependencyError(
+            f"{record_id}.verification does not permit executable fields for {kind.value}"
+        )
+    return VerificationSpec(
+        kind=kind,
+        executable=executable,
+        path=path,
+        args=args,
+        output_contains=output_contains,
+        executable_globs=executable_globs,
+    )
+
+
 def _validate_package(record: DependencyRecord) -> None:
     if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
         if APT_PACKAGE_RE.fullmatch(record.package) is None:
@@ -385,8 +622,8 @@ def _validate_package(record: DependencyRecord) -> None:
 
 def _validate_method_fields(record: DependencyRecord, raw: Mapping[str, object]) -> None:
     common = {
-        "id", "package", "method", "version", "source", "commands", "deps",
-        "provides", "failure_policy",
+        "id", "package", "method", "version", "source", "verification",
+        "deps", "provides", "failure_policy",
     }
     method_fields = {
         Method.APT_PACKAGE: set(),
@@ -479,11 +716,19 @@ def _validate_method_values(record: DependencyRecord) -> None:
             f"{record.id}.browser_cache_path",
             prefix="/usr/local/share",
         )
-
-
-def _validate_command_contract(record: DependencyRecord) -> None:
-    """Keep the method-specific install primitive separate from verification argv."""
-    del record
+    verification = record.verification
+    if record.method is Method.RELEASE_ASSET:
+        assert record.destination is not None
+        if verification.path != record.destination:
+            raise DependencyError(
+                f"{record.id}: release verification path must equal destination"
+            )
+    elif record.method is Method.CARGO_SOURCE_BUILD:
+        if verification.path is None:
+            raise DependencyError(f"{record.id}: cargo verification path is required")
+    elif record.method is Method.BROWSER_INSTALL:
+        if not verification.executable_globs:
+            raise DependencyError(f"{record.id}: browser executable glob is required")
 
 
 def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
@@ -496,7 +741,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         "method",
         "version",
         "source",
-        "commands",
+        "verification",
         "deps",
         "provides",
         "failure_policy",
@@ -527,7 +772,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         "method",
         "version",
         "source",
-        "commands",
+        "verification",
         "deps",
         "provides",
         "failure_policy",
@@ -554,7 +799,9 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         method=Method(method_value),
         version=_string(raw["version"], f"{record_id}.version"),
         source=_string(raw["source"], f"{record_id}.source"),
-        commands=_commands(raw["commands"]),
+        verification=_parse_verification(
+            raw["verification"], record_id=record_id, method=Method(method_value)
+        ),
         deps=_string_list(raw["deps"], f"{record_id}.deps"),
         provides=_string_list(
             raw["provides"], f"{record_id}.provides", allow_empty=False
@@ -632,7 +879,6 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         )
     _validate_method_fields(record, raw)
     _validate_method_values(record)
-    _validate_command_contract(record)
     return record
 
 
@@ -713,6 +959,7 @@ def merge_records(manifests: Sequence[LoadedManifest]) -> tuple[DependencyRecord
                 "method",
                 "version",
                 "source",
+                "verification",
                 "failure_policy",
                 "key_fingerprint",
                 "key_url",
@@ -754,7 +1001,6 @@ def merge_records(manifests: Sequence[LoadedManifest]) -> tuple[DependencyRecord
             merged[current.id] = dataclasses.replace(
                 current,
                 **values,
-                commands=_union(current.commands, incoming.commands),
                 deps=_union(current.deps, incoming.deps),
                 provides=_union(current.provides, incoming.provides),
                 checksums=tuple(sorted(checksum_union.items())),
@@ -974,21 +1220,17 @@ class EnvironmentBoundaryModel:
         return frozenset(packages)
 
     @staticmethod
-    def _requirements(path: Path) -> frozenset[str]:
-        """Parse pinned or constrained requirement names for ownership checks."""
-        names: set[str] = set()
-        requirement_re = re.compile(
-            r"^([A-Za-z0-9][A-Za-z0-9_.-]*)(?:[<>=!~].*)?$"
-        )
+    def _requirements(path: Path) -> tuple[PythonRequirementSpec, ...]:
+        """Parse and preserve active PEP 508 requirements for ownership checks."""
+        requirements: list[PythonRequirementSpec] = []
         for raw_line in path.read_text(encoding="utf-8").splitlines():
-            line = raw_line.split("#", 1)[0].strip()
-            if not line:
+            line = re.split(r"\s+#", raw_line, maxsplit=1)[0].strip()
+            if not line or line.startswith("#"):
                 continue
-            match = requirement_re.fullmatch(line)
-            if match is None:
-                raise DependencyError(f"{path}: unsupported requirement syntax: {line}")
-            names.add(match.group(1).lower().replace("_", "-"))
-        return frozenset(names)
+            requirement = PythonRequirementSpec.parse(line)
+            if requirement.is_active():
+                requirements.append(requirement)
+        return tuple(requirements)
 
     def _check_parent_container(
         self, findings: list[BoundaryFinding], checked: list[str]
@@ -1015,10 +1257,14 @@ class EnvironmentBoundaryModel:
         gitignore = self._require(findings, checked, ".gitignore", "python")
         if requirements is not None:
             try:
-                declared = self._requirements(requirements)
+                declared_requirements = self._requirements(requirements)
             except DependencyError as exc:
                 findings.append(BoundaryFinding("python", str(requirements), str(exc)))
             else:
+                declared = frozenset(
+                    requirement.normalized_name
+                    for requirement in declared_requirements
+                )
                 required = frozenset(
                     {"jupyterlab", "notebook", "ipykernel", "pydeps", "snakeviz", "pyyaml"}
                 )
@@ -1200,7 +1446,7 @@ class Installer:
                 {
                     "id": record.id,
                     "method": record.method.value,
-                    "commands": [list(command) for command in record.commands],
+                    "verification": record.verification.payload(),
                     "environment": (
                         {"PLAYWRIGHT_BROWSERS_PATH": record.browser_cache_path}
                         if record.method is Method.BROWSER_INSTALL
@@ -1238,17 +1484,22 @@ class Installer:
                     print(f"DEPENDENCY_RECORD_WARN={record.id}:{error}", file=sys.stderr)
                     continue
                 raise error
-            if self._receipt_matches(receipt, plan, record):
+            receipt_matches = self._receipt_matches(receipt, plan, record)
+            repair = receipt.exists()
+            if receipt_matches:
                 try:
-                    self._verify_record(record, workspace=workspace)
+                    self.verify(record, workspace=workspace)
                 except Exception:
                     receipt.unlink(missing_ok=True)
+                    repair = True
                 else:
                     completed.append(record.id)
                     continue
+            else:
+                receipt.unlink(missing_ok=True)
             try:
-                self._install_record(record, workspace=workspace)
-                self._verify_record(record, workspace=workspace)
+                self.install_record(record, workspace=workspace, repair=repair)
+                self.verify(record, workspace=workspace)
                 self._write_receipt(receipt, plan, record)
             except Exception as exc:
                 receipt.unlink(missing_ok=True)
@@ -1271,9 +1522,12 @@ class Installer:
         except (FileNotFoundError, OSError, json.JSONDecodeError):
             return False
         return (
-            payload.get("status") == "pass"
+            payload.get("schema") == "agent-canon.devcontainer-dependency-receipt"
+            and payload.get("record_id") == record.id
+            and payload.get("status") == "pass"
             and payload.get("plan_fingerprint") == plan.fingerprint
             and payload.get("record_fingerprint") == record.fingerprint()
+            and payload.get("verification") == record.verification.payload()
         )
 
     @staticmethod
@@ -1286,6 +1540,7 @@ class Installer:
             "record_id": record.id,
             "record_fingerprint": record.fingerprint(),
             "plan_fingerprint": plan.fingerprint,
+            "verification": record.verification.payload(),
         }
         path.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
@@ -1326,6 +1581,7 @@ class Installer:
         """Publish deterministic pip, Rust, and Lean tool paths."""
         pip_user_bin_dir = self._pip_user_bin_dir()
         merged: dict[str, str] = dict(os.environ)
+        merged.pop("CARGO_TARGET_DIR", None)
         merged.update(command_env or {})
         home = Path(merged.get("HOME", str(Path.home())))
         cargo_home = merged.get("CARGO_HOME", str(home / ".cargo"))
@@ -1336,6 +1592,8 @@ class Installer:
         merged["CARGO_HOME"] = cargo_home
         merged["RUSTUP_HOME"] = rustup_home
         merged["ELAN_HOME"] = elan_home
+        merged.pop("RUSTUP_TOOLCHAIN", None)
+        merged.pop("ELAN_TOOLCHAIN", None)
         missing_tool_paths = [
             item for item in tool_paths if item not in path_entries
         ]
@@ -1344,56 +1602,70 @@ class Installer:
         )
         return merged
 
-    def _install_record(self, record: DependencyRecord, *, workspace: Path) -> None:
+    def install_record(
+        self, record: DependencyRecord, *, workspace: Path, repair: bool = False
+    ) -> None:
         method = record.method
         if method is Method.APT_PACKAGE:
+            command = [
+                "apt-get",
+                "install",
+                "-y",
+                "--no-install-recommends",
+                "--no-remove",
+                f"{record.package}={record.version}",
+            ]
+            if repair:
+                command.insert(2, "--reinstall")
             self._run(
-                [
-                    "apt-get",
-                    "install",
-                    "-y",
-                    "--no-install-recommends",
-                    "--no-remove",
-                    f"{record.package}={record.version}",
-                ],
+                command,
                 workspace=workspace,
                 privileged=True,
             )
         elif method is Method.APT_REPOSITORY:
             self._install_apt_repository(record, workspace)
+            command = [
+                "apt-get",
+                "install",
+                "-y",
+                "--no-install-recommends",
+                "--no-remove",
+                f"{record.package}={record.version}",
+            ]
+            if repair:
+                command.insert(2, "--reinstall")
             self._run(
-                [
-                    "apt-get",
-                    "install",
-                    "-y",
-                    "--no-install-recommends",
-                    "--no-remove",
-                    f"{record.package}={record.version}",
-                ],
+                command,
                 workspace=workspace,
                 privileged=True,
             )
         elif method is Method.NPM_GLOBAL:
+            command = [
+                "npm",
+                "install",
+                "--global",
+                f"{record.package}@{record.version}",
+            ]
+            if repair:
+                command.insert(2, "--force")
             self._run(
-                [
-                    "npm",
-                    "install",
-                    "--global",
-                    f"{record.package}@{record.version}",
-                ],
+                command,
                 workspace=workspace,
                 privileged=True,
             )
         elif method is Method.PIP_USER:
+            command = [
+                "python3",
+                "-m",
+                "pip",
+                "install",
+                "--user",
+                f"{record.package}=={record.version}",
+            ]
+            if repair:
+                command.insert(4, "--force-reinstall")
             self._run(
-                [
-                    "python3",
-                    "-m",
-                    "pip",
-                    "install",
-                    "--user",
-                    f"{record.package}=={record.version}",
-                ],
+                command,
                 workspace=workspace,
                 env=self._with_tool_paths(None),
             )
@@ -1414,6 +1686,22 @@ class Installer:
                 workspace=workspace,
                 env=tool_env,
             )
+            if repair:
+                installed = self._capture(
+                    ["rustup", "toolchain", "list"],
+                    workspace=workspace,
+                    env=tool_env,
+                ).stdout
+                if any(
+                    self._rust_toolchain_matches(line, record.version)
+                    for line in installed.splitlines()
+                    if line.strip()
+                ):
+                    self._run(
+                        ["rustup", "toolchain", "uninstall", record.version],
+                        workspace=workspace,
+                        env=tool_env,
+                    )
             self._run(
                 [
                     "rustup",
@@ -1457,6 +1745,22 @@ class Installer:
                 workspace=workspace,
                 env=tool_env,
             )
+            if repair:
+                installed = self._capture(
+                    ["elan", "toolchain", "list"],
+                    workspace=workspace,
+                    env=tool_env,
+                ).stdout
+                if any(
+                    line.split()[0] == record.version
+                    for line in installed.splitlines()
+                    if line.strip()
+                ):
+                    self._run(
+                        ["elan", "toolchain", "uninstall", record.version],
+                        workspace=workspace,
+                        env=tool_env,
+                    )
             self._run(
                 ["elan", "toolchain", "install", record.version],
                 workspace=workspace,
@@ -1468,20 +1772,10 @@ class Installer:
                 env=tool_env,
             )
         elif method is Method.CARGO_SOURCE_BUILD:
-            source = (workspace / record.source).resolve()
-            if not source.is_dir():
-                projected = (workspace / "vendor" / "agent-canon" / record.source).resolve()
-                if projected.is_dir():
-                    source = projected
-            if os.path.commonpath(
-                (str(workspace.resolve()), str(source))
-            ) != str(workspace.resolve()):
-                raise DependencyError(f"{record.id}: cargo source escapes workspace")
-            if not source.is_dir():
-                raise DependencyError(f"{record.id}: cargo source is missing: {source}")
+            source = self._cargo_source(record, workspace)
             assert record.commit is not None
             observed_commit = self.runner.run(
-                ["git", "-C", str(source), "rev-parse", "HEAD"],
+                ["git", "-C", str(source), "log", "-1", "--format=%H", "--", "."],
                 cwd=workspace,
                 capture_output=True,
             ).stdout.strip()
@@ -1500,7 +1794,9 @@ class Installer:
                     str(source / "Cargo.toml"),
                 ],
                 workspace=workspace,
-                env=self._with_tool_paths(None),
+                env=self._with_tool_paths(
+                    {"CARGO_TARGET_DIR": str(source / "target")}
+                ),
             )
         elif method is Method.BROWSER_INSTALL:
             assert record.browser is not None
@@ -1524,13 +1820,280 @@ class Installer:
         else:  # pragma: no cover - Method is a closed enum.
             raise DependencyError(f"unsupported installation method: {method}")
 
-    def _verify_record(
+    def verify(self, record: DependencyRecord, *, workspace: Path) -> None:
+        """Dispatch the record's typed owner-specific live verifier."""
+        verifiers = {
+            VerificationKind.APT_PACKAGE: self._verify_apt_package,
+            VerificationKind.APT_REPOSITORY: self._verify_apt_repository,
+            VerificationKind.NPM_PACKAGE: self._verify_npm_package,
+            VerificationKind.PYTHON_DISTRIBUTION: self._verify_python_distribution,
+            VerificationKind.ABSOLUTE_EXECUTABLE: self._verify_absolute_executable,
+            VerificationKind.RUST_TOOLCHAIN: self._verify_rust_toolchain,
+            VerificationKind.LEAN_TOOLCHAIN: self._verify_lean_toolchain,
+            VerificationKind.CARGO_BINARY: self._verify_cargo_binary,
+            VerificationKind.BROWSER_EXECUTABLE: self._verify_browser_executable,
+        }
+        verifier = verifiers.get(record.verification.kind)
+        if verifier is None:  # pragma: no cover - VerificationKind is closed.
+            raise DependencyError(f"unsupported verification kind: {record.verification.kind}")
+        verifier(record, workspace=workspace)
+
+    def _capture(
+        self,
+        argv: Sequence[str],
+        *,
+        workspace: Path,
+        env: Mapping[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        return self.runner.run(
+            argv,
+            cwd=workspace,
+            capture_output=True,
+            env=self._with_tool_paths(env),
+        )
+
+    @staticmethod
+    def _require_output(
+        result: subprocess.CompletedProcess[str], token: str, record_id: str
+    ) -> None:
+        output = f"{result.stdout}\n{result.stderr}"
+        if token not in output:
+            raise DependencyError(
+                f"{record_id}: verification output lacks required token {token!r}"
+            )
+
+    def _verify_apt_package(self, record: DependencyRecord, *, workspace: Path) -> None:
+        result = self._capture(
+            [
+                "dpkg-query",
+                "--show",
+                "--showformat=${Status}\t${Version}\t${Package}\\n",
+                record.package,
+            ],
+            workspace=workspace,
+        )
+        fields = result.stdout.strip().split("\t")
+        if fields != ["install ok installed", record.version, record.package]:
+            raise DependencyError(f"{record.id}: dpkg package/version/owned state mismatch")
+        verification = self._capture(
+            ["dpkg", "--verify", record.package],
+            workspace=workspace,
+        )
+        if verification.stdout.strip() or verification.stderr.strip():
+            raise DependencyError(f"{record.id}: dpkg-owned artifact verification failed")
+
+    def _verify_apt_repository(
         self, record: DependencyRecord, *, workspace: Path
     ) -> None:
-        """Verify that one record's installed tools are available now."""
-        for command in record.commands:
-            command_env = self._with_tool_paths(None)
-            self._run(command, workspace=workspace, env=command_env)
+        self._verify_apt_package(record, workspace=workspace)
+        assert record.key_fingerprint is not None
+        keyring = Path("/etc/apt/keyrings") / f"{record.id}.gpg"
+        source_list = Path("/etc/apt/sources.list.d") / f"{record.id}.list"
+        if (
+            keyring.is_symlink()
+            or not keyring.is_file()
+            or source_list.is_symlink()
+            or not source_list.is_file()
+        ):
+            raise DependencyError(f"{record.id}: apt repository artifact is missing")
+        fingerprint = self._capture(
+            ["gpg", "--show-keys", "--with-colons", str(keyring)],
+            workspace=workspace,
+        ).stdout
+        observed = {
+            line.split(":")[9].upper()
+            for line in fingerprint.splitlines()
+            if line.startswith("fpr:") and len(line.split(":")) > 9
+        }
+        if record.key_fingerprint not in observed:
+            raise DependencyError(f"{record.id}: apt repository key is stale")
+        expected_source = f"deb [signed-by={keyring}] {record.source} stable main\n"
+        try:
+            observed_source = source_list.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise DependencyError(
+                f"{record.id}: apt repository source is unreadable"
+            ) from exc
+        if observed_source != expected_source:
+            raise DependencyError(f"{record.id}: apt repository source is stale")
+
+    def _verify_npm_package(self, record: DependencyRecord, *, workspace: Path) -> None:
+        result = self._capture(
+            ["npm", "ls", "--global", "--json", "--depth=0", record.package],
+            workspace=workspace,
+        )
+        try:
+            payload = json.loads(result.stdout)
+            observed = payload["dependencies"][record.package]["version"]
+        except (KeyError, TypeError, json.JSONDecodeError) as exc:
+            raise DependencyError(f"{record.id}: npm global JSON is missing package") from exc
+        if observed != record.version:
+            raise DependencyError(
+                f"{record.id}: npm version mismatch {observed!r}!={record.version!r}"
+            )
+        spec = record.verification
+        assert spec.executable is not None and spec.output_contains is not None
+        executable = self._capture(
+            [spec.executable, *spec.args],
+            workspace=workspace,
+        )
+        self._require_output(executable, spec.output_contains, record.id)
+
+    def _verify_python_distribution(
+        self, record: DependencyRecord, *, workspace: Path
+    ) -> None:
+        result = self._capture(
+            ["python3", "-m", "pip", "show", record.package], workspace=workspace
+        )
+        observed_name: str | None = None
+        observed_version: str | None = None
+        for line in result.stdout.splitlines():
+            key, separator, value = line.partition(":")
+            if separator and key == "Name":
+                observed_name = canonicalize_name(value.strip())
+            elif separator and key == "Version":
+                observed_version = value.strip()
+        if observed_name != canonicalize_name(record.package) or observed_version != record.version:
+            raise DependencyError(f"{record.id}: Python distribution/version mismatch")
+        spec = record.verification
+        assert spec.executable is not None and spec.output_contains is not None
+        executable = self._capture(
+            [spec.executable, *spec.args],
+            workspace=workspace,
+        )
+        self._require_output(executable, spec.output_contains, record.id)
+
+    def _verify_absolute_executable(
+        self, record: DependencyRecord, *, workspace: Path
+    ) -> None:
+        spec = record.verification
+        assert spec.path is not None and spec.output_contains is not None
+        path = Path(spec.path)
+        if not path.is_file() or not os.access(path, os.X_OK):
+            raise DependencyError(f"{record.id}: executable is missing or not executable: {path}")
+        result = self._capture([str(path), *spec.args], workspace=workspace)
+        self._require_output(result, spec.output_contains, record.id)
+
+    def _verify_rust_toolchain(self, record: DependencyRecord, *, workspace: Path) -> None:
+        active = self._capture(["rustup", "show", "active-toolchain"], workspace=workspace)
+        if not active.stdout.strip().startswith(record.version):
+            raise DependencyError(f"{record.id}: Rust default toolchain is stale")
+        installed = self._capture(["rustup", "toolchain", "list"], workspace=workspace)
+        if not any(
+            self._rust_toolchain_matches(line, record.version)
+            for line in installed.stdout.splitlines()
+            if line.strip()
+        ):
+            raise DependencyError(f"{record.id}: Rust toolchain is not installed")
+        components = self._capture(
+            ["rustup", "component", "list", "--toolchain", record.version],
+            workspace=workspace,
+        ).stdout
+        for component in record.components:
+            if not any(
+                line.startswith(component) and "(installed)" in line
+                for line in components.splitlines()
+            ):
+                raise DependencyError(f"{record.id}: Rust component is stale: {component}")
+        component_tools = {
+            "rustfmt": "rustfmt",
+            "clippy": "clippy-driver",
+            "rust-analyzer": "rust-analyzer",
+        }
+        tools = (
+            "rustc",
+            "cargo",
+            *(component_tools[component] for component in record.components),
+        )
+        for tool in tools:
+            self._capture(
+                ["rustup", "run", record.version, tool, "--version"],
+                workspace=workspace,
+            )
+
+    @staticmethod
+    def _rust_toolchain_matches(line: str, version: str) -> bool:
+        """Match rustup's optional host-triple suffix for one exact version."""
+        installed = line.split()[0]
+        return installed == version or installed.startswith(f"{version}-")
+
+    def _verify_lean_toolchain(self, record: DependencyRecord, *, workspace: Path) -> None:
+        active = self._capture(["elan", "default"], workspace=workspace)
+        installed = self._capture(["elan", "toolchain", "list"], workspace=workspace)
+        if record.version not in active.stdout or not any(
+            line.split()[0] == record.version
+            for line in installed.stdout.splitlines()
+            if line.strip()
+        ):
+            raise DependencyError(f"{record.id}: Lean toolchain is stale")
+        for tool in ("lean", "lake"):
+            self._capture(
+                ["elan", "run", record.version, tool, "--version"],
+                workspace=workspace,
+            )
+
+    def _cargo_source(self, record: DependencyRecord, workspace: Path) -> Path:
+        source = (workspace / record.source).resolve()
+        if not source.is_dir():
+            source = (workspace / "vendor" / "agent-canon" / record.source).resolve()
+        if os.path.commonpath((str(workspace.resolve()), str(source))) != str(workspace.resolve()):
+            raise DependencyError(f"{record.id}: cargo source escapes workspace")
+        if not source.is_dir():
+            raise DependencyError(f"{record.id}: cargo source is missing: {source}")
+        return source
+
+    def _verify_cargo_binary(self, record: DependencyRecord, *, workspace: Path) -> None:
+        spec = record.verification
+        assert spec.path is not None and spec.output_contains is not None
+        source = self._cargo_source(record, workspace)
+        assert record.commit is not None
+        observed_commit = self.runner.run(
+            ["git", "-C", str(source), "log", "-1", "--format=%H", "--", "."],
+            cwd=workspace,
+            capture_output=True,
+        ).stdout.strip()
+        if observed_commit and observed_commit != record.commit:
+            raise DependencyError(
+                f"{record.id}: cargo source commit mismatch "
+                f"{observed_commit}!={record.commit}"
+            )
+        binary = (source / spec.path).resolve()
+        if os.path.commonpath((str(source), str(binary))) != str(source):
+            raise DependencyError(f"{record.id}: cargo binary escapes source")
+        if not binary.is_file() or not os.access(binary, os.X_OK):
+            raise DependencyError(f"{record.id}: cargo binary is missing: {binary}")
+        result = self._capture([str(binary), *spec.args], workspace=workspace)
+        self._require_output(result, spec.output_contains, record.id)
+
+    def _verify_browser_executable(
+        self, record: DependencyRecord, *, workspace: Path
+    ) -> None:
+        assert record.browser_cache_path is not None
+        spec = record.verification
+        assert spec.output_contains is not None
+        cache_path = Path(record.browser_cache_path)
+        if cache_path.is_symlink() or not cache_path.is_dir():
+            raise DependencyError(f"{record.id}: browser cache is missing")
+        cache = cache_path.resolve()
+        matches: list[Path] = []
+        for pattern in spec.executable_globs:
+            for candidate in sorted(cache.glob(pattern)):
+                resolved = candidate.resolve()
+                if (
+                    not candidate.is_symlink()
+                    and candidate.is_file()
+                    and os.access(candidate, os.X_OK)
+                    and os.path.commonpath((str(cache), str(resolved))) == str(cache)
+                ):
+                    matches.append(candidate)
+        if not matches:
+            raise DependencyError(f"{record.id}: browser executable is missing from cache")
+        result = self._capture(
+            [str(matches[0]), *spec.args],
+            workspace=workspace,
+            env={"PLAYWRIGHT_BROWSERS_PATH": record.browser_cache_path},
+        )
+        self._require_output(result, spec.output_contains, record.id)
 
     def _install_apt_repository(
         self, record: DependencyRecord, workspace: Path
