@@ -53,12 +53,15 @@ def _label(value: str) -> str:
 
 def _edge_labels(
     rules: dict[str, SkillDependencyRule],
-) -> tuple[dict[tuple[str, str], set[str]], set[tuple[str, str]]]:
-    """Collect typed directed and parallel relations without dropping nodes."""
+) -> tuple[dict[tuple[str, str], set[str]], set[tuple[str, str]], set[tuple[str, str]]]:
+    """Collect typed directed, routing-candidate, and parallel relations."""
     directed: dict[tuple[str, str], set[str]] = defaultdict(set)
+    routing: set[tuple[str, str]] = set()
     for rule in rules.values():
         for prerequisite in rule.required_prerequisites:
             directed[(prerequisite, rule.skill)].add("prerequisite")
+        for candidate in rule.routing_candidates:
+            routing.add((rule.skill, candidate))
         for successor in rule.successors:
             directed[(rule.skill, successor)].add("successor")
         for constraint in rule.order_constraints:
@@ -67,7 +70,7 @@ def _edge_labels(
     for rule in rules.values():
         for other in rule.parallel_independent:
             parallel.add(tuple(sorted((rule.skill, other))))
-    return directed, parallel
+    return directed, routing, parallel
 
 
 def render_mermaid(rules: dict[str, SkillDependencyRule]) -> str:
@@ -75,7 +78,7 @@ def render_mermaid(rules: dict[str, SkillDependencyRule]) -> str:
     groups: dict[str, list[str]] = defaultdict(list)
     for rule in rules.values():
         groups[rule.responsibility_group].append(rule.skill)
-    directed, parallel = _edge_labels(rules)
+    directed, routing, parallel = _edge_labels(rules)
     lines = [
         TOP_DEPENDENCY_MANIFEST.rstrip(),
         GRAPH_HEADER,
@@ -95,6 +98,10 @@ def render_mermaid(rules: dict[str, SkillDependencyRule]) -> str:
         lines.append(
             f'  {_mermaid_id(before)} -->|"{label}"| {_mermaid_id(after)}'
         )
+    for before, after in sorted(routing):
+        lines.append(
+            f'  {_mermaid_id(before)} -.->|routing-candidate| {_mermaid_id(after)}'
+        )
     for before, after in sorted(parallel):
         lines.append(
             f'  {_mermaid_id(before)} -.->|"parallel-independent"| '
@@ -108,7 +115,7 @@ def check(root: Path) -> tuple[int, int, int]:
     """Validate the map and return skill, directed-edge, parallel-edge counts."""
     rules = dict(load_skill_dependency_map(root))
     directed = build_skill_dependency_edges(rules)
-    _, parallel = _edge_labels(rules)
+    _, _, parallel = _edge_labels(rules)
     return len(rules), sum(len(targets) for targets in directed.values()), len(parallel)
 
 

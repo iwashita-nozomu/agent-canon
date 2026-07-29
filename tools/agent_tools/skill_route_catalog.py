@@ -222,6 +222,7 @@ class SkillDependencyRule:
     skill: str
     responsibility_group: str
     required_prerequisites: tuple[str, ...]
+    routing_candidates: tuple[str, ...]
     successors: tuple[str, ...]
     order_constraints: tuple[SkillOrderConstraint, ...]
     parallel_independent: tuple[str, ...]
@@ -491,6 +492,14 @@ def load_skill_dependency_map(
                 mapping.get("required_prerequisites"),
                 f"{skill}.required_prerequisites",
             ),
+            routing_candidates=(
+                _dependency_string_list(
+                    mapping.get("routing_candidates"),
+                    f"{skill}.routing_candidates",
+                )
+                if mapping.get("routing_candidates") is not None
+                else ()
+            ),
             successors=_dependency_string_list(
                 mapping.get("successors"), f"{skill}.successors"
             ),
@@ -505,6 +514,7 @@ def load_skill_dependency_map(
     for rule in rules.values():
         for field, references in (
             ("required_prerequisites", rule.required_prerequisites),
+            ("routing_candidates", rule.routing_candidates),
             ("successors", rule.successors),
             ("parallel_independent", rule.parallel_independent),
         ):
@@ -836,10 +846,7 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
                     skill_id,
                 ),
                 related_skills=ordered_unique(
-                    (
-                        *dependency_rules[skill_id].successors,
-                        *dependency_rules[skill_id].parallel_independent,
-                    )
+                    dependency_rules[skill_id].routing_candidates
                 ),
                 visualization_owner_skill=(
                     cast(VisualizationOwnerSkill, visualization_owner)
@@ -889,8 +896,7 @@ def load_skill_route_rules_from_root(
 def load_skill_related_map(root: Path) -> dict[str, tuple[str, ...]]:
     """Return catalog-backed related-skill candidates keyed by public skill id."""
     return {
-        rule.skill: ordered_unique((*rule.successors, *rule.parallel_independent))
-        for rule in load_skill_route_rules(root)
+        rule.skill: rule.related_skills for rule in load_skill_route_rules(root)
     }
 
 
