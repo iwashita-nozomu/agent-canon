@@ -10,26 +10,28 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import subprocess
 import sys
 import tarfile
 import tempfile
 import unittest
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 from tools.agent_tools.devcontainer_dependencies import (
     DependencyError,
     Installer,
     LoadedManifest,
     build_plan,
-    load_manifest,
     manifest_paths,
     parse_record,
     safe_extract_tar,
 )
-
 
 ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
@@ -93,17 +95,17 @@ class FakeRunner:
 
     def run(
         self,
-        argv: list[str] | tuple[str, ...],
+        argv: Sequence[str],
         *,
         cwd: Path | None = None,
         privileged: bool = False,
         capture_output: bool = False,
-        env: dict[str, str] | None = None,
+        env: Mapping[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         del cwd, privileged, capture_output
         command = tuple(argv)
         self.calls.append(command)
-        self.environments.append(env)
+        self.environments.append(dict(env) if env is not None else None)
         if self.fail_on and command[0] == self.fail_on:
             raise subprocess.CalledProcessError(1, command)
         if command == (sys.executable, "-c", "import site; print(site.getuserbase())"):
@@ -202,6 +204,101 @@ class DependencyModelTests(unittest.TestCase):
             value.update(common)
             parsed = parse_record(value, path=Path("fixture.toml"), index=index)
             self.assertEqual(parsed.method.value, value["method"])
+
+    def test_binary_release_asset_accepts_pinned_architecture_paths(self) -> None:
+        parsed = parse_record(
+            record(
+                "binary",
+                method="release-asset",
+                checksum="0" * 64,
+                checksums={"aarch64": "1" * 64, "x86_64": "0" * 64},
+                asset="x86_64-unknown-linux-gnu/tool",
+                assets={
+                    "aarch64": "aarch64-unknown-linux-gnu/tool",
+                    "x86_64": "x86_64-unknown-linux-gnu/tool",
+                },
+                archive_format="binary",
+                extract="none",
+                destination="/usr/local/bin/tool",
+                source="https://example.test/releases",
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        self.assertEqual(parsed.archive_format, "binary")
+        self.assertEqual(
+            dict(parsed.assets)["aarch64"], "aarch64-unknown-linux-gnu/tool"
+        )
+        with self.assertRaisesRegex(DependencyError, "safe relative asset path"):
+            parse_record(
+                record(
+                    "unsafe-binary",
+                    method="release-asset",
+                    checksum="0" * 64,
+                    asset="../tool",
+                    archive_format="binary",
+                    extract="none",
+                    destination="/usr/local/bin/tool",
+                    source="https://example.test/releases",
+                ),
+                path=Path("fixture.toml"),
+                index=0,
+            )
+
+    def test_binary_release_asset_installs_verified_nested_asset(self) -> None:
+        content = b"pinned-rustup-init"
+        parsed = parse_record(
+            record(
+                "rustup-init",
+                method="release-asset",
+                checksum=hashlib.sha256(content).hexdigest(),
+                checksums={
+                    "aarch64": hashlib.sha256(b"aarch64").hexdigest(),
+                    "x86_64": hashlib.sha256(content).hexdigest(),
+                },
+                asset="x86_64-unknown-linux-gnu/rustup-init",
+                assets={
+                    "aarch64": "aarch64-unknown-linux-gnu/rustup-init",
+                    "x86_64": "x86_64-unknown-linux-gnu/rustup-init",
+                },
+                archive_format="binary",
+                extract="none",
+                destination="/usr/local/bin/rustup-init",
+                source="https://static.rust-lang.org/rustup/archive/1.28.2",
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((LoadedManifest(Path("fixture.toml"), (parsed,)),))
+        runner = FakeRunner()
+
+        def download(url: str, destination: Path) -> None:
+            self.assertEqual(
+                url,
+                "https://static.rust-lang.org/rustup/archive/1.28.2/"
+                "x86_64-unknown-linux-gnu/rustup-init",
+            )
+            destination.write_bytes(content)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                mock.patch(
+                    "tools.agent_tools.devcontainer_dependencies.architecture",
+                    return_value="x86_64",
+                ),
+                mock.patch(
+                    "tools.agent_tools.devcontainer_dependencies._download",
+                    side_effect=download,
+                ),
+            ):
+                Installer(runner).install(
+                    plan, workspace=root, receipts=root / "receipts"
+                )
+
+        install_call = next(call for call in runner.calls if call[0] == "install")
+        self.assertEqual(install_call[1:4], ("-D", "-m", "0755"))
+        self.assertEqual(install_call[-1], "/usr/local/bin/rustup-init")
 
     def test_parent_values_are_retained_and_compatible_sets_union(self) -> None:
         parent = parse_record(
@@ -368,6 +465,93 @@ class DependencyModelTests(unittest.TestCase):
                 runner.environments,
             )
 
+    def test_toolchain_installers_bootstrap_and_publish_home_paths(self) -> None:
+        rust = parse_record(
+            record(
+                "rust",
+                method="rust-toolchain",
+                version="1.89.0",
+                commands=[["rustc", "--version"], ["cargo", "--version"]],
+                provides=["rust", "cargo"],
+                components=["rustfmt", "clippy"],
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        lean = parse_record(
+            record(
+                "lean",
+                method="lean-toolchain",
+                version="leanprover/lean4:v4.30.0",
+                commands=[["lean", "--version"], ["lake", "--version"]],
+            ),
+            path=Path("fixture.toml"),
+            index=1,
+        )
+        cargo = parse_record(
+            record(
+                "agent-cli",
+                method="cargo-source-build",
+                source="rust/agent-canon",
+                repo="https://example.test/agent-canon.git",
+                commit="a" * 40,
+                locked=True,
+                commands=[["cargo", "--version"]],
+                deps=["cargo"],
+            ),
+            path=Path("fixture.toml"),
+            index=2,
+        )
+        plan = build_plan((LoadedManifest(Path("fixture.toml"), (rust, lean, cargo)),))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "rust" / "agent-canon").mkdir(parents=True)
+            runner = FakeRunner()
+            with mock.patch.dict(
+                os.environ, {"HOME": str(root), "PATH": "/usr/bin"}, clear=False
+            ):
+                Installer(runner).install(
+                    plan, workspace=root, receipts=root / "receipts"
+                )
+
+        self.assertIn(
+            (
+                "/usr/local/bin/rustup-init",
+                "-y",
+                "--default-toolchain",
+                "none",
+                "--profile",
+                "minimal",
+                "--no-modify-path",
+            ),
+            runner.calls,
+        )
+        self.assertIn(
+            (
+                "/usr/local/bin/elan-init",
+                "-y",
+                "--default-toolchain",
+                "leanprover/lean4:v4.30.0",
+                "--no-modify-path",
+            ),
+            runner.calls,
+        )
+        cargo_build_index = next(
+            index
+            for index, command in enumerate(runner.calls)
+            if command[:2] == ("cargo", "build")
+        )
+        tool_environment = runner.environments[cargo_build_index]
+        self.assertIsNotNone(tool_environment)
+        assert tool_environment is not None
+        self.assertEqual(tool_environment["CARGO_HOME"], f"{root}/.cargo")
+        self.assertEqual(tool_environment["RUSTUP_HOME"], f"{root}/.rustup")
+        self.assertEqual(tool_environment["ELAN_HOME"], f"{root}/.elan")
+        self.assertEqual(
+            tool_environment["PATH"],
+            f"{root}/.cargo/bin:{root}/.elan/bin:/tmp/fake-python-user-base/bin:/usr/bin",
+        )
+
     def test_method_specific_security_values_fail_closed(self) -> None:
         with self.assertRaisesRegex(DependencyError, "full 40-digit"):
             parse_record(
@@ -429,16 +613,49 @@ class DependencyModelTests(unittest.TestCase):
         self.assertNotIn("install_rust_toolchain", post_create)
         self.assertNotIn("grep", validator)
         self.assertIn("PLAYWRIGHT_BROWSERS_PATH", post_create)
+        self.assertIn('export CARGO_HOME="$cargo_home"', post_create)
+        self.assertIn('export RUSTUP_HOME="$rustup_home"', post_create)
+        self.assertIn('export ELAN_HOME="$elan_home"', post_create)
+        self.assertIn("STRUCTURED_ANALYSIS_BOOTSTRAP=warn", post_create)
+        cache_function = post_create.split("build_agent_canon_cache() {", 1)[1].split(
+            "\n}\n", 1
+        )[0]
+        self.assertIn(
+            "if agent-canon structured-analysis build", cache_function
+        )
+        self.assertNotIn("return 1", cache_function)
+        self.assertEqual(
+            post_create.count('"$devcontainer_dir/finalize-shared-runtime.sh"'), 1
+        )
+        bootstrap_index = post_create.rindex(
+            '"$devcontainer_dir/bootstrap-dependencies.sh" --check'
+        )
+        pip_user_path_index = post_create.index('pip_user_script_dir="$(')
+        validate_index = post_create.index("validate --workspace")
+        install_index = post_create.index("install --workspace")
+        python_installer_index = post_create.rindex(
+            "docker/install_python_dependencies.sh"
+        )
+        finalize_index = post_create.rindex(
+            '"$devcontainer_dir/finalize-shared-runtime.sh"'
+        )
+        cache_index = post_create.rindex("\nbuild_agent_canon_cache\n")
+        projection_index = post_create.rindex("\npublish_container_local_runtime\n")
+        self.assertLess(bootstrap_index, pip_user_path_index)
+        self.assertLess(pip_user_path_index, validate_index)
         self.assertLess(
-            post_create.index("validate --workspace"),
-            post_create.index("install --workspace"),
+            validate_index,
+            install_index,
         )
         self.assertLess(
-            post_create.index("install --workspace"),
-            post_create.rindex("docker/install_python_dependencies.sh"),
+            install_index,
+            python_installer_index,
         )
+        self.assertLess(python_installer_index, finalize_index)
+        self.assertLess(finalize_index, cache_index)
+        self.assertLess(cache_index, projection_index)
         self.assertLess(
-            post_create.rindex("docker/install_python_dependencies.sh"),
+            python_installer_index,
             post_create.rindex("\npublish_agent_canon_cli\n"),
         )
 

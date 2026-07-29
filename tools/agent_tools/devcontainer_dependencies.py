@@ -31,6 +31,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections import OrderedDict, deque
@@ -194,6 +195,7 @@ class CommandRunner(Protocol):
         env: Mapping[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run one argv list without a shell."""
+        ...
 
 
 class SubprocessRunner:
@@ -350,6 +352,14 @@ def _validate_safe_member(value: str, field: str) -> None:
         raise DependencyError(f"{field} has an unsupported archive member name")
 
 
+def _validate_safe_asset_path(value: str, field: str) -> None:
+    path = PurePosixPath(value)
+    if path.is_absolute() or str(path) != value or TRAVERSAL_RE.search(value):
+        raise DependencyError(f"{field} must be a safe relative asset path")
+    if any(SAFE_MEMBER_RE.fullmatch(part) is None for part in path.parts):
+        raise DependencyError(f"{field} has an unsupported asset path")
+
+
 def _validate_absolute_path(value: str, field: str, *, prefix: str) -> None:
     if not value.startswith("/") or TRAVERSAL_RE.search(value):
         raise DependencyError(f"{field} must be an absolute path below {prefix}")
@@ -420,15 +430,19 @@ def _validate_method_values(record: DependencyRecord) -> None:
         _validate_https_url(record.source, f"{record.id}.source")
         for asset in (record.asset, *[value for _, value in record.assets]):
             if asset is not None:
-                _validate_safe_member(asset, f"{record.id}.asset")
+                _validate_safe_asset_path(asset, f"{record.id}.asset")
         for arch, _ in record.assets:
             if arch not in {"x86_64", "aarch64"}:
                 raise DependencyError(f"{record.id}.assets has an unsupported architecture")
         assert record.archive_format is not None
-        if record.archive_format not in {"tar.gz", "tar.xz", "tar"}:
+        if record.archive_format not in {"binary", "tar.gz", "tar.xz", "tar"}:
             raise DependencyError(f"{record.id}.archive_format is unsupported")
         assert record.extract is not None
         _validate_safe_member(record.extract, f"{record.id}.extract")
+        if (record.archive_format == "binary") != (record.extract == "none"):
+            raise DependencyError(
+                f"{record.id}: binary release assets require extract=none"
+            )
         assert record.destination is not None
         _validate_absolute_path(record.destination, f"{record.id}.destination", prefix="/usr/local/bin")
     elif record.method is Method.RUST_TOOLCHAIN:
@@ -1300,18 +1314,26 @@ class Installer:
             raise DependencyError("failed to resolve python user site base")
         return f"{site_result}/bin"
 
-    def _with_user_path(self, command_env: Mapping[str, str] | None) -> dict[str, str]:
-        """Add deterministic pip --user bin directory to PATH."""
+    def _with_tool_paths(self, command_env: Mapping[str, str] | None) -> dict[str, str]:
+        """Publish deterministic pip, Rust, and Lean tool paths."""
         pip_user_bin_dir = self._pip_user_bin_dir()
-        path = os.environ.get("PATH", "")
-        if command_env is not None:
-            path = command_env.get("PATH", path)
-        path_entries = tuple(filter(None, path.split(os.pathsep)))
-        if pip_user_bin_dir not in path_entries:
-            path = f"{pip_user_bin_dir}{os.pathsep}{path}"
         merged: dict[str, str] = dict(os.environ)
         merged.update(command_env or {})
-        merged["PATH"] = path
+        home = Path(merged.get("HOME", str(Path.home())))
+        cargo_home = merged.get("CARGO_HOME", str(home / ".cargo"))
+        rustup_home = merged.get("RUSTUP_HOME", str(home / ".rustup"))
+        elan_home = merged.get("ELAN_HOME", str(home / ".elan"))
+        path_entries = list(filter(None, merged.get("PATH", "").split(os.pathsep)))
+        tool_paths = (f"{cargo_home}/bin", f"{elan_home}/bin", pip_user_bin_dir)
+        merged["CARGO_HOME"] = cargo_home
+        merged["RUSTUP_HOME"] = rustup_home
+        merged["ELAN_HOME"] = elan_home
+        missing_tool_paths = [
+            item for item in tool_paths if item not in path_entries
+        ]
+        merged["PATH"] = os.pathsep.join(
+            [*missing_tool_paths, *path_entries]
+        )
         return merged
 
     def _install_record(self, record: DependencyRecord, *, workspace: Path) -> None:
@@ -1365,11 +1387,25 @@ class Installer:
                     f"{record.package}=={record.version}",
                 ],
                 workspace=workspace,
-                env=self._with_user_path(None),
+                env=self._with_tool_paths(None),
             )
         elif method is Method.RELEASE_ASSET:
             self._install_release_asset(record)
         elif method is Method.RUST_TOOLCHAIN:
+            tool_env = self._with_tool_paths(None)
+            self._run(
+                [
+                    "/usr/local/bin/rustup-init",
+                    "-y",
+                    "--default-toolchain",
+                    "none",
+                    "--profile",
+                    "minimal",
+                    "--no-modify-path",
+                ],
+                workspace=workspace,
+                env=tool_env,
+            )
             self._run(
                 [
                     "rustup",
@@ -1380,6 +1416,7 @@ class Installer:
                     "minimal",
                 ],
                 workspace=workspace,
+                env=tool_env,
             )
             if record.components:
                 self._run(
@@ -1392,26 +1429,36 @@ class Installer:
                         record.version,
                     ],
                     workspace=workspace,
+                    env=tool_env,
                 )
+            self._run(
+                ["rustup", "default", record.version],
+                workspace=workspace,
+                env=tool_env,
+            )
         elif method is Method.LEAN_TOOLCHAIN:
-            elan_init = Path("/usr/local/bin/elan-init")
-            if shutil.which("elan") is None and elan_init.is_file():
-                self._run(
-                    [
-                        str(elan_init),
-                        "-y",
-                        "--default-toolchain",
-                        record.version,
-                        "--no-modify-path",
-                    ],
-                    workspace=workspace,
-                    privileged=True,
-                )
+            tool_env = self._with_tool_paths(None)
+            self._run(
+                [
+                    "/usr/local/bin/elan-init",
+                    "-y",
+                    "--default-toolchain",
+                    record.version,
+                    "--no-modify-path",
+                ],
+                workspace=workspace,
+                env=tool_env,
+            )
             self._run(
                 ["elan", "toolchain", "install", record.version],
                 workspace=workspace,
+                env=tool_env,
             )
-            self._run(["elan", "default", record.version], workspace=workspace)
+            self._run(
+                ["elan", "default", record.version],
+                workspace=workspace,
+                env=tool_env,
+            )
         elif method is Method.CARGO_SOURCE_BUILD:
             source = (workspace / record.source).resolve()
             if not source.is_dir():
@@ -1445,6 +1492,7 @@ class Installer:
                     str(source / "Cargo.toml"),
                 ],
                 workspace=workspace,
+                env=self._with_tool_paths(None),
             )
         elif method is Method.BROWSER_INSTALL:
             assert record.browser is not None
@@ -1468,7 +1516,7 @@ class Installer:
         else:  # pragma: no cover - Method is a closed enum.
             raise DependencyError(f"unsupported installation method: {method}")
         for command in record.commands:
-            command_env = self._with_user_path(None)
+            command_env = self._with_tool_paths(None)
             self._run(command, workspace=workspace, env=command_env)
 
     def _install_apt_repository(
@@ -1550,6 +1598,7 @@ class Installer:
         with tempfile.TemporaryDirectory(prefix=f"agent-canon-{record.id}-") as temporary:
             root = Path(temporary)
             archive = root / asset
+            archive.parent.mkdir(parents=True, exist_ok=True)
             _download(source, archive)
             checksum_map = dict(record.checksums)
             if checksum_map:
@@ -1616,6 +1665,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run validation, dry-run, or installation with typed failure output."""
     args = build_parser().parse_args(argv)
     exit_status = 0
+    payload: dict[str, Any]
     try:
         if args.command == "boundary":
             workspace = Path(args.workspace).resolve()
@@ -1633,31 +1683,31 @@ def main(argv: Sequence[str] | None = None) -> int:
             exit_status = 0 if not report.findings else 1
         else:
             plan = _cli_plan(args)
-        if args.command == "validate":
-            payload = {
-                "status": "pass",
-                "sources": [str(path) for path in plan.sources],
-                "order": list(plan.order),
-                "plan_fingerprint": plan.fingerprint,
-            }
-        elif args.command == "dry-run":
-            payload = Installer().dry_run(plan)
-        elif args.command == "install":
-            receipts = (
-                Path(args.receipts).resolve()
-                if args.receipts
-                else Path(args.workspace).resolve()
-                / ".agent-canon"
-                / "dependency-receipts"
-            )
-            completed = Installer().install(
-                plan, workspace=Path(args.workspace).resolve(), receipts=receipts
-            )
-            payload = {
-                "status": "pass",
-                "completed": list(completed),
-                "plan_fingerprint": plan.fingerprint,
-            }
+            if args.command == "validate":
+                payload = {
+                    "status": "pass",
+                    "sources": [str(path) for path in plan.sources],
+                    "order": list(plan.order),
+                    "plan_fingerprint": plan.fingerprint,
+                }
+            elif args.command == "dry-run":
+                payload = Installer().dry_run(plan)
+            else:
+                receipts = (
+                    Path(args.receipts).resolve()
+                    if args.receipts
+                    else Path(args.workspace).resolve()
+                    / ".agent-canon"
+                    / "dependency-receipts"
+                )
+                completed = Installer().install(
+                    plan, workspace=Path(args.workspace).resolve(), receipts=receipts
+                )
+                payload = {
+                    "status": "pass",
+                    "completed": list(completed),
+                    "plan_fingerprint": plan.fingerprint,
+                }
     except (
         DependencyError,
         OSError,

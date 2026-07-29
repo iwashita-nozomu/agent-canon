@@ -30,14 +30,18 @@ tools_home="$HOME/.tools"
 runtime_root="/var/lib/agent-canon/runtime"
 source_projection_root="$workspace/reports/agents/devcontainer/runtime"
 playwright_browsers_path="/usr/local/share/ms-playwright"
-pip_user_script_dir="$(python3 - <<'PY'
-import site
-from pathlib import Path
-
-print(Path(site.getuserbase()) / "bin")
-PY
-)"
+cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
+elan_home="${ELAN_HOME:-$HOME/.elan}"
+pip_user_script_dir=""
 export PLAYWRIGHT_BROWSERS_PATH="$playwright_browsers_path"
+
+prepend_path() {
+  case ":$PATH:" in
+    *:"$1":*) ;;
+    *) export PATH="$1:$PATH" ;;
+  esac
+}
 
 publish_agent_tools_profile() {
   local profile_script
@@ -48,9 +52,20 @@ export AGENT_CANON_TOOLS_HOME="$tools_home"
 export AGENT_CANON_RUNTIME_ROOT="$runtime_root"
 export AGENT_CANON_SOURCE_PROJECTION_ROOT="$source_projection_root"
 export PLAYWRIGHT_BROWSERS_PATH="$playwright_browsers_path"
+export CARGO_HOME="$cargo_home"
+export RUSTUP_HOME="$rustup_home"
+export ELAN_HOME="$elan_home"
 case ":\$PATH:" in
   *:"$tools_home/bin":*) ;;
   *) export PATH="$tools_home/bin:\$PATH" ;;
+esac
+case ":\$PATH:" in
+  *:"$cargo_home/bin":*) ;;
+  *) export PATH="$cargo_home/bin:\$PATH" ;;
+esac
+case ":\$PATH:" in
+  *:"$elan_home/bin":*) ;;
+  *) export PATH="$elan_home/bin:\$PATH" ;;
 esac
 case ":\$PATH:" in
   *:"$pip_user_script_dir":*) ;;
@@ -67,7 +82,7 @@ EOF
     return 1
   fi
   rm -f "$profile_script"
-  export PATH="$tools_home/bin:$PATH"
+  prepend_path "$tools_home/bin"
 }
 
 register_safe_directories() {
@@ -116,12 +131,19 @@ publish_agent_canon_cli() {
 }
 
 build_agent_canon_cache() {
+  local status
   command -v agent-canon >/dev/null 2>&1 || {
-    echo "AgentCanon CLI is unavailable after dependency execution" >&2
-    return 1
+    echo "warning: AgentCanon CLI is unavailable; structured-analysis cache rebuild skipped" >&2
+    echo "STRUCTURED_ANALYSIS_BOOTSTRAP=warn reason=cli-unavailable"
+    return 0
   }
-  agent-canon structured-analysis build --root "$workspace" --profile devcontainer
-  echo "STRUCTURED_ANALYSIS_BOOTSTRAP=pass"
+  if agent-canon structured-analysis build --root "$workspace" --profile devcontainer; then
+    echo "STRUCTURED_ANALYSIS_BOOTSTRAP=pass"
+  else
+    status=$?
+    echo "warning: structured-analysis cache rebuild failed with status $status; continuing post-create" >&2
+    echo "STRUCTURED_ANALYSIS_BOOTSTRAP=warn reason=build-failed status=$status"
+  fi
 }
 
 publish_container_local_runtime() {
@@ -149,18 +171,29 @@ publish_container_local_runtime() {
   echo "ENVIRONMENT_TOOL_AVAILABILITY=$runtime_root/tool-availability.json"
 }
 
-"$devcontainer_dir/finalize-shared-runtime.sh"
 "$devcontainer_dir/bootstrap-dependencies.sh"
 "$devcontainer_dir/bootstrap-dependencies.sh" --check
 
+pip_user_script_dir="$(python3 - <<'PY'
+import site
+from pathlib import Path
+
+print(Path(site.getuserbase()) / "bin")
+PY
+)"
+export CARGO_HOME="$cargo_home"
+export RUSTUP_HOME="$rustup_home"
+export ELAN_HOME="$elan_home"
+prepend_path "$pip_user_script_dir"
+prepend_path "$elan_home/bin"
+prepend_path "$cargo_home/bin"
+
 python3 "$agent_canon_root/tools/agent_tools/devcontainer_dependencies.py" \
   validate --workspace "$workspace" --vendor-root "$agent_canon_root" --format text
+register_safe_directories
 python3 "$agent_canon_root/tools/agent_tools/devcontainer_dependencies.py" \
   install --workspace "$workspace" --vendor-root "$agent_canon_root" --receipts \
   "$workspace/.agent-canon/dependency-receipts" --format text
-
-register_safe_directories
-publish_agent_tools_profile
 
 if [ -f "$workspace/docker/install_python_dependencies.sh" ]; then
   bash "$workspace/docker/install_python_dependencies.sh" "$workspace"
@@ -168,6 +201,8 @@ else
   echo "repo-local Python dependency installer absent; skipping docker/install_python_dependencies.sh"
 fi
 
+"$devcontainer_dir/finalize-shared-runtime.sh"
+publish_agent_tools_profile
 publish_agent_canon_cli
 build_agent_canon_cache
 publish_container_local_runtime
