@@ -14,10 +14,11 @@ downstream implementation ../../../tools/agent_tools/devcontainer_dependencies.p
 
 # Dependency Design
 
-Read the canonical skill document at `agents/skills/dependency-design.md`, then
-produce its design packet before handing the result to
-`environment-maintenance`. Keep the packet scoped to mounted developer/agent
-tools and the parent follow-up contract.
+1. Read the canonical skill document at
+   `agents/skills/dependency-design.md`.
+1. Produce its design packet, scoped to mounted developer/agent tools and the
+   parent follow-up contract.
+1. Hand the passing packet to `environment-maintenance`.
 
 ## Tool Commands
 
