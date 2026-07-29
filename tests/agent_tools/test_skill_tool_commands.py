@@ -645,7 +645,7 @@ class SkillToolCommandsTest(unittest.TestCase):
             self.assertIn("Run these only when editing skill command sections", result.stdout)
 
     def test_show_returns_dependency_derived_related_skills(self) -> None:
-        """Show prints candidates projected from the dependency dictionary."""
+        """Show projects related skills from routing candidates, not successors."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_skill(root, "example-skill", "Use the canon.\n")
@@ -667,13 +667,15 @@ class SkillToolCommandsTest(unittest.TestCase):
                     "  example-skill:",
                     "    responsibility_group: fixture",
                     "    required_prerequisites: []",
-                    "    successors:",
+                    "    routing_candidates:",
                     "      - review-skill",
+                    "    successors: []",
                     "    order_constraints: []",
                     "    parallel_independent: []",
                     "  review-skill:",
                     "    responsibility_group: fixture",
                     "    required_prerequisites: []",
+                    "    routing_candidates: []",
                     "    successors: []",
                     "    order_constraints: []",
                     "    parallel_independent: []",
