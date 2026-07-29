@@ -17,6 +17,13 @@ skill で依存 design packet を閉じます。Docker product image/build/runti
 parent の workspace Python installer、AgentCanon の mounted tooling を同じ
 責務として扱いません。
 
+## Workflow
+
+1. `agents/skills/dependency-design.md` を canonical owner として読みます。
+1. mounted developer/agent tools と parent follow-up contract に限定した
+   design packet を作ります。
+1. packet が pass した後に `environment-maintenance` へ渡します。
+
 ## Tool Commands
 
 ```bash
