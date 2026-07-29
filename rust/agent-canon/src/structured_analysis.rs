@@ -3228,7 +3228,9 @@ mod tests {
 
         assert!(paths.contains("documents/missing.md"));
         assert!(!paths.contains("reports/run-output.md"));
-        assert!(!paths.contains("templates/experiments/_template/result/run/file-surface-inventory.md"));
+        assert!(
+            !paths.contains("templates/experiments/_template/result/run/file-surface-inventory.md")
+        );
         assert!(!report
             .findings
             .iter()
