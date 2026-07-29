@@ -113,6 +113,7 @@ graph LR
   skill_dependency_analysis -->|"order/prerequisite/successor"| skill_code_visualization
   skill_structure_refactor -->|"order/prerequisite/successor"| skill_code_visualization
   skill_code_visualization -->|"order/prerequisite/successor"| skill_md_style_check
+  skill_literature_survey -->|"order"| skill_research_workflow
   skill_adaptive_improvement_loop -.->|routing-candidate| skill_experiment_lifecycle
   skill_adaptive_improvement_loop -.->|routing-candidate| skill_research_workflow
   skill_adaptive_improvement_loop -.->|routing-candidate| skill_result_artifact_writeout
@@ -326,7 +327,6 @@ graph LR
   skill_issue_finding_report -.->|"parallel-independent"| skill_result_artifact_writeout
   skill_issue_finding_report -.->|"parallel-independent"| skill_runtime_log_repair
   skill_issue_finding_report -.->|"parallel-independent"| skill_task_routing
-  skill_literature_survey -.->|"parallel-independent"| skill_research_workflow
   skill_md_style_check -.->|"parallel-independent"| skill_owner_bounded_routing
   skill_md_style_check -.->|"parallel-independent"| skill_prose_reasoning_graph
   skill_oop_readability_check -.->|"parallel-independent"| skill_oop_type_design

@@ -79,8 +79,8 @@ path = "agents/skills/codex-task-workflow.md"
 markers = ["literature-survey", "research-workflow", "設計", "Implementation Source Packet", "adoption/exclusion"]
 
 [[contracts.surfaces]]
-path = "agents/skills/catalog.yaml"
-markers = ["literature-survey", "research-workflow", "related_skills"]
+path = "agents/skills/skill-dependencies.yaml"
+markers = ["literature-survey", "research-workflow", "routing_candidates", "order_constraints"]
 
 [[contracts.surfaces]]
 path = "agents/task_catalog.yaml"

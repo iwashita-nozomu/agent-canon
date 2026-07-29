@@ -696,8 +696,7 @@ skill_dependencies:
     routing_candidates: []
     successors: []
     order_constraints: []
-    parallel_independent:
-    - research-workflow
+    parallel_independent: []
   formal-proof-workflow:
     responsibility_group: research
     required_prerequisites: []
@@ -742,12 +741,14 @@ skill_dependencies:
     - experiment-lifecycle
     - result-artifact-writeout
     successors: []
-    order_constraints: []
+    order_constraints:
+    - before: literature-survey
+      after: research-workflow
+      reason: literature survey precedes research workflow
     parallel_independent:
     - result-artifact-writeout
     - experiment-lifecycle
     - adaptive-improvement-loop
-    - literature-survey
   comprehensive-development:
     responsibility_group: delivery
     required_prerequisites: []

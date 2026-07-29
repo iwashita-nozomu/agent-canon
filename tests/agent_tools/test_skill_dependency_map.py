@@ -115,6 +115,16 @@ class SkillDependencyMapTest(unittest.TestCase):
             ):
                 catalog_module.load_skill_dependency_map(root, tuple(records))
 
+    def test_research_workflow_order_matches_literature_constraint(self) -> None:
+        """Research workflow order now enforces literature-survey before execution."""
+        rules = dict(catalog_module.load_skill_dependency_map(PROJECT_ROOT))
+        research = rules["research-workflow"]
+        self.assertIn("literature-survey", research.routing_candidates)
+        self.assertIn(
+            ("literature-survey", "research-workflow"),
+            {(constraint.before, constraint.after) for constraint in research.order_constraints},
+        )
+
     def test_parallel_relation_cannot_overlap_ordered_work(self) -> None:
         """Parallel-independent declarations cannot contradict the DAG."""
         payload = self.base_payload()

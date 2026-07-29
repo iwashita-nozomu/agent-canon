@@ -542,7 +542,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/catalog.yaml": (
         "skill catalog routing entry skill format-only docs work "
-        "literature-survey research-workflow related_skills "
+        "literature-survey research-workflow "
         "prose-reasoning-graph structure-planning SOLID SRP OCP LSP ISP DIP "
         "Single responsibility Open/closed Liskov Interface segregation "
         "Dependency inversion Protocol コードファイル 順序 定義順 関数 class\n"
@@ -550,6 +550,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "- [\"SOLID\"]\n"
         "- [\"SRP\"]\n"
         "- [\"Dependency inversion\"]\n"
+    ),
+    "agents/skills/skill-dependencies.yaml": (
+        "research-workflow literature-survey routing_candidates order_constraints\n"
     ),
     "agents/task_catalog.yaml": (
         "literature-survey research-workflow source packet adoption/exclusion "
