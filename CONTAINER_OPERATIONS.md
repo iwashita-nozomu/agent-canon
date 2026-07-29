@@ -199,7 +199,12 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   package version, and executable verification; it is agent-side formatting
   infrastructure, not a project runtime dependency. The record's package
   source and version must match the current Ubuntu image contract rather than
-  a copied historical distro literal.
+  a copied historical distro literal. The `apt-package` receipt trust boundary
+  is the package manager database: `dpkg-query --show` must report
+  `install ok installed`, the exact declared version, and the declared package
+  identity, followed by any typed record-owned executable/version check. Raw
+  `dpkg --verify` output is not a blocking oracle because official Ubuntu
+  images may intentionally exclude documentation and manpage payloads.
 - Lean theorem-proving tooling used by formal-proof skills, including
   `elan`, Lean, and Lake, belongs in `.devcontainer/post-create.sh` when it is
   only needed for AgentCanon proof tooling and is declared by exact

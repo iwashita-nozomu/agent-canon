@@ -207,8 +207,6 @@ class FakeRunner:
                 f"install ok installed\t1.0.0\t{package}\n",
                 "",
             )
-        if command[:2] == ("dpkg", "--verify"):
-            return subprocess.CompletedProcess(command, 0, "", "")
         if command[:4] == ("npm", "ls", "--global", "--json"):
             package = command[-1]
             return subprocess.CompletedProcess(
@@ -302,6 +300,16 @@ class DependencyModelTests(unittest.TestCase):
         }
         values = [
             record("apt", method="apt-package"),
+            record(
+                "apt-tool",
+                method="apt-package",
+                verification={
+                    "kind": "apt-package",
+                    "executable": "apt-tool",
+                    "args": ["--version"],
+                    "output_contains": "1.0.0",
+                },
+            ),
             record(
                 "repo",
                 method="apt-repository",
@@ -603,6 +611,41 @@ class DependencyModelTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(DependencyError, "one command name"):
             parse_record(unsafe, path=Path("fixture.toml"), index=0)
+        for method, verification_kind in (
+            ("npm-global", "npm-package"),
+            ("pip-user", "python-distribution"),
+        ):
+            for verification in (
+                {"kind": verification_kind},
+                {
+                    "kind": verification_kind,
+                    "executable": "tool",
+                    "args": ["--version"],
+                },
+                {
+                    "kind": verification_kind,
+                    "executable": "tool",
+                    "output_contains": "1.0.0",
+                },
+                {
+                    "kind": verification_kind,
+                    "args": ["--version"],
+                    "output_contains": "1.0.0",
+                },
+            ):
+                with self.subTest(method=method, verification=verification):
+                    with self.assertRaisesRegex(
+                        DependencyError, "requires executable, args"
+                    ):
+                        parse_record(
+                            record(
+                                f"incomplete-{method}",
+                                method=method,
+                                verification=verification,
+                            ),
+                            path=Path("fixture.toml"),
+                            index=0,
+                        )
         incomplete_apt = record(
             "incomplete-apt",
             method="apt-package",
@@ -655,11 +698,11 @@ class DependencyModelTests(unittest.TestCase):
                 Installer(resumed).install(plan, workspace=root, receipts=receipts),
                 ("tool",),
             )
-            self.assertIn(("dpkg", "--verify", "tool"), resumed.calls)
+            self.assertNotIn(("dpkg", "--verify", "tool"), resumed.calls)
             self.assertIn(("tool", "--version"), resumed.calls)
             self.assertFalse(any(command[0] == "apt-get" for command in resumed.calls))
 
-            rebuilt = FakeRunner(fail_once_on="dpkg")
+            rebuilt = FakeRunner(fail_once_on="dpkg-query")
             self.assertEqual(
                 Installer(rebuilt).install(plan, workspace=root, receipts=receipts),
                 ("tool",),
@@ -668,7 +711,10 @@ class DependencyModelTests(unittest.TestCase):
                 sum(command[0] == "apt-get" for command in rebuilt.calls),
                 1,
             )
-            self.assertEqual(rebuilt.calls.count(("dpkg", "--verify", "tool")), 2)
+            self.assertEqual(
+                sum(command[0] == "dpkg-query" for command in rebuilt.calls),
+                2,
+            )
             apt_install = next(command for command in rebuilt.calls if command[0] == "apt-get")
             self.assertIn("--reinstall", apt_install)
 

@@ -572,12 +572,14 @@ def _parse_verification(
         if "executable_globs" in value
         else ()
     )
-    if kind in {
-        VerificationKind.APT_PACKAGE,
-        VerificationKind.NPM_PACKAGE,
-        VerificationKind.PYTHON_DISTRIBUTION,
-    }:
-        if any((executable, args, output_contains)) and (
+    if kind is VerificationKind.APT_PACKAGE:
+        record_owned_fields = {"executable", "args", "output_contains"}
+        provided_record_owned_fields = record_owned_fields & value.keys()
+        if provided_record_owned_fields not in (set(), record_owned_fields):
+            raise DependencyError(
+                f"{record_id}.verification requires executable, args, and output_contains"
+            )
+        if provided_record_owned_fields and (
             executable is None or not args or output_contains is None
         ):
             raise DependencyError(
@@ -586,6 +588,18 @@ def _parse_verification(
         if executable is not None and (
             Path(executable).name != executable or executable in SHELL_EXECUTABLES
         ):
+            raise DependencyError(
+                f"{record_id}.verification.executable must be one command name"
+            )
+    elif kind in {
+        VerificationKind.NPM_PACKAGE,
+        VerificationKind.PYTHON_DISTRIBUTION,
+    }:
+        if executable is None or not args or output_contains is None:
+            raise DependencyError(
+                f"{record_id}.verification requires executable, args, and output_contains"
+            )
+        if Path(executable).name != executable or executable in SHELL_EXECUTABLES:
             raise DependencyError(
                 f"{record_id}.verification.executable must be one command name"
             )
@@ -1913,6 +1927,12 @@ class Installer:
             )
 
     def _verify_apt_package(self, record: DependencyRecord, *, workspace: Path) -> None:
+        """Verify the dpkg database and any record-owned executable contract.
+
+        The installed dpkg database is the container trust boundary. Official
+        Ubuntu images may exclude documentation and manpage payloads, so raw
+        ``dpkg --verify`` output is not a blocking receipt oracle.
+        """
         result = self._capture(
             [
                 "dpkg-query",
@@ -1925,12 +1945,6 @@ class Installer:
         fields = result.stdout.strip().split("\t")
         if fields != ["install ok installed", record.version, record.package]:
             raise DependencyError(f"{record.id}: dpkg package/version/owned state mismatch")
-        verification = self._capture(
-            ["dpkg", "--verify", record.package],
-            workspace=workspace,
-        )
-        if verification.stdout.strip() or verification.stderr.strip():
-            raise DependencyError(f"{record.id}: dpkg-owned artifact verification failed")
         executable = record.verification.executable
         if executable is not None:
             assert record.verification.output_contains is not None
