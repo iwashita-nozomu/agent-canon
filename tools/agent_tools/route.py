@@ -1098,7 +1098,7 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
     related_by_source, related_candidates = related_skill_candidates(
         matched_skills,
         rules_by_skill,
-        skills,
+        matched_skills,
     )
     evidence = (
         f"mode={active_mode};matched={','.join(matched_skills) if matched_skills else 'none'};"

@@ -13,6 +13,12 @@ skill_dependencies:
   agent-orchestration:
     responsibility_group: orchestration
     required_prerequisites: []
+    routing_candidates:
+    - task-routing
+    - codex-task-workflow
+    - owner-bounded-routing
+    - subagent-bootstrap
+    - dependency-analysis
     successors:
     - task-routing
     - codex-task-workflow
@@ -28,6 +34,7 @@ skill_dependencies:
   repo-onboarding:
     responsibility_group: intake
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent: []
@@ -35,6 +42,15 @@ skill_dependencies:
     responsibility_group: orchestration
     required_prerequisites:
     - agent-orchestration
+    routing_candidates:
+    - agent-orchestration
+    - owner-bounded-routing
+    - structure-refactor
+    - agent-log-analysis
+    - issue-finding-report
+    - tool-finding-report
+    - result-artifact-writeout
+    - agent-learning
     successors:
     - owner-bounded-routing
     - structure-refactor
@@ -51,6 +67,7 @@ skill_dependencies:
   start-repository:
     responsibility_group: intake
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent: []
@@ -58,6 +75,12 @@ skill_dependencies:
     responsibility_group: orchestration
     required_prerequisites:
     - agent-orchestration
+    routing_candidates:
+    - agent-orchestration
+    - task-routing
+    - owner-bounded-routing
+    - result-artifact-writeout
+    - change-review
     successors:
     - subagent-bootstrap
     order_constraints: []
@@ -72,6 +95,10 @@ skill_dependencies:
     required_prerequisites:
     - agent-orchestration
     - task-routing
+    routing_candidates:
+    - task-routing
+    - md-style-check
+    - change-review
     successors: []
     order_constraints: []
     parallel_independent:
@@ -84,6 +111,10 @@ skill_dependencies:
     required_prerequisites:
     - agent-orchestration
     - codex-task-workflow
+    routing_candidates:
+    - agent-orchestration
+    - codex-task-workflow
+    - result-artifact-writeout
     successors: []
     order_constraints: []
     parallel_independent:
@@ -92,6 +123,7 @@ skill_dependencies:
   change-review:
     responsibility_group: review
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -106,6 +138,7 @@ skill_dependencies:
   python-review:
     responsibility_group: review
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -113,6 +146,7 @@ skill_dependencies:
   cpp-review:
     responsibility_group: review
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -120,6 +154,7 @@ skill_dependencies:
   oop-readability-check:
     responsibility_group: design
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -129,6 +164,10 @@ skill_dependencies:
   oop-type-design:
     responsibility_group: design
     required_prerequisites: []
+    routing_candidates:
+    - python-review
+    - cpp-review
+    - oop-readability-check
     successors: []
     order_constraints: []
     parallel_independent:
@@ -139,6 +178,10 @@ skill_dependencies:
     responsibility_group: evidence
     required_prerequisites:
     - report-writing
+    routing_candidates:
+    - tool-finding-report
+    - report-writing
+    - save-experiment-results
     successors:
     - save-experiment-results
     order_constraints: []
@@ -159,6 +202,14 @@ skill_dependencies:
   result-visualize:
     responsibility_group: evidence
     required_prerequisites: []
+    routing_candidates:
+    - structure-planning
+    - report-writing
+    - html-output
+    - html-experiment-report
+    - result-artifact-writeout
+    - experiment-review
+    - experiment-lifecycle
     successors: []
     order_constraints: []
     parallel_independent:
@@ -172,6 +223,10 @@ skill_dependencies:
   tool-finding-report:
     responsibility_group: evidence
     required_prerequisites: []
+    routing_candidates:
+    - result-artifact-writeout
+    - change-review
+    - dependency-analysis
     successors: []
     order_constraints: []
     parallel_independent:
@@ -183,6 +238,10 @@ skill_dependencies:
   issue-finding-report:
     responsibility_group: evidence
     required_prerequisites: []
+    routing_candidates:
+    - agent-log-analysis
+    - result-artifact-writeout
+    - report-writing
     successors: []
     order_constraints: []
     parallel_independent:
@@ -194,6 +253,13 @@ skill_dependencies:
   agent-log-analysis:
     responsibility_group: evidence
     required_prerequisites: []
+    routing_candidates:
+    - issue-finding-report
+    - result-artifact-writeout
+    - tool-finding-report
+    - agent-learning
+    - report-writing
+    - runtime-log-repair
     successors: []
     order_constraints: []
     parallel_independent:
@@ -207,6 +273,14 @@ skill_dependencies:
   runtime-log-repair:
     responsibility_group: evidence
     required_prerequisites: []
+    routing_candidates:
+    - agent-log-analysis
+    - agent-eval-accumulation
+    - result-artifact-writeout
+    - issue-finding-report
+    - subagent-bootstrap
+    - task-routing
+    - agent-learning
     successors: []
     order_constraints: []
     parallel_independent:
@@ -220,6 +294,7 @@ skill_dependencies:
   agent-eval-accumulation:
     responsibility_group: evidence
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -227,6 +302,11 @@ skill_dependencies:
   agent-canon-update:
     responsibility_group: lifecycle
     required_prerequisites: []
+    routing_candidates:
+    - dependency-module-change
+    - pr-processing
+    - agent-update-branch
+    - structure-refactor
     successors: []
     order_constraints: []
     parallel_independent:
@@ -237,6 +317,11 @@ skill_dependencies:
   dependency-module-change:
     responsibility_group: lifecycle
     required_prerequisites: []
+    routing_candidates:
+    - agent-canon-update
+    - dependency-analysis
+    - structure-refactor
+    - task-routing
     successors: []
     order_constraints: []
     parallel_independent:
@@ -247,6 +332,11 @@ skill_dependencies:
   pr-processing:
     responsibility_group: lifecycle
     required_prerequisites: []
+    routing_candidates:
+    - agent-canon-update
+    - agent-update-branch
+    - result-artifact-writeout
+    - change-review
     successors: []
     order_constraints: []
     parallel_independent:
@@ -257,6 +347,7 @@ skill_dependencies:
   agent-update-branch:
     responsibility_group: lifecycle
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -266,6 +357,12 @@ skill_dependencies:
     responsibility_group: documents
     required_prerequisites:
     - prose-reasoning-graph
+    routing_candidates:
+    - result-artifact-writeout
+    - structure-planning
+    - prose-reasoning-graph
+    - html-output
+    - change-review
     successors:
     - result-artifact-writeout
     order_constraints: []
@@ -279,6 +376,10 @@ skill_dependencies:
     responsibility_group: documents
     required_prerequisites:
     - structure-planning
+    routing_candidates:
+    - structure-planning
+    - long-form-writing
+    - report-writing
     successors:
     - long-form-writing
     - report-writing
@@ -291,6 +392,10 @@ skill_dependencies:
     responsibility_group: documents
     required_prerequisites:
     - structure-refactor
+    routing_candidates:
+    - prose-reasoning-graph
+    - report-writing
+    - refactor-loop
     successors:
     - prose-reasoning-graph
     order_constraints: []
@@ -305,6 +410,16 @@ skill_dependencies:
     required_prerequisites:
     - dependency-analysis
     - structure-refactor
+    routing_candidates:
+    - dependency-analysis
+    - structure-planning
+    - structure-refactor
+    - algorithm-flowchart
+    - prose-reasoning-graph
+    - html-output
+    - md-style-check
+    - test-design
+    - oop-readability-check
     successors:
     - md-style-check
     order_constraints:
@@ -321,6 +436,7 @@ skill_dependencies:
   html-output:
     responsibility_group: documents
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -330,6 +446,7 @@ skill_dependencies:
   html-experiment-report:
     responsibility_group: documents
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -337,6 +454,9 @@ skill_dependencies:
   test-design:
     responsibility_group: design
     required_prerequisites: []
+    routing_candidates:
+    - oop-readability-check
+    - change-review
     successors: []
     order_constraints: []
     parallel_independent:
@@ -350,6 +470,10 @@ skill_dependencies:
   refactor-loop:
     responsibility_group: design
     required_prerequisites: []
+    routing_candidates:
+    - dependency-analysis
+    - structure-refactor
+    - change-review
     successors: []
     order_constraints: []
     parallel_independent:
@@ -362,6 +486,11 @@ skill_dependencies:
     responsibility_group: analysis
     required_prerequisites:
     - task-routing
+    routing_candidates:
+    - dependency-analysis
+    - document-canon-cleanup
+    - refactor-loop
+    - md-style-check
     successors:
     - structure-planning
     - code-visualization
@@ -379,6 +508,7 @@ skill_dependencies:
   user-guided-debugging:
     responsibility_group: delivery
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent: []
@@ -386,6 +516,7 @@ skill_dependencies:
     responsibility_group: documents
     required_prerequisites:
     - prose-reasoning-graph
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -393,12 +524,14 @@ skill_dependencies:
   academic-writing:
     responsibility_group: research
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent: []
   paper-writing:
     responsibility_group: research
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent: []
@@ -406,6 +539,9 @@ skill_dependencies:
     responsibility_group: documents
     required_prerequisites:
     - code-visualization
+    routing_candidates:
+    - document-canon-cleanup
+    - prose-reasoning-graph
     successors: []
     order_constraints: []
     parallel_independent:
@@ -415,12 +551,18 @@ skill_dependencies:
   mvp-skeleton:
     responsibility_group: delivery
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent: []
   document-canon-cleanup:
     responsibility_group: documents
     required_prerequisites: []
+    routing_candidates:
+    - prose-reasoning-graph
+    - structure-planning
+    - md-style-check
+    - long-form-writing
     successors: []
     order_constraints: []
     parallel_independent:
@@ -434,6 +576,7 @@ skill_dependencies:
     required_prerequisites:
     - agent-orchestration
     - task-routing
+    routing_candidates: []
     successors:
     - code-visualization
     order_constraints:
@@ -449,18 +592,26 @@ skill_dependencies:
   worktree-start:
     responsibility_group: lifecycle
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent: []
   worktree-health:
     responsibility_group: lifecycle
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent: []
   experiment-lifecycle:
     responsibility_group: experiments
     required_prerequisites: []
+    routing_candidates:
+    - result-artifact-writeout
+    - save-experiment-results
+    - structure-planning
+    - experiment-review
+    - test-design
     successors: []
     order_constraints: []
     parallel_independent:
@@ -477,6 +628,11 @@ skill_dependencies:
     responsibility_group: experiments
     required_prerequisites:
     - result-artifact-writeout
+    routing_candidates:
+    - experiment-lifecycle
+    - result-artifact-writeout
+    - report-writing
+    - experiment-review
     successors: []
     order_constraints: []
     parallel_independent:
@@ -485,6 +641,7 @@ skill_dependencies:
   experiment-review:
     responsibility_group: experiments
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -494,6 +651,12 @@ skill_dependencies:
   gpu-execution:
     responsibility_group: experiments
     required_prerequisites: []
+    routing_candidates:
+    - experiment-lifecycle
+    - computational-optimization
+    - result-artifact-writeout
+    - environment-maintenance
+    - test-design
     successors: []
     order_constraints: []
     parallel_independent:
@@ -505,6 +668,9 @@ skill_dependencies:
   computational-optimization:
     responsibility_group: experiments
     required_prerequisites: []
+    routing_candidates:
+    - test-design
+    - algorithm-proof-exploration
     successors: []
     order_constraints: []
     parallel_independent:
@@ -514,6 +680,10 @@ skill_dependencies:
   adaptive-improvement-loop:
     responsibility_group: experiments
     required_prerequisites: []
+    routing_candidates:
+    - experiment-lifecycle
+    - research-workflow
+    - result-artifact-writeout
     successors: []
     order_constraints: []
     parallel_independent:
@@ -523,6 +693,7 @@ skill_dependencies:
   literature-survey:
     responsibility_group: research
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -530,6 +701,7 @@ skill_dependencies:
   formal-proof-workflow:
     responsibility_group: research
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -537,12 +709,17 @@ skill_dependencies:
   lean-algorithm-design:
     responsibility_group: research
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent: []
   algorithm-proof-exploration:
     responsibility_group: research
     required_prerequisites: []
+    routing_candidates:
+    - formal-proof-workflow
+    - computational-optimization
+    - test-design
     successors: []
     order_constraints: []
     parallel_independent:
@@ -552,6 +729,7 @@ skill_dependencies:
   algorithm-flowchart:
     responsibility_group: research
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -559,6 +737,10 @@ skill_dependencies:
   research-workflow:
     responsibility_group: research
     required_prerequisites: []
+    routing_candidates:
+    - literature-survey
+    - experiment-lifecycle
+    - result-artifact-writeout
     successors: []
     order_constraints: []
     parallel_independent:
@@ -569,6 +751,13 @@ skill_dependencies:
   comprehensive-development:
     responsibility_group: delivery
     required_prerequisites: []
+    routing_candidates:
+    - agent-orchestration
+    - codex-task-workflow
+    - structure-refactor
+    - refactor-loop
+    - dependency-analysis
+    - change-review
     successors: []
     order_constraints: []
     parallel_independent:
@@ -581,6 +770,7 @@ skill_dependencies:
   environment-maintenance:
     responsibility_group: delivery
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -588,12 +778,14 @@ skill_dependencies:
   user-preference-sync:
     responsibility_group: runtime
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent: []
   agent-learning:
     responsibility_group: runtime
     required_prerequisites: []
+    routing_candidates: []
     successors: []
     order_constraints: []
     parallel_independent:
@@ -603,6 +795,9 @@ skill_dependencies:
   wiki-publication:
     responsibility_group: lifecycle
     required_prerequisites: []
+    routing_candidates:
+    - owner-bounded-routing
+    - result-artifact-writeout
     successors: []
     order_constraints: []
     parallel_independent:
