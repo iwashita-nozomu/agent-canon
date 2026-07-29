@@ -37,6 +37,8 @@ downstream implementation ../../tools/agent_tools/skill_dependency_map.py valida
 task 開始時の mandatory routing skill です。
 task を workflow family に分類し、skill set、handoff、review、runtime entrypoint を一貫した形にそろえます。
 
+すべての skill tool command entry は単一の source-root contract を使います。論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
+
 ## Use When
 
 - repository task を開始する

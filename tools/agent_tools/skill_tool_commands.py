@@ -16,14 +16,18 @@
 from __future__ import annotations
 
 import argparse
-import shlex
 import json
 import re
+import shlex
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from agent_canon_source_root import RootResolution, SourceRootFailure, resolve_agent_canon_source_root
+from agent_canon_source_root import (
+    RootResolution,
+    SourceRootFailure,
+    resolve_agent_canon_source_root,
+)
 from route import load_skill_related_map, load_skill_required_tool_commands
 
 DEFAULT_ROOT = Path.cwd()
@@ -35,6 +39,15 @@ SECTION_END = "<!-- skill-tool-commands:end -->"
 COMMAND_TEMPLATE = (
     "python3 tools/agent_tools/skill_tool_commands.py show "
     "--skill {skill} --format text"
+)
+PROMPT_PLACEHOLDER = "<user request>"
+FALLBACK_COMMAND = (
+    f'python3 tools/agent_tools/route.py --prompt "{PROMPT_PLACEHOLDER}" --format json'
+)
+COMMON_RESOLUTION_WORDING = (
+    "論理コマンドは、実行前に AgentCanon source root を基準として解決します。"
+    "各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、"
+    "fallback-only skill を含む script entry の script path は絶対 path にします。"
 )
 FORMAT_VALUES = ("text", "json")
 COMMAND_PREFIXES = (
@@ -51,7 +64,6 @@ COMMAND_PREFIXES = (
     "ruff ",
     "tools/",
 )
-PROMPT_PLACEHOLDER = "<user request>"
 INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 ISSUE_CONTRACT_MARKERS: dict[str, tuple[tuple[str, str], ...]] = {
     "experiment-lifecycle": (
@@ -323,9 +335,10 @@ def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillComman
     resolved_required = tuple(
         build_command_plan(command, source_root) for command in required
     )
+    conditional_commands = discovered or (FALLBACK_COMMAND,)
     resolved_discovered = tuple(
         build_command_plan(command, source_root)
-        for command in discovered
+        for command in conditional_commands
     )
     validation = (
         "python3 tools/agent_tools/check_skill_frontmatter.py --root .",
@@ -400,11 +413,12 @@ def expected_section(skill: str) -> str:
     return (
         f"{SECTION_HEADING}\n\n"
         f"{SECTION_START}\n"
-        "Use the command packet before applying this skill's workflow:\n\n"
+        "この skill の workflow を適用する前に、次の command packet を使用してください。\n\n"
         "```bash\n"
         f"{command}\n"
         "```\n\n"
-        "Execute the required and task-matching conditional commands that the packet prints.\n"
+        f"{COMMON_RESOLUTION_WORDING}\n\n"
+        "packet が出力した必須 command と、task に該当する conditional command を実行してください。\n"
         f"{SECTION_END}\n"
     )
 
@@ -500,7 +514,7 @@ def render_packet_text(packet: SkillCommandPacket) -> str:
     if packet.discovered_commands:
         lines.extend(f"- {command}" for command in packet.discovered_commands)
     else:
-        lines.append(f"- python3 tools/agent_tools/route.py --prompt \"{PROMPT_PLACEHOLDER}\" --format json")
+        lines.append(f"- {FALLBACK_COMMAND}")
     lines.append("SKILL_TOOL_COMMANDS_CONDITIONAL_RESOLUTION:")
     for command, source_root, execution_cwd, argv in packet.resolved_discovered_commands:
         lines.extend(

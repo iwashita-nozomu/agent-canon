@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -214,6 +215,97 @@ class RouteToolTest(unittest.TestCase):
                 )
 
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_route_deduplicates_parent_agents_symlink_view(self) -> None:
+        """A parent root view symlink to its vendor source resolves as vendored."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent_root = Path(tmp_dir)
+            (parent_root / ".git").touch()
+            source_root = parent_root / "source" / "agent-canon"
+            catalog = source_root / "agents" / "skills" / "catalog.yaml"
+            catalog.parent.mkdir(parents=True, exist_ok=True)
+            catalog.write_text("version: 1\nskill_families: []\n", encoding="utf-8")
+            (source_root / "agents" / "skills" / "skill-dependencies.yaml").write_text(
+                "version: 1\nskill_dependencies: {}\n",
+                encoding="utf-8",
+            )
+            vendor_link = parent_root / "vendor" / "agent-canon"
+            vendor_link.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(source_root, vendor_link, target_is_directory=True)
+            os.symlink(
+                vendor_link / "agents",
+                parent_root / "agents",
+                target_is_directory=True,
+            )
+
+            resolution = agent_canon_source_root.resolve_agent_canon_source_root(parent_root)
+
+            self.assertEqual(resolution.layout, "vendored")
+            self.assertEqual(resolution.current_repository_root, parent_root.resolve())
+            self.assertEqual(resolution.source_root, source_root.resolve())
+            result = self.run_route(
+                "--root",
+                str(parent_root),
+                "--prompt",
+                "ルーティング改善を提案してください",
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_route_rejects_different_symlink_view_entity_as_ambiguous(self) -> None:
+        """A root view symlink to another AgentCanon entity stays ambiguous."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent_root = Path(tmp_dir)
+            (parent_root / ".git").touch()
+            standalone_root = parent_root / "standalone"
+            standalone_catalog = standalone_root / "agents" / "skills" / "catalog.yaml"
+            standalone_catalog.parent.mkdir(parents=True, exist_ok=True)
+            standalone_catalog.write_text(
+                "version: 1\nskill_families: []\n",
+                encoding="utf-8",
+            )
+            vendor_root = parent_root / "vendor" / "agent-canon"
+            vendor_catalog = vendor_root / "agents" / "skills" / "catalog.yaml"
+            vendor_catalog.parent.mkdir(parents=True, exist_ok=True)
+            vendor_catalog.write_text("version: 1\nskill_families: []\n", encoding="utf-8")
+            os.symlink(
+                standalone_root / "agents",
+                parent_root / "agents",
+                target_is_directory=True,
+            )
+
+            with self.assertRaises(agent_canon_source_root.SourceRootFailure) as raised:
+                agent_canon_source_root.resolve_agent_canon_source_root(parent_root)
+
+            self.assertEqual(raised.exception.code, "agent_canon_source_root_ambiguous")
+
+    def test_route_rejects_vendor_symlink_outside_repository(self) -> None:
+        """A vendor symlink escaping the parent repository fails typed resolution."""
+        with tempfile.TemporaryDirectory() as tmp_dir, tempfile.TemporaryDirectory() as outside_dir:
+            parent_root = Path(tmp_dir)
+            (parent_root / ".git").touch()
+            outside_root = Path(outside_dir) / "agent-canon"
+            catalog = outside_root / "agents" / "skills" / "catalog.yaml"
+            catalog.parent.mkdir(parents=True, exist_ok=True)
+            catalog.write_text("version: 1\nskill_families: []\n", encoding="utf-8")
+            vendor_link = parent_root / "vendor" / "agent-canon"
+            vendor_link.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(outside_root, vendor_link, target_is_directory=True)
+
+            with self.assertRaises(agent_canon_source_root.SourceRootFailure) as raised:
+                agent_canon_source_root.resolve_agent_canon_source_root(parent_root)
+
+            self.assertEqual(
+                raised.exception.code,
+                "agent_canon_source_root_vendor_outside_repository",
+            )
+            result = self.run_route(
+                "--root",
+                str(parent_root),
+                "--prompt",
+                "ルーティング改善を提案してください",
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn(raised.exception.code, result.stderr)
 
     def test_route_rejects_ambiguous_source_root(self) -> None:
         """Two discoverable roots return a deterministic typed failure."""
