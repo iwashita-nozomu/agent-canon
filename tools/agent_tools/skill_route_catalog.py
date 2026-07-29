@@ -186,6 +186,7 @@ class SkillRoutingRule:
     triggers: tuple[tuple[str, ...], ...]
     capabilities: tuple[CapabilityRoute, ...]
     related_skills: tuple[str, ...]
+    prerequisites: tuple[str, ...] = ()
     visualization_owner_skill: VisualizationOwnerSkill | None = None
     visualization_tool_call: ToolCall | None = None
     visualization_rejection: VisualizationRejection | None = None
@@ -535,6 +536,10 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
                     entry_mapping.get("related_skills"),
                     f"{skill_id}.related_skills",
                 ),
+                prerequisites=optional_string_list(
+                    entry_mapping.get("prerequisites"),
+                    f"{skill_id}.prerequisites",
+                ),
                 visualization_owner_skill=(
                     cast(VisualizationOwnerSkill, visualization_owner)
                     if visualization_owner
@@ -556,17 +561,38 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
         )
     validate_visualization_metadata(rules)
     for rule in rules:
-        for related_skill in rule.related_skills:
-            if related_skill == rule.skill:
-                raise ValueError(f"{rule.skill}.related_skills must not include itself")
-            if related_skill.startswith(PRIVATE_SKILL_PREFIX):
-                raise ValueError(
-                    f"{rule.skill}.related_skills must be public: {related_skill}"
-                )
-            if related_skill not in observed_skill_ids:
-                raise ValueError(
-                    f"{rule.skill}.related_skills unknown skill: {related_skill}"
-                )
+        for field, related_skills in (
+            ("related_skills", rule.related_skills),
+            ("prerequisites", rule.prerequisites),
+        ):
+            for related_skill in related_skills:
+                if related_skill == rule.skill:
+                    raise ValueError(f"{rule.skill}.{field} must not include itself")
+                if related_skill.startswith(PRIVATE_SKILL_PREFIX):
+                    raise ValueError(
+                        f"{rule.skill}.{field} must be public: {related_skill}"
+                    )
+                if related_skill not in observed_skill_ids:
+                    raise ValueError(
+                        f"{rule.skill}.{field} unknown skill: {related_skill}"
+                    )
+    prerequisites = {rule.skill: rule.prerequisites for rule in rules}
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(skill: str) -> None:
+        if skill in visiting:
+            raise ValueError(f"{skill}.prerequisites must not contain a cycle")
+        if skill in visited:
+            return
+        visiting.add(skill)
+        for prerequisite in prerequisites[skill]:
+            visit(prerequisite)
+        visiting.remove(skill)
+        visited.add(skill)
+
+    for skill in prerequisites:
+        visit(skill)
     return tuple(rules)
 
 
@@ -589,7 +615,10 @@ def load_skill_route_rules_from_root(
 
 def load_skill_related_map(root: Path) -> dict[str, tuple[str, ...]]:
     """Return catalog-backed related-skill candidates keyed by public skill id."""
-    return {rule.skill: rule.related_skills for rule in load_skill_route_rules(root)}
+    return {
+        rule.skill: ordered_unique((*rule.prerequisites, *rule.related_skills))
+        for rule in load_skill_route_rules(root)
+    }
 
 
 def load_skill_required_tool_commands(root: Path) -> dict[str, tuple[str, ...]]:

@@ -4,7 +4,7 @@ contract reference
 responsibility Documents Rust migration policy for AgentCanon tools.
 upstream design README.md AgentCanon documentation index
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-downstream environment ../../.devcontainer/post-create.sh installs Rust toolchain and CLI
+downstream environment ../../.devcontainer/dependencies.toml declares Rust toolchain and CLI build records
 downstream implementation ../../rust/agent-canon/src/main.rs Rust CLI entrypoint
 downstream implementation ../../rust/agent-canon/src/migration_audit.rs validates migration boundaries
 downstream implementation ../../rust/agent-canon/src/rust_migration_plan.rs prints sequential migration candidates
@@ -28,12 +28,15 @@ surfaces, audit and plan commands, MCP surfaces, deterministic search, and valid
 
 - Move heavy static-analysis and inventory tooling from Python to Rust.
 - Keep workflow orchestration and rapidly-changing agent logic in Python.
-- Install Rust only in DevContainer post-create flows.
+- Declare the exact Rust toolchain and cargo source build in the mounted
+  DevContainer dependency manifest.
 - Keep template and derived Dockerfiles Rust-free unless the project runtime itself requires Rust.
 
 ## DevContainer Setup
 
-Rust toolchains belong in `.devcontainer/post-create.sh`.
+Rust toolchains belong in the `rust-toolchain` record of
+`.devcontainer/dependencies.toml`; the shared post-create only orchestrates the
+validated plan and lifecycle projections.
 
 Required components:
 
@@ -211,9 +214,9 @@ The audit checks:
 
 - the Rust migration document, crate manifest, CLI entrypoint, audit module,
   and stable wrapper exist;
-- `.devcontainer/post-create.sh` installs the Rust toolchain, developer
-  components, `~/.tools` release CLI cache, and `/usr/local/bin/agent-canon`
-  entrypoint;
+- `.devcontainer/dependencies.toml` declares the Rust toolchain, developer
+  components, and locked cargo source build; post-create publishes the resulting
+  `~/.tools` release CLI cache and `/usr/local/bin/agent-canon` entrypoint;
 - `docker/Dockerfile` does not install rustup or run cargo as an agent-tooling
   convenience path.
 

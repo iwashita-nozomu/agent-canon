@@ -82,7 +82,7 @@ The ownership boundary covers these primary surfaces.
 
 | Surface                | Owner                          | Rule                                                                                                                                                           |
 | ---------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.devcontainer/`       | AgentCanon                     | Shared runtime view. Keep common Codex, GitHub CLI, Rust toolchain, mount, and post-create behavior here.                                                      |
+| `.devcontainer/`       | AgentCanon                     | Shared runtime view. Keep the fixed base bootstrap, declarative developer/agent manifest, mount, and post-create lifecycle here.                              |
 | `.vscode/`             | AgentCanon                     | Shared editor workspace view. Keep common AgentCanon recommendations, safe defaults, and validation tasks here.                                                |
 | `Dockerfile`           | Template or derived repository | Project image contract. Do not add generic Codex, GitHub CLI, Rust toolchain, or agent convenience tooling here.                                               |
 | `docker/`              | Template or derived repository | Project-local container runbook, dependency packs, runtime package contract, and repository-specific image policy.                                             |
@@ -90,6 +90,28 @@ The ownership boundary covers these primary surfaces.
 
 The separation is intentional. AgentCanon owns the shared automation boundary;
 the repository owns its runtime image and product dependencies.
+
+## Product Image And Mounted Tool Boundary
+
+`Dockerfile` and `docker/` describe the product image build/runtime contract:
+project libraries, compilers, native build inputs, service processes, and
+workspace Python dependency policy. They must not acquire Codex, GitHub CLI,
+Node/npm, Rust, Lean, Playwright, or other shared agent tooling solely for
+developer convenience.
+
+The mounted workspace devcontainer contract is separate. The fixed
+`.devcontainer/bootstrap-dependencies.sh` establishes only the base capabilities
+needed to read a manifest: `python3` with `tomllib` or `tomli`, pinned Node/npm
+22.14.0 with architecture-specific SHA256 verification, and `ninja-build`.
+`.devcontainer/dependencies.toml` then describes mounted developer/agent tools.
+The shared post-create validates and merges the parent manifest before the
+AgentCanon manifest, validates the complete graph, and executes it only after
+that validation succeeds.
+
+The parent-owned `docker/install_python_dependencies.sh` remains the owner of
+workspace Python packages. It runs after the shared dependency plan and before
+AgentCanon build/cache/projection. The parent-owned post-create command remains
+the final lifecycle action.
 
 ## Dockerfile Rules
 
@@ -121,35 +143,40 @@ project CI path.
 Use the shared `.devcontainer/` surface for agent runtime setup.
 
 - Codex CLI, GitHub CLI, `gh`, Node.js used only by Codex or agent tooling,
-  JSON and structure inspection helpers such as `jq` and `tree`, and
-  post-create bootstrap belong in `.devcontainer/post-create.sh`.
+  JSON and structure inspection helpers such as `jq` and `tree`, and other
+  shared developer/agent tools belong in `.devcontainer/dependencies.toml`.
+  The fixed bootstrap and the typed dependency engine are invoked by
+  `.devcontainer/post-create.sh`; package versions are not overridden by
+  environment variables.
 - `tree` is the canonical agent-side structure inspection display for template
   and derived parent repo readiness. Use
   `tree -a -L <depth> -I '.git|__pycache__|.venv|node_modules|target|reports' <parent-root>`
   with `tools/agent_tools/parent_repo_readiness.py` when checking root view
   shape; do not require parent repositories to commit generated `tree` output
   unless a task-specific design explicitly asks for that artifact.
-- Codex CLI setup validates `codex --version` before returning. Command absence
-  or a broken wrapper triggers the canonical `npm install -g @openai/codex`
-  install command during post-create.
+- Codex CLI setup is a pinned `npm-global` record for `@openai/codex` 0.145.0
+  with an argv verification command.
 - Public-repository security scanners used by agents, including `gitleaks`,
-  `trufflehog`, and `detect-secrets`, belong in `.devcontainer/post-create.sh`.
+  `trufflehog`, and `detect-secrets`, belong in the typed manifest.
   They are audit tooling, not project runtime dependencies, and must not be
   installed in the project Dockerfile unless a project explicitly needs them at
   runtime.
 - Browser automation tooling used by agents to validate generated HTML and
-  JavaScript report artifacts, including Playwright and its Chromium browser
-  cache, belongs in `.devcontainer/post-create.sh`. It is report-validation
-  infrastructure, not a project runtime dependency.
+  JavaScript report artifacts is represented by separate pinned Playwright and
+  dependent `browser-install` records. The browser record owns the typed shared
+  cache `/usr/local/share/ms-playwright` and exports it through
+  `PLAYWRIGHT_BROWSERS_PATH` for non-root devcontainer commands. It is
+  report-validation infrastructure, not a project runtime dependency.
 - Rust, cargo, rustfmt, clippy, rust-analyzer, and the AgentCanon Rust CLI
-  belong in `.devcontainer/post-create.sh` when they are only needed for shared
-  AgentCanon tooling.
+  belong in typed `rust-toolchain` and `cargo-source-build` records when they
+  are only needed for shared AgentCanon tooling.
 - Lean theorem-proving tooling used by formal-proof skills, including
-  `elan`, Lean, Lake, and the default `AGENT_CANON_LEAN_TOOLCHAIN`, belongs
-  in `.devcontainer/post-create.sh` when it is only needed for AgentCanon
-  proof tooling. Install `elan` from a pinned release asset with a recorded
-  SHA256 checksum, not by piping a moving installer script. It is agent-side
-  proof infrastructure, not a project runtime dependency.
+  `elan`, Lean, and Lake, belongs in `.devcontainer/post-create.sh` when it is
+  only needed for AgentCanon proof tooling and is declared by exact
+  `lean-toolchain` and `release-asset` records. Install `elan` from a pinned
+  release-asset record with recorded architecture checksums, not by piping a
+  moving installer script. It is agent-side proof infrastructure, not a
+  project runtime dependency.
 - Structured analysis cache rebuilds belong in `.devcontainer/post-create.sh`
   after the AgentCanon Rust CLI is installed. The rebuild uses
   `agent-canon structured-analysis build --root <workspace> --profile devcontainer`, writes only to
@@ -159,7 +186,8 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   can be regenerated later.
 - TeX document and image tooling used by the Academic Writing skill, including
   `latexmk`, pdfLaTeX, XeLaTeX, TikZ packages, `dvisvgm`, `pdfcrop`,
-  Ghostscript, and PDF inspection helpers, belongs in `.devcontainer/post-create.sh`.
+  Ghostscript, and PDF inspection helpers, belongs in typed apt records in
+  `.devcontainer/dependencies.toml`.
   This is an agent-side writing toolchain, not a default project runtime
   dependency.
 - Model server, installer, model-cache, and compatibility consumers are not

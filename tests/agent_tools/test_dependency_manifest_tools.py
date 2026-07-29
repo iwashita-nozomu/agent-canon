@@ -619,6 +619,31 @@ class DependencyManifestToolTest(unittest.TestCase):
             (root / "docker").mkdir()
             (root / ".devcontainer").mkdir()
             (root / "tools" / "ci").mkdir(parents=True)
+            (root / "tools" / "agent_tools").mkdir(parents=True)
+            (root / "tools" / "agent_tools" / "devcontainer_dependencies.py").symlink_to(
+                PROJECT_ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
+            )
+            (root / ".devcontainer" / "dependencies.toml").write_text(
+                "\n".join(
+                    [
+                        'schema = "agent-canon.devcontainer-dependencies"',
+                        "schema_version = 1",
+                        "",
+                        "[[records]]",
+                        'id = "fixture"',
+                        'package = "fixture"',
+                        'method = "apt-package"',
+                        'version = "1.0"',
+                        'source = "fixture"',
+                        'commands = [["true"]]',
+                        "deps = []",
+                        'provides = ["fixture"]',
+                        'failure_policy = "fail"',
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
             (root / "pyproject.toml").write_text(
                 "[project]\ndependencies = []\n",
                 encoding="utf-8",
@@ -683,6 +708,16 @@ class DependencyManifestToolTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            os.chmod(root / ".devcontainer" / "post-create.sh", 0o755)
+            (root / ".devcontainer" / "bootstrap-dependencies.sh").write_text(
+                "#!/usr/bin/env bash\n",
+                encoding="utf-8",
+            )
+            os.chmod(root / ".devcontainer" / "bootstrap-dependencies.sh", 0o755)
+            (root / "CONTAINER_OPERATIONS.md").write_text(
+                "## Product Image And Mounted Tool Boundary\n",
+                encoding="utf-8",
+            )
             (root / ".devcontainer" / "devcontainer.json").write_text(
                 '{"postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace"}\n',
                 encoding="utf-8",
@@ -713,8 +748,8 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("result-log / visualization requirements present", result.stdout)
-            self.assertIn("Summary: 0 issues found", result.stdout)
+            self.assertIn("DEVCONTAINER_DEPENDENCY=pass", result.stdout)
+            self.assertIn("DEVCONTAINER_DEPENDENCY_ORDER=fixture", result.stdout)
 
     def test_format_accepts_line_comment_manifest(self) -> None:
         """Line-comment manifests are valid for Python-like files."""

@@ -1264,10 +1264,36 @@ skill_families:
         - ["agent", "growth"]
         - ["すべてのスキル", "修正"]
         - ["all", "skills", "command"]
+  - id: dependency-design
+    purpose: Define and validate the typed declarative devcontainer dependency design packet before environment maintenance.
+    canonical_doc: agents/skills/dependency-design.md
+    shim: .agents/skills/dependency-design/SKILL.md
+    related_skills:
+      - environment-maintenance
+    tool_commands:
+      required:
+        - python3 tools/agent_tools/devcontainer_dependencies.py validate --workspace . --format text
+      conditional:
+        - python3 tools/agent_tools/devcontainer_dependencies.py dry-run --workspace . --format json
+        - bash tools/docker_dependency_validator.sh
+    routing:
+      stage_policy: active
+      reason: declarative devcontainer dependency design must precede environment maintenance
+      triggers:
+        - ["dependency", "design"]
+        - ["dependency", "manifest"]
+        - ["dependencies.toml"]
+        - ["devcontainer", "dependency"]
+        - ["developer", "tools", "manifest"]
+        - ["agent", "tools", "manifest"]
+        - ["依存", "設計"]
+        - ["依存", "manifest"]
   - id: environment-maintenance
     purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
     canonical_doc: agents/skills/environment-maintenance.md
     shim: .agents/skills/environment-maintenance/SKILL.md
+    prerequisites:
+      - dependency-design
     routing:
       stage_policy: active
       reason: Docker, CI, dependency, or runtime environment maintenance is in scope

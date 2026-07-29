@@ -1015,6 +1015,31 @@ def is_current_stage_skill(
     return rule is not None and rule.stage_policy == "active"
 
 
+def prerequisite_closure(
+    skills: Sequence[str], rules_by_skill: Mapping[str, SkillRoutingRule]
+) -> tuple[str, ...]:
+    """Return selected skills with catalog prerequisites before their consumers."""
+    ordered: list[str] = []
+    visiting: set[str] = set()
+
+    def visit(skill: str) -> None:
+        if skill in visiting:
+            raise ValueError(f"skill prerequisite cycle: {skill}")
+        if skill in ordered:
+            return
+        visiting.add(skill)
+        rule = rules_by_skill.get(skill)
+        if rule is not None:
+            for prerequisite in rule.prerequisites:
+                visit(prerequisite)
+        visiting.remove(skill)
+        ordered.append(skill)
+
+    for skill in skills:
+        visit(skill)
+    return tuple(ordered)
+
+
 def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> SkillRouteDecision:
     """Create a prompt-derived public skill route decision."""
     public_prompt = strip_private_route_aliases(prompt)
@@ -1063,7 +1088,9 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
     prompt_skills = matched_skills
     if handoff_required:
         prompt_skills = ordered_unique((*prompt_skills, SUBAGENT_BOOTSTRAP_SKILL))
-    skills = ordered_unique((*base_skills, *prompt_skills))
+    skills = prerequisite_closure(
+        ordered_unique((*base_skills, *prompt_skills)), rules_by_skill
+    )
     active_skill_inputs = ["agent-orchestration"]
     if handoff_required:
         active_skill_inputs.append(SUBAGENT_BOOTSTRAP_SKILL)
@@ -1076,7 +1103,9 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
         )
         or is_current_stage_skill(match.skill, rules_by_skill, public_prompt, active_mode)
     )
-    active_skills = ordered_unique(active_skill_inputs)
+    active_skills = prerequisite_closure(
+        ordered_unique(active_skill_inputs), rules_by_skill
+    )
     deferred_skills = tuple(skill for skill in skills if skill not in active_skills)
     related_by_source, related_candidates = related_skill_candidates(
         matched_skills,

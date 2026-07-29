@@ -5,6 +5,7 @@ contract skill
 responsibility Documents environment-maintenance for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
+upstream design ../../documents/design/devcontainer/parent-dependency-manifest-followup.md dependency-design packet and parent follow-up contract
 @dependency-end
 -->
 
@@ -63,6 +64,11 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - rollback plan
 
 ## Operating Rules
+
+- Consume a passing `dependency-design` packet before changing dependency
+  manifests, bootstrap, devcontainer install order, or related validators.
+  Carry its owner, record inventory, merge/order evidence, and security fields
+  into the environment change.
 
 - Treat `CONTAINER_OPERATIONS.md` as the source of truth for Dockerfile,
   `docker/`, `.devcontainer/`, validator, and Makefile target ownership. This
