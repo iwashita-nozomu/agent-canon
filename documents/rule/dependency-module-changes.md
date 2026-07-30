@@ -151,11 +151,13 @@ clone削除後に同じgateで削除できます。topic rootが空なら topic 
   `integrated-commit-empty-topic-without-remote-tip` で hold する。integration
   側の topic 外 path は比較対象外とし、patch-id や path/status digest は認可根拠に
   使わない。
-- parent cleanup は先に managed child の clean/tree proof と integrated commit の
-  readback を行い、role/topic membership marker の stale または missing を
+- module cleanup と parent cleanup は共通の parent marker readback を先に行い、
+  role/topic membership marker の stale または missing を
   `marker-readback=membership-mismatch` の diagnostic として receipt に残す。
-  proof が pass した後に owner/placement/module/URL/branch の strict identity と
-  managed-child 状態を確認し、membership marker だけを先行 blocker にしない。
+  target clone の exact path、target clone の非membership identity、clean/tree proof、
+  integrated commit readback に到達し、proof が pass した後に parent の strict
+  identity と managed-child 状態を確認する。membership marker だけを main precheck
+  の blocker にしない。
 - `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY` とその reason、
   `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` とその
   reason が同じ command segment から渡されている。

@@ -786,6 +786,50 @@ def test_cleanup_accepts_equivalent_squash_with_stale_membership_marker(
     assert not clone.parent.exists()
 
 
+@pytest.mark.parametrize("marker_mode", ("stale", "missing"))
+def test_cleanup_module_accepts_stale_parent_marker_before_integrated_proof(
+    tmp_path: Path, marker_mode: str
+) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    assert prepare(parent).returncode == 0
+    parent_clone = topic_parent(parent)
+    clone = module_clone(parent)
+    _commit_file(clone, "module.txt", "module\n", "module change")
+    run_git(clone, "push", "origin", "HEAD:refs/heads/feature/foo")
+    integrated_commit = _integrate_topic(
+        tmp_path,
+        remote,
+        "feature/foo",
+        squash=False,
+        delete_topic_branch=False,
+    )
+    stale_membership_marker(parent_clone, marker_mode)
+
+    removed = invoke(
+        parent_clone,
+        "cleanup",
+        "--topic",
+        TOPIC,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--integrated-commit",
+        integrated_commit,
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert removed.returncode == 0, removed.stderr
+    assert "marker-readback=membership-mismatch" in removed.stdout
+    assert "action=removed" in removed.stdout
+    assert removed.stdout.index("marker-readback=membership-mismatch") < removed.stdout.index(
+        "action=removed"
+    )
+    assert not clone.exists()
+
+
 def test_prepare_can_create_and_reuse_parent_pin_branch(tmp_path: Path) -> None:
     remote = create_remote(tmp_path)
     parent = create_parent(tmp_path, remote)

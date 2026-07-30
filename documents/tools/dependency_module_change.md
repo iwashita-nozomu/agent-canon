@@ -64,9 +64,11 @@ topic HEAD が fetched remote の integrated history または remote topic head
 されている readback も要求します。readback がなければ
 `integrated-commit-empty-topic-without-remote-tip` で hold します。省略時の
 canonical discovery と exact final-tree entry equivalence/hold semantics は
-dependency-module policy owner を参照します。parent cleanup は strict membership
-marker precheck より先にこの proof/readback を行い、role/topic marker の stale または
-missing を `marker-readback=membership-mismatch` として診断出力します。proof が
-pass した後に owner evidence、placement、module、URL、branch の strict identity を
-検査します。workspace clone の削除後に computed topic root が空なら、同じ receipt で
+dependency-module policy owner を参照します。module cleanup と parent cleanup は
+strict membership marker precheck より先に parent marker の readback と target clone の
+proof/readback を行い、role/topic marker の stale または missing を
+`marker-readback=membership-mismatch` として診断出力します。target clone の
+非membership identity は従来どおり strict に検査し、proof が pass した後に parent
+の owner evidence、placement、module、URL、branch の strict identity を検査します。
+workspace clone の削除後に computed topic root が空なら、同じ receipt で
 topic root も削除します。

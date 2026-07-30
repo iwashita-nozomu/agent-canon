@@ -1058,6 +1058,21 @@ def _require_cleanup_authority() -> None:
     raise DependencyModuleChangeError("cleanup --apply requires same-command authority/reason fields")
 
 
+def _inspect_cleanup_parent(parent_root: Path, topic: str) -> CloneInspection:
+    """Read parent membership before cleanup proof without making it a blocker."""
+    strict = _inspect(parent_root, role="parent", topic=topic)
+    if strict.state != "membership-mismatch":
+        return strict
+    relaxed = _inspect(
+        parent_root,
+        role="parent",
+        topic=topic,
+        allow_stale_membership=True,
+    )
+    print("CLEANUP parent marker-readback=membership-mismatch")
+    return relaxed
+
+
 def _cleanup_module(
     parent_root: Path,
     topic: str,
@@ -1065,6 +1080,7 @@ def _cleanup_module(
     expected: Path,
     apply: bool,
     integrated_commit: str | None = None,
+    parent_inspection: CloneInspection | None = None,
 ) -> None:
     clone = parent_root.parent / module.basename
     clone = _assert_safe_contained_path(parent_root.parent, clone, "module cleanup clone")
@@ -1098,6 +1114,12 @@ def _cleanup_module(
     if reason:
         print(f"CLEANUP module={module.path} action=hold reason={reason}")
         return
+    if parent_inspection is not None and parent_inspection.state != "ready":
+        print(
+            f"CLEANUP module={module.path} action=hold "
+            f"reason=parent-{parent_inspection.state}"
+        )
+        return
     if not apply:
         print(f"CLEANUP module={module.path} action=would-remove path={clone}")
         return
@@ -1114,21 +1136,14 @@ def _cleanup_parent(
     expected: Path,
     apply: bool,
     integrated_commit: str | None = None,
+    parent_inspection: CloneInspection | None = None,
 ) -> None:
     parent_root = _assert_safe_contained_path(
         parent_root.parent, parent_root, "parent cleanup clone"
     )
     if not expected.is_absolute() or expected != parent_root:
         raise DependencyModuleChangeError(f"--expected-parent must exactly equal {parent_root}")
-    inspection = _inspect(parent_root, role="parent", topic=topic)
-    if inspection.state == "membership-mismatch":
-        inspection = _inspect(
-            parent_root,
-            role="parent",
-            topic=topic,
-            allow_stale_membership=True,
-        )
-        print("CLEANUP parent marker-readback=membership-mismatch")
+    inspection = parent_inspection or _inspect_cleanup_parent(parent_root, topic)
     for module in modules:
         candidate = parent_root.parent / module.basename
         child_inspection = _inspect(
@@ -1368,28 +1383,23 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.integrated_commit,
             )
             return 0
-        parent_cleanup = args.command == "cleanup" and args.parent
+        cleanup_command = args.command == "cleanup"
         parent_root = _resolve_topic_parent(
             root,
             args.topic,
             create=False,
-            allow_stale_membership=parent_cleanup,
+            allow_stale_membership=cleanup_command,
         )
         if not parent_root.is_dir():
             raise DependencyModuleChangeError(f"topic parent clone is absent: {parent_root}")
-        if parent_cleanup:
-            parent_inspection = _inspect(
-                parent_root,
-                role="parent",
-                topic=topic,
-                allow_stale_membership=True,
-            )
+        if cleanup_command:
+            parent_inspection = _inspect_cleanup_parent(parent_root, topic)
         else:
             parent_inspection = _inspect(parent_root, role="parent", topic=topic)
-            if parent_inspection.state != "ready":
-                raise DependencyModuleChangeError(
-                    f"topic parent clone failed identity validation: {parent_root} ({parent_inspection.state})"
-                )
+        if not cleanup_command and parent_inspection.state != "ready":
+            raise DependencyModuleChangeError(
+                f"topic parent clone failed identity validation: {parent_root} ({parent_inspection.state})"
+            )
         modules = _parse_gitmodules(parent_root)
         if args.command == "status":
             _status(parent_root, modules, topic)
@@ -1403,6 +1413,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 Path(args.expected_parent).absolute(),
                 args.apply,
                 args.integrated_commit,
+                parent_inspection,
             )
         else:
             if not args.expected_clone:
@@ -1415,6 +1426,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 Path(args.expected_clone).absolute(),
                 args.apply,
                 args.integrated_commit,
+                parent_inspection,
             )
         return 0
     except (DependencyModuleChangeError, OSError) as exc:

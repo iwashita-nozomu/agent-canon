@@ -8244,7 +8244,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MODULE_CHANGE",
-      "line": 1250,
+      "line": 1265,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8252,7 +8252,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MODULE_CHANGE",
-      "line": 1263,
+      "line": 1278,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8260,7 +8260,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MODULE_CHANGE_ERROR",
-      "line": 1421,
+      "line": 1433,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8276,7 +8276,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "MODULE",
-      "line": 1256,
+      "line": 1271,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8284,7 +8284,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "MODULE",
-      "line": 1279,
+      "line": 1294,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8308,7 +8308,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "PARENT_ROOT",
-      "line": 1253,
+      "line": 1268,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8324,7 +8324,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "PLACEMENT",
-      "line": 1264,
+      "line": 1279,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8412,7 +8412,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOPIC",
-      "line": 1251,
+      "line": 1266,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8420,7 +8420,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOPIC",
-      "line": 1265,
+      "line": 1280,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8428,7 +8428,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOPIC_ROOT",
-      "line": 1252,
+      "line": 1267,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8436,7 +8436,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOPIC_ROOT",
-      "line": 1266,
+      "line": 1281,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
