@@ -184,7 +184,9 @@ def _integrate_topic(
     run_git(integration, "config", "user.email", "test@example.invalid")
     run_git(integration, "fetch", "origin", topic_branch)
     if squash:
-        run_git(integration, "cherry-pick", "--no-commit", f"origin/{topic_branch}")
+        run_git(integration, "merge", "--squash", f"origin/{topic_branch}")
+        (integration / "integration-only.txt").write_text("unrelated\n", encoding="utf-8")
+        run_git(integration, "add", "integration-only.txt")
         integrated_commit = _commit_staged(integration, "squash topic")
     else:
         run_git(integration, "merge", "--no-ff", "--no-edit", f"origin/{topic_branch}")
@@ -193,6 +195,19 @@ def _integrate_topic(
     if delete_topic_branch:
         run_git(integration, "push", "origin", "--delete", topic_branch)
     return integrated_commit
+
+
+def _delete_topic_branch(
+    tmp_path: Path, remote: Path, topic_branch: str, directory_name: str
+) -> None:
+    integration = tmp_path / directory_name
+    subprocess.run(
+        ["git", "clone", "--branch", "main", str(remote), str(integration)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    run_git(integration, "push", "origin", "--delete", topic_branch)
 
 
 def git_submodule_resolved_url(
@@ -783,6 +798,7 @@ def test_cleanup_accepts_squash_merge_with_deleted_branch_and_equivalent_commit(
     assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
     clone = workspace_module_clone(parent, topic=topic)
     _commit_file(clone, "squashed.txt", "squashed\n", "topic change")
+    _commit_file(clone, "second-topic-change.txt", "second\n", "second topic change")
     run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
     integrated_commit = _integrate_topic(
         tmp_path,
@@ -830,6 +846,185 @@ def test_cleanup_accepts_squash_merge_with_deleted_branch_and_equivalent_commit(
     assert removed.returncode == 0, removed.stderr
     assert "action=removed" in removed.stdout
     assert not clone.exists()
+
+
+def test_cleanup_holds_whitespace_only_integrated_content_mismatch(tmp_path: Path) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    topic = "whitespace-mismatch-topic"
+    topic_branch = "feature/whitespace-mismatch"
+    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
+    clone = workspace_module_clone(parent, topic=topic)
+    _commit_file(clone, "topic.txt", "topic\n", "topic change")
+    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
+
+    integration = tmp_path / "whitespace-mismatch-integration"
+    subprocess.run(
+        ["git", "clone", "--branch", "main", str(remote), str(integration)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    run_git(integration, "config", "user.name", "Test")
+    run_git(integration, "config", "user.email", "test@example.invalid")
+    run_git(integration, "fetch", "origin", topic_branch)
+    run_git(integration, "merge", "--squash", f"origin/{topic_branch}")
+    (integration / "topic.txt").write_text("topic \n", encoding="utf-8")
+    run_git(integration, "add", "topic.txt")
+    integrated_commit = _commit_staged(integration, "whitespace-mismatch squash")
+    run_git(integration, "push", "origin", "main")
+    run_git(integration, "push", "origin", "--delete", topic_branch)
+
+    held = invoke(
+        parent,
+        "cleanup",
+        "--placement",
+        "workspace",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--owner-evidence-sha256",
+        owner_evidence_sha(parent),
+        "--integrated-commit",
+        integrated_commit,
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert held.returncode == 0, held.stderr
+    assert "integrated-commit-not-equivalent" in held.stdout
+    assert clone.exists()
+
+
+def test_cleanup_holds_conflict_resolved_content_different_squash(tmp_path: Path) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    topic = "conflict-resolved-topic"
+    topic_branch = "feature/conflict-resolved"
+    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
+    clone = workspace_module_clone(parent, topic=topic)
+    _commit_file(clone, "topic.txt", "topic\n", "topic change")
+    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
+
+    integration = tmp_path / "conflict-resolved-integration"
+    subprocess.run(
+        ["git", "clone", "--branch", "main", str(remote), str(integration)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    run_git(integration, "config", "user.name", "Test")
+    run_git(integration, "config", "user.email", "test@example.invalid")
+    _commit_file(integration, "topic.txt", "main\n", "main change")
+    run_git(integration, "fetch", "origin", topic_branch)
+    conflict = subprocess.run(
+        ["git", "-C", str(integration), "merge", "--squash", f"origin/{topic_branch}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert conflict.returncode != 0
+    (integration / "topic.txt").write_text("resolved\n", encoding="utf-8")
+    run_git(integration, "add", "topic.txt")
+    integrated_commit = _commit_staged(integration, "conflict-resolved squash")
+    run_git(integration, "push", "origin", "main")
+    run_git(integration, "push", "origin", "--delete", topic_branch)
+
+    held = invoke(
+        parent,
+        "cleanup",
+        "--placement",
+        "workspace",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--owner-evidence-sha256",
+        owner_evidence_sha(parent),
+        "--integrated-commit",
+        integrated_commit,
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert held.returncode == 0, held.stderr
+    assert "integrated-commit-not-equivalent" in held.stdout
+    assert clone.exists()
+
+
+def test_cleanup_holds_missing_integrated_commit_oid(tmp_path: Path) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    topic = "missing-oid-topic"
+    topic_branch = "feature/missing-oid"
+    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
+    clone = workspace_module_clone(parent, topic=topic)
+    _commit_file(clone, "topic.txt", "topic\n", "topic change")
+    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
+    _delete_topic_branch(tmp_path, remote, topic_branch, "missing-oid-delete")
+
+    held = invoke(
+        parent,
+        "cleanup",
+        "--placement",
+        "workspace",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--owner-evidence-sha256",
+        owner_evidence_sha(parent),
+        "--integrated-commit",
+        "f" * 40,
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert held.returncode == 0, held.stderr
+    assert "integrated-commit-not-found" in held.stdout
+    assert clone.exists()
+
+
+def test_cleanup_holds_unreachable_integrated_commit_oid(tmp_path: Path) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    topic = "unreachable-oid-topic"
+    topic_branch = "feature/unreachable-oid"
+    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
+    clone = workspace_module_clone(parent, topic=topic)
+    topic_tip = _commit_file(clone, "topic.txt", "topic\n", "topic change")
+    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
+    _delete_topic_branch(tmp_path, remote, topic_branch, "unreachable-oid-delete")
+
+    held = invoke(
+        parent,
+        "cleanup",
+        "--placement",
+        "workspace",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--owner-evidence-sha256",
+        owner_evidence_sha(parent),
+        "--integrated-commit",
+        topic_tip,
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert held.returncode == 0, held.stderr
+    assert "integrated-commit-not-reachable-from-origin-main" in held.stdout
+    assert clone.exists()
 
 
 def test_cleanup_holds_non_equivalent_integrated_commit(tmp_path: Path) -> None:

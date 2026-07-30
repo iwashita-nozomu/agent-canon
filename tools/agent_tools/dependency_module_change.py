@@ -855,57 +855,90 @@ def _module_path_states(
     return tuple(states)
 
 
-def _patch_signature(path: Path, left: str, right: str) -> tuple[str, str, str]:
-    """Return a deterministic semantic/tree signature for one Git range."""
-    diff = subprocess.run(
-        ["git", "-C", str(path), "diff", "--binary", "--no-ext-diff", left, right],
+def _topic_changed_paths(path: Path, topic_base: str, topic_tip: str) -> tuple[str, ...]:
+    """Return topic paths without allowing Git rename similarity to hide entries."""
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(path),
+            "diff",
+            "--name-only",
+            "--no-renames",
+            "-z",
+            topic_base,
+            topic_tip,
+        ],
         check=False,
         capture_output=True,
     )
-    if diff.returncode != 0:
+    if result.returncode != 0:
         raise GitCommandError(
             path,
-            ["diff", "--binary", left, right],
-            diff.stderr.decode(errors="replace"),
+            ["diff", "--name-only", "--no-renames", topic_base, topic_tip],
+            result.stderr.decode(errors="replace"),
         )
-    patch_id = subprocess.run(
-        ["git", "patch-id", "--stable"],
-        input=diff.stdout,
+    return tuple(item.decode(errors="surrogateescape") for item in result.stdout.split(b"\0") if item)
+
+
+def _tree_entry(
+    path: Path, commit: str, changed_path: str
+) -> tuple[str, str, str] | None:
+    """Read one exact tree entry as ``(object, mode, type)`` or absence."""
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(path),
+            "ls-tree",
+            "-r",
+            "-z",
+            "--full-tree",
+            commit,
+            "--",
+            f":(literal){changed_path}",
+        ],
         check=False,
         capture_output=True,
     )
-    if patch_id.returncode != 0:
+    if result.returncode != 0:
         raise GitCommandError(
             path,
-            ["patch-id", "--stable"],
-            patch_id.stderr.decode(errors="replace"),
+            ["ls-tree", "-r", "-z", commit, "--", changed_path],
+            result.stderr.decode(errors="replace"),
         )
-    patch_id_value = (
-        patch_id.stdout.decode(errors="replace").split(maxsplit=1)[0]
-        if patch_id.stdout.strip()
-        else ""
-    )
-    paths = subprocess.run(
-        ["git", "-C", str(path), "diff", "--no-ext-diff", "--name-status", "-z", left, right],
-        check=False,
-        capture_output=True,
-    )
-    if paths.returncode != 0:
+    records = [record for record in result.stdout.split(b"\0") if record]
+    if not records:
+        return None
+    if len(records) != 1 or b"\t" not in records[0]:
         raise GitCommandError(
             path,
-            ["diff", "--name-status", left, right],
-            paths.stderr.decode(errors="replace"),
+            ["ls-tree", "-r", "-z", commit, "--", changed_path],
+            "expected exactly one tree entry",
         )
-    tree_signature = hashlib.sha256(paths.stdout).hexdigest()
-    if patch_id_value:
-        return ("patch-id", patch_id_value, tree_signature)
-    return ("binary-diff", hashlib.sha256(diff.stdout).hexdigest(), tree_signature)
+    metadata, _ = records[0].split(b"\t", 1)
+    fields = metadata.split()
+    if len(fields) != 3:
+        raise GitCommandError(
+            path,
+            ["ls-tree", "-r", "-z", commit, "--", changed_path],
+            "tree entry has unexpected fields",
+        )
+    object_mode, object_type, object_id = fields
+    return (
+        object_id.decode("ascii"),
+        object_mode.decode("ascii"),
+        object_type.decode("ascii"),
+    )
 
 
 def _integrated_commit_failure(
-    path: Path, topic_base: str, topic_tip: str, integrated_commit: str
+    path: Path,
+    topic_paths: tuple[str, ...],
+    topic_tip: str,
+    integrated_commit: str,
 ) -> str | None:
-    """Return a typed refusal reason unless an integrated commit proves equivalence."""
+    """Return a typed refusal unless every topic final tree entry is identical."""
     if not FULL_COMMIT_OID.fullmatch(integrated_commit):
         return "integrated-commit-invalid"
     if not _git_succeeds(path, ["cat-file", "-e", f"{integrated_commit}^{{commit}}"]):
@@ -916,22 +949,24 @@ def _integrated_commit_failure(
     ):
         return "integrated-commit-not-reachable-from-origin-main"
     try:
-        integrated_parent = _run_git(path, ["rev-parse", f"{integrated_commit}^1"]).strip()
-        topic_signature = _patch_signature(path, topic_base, topic_tip)
-        integrated_signature = _patch_signature(path, integrated_parent, integrated_commit)
+        for changed_path in topic_paths:
+            if _tree_entry(path, topic_tip, changed_path) != _tree_entry(
+                path, integrated_commit, changed_path
+            ):
+                return "integrated-commit-not-equivalent"
     except GitCommandError:
         return "integrated-commit-evidence-unreadable"
-    if topic_signature != integrated_signature:
-        return "integrated-commit-not-equivalent"
     return None
 
 
-def _discover_integrated_commit(path: Path, topic_base: str, topic_tip: str) -> str | None:
+def _discover_integrated_commit(
+    path: Path, topic_paths: tuple[str, ...], topic_tip: str
+) -> str | None:
     """Find the newest equivalent commit on the canonical fetched main ref."""
     for candidate in _run_git(
         path, ["rev-list", "--first-parent", INTEGRATION_REMOTE_REF]
     ).splitlines():
-        if _integrated_commit_failure(path, topic_base, topic_tip, candidate) is None:
+        if _integrated_commit_failure(path, topic_paths, topic_tip, candidate) is None:
             return candidate
     return None
 
@@ -953,11 +988,15 @@ def _cleanup_readiness(path: Path, integrated_commit: str | None = None) -> str 
         if not topic_base:
             return "integrated-commit-base-unavailable"
         topic_tip = _run_git(path, ["rev-parse", "HEAD"]).strip()
+        try:
+            topic_paths = _topic_changed_paths(path, topic_base, topic_tip)
+        except GitCommandError:
+            return "integrated-commit-evidence-unreadable"
         if integrated_commit is not None:
-            failure = _integrated_commit_failure(path, topic_base, topic_tip, integrated_commit)
+            failure = _integrated_commit_failure(path, topic_paths, topic_tip, integrated_commit)
             if failure is not None:
                 return failure
-        elif _discover_integrated_commit(path, topic_base, topic_tip) is None:
+        elif _discover_integrated_commit(path, topic_paths, topic_tip) is None:
             return "unique-local-commits"
     return None
 

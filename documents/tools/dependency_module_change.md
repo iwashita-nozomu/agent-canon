@@ -54,5 +54,5 @@ remote 再構成可能性を要求します。
 `--owner-evidence-sha256` の exact match と marker validation を要求します。
 topic branch deletion 後に local-only commit が残る場合の `--integrated-commit` は
 PR merge/readback の full OID を渡す typed integration evidence です。省略時の
-canonical discovery と Git equivalence/hold semantics は dependency-module policy
-owner を参照します。
+canonical discovery と exact final-tree entry equivalence/hold semantics は
+dependency-module policy owner を参照します。

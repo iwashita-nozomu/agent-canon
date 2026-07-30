@@ -133,8 +133,12 @@ clone削除後に同じgateで削除できます。topic rootが空なら topic 
   `--integrated-commit <full-oid>` で渡すか、canonical な
   `refs/remotes/origin/main` first-parent history から tool が deterministic に
   discover した integrated commit を使う。candidate は `origin/main` reachable
-  で、topic branch の cumulative semantic patch/tree と candidate の first-parent
-  差分が Git equivalence を満たす必要がある。
+  である必要がある。tool は common/base commit と topic HEAD の
+  `git diff --name-only --no-renames -z` で topic path set を作り、各 path の
+  `git ls-tree -r -z` entry `(object/blob OID, mode, type)` または absence が
+  integrated commit の最終 tree と exact 一致することを確認する。integration 側の
+  topic 外 path は比較対象外とし、patch-id や path/status digest は認可根拠に
+  使わない。
 - `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY` とその reason、
   `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` とその
   reason が同じ command segment から渡されている。
