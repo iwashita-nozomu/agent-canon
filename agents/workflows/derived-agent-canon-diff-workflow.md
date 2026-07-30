@@ -25,7 +25,7 @@ downstream design ../canonical/CODEX_WORKFLOW.md routes diverged canon workflows
 ## 適用条件
 
 - `git status --short -- vendor/agent-canon` に差分がある
-- `make agent-canon-ensure-latest` または `bash tools/sync_agent_canon.sh ensure-latest` が `diverged_submodule_history` / unsafe local submodule state で止まる
+- `make agent-canon-ensure-latest` または `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh ensure-latest` が `diverged_submodule_history` / unsafe local submodule state で止まる
 - 派生 repo で育った workflow、skill、subagent、tool、runtime entrypoint、shared note を shared canon へ戻したい
 - root の symlink view / synced copy と `vendor/agent-canon/` のどちらを直すべきか判断が必要
 
@@ -54,7 +54,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
   --workspace-root "$PWD"
 
 bash tools/update_agent_canon.sh plan
-bash tools/sync_agent_canon.sh status
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh status
 git status --short -- vendor/agent-canon .github/workflows .github/PULL_REQUEST_TEMPLATE
 git diff --stat -- vendor/agent-canon .github/workflows .github/PULL_REQUEST_TEMPLATE
 ```
@@ -79,7 +79,7 @@ git diff --stat -- vendor/agent-canon .github/workflows .github/PULL_REQUEST_TEM
 
 判断に迷う場合は、`documents/agent-canon/agent-canon-subtree-migration.md` と `documents/runtime/SHARED_RUNTIME_SURFACES.md` の ownership を優先します。
 accidental drift は
-`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root`
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root`
 で復元し、shared-canon candidate と local wrapper を同じ commit に混ぜません。
 
 ## Stage 2. AgentCanon Branch へ渡す
@@ -120,8 +120,8 @@ shared canon main へ取り込んだあと、派生 repo は submodule worktree 
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
   make agent-canon-ensure-latest
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 ```
 
 `ensure-latest` が `already_current_submodule` または `submodule_update` を返すことを evidence に残します。
@@ -136,8 +136,8 @@ git status --short
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
   make agent-canon-ensure-latest
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 make agent-canon-pr-check
 make ci
 python3 tools/agent_tools/github_publish.py push \
@@ -155,7 +155,7 @@ fresh clone smoke がある場合は、更新後の remote から `--recurse-sub
 最低限、次を実行して evidence に残します。
 
 ```bash
-bash tools/sync_agent_canon.sh check
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 python3 tools/agent_tools/check_dependency_headers.py --changed
 bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing
 bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
@@ -180,7 +180,7 @@ repo 全体の runtime 影響がある場合、または template pin を更新�
 - `user_request_contract.md` の active clause がすべて resolved
 - `schedule.md` の planned work unit がすべて complete
 - `work_log.md` に AgentCanon branch push、shared canon main update、派生 repo parent gitlink update、validation、commit、push が記録済み
-- `bash tools/sync_agent_canon.sh check` が pass
+- `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check` が pass
 - `make agent-canon-ensure-latest` が pass し、submodule worktree HEAD と parent gitlink が shared canon main と一致
 - AgentCanon branch push 先と shared canon main の commit が evidence に記録済み
 - template repo では `origin/main` と shared canon main の更新が evidence に記録済み

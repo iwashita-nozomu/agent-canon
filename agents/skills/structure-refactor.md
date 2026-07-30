@@ -277,7 +277,7 @@ python3 tools/agent_tools/repo_structure_contract.py --root <root> \
    If the result shows only AgentCanon-owned root view or submodule drift, route
    to `agent-canon-update`,
    `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest`, and
-   `bash "$(PYTHONPATH=vendor/agent-canon/tools:tools python3 -c "from pathlib import Path; from agent_tools.agent_canon_source_root import resolve_agent_canon_source_root; print((resolve_agent_canon_source_root(Path(\".\")).source_root / \"tools/sync_agent_canon.sh\").as_posix())")"` link-root / `check` before continuing the
+   `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root / `check` before continuing the
    ordinary task. If the result shows real source-layout conflict, continue with
    the structure refactor sequence below.
 1. If `~/.codex` is implicated, inspect only non-secret routing metadata:
