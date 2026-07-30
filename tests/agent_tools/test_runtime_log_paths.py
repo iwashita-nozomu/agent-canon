@@ -32,10 +32,12 @@ class RuntimeLogPathsTest(unittest.TestCase):
     """Exercise runtime log archive path ordering."""
 
     def setUp(self) -> None:
+        """Set the stable source remote used by path fixtures."""
         self._old_source_remote = os.environ.get("AGENT_CANON_SOURCE_REPOSITORY_REMOTE")
         os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = "https://github.com/test/source.git"
 
     def tearDown(self) -> None:
+        """Restore the caller's source remote environment."""
         if self._old_source_remote is None:
             os.environ.pop("AGENT_CANON_SOURCE_REPOSITORY_REMOTE", None)
         else:

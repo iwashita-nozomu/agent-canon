@@ -30,14 +30,13 @@ from pathlib import Path
 from typing import cast
 from unittest.mock import patch
 
+from tools.agent_tools.graph_client import GraphClient
+from tools.agent_tools.log_repository_identity import stable_source_repository_id
 from tools.agent_tools.runtime_log_paths import (
     mounted_log_archive_root,
     repo_log_key,
     runtime_event_publication_outcome_spool_root,
-    safe_slug,
 )
-from tools.agent_tools.log_repository_identity import stable_source_repository_id
-from tools.agent_tools.graph_client import GraphClient
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "runtime_log_archive_git.py"
@@ -70,10 +69,12 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
     """Validate the runtime log archive Git workflow."""
 
     def setUp(self) -> None:
+        """Set the stable source remote used by archive command fixtures."""
         self._old_source_remote = os.environ.get("AGENT_CANON_SOURCE_REPOSITORY_REMOTE")
         os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = "https://github.com/test/source.git"
 
     def tearDown(self) -> None:
+        """Restore the caller's source remote environment."""
         if self._old_source_remote is None:
             os.environ.pop("AGENT_CANON_SOURCE_REPOSITORY_REMOTE", None)
         else:

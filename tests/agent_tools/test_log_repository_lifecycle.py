@@ -1,3 +1,5 @@
+"""Synthetic tests for stable runtime log repository lifecycle behavior."""
+
 from __future__ import annotations
 
 import inspect
@@ -11,6 +13,7 @@ from unittest.mock import patch
 
 from tools.agent_tools.agent_canon_source_root import resolve_agent_canon_source_root
 from tools.agent_tools.log_repository_identity import (
+    normalize_remote,
     stable_log_branch,
     stable_source_repository_id,
 )
@@ -23,12 +26,16 @@ import runtime_log_archive_git as archive  # noqa: E402
 
 
 def git(cwd: Path, *args: str, check: bool = True) -> str:
+    """Run one Git command in a synthetic checkout and return stdout."""
     result = subprocess.run(["git", *args], cwd=cwd, check=check, capture_output=True, text=True)
     return result.stdout.strip()
 
 
 class LogRepositoryLifecycleTest(unittest.TestCase):
+    """Exercise stable identity, root resolution, snapshots, and publication."""
+
     def setUp(self) -> None:
+        """Prepare stable source identity environment for each test."""
         self.env = os.environ.copy()
         self.env["GIT_CONFIG_GLOBAL"] = os.devnull
         self.env["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = "https://github.com/owner/source.git"
@@ -36,6 +43,7 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
             self.env.pop(name, None)
 
     def make_remote(self, root: Path) -> Path:
+        """Create a bare archive remote with one main seed commit."""
         seed = root / "seed"
         seed.mkdir()
         git(seed, "init", "-q")
@@ -50,6 +58,7 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
         return remote
 
     def source(self, root: Path, name: str) -> Path:
+        """Create a synthetic source checkout with the test remote configured."""
         source = root / name
         source.mkdir()
         git(source, "init", "-q")
@@ -64,6 +73,7 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
         *args: str,
         archive_root: Path | None = None,
     ) -> subprocess.CompletedProcess[str]:
+        """Invoke the archive tool against one synthetic source and remote."""
         global_args = [] if archive_root is None else ["--archive-root", str(archive_root)]
         return subprocess.run(
             [
@@ -82,6 +92,7 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
         )
 
     def test_same_remote_different_paths_share_stable_branch(self) -> None:
+        """Different checkouts of one remote resolve to one stable branch."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             first = root / "checkout-a"
@@ -102,12 +113,23 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
                 self.assertEqual(repo_log_key(first), repo_log_key(second))
 
     def test_distinct_sources_do_not_collide(self) -> None:
+        """Distinct normalized repository identities produce different branches."""
         self.assertNotEqual(
             stable_source_repository_id("https://github.com/owner/a.git"),
             stable_source_repository_id("https://github.com/owner/b.git"),
         )
 
+    def test_remote_matrix_strips_case_insensitive_git_suffix(self) -> None:
+        """SSH and HTTPS forms strip a case-insensitive .git suffix equally."""
+        forms = (
+            "git@GITHUB.com:OWNER/SOURCE.GIT",
+            "ssh://git@github.com/owner/source.git",
+            "https://github.com/OWNER/SOURCE.GiT",
+        )
+        self.assertEqual({normalize_remote(form) for form in forms}, {"github.com/owner/source"})
+
     def test_branch_mismatch_is_typed_and_write_does_not_mutate_archive(self) -> None:
+        """A mismatched archive fails status and writes before mutation."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             remote = self.make_remote(root)
@@ -131,6 +153,7 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
             self.assertFalse((archive_clone / "agent-reports").exists())
 
     def test_snapshots_are_content_addressed_idempotent_and_collision_safe(self) -> None:
+        """Identical reports deduplicate while changed content gets a new snapshot."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             remote = self.make_remote(root)
@@ -157,6 +180,7 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
             self.assertEqual(len(list(snapshots[0].parent.iterdir())), 2)
 
     def test_two_writers_retry_without_force_and_read_back_remote_ref(self) -> None:
+        """Concurrent writers retry append-only publication and verify readback."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             remote = self.make_remote(root)
@@ -190,24 +214,48 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
             self.assertEqual(remote_head, git(second_canon / ".agent-canon" / "log-archive", "rev-parse", "HEAD"))
 
     def test_root_resolution_standalone_vendored_and_override(self) -> None:
+        """Standalone, vendored, and mismatched explicit roots remain independently visible."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             standalone = root / "standalone"
             (standalone / "agents" / "skills").mkdir(parents=True)
             (standalone / "agents" / "skills" / "catalog.yaml").write_text("version: 1\n", encoding="utf-8")
-            self.assertEqual(resolve_agent_canon_source_root(standalone).layout, "standalone")
+            standalone_resolution = resolve_agent_canon_source_root(standalone)
+            self.assertEqual(standalone_resolution.layout, "standalone")
+            self.assertEqual(standalone_resolution.source_root, standalone.resolve())
+            self.assertEqual(standalone_resolution.canon_root, standalone.resolve())
             parent = root / "parent"
             (parent / "vendor" / "agent-canon" / "agents" / "skills").mkdir(parents=True)
             (parent / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").write_text("version: 1\n", encoding="utf-8")
-            self.assertEqual(resolve_agent_canon_source_root(parent).layout, "vendored")
-            override = root / "override"
-            (override / "agents" / "skills").mkdir(parents=True)
-            (override / "agents" / "skills" / "catalog.yaml").write_text("version: 1\n", encoding="utf-8")
-            resolution = resolve_agent_canon_source_root(root, source_root=root / "source", canon_root=override)
+            vendored_resolution = resolve_agent_canon_source_root(parent)
+            vendor = parent / "vendor" / "agent-canon"
+            self.assertEqual(vendored_resolution.layout, "vendored")
+            self.assertEqual(vendored_resolution.source_root, vendor.resolve())
+            self.assertEqual(vendored_resolution.canon_root, vendor.resolve())
+            source_override = root / "source-override"
+            (source_override / "agents" / "skills").mkdir(parents=True)
+            (source_override / "agents" / "skills" / "catalog.yaml").write_text("version: 1\n", encoding="utf-8")
+            canon_override = root / "canon-override"
+            (canon_override / "agents" / "skills").mkdir(parents=True)
+            (canon_override / "agents" / "skills" / "catalog.yaml").write_text("version: 1\n", encoding="utf-8")
+            resolution = resolve_agent_canon_source_root(root, source_root=source_override, canon_root=canon_override)
             self.assertEqual(resolution.layout, "override")
-            self.assertEqual(resolution.canon_root, override.resolve())
+            self.assertEqual(resolution.source_root, source_override.resolve())
+            self.assertEqual(resolution.canon_root, canon_override.resolve())
+            self.assertNotEqual(resolution.source_root, resolution.canon_root)
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_SOURCE_ROOT": str(source_override),
+                    "AGENT_CANON_ROOT": str(canon_override),
+                },
+            ):
+                env_resolution = resolve_agent_canon_source_root(root)
+            self.assertEqual(env_resolution.source_root, source_override.resolve())
+            self.assertEqual(env_resolution.canon_root, canon_override.resolve())
 
     def test_sync_has_no_deletion_or_force_route(self) -> None:
+        """The normal sync route contains no branch deletion or force push."""
         source = inspect.getsource(archive.command_sync)
         push = inspect.getsource(archive._compare_and_push)
         self.assertNotIn("push --delete", source)

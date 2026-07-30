@@ -37,7 +37,7 @@ def normalize_remote(remote: str) -> str:
         host = parsed.hostname
         path = parsed.path
     normalized_path = "/".join(part for part in path.split("/") if part)
-    if normalized_path.endswith(".git"):
+    if normalized_path.casefold().endswith(".git"):
         normalized_path = normalized_path[:-4]
     normalized_path = normalized_path.strip("/")
     if not normalized_path:

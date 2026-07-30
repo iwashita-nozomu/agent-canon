@@ -39,6 +39,11 @@ The mount is intentionally ignored by AgentCanon Git. It is not a submodule and
 does not create a gitlink that can dirty AgentCanon source branches or parent
 repo AgentCanon pins.
 
+The stable-branch and retention policy consumed by this contract is recorded in
+[agent-canon-log PR #4](https://github.com/iwashita-nozomu/agent-canon-log/pull/4).
+This document owns the AgentCanon consumer, mount, and publication behavior; it
+does not duplicate the policy repository's schema or retention authority.
+
 ## Reader Map
 
 Use this document to answer where runtime hook logs, accumulated evals, Codex

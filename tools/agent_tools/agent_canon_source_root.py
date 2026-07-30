@@ -9,9 +9,9 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
-import os
 
 LAYOUT_STANDALONE = "standalone"
 LAYOUT_VENDORED = "vendored"
@@ -81,6 +81,26 @@ def _same_canonical_entity(left: Path, right: Path) -> bool:
         return left.resolve() == right.resolve()
 
 
+def _explicit_resolution(raw_root: Path, source: Path, canon: Path) -> RootResolution:
+    """Resolve explicit source and canon roots without collapsing their identities."""
+    if not _has_catalog(source):
+        raise SourceRootFailure(
+            "agent_canon_source_root_override_missing",
+            f"Override source root has no AgentCanon catalog: {source}",
+        )
+    if not _has_catalog(canon):
+        raise SourceRootFailure(
+            "agent_canon_canon_root_override_missing",
+            f"Override canon root has no AgentCanon catalog: {canon}",
+        )
+    return RootResolution(
+        current_repository_root=_find_current_repository_root(raw_root),
+        source_root=source,
+        layout=LAYOUT_OVERRIDE,
+        canon_root=canon,
+    )
+
+
 def _explicit_override(raw_root: Path) -> RootResolution | None:
     source_override = os.environ.get(SOURCE_ROOT_OVERRIDE_ENV, "").strip()
     canon_override = os.environ.get(CANON_ROOT_OVERRIDE_ENV, "").strip()
@@ -93,17 +113,7 @@ def _explicit_override(raw_root: Path) -> RootResolution | None:
         )
     source_root = Path(source_override).expanduser().resolve()
     canon_root = Path(canon_override).expanduser().resolve()
-    if not _has_catalog(canon_root):
-        raise SourceRootFailure(
-            "agent_canon_source_root_override_missing",
-            f"Override canon root has no AgentCanon catalog: {canon_root}",
-        )
-    return RootResolution(
-        current_repository_root=_find_current_repository_root(raw_root),
-        source_root=canon_root,
-        layout=LAYOUT_OVERRIDE,
-        canon_root=canon_root,
-    )
+    return _explicit_resolution(raw_root, source_root, canon_root)
 
 
 def resolve_agent_canon_source_root(
@@ -121,12 +131,7 @@ def resolve_agent_canon_source_root(
             )
         source = source_root.expanduser().resolve()
         canon = canon_root.expanduser().resolve()
-        if not _has_catalog(canon):
-            raise SourceRootFailure(
-                "agent_canon_source_root_override_missing",
-                f"Override canon root has no AgentCanon catalog: {canon}",
-            )
-        return RootResolution(_find_current_repository_root(raw_root), canon, LAYOUT_OVERRIDE, canon)
+        return _explicit_resolution(raw_root, source, canon)
 
     explicit = _explicit_override(raw_root)
     if explicit is not None:
