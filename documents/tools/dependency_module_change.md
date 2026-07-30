@@ -51,8 +51,13 @@ remote 再構成可能性を要求します。
 `--placement workspace-continuation` で明示します。出力の `SOURCE_REMOTE`、
 `SOURCE_BASE_REF`、`SOURCE_BASE_SHA`、`SOURCE_OWNER_EVIDENCE_SHA256`、
 `SOURCE_BRANCH`、`SOURCE_HEAD_SHA` が source identity です。workspace cleanup は
-`--owner-evidence-sha256` の exact match と marker validation を要求します。
+`--owner-evidence-sha256` の exact match と Git / manifest identity validation を要求します。
 topic branch deletion 後に local-only commit が残る場合の `--integrated-commit` は
 PR merge/readback の full OID を渡す typed integration evidence です。省略時の
 canonical discovery と exact final-tree entry equivalence/hold semantics は
-dependency-module policy owner を参照します。
+dependency-module policy owner を参照します。`agent-canon.topic.role` / `topic` の
+stale または missing membership marker は旧 evidence として
+`marker-readback=membership-mismatch` を receipt に残し、clean/tree gate の成立後は
+cleanup を阻害しません。owner evidence、placement、module、URL、branch の不一致は
+hold します。workspace clone の削除後に computed topic root が空なら、同じ receipt で
+topic root も削除します。

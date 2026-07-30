@@ -46,6 +46,13 @@ PR merge/readback 後に topic branch が削除され、clone に local-only com
 残る場合は、cleanup に `--integrated-commit <full-oid>` として統合 commit の
 evidence を渡します。省略時の canonical `origin/main` discovery を含む
 equivalence gate と hold 条件は、詳細 policy owner の cleanup gate に従います。
+computed clone path、manifest / `origin` URL、clean / untracked-zero state、tree の
+inclusion / deletion が証明されていれば、`agent-canon.topic.role` / `topic` の stale または
+missing membership marker は旧 evidence として `marker-readback=membership-mismatch` に
+明示されるだけで cleanup を阻害しません。owner evidence、placement、module、URL、branch
+の不一致は hold します。workspace clone を削除した後、managed child 以外の成果物が無い
+topic root は同じ `CLEANUP` receipt で除去されます。再 clone / `prepare` はこの route に
+追加しません。
 
 独立した replaceable responsibility を parallel に実行する場合は、vendor の clean
 状態を理由に停止せず、親の DAG packet が disjoint write scope、依存/merge order、

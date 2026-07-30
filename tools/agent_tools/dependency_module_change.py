@@ -393,6 +393,7 @@ def _inspect(
     owner_evidence_sha256: str | None = None,
     topic_identity: str | None = None,
     module_url: str | None = None,
+    allow_stale_membership: bool = False,
 ) -> CloneInspection:
     if not path.exists() and not path.is_symlink():
         return CloneInspection(path, "absent")
@@ -410,7 +411,7 @@ def _inspect(
     marker_module = _marker(path, "module")
     marker_url = _marker(path, "url")
     marker_branch = _marker(path, "branch")
-    if marker_role != role or marker_topic != topic:
+    if not allow_stale_membership and (marker_role != role or marker_topic != topic):
         return CloneInspection(path, "membership-mismatch", marker_role, marker_module, remote, marker_branch, actual)
     if placement is not None and _marker(path, "placement") != placement:
         return CloneInspection(path, "placement-mismatch", marker_role, marker_module, remote, marker_branch, actual)
@@ -1041,6 +1042,17 @@ def _cleanup_module(
         topic=topic,
         module_url=_resolve_module_url(parent_root, module.url),
     )
+    marker_readback = inspection.state
+    if inspection.state == "membership-mismatch":
+        inspection = _inspect(
+            clone,
+            role="module",
+            module=module,
+            topic=topic,
+            module_url=_resolve_module_url(parent_root, module.url),
+            allow_stale_membership=True,
+        )
+        print(f"CLEANUP module={module.path} marker-readback={marker_readback}")
     if inspection.state == "absent":
         print(f"CLEANUP module={module.path} action=hold reason=absent")
         return
@@ -1089,6 +1101,15 @@ def _cleanup_parent(
             + ", ".join(str(item) for item in unknown)
         )
     inspection = _inspect(parent_root, role="parent", topic=topic)
+    marker_readback = inspection.state
+    if inspection.state == "membership-mismatch":
+        inspection = _inspect(
+            parent_root,
+            role="parent",
+            topic=topic,
+            allow_stale_membership=True,
+        )
+        print(f"CLEANUP parent marker-readback={marker_readback}")
     if inspection.state != "ready":
         print(f"CLEANUP parent action=hold reason={inspection.state}")
         return
@@ -1138,6 +1159,22 @@ def _cleanup_workspace(
         owner_evidence_sha256=owner_evidence_sha256,
         module_url=_resolve_module_url(root, module.url),
     )
+    marker_readback = inspection.state
+    if inspection.state == "membership-mismatch":
+        inspection = _inspect(
+            clone,
+            role="module",
+            module=module,
+            topic=_topic_name(topic),
+            placement=placement,
+            owner_evidence_sha256=owner_evidence_sha256,
+            module_url=_resolve_module_url(root, module.url),
+            allow_stale_membership=True,
+        )
+        print(
+            f"CLEANUP module={module.path} placement={placement} "
+            f"marker-readback={marker_readback}"
+        )
     if inspection.state == "absent":
         print(f"CLEANUP module={module.path} placement={placement} action=hold reason=absent")
         return
@@ -1155,6 +1192,10 @@ def _cleanup_workspace(
     clone = _assert_safe_contained_path(topic_root, clone, "workspace cleanup clone")
     shutil.rmtree(clone)
     print(f"CLEANUP module={module.path} placement={placement} action=removed path={clone}")
+    if topic_root != CONTAINER_WORKSPACE_ROOT and topic_root.exists() and not any(topic_root.iterdir()):
+        _assert_safe_contained_path(root, topic_root, "workspace cleanup topic root")
+        topic_root.rmdir()
+        print(f"CLEANUP topic action=removed path={topic_root}")
 
 
 def _status(parent_root: Path, modules: tuple[DependencyModule, ...], topic: str) -> None:

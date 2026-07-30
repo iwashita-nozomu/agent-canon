@@ -127,6 +127,12 @@ clone削除後に同じgateで削除できます。topic rootが空なら topic 
 - `git fetch --all --prune` が成功する。
 - worktree、index、untracked files が空である。
 - linked worktree が追加で登録されていない。
+- computed clone path と実際の `origin` URL は引き続き Git / manifest で検証する。
+  `agent-canon.topic.role` と `agent-canon.topic.topic` の membership marker は
+  旧来の所属 evidence として readback するが、stale または missing であることだけを
+  cleanup の拒否理由にしない。marker の readback は `marker-readback=membership-mismatch`
+  として `CLEANUP` receipt に残す。owner evidence、placement、module、URL、branch の
+  不一致は従来どおり hold する。
 - fetch 後の `git rev-list --all --not --remotes` が空であるか、後述の
   integrated-commit evidence gate が pass する。
 - local-only commit が残る場合は、PR merge/readback が返した full OID を
@@ -170,6 +176,9 @@ surface の状態だけを完成形として残します。
   `origin/main` の canonical discovery を使い、equivalence を証明できなければ
   hold する。
 - `cleanup --placement workspace[{-continuation}] --topic <topic> --module <path> --expected-clone <absolute-path> --owner-evidence-sha256 <sha256>`: workspace placement の computed clone だけを扱い、exact expected evidence SHA と marker identity を検証してから同じ cleanup gate を適用する。
+- workspace placement の module clone を同じ gate で削除した後、computed topic root に
+  managed child 以外の成果物が無ければ、同じ `CLEANUP` receipt で topic root も削除する。
+  他の成果物は保持し、再 clone / `prepare` を暗黙に行わない。
 - `cleanup --topic <topic> --parent --expected-parent <absolute-path>`: module cloneが
   無い場合だけparent cloneと空topic rootを同じgateで削除する。
 

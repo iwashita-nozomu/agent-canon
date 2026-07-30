@@ -138,6 +138,15 @@ def owner_evidence_sha(parent: Path) -> str:
     return hashlib.sha256((parent / "owner-evidence.md").read_bytes()).hexdigest()
 
 
+def stale_membership_marker(clone: Path, mode: str) -> None:
+    if mode == "stale":
+        run_git(clone, "config", "--local", "agent-canon.topic.topic", "old-topic")
+    elif mode == "missing":
+        run_git(clone, "config", "--local", "--unset", "agent-canon.topic.topic")
+    else:
+        raise AssertionError(f"unsupported marker mode: {mode}")
+
+
 def _commit_staged(repo: Path, message: str) -> str:
     subprocess.run(
         [
@@ -705,6 +714,54 @@ def test_workspace_placement_cleanup_uses_exact_computed_clone(tmp_path: Path) -
     )
     assert removed.returncode == 0, removed.stderr
     assert not clone.exists()
+    assert not clone.parent.exists()
+
+
+@pytest.mark.parametrize("marker_mode", ("stale", "missing"))
+def test_cleanup_accepts_equivalent_squash_with_stale_membership_marker(
+    tmp_path: Path, marker_mode: str
+) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    topic = f"stale-marker-{marker_mode}"
+    topic_branch = f"feature/stale-marker-{marker_mode}"
+    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
+    clone = workspace_module_clone(parent, topic=topic)
+    _commit_file(clone, "topic.txt", "topic\n", "topic change")
+    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
+    integrated_commit = _integrate_topic(
+        tmp_path,
+        remote,
+        topic_branch,
+        squash=True,
+        delete_topic_branch=True,
+    )
+    stale_membership_marker(clone, marker_mode)
+
+    removed = invoke(
+        parent,
+        "cleanup",
+        "--placement",
+        "workspace",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--owner-evidence-sha256",
+        owner_evidence_sha(parent),
+        "--integrated-commit",
+        integrated_commit,
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert removed.returncode == 0, removed.stderr
+    assert "marker-readback=membership-mismatch" in removed.stdout
+    assert "action=removed" in removed.stdout
+    assert not clone.exists()
+    assert not clone.parent.exists()
 
 
 def test_prepare_can_create_and_reuse_parent_pin_branch(tmp_path: Path) -> None:

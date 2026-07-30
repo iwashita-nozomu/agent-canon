@@ -65,6 +65,15 @@ modify a parent checkout or pin.
   PR head succeeds. After successful readback, the local clone is deleted.
 - If unmaterialized diff remains, deletion is prohibited until those changes are
   materialized to the same PR and the PR head readback confirms identity.
+- After merge/readback, cleanup may consume the same full integrated-commit
+  receipt even when the source clone retains local topic commits from a squash
+  merge. Exact computed path, clean/untracked-zero state, and per-path final-tree
+  inclusion/deletion are authoritative; stale or missing membership markers are
+  read back as `marker-readback=membership-mismatch` and do not block cleanup by
+  themselves. Dirty state, URL/branch/owner evidence mismatch, and wrong or
+  non-equivalent integrated commits still hold. Once the managed child is removed,
+  an empty topic container is removed by that same receipt; no re-clone or
+  `prepare` repair is inserted.
 - For open PR repair work in this lane, always check out the PR remote head
   branch in the source clone, merge latest `origin/main`, and resolve conflicts.
   Then make a local commit on the same branch, push to that same branch,
