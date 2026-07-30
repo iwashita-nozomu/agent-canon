@@ -138,9 +138,14 @@ def baseline_path(root: Path) -> Path:
     if override:
         return Path(override)
     candidates = (
-        root / "documents" / "log-surface-inventory.json",
-        root / "vendor" / "agent-canon" / "documents" / "log-surface-inventory.json",
-        agent_canon_root() / "documents" / "log-surface-inventory.json",
+        root / "documents" / "runtime" / "log-surface-inventory.json",
+        root
+        / "vendor"
+        / "agent-canon"
+        / "documents"
+        / "runtime"
+        / "log-surface-inventory.json",
+        agent_canon_root() / "documents" / "runtime" / "log-surface-inventory.json",
     )
     for candidate in candidates:
         if candidate.is_file():
@@ -150,7 +155,7 @@ def baseline_path(root: Path) -> Path:
 
 def inventory_root_for_baseline(baseline: Path) -> Path:
     """Return the source root whose surfaces are represented by the baseline."""
-    return baseline.resolve().parents[1]
+    return baseline.resolve().parents[2]
 
 
 def block(reason: str) -> None:

@@ -24,7 +24,7 @@ SurfaceKind = Literal["hook", "skill", "tool"]
 Certainty = Literal["static", "dynamic"]
 FieldIdentity = tuple[str, SurfaceKind, str, str, Certainty]
 
-DEFAULT_BASELINE = Path("documents") / "log-surface-inventory.json"
+DEFAULT_BASELINE = Path("documents") / "runtime" / "log-surface-inventory.json"
 KEY_VALUE_PATTERN = re.compile(r"^([A-Za-z][A-Za-z0-9_.-]*)=")
 SHELL_ECHO_PATTERN = re.compile(r"^\s*(?:echo|printf)\s+(?:--\s+)?(?P<value>.+)$")
 EXCLUDED_PARTS = {
@@ -747,8 +747,8 @@ def resolve_baseline_path(root: Path, raw_baseline: Path) -> Path:
 
 
 def inventory_root_for_baseline(baseline: Path) -> Path:
-    """Return the repository root represented by one documents/ baseline."""
-    return baseline.resolve().parents[1]
+    """Return the repository root represented by one documents/runtime baseline."""
+    return baseline.resolve().parents[2]
 
 
 if __name__ == "__main__":
