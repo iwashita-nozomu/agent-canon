@@ -2,19 +2,21 @@
 
 # @dependency-start
 # contract test
-# responsibility Verifies the short `exec` CLI for source-root anchored command execution.
-# downstream implementation ../../tools/agent_tools/agent_canon_source_root.py exports the owner source-root resolver
-# downstream implementation ../../tools/agent_tools/agent_tools/skill_tool_commands.py reads delegated command packets through a stable resolver contract
+# responsibility Verifies CLI command execution
+#              anchored to the resolved source root.
+# implementation: ../../tools/agent_tools/agent_canon_source_root.py
+#              resolves source roots.
+# implementation: ../../tools/agent_tools/skill_tool_commands.py
+#              handles delegated commands.
 # @dependency-end
 
 from __future__ import annotations
 
 import stat
+import sys
 import tempfile
 import unittest
 from pathlib import Path
-
-import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
@@ -40,13 +42,25 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         )
 
     def test_exec_parser_accepts_command(self) -> None:
+        """Accept the exec mode with an AgentCanon entrypoint and arguments."""
         parser = build_parser()
         parsed = parser.parse_args(["exec", "tools/sync_agent_canon.sh", "check"])
         self.assertEqual(parsed.mode, "exec")
         self.assertEqual(parsed.command, "tools/sync_agent_canon.sh")
         self.assertEqual(parsed.args, ["check"])
 
-    def test_exec_command_runs_under_resolved_source_root(self) -> None:
+    def test_exec_command_runs_tracked_entrypoint_script(self) -> None:
+        """Run sync_agent_canon.sh through source-root exec."""
+        script = PROJECT_ROOT / "tools" / "sync_agent_canon.sh"
+        self.assertEqual(script.stat().st_mode & stat.S_IXUSR, stat.S_IXUSR)
+        parser = build_parser().parse_args(
+            ["exec", "tools/sync_agent_canon.sh", "check"]
+        )
+        result = run(parser, resolver=lambda _: self._mock_resolution(PROJECT_ROOT))
+        self.assertNotEqual(result, 0)
+
+    def test_exec_command_propagates_nonzero_exit(self) -> None:
+        """Propagate a non-zero delegated command return code to the caller."""
         with tempfile.TemporaryDirectory() as workspace:
             root = Path(workspace)
             script = root / "tools" / "agent_tool.sh"
@@ -58,13 +72,14 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                 "fi\n"
                 "exit 1\n"
             )
-            script.chmod(stat.S_IRWXU)
+            script.chmod(stat.S_IXUSR | stat.S_IRUSR)
 
-            parser = build_parser().parse_args(["exec", "tools/agent_tool.sh", "pass"])
+            parser = build_parser().parse_args(["exec", "tools/agent_tool.sh", "fail"])
             result = run(parser, resolver=lambda _: self._mock_resolution(root))
-            self.assertEqual(result, 0)
+            self.assertEqual(result, 1)
 
     def test_exec_command_enforces_resolved_source_root(self) -> None:
+        """Reject commands resolving outside the source-root contract."""
         with tempfile.TemporaryDirectory() as workspace:
             root = Path(workspace)
             parser = build_parser().parse_args(

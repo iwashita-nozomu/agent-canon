@@ -2337,7 +2337,7 @@ description = "The runtime AgentCanon update skill must route parent pin updates
 id = "AGENT-CANON-UPDATE-SHIM-1"
 critical = true
 description = "Requires the high-level parent latest route, named structure follow-up gate, and root-view verification commands."
-required_regex = ["make agent-canon-ensure-latest", "make agent-canon-update-plan", "agentcanon_structure_followup=required", "agentcanon_structure_followup=pass", "python3 -m agent_tools\\.agent_canon_source_root exec tools/sync_agent_canon\\.sh", "sync_agent_canon\\.sh"]
+required_regex = ["make agent-canon-ensure-latest", "make agent-canon-update-plan", "agentcanon_structure_followup=required", "agentcanon_structure_followup=pass", "python3 -m agent_tools\\.agent_canon_source_root exec tools/sync_agent_canon\\.sh link-root", "python3 -m agent_tools\\.agent_canon_source_root exec tools/sync_agent_canon\\.sh check", "sync_agent_canon\\.sh"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-2"
