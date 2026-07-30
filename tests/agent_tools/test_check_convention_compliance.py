@@ -39,22 +39,12 @@ from tools.agent_tools.check_convention_compliance import (
     SOURCE_FILE_DEFINITION_ORDER_MARKERS,
     STATIC_READ_VALIDATION_POLICY_MARKERS,
     TEST_CONTRACT_ROUTING_MARKERS,
+    TOOL_GATES,
     VALIDATION_FAILURE_RESPONSE_MARKERS,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_convention_compliance.py"
-def skill_fixture(skill: str, body: str) -> str:
-    """Return a minimal runtime skill fixture with its tool command packet."""
-    return (
-        f"# {skill}\n\n"
-        "## Tool Commands\n\n"
-        "```bash\n"
-        "python3 tools/agent_tools/skill_tool_commands.py show "
-        f"--skill {skill} --format text\n"
-        "```\n\n"
-        f"{body}"
-    )
 
 
 MINIMAL_REPO_FILES: dict[str, str] = {
@@ -195,7 +185,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "tools/agent_tools/tool_rejection_preflight.py": (
         "RESPONSIBILITY_SCOPE_COMMAND responsibility_scope_gate scope_covers "
-        "protecting_tools gate=\"responsibility_scope\" "
+        'protecting_tools gate="responsibility_scope" '
         "EXPERIMENT_EXECUTION_SURFACE_PATHS experiment_execution_surface_guard "
         "experiment_execution_surface_path check_experiment_registry.py "
         "test_run_managed_experiment.py\n"
@@ -249,143 +239,6 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "behavior or contract delta evidence route\n"
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
-    ),
-    ".agents/skills/agent-orchestration/SKILL.md": skill_fixture(
-        "agent-orchestration",
-        "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
-        "$owner-bounded-routing $literature-survey $research-workflow "
-        "task-shape skill check_convention_compliance.py vertical dynamic wave "
-        "write-capable handoff $prose-reasoning-graph $structure-planning "
-        "$md-style-check format-only structure_contract=skipped "
-        "existing-tool route targeted-validation evidence Owner-Bounded Change "
-        "static/read evidence unresolved signal operation checks smoke runs "
-        "Expensive command "
-        "Design Integrity Gate responsibility model Abstract Design Frame "
-        "design_issue_blocker implementation shortcut "
-        "before `$research-workflow` source packet adoption/exclusion "
-        "parent-direct SKILL.md "
-        "selected_agent_type write_capable_handoff_blocker evidence "
-        "parent_packet_ref status=blocked canonical_rerun_pass "
-        "durable_blocker_or_issue router_unavailable_blocker new state evidence "
-        "revised parent packet\n"
-    ),
-    ".agents/skills/codex-task-workflow/SKILL.md": skill_fixture(
-        "codex-task-workflow",
-        "codex task workflow prose-reasoning-graph $structure-planning "
-        "$literature-survey $research-workflow before design "
-        "$md-style-check format-only structure_contract=skipped "
-        "existing-tool route targeted-validation evidence Owner-Bounded Change "
-        "static/read evidence primary validation evidence supplemental evidence "
-        "operation checks unresolved static findings replaceable unit "
-        "implementation paths validation route unresolved branch "
-        "targeted validation route "
-        "changed runtime behavior "
-        "Design Integrity Gate responsibility model Abstract Design Frame "
-        "design_issue_blocker implementation latitude "
-        "parent-direct $owner-bounded-routing SKILL.md "
-        "Implementation Source Packet adoption/exclusion "
-        "tool_rejection_preflight.py "
-        "contract-complete implementation acceptance contract design_issue_blocker "
-        "implementation shortcut "
-        "selected_agent_type write_capable_handoff_blocker evidence "
-        "parent_packet_ref status=blocked canonical_rerun_pass "
-        "durable_blocker_or_issue router_unavailable_blocker new state evidence "
-        "revised parent packet "
-        "$oop-readability-check SOLID principle signal OOP dimension "
-        "finding kind tools/oop/shared/readability_core.py check_solid_evidence.py "
-        "scanned_paths classes Protocol responsibility_scope owner scope "
-        "protecting tools implementation directory\n"
-    ),
-    ".agents/skills/refactor-loop/SKILL.md": skill_fixture(
-        "refactor-loop",
-        "two-stage refactor forced migration usage-surface repair "
-        "return-gate validation\n",
-    ),
-    ".agents/skills/change-review/SKILL.md": skill_fixture(
-        "change-review",
-        "issue_route issues/README.md issue_sync.py new_local_issue github_mirror "
-        "python-review $oop-readability-check tools/agent_tools/check_solid_evidence.py "
-        "SOLID principle signal OOP readability report classes Protocol\n",
-    ),
-    ".agents/skills/subagent-bootstrap/SKILL.md": skill_fixture(
-        "subagent-bootstrap",
-        "selected_agent_type write_capable_handoff_blocker evidence "
-        "parent_packet_ref status=blocked canonical_rerun_pass "
-        "durable_blocker_or_issue router_unavailable_blocker new state evidence "
-        "explicit revised packet\n"
-    ),
-    ".agents/skills/tool-finding-report/SKILL.md": skill_fixture(
-        "tool-finding-report",
-        "tool_warning_exit_status resolved deferred_with_issue "
-        "accepted_with_reason explicit_approval_evidence\n"
-    ),
-    ".agents/skills/md-style-check/SKILL.md": skill_fixture(
-        "md-style-check",
-        "$prose-reasoning-graph $structure-planning $owner-bounded-routing format-only "
-        "structure_contract=skipped existing-tool route "
-        "targeted-validation evidence\n"
-    ),
-    ".agents/skills/structure-planning/SKILL.md": skill_fixture(
-        "structure-planning",
-        "document_unit document_split_decision invalid split boundaries\n",
-    ),
-    ".agents/skills/owner-bounded-routing/SKILL.md": skill_fixture(
-        "owner-bounded-routing",
-        "existing tool owner boundary targeted validation Owner-Bounded Change "
-        "targeted validation tool_rejection_preflight.py "
-        "structure_contract=skipped responsibility_scope owner scope protecting tools "
-        "implementation directory SKILL.md\n"
-    ),
-    ".agents/skills/test-design/SKILL.md": skill_fixture(
-        "test-design",
-        "contract-only wrapper static contract validation canonical command evidence "
-        "observable behavior validation repair scope mathematical necessity gate "
-        "Numerical Trigger Non-Numerical Alternative checker-owned property "
-        "failing contract observation level failure cause approved intent escalate "
-        "oracle weakening documents/runtime/runtime-profiles-and-check-matrix.json "
-        "documents/runtime/runtime-profiles-and-check-matrix.md\n"
-    ),
-    ".agents/skills/experiment-lifecycle/SKILL.md": skill_fixture(
-        "experiment-lifecycle",
-        "experiment_execution_surface_guard tool_rejection_preflight.py "
-        "$test-design check_experiment_registry.py "
-        "tests/tools/test_run_managed_experiment.py\n",
-    ),
-    ".agents/skills/worktree-health/SKILL.md": skill_fixture(
-        "worktree-health",
-        "agents/canonical/CODEX_WORKFLOW.md Branch Reuse Default "
-        "branch_worktree_guard.py "
-        "branch_creation_reason=<reason> "
-        "worktree_creation_reason=<reason> git worktree list --porcelain "
-        "git branch --show-current\n",
-    ),
-    ".agents/skills/computational-optimization/SKILL.md": skill_fixture(
-        "computational-optimization",
-        "mathematical necessity gate iteration map stopping scalar failure semantics\n",
-    ),
-    ".agents/skills/mvp-skeleton/SKILL.md": skill_fixture(
-        "mvp-skeleton",
-        "mvp core loop vertical slice\n",
-    ),
-    ".agents/skills/pr-processing/SKILL.md": skill_fixture(
-        "pr-processing",
-        "PR Essence problem / user request design intent canonical owner "
-        "behavior or contract delta evidence route\n",
-    ),
-    ".agents/skills/python-review/SKILL.md": skill_fixture(
-        "python-review",
-        "SOLID 原則シグナル $oop-readability-check "
-        "tools/oop/python/readability.py tools/agent_tools/check_solid_evidence.py "
-        "Single responsibility Open/closed "
-        "Liskov substitution Interface segregation Dependency inversion "
-        "scanned_paths 定義順 読者順序 "
-        "公開入口 内部補助関数 check_convention_compliance.py\n",
-    ),
-    ".agents/skills/oop-readability-check/SKILL.md": skill_fixture(
-        "oop-readability-check",
-        "SOLID SOLID route owner Single responsibility Open/closed Liskov substitution "
-        "Interface segregation Dependency inversion tools/oop/shared/readability_core.py "
-        "mechanical projections readability.py\n",
     ),
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
@@ -518,21 +371,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
     ),
-    ".agents/skills/long-form-writing/SKILL.md": skill_fixture(
-        "long-form-writing",
-        "mathematical claim program contract proof obligation $formal-proof-workflow "
-        "provisional wording existing-tool route targeted-validation evidence "
-        "typo/link/format-only SKILL.md document_split_decision owner reader path "
-        "source map validation route chunking convenience\n"
-    ),
     "agents/skills/formal-proof-workflow.md": (
         "program contract public entrypoint return projection proof obligation "
         "mathematical necessity gate theorem surface\n"
-    ),
-    ".agents/skills/formal-proof-workflow/SKILL.md": skill_fixture(
-        "formal-proof-workflow",
-        "program contract public entrypoint return projection validation command "
-        "mathematical necessity gate theorem surface proof obligation\n"
     ),
     "agents/skills/README.md": (
         "owner-bounded-routing existing tool targeted validation .codex/config.toml "
@@ -546,9 +387,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "Single responsibility Open/closed Liskov Interface segregation "
         "Dependency inversion Protocol コードファイル 順序 定義順 関数 class\n"
         "owner-bounded-routing owner-bounded targeted validation Owner-Bounded Change\n"
-        "- [\"SOLID\"]\n"
-        "- [\"SRP\"]\n"
-        "- [\"Dependency inversion\"]\n"
+        '- ["SOLID"]\n'
+        '- ["SRP"]\n'
+        '- ["Dependency inversion"]\n'
     ),
     "agents/skills/skill-dependencies.yaml": (
         "research-workflow literature-survey routing_candidates order_constraints\n"
@@ -560,7 +401,6 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/agent_tools/agent_team.py": (
         "$literature-survey $research-workflow research_driven_change selected.append\n"
     ),
-    ".codex/config.toml": "../.agents/skills/owner-bounded-routing/SKILL.md\n",
     ".codex/agents/python_reviewer.toml": (
         "check_solid_evidence.py OOP readability report SOLID principle signal "
         "Single responsibility Open/closed Liskov substitution Interface segregation "
@@ -804,19 +644,49 @@ class CheckConventionComplianceTest(unittest.TestCase):
         self.assertIn("CONVENTION_COMPLIANCE=pass", result.stdout)
         self.assertIn("CONVENTION_COMPLIANCE_FINDINGS=0", result.stdout)
 
-    def test_runtime_skill_requires_tool_command_packet(self) -> None:
-        """Runtime skills expose the command packet entrypoint."""
+    def test_generated_skill_content_is_outside_convention_policy(self) -> None:
+        """Generated shim prose is validated by its dedicated readback gates."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
             skill = root / ".agents" / "skills" / "mvp-skeleton" / "SKILL.md"
+            skill.parent.mkdir(parents=True)
             skill.write_text("# mvp-skeleton\n\nmvp core loop\n", encoding="utf-8")
 
             result = self.run_checker(root)
 
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("skill_tool_commands", result.stdout)
-            self.assertIn("missing-tool-commands-section", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn(".agents/skills", result.stdout)
+
+    def test_policy_source_tables_exclude_generated_skill_shims(self) -> None:
+        """Every skill policy source resolves to its canonical prose owner."""
+        source_tables = (
+            DESIGN_INTEGRITY_GATE_MARKERS,
+            DOCUMENT_CLAIM_GROUNDING_MARKERS,
+            DOCUMENT_SPLIT_DECISION_MARKERS,
+            DOCUMENT_STRUCTURE_ROUTING_MARKERS,
+            EXIT_BLOCKER_POLICY_MARKERS,
+            EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
+            IMPLEMENTATION_GUARDRAIL_MARKERS,
+            LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
+            MATHEMATICAL_NECESSITY_MARKERS,
+            OWNER_BOUNDED_TOOL_ROUTE_MARKERS,
+            PR_ESSENCE_DOCUMENTATION_MARKERS,
+            REFACTOR_SEQUENCE_MARKERS,
+            RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
+            REVIEW_ISSUE_ROUTING_MARKERS,
+            SOLID_CODING_CONTRACT_MARKERS,
+            SOURCE_FILE_DEFINITION_ORDER_MARKERS,
+            STATIC_READ_VALIDATION_POLICY_MARKERS,
+        )
+        paths = {path for table in source_tables for path in table}
+        tool_references = {
+            path for _, references in TOOL_GATES.values() for path in references
+        }
+
+        self.assertFalse(
+            any(path.startswith(".agents/skills/") for path in paths | tool_references)
+        )
 
     def test_missing_workflow_hook_fails(self) -> None:
         """The canonical source gate cannot omit convention verification."""
@@ -880,7 +750,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            manifest = root / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+            manifest = (
+                root / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+            )
             manifest.parent.mkdir(parents=True, exist_ok=True)
             manifest.write_text(
                 "version = 1\n",
@@ -901,9 +773,13 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.copy_minimal_repo(root)
             for marker in AGENT_CANON_PUSH_REMOTE_MARKERS:
                 with self.subTest(marker=marker):
-                    workflow = root / "agents" / "workflows" / "agent-canon-pr-workflow.md"
+                    workflow = (
+                        root / "agents" / "workflows" / "agent-canon-pr-workflow.md"
+                    )
                     workflow.write_text(
-                        MINIMAL_REPO_FILES["agents/workflows/agent-canon-pr-workflow.md"].replace(
+                        MINIMAL_REPO_FILES[
+                            "agents/workflows/agent-canon-pr-workflow.md"
+                        ].replace(
                             f"{marker}\n",
                             "",
                         ),
@@ -912,7 +788,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
                     result = self.run_checker(root)
 
-                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertEqual(
+                        result.returncode, 1, result.stdout + result.stderr
+                    )
                     self.assertIn("agentcanon_push_remote_guard", result.stdout)
                     self.assertIn(f"missing-marker:{marker}", result.stdout)
 
@@ -929,7 +807,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("surface_manifest:documents/runtime/SHARED_RUNTIME_SURFACES.md", result.stdout)
+            self.assertIn(
+                "surface_manifest:documents/runtime/SHARED_RUNTIME_SURFACES.md",
+                result.stdout,
+            )
             self.assertIn("missing-marker:.codex/hooks.json", result.stdout)
 
     def test_hook_guardrail_policy_marker_fails(self) -> None:
@@ -967,7 +848,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("hook_guardrail_policy:.codex/hooks/hook_safety.py", result.stdout)
+            self.assertIn(
+                "hook_guardrail_policy:.codex/hooks/hook_safety.py", result.stdout
+            )
             self.assertIn("missing-marker:operation", result.stdout)
 
     def test_parent_repo_can_keep_shared_docs_only_in_vendor_canon(self) -> None:
@@ -1085,7 +968,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            skill = root / ".agents" / "skills" / "codex-task-workflow" / "SKILL.md"
+            skill = root / "agents" / "skills" / "codex-task-workflow.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8")
                 + "\nrecord blocker before falling back to a parent-direct alternate route\n",
@@ -1118,12 +1001,14 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("skill_exit_blocker_policy", result.stdout)
             self.assertIn("missing-marker:status=blocked", result.stdout)
 
-    def test_fallback_exit_policy_requires_event_driven_wait_recovery_markers(self) -> None:
+    def test_fallback_exit_policy_requires_event_driven_wait_recovery_markers(
+        self,
+    ) -> None:
         """Timeout recovery requires status + new-state or revised-packet evidence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            skill = root / ".agents" / "skills" / "codex-task-workflow" / "SKILL.md"
+            skill = root / "agents" / "skills" / "codex-task-workflow.md"
             updated = skill.read_text(encoding="utf-8").replace(
                 "new state evidence", "", 1
             )
@@ -1140,7 +1025,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            skill = root / ".agents" / "skills" / "tool-finding-report" / "SKILL.md"
+            skill = root / "agents" / "skills" / "tool-finding-report.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8").replace(
                     " explicit_approval_evidence",
@@ -1173,10 +1058,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / ".agents" / "skills" / "codex-task-workflow" / "SKILL.md"
+            workflow = root / "agents" / "skills" / "codex-task-workflow.md"
             workflow.write_text(
                 workflow.read_text(encoding="utf-8").replace(
-                    "$structure-planning",
+                    "structure-planning",
                     "structure-route-missing",
                 ),
                 encoding="utf-8",
@@ -1186,7 +1071,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("document_structure_routing", result.stdout)
-            self.assertIn("missing-marker:$structure-planning", result.stdout)
+            self.assertIn("missing-marker:structure-planning", result.stdout)
 
     def test_document_structure_routing_requires_format_skip_evidence(self) -> None:
         """Format-only Markdown routes must keep the skip evidence marker."""
@@ -1298,12 +1183,14 @@ class CheckConventionComplianceTest(unittest.TestCase):
     def test_owner_bounded_tool_route_contract_is_manifest_backed(self) -> None:
         """Owner-bounded marker surfaces are loaded from the manifest contract."""
         self.assertIn(
-            ".agents/skills/owner-bounded-routing/SKILL.md",
-            OWNER_BOUNDED_TOOL_ROUTE_MARKERS,
-        )
-        self.assertIn(
             "agents/skills/owner-bounded-routing.md",
             OWNER_BOUNDED_TOOL_ROUTE_MARKERS,
+        )
+        self.assertFalse(
+            any(
+                path.startswith(".agents/skills/")
+                for path in OWNER_BOUNDED_TOOL_ROUTE_MARKERS
+            )
         )
 
     def test_design_integrity_gate_requires_markers(self) -> None:
@@ -1359,7 +1246,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
-    def test_literature_backed_skill_call_order_contract_is_manifest_backed(self) -> None:
+    def test_literature_backed_skill_call_order_contract_is_manifest_backed(
+        self,
+    ) -> None:
         """Literature-backed skill-call order surfaces are manifest-backed."""
         self.assertNotIn(
             ".agents/skills/agent-orchestration/SKILL.md",
@@ -1374,7 +1263,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
             LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
         )
 
-    def test_minimal_fixture_covers_literature_backed_skill_call_order_surfaces(self) -> None:
+    def test_minimal_fixture_covers_literature_backed_skill_call_order_surfaces(
+        self,
+    ) -> None:
         """The fixture includes every literature-backed skill-call order surface."""
         missing = sorted(
             path
@@ -1411,14 +1302,16 @@ class CheckConventionComplianceTest(unittest.TestCase):
             STATIC_READ_VALIDATION_POLICY_MARKERS,
         )
         self.assertIn(
-            ".agents/skills/codex-task-workflow/SKILL.md",
-            STATIC_READ_VALIDATION_POLICY_MARKERS,
-        )
-        self.assertIn(
             "primary validation evidence",
             STATIC_READ_VALIDATION_POLICY_MARKERS[
-                ".agents/skills/codex-task-workflow/SKILL.md"
+                "agents/skills/codex-task-workflow.md"
             ],
+        )
+        self.assertFalse(
+            any(
+                path.startswith(".agents/skills/")
+                for path in STATIC_READ_VALIDATION_POLICY_MARKERS
+            )
         )
         self.assertNotIn(
             "動作確認",
@@ -1427,7 +1320,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
             ],
         )
 
-    def test_minimal_fixture_covers_static_read_validation_policy_surfaces(self) -> None:
+    def test_minimal_fixture_covers_static_read_validation_policy_surfaces(
+        self,
+    ) -> None:
         """The fixture includes every static/read validation policy surface."""
         missing = sorted(
             path
@@ -1457,7 +1352,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("responsibility_preflight_gate", result.stdout)
             self.assertIn("missing-marker:responsibility_scope", result.stdout)
 
-    def test_minimal_fixture_covers_responsibility_preflight_gate_surfaces(self) -> None:
+    def test_minimal_fixture_covers_responsibility_preflight_gate_surfaces(
+        self,
+    ) -> None:
         """The minimal test fixture includes every responsibility preflight surface."""
         missing = sorted(
             path
@@ -1472,7 +1369,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            skill = root / ".agents" / "skills" / "experiment-lifecycle" / "SKILL.md"
+            skill = root / "agents" / "skills" / "experiment-lifecycle.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8").replace(
                     "experiment_execution_surface_guard",
@@ -1537,10 +1434,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            docs_policy = (
-                root / "documents" / "conventions" / "common" / "05_docs.md"
+            docs_policy = root / "documents" / "conventions" / "common" / "05_docs.md"
+            docs_policy.write_text(
+                "docs check_convention_compliance.py\n", encoding="utf-8"
             )
-            docs_policy.write_text("docs check_convention_compliance.py\n", encoding="utf-8")
 
             result = self.run_checker(root)
 
@@ -1605,7 +1502,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
-    def test_validation_failure_response_rejects_stale_owner_projection_set(self) -> None:
+    def test_validation_failure_response_rejects_stale_owner_projection_set(
+        self,
+    ) -> None:
         """Validation-failure slug ownership must stay on runtime-profile JSON."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -1810,12 +1709,12 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("solid_coding_contract", result.stdout)
             self.assertIn("missing-marker:SOLID_PRINCIPLES_BY_KIND", result.stdout)
 
-    def test_solid_runtime_skill_requires_route_owner_marker(self) -> None:
-        """Runtime OOP skill keeps the SOLID route owner visible."""
+    def test_solid_canonical_skill_requires_route_owner_marker(self) -> None:
+        """Canonical OOP skill keeps the SOLID route owner visible."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            skill = root / ".agents" / "skills" / "oop-readability-check" / "SKILL.md"
+            skill = root / "agents" / "skills" / "oop-readability-check.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8").replace(
                     "SOLID route owner",
@@ -2007,9 +1906,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            finding = (
-                "missing-owner-row:workflow family, spawn budget, role topology"
-            )
+            finding = "missing-owner-row:workflow family, spawn budget, role topology"
             self.assertEqual(result.stdout.count(finding), 1, result.stdout)
             self.assertIn(
                 "owner_map_entrypoints:ROOT_AGENTS.md:" + finding,
@@ -2081,7 +1978,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_owner_map_entrypoint_requires_active_design_packet_schema_row(self) -> None:
+    def test_owner_map_entrypoint_requires_active_design_packet_schema_row(
+        self,
+    ) -> None:
         """The workflow reader map keeps the canonical packet schema owners."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)

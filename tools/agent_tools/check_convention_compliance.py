@@ -17,13 +17,6 @@
 # upstream design ../../agents/skills/owner-bounded-routing.md owner-bounded routing skill
 # upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
 # upstream design ../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
-# upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill
-# upstream design ../../.agents/skills/codex-task-workflow/SKILL.md runtime implementation workflow skill
-# upstream design ../../.agents/skills/subagent-bootstrap/SKILL.md runtime handoff skill
-# upstream design ../../.agents/skills/tool-finding-report/SKILL.md runtime tool finding skill
-# upstream design ../../.agents/skills/pr-processing/SKILL.md runtime PR processing skill
-# upstream design ../../.agents/skills/md-style-check/SKILL.md runtime Markdown small-edit skill route
-# upstream design ../../.agents/skills/long-form-writing/SKILL.md runtime document claim grounding skill route
 # upstream design ../../templates/agents/workflow_monitoring.md tool warning closeout ledger
 # upstream design ../../templates/agents/closeout_gate.md closeout gate policy
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
@@ -39,7 +32,6 @@
 # upstream implementation ./tool_drift.py validates tool/convention drift
 # upstream implementation ./convention_compliance_contracts.toml declares marker contracts
 # upstream implementation ./check_skill_frontmatter.py validates runtime skill frontmatter
-# upstream implementation ./skill_tool_commands.py validates runtime skill command packets
 # upstream implementation ./surface_manifest.py validates shared surface manifest wiring
 # downstream implementation ../../tools/ci/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
@@ -72,15 +64,19 @@ def load_marker_contracts() -> dict[str, dict[str, tuple[str, ...]]]:
         contract_id = contract["id"]
         surfaces: dict[str, tuple[str, ...]] = {}
         for surface in contract.get("surfaces", []):
-            surfaces[surface["path"]] = tuple(surface.get("markers", []))
+            path = surface["path"]
+            if path.startswith(".agents/skills/") and path.endswith("/SKILL.md"):
+                raise ValueError(
+                    "generated skill shims cannot own convention marker contracts: "
+                    f"{path}"
+                )
+            surfaces[path] = tuple(surface.get("markers", []))
         contracts[contract_id] = surfaces
     return contracts
 
 
 DECLARATIVE_MARKER_CONTRACTS = load_marker_contracts()
-DESIGN_INTEGRITY_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
-    "design_integrity_gate"
-]
+DESIGN_INTEGRITY_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS["design_integrity_gate"]
 
 CONVENTION_SOURCES = (
     "documents/conventions/README.md",
@@ -161,9 +157,7 @@ TOOL_GATES = {
             "documents/conventions/object-oriented-design.md",
             "documents/conventions/coding-conventions-python.md",
             "agents/skills/oop-readability-check.md",
-            ".agents/skills/oop-readability-check/SKILL.md",
             "agents/skills/python-review.md",
-            ".agents/skills/python-review/SKILL.md",
             "agents/workflows/comprehensive-refactoring-workflow.md",
         ),
     ),
@@ -183,7 +177,10 @@ TOOL_GATES = {
     ),
     "behavior_eval": (
         "tools/agent_tools/evaluate_agent_run.py",
-        ("evidence/agent-evals/agent_behavior_eval.toml", "templates/agents/closeout_gate.md"),
+        (
+            "evidence/agent-evals/agent_behavior_eval.toml",
+            "templates/agents/closeout_gate.md",
+        ),
     ),
     "skill_frontmatter": (
         "tools/agent_tools/check_skill_frontmatter.py",
@@ -194,7 +191,10 @@ TOOL_GATES = {
     ),
     "convention_compliance": (
         "tools/agent_tools/check_convention_compliance.py",
-        ("tools/ci/run_all_checks.sh", "evidence/agent-evals/skill_workflow_prompt_eval.toml"),
+        (
+            "tools/ci/run_all_checks.sh",
+            "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+        ),
     ),
     "tool_catalog": (
         "tools/agent_tools/tool_catalog.py",
@@ -258,9 +258,7 @@ AGENT_CANON_PUSH_REMOTE_MARKERS = (
     "QueueReceipt",
 )
 
-SKILL_ROUTING_PROMPTS = (
-    "agents/skills/agent-orchestration.md",
-)
+SKILL_ROUTING_PROMPTS = ("agents/skills/agent-orchestration.md",)
 
 SKILL_ROUTING_MARKERS = (
     "$agent-orchestration",
@@ -278,18 +276,6 @@ EXIT_BLOCKER_POLICY_MARKERS = {
         "status=blocked",
         "router_unavailable_blocker",
     ),
-    ".agents/skills/codex-task-workflow/SKILL.md": (
-        "selected_agent_type",
-        "write_capable_handoff_blocker",
-        "evidence",
-        "parent_packet_ref",
-        "status=blocked",
-        "canonical_rerun_pass",
-        "durable_blocker_or_issue",
-        "router_unavailable_blocker",
-        "new state evidence",
-        "revised parent packet",
-    ),
     "agents/skills/codex-task-workflow.md": (
         "selected_agent_type",
         "write_capable_handoff_blocker",
@@ -302,15 +288,6 @@ EXIT_BLOCKER_POLICY_MARKERS = {
         "new state evidence",
         "revised parent packet",
     ),
-    ".agents/skills/subagent-bootstrap/SKILL.md": (
-        "selected_agent_type",
-        "write_capable_handoff_blocker",
-        "evidence",
-        "parent_packet_ref",
-        "status=blocked",
-        "new state evidence",
-        "explicit revised packet",
-    ),
     "agents/skills/subagent-bootstrap.md": (
         "selected_agent_type",
         "write_capable_handoff_blocker",
@@ -319,13 +296,6 @@ EXIT_BLOCKER_POLICY_MARKERS = {
         "status=blocked",
         "new state evidence",
         "explicit revised packet",
-    ),
-    ".agents/skills/tool-finding-report/SKILL.md": (
-        "tool_warning_exit_status",
-        "resolved",
-        "deferred_with_issue",
-        "accepted_with_reason",
-        "explicit_approval_evidence",
     ),
     "agents/skills/tool-finding-report.md": (
         "tool_warning_exit_status",
@@ -358,23 +328,10 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "format-only",
         "structure_contract=skipped",
     ),
-    ".agents/skills/codex-task-workflow/SKILL.md": (
-        "prose-reasoning-graph",
-        "$structure-planning",
-        "$md-style-check",
-        "format-only",
-        "structure_contract=skipped",
-    ),
     "agents/skills/codex-task-workflow.md": (
         "prose-reasoning-graph",
         "structure-planning",
         "md-style-check",
-        "format-only",
-        "structure_contract=skipped",
-    ),
-    ".agents/skills/md-style-check/SKILL.md": (
-        "$prose-reasoning-graph",
-        "$structure-planning",
         "format-only",
         "structure_contract=skipped",
     ),
@@ -447,20 +404,7 @@ DOCUMENT_SPLIT_DECISION_MARKERS = {
         "merge_when",
         "invalid_split_boundaries",
     ),
-    ".agents/skills/structure-planning/SKILL.md": (
-        "document_unit",
-        "document_split_decision",
-        "invalid split boundaries",
-    ),
     "agents/skills/long-form-writing.md": (
-        "document_split_decision",
-        "owner",
-        "reader path",
-        "source map",
-        "validation route",
-        "chunking convenience",
-    ),
-    ".agents/skills/long-form-writing/SKILL.md": (
         "document_split_decision",
         "owner",
         "reader path",
@@ -538,24 +482,11 @@ DOCUMENT_CLAIM_GROUNDING_MARKERS = {
         "$formal-proof-workflow",
         "provisional wording",
     ),
-    ".agents/skills/long-form-writing/SKILL.md": (
-        "mathematical claim",
-        "program contract",
-        "proof obligation",
-        "$formal-proof-workflow",
-        "provisional wording",
-    ),
     "agents/skills/formal-proof-workflow.md": (
         "program contract",
         "public entrypoint",
         "return projection",
         "proof obligation",
-    ),
-    ".agents/skills/formal-proof-workflow/SKILL.md": (
-        "program contract",
-        "public entrypoint",
-        "return projection",
-        "validation command",
     ),
 }
 TEST_CONTRACT_ROUTING_MARKERS = {
@@ -618,19 +549,7 @@ MATHEMATICAL_NECESSITY_MARKERS = {
         "stopping scalar",
         "failure semantics",
     ),
-    ".agents/skills/computational-optimization/SKILL.md": (
-        "mathematical necessity gate",
-        "iteration map",
-        "stopping scalar",
-        "failure semantics",
-    ),
     "agents/skills/formal-proof-workflow.md": (
-        "mathematical necessity gate",
-        "program contract",
-        "theorem surface",
-        "proof obligation",
-    ),
-    ".agents/skills/formal-proof-workflow/SKILL.md": (
         "mathematical necessity gate",
         "program contract",
         "theorem surface",
@@ -674,12 +593,6 @@ IMPLEMENTATION_GUARDRAIL_MARKERS = {
         "design_issue_blocker",
         "implementation shortcut",
     ),
-    ".agents/skills/codex-task-workflow/SKILL.md": (
-        "contract-complete implementation",
-        "acceptance contract",
-        "design_issue_blocker",
-        "implementation shortcut",
-    ),
     "agents/workflows/comprehensive-refactoring-workflow.md": (
         "compatibility-preservation drift",
         "duplicate implementation",
@@ -689,12 +602,6 @@ IMPLEMENTATION_GUARDRAIL_MARKERS = {
 }
 REFACTOR_SEQUENCE_MARKERS = {
     "agents/skills/refactor-loop.md": (
-        "two-stage refactor",
-        "forced migration",
-        "usage-surface repair",
-        "return-gate validation",
-    ),
-    ".agents/skills/refactor-loop/SKILL.md": (
         "two-stage refactor",
         "forced migration",
         "usage-surface repair",
@@ -717,13 +624,6 @@ REVIEW_ISSUE_ROUTING_MARKERS = {
     "agents/skills/change-review.md": (
         "issue_route",
         "issues/open/",
-        "issue_sync.py",
-        "new_local_issue",
-        "github_mirror",
-    ),
-    ".agents/skills/change-review/SKILL.md": (
-        "issue_route",
-        "issues/README.md",
         "issue_sync.py",
         "new_local_issue",
         "github_mirror",
@@ -761,14 +661,6 @@ PR_ESSENCE_DOCUMENTATION_MARKERS = {
         "behavior or contract delta",
         "evidence route",
     ),
-    ".agents/skills/pr-processing/SKILL.md": (
-        "PR Essence",
-        "problem / user",
-        "design intent",
-        "canonical owner",
-        "behavior or contract delta",
-        "evidence route",
-    ),
     "agents/workflows/agent-canon-pr-workflow.md": (
         "PR Essence",
         "problem / user request",
@@ -778,9 +670,7 @@ PR_ESSENCE_DOCUMENTATION_MARKERS = {
         "evidence route",
     ),
 }
-SOLID_CODING_CONTRACT_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
-    "solid_coding_contract"
-]
+SOLID_CODING_CONTRACT_MARKERS = DECLARATIVE_MARKER_CONTRACTS["solid_coding_contract"]
 
 SOURCE_FILE_DEFINITION_ORDER_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "source_file_definition_order"
@@ -1045,11 +935,6 @@ ENTRYPOINT_DELEGATED_SECTION_HEADINGS = (
     "## Required Before Implementation",
 )
 ENTRYPOINT_DELEGATION_PATHS = ("ROOT_AGENTS.md", "AGENTS.md")
-SKILL_TOOL_COMMANDS_HEADING = "## Tool Commands"
-SKILL_TOOL_COMMANDS_COMMAND_RE = re.compile(
-    r"python3\s+tools/agent_tools/skill_tool_commands\.py\s+show\s+"
-    r"--skill\s+([A-Za-z0-9_-]+)\s+--format\s+text"
-)
 
 
 @dataclass(frozen=True)
@@ -1578,7 +1463,9 @@ def check_surface_manifest_wiring(root: Path) -> list[Finding]:
                     f"missing-marker:{marker}",
                 )
             )
-    manifest_text = readable_files.get("documents/runtime/shared-runtime-surfaces.toml", "")
+    manifest_text = readable_files.get(
+        "documents/runtime/shared-runtime-surfaces.toml", ""
+    )
     for marker in SURFACE_MANIFEST_MARKERS:
         if marker not in manifest_text:
             findings.append(
@@ -1592,7 +1479,11 @@ def check_surface_manifest_wiring(root: Path) -> list[Finding]:
     for marker in SURFACE_SYNC_MARKERS:
         if marker not in sync_text:
             findings.append(
-                Finding("surface_manifest", "tools/sync_agent_canon.sh", f"missing-marker:{marker}")
+                Finding(
+                    "surface_manifest",
+                    "tools/sync_agent_canon.sh",
+                    f"missing-marker:{marker}",
+                )
             )
     return findings
 
@@ -1658,8 +1549,7 @@ def check_owner_map_entrypoints(root: Path) -> list[Finding]:
                 continue
             for row_markers in expected_rows:
                 if any(
-                    all(marker in row for marker in row_markers)
-                    for row in table_rows
+                    all(marker in row for marker in row_markers) for row in table_rows
                 ):
                     continue
                 findings.append(
@@ -1678,7 +1568,9 @@ def check_entrypoint_delegated_sections(root: Path) -> list[Finding]:
     for path in ENTRYPOINT_DELEGATION_PATHS:
         resolved = readable_path(root, path)
         if resolved is None:
-            findings.append(Finding("entrypoint_delegation", path, "missing-required-file"))
+            findings.append(
+                Finding("entrypoint_delegation", path, "missing-required-file")
+            )
             continue
         if duplicate_root_view_entrypoint(root, path):
             continue
@@ -1692,39 +1584,6 @@ def check_entrypoint_delegated_sections(root: Path) -> list[Finding]:
                         f"delegated-section:{heading}",
                     )
                 )
-    return findings
-
-
-def check_skill_tool_command_sections(root: Path) -> list[Finding]:
-    """Verify every runtime skill exposes its command packet entrypoint."""
-    findings: list[Finding] = []
-    skill_root = root / ".agents" / "skills"
-    if not skill_root.is_dir():
-        findings.append(Finding("skill_tool_commands", ".agents/skills", "missing-skill-root"))
-        return findings
-    for path in sorted(skill_root.glob("*/SKILL.md")):
-        skill = path.parent.name
-        relative = path.relative_to(root).as_posix()
-        text = path.read_text(encoding="utf-8", errors="replace")
-        if SKILL_TOOL_COMMANDS_HEADING not in text:
-            findings.append(
-                Finding("skill_tool_commands", relative, "missing-tool-commands-section")
-            )
-            continue
-        match = SKILL_TOOL_COMMANDS_COMMAND_RE.search(text)
-        if match is None:
-            findings.append(
-                Finding("skill_tool_commands", relative, "missing-command-packet-entry")
-            )
-            continue
-        if match.group(1) != skill:
-            findings.append(
-                Finding(
-                    "skill_tool_commands",
-                    relative,
-                    f"wrong-skill-command:{match.group(1)}",
-                )
-            )
     return findings
 
 
@@ -1889,7 +1748,6 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_hook_guardrail_policy(root))
     findings.extend(check_owner_map_entrypoints(root))
     findings.extend(check_entrypoint_delegated_sections(root))
-    findings.extend(check_skill_tool_command_sections(root))
     findings.extend(check_convention_assertions(root))
     findings.extend(check_legacy_forwarder_warning_policy(root))
     return sorted(
