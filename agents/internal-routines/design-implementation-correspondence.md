@@ -41,12 +41,16 @@ CorrespondenceRecord {
   clause_fingerprints: map<ClauseId, Sha256>
   owner_stage: StageId
   implementation_targets: list<RepoRelativeTarget>
+  implementation_targets_sha256: Sha256
   validation_route: list<RepoRelativeCommand>
+  validation_route_sha256: Sha256
   state: DICState
 }
 ```
 
 `RepoRelativeLocator` と `RepoRelativeTarget` は repository root を基準にした `/` 区切りの locator とし、`..`、空 locator、絶対 path を拒否します。実行時だけ `ExecutionContext` が root と locator から絶対 path を解決します。handoff、manifest、ToolCall、review finding はこの値の ID、digest、論理 locator だけを参照し、同じ identity payload を再シリアライズしません。
+
+`implementation_targets` は変更を許可された ordered logical target のリスト、`validation_route` はその変更を検証する ordered logical command のリストです。各リストは Unicode NFC、UTF-8、compact canonical JSON（field order は `items` のみ）へ一度だけ serialize し、それぞれ domain-separated に `SHA-256(UTF8("agent-canon/design-implementation-correspondence/v1\0implementation_targets\0") + bytes)`、`SHA-256(UTF8("agent-canon/design-implementation-correspondence/v1\0validation_route\0") + bytes)` を計算します。handoff は list の再掲を必要とせず、list reference と対応 digest を運びます。実装 owner と reviewer は実際に選択・実行した logical list を read-back して digest と比較し、target の追加・削除・順序変更または validation command の変更を `packet_scope_drift` として扱います。
 
 ### State
 
@@ -63,7 +67,7 @@ read|fingerprinted|handed_off|implementing|review_ready -> drifted|blocked
 - `DIC-001` repository-changing implementation の前に、変更対象を所有する design document を解決して全文を read-back する。
 - `DIC-002` design document が absent、reader path 不明、責務境界不明、clause ID 欠落、implementation trace 欠落、または validation route 欠落なら、implementation handoff を作らず、design を先に create/fix して review する。
 - `DIC-003` selected document の bytes と各 clause の canonical text から fingerprint を一度だけ計算し、handoff と review はその ID/digest を参照する。
-- `DIC-004` implementation handoff の各 change target は一つ以上の clause ID と一つ以上の validation/evidence locator に対応する。
+- `DIC-004` implementation handoff の各 change target は一つ以上の clause ID と一つ以上の validation/evidence locator に対応し、`implementation_targets_sha256` と `validation_route_sha256` を持つ。digest のない list は handoff として不完全である。
 - `DIC-005` implementation review は forward coverage（design clause → implementation/evidence）と reverse coverage（changed behavior/path → design clause）の両方を確認する。
 - `DIC-006` design fingerprint、owner、target、state、validation route が変わったときは `drifted` とし、design の更新・再読・再レビューまで implementation を停止する。
 - `DIC-007` routine は capability owner、adapter、implementation owner の順序を保持し、prose keyword、近接 filename、既存の stale artifact を route verdict にしない。
@@ -81,6 +85,7 @@ read|fingerprinted|handed_off|implementing|review_ready -> drifted|blocked
 | `design_missing` / `design_incomplete` | `blocked` | owner document を作成・補完し、design review 後に再読する |
 | `owner_ambiguous` | `blocked` | canonical owner map を解決するまで target を選ばない |
 | `clause_fingerprint_mismatch` | `drifted` | design を更新して fingerprint を再発行する。実装を継続しない |
+| `implementation_target_digest_mismatch` / `validation_route_digest_mismatch` | `drifted` | 実行前に packet を再生成し、対象と検証 route を再レビューする |
 | `forward_coverage_missing` / `reverse_coverage_missing` | `blocked` | handoff または design trace を補完して review を再実行する |
 | `absolute_locator_in_durable_artifact` | `blocked` | logical locator に置換し、execution-time resolver の readback を行う |
 | `keyword_only_capability_route` | `blocked` | typed capability owner の route packet を使い、prose route を破棄する |
@@ -92,7 +97,7 @@ read|fingerprinted|handed_off|implementing|review_ready -> drifted|blocked
 1. `agent-orchestration` が request mode、owner、replaceable unit、implementation mechanism、validation route を固定する。
 2. 選択された owner が `design_locator` を解決し、DIC-001/002 に従って design を読む。
 3. `oop-type-design` または該当 design owner が clause IDs、責務境界、state/invariant、implementation trace を固定する。
-4. handoff owner が `design_sha256`、clause fingerprints、allowed targets、reverse-coverage expectation を一つの参照 packet にする。
+4. handoff owner が `design_sha256`、clause fingerprints、allowed targets と `implementation_targets_sha256`、validation route と `validation_route_sha256`、reverse-coverage expectation を一つの参照 packet にする。
 5. implementation owner は各 change を clause ID に結び付け、追加の design divergence を作らない。
 6. change-review owner が forward/reverse coverage、fingerprint、logical locator、owner order を read-back する。
 7. drift または coverage gap があれば `blocked` とし、design update/review を経てから handoff を再発行する。
@@ -108,14 +113,14 @@ python3 tools/agent_tools/check_agent_runtime_alignment.py
 tools/bin/agent-canon docs check
 ```
 
-レビュー時の readback は、(a) selected design bytes と `design_sha256`、(b) clause ID 集合と個別 fingerprint、(c) changed path/behavior と clause ID、(d) evidence/validation locator の four-way join が完全であることを確認します。未実装の planned owner は `planned` と明記し、current evidence と混同しません。
+レビュー時の readback は、(a) selected design bytes と `design_sha256`、(b) clause ID 集合と個別 fingerprint、(c) changed path/behavior と clause ID、(d) `implementation_targets` とその digest、(e) `validation_route` とその digest、(f) evidence locator の six-way join が完全であることを確認します。未実装の planned owner は `planned` と明記し、current evidence と混同しません。
 
 ## Design-To-Implementation Trace
 
 | clause | current/planned implementation owner | file / symbol | evidence / reverse rule |
 | --- | --- | --- | --- |
 | `DIC-001..DIC-009` | current workflow and review owners | `agents/skills/agent-orchestration.md`, `agents/skills/oop-type-design.md`, `agents/skills/change-review.md`, this routine | changed path must cite one DIC clause; missing design readback blocks |
-| `DIC-003..DIC-004` | planned transport owner | `tools/agent_tools/bootstrap_agent_run.py`, `agents/COMMUNICATION_PROTOCOL.md` | handoff identity is referenced by digest; no duplicate payload |
+| `DIC-003..DIC-004` | planned transport owner | `tools/agent_tools/bootstrap_agent_run.py`, `agents/COMMUNICATION_PROTOCOL.md` | handoff identity、`implementation_targets`、`validation_route` は各 digest で参照し、実行 readback は両 digest を再計算する |
 | `DIC-005..DIC-006` | current/planned review owner | `agents/skills/change-review.md`, `tools/agent_tools/check_design_doc_claims.py` | every accepted finding has forward and reverse evidence; drift is a blocker |
 | `DIC-007..DIC-008` | current routing/path owners | `tools/agent_tools/route.py`, `tools/agent_tools/agent_canon_source_root.py` | capability and locator changes map back to the clause that authorized them |
 | `DIC-009` | current canonical-document owners | `agents/internal-routines/`, `agents/skills/`, `documents/design/` | a new policy copy or loophole maps to a rejected design change |
