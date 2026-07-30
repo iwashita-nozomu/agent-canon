@@ -29,37 +29,39 @@ try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
-from typing import Callable, Literal, Mapping, cast
+from typing import Literal, cast
 
 import yaml
+
 if __package__:
-    from . import capacity_handshake
-    from . import implementation_route
-    from . import model_profile_registry
-    from .artifact_identity import canonical_json_bytes
+    from . import capacity_handshake, implementation_route, model_profile_registry
     from .agent_canon_source_root import resolve_agent_canon_source_root
+    from .artifact_identity import canonical_json_bytes
 else:
     import capacity_handshake
     import implementation_route
     import model_profile_registry
-    from artifact_identity import canonical_json_bytes
     from agent_canon_source_root import resolve_agent_canon_source_root
+    from artifact_identity import canonical_json_bytes
 from route import decide_skills, implementation_handoff_required, load_skill_route_rules
 from skill_tool_commands import SkillCommandPacket, packet_for_skill
 from task_authority import AUTHORITY_FILE_NAME, build_default_task_authority
 from update_lifecycle_contract import (
     import_decision_sufficiency_verdict,
-    materialize_close_agent_tool_call as materialize_lifecycle_close_agent_tool_call,
     materialize_gate_verdict,
     validate_cleanup_proof,
     validate_descendant_close_receipt,
     validate_durable_handback,
     validate_gate_chain,
-    validate_reservation_release_receipt,
     validate_record_binding,
+    validate_reservation_release_receipt,
+)
+from update_lifecycle_contract import (
+    materialize_close_agent_tool_call as materialize_lifecycle_close_agent_tool_call,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -197,7 +199,12 @@ REPO_TOOL_ROUTING_STAGE_FIELDS = (
 REPO_DYNAMIC_SKILL_ROUTING_STATUS = "related_skill_candidates"
 REPO_DYNAMIC_SKILL_ROUTING_NEXT = "add_skill_then_regenerate_repo_tool_routes"
 TOOL_CALL_SCHEMA = "agent-canon.tool-call.v1"
-SKILL_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.skill-tool-commands.args.v1"
+SKILL_TOOL_CALL_PHASES = (
+    "required",
+    "discovered",
+    "conditional",
+    "maintenance",
+)
 ROUTE_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.route.args.v1"
 DECISION_SUFFICIENCY_OWNER = "agents/skills/agent-orchestration.md#Decision Sufficiency Packet"
 DECISION_SUFFICIENCY_VALIDATOR = "semantic_decision_sufficiency"
@@ -546,6 +553,7 @@ class ReportBundleArtifactPathError(RuntimeError):
     """Report one rejected run-artifact path and its containment reason."""
 
     def __init__(self, declared_path: str, reason: str) -> None:
+        """Bind one rejected path to its containment failure reason."""
         self.declared_path = declared_path
         self.reason = reason
         super().__init__(
@@ -869,6 +877,7 @@ class CapacityHandshakeConsumerBinding:
 
     @property
     def shape_id(self) -> str:
+        """Return the stable consumer-binding schema identifier."""
         return "capacity_handshake_consumer_binding_v1"
 
 
@@ -1576,30 +1585,54 @@ def materialize_tool_call_token(
     return record
 
 
-def materialize_skill_tool_call_token(skill: str) -> dict[str, object]:
-    """Return the canonical skill-command materializer call without prose argv."""
-    return materialize_tool_call_token(
+def materialize_skill_tool_call_token(
+    skill: str, *, phase: str = "required"
+) -> dict[str, object]:
+    """Return the canonical, skill/phase-bound skill-command ToolCall identity."""
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", skill):
+        raise RuntimeError("skill_tool_call_token invalid skill")
+    if phase not in SKILL_TOOL_CALL_PHASES:
+        raise RuntimeError("skill_tool_call_token invalid phase")
+    token = materialize_tool_call_token(
         tool_id="skill-tool-commands",
-        argument_schema_id=SKILL_TOOL_CALL_ARGUMENT_SCHEMA,
+        argument_schema_id=(
+            "agent-canon.skill-tool-commands."
+            f"{skill}.{phase}.args.v1"
+        ),
         argument_properties={
-            "skill": {"type": "string", "minLength": 1},
+            "skill": {"type": "string", "const": skill},
             "format": {"type": "string", "enum": ["json"]},
         },
         arguments={"skill": skill, "format": "json"},
-        intent="Materialize the selected skill's canonical repository-tool packet.",
+        intent=(
+            "Materialize the selected skill's canonical repository-tool packet "
+            f"for its {phase} command phase."
+        ),
         typed_failure_semantics=(
             {
-                "code": "skill_tool_route:unknown_skill",
+                "code": f"skill_tool_route:{phase}:unknown_skill",
                 "retryable": False,
                 "next": "reject_route_packet",
             },
             {
-                "code": "skill_tool_route:catalog_mismatch",
+                "code": f"skill_tool_route:{phase}:catalog_mismatch",
                 "retryable": False,
                 "next": "return_to_tool_catalog_owner",
             },
         ),
     )
+    argument_schema = cast(Mapping[str, object], token["argument_schema"])
+    token["identity"] = {
+        "skill": skill,
+        "phase": phase,
+        "tool_id": token["tool_id"],
+        "tool_call_token_id": token["token_id"],
+        "tool_call_digest": token["token_body_sha256"],
+        "argument_schema_id": argument_schema["$id"],
+        "argument_schema_digest": "sha256:"
+        + hashlib.sha256(canonical_json_bytes(argument_schema)).hexdigest(),
+    }
+    return token
 
 
 def materialize_dynamic_route_tool_call_token() -> dict[str, object]:

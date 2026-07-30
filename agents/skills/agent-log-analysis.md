@@ -183,3 +183,41 @@ replaceable responsibility before splitting follow-up work. Use
 `instance_partition` only for independent owner, write-authority, context,
 validation, or review boundaries. Suggested same-role instance id:
 `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>`.
+
+## Runtime Contract Clauses
+
+The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+
+1. Read the API JSON or compact Markdown as the default analysis input. The
+   archive repo owns append-only evidence; the AgentCanon source dashboard owns
+   aggregation, moving averages, and routing evidence cells.
+1. Classify missing actual wave rows before proposing reconciliation as
+   `overplanning`, `logging_gap`, or `unresolved`. Do not backfill overplanning
+   or unresolved rows; only a supported logging gap routes to logging repair.
+   Group findings by owning replaceable responsibility and compatible context,
+   not one agent, packet, wave, or review per finding.
+1. Confirm the API JSON includes the normal analysis fields `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, and `oop_applicability`.
+1. When `generate_agent_runtime_dashboard.py` lacks a needed compact field,
+   record `dashboard_api_contract_gap`, route that finding to the dashboard API owner,
+   and rerun it after the source tool is repaired.
+1. For eval family gaps, run `python3 tools/agent_tools/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; if it reports missing, stale, or failing families, add `$agent-eval-accumulation` and use its producer/checker/archive loop.
+1. Event-file drilldown is for tool development, schema debugging, corruption audit, or an API-named drilldown path; record an explicit rationale before reading it.
+1. Answer token-use questions from the API token coverage/moving-average fields. If token status is missing, say token claims are unsupported.
+1. Report observations separately from interpretation, repair target, and unknowns.
+1. When the user asks to turn structured evidence into durable skill issues, hand
+   the structured API output, structured Markdown summary, and Finding Route Packet to
+   `$issue-finding-report`.
+1. If the analysis drives a prompt, skill, workflow, or tool change, write the `Finding Route Packet` from `agents/skills/agent-log-analysis.md` before editing or spawning the repair wave. A structured handoff message or tool result satisfies it; use a durable file only for coordination or resumption. The packet must include `finding_class`, `evidence_cells`, `route_target`, `instance_partition`, `required_packet`, and `closeout_gate`.
+1. Route by finding class:
+   wave execution findings to `$subagent-bootstrap`;
+   skill selection findings to the affected skill plus `prompt_config_reviewer`;
+   tool selection findings to `tools/catalog.yaml` plus the owning tool docs;
+   workflow selection findings to `agents/TASK_WORKFLOWS.md` plus the owning
+   workflow guide; workflow attribution or token coverage findings to
+   `$agent-learning` or the logging owner; eval gaps to
+   `$agent-eval-accumulation`; archive hygiene findings to
+   `$result-artifact-writeout` or the log archive owner; prompt/config drift to
+   `prompt_config_reviewer`; and structure-boundary findings to
+   `$structure-refactor`.
+1. When one structured summary contains independent findings, split same-role review instances by `repo_key`, `hook_family`, `skill_name`, `workflow_name`, `issue_id`, or path scope. Use an instance id shaped like `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>`.
+1. If the user asks for a durable report, pair this skill with `$result-artifact-writeout`.

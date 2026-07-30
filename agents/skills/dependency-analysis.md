@@ -217,3 +217,23 @@ agent-canon python-structure-hash-scope-plan \
 - `agents/workflows/hypothesis-validation-workflow.md`
 - `agents/canonical/CODEX_WORKFLOW.md`
 - `templates/agents/closeout_gate.md`
+
+## Runtime Contract Clauses
+
+The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+
+1. Read `documents/design/dependency-manifest-design.md`.
+1. If the task selects or justifies a fix surface, read `agents/workflows/hypothesis-validation-workflow.md`.
+1. For code-improvement work, do not implement until the artifact records `Observation`, `Hypothesis`, `Expected Mechanism`, `Candidate Comparison`, `Disconfirming Evidence`, `Support Evidence`, and `fix_surface_validated=yes`.
+1. After the change, record `Post-Change Evidence` and `Hypothesis Decision: supported|rejected|inconclusive`. If the decision is `rejected` or `inconclusive`, return to hypothesis selection instead of expanding the implementation pass.
+1. Choose the mode that answers the task without hiding dependency evidence:
+   - code dependency surface: run `scan_code_dependencies.sh`
+   - changed-file closeout gate: use `--changed`
+   - explicit file review: pass file paths explicitly
+   - repo migration inventory: run full scan without `--changed`
+   - dependency edge change: include graph validation
+   - repo-wide search triage: run responsibility-based search first, then use bounded `git grep -l` only as comparison evidence or within selected source surfaces before search-to-edit-scope expansion
+   - design-document evidence: run `check_design_doc_claims.py` on changed or newly authored design docs
+   - repair planning or subagent handoff: build a structured `Change Impact
+     Packet` manifest before selecting implementation targets
+1. For code dependency evidence, run:

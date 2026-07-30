@@ -21,13 +21,9 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-
-UTC = timezone.utc
+from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
 try:
@@ -35,7 +31,11 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
-from eval_manifest_paths import eval_manifest_path, relative_manifest_path, resolve_eval_manifest
+from eval_manifest_paths import (
+    eval_manifest_path,
+    relative_manifest_path,
+    resolve_eval_manifest,
+)
 from runtime_log_paths import agent_canon_root, eval_results_dir
 from workflow_monitor import MonitoringEntries, append_monitoring
 
@@ -66,6 +66,7 @@ class PromptEval:
 
     eval_id: str
     target: Path
+    canonical_target: Path | None
     kind: str
     description: str
     checklist: tuple[ChecklistItem, ...]
@@ -199,6 +200,7 @@ class SkillEvaluatorReportParseError(ValueError):
     """One fixed malformed T14 report error; never expose free-form traceback."""
 
     def __init__(self, code: str) -> None:
+        """Bind the stable malformed-report code."""
         self.code = code
         super().__init__(code)
 
@@ -207,6 +209,7 @@ class T14EvaluationError(ValueError):
     """One fixed parent-accumulator error with a stable code attribute."""
 
     def __init__(self, code: str) -> None:
+        """Bind the stable accumulator failure code."""
         self.code = code
         super().__init__(code)
 
@@ -387,6 +390,11 @@ def expand_eval_entry(
             PromptEval(
                 eval_id=eval_id,
                 target=resolve_target(root, str(entry["target"])),
+                canonical_target=(
+                    resolve_target(root, str(entry["canonical_target"]))
+                    if entry.get("canonical_target") is not None
+                    else None
+                ),
                 kind=kind,
                 description=description,
                 checklist=checklist,
@@ -412,6 +420,7 @@ def expand_eval_entry(
         PromptEval(
             eval_id=f"{eval_id}:{path.relative_to(root).as_posix()}",
             target=path,
+            canonical_target=None,
             kind=kind,
             description=description,
             checklist=checklist,
@@ -445,13 +454,20 @@ def load_checklist_item(entry: object, eval_id: str) -> ChecklistItem:
     )
 
 
-def evaluate_item(item: ChecklistItem, eval_def: PromptEval, text: str) -> ChecklistResult:
+def evaluate_item(
+    item: ChecklistItem,
+    eval_def: PromptEval,
+    required_text: str,
+    forbidden_text: str,
+) -> ChecklistResult:
     """Evaluate one checklist item against target text."""
     missing_required = tuple(
-        pattern for pattern in item.required_regex if re.search(pattern, text, re.MULTILINE) is None
+        pattern
+        for pattern in item.required_regex
+        if re.search(pattern, required_text, re.MULTILINE) is None
     )
     matched_forbidden = tuple(
-        pattern for pattern in item.forbidden_regex if re.search(pattern, text, re.MULTILINE)
+        pattern for pattern in item.forbidden_regex if re.search(pattern, forbidden_text, re.MULTILINE)
     )
     return ChecklistResult(
         eval_id=eval_def.eval_id,
@@ -479,8 +495,27 @@ def evaluate_prompt(eval_def: PromptEval) -> tuple[ChecklistResult, ...]:
             )
             for item in eval_def.checklist
         )
-    text = eval_def.target.read_text(encoding="utf-8")
-    return tuple(evaluate_item(item, eval_def, text) for item in eval_def.checklist)
+    shim_text = eval_def.target.read_text(encoding="utf-8")
+    required_text = shim_text
+    if eval_def.canonical_target is not None:
+        if not eval_def.canonical_target.is_file():
+            return tuple(
+                ChecklistResult(
+                    eval_id=eval_def.eval_id,
+                    item_id=item.item_id,
+                    critical=item.critical,
+                    passed=False,
+                    description=f"missing canonical target: {eval_def.canonical_target}",
+                    missing_required=("canonical-target-file",),
+                    matched_forbidden=(),
+                )
+                for item in eval_def.checklist
+            )
+        required_text += "\n" + eval_def.canonical_target.read_text(encoding="utf-8")
+    return tuple(
+        evaluate_item(item, eval_def, required_text, shim_text)
+        for item in eval_def.checklist
+    )
 
 
 def render_machine_status(

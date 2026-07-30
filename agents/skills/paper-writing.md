@@ -99,3 +99,21 @@ python3 tools/agent_tools/doc_start.py \
 - paper-like でない学術文章や method note は `academic-writing` を使います
 - 文献探索自体が主タスクなら `literature-survey` を先に使います
 - rebuttal や report の evidence traceability を主に見たいなら report review を追加します
+
+## Runtime Contract Clauses
+
+The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+
+1. Read `agents/skills/paper-writing.md`.
+1. Read `agents/workflows/paper-writing-workflow.md`.
+1. Read `agents/workflows/academic-writing-workflow.md`.
+1. Select this as the DSL-to-prose projection adapter when file/document responsibility is submission paper, thesis chapter, or paper-style manuscript with paper section contracts and citation/evidence review; do not select it by length.
+1. Use `$structure-planning` before drafting when section order, first figure/table, claim/evidence layout, source-to-structure map, or invalid interpretations are nontrivial.
+1. For paragraph-level claim flow, transition pairs, or logic-gap triage, have `$structure-planning` use `agent-canon semantic-index discourse-relations --profile academic-argument` and treat it as advisory discourse evidence before prose drafting.
+1. For nontrivial paper prose creation or revision, create or receive a `$prose-reasoning-graph` handoff before drafting; include its claim/evidence gaps, weak transitions, experiment-plan gaps, and split/merge/bridge/reorder operations in the section contract and reviewer handoff.
+1. When the prose graph handoff includes `selected_ordering.ordered_anchors`, use that whole-document topological sentence order as the DSL-to-prose input sequence before drafting paper sections or paragraph transitions.
+1. Project paper responsibilities into positive prose contracts: state each section role, claim, citation/evidence relation, result claim, limitation, and reviewer handoff directly. Use negative boundary wording only inside an explicit Boundary, Limitation, or Non-Goal slot, and replace `ad hoc` labels with a named responsibility, evidence gap, verification route, or prompt-defect classification.
+1. Before writing paper prose, close `fix-now` findings at the DSL/projection stage: revise the section contract, citation/evidence matrix, paragraph claim map, graph-backed rewrite packet, or graph-backed units, rerun graph diagnostics, and only draft prose after the selected profile has no active findings.
+1. After projecting DSL/projection state to paper prose, rerun the graph check. If new findings appear only after projection, record `dsl_to_prose_prompt_defect` against this skill's paper prose-generation prompt and repair it before continuing.
+1. Fix the paper intent brief, claim contract, section contract, citation/evidence matrix, notation ledger, and paragraph claim map before drafting.
+1. Route citation/evidence review, notation review, logic-gap review, and document-flow review as separate review passes before closeout.

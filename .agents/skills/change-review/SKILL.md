@@ -1,93 +1,27 @@
 ---
 name: change-review
-description: Use for code review, doc review, or AI-generated diff review when you need findings-first output focused on bugs, regressions, missing tests, and broken assumptions.
+description: "Use for code review, doc review, or AI-generated diff review when you need findings-first output focused on bugs, regressions, missing tests, and broken assumptions."
 ---
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"388ea4b09538986553348f333da8dcde231f1dd37dfd0c53a197998b803a6a56"} -->
+
 <!--
 @dependency-start
 contract skill
-responsibility Documents Change Review for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
-upstream design ../../../documents/rule/README.md document rule canon
-upstream design ../../../documents/design/README.md design canon reader route
-upstream design ../../../issues/README.md durable issue and GitHub mirror policy
+responsibility Exposes change-review for runtime discovery.
+upstream design ../../../agents/skills/change-review.md owner
 @dependency-end
 -->
 
+# change-review
 
-# Change Review
+## Canonical Skill
 
-## 文書正本
-
-文書の filename、配置、構成判断は
-[`documents/rule/README.md`](../../../documents/rule/README.md) を参照します。
-個別の target state と実装境界は
-[`documents/design/README.md`](../../../documents/design/README.md) を参照します。
-詳細規則はこの runtime shim に複製しません。
+Canonical workflow and policy: [change-review](../../../agents/skills/change-review.md).
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill change-review --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+`python3 tools/agent_tools/skill_tool_commands.py show --skill change-review --format text`
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/change-review.md`.
-1. Review the actual diff first.
-1. Report findings before summaries.
-1. Treat reviewer output as hypotheses. The parent / integration owner is the
-   adjudicator; a reviewer cannot authorize edits, rollback, or publication.
-1. Accept a hypothesis only when it cites the current source snapshot, a
-   reachable input/control path, the violated request/design/behavior contract,
-   and a witness or static proof that changes the owner, edit, or validation
-   decision. Reject unreachable, stale, private/incidental, duplicate,
-   evidence-free, out-of-scope, or unproven design-conflict hypotheses with a
-   `reason_code` and `evidence_ref`; rejected hypotheses open no wave.
-1. Prioritize:
-   - behavioral regressions
-   - missing validation
-   - missing tests
-   - stale documentation
-1. For Python diffs that touch classes, dataclasses, `Protocol`, inheritance, public APIs, type boundaries, or dependency direction, add `python-review` and `$oop-readability-check`; require an OOP readability report with SOLID principle signal evidence plus `python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>` path coverage.
-1. Use static checks and targeted validation first. Run the full repository
-   dependency review, full suite, or remote CI only once for the final candidate
-   when the touched contract requires it.
-1. Separate `fix now` from `follow-up`.
-1. For fixes made after validation failure, check that the diff records
-   `failing_contract`, `observation_level`, `cause_classification`,
-   `intent_preservation`, and `evidence` before any pass-only simplification.
-   Use `intent_preservation` for the same-intent repair or escalation route before
-   revert, intended behavior/test deletion, oracle weakening, or validation
-   downscope. Findings must preserve approved intent or route oracle/spec,
-   fixture/environment/stale artifact, unrelated, and approved-design/user-
-   request conflicts to the proper repair, residual, or escalation path.
-1. A `revise`, `required_change`, rejected diff, or requested-change review is
-   not authority to roll back the user request. Findings must name the same
-   user-request or design intent to preserve, then require repair, redesign, or
-   escalation. Recommend revert / discard only with evidence that the clause was
-   withdrawn or superseded, outside the canonical owner, or unsafe and replaced
-   by an intent-preserving alternative.
-1. Add `issue_route` to every `fix now` and `follow-up` finding: use
-   `run_local_resolution:<evidence>` for findings closed in the current review
-   loop, `existing_issue:<path-or-url>` for known durable findings,
-   `new_local_issue:<issues/open/AC-YYYYMMDD-slug.md>` for durable local records,
-   and `github_mirror:<issue_sync.py command-or-url>` for operator-facing
-   GitHub Issue visibility.
-1. Use `issues/README.md` for required issue fields and
-   `python3 tools/agent_tools/issue_sync.py --root .` for local validation or
-   GitHub mirror planning.
-1. Use `documents/conventions/REVIEW_PROCESS.md` for repo review expectations.
-   In template or derived repo roots, `documents/...` is a logical AgentCanon
-   path: resolve it under `vendor/agent-canon/documents/` unless
-   `documents/README.md` lists the path as a template-owned active contract.
-1. One owning review gate may cover all claims in the same replaceable
-   responsibility. Add a specialist only for a distinct unresolved claim/risk
-   the owning gate cannot judge. Duplicate, stylistic, already-covered, or
-   witness-free findings are recorded without opening a repair wave.
+1. Read the canonical owner before applying this skill.

@@ -169,6 +169,10 @@ without compacting or deleting archive results.
 Specialized evals share the same source/result boundary: source manifests live
 in this directory, accumulated reports live under `.agent-canon/log-archive/`,
 and bounded run stdout/stderr may live under `reports/agent-eval-runs/<run-id>/`.
+The checked-in shim measurement fixture is
+`skill-runtime-shim/measurements/fixture-measurement.json`; ignored
+`reports/agent-eval-runs/` copies are transient producer output and are not an
+alternate oracle.
 
 | Eval surface | Command | Accumulated evidence and privacy rule |
 | --- | --- | --- |

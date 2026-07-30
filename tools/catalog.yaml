@@ -1372,7 +1372,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/agent_tools/skill_tool_commands.py check
-    writes: true
+    writes: false
     default_wiring:
       ci: false
       pr_check: true

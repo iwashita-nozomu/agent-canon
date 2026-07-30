@@ -275,3 +275,101 @@ accepted record と current publication readback の後だけ parent PR lane を
 lane で再検査しません。
 
 この細部は `agents/workflows/pr-queue-cleanup-workflow.md` を正本にします。
+
+## Runtime Contract Clauses
+
+The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+
+1. Read `agents/skills/pr-processing.md`.
+1. If AgentCanon source PRs or parent pin PRs are involved, also read
+   `agents/workflows/pr-queue-cleanup-workflow.md` and
+   `agents/workflows/agent-canon-pr-workflow.md`.
+1. Before creating or updating a PR, record source `origin/main`, parent
+   `origin/main` gitlink, target tree, selected merge strategy, and selected
+   remote. Use a run bundle only when coordination, resumption, or the selected
+   PR workflow needs durable evidence; otherwise a structured handoff/tool result
+   is sufficient.
+1. Keep PR publication artifacts inside the run bundle when one is selected:
+   - write the reviewed PR body to `reports/agents/<run-id>/pr_body.md`;
+   - include a `PR Essence` section in `pr_body.md` with problem / user
+     request, design intent, canonical owner, behavior or contract delta, and
+     evidence route;
+   - pass `--summary-out reports/agents/<run-id>/github_publish.json` to
+     `github_publish.py publish-pr`;
+   - record PR number / URL, branch, head SHA, authority decision, checks
+     summary, issue actions, and blockers in `work_log.md` or a run-local
+     `pr_processing_log.md`.
+1. Fix the authority boundary before mutation:
+   - inspecting PRs, checks, comments, reviews, and issues is allowed when the
+     task asks for PR / Issue processing;
+   - merging, closing, marking ready, deleting branches, or dismissing reviews
+     needs current user authority or tracked maintainer policy for that action;
+   - never bypass failed checks, branch protection, requested reviews, or draft
+     state.
+1. Snapshot the queue before editing:
+   - `gh pr list --state open --json number,title,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt`
+   - `gh issue list --state open --json number,title,labels,updatedAt,url`
+   - for each candidate PR, inspect `gh pr view` and `gh pr checks`.
+1. Classify each PR as `ready`, `behind`, `conflicting`, `draft`,
+   `checks-failing`, `review-blocked`, `stale`, or `dependent-pin`.
+1. For `checks-failing` or validation failure after branch repair, record
+   `failing_contract`, `observation_level`, `cause_classification`,
+   `intent_preservation`, and `evidence` in the PR log or run bundle before
+   pass-only simplification, revert, intended behavior/test deletion, oracle
+   weakening, or validation downscope. Preserve the PR Essence for
+   implementation bugs; route oracle/spec, fixture/environment/stale artifact,
+   unrelated, and approved-design/user-request conflicts to owner repair,
+   residual, or escalation before the merge gate.
+1. Treat requested-change or rejecting reviews as branch repair signals, not
+   authority to revert the PR's user request or PR Essence. Repair the head
+   branch so the original design intent remains covered, or record withdrawal,
+   supersession, owner-boundary, unsafe-replacement, or escalation evidence
+   before discarding a slice.
+1. Before marking a PR ready, merging it, or syncing a dependent parent pin,
+   perform diff intake against the target base. Compare the head diff with the
+   PR Essence, user request, canonical owner, and validation route; repair
+   missing, stale, unintended, or over-broad diff entries on the PR head branch
+   before the merge gate. Record the diff intake decision and repaired paths in
+   the PR log or run bundle.
+1. Plan merge order from dependency and conflict evidence, without rebase or
+   unrelated-history changes:
+   - source / library / AgentCanon PRs before parent pin or template PRs;
+   - PRs touching shared root/runtime surfaces before dependent docs-only PRs;
+   - conflicting PRs after the branch they conflict with has landed, unless the
+     conflict repair is independent.
+1. Resolve conflicts on the PR head branch, then rerun validation that covers
+   the touched surface. Do not resolve conflicts by discarding user
+   changes or force-pushing without explicit authority.
+   Conflict repair is semantic integration, not "ours/theirs" selection: inspect
+   the merge base, current branch intent, incoming branch intent, owning
+   contract, and validation surface; record which clauses from each side are
+   preserved, rewritten, or intentionally rejected before marking the conflict
+   resolved.
+1. Before merging a PR, require:
+   - open, non-draft PR;
+   - mergeable state;
+   - required checks passing;
+   - no blocking review request or requested-change review;
+   - PR body, comment, or run bundle includes `PR Essence`, validation
+     evidence, and any automation authority lines required by the repo.
+   - PR body, comment, or run bundle shows that the
+     `documents/operations/BRANCH_SCOPE.md` scope-split contract was applied: the PR is one
+     review unit, or it has a scope table plus the split/group decision for
+     every slice.
+1. For AgentCanon source PRs, merge source first, then update parent repos with
+   `make agent-canon-ensure-latest`, `bash tools/sync_agent_canon.sh link-root`,
+   diff intake / repair, and the parent PR gate. Parent projection occurs once
+   after source publication readback; do not rerun source correctness or engineer
+   ancestry to retain internal commit ids.
+1. Process issues with the same evidence rule:
+   - close only resolved, duplicate, obsolete, or intentionally not-planned
+     issues with a concrete PR, commit, or policy reference;
+   - update active issues with residual work and owner;
+   - keep stale issues open when evidence is insufficient.
+   - deletion or retirement validates the dependency closure and active
+     references first; it does not invent replacements or import unrelated
+     latest-main changes.
+1. Close out with a table of PR actions, issue actions, merge SHAs, remaining
+   blockers, validation commands, final open PR / Issue counts, and the run
+   bundle paths that contain the bootstrap log, PR body, publish summary, and
+   check evidence.

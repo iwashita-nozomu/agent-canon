@@ -17,9 +17,7 @@ import hashlib
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-
-UTC = timezone.utc
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
@@ -53,6 +51,7 @@ class QualityEval:
 
     eval_id: str
     target: Path
+    canonical_target: Path | None
     description: str
     checklist: tuple[QualityChecklistItem, ...]
 
@@ -181,10 +180,17 @@ def load_eval_entry(
         raise ValueError(f"duplicate eval target: {target}")
     seen_targets.add(target)
     target_path = validated_target_path(root, eval_id, target)
+    canonical_target = entry.get("canonical_target")
+    canonical_target_path = (
+        validated_target_path(root, eval_id, str(canonical_target))
+        if canonical_target is not None
+        else None
+    )
     checklist = load_eval_checklist(entry, eval_id)
     return QualityEval(
         eval_id=eval_id,
         target=target_path,
+        canonical_target=canonical_target_path,
         description=str(entry.get("description") or ""),
         checklist=checklist,
     )
@@ -265,6 +271,8 @@ def evaluate(root: Path, manifest: Path) -> ReportQualityBundle:
     results: list[QualityChecklistResult] = []
     for report_eval in evals:
         text = report_eval.target.read_text(encoding="utf-8")
+        if report_eval.canonical_target is not None:
+            text += "\n" + report_eval.canonical_target.read_text(encoding="utf-8")
         results.extend(evaluate_item(report_eval, item, text) for item in report_eval.checklist)
     result_tuple = tuple(results)
     status = "pass" if all(result.passed or not result.critical for result in result_tuple) else "fail"

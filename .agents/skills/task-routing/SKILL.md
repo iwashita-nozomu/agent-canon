@@ -1,46 +1,27 @@
 ---
 name: task-routing
-description: Use when choosing short AgentCanon tool, skill, profile, check, runtime, closeout, or evidence routes from long candidate names, broad workflow text, routing misses, over-constrained related-skill candidates, public/system skill delegation, skill splitting, or skill/tool routing refactors.
+description: "Use when choosing short AgentCanon tool, skill, profile, check, runtime, closeout, or evidence routes from long candidate names, broad workflow text, routing misses, over-constrained related-skill candidates, public/system skill delegation, skill splitting, or skill/tool routing refactors."
 ---
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"a0877cbac35b53a623718b1a84d1c3a9419fabfb21703725005984f5930a808e"} -->
 
 <!--
 @dependency-start
 contract skill
-responsibility Documents Task Routing skill shim.
-upstream design ../../../agents/skills/task-routing.md human-facing task routing skill
-upstream design ../../../agents/skills/skill-dependencies.yaml owns typed prerequisites, successors, order, and parallel relations
-upstream implementation ../../../tools/agent_tools/route.py selects short routing areas
-upstream implementation ../../../tools/agent_tools/skill_route_catalog.py derives invocation order from the dependency map
+responsibility Exposes task-routing for runtime discovery.
+upstream design ../../../agents/skills/task-routing.md owner
 @dependency-end
 -->
 
-# Task Routing
+# task-routing
+
+## Canonical Skill
+
+Canonical workflow and policy: [task-routing](../../../agents/skills/task-routing.md).
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill task-routing --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+`python3 tools/agent_tools/skill_tool_commands.py show --skill task-routing --format text`
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/task-routing.md`.
-1. Use `python3 tools/agent_tools/route.py --name <candidate>` to resolve a long proposed tool or skill name before creating any new public surface.
-1. Use `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` when a broad request needs deterministic public skill routing. Treat `ACTIVE_SKILLS` as current-wave skill guidance, `DEFERRED_SKILLS` as selected later wave triggers, and `RELATED_SKILL_CANDIDATES` as evidence-gated candidates for later stages.
-1. When a user reports that skills are missed, called late, or that related skills are over-constrained, use prompt routing first, then route observable evidence to `$agent-log-analysis`, durable issue candidates to `$issue-finding-report`, and recurrence feedback to `$agent-learning`.
-1. Route host-provided system-skill work to `$openai-docs`, `$skill-creator`, `$skill-installer`, `$imagegen`, or `$plugin-creator`; keep AgentCanon changes to local routing, evidence, and owner-surface contracts.
-1. Use `python3 tools/agent_tools/route.py --area <area> --changed <paths...>` to select the structured route for surface, profile, checks, environment, remote, AgentCanon update, MCP, goal, runtime, token, skill, agent, closeout, dependency, convention, docs, logs, or tool catalog decisions.
-1. Prefer the returned short `COMMANDS` and `NEXT_ACTION` over reading or repeating long workflow prose.
-1. When `task_start.py` or `bootstrap_agent_run.py` has emitted `run.repo_tool_routing_policy`, execute the selected skill tool route in manifest order: `show_skill_packet`, `required_commands`, task-matching conditional commands, then validation commands. If a related skill becomes active later, regenerate that skill packet before handoff.
-1. Treat task-catalog roles, default review packs, and related skills as
-   candidates. Activate an owner-critical skill before its edit, artifact, PR,
-   pin, or integration operation; deferred candidates do not create packets,
-   waves, or work.
-1. Create a new tool or skill only when the candidate is unknown and cannot fit an existing route area.
+1. Read the canonical owner before applying this skill.

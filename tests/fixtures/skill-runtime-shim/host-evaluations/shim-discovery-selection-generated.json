@@ -1,0 +1,22 @@
+{
+  "schema": "agent_canon.skill_runtime_shim.host_observation",
+  "version": 1,
+  "scenario_id": "discovery-selection",
+  "packet_id": "shim-discovery-selection-v1",
+  "packet_class": "full",
+  "iteration_id": "fresh-generated-01",
+  "skill_id": "agent-orchestration",
+  "variant": "generated",
+  "prompt": "You are given a task that requires coordinated repository implementation. Inspect the\navailable public skill discovery surface, identify the canonical owner for the selected\nworkflow, and report the owner boundary and read-only command-packet route. Keep the\nevaluation read-only and do not modify repository files.\n",
+  "prompt_digest": "ca3ae5fe1e5b07e7411bc7d394179f3dfdad1b9988f58e239796eaa293e6ce06",
+  "input_tokens": 608,
+  "canonical_followup_input_tokens": 187,
+  "cache_fields_observed": {
+    "cache_read_input_tokens": 0
+  },
+  "category": "discovery-selection",
+  "model_id": "gpt-5.4-mini",
+  "host_profile": "medium",
+  "method": "fresh_read_only",
+  "observation_status": "pass"
+}

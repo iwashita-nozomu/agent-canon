@@ -1,41 +1,27 @@
 ---
 name: cpp-review
-description: Use when C or C++ code changes need strict review for build evidence, header boundaries, ownership, and native-code behavior.
+description: "Use when C or C++ code changes need strict review for build evidence, header boundaries, ownership, and native-code behavior."
 ---
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"8ed5142592202352a41ee1df2e329daf7372f75e302a9fb8bd11f4497f01d20a"} -->
+
 <!--
 @dependency-start
 contract skill
-responsibility Documents C++ Review for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
+responsibility Exposes cpp-review for runtime discovery.
+upstream design ../../../agents/skills/cpp-review.md owner
 @dependency-end
 -->
 
+# cpp-review
 
-# C++ Review
+## Canonical Skill
 
-## Activation readback
-
-`cpp/CMakeLists.txt`、`cpp/src/`、`cpp/include/`、`cpp/tests/`、
-`cpp/experiments/` の changed path は `cpp_reviewer` の native review route に入ります。
+Canonical workflow and policy: [cpp-review](../../../agents/skills/cpp-review.md).
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill cpp-review --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+`python3 tools/agent_tools/skill_tool_commands.py show --skill cpp-review --format text`
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/cpp-review.md`.
-1. Fix the changed native files, headers, and related tests before validating.
-1. Run or inspect the project-native configure, build, and test commands.
-1. If the repo uses CMake, run or inspect `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"`, `cmake --build "$ROOT/build/cpp/<profile>"`, and `ctest --test-dir "$ROOT/build/cpp/<profile>"`.
-1. Check ABI boundaries, header drift, ownership, error paths, and docs/test follow-through.
-1. Report findings before summaries.
+1. Read the canonical owner before applying this skill.

@@ -1,49 +1,27 @@
 ---
 name: mvp-skeleton
-description: Use when creating, scaffolding, planning, or implementing an MVP, prototype, runnable vertical slice, product skeleton, v0, or thin vertical slice and the agent must prevent overbuilding. Trigger for MVP作成, プロトタイプ, 骨格だけ, core runnable path, thin vertical slice, scope creep, over-polish, and cases where early implementation is getting unnecessary UI, architecture, features, or tests.
+description: "Use when creating, scaffolding, planning, or implementing an MVP, prototype, runnable vertical slice, product skeleton, v0, or thin vertical slice and the agent must prevent overbuilding. Trigger for MVP作成, プロトタイプ, 骨格だけ, core runnable path, thin vertical slice, scope creep, over-polish, and cases where early implementation is getting unnecessary UI, architecture, features, or tests."
 ---
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"ae19ad361621a4e749082c643ff0636689f719a5f29ffaaf293025f6e81220db"} -->
+
 <!--
 @dependency-start
 contract skill
-responsibility Documents MVP Skeleton runtime skill for this repository.
-upstream design ../../../agents/skills/mvp-skeleton.md documents the human-facing MVP skeleton workflow
-downstream design ../../../agents/skills/catalog.yaml catalogs this public skill
+responsibility Exposes mvp-skeleton for runtime discovery.
+upstream design ../../../agents/skills/mvp-skeleton.md owner
 @dependency-end
 -->
 
-# MVP Skeleton
+# mvp-skeleton
+
+## Canonical Skill
+
+Canonical workflow and policy: [mvp-skeleton](../../../agents/skills/mvp-skeleton.md).
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill mvp-skeleton --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+`python3 tools/agent_tools/skill_tool_commands.py show --skill mvp-skeleton --format text`
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/mvp-skeleton.md`.
-1. Before editing, write a compact MVP contract in working notes, a run bundle, or the user-facing plan:
-   - `core_user`: who uses the skeletal slice
-   - `core_loop`: one input-to-useful-output path
-   - `success_signal`: observable result that proves the core loop
-   - `runtime_floor`: local run or inspection path that exercises the loop
-   - `stop_line`: tempting work that must be deferred
-1. Classify every candidate feature as `required`, `stub`, or `defer`; choose `defer` when uncertain.
-1. Keep only the `required` items that are necessary for one end-to-end path.
-1. Prefer one vertical slice over reusable infrastructure, extra workflows, broad abstractions, and generalized services.
-1. Stub auth, external services, payments, imports, analytics, admin tools, notifications, search, exports, persistence, and deployment unless the core loop specifically depends on them.
-1. For frontend work, make the entry screen the usable product surface rather than a landing page unless the user explicitly asked for a landing page.
-1. Add a smoke check that proves the MVP path runs.
-1. Stop when the core runnable path is available and report:
-   - core loop implemented
-   - run or inspection path
-   - smoke check performed
-   - deferred list capped at five items
-1. Treat the deferred list as success evidence and scope control.
+1. Read the canonical owner before applying this skill.

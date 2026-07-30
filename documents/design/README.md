@@ -37,6 +37,18 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
   - Wave 3 の3 active event、`hook_dispatcher.py`→`behavior_event_assembly.py` の exactly-once caller contract、`behavior_event_assembly.record_hook_invocation(parts)` の純アセンブリ公開 API、`.codex/hooks/hook_event_log.py` が no-replace per-event spool transport の serialization/append writer、活性ハンドラ毎に1 base append、行動レコード存在時のみ monitor projection、`RETIRED_CHILD_TOMBSTONES=23` / `MOVED_SOURCE_ABSENCES=1` / retired basenames `24`、分離した semantic event / hook event、skill logger 単独 owner 化、`skill_usage.jsonl` 履歴 read-only 取扱い、PR #471後 current-main inventory gate、検証コーパス
 - [skill-tool-invocation-graph.md](skill-tool-invocation-graph.md)
   - skill / capability / phase / tool / edge の identity、参照、coverage、readback
+- [skill-runtime-shim-materialization.md](skill-runtime-shim-materialization.md)
+  - 60 件の Codex discovery shim の schema、単一 materializer、移行、readback、prompt 評価
+  - `skill_tool_commands.py` は read-only packet producer、SKILL.md の writer は materializer
+    一つだけとする command surface、shim routing と全体 `route.py` の所有境界
+  - 実在する `workflow_selection_eval.toml` の 525 cases、固定 prompt/expected readback、
+    graph/route/ToolID/ToolCall golden、fresh `gpt-5.4-mini` scenario と paired token contract
+  - 60件の全件transactionではなく per-file `temp + os.replace`、全件readback、同一
+    materializer再実行による idempotent recovery。source/tests/eval producer は通常の
+    実装diffとしてruntime write setから分離
+  - determinism と idempotent fixed point の分離、2回実行時のrecord/60 projection/
+    readback equality と2回目content delta=0、route argparse error mapping、厳密な
+    measurement artifact schema/version/row contract
 - [runtime-log-repository-lifecycle.md](runtime-log-repository-lifecycle.md)
   - AgentCanon-log #4 と AgentCanon #461 の runtime-log repository owner split
 - [request-intent-and-update-relation.md](request-intent-and-update-relation.md)

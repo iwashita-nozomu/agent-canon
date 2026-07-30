@@ -1,0 +1,23 @@
+{
+  "schema": "agent_canon.skill_runtime_shim.host_observation",
+  "version": 1,
+  "scenario_id": "toolcall-route",
+  "packet_id": "shim-toolcall-route-v1",
+  "packet_class": "changed",
+  "iteration_id": "fresh-generated-01",
+  "skill_id": "structure-planning",
+  "variant": "generated",
+  "prompt": "A changed repository task needs the command packet for a structured planning skill. Read\nthe discovery adapter, resolve its canonical owner, and obtain the complete packet through\nthe owner command producer. Distinguish ToolID, ToolCall, argument schema, and failure\nsemantics. Keep the evaluation read-only and do not invent an execution payload.\n",
+  "prompt_digest": "2d55c4e202ddfce59f2c5b3f662aa18542ee76e576d092621119fcf00fa4bfaa",
+  "input_tokens": 571,
+  "canonical_followup_input_tokens": 168,
+  "cache_fields_observed": {
+    "cache_read_input_tokens": 0,
+    "cache_creation_input_tokens": 0
+  },
+  "category": "toolcall-route",
+  "model_id": "gpt-5.4-mini",
+  "host_profile": "medium",
+  "method": "fresh_read_only",
+  "observation_status": "pass"
+}

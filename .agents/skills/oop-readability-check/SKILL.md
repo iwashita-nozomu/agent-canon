@@ -1,81 +1,27 @@
 ---
 name: oop-readability-check
-description: Use when the user asks to run the OOP readability checker, SOLID check, OOP check, readability check, produce a mechanical OOP report table, or interpret/prioritize OOP readability results; keep mechanical tool output separate from agent analysis.
+description: "Use when the user asks to run the OOP readability checker, SOLID check, OOP check, readability check, produce a mechanical OOP report table, or interpret/prioritize OOP readability results; keep mechanical tool output separate from agent analysis."
 ---
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"e09bb877f49d50e9a8b173ef58431269b432f56653043f5d73bc28ef63e40b9a"} -->
+
 <!--
 @dependency-start
 contract skill
-responsibility Documents the OOP readability check and analysis skill for this repository.
-upstream design ../../../agents/skills/oop-readability-check.md human-readable skill canon
-upstream implementation ../../../tools/oop/python/readability.py OOP readability CLI with language selection
-upstream implementation ../../../tools/oop/shared/readability_core.py defines mechanical finding categories
-upstream implementation ../../../tools/agent_tools/workflow_monitor.py records optional timing evidence
+responsibility Exposes oop-readability-check for runtime discovery.
+upstream design ../../../agents/skills/oop-readability-check.md owner
 @dependency-end
 -->
 
-# OOP Readability Check
+# oop-readability-check
+
+## Canonical Skill
+
+Canonical workflow and policy: [oop-readability-check](../../../agents/skills/oop-readability-check.md).
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill oop-readability-check --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+`python3 tools/agent_tools/skill_tool_commands.py show --skill oop-readability-check --format text`
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/oop-readability-check.md`.
-1. Select exactly one mode from the user's request:
-   - `mechanical-only`: run the tool and report status/counts/tables only
-   - `analyze-existing`: analyze an existing OOP report or JSON result
-   - `run-and-analyze`: run the tool, then add agent analysis
-1. Treat user-provided paths as authoritative. Do not broaden scope unless the
-   user asks for broader scope.
-1. Treat SOLID, Single responsibility, Open/closed, Liskov substitution,
-   Interface segregation, Dependency inversion, class responsibility, public API
-   width, `Protocol`, inheritance, and dependency inversion prompts as OOP
-   readability scope.
-1. Treat this skill as the SOLID route owner for SOLID check prompts and
-   mechanical SOLID signal reports; language-specific review skills consume the
-   report only when their changed diff already owns that language surface. Keep
-   SOLID labels as mechanical projections of the checker categories.
-1. In tool-running modes, use the OOP readability CLI with language selection
-   delegated to the tool. The default command shape is:
-
-   ```bash
-   python3 tools/oop/python/readability.py --root . --language all <paths>
-   ```
-
-1. If the user gives no path, use the repo-local active source paths and
-   exclude generated or vendored surfaces (`vendor`, `reports`, `.git`, `build`,
-   `.pytest_cache`, `.ruff_cache`).
-1. If the user asks for a report, render the mechanical result as tables:
-   command, exit status, summary metrics, SOLID principle signals, dimensions,
-   finding kinds, hotspots, and the first relevant finding rows.
-1. In any tool-running mode, create a Markdown report artifact by default at
-   `reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>.md`.
-   Chat-only tables do not satisfy this skill unless the user explicitly says
-   no file / chat only. Use `--format markdown --max-report-findings 80` for the
-   artifact, or save JSON as a sibling file and derive the Markdown tables from
-   that same JSON result. Include the artifact path in the final response.
-1. Use `$result-artifact-writeout` when the result must persist beyond chat; save the checker output as the raw artifact and derive Markdown tables from the same source result.
-1. Add agent analysis only in `analyze-existing` or `run-and-analyze` mode.
-   Keep it under a separate `Agent Analysis` section after the mechanical
-   result. Prioritize by risk and leverage, identify likely false positives,
-   group by SOLID principle signals, cite mechanical evidence, and read hotspot
-   files only when needed.
-   Treat `typed_boundary_evidence` as mechanical evidence owned by the checker.
-   Use `status`, `status_reason`, boundary counts, and evidence refs together;
-   never turn a scalar heuristic into the design judgment.
-   Treat public-surface, parameter-count, and complexity findings as boundary
-   review signals, not automatic split/extract or private-helper instructions.
-   Only recommend a boundary change after reading the caller contract, ownership,
-   or surrounding source shape that makes the split stable.
-1. When a run bundle is active, record timing as a behavior event:
-   `tool_call=oop-readability-check duration_ms=<n> status=<pass|fail> scope=<paths>`.
+1. Read the canonical owner before applying this skill.

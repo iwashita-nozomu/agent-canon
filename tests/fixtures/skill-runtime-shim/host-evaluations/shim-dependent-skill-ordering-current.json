@@ -1,0 +1,22 @@
+{
+  "schema": "agent_canon.skill_runtime_shim.host_observation",
+  "version": 1,
+  "scenario_id": "dependent-skill-ordering",
+  "category": "dependent-skill-ordering",
+  "packet_id": "shim-dependent-skill-ordering-v1",
+  "packet_class": "changed",
+  "iteration_id": "fresh-current-01",
+  "skill_id": "agent-orchestration",
+  "variant": "current",
+  "prompt": "A repository task needs orchestration and a dependent skill. Inspect the discovery\nadapter, follow its canonical owner, and report the dependency-backed ordering without\ninventing a route from shim prose. Keep the evaluation read-only.\n",
+  "prompt_digest": "545dfae08a21d23699cc2050442c531daaea2e730b97f4573209dba90b6e2232",
+  "input_tokens": 603,
+  "canonical_followup_input_tokens": 184,
+  "cache_fields_observed": {
+    "cache_read_input_tokens": 0
+  },
+  "model_id": "gpt-5.4-mini",
+  "host_profile": "medium",
+  "method": "fresh_read_only",
+  "observation_status": "pass"
+}

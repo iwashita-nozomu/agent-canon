@@ -1,41 +1,27 @@
 ---
 name: comprehensive-development
-description: Use when a repo-wide task spans code, docs, tools, workflows, and runtime surfaces and needs explicit subagent routing.
+description: "Use when a repo-wide task spans code, docs, tools, workflows, and runtime surfaces and needs explicit subagent routing."
 ---
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"39ff9aaab8cf5fa6e41e22f2b173a8d66f15d0940d816df9505487c85c3d569f"} -->
+
 <!--
 @dependency-start
 contract skill
-responsibility Documents Comprehensive Development for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
-upstream design ../../../agents/task_catalog.yaml workflow family spawn budget and role topology owner
-upstream design ../../../agents/agents_config.json permanent team role ownership and write policy owner
-upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md Codex subagent inventory and activation contract
+responsibility Exposes comprehensive-development for runtime discovery.
+upstream design ../../../agents/skills/comprehensive-development.md owner
 @dependency-end
 -->
 
+# comprehensive-development
 
-# Comprehensive Development
+## Canonical Skill
+
+Canonical workflow and policy: [comprehensive-development](../../../agents/skills/comprehensive-development.md).
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill comprehensive-development --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+`python3 tools/agent_tools/skill_tool_commands.py show --skill comprehensive-development --format text`
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/comprehensive-development.md`.
-1. Set `workflow=Comprehensive Development` and declare `skills=<...>`, `review=<...>`.
-1. Read `agents/task_catalog.yaml` for the `comprehensive_development` family `spawn_budget`, `role_topology`, `roles`, and `subagent_prompt`.
-1. Read `agents/agents_config.json` for permanent team role ownership, required output, and write policy.
-1. Read `agents/canonical/CODEX_SUBAGENTS.md` for Codex inventory, activation, and runtime surface routing.
-1. Bootstrap the standard bundle, then mirror catalog / config ownership into `team_manifest.yaml`.
-1. Use `project_reviewer` as the repo-wide integration reviewer named by the catalog and config surfaces.
-1. Assign colliding writers to later waves in the current checkout when multiple writers are needed.
+1. Read the canonical owner before applying this skill.

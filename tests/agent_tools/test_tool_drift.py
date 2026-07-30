@@ -31,6 +31,7 @@ class FakeToolGraphClient:
     last_query: dict[str, object] = {}
 
     def __init__(self, root: Path, _executable: Path | None = None) -> None:
+        """Create a fixture graph client for the given root."""
         self._root = root.resolve()
 
     def query(
@@ -215,6 +216,39 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 "tools/agent_tools/check_convention_compliance.py:"
                 "agents/canonical/CODEX_WORKFLOW.md",
                 result.stdout,
+            )
+            self.assertNotIn(
+                ".agents/skills/agent-orchestration/SKILL.md", result.stdout
+            )
+
+    def test_tool_rejection_preflight_checks_canonical_owner_skills(self) -> None:
+        """Tool rejection preflight checks canonical skill owners, not generated shims."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_tool_rejection_preflight_contract(root)
+            workflow = root / "agents" / "skills" / "codex-task-workflow.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "responsibility_scope",
+                    "missing-scope-policy",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "tool_rejection_preflight")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-text:tool_rejection_preflight:"
+                "agents/skills/codex-task-workflow.md:"
+                "missing-runtime-workflow-responsibility-preflight",
+                result.stdout,
+            )
+            self.assertNotIn(
+                ".agents/skills/codex-task-workflow/SKILL.md", result.stdout
+            )
+            self.assertNotIn(
+                ".agents/skills/owner-bounded-routing/SKILL.md", result.stdout
             )
 
     def test_kind_mismatch_is_reported(self) -> None:
@@ -521,29 +555,8 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 "missing-canonical-write-capable-handoff-policy",
                 result.stdout,
             )
-
-    def test_subagent_wave_routing_requires_runtime_owner_pointer(self) -> None:
-        """The runtime shim points to the policy owner instead of copying policy."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_subagent_wave_routing_contract(root)
-            shim = root / ".agents" / "skills" / "agent-orchestration" / "SKILL.md"
-            shim.write_text(
-                shim.read_text(encoding="utf-8").replace(
-                    "agents/skills/agent-orchestration.md",
-                    "missing-owner.md",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root, "--contract", "subagent_wave_routing")
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "missing-required-text:subagent_wave_routing:"
-                ".agents/skills/agent-orchestration/SKILL.md:"
-                "missing-runtime-orchestration-owner-pointer",
-                result.stdout,
+            self.assertNotIn(
+                ".agents/skills/agent-orchestration/SKILL.md", result.stdout
             )
 
     def write_file(self, root: Path, relative: str, text: str) -> None:
@@ -585,9 +598,8 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagents",
                     "# upstream design ../../agents/TASK_WORKFLOWS.md workflows",
                     "# upstream design ../../agents/skills/agent-orchestration.md orchestration",
-                    "# upstream design ../../.agents/skills/agent-orchestration/SKILL.md skill",
                     "# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml evals",
-                        "# upstream design ../../templates/agents/closeout_gate.md closeout",
+                    "# upstream design ../../templates/agents/closeout_gate.md closeout",
                     "# upstream implementation ../ci/run_all_checks.sh ci",
                     "# upstream implementation ./tool_drift.py drift gate",
                     "# @dependency-end",
@@ -601,7 +613,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "agents/canonical/CODEX_SUBAGENTS.md",
             "agents/TASK_WORKFLOWS.md",
             "agents/skills/agent-orchestration.md",
-            ".agents/skills/agent-orchestration/SKILL.md",
             "evidence/agent-evals/skill_workflow_prompt_eval.toml",
             "templates/agents/closeout_gate.md",
             "tools/ci/run_all_checks.sh",
@@ -622,7 +633,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagents",
                     "# upstream design ../../agents/TASK_WORKFLOWS.md workflows",
                     "# upstream design ../../agents/skills/agent-orchestration.md orchestration",
-                    "# upstream design ../../.agents/skills/agent-orchestration/SKILL.md skill",
                     "# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml evals",
                     "# upstream implementation ./check_convention_compliance.py convention gate",
                     "# downstream implementation ../../tests/agent_tools/test_tool_drift.py tests",
@@ -659,23 +669,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             )
         self.write_file(
             root,
-            ".agents/skills/agent-orchestration/SKILL.md",
-            "\n".join(
-                [
-                    "<!--",
-                    "@dependency-start",
-                    "responsibility Routes to the canonical orchestration owner.",
-                    "upstream design ../../../agents/skills/agent-orchestration.md owner",
-                    "@dependency-end",
-                    "-->",
-                    "agents/skills/agent-orchestration.md",
-                    "machine-readable ToolCall tokens",
-                    "",
-                ]
-            ),
-        )
-        self.write_file(
-            root,
             "evidence/agent-evals/skill_workflow_prompt_eval.toml",
             "VERTICAL-WAVE-POLICY ORCH-SHIM-POINTER-1 ORCH-SHIM-TOOLCALL-1\n",
         )
@@ -684,6 +677,63 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "tests/agent_tools/test_tool_drift.py",
             "# fixture test vertical dynamic wave\n",
         )
+
+    def write_tool_rejection_preflight_contract(self, root: Path) -> None:
+        """Write fixtures for the tool rejection preflight contract."""
+        self.write_file(
+            root,
+            "tools/agent_tools/tool_rejection_preflight.py",
+            "\n".join(
+                [
+                    "# @dependency-start",
+                    "# responsibility Prechecks edit-time risk class.",
+                    "# upstream design ../../agents/COMMUNICATION_PROTOCOL.md protocol",
+                    "# upstream design ../../agents/skills/codex-task-workflow.md workflow",
+                    "# upstream design ../../agents/skills/owner-bounded-routing.md owner-bounded",
+                    "# upstream design ../../tools/agent_tools/responsibility_scope.py scope",
+                    "# upstream implementation ../../tests/agent_tools/test_tool_rejection_preflight.py scope preflight",
+                    "# @dependency-end",
+                    "",
+                ]
+            ),
+        )
+        for relative in [
+            "agents/COMMUNICATION_PROTOCOL.md",
+            "agents/skills/codex-task-workflow.md",
+            "agents/skills/owner-bounded-routing.md",
+            "tools/agent_tools/responsibility_scope.py",
+            "tools/README.md",
+            "documents/tools/README.md",
+            "tests/agent_tools/test_tool_rejection_preflight.py",
+        ]:
+            if relative in {
+                "agents/skills/codex-task-workflow.md",
+                "agents/skills/owner-bounded-routing.md",
+                "agents/COMMUNICATION_PROTOCOL.md",
+            }:
+                snippet = (
+                    "`responsibility_scope` gate records"
+                    if relative == "agents/COMMUNICATION_PROTOCOL.md"
+                    else "responsibility_scope"
+                )
+                self.write_file(
+                    root,
+                    relative,
+                    "\n".join(
+                        [
+                            "<!--",
+                            "@dependency-start",
+                            "responsibility Provides preflight fixture.",
+                            "upstream design README.md fixture anchor",
+                            "@dependency-end",
+                            "-->",
+                            snippet,
+                            "",
+                        ]
+                    ),
+                )
+            else:
+                self.write_plain_manifest(root, relative)
 
     def write_agent_canon_pr_contract(self, root: Path) -> None:
         """Write fixtures for the AgentCanon PR check contract."""

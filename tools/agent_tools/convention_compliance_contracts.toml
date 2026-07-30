@@ -1,6 +1,6 @@
 # @dependency-start
 # contract tool
-# responsibility Declares marker contracts consumed by convention compliance checks.
+# responsibility Declares canonical-source marker contracts consumed by convention compliance checks.
 # upstream design ../../agents/skills/owner-bounded-routing.md owner-bounded routing skill contract
 # upstream design ../../agents/skills/oop-readability-check.md SOLID checker route ownership
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md branch reuse and checkout continuity policy
@@ -9,6 +9,9 @@
 # @dependency-end
 
 schema_version = 1
+
+# Skill policy markers belong to agents/skills/<skill>.md canonical prose owners.
+# Generated .agents/skills/<skill>/SKILL.md adapters use dedicated shim readback gates.
 
 [[contracts]]
 id = "design_integrity_gate"
@@ -21,10 +24,6 @@ markers = ["Design Integrity Gate", "owning responsibility model", "owner, repla
 [[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"
 markers = ["Design Integrity Gate", "Decision sufficiency is semantic", "owner, replaceable unit", "implementation mechanism", "validation route", "unresolved branch", "design_issue_blocker"]
-
-[[contracts.surfaces]]
-path = ".agents/skills/codex-task-workflow/SKILL.md"
-markers = ["Design Integrity Gate", "responsibility model", "replaceable unit", "implementation paths", "validation route", "unresolved branch", "design_issue_blocker"]
 
 [[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
@@ -47,10 +46,6 @@ path = "agents/skills/agent-orchestration.md"
 markers = ["静的解析・読み取り evidence", "targeted validation", "実行が必要な未解決 signal", "smoke run"]
 
 [[contracts.surfaces]]
-path = ".agents/skills/codex-task-workflow/SKILL.md"
-markers = ["static/read evidence", "primary validation evidence", "targeted validation route", "changed runtime behavior", "unresolved static findings"]
-
-[[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
 markers = ["静的解析・読み取り evidence", "primary validation evidence", "supplemental evidence", "runtime behavior", "未解決 finding"]
 
@@ -69,10 +64,6 @@ description = "Research-backed implementation skill-call sequences place literat
 [[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"
 markers = ["literature-survey", "research-workflow", "先に", "source packet", "adoption/exclusion"]
-
-[[contracts.surfaces]]
-path = ".agents/skills/codex-task-workflow/SKILL.md"
-markers = ["$literature-survey", "$research-workflow", "before design", "Implementation Source Packet", "adoption/exclusion"]
 
 [[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
@@ -99,32 +90,16 @@ path = "agents/skills/agent-orchestration.md"
 markers = ["existing-tool route", "targeted validation", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing"]
 
 [[contracts.surfaces]]
-path = ".agents/skills/codex-task-workflow/SKILL.md"
-markers = ["existing-tool route", "targeted-validation evidence", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing"]
-
-[[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
 markers = ["existing-tool route", "targeted validation", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing"]
-
-[[contracts.surfaces]]
-path = ".agents/skills/owner-bounded-routing/SKILL.md"
-markers = ["existing tool", "owner boundary", "Owner-Bounded Change", "targeted validation", "tool_rejection_preflight.py", "structure_contract=skipped"]
 
 [[contracts.surfaces]]
 path = "agents/skills/owner-bounded-routing.md"
 markers = ["existing tool", "owner boundary", "Owner-Bounded Change", "targeted validation", "tool_rejection_preflight.py", "structure_contract=skipped"]
 
 [[contracts.surfaces]]
-path = ".agents/skills/md-style-check/SKILL.md"
-markers = ["existing-tool route", "targeted-validation evidence", "format-only", "$owner-bounded-routing"]
-
-[[contracts.surfaces]]
 path = "agents/skills/md-style-check.md"
 markers = ["existing-tool route", "targeted validation", "format-only", "$owner-bounded-routing"]
-
-[[contracts.surfaces]]
-path = ".agents/skills/long-form-writing/SKILL.md"
-markers = ["existing-tool route", "targeted-validation evidence", "typo/link/format-only"]
 
 [[contracts.surfaces]]
 path = "agents/skills/long-form-writing.md"
@@ -137,10 +112,6 @@ markers = ["owner-bounded-routing", "existing tool", "targeted validation", ".co
 [[contracts.surfaces]]
 path = "agents/skills/catalog.yaml"
 markers = ["owner-bounded-routing", "owner-bounded", "targeted validation", "Owner-Bounded Change"]
-
-[[contracts.surfaces]]
-path = ".codex/config.toml"
-markers = ["../.agents/skills/owner-bounded-routing/SKILL.md"]
 
 [[contracts.surfaces]]
 path = "agents/canonical/CODEX_WORKFLOW.md"
@@ -163,16 +134,8 @@ path = "agents/COMMUNICATION_PROTOCOL.md"
 markers = ["responsibility_scope", "responsibility-scope.toml", "owner", "class", "protecting tools", "planned path"]
 
 [[contracts.surfaces]]
-path = ".agents/skills/codex-task-workflow/SKILL.md"
-markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "implementation directory"]
-
-[[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
 markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "実装ディレクトリ"]
-
-[[contracts.surfaces]]
-path = ".agents/skills/owner-bounded-routing/SKILL.md"
-markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "implementation directory"]
 
 [[contracts.surfaces]]
 path = "agents/skills/owner-bounded-routing.md"
@@ -193,10 +156,6 @@ description = "Managed experiment execution surfaces route through lifecycle and
 [[contracts.surfaces]]
 path = "tools/agent_tools/tool_rejection_preflight.py"
 markers = ["EXPERIMENT_EXECUTION_SURFACE_PATHS", "experiment_execution_surface_guard", "experiment_execution_surface_path", "check_experiment_registry.py", "test_run_managed_experiment.py"]
-
-[[contracts.surfaces]]
-path = ".agents/skills/experiment-lifecycle/SKILL.md"
-markers = ["experiment_execution_surface_guard", "tool_rejection_preflight.py", "$test-design", "check_experiment_registry.py", "tests/tools/test_run_managed_experiment.py"]
 
 [[contracts.surfaces]]
 path = "agents/skills/experiment-lifecycle.md"
@@ -247,10 +206,6 @@ path = ".codex/README.md"
 markers = ["active events", "legacy `Stop`", "fail-open", "retired child tombstones", "bounded", "redacted"]
 
 [[contracts.surfaces]]
-path = ".agents/skills/worktree-health/SKILL.md"
-markers = ["agents/canonical/CODEX_WORKFLOW.md", "Branch Reuse Default", "tools/agent_tools/hook_safety.py", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "git worktree list --porcelain", "git branch --show-current"]
-
-[[contracts.surfaces]]
 path = "agents/skills/worktree-health.md"
 markers = ["agents/canonical/CODEX_WORKFLOW.md", "Branch Reuse Default", "tools/agent_tools/hook_safety.py", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "git worktree list --porcelain", "git branch --show-current"]
 
@@ -275,24 +230,12 @@ path = "agents/skills/codex-task-workflow.md"
 markers = ["$oop-readability-check", "SOLID principle signal", "OOP dimension", "finding kind", "tools/oop/shared/readability_core.py", "check_solid_evidence.py", "scanned_paths", "class", "Protocol"]
 
 [[contracts.surfaces]]
-path = ".agents/skills/codex-task-workflow/SKILL.md"
-markers = ["$oop-readability-check", "SOLID principle signal", "OOP dimension", "finding kind", "tools/oop/shared/readability_core.py", "check_solid_evidence.py", "scanned_paths", "classes", "Protocol"]
-
-[[contracts.surfaces]]
 path = "agents/skills/python-review.md"
 markers = ["SOLID 原則シグナル", "OOP 可読性レポート", "tools/oop/python/readability.py", "tools/agent_tools/check_solid_evidence.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "readability.py", "scanned_paths"]
 
 [[contracts.surfaces]]
-path = ".agents/skills/python-review/SKILL.md"
-markers = ["SOLID 原則シグナル", "$oop-readability-check", "tools/oop/python/readability.py", "tools/agent_tools/check_solid_evidence.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "scanned_paths"]
-
-[[contracts.surfaces]]
 path = "agents/skills/change-review.md"
 markers = ["python-review", "$oop-readability-check", "tools/agent_tools/check_solid_evidence.py", "SOLID principle signal", "OOP readability report", "class", "Protocol"]
-
-[[contracts.surfaces]]
-path = ".agents/skills/change-review/SKILL.md"
-markers = ["python-review", "$oop-readability-check", "tools/agent_tools/check_solid_evidence.py", "SOLID principle signal", "OOP readability report", "classes", "Protocol"]
 
 [[contracts.surfaces]]
 path = ".codex/agents/python_reviewer.toml"
@@ -315,10 +258,6 @@ path = "agents/skills/oop-readability-check.md"
 markers = ["SOLID", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/oop/shared/readability_core.py", "SOLID route owner", "mechanical projections", "readability.py"]
 
 [[contracts.surfaces]]
-path = ".agents/skills/oop-readability-check/SKILL.md"
-markers = ["SOLID", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/oop/shared/readability_core.py", "SOLID route owner", "mechanical projections", "readability.py"]
-
-[[contracts.surfaces]]
 path = "agents/skills/catalog.yaml"
 markers = ["SOLID", "SRP", "OCP", "LSP", "ISP", "DIP", "Single responsibility", "Open/closed", "Liskov", "Interface segregation", "Dependency inversion", "Protocol", "- [\"SOLID\"]", "- [\"SRP\"]", "- [\"Dependency inversion\"]"]
 
@@ -336,10 +275,6 @@ markers = ["読者順序", "公開契約", "公開入口", "内部補助関数",
 
 [[contracts.surfaces]]
 path = "agents/skills/python-review.md"
-markers = ["定義順", "読者順序", "公開入口", "内部補助関数", "check_convention_compliance.py"]
-
-[[contracts.surfaces]]
-path = ".agents/skills/python-review/SKILL.md"
 markers = ["定義順", "読者順序", "公開入口", "内部補助関数", "check_convention_compliance.py"]
 
 [[contracts.surfaces]]

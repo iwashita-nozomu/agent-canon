@@ -343,3 +343,65 @@ Closeout cites:
 - the deterministic `coverage_digest` and `final_token_readback`;
 - final typed coverage status, or the typed renderer-capacity blocker when no
   complete artifact can be produced.
+
+## Runtime Contract Clauses
+
+The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+
+1. Read `agents/skills/code-visualization.md`.
+   Complete its canonical typed gate before renderer selection.
+1. Record a context-derived `Visualization Selection` before rendering:
+   - `context_question`
+   - `embedding_context`
+   - `literal_user_scope`
+   - `visualization_source_universe`
+   - `projection_coverage_manifest`
+   - `canonical_owner_tool_call`
+   - `precision_need`
+   - `visualization_kind`
+   - `question`
+   - `source_evidence`
+   - `owner_skill_or_tool`
+   - `adapter_tool_calls`
+   - `renderer`
+   - `output_path`
+1. Infer the context question, then project it to a diagram family:
+   - "what happens in what order": flowchart / activity diagram.
+   - "which exact branches and joins exist": control-flow graph.
+   - "what calls or imports what": call graph or dependency graph.
+   - "who exchanges messages over time": sequence diagram.
+   - "how concurrent events overlap": timing diagram or concurrency sequence diagram.
+   - "what states can exist and how transitions occur": state-transition diagram.
+   - "where data or artifacts move": data-flow diagram.
+   - "which types, classes, protocols, or owners relate": class/type diagram or
+     architecture map.
+   - "where algorithm/proof status sits on implemented operations":
+     `$algorithm-flowchart`.
+   - "which large graph needs filtering or navigation": `$html-output` after the
+     graph source is available.
+   Diagram-family selection changes representation only and cannot change the
+   immutable universe or manifest membership.
+1. For a diagram embedded in a document, infer the local claim, section role,
+   reader action, and `visual_plan` slot before choosing the diagram family.
+   Pair this skill with `$structure-planning` for the visual plan and
+   `$md-style-check` for Mermaid / Markdown checks.
+   Treat this as `Document Embedded Diagrams`: the section claim, reader path,
+   and embedding context are part of the visualization selection.
+1. Route source ownership and delegation through owning skills and packets only.
+1. Keep pass/fail authority with the source producer. The diagram is a
+   projection of extracted facts; code, dependency, proof, or runtime checkers
+   own correctness claims.
+1. If the request is repository/code-space dependency visualization, execute
+   exactly one matching command from Small-Model Direct Route after the owner
+   ToolCall, and retain its adapter ToolCall in the handoff.
+1. Run the owning formatter after rendering. Formatter and renderer remain
+   syntax/layout-only and cannot extract facts or mutate typed coverage.
+1. Handoff and closeout are incomplete unless they carry the complete
+   `VisualizationSourceUniverse`, canonical owner ToolCall, every adapter
+   ToolCall, `ProjectionCoverageManifest`, final artifact,
+   exact eight-kind `source_counts`, `rendered_counts`, and `readback_counts`
+   maps for `identity`, `edge`, `field`, `phase`, `branch`, `module`,
+   `evidence`, and `time`, deterministic `coverage_digest`,
+   `final_token_readback`, and final typed status. If
+   capacity prevents complete output, return the typed renderer-capacity
+   blocker with no partial artifact.
