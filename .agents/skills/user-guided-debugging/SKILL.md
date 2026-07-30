@@ -15,8 +15,8 @@ description: "Use when the user explicitly asks to debug, repair, or refactor on
 <!--
 @dependency-start
 contract skill
-responsibility Exposes user-guided-debugging as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/user-guided-debugging.md canonical skill owner
+responsibility Exposes user-guided-debugging for runtime discovery.
+upstream design ../../../agents/skills/user-guided-debugging.md owner
 @dependency-end
 -->
 

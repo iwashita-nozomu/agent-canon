@@ -15,8 +15,8 @@ description: "Sole public visualization owner for code, repository structure, ru
 <!--
 @dependency-start
 contract skill
-responsibility Exposes code-visualization as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/code-visualization.md canonical skill owner
+responsibility Exposes code-visualization for runtime discovery.
+upstream design ../../../agents/skills/code-visualization.md owner
 @dependency-end
 -->
 

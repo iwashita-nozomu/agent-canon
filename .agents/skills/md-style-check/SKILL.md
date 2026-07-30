@@ -15,8 +15,8 @@ description: "Use when Markdown files changed, docs formatter/fixer output must 
 <!--
 @dependency-start
 contract skill
-responsibility Exposes md-style-check as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/md-style-check.md canonical skill owner
+responsibility Exposes md-style-check for runtime discovery.
+upstream design ../../../agents/skills/md-style-check.md owner
 @dependency-end
 -->
 

@@ -15,8 +15,8 @@ description: "Use when touching Docker, CI, dependencies, runtime compatibility,
 <!--
 @dependency-start
 contract skill
-responsibility Exposes environment-maintenance as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/environment-maintenance.md canonical skill owner
+responsibility Exposes environment-maintenance for runtime discovery.
+upstream design ../../../agents/skills/environment-maintenance.md owner
 @dependency-end
 -->
 

@@ -15,8 +15,8 @@ description: "Use when a dependency source change, topic branch clone, or recons
 <!--
 @dependency-start
 contract skill
-responsibility Exposes dependency-module-change as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/dependency-module-change.md canonical skill owner
+responsibility Exposes dependency-module-change for runtime discovery.
+upstream design ../../../agents/skills/dependency-module-change.md owner
 @dependency-end
 -->
 

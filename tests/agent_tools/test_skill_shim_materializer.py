@@ -25,6 +25,7 @@ from skill_shim_materializer import (  # noqa: E402
     MIGRATION_BASELINE_PATH,
     MaterializerError,
     _previous_dependency_manifest_shim,
+    _previous_contract_reference_shim,
     build_context,
     build_record,
     check,
@@ -177,8 +178,8 @@ class SkillShimMaterializerTest(unittest.TestCase):
                     "<!--",
                     "@dependency-start",
                     "contract skill",
-                    "responsibility Exposes agent-orchestration as a Codex runtime discovery adapter.",
-                    "upstream design ../../../agents/skills/agent-orchestration.md canonical skill owner",
+                    "responsibility Exposes agent-orchestration for runtime discovery.",
+                    "upstream design ../../../agents/skills/agent-orchestration.md owner",
                     "@dependency-end",
                     "-->",
                 )
@@ -192,6 +193,40 @@ class SkillShimMaterializerTest(unittest.TestCase):
         skill = "agent-orchestration"
         expected = render_shim(build_record(context, skill))
         previous = _previous_dependency_manifest_shim(context, skill, expected)
+        self.assertIn(
+            f"responsibility Exposes {skill} as a Codex runtime discovery adapter.",
+            previous,
+        )
+        self.assertIn(
+            f"upstream design ../../../agents/skills/{skill}.md canonical skill owner",
+            previous,
+        )
+        runtime_path = PROJECT_ROOT / ".agents/skills" / skill / "SKILL.md"
+        original = runtime_path.read_text(encoding="utf-8")
+        runtime_path.write_text(previous, encoding="utf-8")
+        try:
+            receipt = classify_legacy(context, skill, expected)
+        finally:
+            runtime_path.write_text(original, encoding="utf-8")
+        self.assertEqual(
+            receipt["classification"],
+            "generated_previous_dependency_manifest",
+        )
+        self.assertEqual(receipt["resolution"], "migrated")
+        self.assertEqual(receipt["unmatched_blocks"], [])
+
+    def test_previous_contract_reference_manifest_migrates_if_present(self) -> None:
+        """An older contract-reference-only manifest remains a bounded migration input."""
+        context = build_context(PROJECT_ROOT)
+        skill = "agent-orchestration"
+        expected = render_shim(build_record(context, skill))
+        previous = _previous_contract_reference_shim(context, skill, expected)
+        if previous is None:
+            self.skipTest("contract reference migration is not currently supported")
+        self.assertIn(
+            f"upstream implementation ../../../agents/skills/{skill}.md",
+            previous,
+        )
         runtime_path = PROJECT_ROOT / ".agents/skills" / skill / "SKILL.md"
         original = runtime_path.read_text(encoding="utf-8")
         runtime_path.write_text(previous, encoding="utf-8")

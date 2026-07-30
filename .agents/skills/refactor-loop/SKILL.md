@@ -15,8 +15,8 @@ description: "Use when a large refactor should run as a behavior-preserving refa
 <!--
 @dependency-start
 contract skill
-responsibility Exposes refactor-loop as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/refactor-loop.md canonical skill owner
+responsibility Exposes refactor-loop for runtime discovery.
+upstream design ../../../agents/skills/refactor-loop.md owner
 @dependency-end
 -->
 

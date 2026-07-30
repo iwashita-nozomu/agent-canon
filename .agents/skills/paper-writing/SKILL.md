@@ -15,8 +15,8 @@ description: "Use when drafting a submission paper, thesis chapter, or other pap
 <!--
 @dependency-start
 contract skill
-responsibility Exposes paper-writing as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/paper-writing.md canonical skill owner
+responsibility Exposes paper-writing for runtime discovery.
+upstream design ../../../agents/skills/paper-writing.md owner
 @dependency-end
 -->
 

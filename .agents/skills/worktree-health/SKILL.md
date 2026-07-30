@@ -15,8 +15,8 @@ description: "Use this skill to review current checkout authority, run-bundle dr
 <!--
 @dependency-start
 contract skill
-responsibility Exposes worktree-health as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/worktree-health.md canonical skill owner
+responsibility Exposes worktree-health for runtime discovery.
+upstream design ../../../agents/skills/worktree-health.md owner
 @dependency-end
 -->
 

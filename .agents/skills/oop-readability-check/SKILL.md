@@ -15,8 +15,8 @@ description: "Use when the user asks to run the OOP readability checker, SOLID c
 <!--
 @dependency-start
 contract skill
-responsibility Exposes oop-readability-check as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/oop-readability-check.md canonical skill owner
+responsibility Exposes oop-readability-check for runtime discovery.
+upstream design ../../../agents/skills/oop-readability-check.md owner
 @dependency-end
 -->
 

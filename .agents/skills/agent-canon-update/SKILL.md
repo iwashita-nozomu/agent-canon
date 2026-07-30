@@ -15,8 +15,8 @@ description: "Use when updating AgentCanon itself, refreshing a vendored vendor/
 <!--
 @dependency-start
 contract skill
-responsibility Exposes agent-canon-update as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/agent-canon-update.md canonical skill owner
+responsibility Exposes agent-canon-update for runtime discovery.
+upstream design ../../../agents/skills/agent-canon-update.md owner
 @dependency-end
 -->
 

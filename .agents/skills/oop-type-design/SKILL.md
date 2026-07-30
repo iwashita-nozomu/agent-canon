@@ -15,8 +15,8 @@ description: "Use before implementation to define language-neutral OOP/type cont
 <!--
 @dependency-start
 contract skill
-responsibility Exposes oop-type-design as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/oop-type-design.md canonical skill owner
+responsibility Exposes oop-type-design for runtime discovery.
+upstream design ../../../agents/skills/oop-type-design.md owner
 @dependency-end
 -->
 

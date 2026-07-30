@@ -15,8 +15,8 @@ description: "Use when memory/USER_PREFERENCES.md should be distilled into stabl
 <!--
 @dependency-start
 contract skill
-responsibility Exposes user-preference-sync as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/user-preference-sync.md canonical skill owner
+responsibility Exposes user-preference-sync for runtime discovery.
+upstream design ../../../agents/skills/user-preference-sync.md owner
 @dependency-end
 -->
 

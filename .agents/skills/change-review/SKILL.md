@@ -15,8 +15,8 @@ description: "Use for code review, doc review, or AI-generated diff review when 
 <!--
 @dependency-start
 contract skill
-responsibility Exposes change-review as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/change-review.md canonical skill owner
+responsibility Exposes change-review for runtime discovery.
+upstream design ../../../agents/skills/change-review.md owner
 @dependency-end
 -->
 

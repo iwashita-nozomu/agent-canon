@@ -15,8 +15,8 @@ description: "Use when checking, validating, or diagnosing repository dependency
 <!--
 @dependency-start
 contract skill
-responsibility Exposes dependency-analysis as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/dependency-analysis.md canonical skill owner
+responsibility Exposes dependency-analysis for runtime discovery.
+upstream design ../../../agents/skills/dependency-analysis.md owner
 @dependency-end
 -->
 

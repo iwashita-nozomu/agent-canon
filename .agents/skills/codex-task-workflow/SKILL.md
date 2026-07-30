@@ -15,8 +15,8 @@ description: "Use when Codex needs a context-independent execution path for a re
 <!--
 @dependency-start
 contract skill
-responsibility Exposes codex-task-workflow as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/codex-task-workflow.md canonical skill owner
+responsibility Exposes codex-task-workflow for runtime discovery.
+upstream design ../../../agents/skills/codex-task-workflow.md owner
 @dependency-end
 -->
 

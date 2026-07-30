@@ -15,8 +15,8 @@ description: "Use when processing GitHub pull requests or issue queues: inventor
 <!--
 @dependency-start
 contract skill
-responsibility Exposes pr-processing as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/pr-processing.md canonical skill owner
+responsibility Exposes pr-processing for runtime discovery.
+upstream design ../../../agents/skills/pr-processing.md owner
 @dependency-end
 -->
 

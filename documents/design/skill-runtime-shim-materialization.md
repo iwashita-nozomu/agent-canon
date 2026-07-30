@@ -260,8 +260,8 @@ description: <discovery.description>
 <!--
 @dependency-start
 contract skill
-responsibility Exposes <skill-id> as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/<skill-id>.md canonical skill owner
+responsibility Exposes <skill-id> for runtime discovery.
+upstream design ../../../agents/skills/<skill-id>.md owner
 @dependency-end
 -->
 
@@ -284,7 +284,7 @@ Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show
 
 dependency headerの具体的な field は source record の owner links から生成し、
 canonical document の dependency header をコピーしません。固定の responsibility は
-「Codex host discovery adapter を expose する」とし、upstream は catalog、dependency
+「Exposes <skill-id> for runtime discovery.」とし、upstream は catalog、dependency
 map、canonical doc、downstream は materializer、command packet、route、alignment checker
 とします。これで owner link は残りますが、個別 skill の policy は二重管理になりません。
 

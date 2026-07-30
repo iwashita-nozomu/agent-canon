@@ -15,8 +15,8 @@ description: "Use when C or C++ code changes need strict review for build eviden
 <!--
 @dependency-start
 contract skill
-responsibility Exposes cpp-review as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/cpp-review.md canonical skill owner
+responsibility Exposes cpp-review for runtime discovery.
+upstream design ../../../agents/skills/cpp-review.md owner
 @dependency-end
 -->
 

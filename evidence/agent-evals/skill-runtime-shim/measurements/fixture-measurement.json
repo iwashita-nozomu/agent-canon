@@ -2,7 +2,7 @@
   "schema": "agent_canon.skill_runtime_shim.measurement",
   "version": 1,
   "run_id": "fixture-measurement",
-  "source_snapshot_digest": "60b8168799555226b11a900a0b99521f463c31dbda0d2eb166e43910a553f4db",
+  "source_snapshot_digest": "9a88f25dcdb13f7a3ffdab13d75bd2cffaa378154a9d9025e341411c12ef49ee",
   "model_id": "gpt-5.4-mini",
   "host_profile": "medium",
   "normalization": "utf8-nfc-lf-final-newline",
@@ -17,8 +17,8 @@
       "config_order": 52,
       "config_path": "../.agents/skills/task-routing/SKILL.md",
       "enabled": true,
-      "prompt_sha256": "0ca52d31f403809956925bad6e2054d50c8433b0ddecb47e97b81df1fe04ad78",
-      "host_envelope_sha256": "c985e6cebfc4348f79a57b9b0a73efd438be6b5f232814a7ec507ec013437dc4",
+      "prompt_sha256": "95c636dd3b8567ab94b0d28700d4460cf77335b5c5184ef3dca28e3d37b24e1b",
+      "host_envelope_sha256": "172dcf49bcccab03ebdd27e15272ee33d2a45b816901b48429a13035991e997d",
       "host_utf8_bytes": 274,
       "host_unicode_scalars": 274
     },
@@ -32,8 +32,8 @@
       "config_order": 52,
       "config_path": "../.agents/skills/task-routing/SKILL.md",
       "enabled": true,
-      "prompt_sha256": "0ca52d31f403809956925bad6e2054d50c8433b0ddecb47e97b81df1fe04ad78",
-      "host_envelope_sha256": "c985e6cebfc4348f79a57b9b0a73efd438be6b5f232814a7ec507ec013437dc4",
+      "prompt_sha256": "95c636dd3b8567ab94b0d28700d4460cf77335b5c5184ef3dca28e3d37b24e1b",
+      "host_envelope_sha256": "172dcf49bcccab03ebdd27e15272ee33d2a45b816901b48429a13035991e997d",
       "host_utf8_bytes": 274,
       "host_unicode_scalars": 274
     },
@@ -47,8 +47,8 @@
       "config_order": 7,
       "config_path": "../.agents/skills/agent-orchestration/SKILL.md",
       "enabled": true,
-      "prompt_sha256": "71c3cbf005a729a50bc2591d7af61a24d82f83ccde9cce333328a7bd3a662167",
-      "host_envelope_sha256": "af5584c154687d48619b0e18e6a75f03428f53a04b6275412f2a1da4607210fd",
+      "prompt_sha256": "545dfae08a21d23699cc2050442c531daaea2e730b97f4573209dba90b6e2232",
+      "host_envelope_sha256": "7ae583f7f401f60375818f2d8dd5a9302fbd4d8fc6742db1166cdf6719f0fd27",
       "host_utf8_bytes": 286,
       "host_unicode_scalars": 286
     },
@@ -62,8 +62,8 @@
       "config_order": 7,
       "config_path": "../.agents/skills/agent-orchestration/SKILL.md",
       "enabled": true,
-      "prompt_sha256": "71c3cbf005a729a50bc2591d7af61a24d82f83ccde9cce333328a7bd3a662167",
-      "host_envelope_sha256": "af5584c154687d48619b0e18e6a75f03428f53a04b6275412f2a1da4607210fd",
+      "prompt_sha256": "545dfae08a21d23699cc2050442c531daaea2e730b97f4573209dba90b6e2232",
+      "host_envelope_sha256": "7ae583f7f401f60375818f2d8dd5a9302fbd4d8fc6742db1166cdf6719f0fd27",
       "host_utf8_bytes": 286,
       "host_unicode_scalars": 286
     },
@@ -77,8 +77,8 @@
       "config_order": 7,
       "config_path": "../.agents/skills/agent-orchestration/SKILL.md",
       "enabled": true,
-      "prompt_sha256": "8cd502af3ff373b3b8b85c1b48a949049ecf3effcfff9d1080923378f5738131",
-      "host_envelope_sha256": "1738b7883b8b10e0a561bb1b4615545ad7cd27245147ff55b728fe72d1ff6c6e",
+      "prompt_sha256": "ca3ae5fe1e5b07e7411bc7d394179f3dfdad1b9988f58e239796eaa293e6ce06",
+      "host_envelope_sha256": "215096342a68dbfa0ef4eb0a94f2295b7fb2e1e93bb3ee4009c3df84932777f5",
       "host_utf8_bytes": 286,
       "host_unicode_scalars": 286
     },
@@ -92,8 +92,8 @@
       "config_order": 7,
       "config_path": "../.agents/skills/agent-orchestration/SKILL.md",
       "enabled": true,
-      "prompt_sha256": "8cd502af3ff373b3b8b85c1b48a949049ecf3effcfff9d1080923378f5738131",
-      "host_envelope_sha256": "1738b7883b8b10e0a561bb1b4615545ad7cd27245147ff55b728fe72d1ff6c6e",
+      "prompt_sha256": "ca3ae5fe1e5b07e7411bc7d394179f3dfdad1b9988f58e239796eaa293e6ce06",
+      "host_envelope_sha256": "215096342a68dbfa0ef4eb0a94f2295b7fb2e1e93bb3ee4009c3df84932777f5",
       "host_utf8_bytes": 286,
       "host_unicode_scalars": 286
     },
@@ -107,8 +107,8 @@
       "config_order": 7,
       "config_path": "../.agents/skills/agent-orchestration/SKILL.md",
       "enabled": true,
-      "prompt_sha256": "a3219348484862b1b604b3a9e528a5c188188bcd679806ddd8c483290d0a7b6a",
-      "host_envelope_sha256": "0de09145fe9a27b2cd7e46679d64027f2228ee13ca45b6034120775d767c3bc1",
+      "prompt_sha256": "a82826d53ee43e0096ea312f9d36f9864ab8b10ed1a84cf51059d20565771365",
+      "host_envelope_sha256": "2366f70118c73a85c651b2ed7e2d105dd7e4cee6a33648b5e8a168b26c946c8f",
       "host_utf8_bytes": 286,
       "host_unicode_scalars": 286
     },
@@ -122,8 +122,8 @@
       "config_order": 7,
       "config_path": "../.agents/skills/agent-orchestration/SKILL.md",
       "enabled": true,
-      "prompt_sha256": "a3219348484862b1b604b3a9e528a5c188188bcd679806ddd8c483290d0a7b6a",
-      "host_envelope_sha256": "0de09145fe9a27b2cd7e46679d64027f2228ee13ca45b6034120775d767c3bc1",
+      "prompt_sha256": "a82826d53ee43e0096ea312f9d36f9864ab8b10ed1a84cf51059d20565771365",
+      "host_envelope_sha256": "2366f70118c73a85c651b2ed7e2d105dd7e4cee6a33648b5e8a168b26c946c8f",
       "host_utf8_bytes": 286,
       "host_unicode_scalars": 286
     },
@@ -137,8 +137,8 @@
       "config_order": 51,
       "config_path": "../.agents/skills/subagent-bootstrap/SKILL.md",
       "enabled": true,
-      "prompt_sha256": "971495b64e1b4deab71fbcb362e5e3cf0974c0166e0d826795abb4d063d77158",
-      "host_envelope_sha256": "8da9bbebec9de19e00b9dce0c7f7935baf5750f5dce9787a361d816027c99064",
+      "prompt_sha256": "3864c2552648a0342fa6e957d528ca210d1fe712538b8cac7996136e30bdcd20",
+      "host_envelope_sha256": "d5edd6bbaa421f806c194bd2c5304cee6390cefc4b53553211bbee898cc1176f",
       "host_utf8_bytes": 286,
       "host_unicode_scalars": 286
     },
@@ -152,8 +152,8 @@
       "config_order": 51,
       "config_path": "../.agents/skills/subagent-bootstrap/SKILL.md",
       "enabled": true,
-      "prompt_sha256": "971495b64e1b4deab71fbcb362e5e3cf0974c0166e0d826795abb4d063d77158",
-      "host_envelope_sha256": "8da9bbebec9de19e00b9dce0c7f7935baf5750f5dce9787a361d816027c99064",
+      "prompt_sha256": "3864c2552648a0342fa6e957d528ca210d1fe712538b8cac7996136e30bdcd20",
+      "host_envelope_sha256": "d5edd6bbaa421f806c194bd2c5304cee6390cefc4b53553211bbee898cc1176f",
       "host_utf8_bytes": 286,
       "host_unicode_scalars": 286
     },
@@ -167,8 +167,8 @@
       "config_order": 49,
       "config_path": "../.agents/skills/structure-planning/SKILL.md",
       "enabled": true,
-      "prompt_sha256": "c22d6b415fe2890439f0e449ae7ae2ab36a212fd1b26d79c06ba7c4daae21087",
-      "host_envelope_sha256": "f851b285567f01026c9b216d37741a400167f8549879c1eae8ce501331ccc028",
+      "prompt_sha256": "2d55c4e202ddfce59f2c5b3f662aa18542ee76e576d092621119fcf00fa4bfaa",
+      "host_envelope_sha256": "9b84a4f97b841b306aa11f2b0b00ffba82efe5a71fe1ba660c229c2e0f3cd408",
       "host_utf8_bytes": 286,
       "host_unicode_scalars": 286
     },
@@ -182,8 +182,8 @@
       "config_order": 49,
       "config_path": "../.agents/skills/structure-planning/SKILL.md",
       "enabled": true,
-      "prompt_sha256": "c22d6b415fe2890439f0e449ae7ae2ab36a212fd1b26d79c06ba7c4daae21087",
-      "host_envelope_sha256": "f851b285567f01026c9b216d37741a400167f8549879c1eae8ce501331ccc028",
+      "prompt_sha256": "2d55c4e202ddfce59f2c5b3f662aa18542ee76e576d092621119fcf00fa4bfaa",
+      "host_envelope_sha256": "9b84a4f97b841b306aa11f2b0b00ffba82efe5a71fe1ba660c229c2e0f3cd408",
       "host_utf8_bytes": 286,
       "host_unicode_scalars": 286
     },
@@ -2007,10 +2007,10 @@
       "host_envelope_id": "host-0001-boundary-and-negative-generated",
       "skill_id": "task-routing",
       "variant": "generated",
-      "content_sha256": "5abb64c5ae4896eb1292d1d67eedfa1f02a62af4fbc5a262ce25b88eaad3032e",
+      "content_sha256": "953ffe5bb92712e0a47d88092ce2d579131d42bb85ef63a88fbaad96ae6d836c",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2159,
-      "unicode_scalars": 2159,
+      "utf8_bytes": 2212,
+      "unicode_scalars": 2212,
       "denominator_status": "valid"
     },
     {
@@ -2031,10 +2031,10 @@
       "host_envelope_id": "host-0003-dependent-skill-ordering-generated",
       "skill_id": "agent-orchestration",
       "variant": "generated",
-      "content_sha256": "3be5c3ddd0212f54f2e9fcc25c1d33d765979ab426af4a0023eca60d816426d1",
+      "content_sha256": "a9c12829d9c822077c4ab60a68e67d60d59dfd1bdffdb31904c79d340ada22e5",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2153,
-      "unicode_scalars": 2153,
+      "utf8_bytes": 2213,
+      "unicode_scalars": 2213,
       "denominator_status": "valid"
     },
     {
@@ -2055,10 +2055,10 @@
       "host_envelope_id": "host-0005-discovery-selection-generated",
       "skill_id": "agent-orchestration",
       "variant": "generated",
-      "content_sha256": "3be5c3ddd0212f54f2e9fcc25c1d33d765979ab426af4a0023eca60d816426d1",
+      "content_sha256": "a9c12829d9c822077c4ab60a68e67d60d59dfd1bdffdb31904c79d340ada22e5",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2153,
-      "unicode_scalars": 2153,
+      "utf8_bytes": 2213,
+      "unicode_scalars": 2213,
       "denominator_status": "valid"
     },
     {
@@ -2079,10 +2079,10 @@
       "host_envelope_id": "host-0007-failure-argparse-normalization-generated",
       "skill_id": "agent-orchestration",
       "variant": "generated",
-      "content_sha256": "3be5c3ddd0212f54f2e9fcc25c1d33d765979ab426af4a0023eca60d816426d1",
+      "content_sha256": "a9c12829d9c822077c4ab60a68e67d60d59dfd1bdffdb31904c79d340ada22e5",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2153,
-      "unicode_scalars": 2153,
+      "utf8_bytes": 2213,
+      "unicode_scalars": 2213,
       "denominator_status": "valid"
     },
     {
@@ -2103,10 +2103,10 @@
       "host_envelope_id": "host-0009-parent-subagent-instruction-generated",
       "skill_id": "subagent-bootstrap",
       "variant": "generated",
-      "content_sha256": "26b661d6535c11e9ab8ab710632054d633b831019c4a592fb3ffb9c4ffc324d2",
+      "content_sha256": "8dd601dde7ff1ba938135effae6a915d1b73b16b708d03eecf5ca8a3f96b2e6c",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2078,
-      "unicode_scalars": 2078,
+      "utf8_bytes": 2137,
+      "unicode_scalars": 2137,
       "denominator_status": "valid"
     },
     {
@@ -2127,10 +2127,10 @@
       "host_envelope_id": "host-0011-toolcall-route-generated",
       "skill_id": "structure-planning",
       "variant": "generated",
-      "content_sha256": "f30d9973b70a03af27523b6b66cad27549433596fb36a9183ae3eb42cb50d1f5",
+      "content_sha256": "276fa15945d8b00158ae700c5eea803da6860c26973262c50a26c0602632c71f",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2175,
-      "unicode_scalars": 2175,
+      "utf8_bytes": 2234,
+      "unicode_scalars": 2234,
       "denominator_status": "valid"
     },
     {
@@ -2151,10 +2151,10 @@
       "host_envelope_id": "deterministic-agent-orchestration-generated",
       "skill_id": "agent-orchestration",
       "variant": "generated",
-      "content_sha256": "3be5c3ddd0212f54f2e9fcc25c1d33d765979ab426af4a0023eca60d816426d1",
+      "content_sha256": "a9c12829d9c822077c4ab60a68e67d60d59dfd1bdffdb31904c79d340ada22e5",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2153,
-      "unicode_scalars": 2153,
+      "utf8_bytes": 2213,
+      "unicode_scalars": 2213,
       "denominator_status": "valid"
     },
     {
@@ -2175,10 +2175,10 @@
       "host_envelope_id": "deterministic-repo-onboarding-generated",
       "skill_id": "repo-onboarding",
       "variant": "generated",
-      "content_sha256": "7f7f5fad662f1a12a2109909da54fd2ca5b930d07b89dc48d1206bdc5747f591",
+      "content_sha256": "5d56cdfd1f113ecc22e181bbd192d84c45113ca899ba861d04fd48d56a361f38",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2066,
-      "unicode_scalars": 2066,
+      "utf8_bytes": 2122,
+      "unicode_scalars": 2122,
       "denominator_status": "valid"
     },
     {
@@ -2199,10 +2199,10 @@
       "host_envelope_id": "deterministic-task-routing-generated",
       "skill_id": "task-routing",
       "variant": "generated",
-      "content_sha256": "5abb64c5ae4896eb1292d1d67eedfa1f02a62af4fbc5a262ce25b88eaad3032e",
+      "content_sha256": "953ffe5bb92712e0a47d88092ce2d579131d42bb85ef63a88fbaad96ae6d836c",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2159,
-      "unicode_scalars": 2159,
+      "utf8_bytes": 2212,
+      "unicode_scalars": 2212,
       "denominator_status": "valid"
     },
     {
@@ -2223,10 +2223,10 @@
       "host_envelope_id": "deterministic-start-repository-generated",
       "skill_id": "start-repository",
       "variant": "generated",
-      "content_sha256": "4e69f9402ce10834a140a7a682e8c7d5520c4faca66b23d9376df8ad077981b5",
+      "content_sha256": "7063b854d3e43643ba3b0535fc190bd44e800033cbf1e83bc709542aec6bdad3",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2093,
-      "unicode_scalars": 2093,
+      "utf8_bytes": 2150,
+      "unicode_scalars": 2150,
       "denominator_status": "valid"
     },
     {
@@ -2247,10 +2247,10 @@
       "host_envelope_id": "deterministic-codex-task-workflow-generated",
       "skill_id": "codex-task-workflow",
       "variant": "generated",
-      "content_sha256": "2ca3d55bbbbabfe5d910fca4dbc790db52a537af1ace19135f9788c916a9413c",
+      "content_sha256": "1ebeaf3302e28d4b68ad5b691a96e7f5bb16237b50f34ed5b5c1b5511a20f027",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2152,
-      "unicode_scalars": 2152,
+      "utf8_bytes": 2212,
+      "unicode_scalars": 2212,
       "denominator_status": "valid"
     },
     {
@@ -2271,10 +2271,10 @@
       "host_envelope_id": "deterministic-owner-bounded-routing-generated",
       "skill_id": "owner-bounded-routing",
       "variant": "generated",
-      "content_sha256": "c917aef391ba663cd40035e993a448de876f42de8355ff971d78d7cbdcaa095c",
+      "content_sha256": "7272f5e375dfbf8ac2e1d3c91189bb9c94d3025e57b85e0bdf1568707e9c2bd1",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2395,
-      "unicode_scalars": 2395,
+      "utf8_bytes": 2457,
+      "unicode_scalars": 2457,
       "denominator_status": "valid"
     },
     {
@@ -2295,10 +2295,10 @@
       "host_envelope_id": "deterministic-subagent-bootstrap-generated",
       "skill_id": "subagent-bootstrap",
       "variant": "generated",
-      "content_sha256": "26b661d6535c11e9ab8ab710632054d633b831019c4a592fb3ffb9c4ffc324d2",
+      "content_sha256": "8dd601dde7ff1ba938135effae6a915d1b73b16b708d03eecf5ca8a3f96b2e6c",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2078,
-      "unicode_scalars": 2078,
+      "utf8_bytes": 2137,
+      "unicode_scalars": 2137,
       "denominator_status": "valid"
     },
     {
@@ -2319,10 +2319,10 @@
       "host_envelope_id": "deterministic-change-review-generated",
       "skill_id": "change-review",
       "variant": "generated",
-      "content_sha256": "0308db53aa2e305be67e9a51334d1ebd5c913e1671b584544a4f2e29482b024a",
+      "content_sha256": "5e8e5e45794cec99a6b45028070e5c1062061ba1a51d05f1a096001e4171cdc4",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2048,
-      "unicode_scalars": 2048,
+      "utf8_bytes": 2102,
+      "unicode_scalars": 2102,
       "denominator_status": "valid"
     },
     {
@@ -2343,10 +2343,10 @@
       "host_envelope_id": "deterministic-python-review-generated",
       "skill_id": "python-review",
       "variant": "generated",
-      "content_sha256": "5ca4705f1123dc5410964e73a0325a15c0828a07280296482d2b6ac0f2bac65a",
+      "content_sha256": "2918ddf8bda8fb23b99bc138cb03519e4787bed8d1bbc02b901d209fc3df1ffc",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 1997,
-      "unicode_scalars": 1943,
+      "utf8_bytes": 2051,
+      "unicode_scalars": 1997,
       "denominator_status": "valid"
     },
     {
@@ -2367,10 +2367,10 @@
       "host_envelope_id": "deterministic-cpp-review-generated",
       "skill_id": "cpp-review",
       "variant": "generated",
-      "content_sha256": "bc99cdb61c97e2be721cef7d8c18a37b51840e5e08d205b6e4cebbef63ed52e1",
+      "content_sha256": "7a98185c59443b6f32104f5a4c8d82014885c9441c5302440f9db064e342398a",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 1966,
-      "unicode_scalars": 1966,
+      "utf8_bytes": 2017,
+      "unicode_scalars": 2017,
       "denominator_status": "valid"
     },
     {
@@ -2391,10 +2391,10 @@
       "host_envelope_id": "deterministic-oop-readability-check-generated",
       "skill_id": "oop-readability-check",
       "variant": "generated",
-      "content_sha256": "c054d8c21a65953c1ce7d964602359ca28c846d2f10a8dd87e52f82c7d411e92",
+      "content_sha256": "de10b6d9eb18770ace8da0b6743c9d220af65f93819b46935b7741aacc1a6885",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2242,
-      "unicode_scalars": 2242,
+      "utf8_bytes": 2304,
+      "unicode_scalars": 2304,
       "denominator_status": "valid"
     },
     {
@@ -2415,10 +2415,10 @@
       "host_envelope_id": "deterministic-oop-type-design-generated",
       "skill_id": "oop-type-design",
       "variant": "generated",
-      "content_sha256": "8478dd702d463eb62c865d34c2059f9af9cf471af93e50ca206de81775d780eb",
+      "content_sha256": "be9d6e6284a169588f1fdfa8d72b5812e19ff528eab44df61a6e918f1855b980",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2056,
-      "unicode_scalars": 2056,
+      "utf8_bytes": 2112,
+      "unicode_scalars": 2112,
       "denominator_status": "valid"
     },
     {
@@ -2439,10 +2439,10 @@
       "host_envelope_id": "deterministic-result-artifact-writeout-generated",
       "skill_id": "result-artifact-writeout",
       "variant": "generated",
-      "content_sha256": "81b90d0b3f6f84d648e2b8737aa8e2c198b1c7f4baf9922048124f393fdf67a5",
+      "content_sha256": "e8a424c0412b1faaf678a9a535f09244b04536eb14fb712fbe1fd70c8fbeb956",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2236,
-      "unicode_scalars": 2236,
+      "utf8_bytes": 2301,
+      "unicode_scalars": 2301,
       "denominator_status": "valid"
     },
     {
@@ -2463,10 +2463,10 @@
       "host_envelope_id": "deterministic-result-visualize-generated",
       "skill_id": "result-visualize",
       "variant": "generated",
-      "content_sha256": "0acf002c81436f4bbef710fbb4fa538593e246a2c540cb01bc8dc5a307e343df",
+      "content_sha256": "4ecfb4755ad3ddbf4cf0acb8239898557472ab99f8456af53c4f2ffb7a7b0672",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2068,
-      "unicode_scalars": 2068,
+      "utf8_bytes": 2125,
+      "unicode_scalars": 2125,
       "denominator_status": "valid"
     },
     {
@@ -2487,10 +2487,10 @@
       "host_envelope_id": "deterministic-tool-finding-report-generated",
       "skill_id": "tool-finding-report",
       "variant": "generated",
-      "content_sha256": "8a11ed837b38e282a8fe8913bd27d1776b518f3e86a4edce951dc75f031a1a2f",
+      "content_sha256": "f7bbd225c997c4d209c4f47e69f322bb6845178d07a3c08f4a6bc689bb8ee732",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2289,
-      "unicode_scalars": 2289,
+      "utf8_bytes": 2349,
+      "unicode_scalars": 2349,
       "denominator_status": "valid"
     },
     {
@@ -2511,10 +2511,10 @@
       "host_envelope_id": "deterministic-issue-finding-report-generated",
       "skill_id": "issue-finding-report",
       "variant": "generated",
-      "content_sha256": "14e9ff6a1e9ea3ddbf16b235fd8893acee1b334939327e19e209f8848e170e43",
+      "content_sha256": "4def31bbbe2f736d79ae645e7f46856c77e518d4c9f93d8d0f2085f1d6ded22e",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2319,
-      "unicode_scalars": 2319,
+      "utf8_bytes": 2380,
+      "unicode_scalars": 2380,
       "denominator_status": "valid"
     },
     {
@@ -2535,10 +2535,10 @@
       "host_envelope_id": "deterministic-agent-log-analysis-generated",
       "skill_id": "agent-log-analysis",
       "variant": "generated",
-      "content_sha256": "08fbcbe51520de45d9b050e76f2ee756f93c1f640dbf92a2c5f2c661ead6c183",
+      "content_sha256": "8fd2ce96e5bf69da10a0245256f436597ec95bd7d66d0788ed4b95c66598c67b",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2307,
-      "unicode_scalars": 2307,
+      "utf8_bytes": 2366,
+      "unicode_scalars": 2366,
       "denominator_status": "valid"
     },
     {
@@ -2559,10 +2559,10 @@
       "host_envelope_id": "deterministic-runtime-log-repair-generated",
       "skill_id": "runtime-log-repair",
       "variant": "generated",
-      "content_sha256": "5d574b29122a95be3f0fe3a3ce9a38f77c54c61160489348372bcc405ef273ad",
+      "content_sha256": "aaf3d7d5b1b8cb415b174683ab6593ba49834395a99e1cf6be8c459007e37638",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2376,
-      "unicode_scalars": 2376,
+      "utf8_bytes": 2435,
+      "unicode_scalars": 2435,
       "denominator_status": "valid"
     },
     {
@@ -2583,10 +2583,10 @@
       "host_envelope_id": "deterministic-agent-eval-accumulation-generated",
       "skill_id": "agent-eval-accumulation",
       "variant": "generated",
-      "content_sha256": "5b3d5847fc0a817557f69789f574d3f937e446c44dce50d5b88e9318cd4fbe83",
+      "content_sha256": "bb6256d5eb6bb181f5e211f45b858bab84d22cfcf774113fe5015f5861f79a0b",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2240,
-      "unicode_scalars": 2240,
+      "utf8_bytes": 2304,
+      "unicode_scalars": 2304,
       "denominator_status": "valid"
     },
     {
@@ -2607,10 +2607,10 @@
       "host_envelope_id": "deterministic-agent-canon-update-generated",
       "skill_id": "agent-canon-update",
       "variant": "generated",
-      "content_sha256": "50843634fad65973fc690e857602cc1ed5dae6190e6c23fd1d648a2be9a5c823",
+      "content_sha256": "7cf5547151a852092c1ef167c7cebacdd5824e2b50e5684b4b1b877713bd538f",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2228,
-      "unicode_scalars": 2228,
+      "utf8_bytes": 2287,
+      "unicode_scalars": 2287,
       "denominator_status": "valid"
     },
     {
@@ -2631,10 +2631,10 @@
       "host_envelope_id": "deterministic-dependency-module-change-generated",
       "skill_id": "dependency-module-change",
       "variant": "generated",
-      "content_sha256": "fbd06e0cb9080caab37f236a4c38f557f0eab923cd80e871afd7e7d0d5ffcdc3",
+      "content_sha256": "629a313e9d8956930561f766027f4f012a2329e1ac17f14354601fe268ad6be2",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2148,
-      "unicode_scalars": 2148,
+      "utf8_bytes": 2213,
+      "unicode_scalars": 2213,
       "denominator_status": "valid"
     },
     {
@@ -2655,10 +2655,10 @@
       "host_envelope_id": "deterministic-pr-processing-generated",
       "skill_id": "pr-processing",
       "variant": "generated",
-      "content_sha256": "e957bd586f884d784f4c2590a672b325e27a9aa43e828c2995abc175a7a06299",
+      "content_sha256": "9683c2ad137576a94647e11bbae25fb247a5aec3dcaee8528a7cc08fbf9c7ef0",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2175,
-      "unicode_scalars": 2175,
+      "utf8_bytes": 2229,
+      "unicode_scalars": 2229,
       "denominator_status": "valid"
     },
     {
@@ -2679,10 +2679,10 @@
       "host_envelope_id": "deterministic-agent-update-branch-generated",
       "skill_id": "agent-update-branch",
       "variant": "generated",
-      "content_sha256": "03ab0f9029ff97bbb77c9837b23035bd3d92ed2d481b176e12b184d1cca0a86d",
+      "content_sha256": "bc197b482494d755a1945e26fc0b14c888652c6b698b7fdd39a3e0136f9e8ca9",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2155,
-      "unicode_scalars": 2155,
+      "utf8_bytes": 2215,
+      "unicode_scalars": 2215,
       "denominator_status": "valid"
     },
     {
@@ -2703,10 +2703,10 @@
       "host_envelope_id": "deterministic-report-writing-generated",
       "skill_id": "report-writing",
       "variant": "generated",
-      "content_sha256": "1d040154651eb40f1dc5ab852adbf994d61222a6f570c4b2c21d4ac3e228ac52",
+      "content_sha256": "55790c130ea4b6cb2becbadb006dcee017033cbf71ad12cb4b19cf07567f542c",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2238,
-      "unicode_scalars": 2238,
+      "utf8_bytes": 2293,
+      "unicode_scalars": 2293,
       "denominator_status": "valid"
     },
     {
@@ -2727,10 +2727,10 @@
       "host_envelope_id": "deterministic-prose-reasoning-graph-generated",
       "skill_id": "prose-reasoning-graph",
       "variant": "generated",
-      "content_sha256": "f2e28a0f83c88f55e143bbee5136da253cef2cb40c62ccd817a1841107f35196",
+      "content_sha256": "7d1924d91bab15199da684d8ece7f9e9fd43a7911cc7780d9acca447d0ebea8c",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2258,
-      "unicode_scalars": 2258,
+      "utf8_bytes": 2320,
+      "unicode_scalars": 2320,
       "denominator_status": "valid"
     },
     {
@@ -2751,10 +2751,10 @@
       "host_envelope_id": "deterministic-structure-planning-generated",
       "skill_id": "structure-planning",
       "variant": "generated",
-      "content_sha256": "f30d9973b70a03af27523b6b66cad27549433596fb36a9183ae3eb42cb50d1f5",
+      "content_sha256": "276fa15945d8b00158ae700c5eea803da6860c26973262c50a26c0602632c71f",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2175,
-      "unicode_scalars": 2175,
+      "utf8_bytes": 2234,
+      "unicode_scalars": 2234,
       "denominator_status": "valid"
     },
     {
@@ -2775,10 +2775,10 @@
       "host_envelope_id": "deterministic-code-visualization-generated",
       "skill_id": "code-visualization",
       "variant": "generated",
-      "content_sha256": "d4804e595babaf9566dc9d2be36f2e76aebf0dd233f58379ab642ec5576533b7",
+      "content_sha256": "cac8c54f30506f279283a02aaafa0b77e8b7ceb61b955cba7b771ccd8e0c86ff",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2234,
-      "unicode_scalars": 2234,
+      "utf8_bytes": 2293,
+      "unicode_scalars": 2293,
       "denominator_status": "valid"
     },
     {
@@ -2799,10 +2799,10 @@
       "host_envelope_id": "deterministic-html-output-generated",
       "skill_id": "html-output",
       "variant": "generated",
-      "content_sha256": "a3ec7c14bf747455578c6695e2692ce9d801f5bf5a1b16bac5a9187a3468f273",
+      "content_sha256": "95bbf43c4bf43eadaa604068d731ea36be747fe189e527d7b4f5d3b4f2e39e59",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2062,
-      "unicode_scalars": 2062,
+      "utf8_bytes": 2114,
+      "unicode_scalars": 2114,
       "denominator_status": "valid"
     },
     {
@@ -2823,10 +2823,10 @@
       "host_envelope_id": "deterministic-html-experiment-report-generated",
       "skill_id": "html-experiment-report",
       "variant": "generated",
-      "content_sha256": "a7f57334d8c2ee43a9b26643af015187c1e0e389873c326c4c0ca1dad2f0d16b",
+      "content_sha256": "cfba1300c73e3ee9f63aa6c65599788158c5cc3b75d6ab79c83668cbf2b2b024",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2217,
-      "unicode_scalars": 2217,
+      "utf8_bytes": 2280,
+      "unicode_scalars": 2280,
       "denominator_status": "valid"
     },
     {
@@ -2847,10 +2847,10 @@
       "host_envelope_id": "deterministic-test-design-generated",
       "skill_id": "test-design",
       "variant": "generated",
-      "content_sha256": "c03225e6669ea525a7f3e711bb4e7526b312095962953d36d798c9fccb92ea21",
+      "content_sha256": "304d806286a79de993e9f336c4cffabf76dee8d6003ad3ffb0c6517dc55fc270",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2057,
-      "unicode_scalars": 2057,
+      "utf8_bytes": 2109,
+      "unicode_scalars": 2109,
       "denominator_status": "valid"
     },
     {
@@ -2871,10 +2871,10 @@
       "host_envelope_id": "deterministic-refactor-loop-generated",
       "skill_id": "refactor-loop",
       "variant": "generated",
-      "content_sha256": "9accf53096ead5d1d4c31e4ea1f9532128905ca306b328b2c8d325a809a66328",
+      "content_sha256": "0747f625ede60c6aff8272f436de47b4a6730232daa97b6d15910e0ce298b6c3",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2051,
-      "unicode_scalars": 2051,
+      "utf8_bytes": 2105,
+      "unicode_scalars": 2105,
       "denominator_status": "valid"
     },
     {
@@ -2895,10 +2895,10 @@
       "host_envelope_id": "deterministic-structure-refactor-generated",
       "skill_id": "structure-refactor",
       "variant": "generated",
-      "content_sha256": "e8ede780dfcc195c97b2fbda3e9d2648c94c76d95ecd1a61fab048501af85699",
+      "content_sha256": "ab517526e61b71890a951ee1c14d4269dcdd91adf25ff408d60a39940f83b717",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2443,
-      "unicode_scalars": 2443,
+      "utf8_bytes": 2502,
+      "unicode_scalars": 2502,
       "denominator_status": "valid"
     },
     {
@@ -2919,10 +2919,10 @@
       "host_envelope_id": "deterministic-user-guided-debugging-generated",
       "skill_id": "user-guided-debugging",
       "variant": "generated",
-      "content_sha256": "7e7c364f73741d95555501df549b1cb67f5b021c54dc730741e6e4ead4e18d77",
+      "content_sha256": "b1f5b400456a8b586a7eedc45a544a48bba08202ce87540f1c1ecf64b4b01dc9",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2174,
-      "unicode_scalars": 2174,
+      "utf8_bytes": 2236,
+      "unicode_scalars": 2236,
       "denominator_status": "valid"
     },
     {
@@ -2943,10 +2943,10 @@
       "host_envelope_id": "deterministic-long-form-writing-generated",
       "skill_id": "long-form-writing",
       "variant": "generated",
-      "content_sha256": "825659869aec3e67103dca9177f6119921ac88dd67bb0168694cca9a3eb00e55",
+      "content_sha256": "7dee7b02ed1827ef55d86ad6788c216f7c72b5607dfc96e127a8bb4a0189058f",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2164,
-      "unicode_scalars": 2164,
+      "utf8_bytes": 2222,
+      "unicode_scalars": 2222,
       "denominator_status": "valid"
     },
     {
@@ -2967,10 +2967,10 @@
       "host_envelope_id": "deterministic-academic-writing-generated",
       "skill_id": "academic-writing",
       "variant": "generated",
-      "content_sha256": "acb4755bceec772a019d84a7d7d854d0be4a8abc50ec1e03c082b628aa1ba494",
+      "content_sha256": "286bb40f7f1e2ce363d6310528fa3f0f78e62dfaf484bb8b30390228aaba1c87",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2084,
-      "unicode_scalars": 2084,
+      "utf8_bytes": 2141,
+      "unicode_scalars": 2141,
       "denominator_status": "valid"
     },
     {
@@ -2991,10 +2991,10 @@
       "host_envelope_id": "deterministic-paper-writing-generated",
       "skill_id": "paper-writing",
       "variant": "generated",
-      "content_sha256": "8532d79e99cff2915585d94a5ddd736bc69bd7d5bdb3379d8f9e1486a5e69ba0",
+      "content_sha256": "f2bc423a08b657ca24faeaf2d4dcf54edc19ae95f2d6c4ebcab2ae44864c22d0",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2063,
-      "unicode_scalars": 2063,
+      "utf8_bytes": 2117,
+      "unicode_scalars": 2117,
       "denominator_status": "valid"
     },
     {
@@ -3015,10 +3015,10 @@
       "host_envelope_id": "deterministic-md-style-check-generated",
       "skill_id": "md-style-check",
       "variant": "generated",
-      "content_sha256": "89f7f8fa3b0a9ae33c06386bd796fb3e626026457347366f5d4c6725cc1a6871",
+      "content_sha256": "ee08bcff1d1ad05ac6b30552a3b689e07ec6f879149af2681ad9568decaa2ca9",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2062,
-      "unicode_scalars": 2062,
+      "utf8_bytes": 2117,
+      "unicode_scalars": 2117,
       "denominator_status": "valid"
     },
     {
@@ -3039,10 +3039,10 @@
       "host_envelope_id": "deterministic-mvp-skeleton-generated",
       "skill_id": "mvp-skeleton",
       "variant": "generated",
-      "content_sha256": "572820306280e733face85bee622f0af300071fd5ca8214f790c42f91c5178dc",
+      "content_sha256": "ff7556975cf6a6db6723156bdc2d181d5f17c79750181ab7bdeadf4e52f38243",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2278,
-      "unicode_scalars": 2254,
+      "utf8_bytes": 2331,
+      "unicode_scalars": 2307,
       "denominator_status": "valid"
     },
     {
@@ -3063,10 +3063,10 @@
       "host_envelope_id": "deterministic-document-canon-cleanup-generated",
       "skill_id": "document-canon-cleanup",
       "variant": "generated",
-      "content_sha256": "beff21438591a3002c982f0dceb77f40976e72093cc07b3a350a0463294f31ea",
+      "content_sha256": "895061cde9b7a232861af18457ebd538f1a83f5cb352bbbeb10a5c09b40b912e",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2200,
-      "unicode_scalars": 2200,
+      "utf8_bytes": 2263,
+      "unicode_scalars": 2263,
       "denominator_status": "valid"
     },
     {
@@ -3087,10 +3087,10 @@
       "host_envelope_id": "deterministic-dependency-analysis-generated",
       "skill_id": "dependency-analysis",
       "variant": "generated",
-      "content_sha256": "6ba385d32b488de825445732259d5a12f413bb7287dd1ad993eb8e03315d208a",
+      "content_sha256": "48bbbfb94b7f88b35a20c7613feb8815c0de370ea20150b11f985a0234332cf8",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2210,
-      "unicode_scalars": 2210,
+      "utf8_bytes": 2270,
+      "unicode_scalars": 2270,
       "denominator_status": "valid"
     },
     {
@@ -3111,10 +3111,10 @@
       "host_envelope_id": "deterministic-worktree-start-generated",
       "skill_id": "worktree-start",
       "variant": "generated",
-      "content_sha256": "0ee53900a4c6da9a99d474ee2395adeee0fbc7bc6ed11a958f86beb64119687b",
+      "content_sha256": "b71440c94bea9e6eb9686593ba6e20b1cff58c923bb0b69fea997b9dc994c8fe",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2065,
-      "unicode_scalars": 2065,
+      "utf8_bytes": 2120,
+      "unicode_scalars": 2120,
       "denominator_status": "valid"
     },
     {
@@ -3123,10 +3123,10 @@
       "host_envelope_id": "deterministic-worktree-health-current",
       "skill_id": "worktree-health",
       "variant": "current",
-      "content_sha256": "7f1db7815179c00b398bb1e4b42309321d2a99222c8ed304f965d7f12e67c34b",
+      "content_sha256": "07849621245b33a95270de1d91aa5e7ec6dc3aa9137d6c6a76e43f79a3f261f2",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2584,
-      "unicode_scalars": 2392,
+      "utf8_bytes": 2592,
+      "unicode_scalars": 2400,
       "denominator_status": "valid"
     },
     {
@@ -3135,10 +3135,10 @@
       "host_envelope_id": "deterministic-worktree-health-generated",
       "skill_id": "worktree-health",
       "variant": "generated",
-      "content_sha256": "94bd4048e4b4d6795d4510775f540fab677dfd482b5eb115d1ede096b5af36d0",
+      "content_sha256": "5543fe788753285fe4d5d3c183a547b195aa087bb3c34e17521828805d1fbc34",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2038,
-      "unicode_scalars": 2038,
+      "utf8_bytes": 2094,
+      "unicode_scalars": 2094,
       "denominator_status": "valid"
     },
     {
@@ -3159,10 +3159,10 @@
       "host_envelope_id": "deterministic-experiment-lifecycle-generated",
       "skill_id": "experiment-lifecycle",
       "variant": "generated",
-      "content_sha256": "b14893aa31657cb21987e8d93448ff56eeeb3a86d6a65a5a6a1a992d38d17952",
+      "content_sha256": "2c6f02828da08efd4fd360118a6a909fef1aaaa73461cb4979533f5a74c0bd87",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2047,
-      "unicode_scalars": 2047,
+      "utf8_bytes": 2108,
+      "unicode_scalars": 2108,
       "denominator_status": "valid"
     },
     {
@@ -3183,10 +3183,10 @@
       "host_envelope_id": "deterministic-save-experiment-results-generated",
       "skill_id": "save-experiment-results",
       "variant": "generated",
-      "content_sha256": "85b4be9524c2d952c73fd7b3b5a2be525ccf718030db13e4890e63ff2be97258",
+      "content_sha256": "909135bc4642f0ea14c20b78c0d7900c2614f88508ed246a35afecd4b7c075bf",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2360,
-      "unicode_scalars": 2360,
+      "utf8_bytes": 2424,
+      "unicode_scalars": 2424,
       "denominator_status": "valid"
     },
     {
@@ -3207,10 +3207,10 @@
       "host_envelope_id": "deterministic-experiment-review-generated",
       "skill_id": "experiment-review",
       "variant": "generated",
-      "content_sha256": "0647455d17bc27cfccbdb883cfc84a6611d889bda860c54f661358878204758b",
+      "content_sha256": "bd44ef1dc3bb1b52b7d6a0fac6672fdf895023203dae746b39b476aa88f60bb4",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2103,
-      "unicode_scalars": 2103,
+      "utf8_bytes": 2161,
+      "unicode_scalars": 2161,
       "denominator_status": "valid"
     },
     {
@@ -3231,10 +3231,10 @@
       "host_envelope_id": "deterministic-gpu-execution-generated",
       "skill_id": "gpu-execution",
       "variant": "generated",
-      "content_sha256": "0bb6477272e4389f9295379c45042a4a629b95731c8068c7d22124963cbca013",
+      "content_sha256": "0b3d4a4aa15c1efa3d5a38a966c950d0912fa35d7e92807c385da0eee943da1f",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2135,
-      "unicode_scalars": 2135,
+      "utf8_bytes": 2189,
+      "unicode_scalars": 2189,
       "denominator_status": "valid"
     },
     {
@@ -3255,10 +3255,10 @@
       "host_envelope_id": "deterministic-computational-optimization-generated",
       "skill_id": "computational-optimization",
       "variant": "generated",
-      "content_sha256": "b55128c54ce8562f9d2a6355668bd12177be2ecdbd926375ccd046533e4bd75a",
+      "content_sha256": "e151599cb5f7f85e190bd80aa0925efd9d3d5b541072746e523db5da5f7e3bf9",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2356,
-      "unicode_scalars": 2356,
+      "utf8_bytes": 2423,
+      "unicode_scalars": 2423,
       "denominator_status": "valid"
     },
     {
@@ -3279,10 +3279,10 @@
       "host_envelope_id": "deterministic-adaptive-improvement-loop-generated",
       "skill_id": "adaptive-improvement-loop",
       "variant": "generated",
-      "content_sha256": "2e92d00092a529b965b8af703712a92ee49f9400f4bef2346e0f6ab20aa647d8",
+      "content_sha256": "98c197a9e411809e9bff21174d3830d9618e0afb0a4771fe867d6d7ff6a46c6f",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2173,
-      "unicode_scalars": 2173,
+      "utf8_bytes": 2239,
+      "unicode_scalars": 2239,
       "denominator_status": "valid"
     },
     {
@@ -3303,10 +3303,10 @@
       "host_envelope_id": "deterministic-literature-survey-generated",
       "skill_id": "literature-survey",
       "variant": "generated",
-      "content_sha256": "f2185b97253d5a652e4aa5ff03e8fe809308608f1d3876f8d4243979e7169bac",
+      "content_sha256": "cbae19cb95ffa8a6d354bb3db2382569436f62ef7460b4423443ea35f7434e3a",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2051,
-      "unicode_scalars": 2051,
+      "utf8_bytes": 2109,
+      "unicode_scalars": 2109,
       "denominator_status": "valid"
     },
     {
@@ -3327,10 +3327,10 @@
       "host_envelope_id": "deterministic-formal-proof-workflow-generated",
       "skill_id": "formal-proof-workflow",
       "variant": "generated",
-      "content_sha256": "fbecf9df132f6a22875df8236f1d6f68b3c946ea9961737f3b2c23172b2b092c",
+      "content_sha256": "bee4c67443716938f3d542b692b4e83b82f95e633b414402ece60d90b447baf3",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2243,
-      "unicode_scalars": 2243,
+      "utf8_bytes": 2305,
+      "unicode_scalars": 2305,
       "denominator_status": "valid"
     },
     {
@@ -3351,10 +3351,10 @@
       "host_envelope_id": "deterministic-lean-algorithm-design-generated",
       "skill_id": "lean-algorithm-design",
       "variant": "generated",
-      "content_sha256": "c5023d802800792dc5c84bed7b3465e7bc865346bfedf35c5af9bc17d6f5f0d5",
+      "content_sha256": "503afe2d16a057f182bf43d5a3d943be4d141c9d1d92951b9f72920e1766bdd3",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2355,
-      "unicode_scalars": 2355,
+      "utf8_bytes": 2417,
+      "unicode_scalars": 2417,
       "denominator_status": "valid"
     },
     {
@@ -3375,10 +3375,10 @@
       "host_envelope_id": "deterministic-algorithm-proof-exploration-generated",
       "skill_id": "algorithm-proof-exploration",
       "variant": "generated",
-      "content_sha256": "9549f085d84745a5d63a14ff180239b4db2c23ee47bccc57e112faf35ac47151",
+      "content_sha256": "5f50055d876293baebd9e95efb1fc9ac0d2bf14a530093442ed384fd74a82427",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2333,
-      "unicode_scalars": 2333,
+      "utf8_bytes": 2401,
+      "unicode_scalars": 2401,
       "denominator_status": "valid"
     },
     {
@@ -3399,10 +3399,10 @@
       "host_envelope_id": "deterministic-algorithm-flowchart-generated",
       "skill_id": "algorithm-flowchart",
       "variant": "generated",
-      "content_sha256": "00cf5be2e8a0dd126d4eacd61a229acccf48321b49c363f417dae6e06b5eaa12",
+      "content_sha256": "f05fbbb18ce664fa7ba008986779ca53d7cac7ddf50d44c23fdc755b71670514",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2162,
-      "unicode_scalars": 2162,
+      "utf8_bytes": 2222,
+      "unicode_scalars": 2222,
       "denominator_status": "valid"
     },
     {
@@ -3423,10 +3423,10 @@
       "host_envelope_id": "deterministic-research-workflow-generated",
       "skill_id": "research-workflow",
       "variant": "generated",
-      "content_sha256": "423c2c2e73a6e47acd59d93b507e9e5f2802720e808da0a6ac3aa8a9bf7791d4",
+      "content_sha256": "29939d5d42c73a37651ce5fe54221c75672a7f18e0dc5a56f991fb4dda294637",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2091,
-      "unicode_scalars": 2091,
+      "utf8_bytes": 2149,
+      "unicode_scalars": 2149,
       "denominator_status": "valid"
     },
     {
@@ -3447,10 +3447,10 @@
       "host_envelope_id": "deterministic-comprehensive-development-generated",
       "skill_id": "comprehensive-development",
       "variant": "generated",
-      "content_sha256": "331caaddc0a93a113f57b86391f0a42509b73ebc7c0f2636ff03dfdb4e587e69",
+      "content_sha256": "4c645665b8c8e6ca2566b636c4e2d591cc085450f2eb04ddecabf10dc801fd24",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2170,
-      "unicode_scalars": 2170,
+      "utf8_bytes": 2236,
+      "unicode_scalars": 2236,
       "denominator_status": "valid"
     },
     {
@@ -3471,10 +3471,10 @@
       "host_envelope_id": "deterministic-dependency-design-generated",
       "skill_id": "dependency-design",
       "variant": "generated",
-      "content_sha256": "300baafd7238bbb6681ebd252e12bee0d5982ed54affc5bd77e93c88d6025f27",
+      "content_sha256": "72ae41047cf0a5a791f846d1f0cccf1a8faf9606e5acd95973888d4f405fa5e9",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2124,
-      "unicode_scalars": 2124,
+      "utf8_bytes": 2182,
+      "unicode_scalars": 2182,
       "denominator_status": "valid"
     },
     {
@@ -3495,10 +3495,10 @@
       "host_envelope_id": "deterministic-environment-maintenance-generated",
       "skill_id": "environment-maintenance",
       "variant": "generated",
-      "content_sha256": "b7913ece0d1002e620da8d69352357bb7cbf48ae0a98d41ab8f063618bf52d6b",
+      "content_sha256": "77456623ea4af5b5d1fe892d6d42d3c48fda36a175cf963eb0ecf01446f20935",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2147,
-      "unicode_scalars": 2147,
+      "utf8_bytes": 2211,
+      "unicode_scalars": 2211,
       "denominator_status": "valid"
     },
     {
@@ -3519,10 +3519,10 @@
       "host_envelope_id": "deterministic-user-preference-sync-generated",
       "skill_id": "user-preference-sync",
       "variant": "generated",
-      "content_sha256": "89b08332761ca86ae30ab61ffcdc18a58914cd5ba18abfcf9a3b7314c870a9f6",
+      "content_sha256": "f3c8901f52babd62210b35f81c1be0f66195dead216142d008589459b5ec2ee9",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2117,
-      "unicode_scalars": 2117,
+      "utf8_bytes": 2178,
+      "unicode_scalars": 2178,
       "denominator_status": "valid"
     },
     {
@@ -3543,10 +3543,10 @@
       "host_envelope_id": "deterministic-agent-learning-generated",
       "skill_id": "agent-learning",
       "variant": "generated",
-      "content_sha256": "4da9937dc03cbfe897d5063de34c914f9ccdb3d72c2fe836333a5089ddbaaea6",
+      "content_sha256": "831241f0c5978425d0d04f70e0233087ff7a509dbcc96fb7d738513fca0af272",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2118,
-      "unicode_scalars": 2118,
+      "utf8_bytes": 2173,
+      "unicode_scalars": 2173,
       "denominator_status": "valid"
     },
     {
@@ -3567,10 +3567,10 @@
       "host_envelope_id": "deterministic-wiki-publication-generated",
       "skill_id": "wiki-publication",
       "variant": "generated",
-      "content_sha256": "cbefb875b57ae5298fb1e8125e33335bf1e1e0a40dea20f16e89d7b6ff8ac41d",
+      "content_sha256": "e3ec80e8543bb35d275233814181eb4a11e7f42017aec57e07969b6bd1b3c9c4",
       "measured_input": "host_envelope_plus_candidate",
-      "utf8_bytes": 2058,
-      "unicode_scalars": 2058,
+      "utf8_bytes": 2115,
+      "unicode_scalars": 2115,
       "denominator_status": "valid"
     }
   ],
@@ -3796,10 +3796,10 @@
     "scenario_row_count": 12,
     "valid_denominator_row_count": 132,
     "not_applicable_row_count": 0,
-    "current_utf8_bytes_total": 493968,
-    "generated_utf8_bytes_total": 143033,
-    "current_unicode_scalars_total": 479350,
-    "generated_unicode_scalars_total": 142955,
+    "current_utf8_bytes_total": 493976,
+    "generated_utf8_bytes_total": 146918,
+    "current_unicode_scalars_total": 479358,
+    "generated_unicode_scalars_total": 146840,
     "observed_host_input_tokens_total": 7089,
     "deterministic_reduction_status": "pass"
   }

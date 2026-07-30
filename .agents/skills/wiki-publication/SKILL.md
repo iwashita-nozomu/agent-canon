@@ -15,8 +15,8 @@ description: "Use this when publishing AgentCanon wiki pages to a dedicated wiki
 <!--
 @dependency-start
 contract skill
-responsibility Exposes wiki-publication as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/wiki-publication.md canonical skill owner
+responsibility Exposes wiki-publication for runtime discovery.
+upstream design ../../../agents/skills/wiki-publication.md owner
 @dependency-end
 -->
 

@@ -15,8 +15,8 @@ description: "Use when AgentCanon runtime dashboard evidence should be turned in
 <!--
 @dependency-start
 contract skill
-responsibility Exposes runtime-log-repair as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/runtime-log-repair.md canonical skill owner
+responsibility Exposes runtime-log-repair for runtime discovery.
+upstream design ../../../agents/skills/runtime-log-repair.md owner
 @dependency-end
 -->
 

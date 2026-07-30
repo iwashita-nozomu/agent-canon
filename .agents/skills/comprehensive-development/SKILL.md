@@ -15,8 +15,8 @@ description: "Use when a repo-wide task spans code, docs, tools, workflows, and 
 <!--
 @dependency-start
 contract skill
-responsibility Exposes comprehensive-development as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/comprehensive-development.md canonical skill owner
+responsibility Exposes comprehensive-development for runtime discovery.
+upstream design ../../../agents/skills/comprehensive-development.md owner
 @dependency-end
 -->
 

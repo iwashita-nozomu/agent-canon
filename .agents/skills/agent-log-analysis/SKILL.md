@@ -15,8 +15,8 @@ description: "Use when analyzing accumulated AgentCanon skill/tool/workflow/hook
 <!--
 @dependency-start
 contract skill
-responsibility Exposes agent-log-analysis as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/agent-log-analysis.md canonical skill owner
+responsibility Exposes agent-log-analysis for runtime discovery.
+upstream design ../../../agents/skills/agent-log-analysis.md owner
 @dependency-end
 -->
 

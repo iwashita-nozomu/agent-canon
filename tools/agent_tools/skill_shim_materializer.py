@@ -676,8 +676,8 @@ def render_shim(record: Mapping[str, object]) -> str:
         "<!--",
         "@dependency-start",
         "contract skill",
-        f"responsibility Exposes {skill} as a Codex runtime discovery adapter.",
-        f"upstream design ../../../{canonical_doc} canonical skill owner",
+        f"responsibility Exposes {skill} for runtime discovery.",
+        f"upstream design ../../../{canonical_doc} owner",
         "@dependency-end",
         "-->",
         "",
@@ -709,12 +709,23 @@ def _runtime_path(context: BuildContext, skill: str) -> Path:
 def _previous_dependency_manifest_shim(
     context: BuildContext, skill: str, expected: str
 ) -> str:
-    """Render the exact previous dependency block for one-step generated migration."""
+    """Render the immediate previous dependency manifest for one-step migration."""
     canonical_doc = _string(
         context.catalog_entries[skill].get("canonical_doc"),
         f"{skill}.canonical_doc",
     )
     current_block = "\n".join(
+        (
+            "<!--",
+            "@dependency-start",
+            "contract skill",
+            f"responsibility Exposes {skill} for runtime discovery.",
+            f"upstream design ../../../{canonical_doc} owner",
+            "@dependency-end",
+            "-->",
+        )
+    )
+    previous_block = "\n".join(
         (
             "<!--",
             "@dependency-start",
@@ -725,7 +736,31 @@ def _previous_dependency_manifest_shim(
             "-->",
         )
     )
-    previous_block = "\n".join(
+    if expected.count(current_block) != 1:
+        raise MaterializerError("dependency_manifest_template_mismatch", skill)
+    return expected.replace(current_block, previous_block, 1)
+
+
+def _previous_contract_reference_shim(
+    context: BuildContext, skill: str, expected: str
+) -> str | None:
+    """Render an older `contract reference` migration target if still supported."""
+    canonical_doc = _string(
+        context.catalog_entries[skill].get("canonical_doc"),
+        f"{skill}.canonical_doc",
+    )
+    current_block = "\n".join(
+        (
+            "<!--",
+            "@dependency-start",
+            "contract skill",
+            f"responsibility Exposes {skill} for runtime discovery.",
+            f"upstream design ../../../{canonical_doc} owner",
+            "@dependency-end",
+            "-->",
+        )
+    )
+    contract_reference_block = "\n".join(
         (
             "<!--",
             "@dependency-start",
@@ -736,8 +771,8 @@ def _previous_dependency_manifest_shim(
         )
     )
     if expected.count(current_block) != 1:
-        raise MaterializerError("dependency_manifest_template_mismatch", skill)
-    return expected.replace(current_block, previous_block, 1)
+        return None
+    return expected.replace(current_block, contract_reference_block, 1)
 
 
 def classify_legacy(context: BuildContext, skill: str, expected: str) -> dict[str, object]:
@@ -773,6 +808,14 @@ def classify_legacy(context: BuildContext, skill: str, expected: str) -> dict[st
             "unmatched_blocks": [],
         }
     if body == _previous_dependency_manifest_shim(context, skill, expected):
+        return {
+            "skill_id": skill,
+            "classification": "generated_previous_dependency_manifest",
+            "resolution": "migrated",
+            "unmatched_blocks": [],
+        }
+    previous_reference = _previous_contract_reference_shim(context, skill, expected)
+    if previous_reference is not None and body == previous_reference:
         return {
             "skill_id": skill,
             "classification": "generated_previous_dependency_manifest",

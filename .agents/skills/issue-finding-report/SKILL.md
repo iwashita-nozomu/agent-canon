@@ -15,8 +15,8 @@ description: "Use when converting accumulated prompt history, run bundles, hook 
 <!--
 @dependency-start
 contract skill
-responsibility Exposes issue-finding-report as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/issue-finding-report.md canonical skill owner
+responsibility Exposes issue-finding-report for runtime discovery.
+upstream design ../../../agents/skills/issue-finding-report.md owner
 @dependency-end
 -->
 

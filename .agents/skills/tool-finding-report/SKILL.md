@@ -15,8 +15,8 @@ description: "Use when running tools, checkers, hooks, static analysis, or struc
 <!--
 @dependency-start
 contract skill
-responsibility Exposes tool-finding-report as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/tool-finding-report.md canonical skill owner
+responsibility Exposes tool-finding-report for runtime discovery.
+upstream design ../../../agents/skills/tool-finding-report.md owner
 @dependency-end
 -->
 

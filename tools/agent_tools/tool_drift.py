@@ -7,7 +7,6 @@
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
 # upstream design ../../agents/TASK_WORKFLOWS.md workflow routing contract
 # upstream design ../../agents/skills/agent-orchestration.md orchestration routing contract
-# upstream design ../../.agents/skills/agent-orchestration/SKILL.md runtime orchestration skill prompt
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt routing eval contract
 # upstream design ../../documents/conventions/REVIEW_PROCESS.md closeout validation policy
 # upstream design ../../tools/catalog.yaml structured tool catalog
@@ -184,9 +183,7 @@ CONTRACTS = (
         links=(
             LinkCheck("agents/COMMUNICATION_PROTOCOL.md"),
             LinkCheck("agents/skills/codex-task-workflow.md"),
-            LinkCheck(".agents/skills/codex-task-workflow/SKILL.md"),
             LinkCheck("agents/skills/owner-bounded-routing.md"),
-            LinkCheck(".agents/skills/owner-bounded-routing/SKILL.md"),
             LinkCheck("tools/agent_tools/responsibility_scope.py"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
@@ -199,12 +196,12 @@ CONTRACTS = (
                 "missing-responsibility-scope-preflight-protocol",
             ),
             TextCheck(
-                ".agents/skills/codex-task-workflow/SKILL.md",
+                "agents/skills/codex-task-workflow.md",
                 "responsibility_scope",
                 "missing-runtime-workflow-responsibility-preflight",
             ),
             TextCheck(
-                ".agents/skills/owner-bounded-routing/SKILL.md",
+                "agents/skills/owner-bounded-routing.md",
                 "responsibility_scope",
                 "missing-runtime-small-change-responsibility-preflight",
             ),
@@ -329,7 +326,6 @@ CONTRACTS = (
             LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
             LinkCheck("agents/TASK_WORKFLOWS.md"),
             LinkCheck("agents/skills/agent-orchestration.md"),
-            LinkCheck(".agents/skills/agent-orchestration/SKILL.md"),
             LinkCheck("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
             LinkCheck("templates/agents/closeout_gate.md"),
             LinkCheck("tools/ci/run_all_checks.sh"),
@@ -343,7 +339,6 @@ CONTRACTS = (
             LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
             LinkCheck("agents/TASK_WORKFLOWS.md"),
             LinkCheck("agents/skills/agent-orchestration.md"),
-            LinkCheck(".agents/skills/agent-orchestration/SKILL.md"),
             LinkCheck("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
             LinkCheck("tools/agent_tools/check_convention_compliance.py"),
             LinkCheck("tests/agent_tools/test_tool_drift.py"),
@@ -368,16 +363,6 @@ CONTRACTS = (
                 "agents/skills/agent-orchestration.md",
                 "write-capable handoff",
                 "missing-orchestration-write-capable-handoff-policy",
-            ),
-            TextCheck(
-                ".agents/skills/agent-orchestration/SKILL.md",
-                "agents/skills/agent-orchestration.md",
-                "missing-runtime-orchestration-owner-pointer",
-            ),
-            TextCheck(
-                ".agents/skills/agent-orchestration/SKILL.md",
-                "machine-readable ToolCall tokens",
-                "missing-runtime-orchestration-toolcall-consumer",
             ),
             TextCheck(
                 "evidence/agent-evals/skill_workflow_prompt_eval.toml",

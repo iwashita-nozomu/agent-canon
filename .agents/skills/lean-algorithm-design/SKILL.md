@@ -15,8 +15,8 @@ description: "Use when an algorithm should be designed and checked in Lean befor
 <!--
 @dependency-start
 contract skill
-responsibility Exposes lean-algorithm-design as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/lean-algorithm-design.md canonical skill owner
+responsibility Exposes lean-algorithm-design for runtime discovery.
+upstream design ../../../agents/skills/lean-algorithm-design.md owner
 @dependency-end
 -->
 

@@ -15,8 +15,8 @@ description: "Use when a task needs external research, comparison design, iterat
 <!--
 @dependency-start
 contract skill
-responsibility Exposes research-workflow as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/research-workflow.md canonical skill owner
+responsibility Exposes research-workflow for runtime discovery.
+upstream design ../../../agents/skills/research-workflow.md owner
 @dependency-end
 -->
 

@@ -15,8 +15,8 @@ description: "Mandatory routing skill for repository tasks. Use before selecting
 <!--
 @dependency-start
 contract skill
-responsibility Exposes agent-orchestration as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/agent-orchestration.md canonical skill owner
+responsibility Exposes agent-orchestration for runtime discovery.
+upstream design ../../../agents/skills/agent-orchestration.md owner
 @dependency-end
 -->
 

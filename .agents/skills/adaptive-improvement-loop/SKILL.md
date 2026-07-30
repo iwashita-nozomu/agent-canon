@@ -15,8 +15,8 @@ description: "Use when experiments, research, tuning, and iterative code improve
 <!--
 @dependency-start
 contract skill
-responsibility Exposes adaptive-improvement-loop as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/adaptive-improvement-loop.md canonical skill owner
+responsibility Exposes adaptive-improvement-loop for runtime discovery.
+upstream design ../../../agents/skills/adaptive-improvement-loop.md owner
 @dependency-end
 -->
 

@@ -15,8 +15,8 @@ description: "Use as the general explanatory-doc DSL-to-prose adapter for README
 <!--
 @dependency-start
 contract skill
-responsibility Exposes long-form-writing as a Codex runtime discovery adapter.
-upstream design ../../../agents/skills/long-form-writing.md canonical skill owner
+responsibility Exposes long-form-writing for runtime discovery.
+upstream design ../../../agents/skills/long-form-writing.md owner
 @dependency-end
 -->
 
