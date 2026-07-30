@@ -4,7 +4,7 @@ description: "Use when drafting or revising reader-facing reports, decision brie
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:report-writing -->
-<!-- canonical: agents/skills/report-writing.md sha256=559a11831282d6a36730a3fa4763ad26ca0a27d63f171a808fbc4865ff87505b -->
+<!-- canonical: agents/skills/report-writing.md sha256=e1bfc8758ff28de2fb9c2c8a26f26861572ea02e64b986c3e1363477af007745 -->
 <!-- route: agents/skills/catalog.yaml#skill:report-writing.routing digest=8a09ead0535032817f97eeaec52cbcc6633247161be7ec6b662bb813c2df760d -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:report-writing digest=5f0856a9544815a681d9d1fd9880697fa5926d640024f4e7d5a2287d426e5877 -->
 <!-- commands: agents/skills/catalog.yaml#skill:report-writing.tool_commands digest=584b555300bc1b1b01262d515a19d702385e4e50b211158b874e606cb3fc9e97 -->

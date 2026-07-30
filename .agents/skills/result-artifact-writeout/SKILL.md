@@ -4,7 +4,7 @@ description: "Use when writing, exporting, saving, accumulating, or reporting to
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:result-artifact-writeout -->
-<!-- canonical: agents/skills/result-artifact-writeout.md sha256=7746950a045324e7111da78c984fce9d5ddb51d38454a8818c08038baa08d1f5 -->
+<!-- canonical: agents/skills/result-artifact-writeout.md sha256=39ac20f76d55c6049324e4c24f542f4fe3bebbed1d8831816f518227c46447c6 -->
 <!-- route: agents/skills/catalog.yaml#skill:result-artifact-writeout.routing digest=8a4143d9c15cedf7e6cbad6214ddf32cd1cba61b4d05aea0024796dc408672f4 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:result-artifact-writeout digest=26849f81147b6da479bf5b6819810a493d05e05efb12fb99bded671b1f649d4f -->
 <!-- commands: agents/skills/catalog.yaml#skill:result-artifact-writeout.tool_commands digest=fb71b0640c95875b34ecde5a661ad661e31aa790cf182fd83fd79744d3b7f189 -->

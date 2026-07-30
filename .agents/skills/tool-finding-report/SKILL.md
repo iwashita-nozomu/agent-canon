@@ -4,7 +4,7 @@ description: "Use when running tools, checkers, hooks, static analysis, or struc
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:tool-finding-report -->
-<!-- canonical: agents/skills/tool-finding-report.md sha256=d72485e69bc2af8f11ab3e9fef38fb1d72a125b7b9ff05ab709d6e87a97a4c20 -->
+<!-- canonical: agents/skills/tool-finding-report.md sha256=c17c9c83b20184fcb61937d24d95912540b296df7429da70b750a733c878b6a3 -->
 <!-- route: agents/skills/catalog.yaml#skill:tool-finding-report.routing digest=c4efc1f6d5c496198e24285312873ccf59fee23f28859f6165573e2610b4de5c -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:tool-finding-report digest=73a0440bb18fb73e90cbe91c224e13749583a0c5427287daf292f3053ebe7c65 -->
 <!-- commands: agents/skills/catalog.yaml#skill:tool-finding-report.tool_commands digest=2ebcc7500ef166476ebf640526aa1d823c35e88ccd244c2e210a3aee76bf0052 -->

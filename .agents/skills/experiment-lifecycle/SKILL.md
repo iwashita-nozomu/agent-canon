@@ -4,7 +4,7 @@ description: "Use this skill when preparing, running, or validating experiments.
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:experiment-lifecycle -->
-<!-- canonical: agents/skills/experiment-lifecycle.md sha256=3d8b0f4705d6499cd86b29c69bbd7179218ee8f7efbedbfa36a9b34c757ecf81 -->
+<!-- canonical: agents/skills/experiment-lifecycle.md sha256=81c9a387fcfb327b77af99fc6302e99376bbe5f1735446fa00b5cca99ded1cfe -->
 <!-- route: agents/skills/catalog.yaml#skill:experiment-lifecycle.routing digest=920be5167b67012e02c6f64d6b571627479c25d3d63508cb6d088156e8427f00 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:experiment-lifecycle digest=03b4becafba4dd8a413e7c1848787007db27190f8fa70d49033f96eaeab08c94 -->
 <!-- commands: agents/skills/catalog.yaml#skill:experiment-lifecycle.tool_commands digest=78d5fe86b6f2e41b342e9b1ff747712814d7efac6892e7b989261e4b239b5a9a -->

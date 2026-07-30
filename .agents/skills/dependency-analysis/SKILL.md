@@ -4,7 +4,7 @@ description: "Use when checking, validating, or diagnosing repository dependency
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:dependency-analysis -->
-<!-- canonical: agents/skills/dependency-analysis.md sha256=9baa50adac05626d3ad5cc86c278844d89cf7eb0b351979c13d5b443a7cb0098 -->
+<!-- canonical: agents/skills/dependency-analysis.md sha256=539092d1120f07d4d790612bce3cfe80dd6d3f8c4e55b1142d36dfbb2f2b1f45 -->
 <!-- route: agents/skills/catalog.yaml#skill:dependency-analysis.routing digest=16584206a3b7cd1747d112850220a0c705bf7f156d5aea6d9152b029b5ff8819 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:dependency-analysis digest=87001901117d908accf231c34b624bd8663bc562ce1f4f78bba0700317f90ac7 -->
 <!-- commands: agents/skills/catalog.yaml#skill:dependency-analysis.tool_commands digest=560633aa5d07d2d2feaef85399ce5835465efc1f1b04a5448a1f71ca3f713dcc -->

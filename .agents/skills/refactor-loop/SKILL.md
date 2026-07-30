@@ -4,7 +4,7 @@ description: "Use when a large refactor should run as a behavior-preserving refa
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:refactor-loop -->
-<!-- canonical: agents/skills/refactor-loop.md sha256=af5d3c47e1a5266fcbb38cb58314e547344cef41e3afe9134c94c0c04117b56b -->
+<!-- canonical: agents/skills/refactor-loop.md sha256=21755d7f6fa239d0cd90acf8672346166e947ab8ade6a62778c3fc4412c61476 -->
 <!-- route: agents/skills/catalog.yaml#skill:refactor-loop.routing digest=2fb076b8062b21194ce598f2396fd841cb7e932f04f5429e229f8001d095c0f3 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:refactor-loop digest=c2075a67d124d4b7aec3dfd31d2d9cd2ab181bb53adaaff8a752e614c9f5fe72 -->
 <!-- commands: agents/skills/catalog.yaml#skill:refactor-loop.tool_commands digest=a9d49937251e18e25631807d7668e425f481a301bbe0f01dd05a624365bea9fe -->

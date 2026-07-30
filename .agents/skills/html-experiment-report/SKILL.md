@@ -4,7 +4,7 @@ description: "Use when producing a browser-readable HTML experiment or Eval repo
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:html-experiment-report -->
-<!-- canonical: agents/skills/html-experiment-report.md sha256=810b7a5f1496021f22dc1c4fc9b277d6f60bb9921900989867ce59b8a4f4e247 -->
+<!-- canonical: agents/skills/html-experiment-report.md sha256=3970b57af92b62c619d5b3d7bcc0d672c171eb0d0fdbb5839798dd3fd80969c2 -->
 <!-- route: agents/skills/catalog.yaml#skill:html-experiment-report.routing digest=a75d0c6166dc6a7b942ebfe7604829bc9f8f0147b1a9a0a6e3e4d17d865a21d0 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:html-experiment-report digest=f7e55f5767b4e397ecfeceafe13eda8ed9b765a857b29563e6a3bb773c4ba21e -->
 <!-- commands: agents/skills/catalog.yaml#skill:html-experiment-report.tool_commands digest=f14dcd803384868dc064fa6905260d8778937cd111fdbbeafd0b2f9a638e0593 -->

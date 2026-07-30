@@ -4,7 +4,7 @@ description: "Use when the user asks to run the OOP readability checker, SOLID c
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:oop-readability-check -->
-<!-- canonical: agents/skills/oop-readability-check.md sha256=57d676d84ba9fac2d2c837ee114cf4f711bb8a1b5f4b9d81470e536005e70648 -->
+<!-- canonical: agents/skills/oop-readability-check.md sha256=a4d54861c3388cf6c5b340133d21bb18b7765b91f79e536a95f3c5ec7d2b4b85 -->
 <!-- route: agents/skills/catalog.yaml#skill:oop-readability-check.routing digest=bb3d89ba9d1db9a6007b3cef2601174b6a950c12850b566684639b217be106d1 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:oop-readability-check digest=3ceeae86534bd675b142a2760ae269df6bb49165786fdaa15876921e2db116dd -->
 <!-- commands: agents/skills/catalog.yaml#skill:oop-readability-check.tool_commands digest=87503446ed556b99ea7ff95fa0e8be5be859ecd7c43df94df1a20623b6115316 -->

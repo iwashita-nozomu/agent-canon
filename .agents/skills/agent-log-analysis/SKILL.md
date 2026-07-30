@@ -4,7 +4,7 @@ description: "Use when analyzing accumulated AgentCanon skill/tool/workflow/hook
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:agent-log-analysis -->
-<!-- canonical: agents/skills/agent-log-analysis.md sha256=15c5b275768b3392413c4275577c81f41f6db8240bfa2ddd2bc54b05a06fb9d0 -->
+<!-- canonical: agents/skills/agent-log-analysis.md sha256=d5a25411820c7ef6690fa6d49d8508d066ac9f1f4d47019f5bc9c18e6e16d49e -->
 <!-- route: agents/skills/catalog.yaml#skill:agent-log-analysis.routing digest=209982eafc56e4192bcf5be5bbea7741de5cbe6681ef255974b92fe16c89af3d -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:agent-log-analysis digest=486745168c9797b58bfa8de909ac43bc81c349067f2a4fd6e10f889a214dacc9 -->
 <!-- commands: agents/skills/catalog.yaml#skill:agent-log-analysis.tool_commands digest=14d8d7b7dfd1e9d92a4eadfa8e2936e383a9ee4e8230d8b2a4e49e0fc9f9d632 -->

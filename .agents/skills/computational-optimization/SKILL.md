@@ -4,7 +4,7 @@ description: "Use when designing, implementing, reviewing, or diagnosing numeric
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:computational-optimization -->
-<!-- canonical: agents/skills/computational-optimization.md sha256=0c70d53b1fc9100fcd6b1c1b8f7e63238bf6fdaffbeb9da0b8c42b9a56c16336 -->
+<!-- canonical: agents/skills/computational-optimization.md sha256=07a396f269e752721c5cfef66ce0418b1c8023e2a5a2df4b0146f735add3ff74 -->
 <!-- route: agents/skills/catalog.yaml#skill:computational-optimization.routing digest=3cd1e4900875547f684079e08bf0383aca540e652b56f911493a9b7e4231b27f -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:computational-optimization digest=7513bdc9961d503677724d22a087ed8075b4e8e1c91a5f543cbb45e1d8264a4e -->
 <!-- commands: agents/skills/catalog.yaml#skill:computational-optimization.tool_commands digest=f017a3cded113d914f275481c9203eddcd67eaee0a5fd48bc3e4915b3f5c37ea -->

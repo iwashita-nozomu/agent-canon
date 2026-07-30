@@ -4,7 +4,7 @@ description: "Use when Codex needs a context-independent execution path for a re
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:codex-task-workflow -->
-<!-- canonical: agents/skills/codex-task-workflow.md sha256=6c87597b53a41f77ae1e55437f7e8dba8bab803fc38c726f7dbc54e2a044f01f -->
+<!-- canonical: agents/skills/codex-task-workflow.md sha256=69280b6126478abe94dc734a4b2f1e11c0e73b40ff6af4b2bac4de65c254c75a -->
 <!-- route: agents/skills/catalog.yaml#skill:codex-task-workflow.routing digest=b62ef8a5d9dc51d40389f5adf349b920943c2308ed63611356e325874293760b -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:codex-task-workflow digest=2af7374d7e96f1a1fad66ce67b13639c9d2be77e05a5860b6868d2139d327afb -->
 <!-- commands: agents/skills/catalog.yaml#skill:codex-task-workflow.tool_commands digest=ee5089af5326e568668d92a75a1d0c2fa029b473595b9bada276842eca11865a -->

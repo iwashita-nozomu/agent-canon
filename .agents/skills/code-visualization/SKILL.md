@@ -4,7 +4,7 @@ description: "Sole public visualization owner for code, repository structure, ru
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:code-visualization -->
-<!-- canonical: agents/skills/code-visualization.md sha256=5f6d36db19e9e2b7def6611515bb1d77d9958c268ced8241d2044753c82dab30 -->
+<!-- canonical: agents/skills/code-visualization.md sha256=bf8bb1cc6d04da53c2535e9d95632c0e324c67b2cec19134a525bca5af05f4b7 -->
 <!-- route: agents/skills/catalog.yaml#skill:code-visualization.routing digest=ba012b9d0ad5ca234b17c2e7c146b4e302174af6558412ba93b1521a3c80526a -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:code-visualization digest=c55efa485014c1ffdcbc12e5fd00040320b0af1ac612a35d8f42f19513717fbe -->
 <!-- commands: agents/skills/catalog.yaml#skill:code-visualization.tool_commands digest=eef8b9f1f9446631c5c1e30c02d95713654c18bcec830c11af78333d64cd8273 -->

@@ -4,7 +4,7 @@ description: "Use when the user explicitly asks for HTML output, a browser-reada
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:html-output -->
-<!-- canonical: agents/skills/html-output.md sha256=4998532c5469908e96a74eb76448605d1a75d5be73c0c84c99158df74c01cbd9 -->
+<!-- canonical: agents/skills/html-output.md sha256=3743668c77956ea0368326287a6759d76a4b824a09a0b4fd1b0873f32d88e1b0 -->
 <!-- route: agents/skills/catalog.yaml#skill:html-output.routing digest=a3724897179885d50f35b9cdca676b197d9285abb4b36f33cd75806e24316a63 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:html-output digest=63c8377b1a4ef67c4612aaf6be6beb92d8c14827bdfc0447f1cc3b518e2e0047 -->
 <!-- commands: agents/skills/catalog.yaml#skill:html-output.tool_commands digest=faae41417745d693597e5c01a9099bc454cc545f36c3d81acdcabc13d57190ff -->

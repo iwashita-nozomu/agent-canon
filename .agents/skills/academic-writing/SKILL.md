@@ -4,7 +4,7 @@ description: "Use when drafting a paper, thesis chapter, scholarly note, or othe
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:academic-writing -->
-<!-- canonical: agents/skills/academic-writing.md sha256=0b9d0e6901cc0a67bc3c2181c378ba1fb0f0a3430770fa19a1fa3e8c99cb2337 -->
+<!-- canonical: agents/skills/academic-writing.md sha256=10805ab5b5209a240851efba887de0e3d6d38d80babdeeafc175489a24674792 -->
 <!-- route: agents/skills/catalog.yaml#skill:academic-writing.routing digest=ca10bf6d75f42cd4327f5f00eb4a2d4bd60d989e5e15e07e1277226fff1a36cc -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:academic-writing digest=4cda45473cbe5fe4639378efbbac6b3b38a044c67ea77a6b9995a427c471c1a7 -->
 <!-- commands: agents/skills/catalog.yaml#skill:academic-writing.tool_commands digest=561590ebe2edf789760dc83d3d374325ea550408192cafc55d4f7022baabc102 -->

@@ -4,7 +4,7 @@ description: "Use when updating AgentCanon itself, refreshing a vendored vendor/
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:agent-canon-update -->
-<!-- canonical: agents/skills/agent-canon-update.md sha256=71c5a790e90e2a0b78b4be2a95264aa59bf6ad26895bbc03f03813525178727e -->
+<!-- canonical: agents/skills/agent-canon-update.md sha256=1e6b140dcdb7896b589d74e05cc1af28d286495c21d780b38d21007e619120fe -->
 <!-- route: agents/skills/catalog.yaml#skill:agent-canon-update.routing digest=4ba74601f6db489caeb39270fe520ace1621e68f68b8848d97103b8ee2103614 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:agent-canon-update digest=674cd72a8044b4c5520f0208a04f7bcd191f318bacfe9141c69567653f263692 -->
 <!-- commands: agents/skills/catalog.yaml#skill:agent-canon-update.tool_commands digest=5561d7685a1445cf68ac6b40a4da47f9793a4d0d8749e243a1026da0ab259295 -->

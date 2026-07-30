@@ -4,7 +4,7 @@ description: "Mandatory routing skill for repository tasks. Use before selecting
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:agent-orchestration -->
-<!-- canonical: agents/skills/agent-orchestration.md sha256=cebe3b719aa1a04e4110e1f07893def08a46cddfe1d8bfa49b7251eb9878a5b6 -->
+<!-- canonical: agents/skills/agent-orchestration.md sha256=69511390ae60bfe1bf47f41ac91bcd79803b3ffda8d0134b19790e426f54c9d7 -->
 <!-- route: agents/skills/catalog.yaml#skill:agent-orchestration.routing digest=3f8c23709a63eb8c7af65da6ba22becbfb9edb77c7320080d8b955bcf1c49b89 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:agent-orchestration digest=cb5ffbaa6b1fff3996a1c6e7c8320778a62a50162a4e53f4db6db1c855462075 -->
 <!-- commands: agents/skills/catalog.yaml#skill:agent-orchestration.tool_commands digest=adb5f208c3beab6a61a81da68764e04acf22840014be6a878c4411e61a606641 -->
