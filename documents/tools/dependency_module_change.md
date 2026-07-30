@@ -27,10 +27,11 @@ python3 tools/agent_tools/dependency_module_change.py --root <repo> prepare \
   --branch <task-branch> --owner-evidence <evidence-file>
 python3 tools/agent_tools/dependency_module_change.py --root <topic-parent> cleanup \
   --topic <topic> --module vendor/agent-canon --expected-clone <absolute-clone> \
-  [--apply]
+  [--integrated-commit <full-oid>] [--apply]
 python3 tools/agent_tools/dependency_module_change.py --root <repo> cleanup \
   --placement workspace --topic <topic> --module vendor/agent-canon \
-  --expected-clone <absolute-clone> --owner-evidence-sha256 <sha256> [--apply]
+  --expected-clone <absolute-clone> --owner-evidence-sha256 <sha256> \
+  [--integrated-commit <full-oid>] [--apply]
 ```
 
 host は `<parent-repo-root>/workspace/<topic-slug>/<parent>` とその同列 module cloneだけを保持します。
@@ -51,3 +52,7 @@ remote 再構成可能性を要求します。
 `SOURCE_BASE_REF`、`SOURCE_BASE_SHA`、`SOURCE_OWNER_EVIDENCE_SHA256`、
 `SOURCE_BRANCH`、`SOURCE_HEAD_SHA` が source identity です。workspace cleanup は
 `--owner-evidence-sha256` の exact match と marker validation を要求します。
+topic branch deletion 後に local-only commit が残る場合の `--integrated-commit` は
+PR merge/readback の full OID を渡す typed integration evidence です。省略時の
+canonical discovery と Git equivalence/hold semantics は dependency-module policy
+owner を参照します。

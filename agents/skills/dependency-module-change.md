@@ -34,6 +34,11 @@ update-only・read-only では clone を作りません。返された `PARENT_R
 使います。cleanup は dry-run を経て remote に全 state がある場合
 だけ apply します。
 
+PR merge/readback 後に topic branch が削除され、clone に local-only commit が
+残る場合は、cleanup に `--integrated-commit <full-oid>` として統合 commit の
+evidence を渡します。省略時の canonical `origin/main` discovery を含む
+equivalence gate と hold 条件は、詳細 policy owner の cleanup gate に従います。
+
 独立した replaceable responsibility を parallel に実行する場合は、vendor の clean
 状態を理由に停止せず、親の DAG packet が disjoint write scope、依存/merge order、
 validation、reviewer ownership を固定した後で、次の typed route を使います。

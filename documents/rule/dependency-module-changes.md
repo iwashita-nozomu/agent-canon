@@ -127,7 +127,14 @@ clone削除後に同じgateで削除できます。topic rootが空なら topic 
 - `git fetch --all --prune` が成功する。
 - worktree、index、untracked files が空である。
 - linked worktree が追加で登録されていない。
-- fetch 後の `git rev-list --all --not --remotes` が空である。
+- fetch 後の `git rev-list --all --not --remotes` が空であるか、後述の
+  integrated-commit evidence gate が pass する。
+- local-only commit が残る場合は、PR merge/readback が返した full OID を
+  `--integrated-commit <full-oid>` で渡すか、canonical な
+  `refs/remotes/origin/main` first-parent history から tool が deterministic に
+  discover した integrated commit を使う。candidate は `origin/main` reachable
+  で、topic branch の cumulative semantic patch/tree と candidate の first-parent
+  差分が Git equivalence を満たす必要がある。
 - `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY` とその reason、
   `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` とその
   reason が同じ command segment から渡されている。
@@ -137,9 +144,10 @@ clone削除後に同じgateで削除できます。topic rootが空なら topic 
 clone は冗長になり得るため、PR/pin/root-sync 状態を cleanup の前提に
 しません。
 
-dirty、unique local commits、URL mismatch、linked worktree、unknown path、
-fetch failure は削除を保留します。これは旧 topology を成功経路として認める
-ことではなく、cleanup が安全条件を満たさず停止したことを意味します。
+dirty、未証明または non-equivalent な unique local commits、URL mismatch、
+linked worktree、unknown path、fetch failure は削除を保留します。これは旧
+topology を成功経路として認めることではなく、cleanup が安全条件を満たさず
+停止したことを意味します。
 source の移送後は独立 clone、clean vendor pin projection、results owner
 surface の状態だけを完成形として残します。
 
@@ -153,6 +161,10 @@ surface の状態だけを完成形として残します。
 - `prepare --placement workspace-continuation --topic <topic> --module <path> --branch <branch> --owner-evidence <file>`: 既存 remote branch の継続を明示的に行う non-fresh route。
 - `cleanup --topic <topic> --module <path> --expected-clone <absolute-path>`: dry-run で
   判定し、`--apply` のときだけ cleanup gate を満たす clone を削除する。
+- `cleanup ... [--integrated-commit <full-oid>]`: squash-merged などで local-only
+  commit が残る場合の typed integration evidence を受け取る。省略時は
+  `origin/main` の canonical discovery を使い、equivalence を証明できなければ
+  hold する。
 - `cleanup --placement workspace[{-continuation}] --topic <topic> --module <path> --expected-clone <absolute-path> --owner-evidence-sha256 <sha256>`: workspace placement の computed clone だけを扱い、exact expected evidence SHA と marker identity を検証してから同じ cleanup gate を適用する。
 - `cleanup --topic <topic> --parent --expected-parent <absolute-path>`: module cloneが
   無い場合だけparent cloneと空topic rootを同じgateで削除する。

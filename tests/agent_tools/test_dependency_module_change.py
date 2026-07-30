@@ -138,6 +138,63 @@ def owner_evidence_sha(parent: Path) -> str:
     return hashlib.sha256((parent / "owner-evidence.md").read_bytes()).hexdigest()
 
 
+def _commit_staged(repo: Path, message: str) -> str:
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            message,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return run_git(repo, "rev-parse", "HEAD")
+
+
+def _commit_file(repo: Path, filename: str, content: str, message: str) -> str:
+    (repo / filename).write_text(content, encoding="utf-8")
+    run_git(repo, "add", filename)
+    return _commit_staged(repo, message)
+
+
+def _integrate_topic(
+    tmp_path: Path,
+    remote: Path,
+    topic_branch: str,
+    *,
+    squash: bool,
+    delete_topic_branch: bool,
+) -> str:
+    integration = tmp_path / ("squash-integration" if squash else "merge-integration")
+    subprocess.run(
+        ["git", "clone", "--branch", "main", str(remote), str(integration)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    run_git(integration, "config", "user.name", "Test")
+    run_git(integration, "config", "user.email", "test@example.invalid")
+    run_git(integration, "fetch", "origin", topic_branch)
+    if squash:
+        run_git(integration, "cherry-pick", "--no-commit", f"origin/{topic_branch}")
+        integrated_commit = _commit_staged(integration, "squash topic")
+    else:
+        run_git(integration, "merge", "--no-ff", "--no-edit", f"origin/{topic_branch}")
+        integrated_commit = run_git(integration, "rev-parse", "HEAD")
+    run_git(integration, "push", "origin", "main")
+    if delete_topic_branch:
+        run_git(integration, "push", "origin", "--delete", topic_branch)
+    return integrated_commit
+
+
 def git_submodule_resolved_url(
     parent: Path, parent_remote: str, dependency_remote: Path, suffix: str
 ) -> str:
@@ -681,6 +738,190 @@ def test_cleanup_holds_dirty_and_url_mismatch(tmp_path: Path) -> None:
     mismatch = invoke(topic_parent(parent), "cleanup", "--topic", TOPIC, "--module", "vendor/dep", "--expected-clone", str(clone))
     assert mismatch.returncode == 0, mismatch.stderr
     assert "url-mismatch" in mismatch.stdout
+
+
+def test_cleanup_accepts_reachable_ordinary_merge(tmp_path: Path) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    assert prepare(parent).returncode == 0
+    clone = module_clone(parent)
+    _commit_file(clone, "merged.txt", "merged\n", "topic change")
+    run_git(clone, "push", "origin", "HEAD:refs/heads/feature/foo")
+    _integrate_topic(
+        tmp_path,
+        remote,
+        "feature/foo",
+        squash=False,
+        delete_topic_branch=False,
+    )
+
+    removed = invoke(
+        topic_parent(parent),
+        "cleanup",
+        "--topic",
+        TOPIC,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert removed.returncode == 0, removed.stderr
+    assert "action=removed" in removed.stdout
+    assert not clone.exists()
+
+
+def test_cleanup_accepts_squash_merge_with_deleted_branch_and_equivalent_commit(
+    tmp_path: Path,
+) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    topic = "squash-topic"
+    topic_branch = "feature/squash-cleanup"
+    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
+    clone = workspace_module_clone(parent, topic=topic)
+    _commit_file(clone, "squashed.txt", "squashed\n", "topic change")
+    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
+    integrated_commit = _integrate_topic(
+        tmp_path,
+        remote,
+        topic_branch,
+        squash=True,
+        delete_topic_branch=True,
+    )
+
+    discovered = invoke(
+        parent,
+        "cleanup",
+        "--placement",
+        "workspace",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--owner-evidence-sha256",
+        owner_evidence_sha(parent),
+    )
+    assert discovered.returncode == 0, discovered.stderr
+    assert "action=would-remove" in discovered.stdout
+
+    removed = invoke(
+        parent,
+        "cleanup",
+        "--placement",
+        "workspace",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--owner-evidence-sha256",
+        owner_evidence_sha(parent),
+        "--integrated-commit",
+        integrated_commit,
+        "--apply",
+        env=cleanup_env(),
+    )
+    assert removed.returncode == 0, removed.stderr
+    assert "action=removed" in removed.stdout
+    assert not clone.exists()
+
+
+def test_cleanup_holds_non_equivalent_integrated_commit(tmp_path: Path) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    topic = "non-equivalent-topic"
+    topic_branch = "feature/non-equivalent-cleanup"
+    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
+    clone = workspace_module_clone(parent, topic=topic)
+    _commit_file(clone, "topic.txt", "topic\n", "topic change")
+    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
+
+    integration = tmp_path / "non-equivalent-integration"
+    subprocess.run(
+        ["git", "clone", "--branch", "main", str(remote), str(integration)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    integrated_commit = _commit_file(
+        integration,
+        "different.txt",
+        "different\n",
+        "different integration",
+    )
+    run_git(integration, "push", "origin", "main")
+    run_git(integration, "push", "origin", "--delete", topic_branch)
+
+    held = invoke(
+        parent,
+        "cleanup",
+        "--placement",
+        "workspace",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--owner-evidence-sha256",
+        owner_evidence_sha(parent),
+        "--integrated-commit",
+        integrated_commit,
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert held.returncode == 0, held.stderr
+    assert "integrated-commit-not-equivalent" in held.stdout
+    assert clone.exists()
+
+
+def test_cleanup_holds_dirty_untracked_state_even_with_equivalent_commit(tmp_path: Path) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    topic = "dirty-squash-topic"
+    topic_branch = "feature/dirty-squash-cleanup"
+    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
+    clone = workspace_module_clone(parent, topic=topic)
+    _commit_file(clone, "topic.txt", "topic\n", "topic change")
+    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
+    integrated_commit = _integrate_topic(
+        tmp_path,
+        remote,
+        topic_branch,
+        squash=True,
+        delete_topic_branch=True,
+    )
+    (clone / "untracked.txt").write_text("must hold\n", encoding="utf-8")
+
+    held = invoke(
+        parent,
+        "cleanup",
+        "--placement",
+        "workspace",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--owner-evidence-sha256",
+        owner_evidence_sha(parent),
+        "--integrated-commit",
+        integrated_commit,
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert held.returncode == 0, held.stderr
+    assert "dirty-worktree-index-or-untracked" in held.stdout
+    assert clone.exists()
 
 
 def test_cleanup_removes_reconstructible_module_then_parent_and_topic(tmp_path: Path) -> None:

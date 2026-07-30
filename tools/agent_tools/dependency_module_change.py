@@ -34,6 +34,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 CONTAINER_WORKSPACE_ROOT = Path("/workspace")
 MARKER_PREFIX = "agent-canon.topic"
+INTEGRATION_REMOTE_REF = "refs/remotes/origin/main"
+FULL_COMMIT_OID = re.compile(r"[0-9a-f]{40}")
 
 
 class DependencyModuleChangeError(RuntimeError):
@@ -853,7 +855,88 @@ def _module_path_states(
     return tuple(states)
 
 
-def _cleanup_readiness(path: Path) -> str | None:
+def _patch_signature(path: Path, left: str, right: str) -> tuple[str, str, str]:
+    """Return a deterministic semantic/tree signature for one Git range."""
+    diff = subprocess.run(
+        ["git", "-C", str(path), "diff", "--binary", "--no-ext-diff", left, right],
+        check=False,
+        capture_output=True,
+    )
+    if diff.returncode != 0:
+        raise GitCommandError(
+            path,
+            ["diff", "--binary", left, right],
+            diff.stderr.decode(errors="replace"),
+        )
+    patch_id = subprocess.run(
+        ["git", "patch-id", "--stable"],
+        input=diff.stdout,
+        check=False,
+        capture_output=True,
+    )
+    if patch_id.returncode != 0:
+        raise GitCommandError(
+            path,
+            ["patch-id", "--stable"],
+            patch_id.stderr.decode(errors="replace"),
+        )
+    patch_id_value = (
+        patch_id.stdout.decode(errors="replace").split(maxsplit=1)[0]
+        if patch_id.stdout.strip()
+        else ""
+    )
+    paths = subprocess.run(
+        ["git", "-C", str(path), "diff", "--no-ext-diff", "--name-status", "-z", left, right],
+        check=False,
+        capture_output=True,
+    )
+    if paths.returncode != 0:
+        raise GitCommandError(
+            path,
+            ["diff", "--name-status", left, right],
+            paths.stderr.decode(errors="replace"),
+        )
+    tree_signature = hashlib.sha256(paths.stdout).hexdigest()
+    if patch_id_value:
+        return ("patch-id", patch_id_value, tree_signature)
+    return ("binary-diff", hashlib.sha256(diff.stdout).hexdigest(), tree_signature)
+
+
+def _integrated_commit_failure(
+    path: Path, topic_base: str, topic_tip: str, integrated_commit: str
+) -> str | None:
+    """Return a typed refusal reason unless an integrated commit proves equivalence."""
+    if not FULL_COMMIT_OID.fullmatch(integrated_commit):
+        return "integrated-commit-invalid"
+    if not _git_succeeds(path, ["cat-file", "-e", f"{integrated_commit}^{{commit}}"]):
+        return "integrated-commit-not-found"
+    if not _git_succeeds(
+        path,
+        ["merge-base", "--is-ancestor", integrated_commit, INTEGRATION_REMOTE_REF],
+    ):
+        return "integrated-commit-not-reachable-from-origin-main"
+    try:
+        integrated_parent = _run_git(path, ["rev-parse", f"{integrated_commit}^1"]).strip()
+        topic_signature = _patch_signature(path, topic_base, topic_tip)
+        integrated_signature = _patch_signature(path, integrated_parent, integrated_commit)
+    except GitCommandError:
+        return "integrated-commit-evidence-unreadable"
+    if topic_signature != integrated_signature:
+        return "integrated-commit-not-equivalent"
+    return None
+
+
+def _discover_integrated_commit(path: Path, topic_base: str, topic_tip: str) -> str | None:
+    """Find the newest equivalent commit on the canonical fetched main ref."""
+    for candidate in _run_git(
+        path, ["rev-list", "--first-parent", INTEGRATION_REMOTE_REF]
+    ).splitlines():
+        if _integrated_commit_failure(path, topic_base, topic_tip, candidate) is None:
+            return candidate
+    return None
+
+
+def _cleanup_readiness(path: Path, integrated_commit: str | None = None) -> str | None:
     try:
         _run_git(path, ["fetch", "--all", "--prune"])
     except GitCommandError as exc:
@@ -863,7 +946,19 @@ def _cleanup_readiness(path: Path) -> str | None:
     if sum(line.startswith("worktree ") for line in _run_git(path, ["worktree", "list", "--porcelain"]).splitlines()) > 1:
         return "linked-worktree-present"
     if _run_git(path, ["rev-list", "--all", "--not", "--remotes"]).strip():
-        return "unique-local-commits"
+        try:
+            topic_base = _run_git(path, ["merge-base", "HEAD", INTEGRATION_REMOTE_REF]).strip()
+        except GitCommandError:
+            return "integrated-commit-base-unavailable"
+        if not topic_base:
+            return "integrated-commit-base-unavailable"
+        topic_tip = _run_git(path, ["rev-parse", "HEAD"]).strip()
+        if integrated_commit is not None:
+            failure = _integrated_commit_failure(path, topic_base, topic_tip, integrated_commit)
+            if failure is not None:
+                return failure
+        elif _discover_integrated_commit(path, topic_base, topic_tip) is None:
+            return "unique-local-commits"
     return None
 
 
@@ -878,7 +973,14 @@ def _require_cleanup_authority() -> None:
     raise DependencyModuleChangeError("cleanup --apply requires same-command authority/reason fields")
 
 
-def _cleanup_module(parent_root: Path, topic: str, module: DependencyModule, expected: Path, apply: bool) -> None:
+def _cleanup_module(
+    parent_root: Path,
+    topic: str,
+    module: DependencyModule,
+    expected: Path,
+    apply: bool,
+    integrated_commit: str | None = None,
+) -> None:
     clone = parent_root.parent / module.basename
     clone = _assert_safe_contained_path(parent_root.parent, clone, "module cleanup clone")
     if not expected.is_absolute() or expected != clone:
@@ -896,7 +998,7 @@ def _cleanup_module(parent_root: Path, topic: str, module: DependencyModule, exp
     if inspection.state != "ready":
         print(f"CLEANUP module={module.path} action=hold reason={inspection.state}")
         return
-    reason = _cleanup_readiness(clone)
+    reason = _cleanup_readiness(clone, integrated_commit)
     if reason:
         print(f"CLEANUP module={module.path} action=hold reason={reason}")
         return
@@ -909,7 +1011,14 @@ def _cleanup_module(parent_root: Path, topic: str, module: DependencyModule, exp
     print(f"CLEANUP module={module.path} action=removed path={clone}")
 
 
-def _cleanup_parent(parent_root: Path, modules: tuple[DependencyModule, ...], topic: str, expected: Path, apply: bool) -> None:
+def _cleanup_parent(
+    parent_root: Path,
+    modules: tuple[DependencyModule, ...],
+    topic: str,
+    expected: Path,
+    apply: bool,
+    integrated_commit: str | None = None,
+) -> None:
     parent_root = _assert_safe_contained_path(
         parent_root.parent, parent_root, "parent cleanup clone"
     )
@@ -934,7 +1043,7 @@ def _cleanup_parent(parent_root: Path, modules: tuple[DependencyModule, ...], to
     if inspection.state != "ready":
         print(f"CLEANUP parent action=hold reason={inspection.state}")
         return
-    reason = _cleanup_readiness(parent_root)
+    reason = _cleanup_readiness(parent_root, integrated_commit)
     if reason:
         print(f"CLEANUP parent action=hold reason={reason}")
         return
@@ -959,6 +1068,7 @@ def _cleanup_workspace(
     apply: bool,
     placement: str,
     owner_evidence_sha256: str | None,
+    integrated_commit: str | None = None,
 ) -> None:
     if owner_evidence_sha256 is None:
         raise DependencyModuleChangeError(
@@ -985,7 +1095,7 @@ def _cleanup_workspace(
     if inspection.state != "ready":
         print(f"CLEANUP module={module.path} placement={placement} action=hold reason={inspection.state}")
         return
-    reason = _cleanup_readiness(clone)
+    reason = _cleanup_readiness(clone, integrated_commit)
     if reason:
         print(f"CLEANUP module={module.path} placement={placement} action=hold reason={reason}")
         return
@@ -1060,6 +1170,10 @@ def _build_parser() -> argparse.ArgumentParser:
     cleanup.add_argument("--expected-clone")
     cleanup.add_argument("--expected-parent")
     cleanup.add_argument("--owner-evidence-sha256")
+    cleanup.add_argument(
+        "--integrated-commit",
+        help="full OID of the PR-integrated commit on origin/main; omitted uses deterministic origin/main discovery",
+    )
     cleanup.add_argument("--apply", action="store_true")
     return parser
 
@@ -1113,6 +1227,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.apply,
                 args.placement,
                 args.owner_evidence_sha256,
+                args.integrated_commit,
             )
             return 0
         parent_root = _resolve_topic_parent(root, args.topic, create=False)
@@ -1129,12 +1244,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.parent:
             if not args.expected_parent:
                 raise DependencyModuleChangeError("--expected-parent is required with --parent")
-            _cleanup_parent(parent_root, modules, topic, Path(args.expected_parent).absolute(), args.apply)
+            _cleanup_parent(
+                parent_root,
+                modules,
+                topic,
+                Path(args.expected_parent).absolute(),
+                args.apply,
+                args.integrated_commit,
+            )
         else:
             if not args.expected_clone:
                 raise DependencyModuleChangeError("--expected-clone is required with --module")
             module = _select_module(modules, args.module)
-            _cleanup_module(parent_root, topic, module, Path(args.expected_clone).absolute(), args.apply)
+            _cleanup_module(
+                parent_root,
+                topic,
+                module,
+                Path(args.expected_clone).absolute(),
+                args.apply,
+                args.integrated_commit,
+            )
         return 0
     except (DependencyModuleChangeError, OSError) as exc:
         print(f"DEPENDENCY_MODULE_CHANGE_ERROR={exc}", file=sys.stderr)
