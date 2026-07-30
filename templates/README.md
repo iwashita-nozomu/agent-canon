@@ -4,6 +4,7 @@ contract reference
 responsibility Indexes the centralized AgentCanon template owner and its parent-root projections.
 upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared template surface ownership
 upstream design ../documents/rule/README.md document filename, placement, and language rules
+upstream design ../documents/conventions/DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse projection traces
 downstream implementation ./agents/README.md reusable agent artifact template source
 downstream implementation ./documents/README.md reader-facing document template source
 downstream implementation ./experiments/_template/run.py runnable experiment scaffold source
@@ -55,3 +56,11 @@ GitHub Issue / PR projection は `templates/documents/github/` を source とし
 
 Parent `experiments/registry.toml` remains project-owned: only the obsolete `_template` entry is
 removed, and all real topic identities stay intact.
+
+## Docstring projection
+
+Template Docstrings use the [Docstring Semantic Contract](../documents/conventions/DOCSTRING_GUIDE.md)
+as their semantic owner. Each consumer records only the responsibility region and selected
+semantic delta; it does not require fixed sections or repeat signature, type, namespace, or field
+facts. A design document or generated experiment records the guide reference and its projection
+anchor when that trace is materialized.

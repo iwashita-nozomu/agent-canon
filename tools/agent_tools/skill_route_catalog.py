@@ -25,10 +25,9 @@ from types import MappingProxyType
 from typing import Literal, cast
 
 import yaml
-
 from visualization_contract import (
-    ArgumentSchemaID,
     TOOL_ARGUMENT_SCHEMAS,
+    ArgumentSchemaID,
     ToolCall,
     ToolID,
     VisualizationSourceItem,
@@ -41,6 +40,7 @@ __all__ = (
     "CapabilityRootError",
     "CapabilityRoute",
     "CapabilityIndex",
+    "SkillToolCommandSpec",
     "SkillRoutingRule",
     "SkillDependencyRule",
     "SkillOrderConstraint",
@@ -49,8 +49,14 @@ __all__ = (
     "VISUALIZATION_OWNER_SKILL",
     "VISUALIZATION_OWNER_TOOL_ID",
     "VISUALIZATION_OWNER_ARGUMENT_SCHEMA",
+    "VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID",
+    "VISUALIZATION_DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA",
+    "VISUALIZATION_ADAPTER_TOOL_IDS",
+    "VISUALIZATION_CAPABILITY_ADAPTERS",
     "VISUALIZATION_ROLE_VALUES",
     "build_visualization_owner_tool_call",
+    "build_visualization_adapter_tool_call",
+    "visualization_adapter_for_capability",
     "visualization_rejection_from_error",
     "capability_id_from_raw",
     "capability_routes",
@@ -64,6 +70,7 @@ __all__ = (
     "derive_skill_invocation_order",
     "load_skill_related_map",
     "load_skill_required_tool_commands",
+    "load_skill_tool_commands",
     "build_capability_index",
     "ordered_unique",
     "related_skill_candidates",
@@ -88,6 +95,45 @@ VISUALIZATION_ROLE_VALUES = ("owner", "adapter")
 VISUALIZATION_OWNER_TOOL_ID: ToolID = "agent_canon.visualization.coverage"
 VISUALIZATION_OWNER_ARGUMENT_SCHEMA: ArgumentSchemaID = (
     "agent_canon.visualization.arguments.coverage.v1"
+)
+VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID: ToolID = (
+    "agent_canon.visualization.adapter.dependency_manifest"
+)
+VISUALIZATION_DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA: ArgumentSchemaID = (
+    "agent_canon.visualization.arguments.dependency_manifest.v1"
+)
+VISUALIZATION_ADAPTER_TOOL_IDS: tuple[ToolID, ...] = tuple(
+    tool_id
+    for tool_id in TOOL_ARGUMENT_SCHEMAS
+    if tool_id != VISUALIZATION_OWNER_TOOL_ID
+)
+VISUALIZATION_CAPABILITY_ADAPTERS: MappingProxyType = MappingProxyType(
+    {
+        "dependency_manifest_graph": VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID,
+    }
+)
+_VISUALIZATION_ADAPTER_LOCATORS: MappingProxyType = MappingProxyType(
+    {
+        "agent_canon.visualization.adapter.dependency_manifest": {
+            "dependency_manifest_locator": (
+                "tools/agent_tools/render_dependency_manifest_graph.py"
+            )
+        },
+        "agent_canon.visualization.adapter.algorithm_flowchart": {
+            "jit_ir_locator": "tools/agent_tools/jit_canonical_ir.py",
+            "lean_evidence_locator": "tools/agent_tools/operational_ir_to_lean.py",
+            "theorem_graph_locator": "tools/agent_tools/theorem_graph_board.py",
+        },
+        "agent_canon.visualization.adapter.document_mermaid": {
+            "document_locator": "documents/runtime/skill-dependency-graph.md"
+        },
+        "agent_canon.visualization.adapter.repository_graph": {
+            "repository_locator": "documents"
+        },
+        "agent_canon.visualization.adapter.knowledge_graph": {
+            "graph_locator": "documents"
+        },
+    }
 )
 
 
@@ -164,6 +210,40 @@ def build_visualization_owner_tool_call(
     return call
 
 
+def build_visualization_adapter_tool_call(
+    owner_call: ToolCall,
+    *,
+    adapter_tool_id: ToolID = VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID,
+    adapter_arguments: Mapping[str, object] | None = None,
+) -> ToolCall:
+    """Build one selected adapter call after a validated owner call."""
+    serialize_tool_call(owner_call)
+    if adapter_tool_id not in VISUALIZATION_ADAPTER_TOOL_IDS:
+        raise ValueError("invalid_visualization_adapter_tool_id")
+    arguments = dict(owner_call["arguments"])
+    locator_arguments = _VISUALIZATION_ADAPTER_LOCATORS[adapter_tool_id]
+    for field, default in locator_arguments.items():
+        arguments[field] = (
+            adapter_arguments[field]
+            if adapter_arguments is not None and field in adapter_arguments
+            else default
+        )
+    adapter: ToolCall = {
+        "schema": "agent_canon.visualization_tool_call.v1",
+        "tool_id": adapter_tool_id,
+        "argument_schema": TOOL_ARGUMENT_SCHEMAS[adapter_tool_id],
+        "arguments": arguments,
+    }
+    serialize_tool_call(adapter)
+    return adapter
+
+
+def visualization_adapter_for_capability(capability_id: str) -> ToolID | None:
+    """Return the catalog-owned adapter selected by one typed capability."""
+    adapter = VISUALIZATION_CAPABILITY_ADAPTERS.get(capability_id)
+    return cast(ToolID | None, adapter)
+
+
 def visualization_rejection_from_error(error: ValueError) -> VisualizationRejection:
     """Map canonical ToolCall validation errors to the fixed route rejection."""
     if str(error).startswith("schema_mismatch:"):
@@ -181,6 +261,16 @@ class CapabilityRoute:
     phase: str
     activation: str
     exclusive: bool
+
+
+@dataclass(frozen=True)
+class SkillToolCommandSpec:
+    """Structured command phases owned by one public skill catalog entry."""
+
+    required: tuple[str, ...] = ()
+    conditional: tuple[str, ...] = ()
+    maintenance: tuple[str, ...] = ()
+    structured: bool = True
 
 
 @dataclass(frozen=True)
@@ -443,8 +533,10 @@ def _validate_dependency_graph(rules: Mapping[str, SkillDependencyRule]) -> None
         raise ValueError("skill-dependency-map-cycle")
     for rule in rules.values():
         for parallel in rule.parallel_independent:
-            if parallel == rule.skill or _reachable(edges, rule.skill, parallel) or _reachable(
-                edges, parallel, rule.skill
+            if (
+                parallel == rule.skill
+                or _reachable(edges, rule.skill, parallel)
+                or _reachable(edges, parallel, rule.skill)
             ):
                 raise ValueError(
                     "skill-dependency-map-parallel-contradiction:"
@@ -470,7 +562,9 @@ def load_skill_dependency_map(
     dependency_data = object_mapping(
         data.get("skill_dependencies"), "skill_dependencies"
     )
-    expected_ids = tuple(public_skill_ids or _skill_ids_from_catalog(load_skill_catalog(root)))
+    expected_ids = tuple(
+        public_skill_ids or _skill_ids_from_catalog(load_skill_catalog(root))
+    )
     observed_ids = tuple(str(key) for key in dependency_data)
     missing = tuple(skill for skill in expected_ids if skill not in dependency_data)
     extra = tuple(skill for skill in observed_ids if skill not in expected_ids)
@@ -653,7 +747,10 @@ def validate_visualization_metadata(rules: Sequence[SkillRoutingRule]) -> None:
             or rule.argument_schema != VISUALIZATION_OWNER_ARGUMENT_SCHEMA
         ):
             raise ValueError("visualization-catalog-owner-tool-call-invalid")
-        if rule.visualization_role == "adapter" and rule.tool_id == VISUALIZATION_OWNER_TOOL_ID:
+        if (
+            rule.visualization_role == "adapter"
+            and rule.tool_id == VISUALIZATION_OWNER_TOOL_ID
+        ):
             raise ValueError(f"{rule.skill}.adapter_tool_id invalid")
     observed_pairs = {(rule.tool_id, rule.argument_schema) for rule in visual_rules}
     required_pairs = set(TOOL_ARGUMENT_SCHEMAS.items())
@@ -692,10 +789,7 @@ def capability_routes(
         record = cast(Mapping[object, object], raw_record)
         if set(record) != required_keys:
             raise _capability_catalog_error(skill, record_field)
-        values = {
-            key: record[key]
-            for key in ("id", "owner", "phase", "activation")
-        }
+        values = {key: record[key] for key in ("id", "owner", "phase", "activation")}
         if any(
             not isinstance(item, str)
             or not item.strip()
@@ -738,8 +832,10 @@ def freeze_related_skill_mapping(
         raise TypeError(f"invalid-route-mapping:{field}")
     copied: dict[str, tuple[str, ...]] = {}
     for key, related in value.items():
-        if not isinstance(key, str) or not isinstance(related, tuple) or not all(
-            isinstance(item, str) for item in related
+        if (
+            not isinstance(key, str)
+            or not isinstance(related, tuple)
+            or not all(isinstance(item, str) for item in related)
         ):
             raise TypeError(f"invalid-route-mapping:{field}")
         copied[key] = tuple(related)
@@ -865,7 +961,9 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
                 visualization_role=visualization_role,
                 tool_id=tool_id,
                 argument_schema=argument_schema,
-                required_prerequisites=dependency_rules[skill_id].required_prerequisites,
+                required_prerequisites=dependency_rules[
+                    skill_id
+                ].required_prerequisites,
                 successors=dependency_rules[skill_id].successors,
                 order_constraints=dependency_rules[skill_id].order_constraints,
                 parallel_independent=dependency_rules[skill_id].parallel_independent,
@@ -895,18 +993,28 @@ def load_skill_route_rules_from_root(
 
 def load_skill_related_map(root: Path) -> dict[str, tuple[str, ...]]:
     """Return catalog-backed related-skill candidates keyed by public skill id."""
-    return {
-        rule.skill: rule.related_skills for rule in load_skill_route_rules(root)
-    }
+    return {rule.skill: rule.related_skills for rule in load_skill_route_rules(root)}
 
 
 def load_skill_required_tool_commands(root: Path) -> dict[str, tuple[str, ...]]:
     """Return catalog-owned required commands keyed by public skill id."""
+    return {
+        skill: spec.required for skill, spec in load_skill_tool_commands(root).items()
+    }
+
+
+def load_skill_tool_commands(root: Path) -> dict[str, SkillToolCommandSpec]:
+    """Return all catalog-owned command phases keyed by public skill id.
+
+    A missing ``tool_commands`` block is retained as an unstructured fixture
+    marker for legacy/minimal roots.  The canonical catalog contains a block
+    for every public skill and therefore never falls back to prose discovery.
+    """
     if not (root / SKILL_CATALOG_PATH).is_file():
         return {}
     data = load_skill_catalog(root)
     families = object_sequence(data.get("skill_families"), "skill_families")
-    result: dict[str, tuple[str, ...]] = {}
+    result: dict[str, SkillToolCommandSpec] = {}
     for index, entry in enumerate(families):
         entry_mapping = object_mapping(entry, f"skill_families[{index}]")
         skill_id = entry_mapping.get("id")
@@ -916,12 +1024,31 @@ def load_skill_required_tool_commands(root: Path) -> dict[str, tuple[str, ...]]:
             raise ValueError(f"duplicate skill catalog id: {skill_id}")
         commands = entry_mapping.get("tool_commands")
         if commands is None:
-            result[skill_id] = ()
+            result[skill_id] = SkillToolCommandSpec(structured=False)
             continue
         command_mapping = object_mapping(commands, f"{skill_id}.tool_commands")
-        result[skill_id] = optional_string_list(
-            command_mapping.get("required"),
-            f"{skill_id}.tool_commands.required",
+        phases = {
+            phase: optional_string_list(
+                command_mapping.get(phase),
+                f"{skill_id}.tool_commands.{phase}",
+            )
+            for phase in ("required", "conditional", "maintenance")
+        }
+        commands_seen: set[str] = set()
+        for phase, values in phases.items():
+            duplicate = next(
+                (command for command in values if command in commands_seen),
+                None,
+            )
+            if duplicate is not None:
+                raise ValueError(
+                    f"{skill_id}.tool_commands.duplicate:{phase}:{duplicate}"
+                )
+            commands_seen.update(values)
+        result[skill_id] = SkillToolCommandSpec(
+            required=phases["required"],
+            conditional=phases["conditional"],
+            maintenance=phases["maintenance"],
         )
     return result
 

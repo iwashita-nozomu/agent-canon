@@ -4,6 +4,7 @@ contract skill
 responsibility Documents pre-implementation OOP and type-boundary design for this repository.
 upstream design ../canonical/skills.md public skill registry and visibility contract
 upstream design ../../documents/conventions/object-oriented-design.md shared OOP boundary policy
+upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract and sparse projection skeleton
 upstream design ../../documents/design/protocols.md Protocol and dependency-direction policy
 upstream design ../../documents/design/dependency-manifest-design.md dependency-header DSL
 upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
@@ -37,6 +38,16 @@ Natural-language keywords do not activate this skill. `$oop-readability-check`,
 produce post-hoc OOP/SOLID, Python, or C/C++ evidence after an implementation
 diff exists. They do not select this design owner, and this skill does not
 duplicate their checks or scores.
+
+When the changed surface includes a Docstring or template projection, read
+`documents/conventions/DOCSTRING_GUIDE.md` as the semantic owner. The packet
+records the responsibility region, selected semantic relation, and projection
+anchor; it does not copy the guide’s clause text or force `Args`, `Returns`,
+`Raises`, or other fixed sections. The catalog capability `oop_type_design` selects this
+language-neutral OOP/type design owner only. After that owner selection, existing
+`agent_team.language_review_candidates` selects `python_reviewer` or `cpp_reviewer` for
+language implementation paths and `docs_workflow_steward` for convention/template docs.
+No new routing branch is introduced.
 
 ## Purpose
 

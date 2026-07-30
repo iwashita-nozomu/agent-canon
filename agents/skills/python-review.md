@@ -4,6 +4,9 @@
 contract skill
 responsibility Documents python-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ./catalog.yaml public skill and capability projection
+upstream design ./skill-dependencies.yaml prerequisite and reviewer order
+upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract and sparse Python projection
 @dependency-end
 -->
 
@@ -27,6 +30,7 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
 ## Use When
 
 - `python/` 配下を触る
+- `templates/experiments/_template/*.py` または Python Docstring projection を触る
 - pyright 警告を扱う
 - API や型境界を変える
 - `bootstrap_agent_run.py` の変更パス判定で `python_reviewer` が自動で足された
@@ -43,6 +47,17 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
   `python3 tools/oop/python/readability.py --root . --language python <changed-python-paths>`
 - 同じ SOLID 対象の Python 差分には
   `python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>`
+
+## Docstring projection route
+
+`agent_team.language_review_candidates` が Python implementation path（`python/`、`tests/`、
+`.py` / `.pyi`）を含む changed surface に `python_reviewer` を候補として返した場合に、
+この reviewer を起動します。convention/template documentation は同じ path inventory から
+`docs_workflow_steward` が担当し、catalog capability は OOP/type design owner の選択に限ります。
+semantic clause の owner は `documents/conventions/DOCSTRING_GUIDE.md` へ戻します。レビューは
+Python syntax / format（Ruff D または pydocstyle）と、target の responsibility region に
+選択した semantic delta が対応するかを確認します。signature、annotation、namespace、field
+を重複記載せず、`Args`、`Returns`、`Raises` の全欄を意味契約の gate にしません。
 
 ## 参照正本
 
@@ -84,6 +99,8 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
 1. 同じ変更パスに対して `check_solid_evidence.py` を走らせ、OOP 可読性レポートの `scanned_paths` が review 対象を覆っていることを確認します。
 1. `pytest tests/` で挙動を確認します。
 1. `bash tools/ci/run_python_quality_checks.sh` で style / import / docstring / upgrade の逸脱を見ます。
+1. Python Docstring projection が変更された場合は、guide の DIC path / section / clause /
+   evidence trace と Python adapter の syntax / format を read back します。
 1. 指摘を API 挙動、型安全性、テスト網羅、文書ずれに分けて返します。
 
 ## よくある失敗

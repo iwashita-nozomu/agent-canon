@@ -18,16 +18,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from skill_route_catalog import (
+    VISUALIZATION_OWNER_SKILL,
     CapabilityId,
     CapabilityIndex,
     VisualizationOwnerSkill,
     VisualizationRejection,
-    VISUALIZATION_OWNER_SKILL,
+    build_visualization_adapter_tool_call,
     build_visualization_owner_tool_call,
     capability_id_from_raw,
     freeze_related_skill_mapping,
     ordered_unique,
     related_skill_candidates,
+    visualization_adapter_for_capability,
     visualization_rejection_from_error,
 )
 from visualization_contract import ToolCall, serialize_tool_call
@@ -107,6 +109,7 @@ class CapabilityRouteDecision:
     reasons: tuple[str, ...]
     visualization_owner_skill: VisualizationOwnerSkill | None
     visualization_tool_call: ToolCall | None
+    visualization_adapter_tool_call: ToolCall | None
     visualization_rejection: VisualizationRejection | None
 
     def __post_init__(self) -> None:
@@ -154,8 +157,7 @@ def capability_flag_conflict(
     """Return the first forbidden capability-mode raw-argv conflict."""
     del args
     capability_present = any(
-        token == "--capability" or token.startswith("--capability=")
-        for token in argv
+        token == "--capability" or token.startswith("--capability=") for token in argv
     )
     if not capability_present:
         return None
@@ -389,7 +391,9 @@ def capability_failure_decision(
     mode: str,
 ) -> CapabilityRouteDecision:
     """Build one deterministic failure envelope without rendering."""
-    ids = () if error_code.startswith("invalid-capability-id:") else tuple(capability_ids)
+    ids = (
+        () if error_code.startswith("invalid-capability-id:") else tuple(capability_ids)
+    )
     return CapabilityRouteDecision(
         schema=CAPABILITY_SCHEMA,
         route="capability-selection",
@@ -406,6 +410,7 @@ def capability_failure_decision(
         reasons=(),
         visualization_owner_skill=None,
         visualization_tool_call=None,
+        visualization_adapter_tool_call=None,
         visualization_rejection=None,
     )
 
@@ -425,7 +430,7 @@ def decide_capabilities(
     skills = ordered_unique(
         (
             "agent-orchestration",
-            *( ("codex-task-workflow",) if mode == "repo-changing" else () ),
+            *(("codex-task-workflow",) if mode == "repo-changing" else ()),
             match.skill,
         )
     )
@@ -440,12 +445,12 @@ def decide_capabilities(
         f"activation={match.activation}"
     )
     rule = index.rules_by_skill.get(match.skill)
-    visualization_requested = (
-        match.skill == VISUALIZATION_OWNER_SKILL
-        or (rule is not None and rule.visualization_owner_skill is not None)
+    visualization_requested = match.skill == VISUALIZATION_OWNER_SKILL or (
+        rule is not None and rule.visualization_owner_skill is not None
     )
     visualization_owner_skill: VisualizationOwnerSkill | None = None
     visualization_tool_call: ToolCall | None = None
+    visualization_adapter_tool_call: ToolCall | None = None
     visualization_rejection: VisualizationRejection | None = None
     if visualization_requested:
         if (
@@ -454,7 +459,10 @@ def decide_capabilities(
             or rule.visualization_tool_call is None
         ):
             visualization_rejection = "missing_owner"
-        elif rule.visualization_tool_call["tool_id"] != "agent_canon.visualization.coverage":
+        elif (
+            rule.visualization_tool_call["tool_id"]
+            != "agent_canon.visualization.coverage"
+        ):
             visualization_rejection = "missing_owner"
         else:
             visualization_owner_skill = VISUALIZATION_OWNER_SKILL
@@ -467,6 +475,12 @@ def decide_capabilities(
             except ValueError as exc:
                 visualization_rejection = visualization_rejection_from_error(exc)
                 visualization_owner_skill = None
+            adapter_tool_id = visualization_adapter_for_capability(match.capability_id)
+            if visualization_tool_call is not None and adapter_tool_id is not None:
+                visualization_adapter_tool_call = build_visualization_adapter_tool_call(
+                    visualization_tool_call,
+                    adapter_tool_id=adapter_tool_id,
+                )
     return CapabilityRouteDecision(
         schema=CAPABILITY_SCHEMA,
         route="capability-selection",
@@ -487,5 +501,6 @@ def decide_capabilities(
         reasons=(f"{match.skill}:{reason}",),
         visualization_owner_skill=visualization_owner_skill,
         visualization_tool_call=visualization_tool_call,
+        visualization_adapter_tool_call=visualization_adapter_tool_call,
         visualization_rejection=visualization_rejection,
     )

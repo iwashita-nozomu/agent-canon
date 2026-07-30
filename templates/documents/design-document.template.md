@@ -4,6 +4,7 @@ contract template
 responsibility Provides the canonical structure for a design document.
 upstream design ../../documents/design/README.md design-document ownership and reader route.
 upstream design ../../documents/rule/README.md repository document filename and language rules.
+upstream design ../../documents/conventions/DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse projection traces.
 downstream implementation README.md implements the approved boundary.
 @dependency-end
 -->
@@ -42,6 +43,19 @@ authority、責務、OOP/type boundary、依存閉包、side effect と failure 
 複数の選択肢と棄却根拠、敵対レビュー、再構築手順、受入条件、evidence and
 assumption ledger を含めます。実装詳細の羅列、未検証の性能主張、run-local log の
 貼り付けは含めません。
+
+## Docstring projection
+
+実装責務に Docstring がある場合は、[Docstring Semantic Contract](../../documents/conventions/DOCSTRING_GUIDE.md#canonical-template-skeleton)
+を意味の正本として参照し、次の projection trace だけをこの design document に記録します。
+
+- responsibility region:
+- selected semantic delta / clause relation:
+- implementation or template anchor:
+- sparse trace and reviewer evidence:
+
+この欄は契約本文を複製しません。signature、type、namespace、field、または意味差分のない
+固定 section は記録せず、選択した差分がない場合は責務の一文だけで閉じます。
 
 ## Authority and decision status
 
