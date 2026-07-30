@@ -6,7 +6,7 @@ responsibility Documents agent-log-analysis for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/runtime/runtime-log-archive.md accumulated eval and hook result storage
 upstream design ../../documents/tools/search-coordination.md coordinated search policy
-upstream design ../../documents/runtime/runtime-log-archive.md defines the external log archive mount and branch policy
+upstream design ../../documents/runtime/runtime-log-archive.md defines the external log archive mount
 downstream design issue-finding-report.md converts compact log findings into durable issues
 upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py owns structured dashboard API fields
 upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
@@ -14,6 +14,11 @@ downstream implementation ../../.agents/skills/agent-log-analysis/SKILL.md expos
 downstream design agent-eval-accumulation.md repairs missing accumulated eval family evidence
 @dependency-end
 -->
+
+The consumed stable-branch and retention policy provenance is recorded in
+[agent-canon-log PR #4](https://github.com/iwashita-nozomu/agent-canon-log/pull/4).
+This external evidence link is intentionally prose metadata; dependency headers
+contain only repository-local owner paths.
 
 ## Reader Map
 
@@ -108,6 +113,15 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
   `generate_agent_runtime_dashboard.py --api-out` の JSON、structured summary、
   generated evidence cell を既定にします。
 - Normal analysis reads structured API fields first. `unknown_event_count` routes missing event taxonomy, `status_by_hook_family` routes status distribution, `failure_by_hook_family` routes failure ownership, `skip_by_hook_family` routes skipped hook ownership, `namespace_debt_by_hook_family` routes legacy namespace debt, and `oop_applicability` routes OOP hook applicability findings.
+
+## Archive branch policy
+
+Stable branch identity is owned by the `agent-canon-log` policy repository. The
+source adapter reads the normalized Git remote and uses its
+`logs/<stable-source-repository-id>` branch. Filesystem paths and chat/session
+IDs remain metadata only. Migration inventory and retention are read-only
+policy-owner workflows; this skill consumes dashboard evidence and does not
+restate or implement their schema.
 
 ## Work Amplification And Wave Interpretation
 
