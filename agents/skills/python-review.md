@@ -50,12 +50,14 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
 
 ## Docstring projection route
 
-Python surface が選ばれた場合は、catalog の `python-review` route と skill dependency order
-を使ってこの reviewer を起動し、semantic clause の owner は
-`documents/conventions/DOCSTRING_GUIDE.md` へ戻します。レビューは Python syntax / format
-（Ruff D または pydocstyle）と、target の responsibility region に選択した semantic delta
-が対応するかを確認します。signature、annotation、namespace、field を重複記載せず、
-`Args`、`Returns`、`Raises` の全欄を意味契約の gate にしません。
+`agent_team.language_review_candidates` が Python implementation path（`python/`、`tests/`、
+`.py` / `.pyi`）を含む changed surface に `python_reviewer` を候補として返した場合に、
+この reviewer を起動します。convention/template documentation は同じ path inventory から
+`docs_workflow_steward` が担当し、catalog capability は OOP/type design owner の選択に限ります。
+semantic clause の owner は `documents/conventions/DOCSTRING_GUIDE.md` へ戻します。レビューは
+Python syntax / format（Ruff D または pydocstyle）と、target の responsibility region に
+選択した semantic delta が対応するかを確認します。signature、annotation、namespace、field
+を重複記載せず、`Args`、`Returns`、`Raises` の全欄を意味契約の gate にしません。
 
 ## 参照正本
 
@@ -97,7 +99,8 @@ Python surface が選ばれた場合は、catalog の `python-review` route と 
 1. 同じ変更パスに対して `check_solid_evidence.py` を走らせ、OOP 可読性レポートの `scanned_paths` が review 対象を覆っていることを確認します。
 1. `pytest tests/` で挙動を確認します。
 1. `bash tools/ci/run_python_quality_checks.sh` で style / import / docstring / upgrade の逸脱を見ます。
-1. Python Docstring projection が変更された場合は、guide の sparse trace と Python adapter の syntax / format を read back します。
+1. Python Docstring projection が変更された場合は、guide の DIC path / section / clause /
+   evidence trace と Python adapter の syntax / format を read back します。
 1. 指摘を API 挙動、型安全性、テスト網羅、文書ずれに分けて返します。
 
 ## よくある失敗

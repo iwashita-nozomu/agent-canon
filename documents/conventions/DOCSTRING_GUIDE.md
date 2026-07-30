@@ -5,14 +5,14 @@ responsibility Defines the language-neutral semantic Docstring contract, its can
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../rule/README.md document filename, placement, and language rules
 upstream design ../design/cpp-build-layout.md selects derived-repo native C++ target identities and build layout
-upstream design ../../agents/skills/catalog.yaml selects reviewer capabilities for the touched surface
+upstream design ../../agents/skills/catalog.yaml selects the OOP/type-design capability owner
 upstream design ../../agents/skills/skill-dependencies.yaml selects reviewer prerequisite and dependency order
 downstream implementation ../../templates/README.md indexes template projection consumers and sparse Docstring boundaries
 downstream design ./coding-conventions-python.md projects the contract into Python docstring syntax and public-surface rules
 downstream design ./coding-conventions-cpp.md projects the contract into C++ documentation syntax and native-boundary rules
 downstream implementation ../../templates/documents/design-document.template.md consumes the semantic skeleton in the reusable design template
-downstream implementation ../../templates/experiments/_template/run.py projects the contract into the later Python code template
-downstream implementation ../../templates/experiments/_template/cases.py projects the contract into the later Python module template
+downstream implementation ../../templates/experiments/_template/run.py projects the contract into the Python code template
+downstream implementation ../../templates/experiments/_template/cases.py projects the contract into the Python module template
 downstream implementation ../../tools/ci/run_python_quality_checks.sh checks language-level Python docstring presence and style
 downstream design ../../agents/skills/python-review.md reviews Python semantic projection when its changed-surface route is selected
 downstream design ../../agents/skills/cpp-review.md reviews C++ semantic projection when its changed-surface route is selected
@@ -45,11 +45,11 @@ projection consumer であり、同じ契約を再定義しません。
 | --- | --- | --- |
 | semantic contract | `documents/conventions/DOCSTRING_GUIDE.md` | 唯一の正本 |
 | canonical template skeleton | `documents/conventions/DOCSTRING_GUIDE.md#canonical-template-skeleton` | 言語非依存の clause source |
-| reusable document-template projection | `templates/documents/design-document.template.md` | 後続実装で skeleton を参照する既存 template |
+| reusable document-template projection | `templates/documents/design-document.template.md` | skeleton を参照する既存 template |
 | Python adapter projection | `documents/conventions/coding-conventions-python.md` | Python docstring syntax / format |
 | C++ adapter projection | `documents/conventions/coding-conventions-cpp.md` | C++ documentation syntax / native format |
-| Python code-template projection | `templates/experiments/_template/run.py` | 後続実装で runtime code へ投影 |
-| Python module-template projection | `templates/experiments/_template/cases.py` | 後続実装で module responsibility を投影 |
+| Python code-template projection | `templates/experiments/_template/run.py` | runtime code への current projection |
+| Python module-template projection | `templates/experiments/_template/cases.py` | module responsibility の current projection |
 | Python public surface | `documents/conventions/coding-conventions-python.md` | `__all__` と公開 export の owner |
 
 `__all__` は Docstring contract の一部ではありません。Python public surface owner へ
@@ -101,7 +101,7 @@ Docstring が保持するのは、code、type、signature、namespace、また�
 
 Reviewer は module / class / function という有限の Docstring 種別から欄を選びません。
 実装、design clause、observable effect の意味関係から、各 target / clause / adapter の
-projection 要否を導き、後述の sparse trace record として materialize します。同一
+projection 要否を導き、既存 DIC の path / clause / evidence trace に束縛します。同一
 Docstring に複数の関係が同時に成立してよく、関係がなければ追加 clause の projection
 は作りません。この matrix は関係を導く decision aid であり、結果分類や文章量・欄数を
 増やす checklist ではありません。
@@ -118,55 +118,29 @@ Docstring に複数の関係が同時に成立してよく、関係がなけれ�
 | none of the above and no non-obvious public behavior | responsibility is sufficient; any omitted clause needs static-surface evidence | no additional clause | 不要な projection を足さず、省略根拠を trace へ残しているか |
 
 clause の owner、partial-effect semantics、algorithm/design source、または public
-contract が未確定で、実装者が Docstring で補ってはいけない場合は、trace record の
-`projection.materialization=owner_returned` として設計 owner へ返します。
+contract が未確定で、実装者が Docstring で補ってはいけない場合は、既存 DIC の evidence
+trace から設計 owner へ返します。
 
-### Sparse trace record schema
+### DIC path / clause / evidence trace
 
-各 target × clause × adapter について、次の最小 record を materialize します。これは
-`include` / `omit` / `escalate` の分類表ではなく、projection の存在、省略、owner 返却を
-正の結果として保持する sparse record です。適用しない詳細 field は空欄で埋めず省略し、
-core identity と reviewer decision は常に残します。
+既存の Design-Implementation Correspondence (DIC) record が semantic completeness の
+owner です。各 function に別の materialized record schema を追加せず、DIC-004 の変更
+target と clause ID、DIC-005 の forward / reverse coverage、そして validation / evidence
+locator を current projection に結び付けます。
 
-```yaml
-docstring_trace_record:
-  record_id: <stable trace identifier>
-  target:
-    identity: <repo-relative path:qualname:span or responsibility region>
-    responsibility_region: <cohesive implementation boundary>
-  clause:
-    canonical_name: <responsibility|precondition|postcondition|invariant|side_effect|failure|ownership_lifetime|algorithm_design>
-    relation: <semantic relation derived from the reviewer matrix>
-    semantic_delta: <meaning not recoverable from the static surface>
-  adapter:
-    kind: <document-template|python|cpp>
-    owner_path: <adapter or template owner path>
-    projection_path: <consumer path>
-    projection_anchor: <section|qualname|comment anchor or null>
-  evidence:
-    source_anchor: <code, design clause, or static-surface path:line>
-    observation: <state/effect/failure/ownership/result fact>
-    static_surface: <what code/type/signature/namespace/design trace already exposes>
-  rationale:
-    projection_basis: <why this semantic delta is reader-relevant>
-    duplication_check: <why the projection does not copy an owner fact>
-    omission_evidence: <required when materialization is omitted>
-    owner_return_reason: <required when materialization is owner_returned>
-  projection:
-    materialization: <present|omitted|owner_returned>
-    text_or_reference: <projected clause, omission record, or owner packet reference>
-  reviewer_decision:
-    reviewer: <catalog-selected reviewer or design owner>
-    evidence_ref: <review/readback evidence path or record id>
-    decision_note: <why this materialized result closes or returns the projection>
-```
+各 projection の trace は次の4点を持つ既存 DIC の対応関係として read back します。
 
-`materialization=omitted` は、`evidence.static_surface` に semantic delta が十分表現
-済みであること、または追加 clause が同じ情報を重複することを明記した場合だけ有効です。
-`materialization=owner_returned` は未確定 contract の owner path と理由を持ちます。
-`materialization=present` は adapter の projection anchor と reader-visible clause を
-持ちます。これらは materialized result の値であり、Docstring 全体へ一律適用する欄の
-分類ではありません。
+| trace field | content | positive completion evidence |
+| --- | --- | --- |
+| path | repo-relative current projection path | changed-path inventory と implementation target |
+| section | section、qualname、または cohesive responsibility region | projection anchor と責務境界 |
+| clause | `responsibility` などの clause と `DSC-*` / DIC clause ID | forward clause mapping |
+| evidence | source、static-surface、review、または canonical readback locator | reverse evidence mapping |
+
+present、omitted、owner-returned は projection の結果分類として DIC evidence に記録
+できます。omitted は static surface で意味が閉じる positive decision、owner-returned は
+未確定 contract を owner に戻す positive decision です。いずれも function ごとの新しい
+schema、全 function の record、固定 field の穴埋めを要求しません。
 
 ## Canonical template skeleton
 
@@ -198,13 +172,12 @@ AlgorithmDesignSnippet     := <non-obvious correctness, ordering, convergence, o
 Snippet は matrix の意味関係から選択し、同じ関係に対応する複数の snippet は必要な
 範囲で合成できます。`ResponsibilitySnippet` 以外に semantic delta がなければ、生成物
 は responsibility の一文だけです。空欄を埋めること、固定順序を守ること、各 snippet
-を一度ずつ使うことは completion 条件ではありません。matrix で選択された結果を
-sparse trace record へ materialize してから language adapter の syntax へ投影します。
+を一度ずつ使うことは completion 条件ではありません。matrix で選択された結果を既存 DIC の
+path / clause / evidence trace に束縛してから language adapter の syntax へ投影します。
 
 この skeleton の reusable document-template projection target は
 `templates/documents/design-document.template.md` です。そこへ semantic clause をコピー
-して第二正本を作らず、contract owner への参照と projection/trace 欄だけを後続実装で
-追加します。
+して第二正本を作らず、contract owner への参照と projection/trace 欄を追加します。
 
 ## Projection consumers and acceptance trace
 
@@ -217,10 +190,10 @@ acceptance trace だけを持ちます。
 - consumer: `templates/documents/design-document.template.md`
 - responsibility region: authority / decision status、target state、OOP/type boundary、
   dependency/effect、adversarial review、reconstruction、acceptance、evidence ledger
-- acceptance trace: `adapter.kind=document-template` とし、template section anchor と
-  design clause の source anchor を record に保存します。semantic clause 本文をこの
+- acceptance trace: template section anchor と design clause の source anchor を既存 DIC
+  の path / section / clause / evidence trace に保存します。semantic clause 本文をこの
   templateへ複製せず、canonical guide への owner reference と projection/trace 欄だけを
-  後続実装で追加します。
+  追加します。
 
 ### Python projection
 
@@ -233,10 +206,10 @@ acceptance trace だけを持ちます。
   `execute_visualization_notebook`（subprocess / notebook artifact）、
   `require_managed_runner_route`（failure semantics）、`main`（orchestration boundary）、
   `cases.py` の module-level case-definition region
-- acceptance trace: `adapter.kind=python`、qualname/responsibility region、Python
-  projection anchor、selected catalog reviewer、static-surface evidence を一つの record
-  に保存します。後続実装では既存 Python docstring prose をこの consumer projection
-  へ変換し、language convention に残った semantic duplicate owner を削除します。
+- acceptance trace: qualname/responsibility region、Python projection anchor、selected
+  reviewer、static-surface evidence を既存 DIC の path / section / clause / evidence trace
+  に保存します。既存 Python docstring prose はこの consumer projectionへ変換し、language
+  convention に残った semantic duplicate owner を削除します。
 
 ### C++ projection
 
@@ -246,9 +219,9 @@ acceptance trace だけを持ちます。
   surface とこの adapter projection を結びます。
 - responsibility regions: public header の declaration / ownership boundary と、source
   implementation の algorithm / failure / native side effect boundary
-- acceptance trace: `adapter.kind=cpp`、header/source anchor、Doxygen projection、native
-  ownership/header evidence、selected catalog reviewer を record に保存します。後続実装
-  では既存 C++ docstring/comment prose をこの projection consumer へ変換し、C++ convention
+- acceptance trace: header/source anchor、Doxygen projection、native ownership/header
+  evidence、selected reviewer を既存 DIC の path / section / clause / evidence trace に保存
+  します。既存 C++ docstring/comment prose はこの projection consumer へ変換し、C++ convention
   側の semantic duplicate owner を削除します。AgentCanon C++ scaffold は、この build
   design が owner と target identity を定義した場合に限り、別 change として追加します。
 
@@ -259,10 +232,10 @@ normalization の意味、owner、evidence、validation を、次の短い struc
 
 | id | normalization meaning | owner | evidence | validation |
 | --- | --- | --- | --- | --- |
-| DAL-01 | C++ native consumer は build design が選ぶ `cpp/include/<project>/...` / `cpp/src/...` target identity に正規化する | `documents/design/cpp-build-layout.md` | dependency graph の upstream design edge と design document source anchor | fresh graph、`check_design_doc_claims.py`、C++ review selected by catalog |
+| DAL-01 | C++ native consumer は build design が選ぶ `cpp/include/<project>/...` / `cpp/src/...` target identity に正規化する | `documents/design/cpp-build-layout.md` | canonical dependency readback と design document source anchor | canonical CI/readback、`check_design_doc_claims.py`、native-path candidate |
 | DAL-02 | C++ Docstring projection は syntax / format と native target anchor の join に正規化する | `documents/conventions/coding-conventions-cpp.md` + `documents/design/cpp-build-layout.md` | C++ projection record の adapter owner、target identity、header/source anchor | design claim checker と C++ adapter readback |
-| DAL-03 | reviewer 選択は changed-surface evidence を catalog/capability projection へ正規化する | `agents/skills/catalog.yaml` + `agents/skills/skill-dependencies.yaml` | materialized route packet と dependency order | `tools/agent_tools/route.py` と orchestration check |
-| DAL-04 | projection の省略は static surface に semantic delta が十分表現済みという record に正規化する | `documents/conventions/DOCSTRING_GUIDE.md` | sparse trace の `static_surface`、`omission_evidence`、reviewer decision | docs check、prose readback、design claim checker |
+| DAL-03 | reviewer 選択は changed-surface evidence を existing language/docs candidates へ正規化し、OOP ownerだけを capability projection へ渡す | `tools/agent_tools/agent_team.py` + `agents/skills/catalog.yaml` | candidate list、OOP route packet、dependency order | `language_review_candidates`、`route.py`、orchestration check |
+| DAL-04 | projection の省略は static surface に semantic delta が十分表現済みという DIC evidence に正規化する | `documents/conventions/DOCSTRING_GUIDE.md` | DIC path / section / clause / evidence trace | docs check、prose readback、design claim checker |
 
 ## Language projection boundary
 
@@ -279,21 +252,27 @@ ABI/header/native ownership の詳細は `documents/conventions/coding-conventio
 
 ## Skill routing boundary
 
-skill routing の唯一の選択面は canonical catalog / capability projection です。routing
-input は changed surface、language、type boundary、design clause relation、projection
-kind とし、catalog が materialize した selected capability と dependency order をそのまま
-利用します。
+skill routing は、既存の changed-path routing と設計 owner の capability 選択を分離します。
+`agent_team.language_review_candidates` が language implementation path と convention /
+template documentation path を読み、選択された touched surface に対応する reviewer を
+返します。catalog capability は pre-implementation の OOP/type design owner を選ぶ場合に
+だけ使います。新しい Docstring capability、keyword branch、または reviewer branch は追加
+しません。
 
 | routing owner | projection input / result |
 | --- | --- |
-| `agents/skills/catalog.yaml` | public skill/capability identity and capability projection |
+| `agents/skills/catalog.yaml` | OOP/type design owner の capability identity and selection |
 | `agents/skills/skill-dependencies.yaml` | prerequisite, successor, and dependency order |
-| `tools/agent_tools/route.py` | request plus changed-surface evidence to materialized route packet |
+| `tools/agent_tools/agent_team.py` | changed paths から language reviewer candidates を選択 |
+| `tools/agent_tools/route.py` | OOP/type design capability と既存 route packet を materialize |
 
-catalog が返した capability projection が language-neutral design、Python、C++、または
-Markdown の reviewer scope を決めます。selected route と dependency order が reviewer
-起動、static type facts、format facts、semantic contract judgement の owner boundary を
-定め、guide はその materialized result を利用します。
+`agent_team.language_review_candidates` は Python implementation path（`python/`、`tests/`、
+`.py` / `.pyi`）、native C/C++ implementation path（native suffix または `src/`、`include/`、
+`lib/`、`cmake/` marker）、および document/config・convention/template path を判定します。
+それぞれ `python_reviewer`、`cpp_reviewer`、`docs_workflow_steward` を候補にし、convention /
+template docs は `docs_workflow_steward` が所有します。guide は selected candidate の
+surface に応じて semantic clause を読み戻します。catalog capability は OOP/type design owner
+の選択に限り、language reviewer の選択は既存 candidates が担います。
 
 ## Validation and review boundary
 
@@ -330,70 +309,78 @@ Completion は欄の充足率ではなく、次の forward/reverse correspondenc
 責務以外の semantic delta がない場合は responsibility-only の対応で閉じ、projection の
 省略は static-surface evidence を持つ正の materialized result になります。
 
-1. **Forward**: canonical template skeleton の各 selected clause が、対象実装の
-   `path:start-end:qualname` または cohesive responsibility region と、language adapter
-   の Docstring clause へ対応する sparse trace record を持つ。
+1. **Forward**: canonical template skeleton の各 selected clause が、current projection
+   の `path`、`section`（`qualname` または cohesive responsibility region）、clause ID、
+   evidence locator として既存 DIC trace に対応する。
 2. **Reverse**: 実装・design evidence に現れる state transition、pure-function result、
-   effect、ownership、failure、algorithm/design condition が、projection present record、
-   static-surface evidence 付き omission record、または owner-return record のいずれかへ
-   戻れる。
+   effect、ownership、failure、algorithm/design condition が、DIC の path / section /
+   clause / evidence join へ戻れる。static surface で閉じる omission と owner へ返す
+   未確定 contract も同じ DIC evidence で正の判断として保持する。
 3. **Consistency**: Docstring が design clause にない保証、effect、failure、ownership を
-   発明していない。未確定の内容は owner-return record として設計 owner へ戻る。
-4. **Readback**: template source、adapter projection、実装 Docstring、review decision、
-   fresh graph を同じ対象 trace で再読し、forward/reverse の欠落を closeout 前に解消する。
+   発明していない。未確定の内容は DIC evidence から設計 owner へ戻る。
+4. **Readback**: template source、adapter projection、実装 Docstring、review decision を
+   同じ DIC trace で再読し、forward/reverse の欠落を closeout 前に解消する。dependency /
+   skill projection source が変わった場合は、canonical CI と selected edge/readback evidence
+   を使用する。一般の Docstring projectionには local runtime-event certificate や graph
+   freshness gate を追加しない。
 
 ### Design-to-implementation trace
 
-| trace id | source / design clause | current canonical path | later projection consumer | acceptance evidence |
+| trace id | source / design clause | current canonical path | current projection consumer | acceptance evidence |
 | --- | --- | --- | --- | --- |
-| DSC-01 | semantic contract, matrix, sparse record schema | `documents/conventions/DOCSTRING_GUIDE.md` | same section remains the source | record core fields and relation readback |
+| DSC-01 | semantic contract, matrix, DIC path / clause / evidence trace | `documents/conventions/DOCSTRING_GUIDE.md` | same section remains the source | DIC path, clause, and evidence readback |
 | DSC-02 | canonical skeleton | `documents/conventions/DOCSTRING_GUIDE.md#canonical-template-skeleton` | `templates/documents/design-document.template.md` | document-template record with section anchor |
 | DSC-03 | document-template responsibility region | this section | `templates/documents/design-document.template.md` | authority/target/acceptance section trace |
-| DSC-04 | Python syntax/public surface | `documents/conventions/coding-conventions-python.md` | `templates/experiments/_template/run.py`, `cases.py` | Python record per responsibility region and adapter readback |
-| DSC-05 | C++ syntax/native boundary and build-design join | `documents/conventions/coding-conventions-cpp.md` + `documents/design/cpp-build-layout.md` | derived-repo `cpp/include/<project>/...` / `cpp/src/...` target identity | C++ record with build-design anchor and header/source trace |
-| DSC-06 | existing prose migration | this guide plus language convention owners | existing Python/C++ prose converted into projection consumers | duplicate semantic owner removed and adapter record retained |
-| DSC-07 | reviewer routing | catalog, capability, and dependency owners | catalog-materialized route packet | no keyword branch or all-reviewer activation |
-| DSC-08 | positive completion | this section | implementation Docstring and review artifact | every relation has present/omitted/owner-return record |
-| DSC-09 | fresh graph/readback | `Fresh graph and readback route` | dependency graph and source readback artifacts | fresh status, graph query, docs/header checks |
+| DSC-04 | Python syntax/public surface | `documents/conventions/coding-conventions-python.md` | `templates/experiments/_template/run.py`, `cases.py` | DIC path/section/clause/evidence readback for Python regions |
+| DSC-05 | C++ syntax/native boundary and build-design join | `documents/conventions/coding-conventions-cpp.md` + `documents/design/cpp-build-layout.md` | derived-repo `cpp/include/<project>/...` / `cpp/src/...` target identity | DIC path/section/clause/evidence readback with build-design anchor |
+| DSC-06 | existing prose migration | this guide plus language convention owners | existing Python/C++ prose converted into projection consumers | duplicate semantic owner removed and DIC trace retained |
+| DSC-07 | reviewer routing | `agent_team.language_review_candidates` plus OOP capability owner | existing changed-path candidates and OOP route packet | language implementation/docs candidates; no keyword/new branch |
+| DSC-08 | positive completion | this section | implementation Docstring and review artifact | each current path has forward/reverse DIC trace; no per-function record |
+| DSC-09 | dependency/skill projection readback | `Dependency/skill projection readback route` | canonical CI and selected source/edge readback | canonical CI/readback evidence when those projections change |
 
-### Subsequent write set
+### Current projection set
 
-The following files are intentionally later work, not this design-phase change:
+The approved design and this implementation are bound to the following 11 current projection
+paths. Each row is a cohesive path/section trace target, not a requirement for a function-level
+record. The existing DIC path / clause / evidence trace owns semantic completeness.
 
-- `templates/documents/design-document.template.md`
-- `templates/experiments/_template/run.py`
-- `templates/experiments/_template/cases.py`
-- `documents/conventions/coding-conventions-python.md`
-- `documents/conventions/coding-conventions-cpp.md`
-- `agents/skills/oop-type-design.md`
-- `agents/skills/python-review.md`
-- `agents/skills/cpp-review.md`
+| current path | forward projection section / region | clause trace | reverse evidence trace |
+| --- | --- | --- | --- |
+| `documents/conventions/DOCSTRING_GUIDE.md` | `Semantic contract`, `Canonical template skeleton`, `Positive completion and design trace` | DSC-01, DSC-08; DIC-004..006 | guide matrix, skeleton, and DIC readback |
+| `documents/conventions/README.md` | conventions index / Docstring owner reference | DSC-01 | owner link and docs check |
+| `documents/conventions/coding-conventions-python.md` | Python Docstring syntax / public-surface projection | DSC-04, DSC-06 | syntax/format section and Python adapter readback |
+| `documents/conventions/coding-conventions-cpp.md` | C++ documentation syntax / native-boundary projection | DSC-05, DSC-06 | Doxygen/native anchor and cpp-build-layout reference |
+| `templates/README.md` | template Docstring projection index | DSC-02, DSC-03 | guide reference and docs check |
+| `templates/documents/design-document.template.md` | design-template Docstring projection | DSC-02, DSC-03 | owner reference and projection fields |
+| `templates/experiments/_template/run.py` | module, result, worker, artifact, subprocess, failure, and orchestration regions | DSC-04, DSC-08 | Python syntax/static check and DIC reverse readback |
+| `templates/experiments/_template/cases.py` | module-level case-definition region | DSC-04, DSC-08 | Python syntax/static check and DIC reverse readback |
+| `agents/skills/oop-type-design.md` | OOP/type boundary and Docstring projection route | DSC-07, DIC-007 | OOP capability route and skill docs readback |
+| `agents/skills/python-review.md` | Python implementation-path reviewer route | DSC-04, DSC-07 | `agent_team.language_review_candidates` and Python review readback |
+| `agents/skills/cpp-review.md` | native implementation-path reviewer route | DSC-05, DSC-07 | `agent_team.language_review_candidates` and C++ review readback |
 
-This list is a trace target, not permission to edit those files in the current revision.
-AgentCanon C++ scaffold はこの write set に含まず、`cpp-build-layout.md` の owner decision 後に
-別 change として設計します。
+Convention and template documentation paths are current consumers owned by
+`docs_workflow_steward`; Python/C++ reviewers are candidates when the changed surface also
+contains the corresponding language implementation paths. AgentCanon C++ scaffold remains out of
+scope, and `cpp-build-layout.md` continues to own any future native target identity decision.
 
-## Fresh graph and readback route
+## Dependency/skill projection readback route
 
-Source or reader-map changes invalidate the previous graph. Regenerate before consuming
-dependency facts, then read back the exact owner and projection edges:
+General Docstring changes close through the DIC trace and targeted docs, dependency-header, runtime
+alignment, and routing checks. This evidence set contains no local runtime-event certificate or
+fresh-graph status gate. Local `.active_run` state remains task-local runtime state, while canonical
+readback evidence establishes dependency and skill projection state.
 
-```bash
-CARGO_TARGET_DIR=<task-local-cargo-target> tools/bin/agent-canon graph build --root . --format json
-CARGO_TARGET_DIR=<task-local-cargo-target> tools/bin/agent-canon graph status --root . --profile default --format json
-CARGO_TARGET_DIR=<task-local-cargo-target> bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges
-```
-
-After graph publication, rerun dependency-header checks and `agent-canon docs check` for the
-changed guide and reader map. Read back the sparse trace schema, projection paths, catalog route,
-and graph edges from the fresh source snapshot. A stale graph status is a blocker to dependency
-readback, not a reason to consume the previous snapshot.
+When a dependency or skill projection source changes, read back the selected owner and edges through
+the canonical CI/static gate and its fresh-checkout evidence, together with the targeted dependency
+header, runtime-alignment, and route checks. The canonical GitHub static-gate result is the accepted
+positive evidence for this projection branch; local task state remains outside that evidence path.
 
 ## Mechanical checks
 
 Changed Markdown remains subject to dependency-header validation, formatter, and docs checks.
-Those checks establish source readability and graph integrity; they do not replace the
-reviewer decision matrix or the forward/reverse semantic trace.
+Those checks establish source readability and header integrity; canonical CI/readback evidence
+covers dependency/skill projection edges when those owners change. They do not replace the reviewer
+decision matrix or the forward/reverse semantic trace.
 
 ## References
 

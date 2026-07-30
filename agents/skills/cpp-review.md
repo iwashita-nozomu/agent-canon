@@ -38,12 +38,15 @@ C / C++ 差分を build 境界、header 境界、所有権、例外・error path
 
 ## Docstring projection route
 
-C++ surface が選ばれた場合は、catalog の `cpp-review` route と skill dependency order を
-使って reviewer を起動し、semantic clause の owner は
-`documents/conventions/DOCSTRING_GUIDE.md` へ戻します。レビューは Doxygen syntax / format、
-header/source anchor、native ownership evidence と、target responsibility region に選択した
-semantic delta が対応するかを確認します。signature、namespace、field、型事実を comment に
-複製せず、`@param`、`@return`、`@throws` の全 tag を意味契約の gate にしません。
+`agent_team.language_review_candidates` が native C/C++ implementation path（native suffix、
+`src/`、`include/`、`lib/`、`cmake/` marker）を含む changed surface に `cpp_reviewer` を
+候補として返した場合に、reviewer を起動します。convention/template documentation は同じ
+path inventory から `docs_workflow_steward` が担当し、catalog capability は OOP/type design
+owner の選択に限ります。semantic clause の owner は `documents/conventions/DOCSTRING_GUIDE.md`
+へ戻します。レビューは Doxygen syntax / format、header/source anchor、native ownership
+evidence と、target responsibility region に選択した semantic delta が対応するかを確認
+します。signature、namespace、field、型事実を comment に複製せず、`@param`、`@return`、
+`@throws` の全 tag を意味契約の gate にしません。
 
 Docstring または規約だけの差分では native build を追加せず、design/header/static evidence
 で完了します。native source、header、ABI、または build configuration が変わった場合だけ
