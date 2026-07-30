@@ -134,7 +134,7 @@ owner = {
 identity = {
   catalog_identity_digest, dependency_identity_digest,
   route_identity_digest, command_packet_identity_digest,
-  tool_surface_identity_digest
+  tool_surface_identity_digest, tool_call_refs
 }
 render = { mode, template_id, command_packet_template_id }
 provenance = {
@@ -182,6 +182,21 @@ digest は `agent_team.materialize_skill_tool_call_token(skill, phase=...)` の 
 serializer と digest domain を使い、
 shim record はそれらを `Ref={id,digest}` として参照します。
 
+rendered shim は source、canonical、route、dependency、command、host config、
+ToolCall、materializer を個別 comment として複製しません。materializer は
+`SkillRuntimeShimRecord` 全体を owner source から再構成し、次の単一 comment だけを
+render/readback します。
+
+~~~text
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"<hex64>"} -->
+~~~
+
+`record_digest` の preimage は canonical doc SHA、route/dependency/command packet
+digests、host path/index/order/enabled、全非空 phase の skill/phase 固有
+ToolID/ToolCall/argument-schema identity、materializer/template identity を含みます。
+comment 自体は owner payload を再掲せず、readback は comment の exact
+schema/version/digest と owner sources から再構成した record digest を照合します。
+
 ### Determinism and idempotent fixed point
 
 この二つを同じ性質として扱いません。
@@ -193,6 +208,10 @@ shim record はそれらを `Ref={id,digest}` として参照します。
   の property です。初回は legacy body から content delta が発生し得ます。初回完了後、
   source が不変なら二回目は同じ record digest、60件の projection digest、readback
   digest/status を返し、`content_delta_count=0`、`content_delta_paths=[]` になります。
+  canonical doc を含む record source が一件でも変わった場合は、acceptance fixture を
+  更新する前に全60件を materialize/readback して target tree を収束させます。その
+  収束済み tree から fixture producer を二回実行し、first/second とも
+  `content_delta_count=0`、`content_delta_paths=[]` を固定します。
 
 実装時の fixture は
 `tests/fixtures/skill-runtime-shim/fixed-point/expected.json`、acceptance test は
@@ -247,15 +266,7 @@ discovery の値は現行 frontmatter の readback から一度だけ移しま�
 name: <discovery.name>
 description: <discovery.description>
 ---
-<!-- generated: agent_canon.skill_runtime_shim.v1 -->
-<!-- source: agents/skills/catalog.yaml#skill:<skill_id> -->
-<!-- canonical: <owner.canonical_doc> sha256=<provenance.canonical_doc_digest> -->
-<!-- route: <owner.route_ref> digest=<identity.route_identity_digest> -->
-<!-- dependencies: <owner.dependency_ref> digest=<identity.dependency_identity_digest> -->
-<!-- commands: <owner.command_ref> digest=<identity.command_packet_identity_digest> -->
-<!-- host-config: path=<discovery.host_config_path> index=<discovery.host_config_index> order=<discovery.host_config_order> enabled=<discovery.host_enabled> digest=<discovery.host_config_entry_digest> -->
-<!-- toolcalls: <owner.tool_surface_ref> digest=<identity.tool_surface_identity_digest> -->
-<!-- materializer: <provenance.materializer_id> -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"<provenance.record_digest>"} -->
 
 <!--
 @dependency-start
@@ -302,18 +313,21 @@ packet digest で保存し、`source_root`、`execution_cwd`、`execution_argv` 
 
 | 状態 | canonical owner | runtime file | 処理 |
 | --- | --- | --- | --- |
-| canonical_prose | agents/skills/<id>.md | adapter_only shim | 正常な v1。canonical link/digest だけを生成 |
-| legacy_adapter_only | 既存 shim の exact generated section | adapter 節 | exact section receipt を readback して再生成 |
+| canonical_prose | agents/skills/<id>.md | adapter_only shim | 正常な v1。canonical link と単一 materialization-record comment だけを生成 |
+| legacy_adapter_only | 旧 generated schema の完全な bytes | adapter 節 | 全必須 metadata field、owner link、dependency manifest、canonical/command section の exact match を readback して再生成 |
 | legacy_canonical_prose | canonical doc と重複する既存 shim prose | 生成停止 | canonical prose を adapter 節へ推測で縮退しない |
 | legacy_mixed_or_unknown | 未確定 | 生成停止 | shim-only の意味を自動で canonical policy に昇格せず、blocking finding として修正 |
 
 移行は current shim body を正規表現で keyword routing するものではありません。
-生成済み marker を持つ stale shim は通常の source-drift update として再生成できます。
-それ以外の legacy input は、frontmatter を除いた exact generated level-two section だけを
-受理します。canonical doc の first heading、semantic similarity、keyword、近接 path へ
-fallback しません。受理できない block は全件 locator/digest 付き receipt に出し、一件でも
-存在すれば per-file replace の前に generation を停止します。canonical prose については
-semantic similarity を oracle にせず、次の `LegacyResolutionRecord` を全 block に対して作ります。
+旧 generated schema は、その schema が要求した frontmatter、8 metadata comments、
+canonical owner link、dependency manifest、command invocation、全 section が
+materializer の旧 exact template と byte-for-byte 一致する場合だけ受理します。
+`Tool Commands` だけ、expected section の subset、owner link 欠落、field 欠落、
+field digest mismatch はすべて fail closed です。canonical doc の first heading、
+semantic similarity、keyword、近接 path、section membership へ fallback しません。
+受理できない block は全件 locator/digest 付き receipt に出し、一件でも存在すれば
+per-file replace の前に generation を停止します。canonical prose については semantic
+similarity を oracle にせず、次の `LegacyResolutionRecord` を全 block に対して作ります。
 
 ~~~text
 LegacyResolutionRecord = {
@@ -713,6 +727,8 @@ MeasurementSummary = {
   current_unicode_scalars_total: integer >= 0,
   generated_unicode_scalars_total: integer >= 0,
   observed_host_input_tokens_total: integer >= 0,
+  paired_reduction_row_count: integer >= 0,
+  non_positive_reduction_row_count: integer >= 0,
   deterministic_reduction_status: "pass" | "fail" | "not_applicable"
 }
 ~~~
@@ -733,6 +749,13 @@ pairing し、observed token usage と candidate deterministic bytes/scalars を
 `host_envelope_plus_candidate` の正規化済み入力尺度、`content_sha256` は候補本文だけの
 digest です。B_i=0 は 0 とせず `denominator_status="not_applicable"` とし、zero
 denominator row は aggregate pass を禁止します。
+
+current/generated candidate は scenario identity または deterministic skill identity ごとに
+exact pair として照合します。missing、duplicate、variant/skill/envelope mismatch は
+producer failure とし、各 pair で current の UTF-8 bytes と Unicode scalars の両方が
+generated より厳密に大きい場合だけ positive reduction row と数えます。
+`non_positive_reduction_row_count > 0` は aggregate が 70% 以上でも
+`deterministic_reduction_status="fail"` とします。
 
 報告するのは 60-row の deterministic bytes/scalars total、median、p10/p90、最大値、
 zero-denominator row 数、fresh host の paired input-token total、canonical-followup

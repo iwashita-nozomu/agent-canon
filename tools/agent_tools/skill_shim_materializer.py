@@ -21,10 +21,10 @@ import posixpath
 import re
 import tempfile
 import unicodedata
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Protocol, TypedDict, cast
 
 try:
     import tomllib
@@ -50,6 +50,10 @@ FIXED_POINT_SCHEMA = "agent_canon.skill_runtime_shim.fixed_point"
 MATERIALIZER_ID = "skill_shim_materializer.v1"
 TEMPLATE_ID = "skill-runtime-shim-md-v1"
 COMMAND_PACKET_TEMPLATE_ID = "skill-tool-command-packet-v2"
+MATERIALIZATION_RECORD_SCHEMA = (
+    "agent_canon.skill_runtime_shim.materialization_record"
+)
+MATERIALIZATION_RECORD_VERSION = 1
 MIGRATION_BASELINE_PATH = Path(
     "tests/fixtures/skill-runtime-shim/migration-baseline/expected.json"
 )
@@ -67,9 +71,6 @@ SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 ABSOLUTE_LOCATOR_RE = re.compile(
     r"(?<![A-Za-z0-9._~/<>-])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+"
 )
-MaterializeToolCallFn = Callable[[str, str], dict[str, object]]
-
-
 class MaterializerError(RuntimeError):
     """One stable fail-closed materializer error."""
 
@@ -117,6 +118,14 @@ class MigrationBaselineDocument(TypedDict):
     schema: str
     version: int
     host_config_rows: list[MigrationBaselineRow]
+
+
+class SkillToolCallMaterializer(Protocol):
+    """Typed callable boundary for the agent-team ToolCall owner."""
+
+    def __call__(self, skill: str, *, phase: str = "required") -> dict[str, object]:
+        """Materialize one skill/phase ToolCall identity."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -210,12 +219,12 @@ def _load_migration_baseline(
     """Load and validate the immutable migration baseline fixture."""
     path = root / MIGRATION_BASELINE_PATH
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload: object = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise MaterializerError("migration_baseline_unreadable", str(exc)) from exc
     if not isinstance(payload, Mapping):
         raise MaterializerError("migration_baseline_invalid_rows", "host_config_rows")
-    payload_map = _mapping(payload, "migration_baseline")
+    payload_map = cast(Mapping[str, object], payload)
     if payload_map.get("schema") != MIGRATION_BASELINE_SCHEMA:
         raise MaterializerError("migration_baseline_invalid_schema", str(payload_map.get("schema")))
     if payload_map.get("version") != VERSION:
@@ -476,10 +485,10 @@ def _tool_call_refs(packet: SkillCommandPacket) -> tuple[list[dict[str, object]]
     for phase, commands in phases:
         if not commands:
             continue
-        token = cast(
-            dict[str, object],
-            cast(Any, materialize_skill_tool_call_token)(packet.skill, phase=phase),
+        materialize_token = cast(
+            SkillToolCallMaterializer, materialize_skill_tool_call_token
         )
+        token = materialize_token(packet.skill, phase=phase)
         identity = cast(Mapping[str, object], token["identity"])
         refs.append({"command_count": len(commands), **dict(identity)})
     if not refs:
@@ -619,6 +628,7 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
             "route_identity_digest": route_identity,
             "command_packet_identity_digest": packet_digest,
             "tool_surface_identity_digest": tool_surface_digest,
+            "tool_call_refs": tool_call_refs,
         },
         "render": {
             "mode": "adapter_only",
@@ -645,21 +655,28 @@ def _record_digest(record: Mapping[str, object]) -> str:
     return cast(str, cast(Mapping[str, object], record["provenance"])["record_digest"])
 
 
-def render_shim(record: Mapping[str, object]) -> str:
-    """Render the exact adapter-only Markdown template."""
+def _materialization_record_comment(record: Mapping[str, object]) -> str:
+    """Render the sole structured metadata comment from the rebuilt record."""
+    payload = {
+        "schema": MATERIALIZATION_RECORD_SCHEMA,
+        "version": MATERIALIZATION_RECORD_VERSION,
+        "record_digest": _record_digest(record),
+    }
+    return (
+        "<!-- materialization-record: "
+        + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        + " -->"
+    )
+
+
+def _legacy_metadata_lines(record: Mapping[str, object]) -> list[str]:
+    """Render every required field of the previous generated metadata schema."""
     discovery = cast(Mapping[str, object], record["discovery"])
     owner = cast(Mapping[str, object], record["owner"])
     identity = cast(Mapping[str, object], record["identity"])
     provenance = cast(Mapping[str, object], record["provenance"])
-    skill = cast(str, record["skill_id"])
-    description = json.dumps(cast(str, discovery["description"]), ensure_ascii=False)
     canonical_doc = cast(str, owner["canonical_doc"])
-    canonical_link = posixpath.relpath(canonical_doc, f".agents/skills/{skill}")
-    lines = [
-        "---",
-        f"name: {discovery['name']}",
-        f"description: {description}",
-        "---",
+    return [
         "<!-- generated: agent_canon.skill_runtime_shim.v1 -->",
         f"<!-- source: {owner['catalog_ref']} -->",
         f"<!-- canonical: {canonical_doc} sha256={provenance['canonical_doc_digest']} -->",
@@ -672,14 +689,59 @@ def render_shim(record: Mapping[str, object]) -> str:
         f"digest={discovery['host_config_entry_digest']} -->",
         f"<!-- toolcalls: {owner['tool_surface_ref']} digest={identity['tool_surface_identity_digest']} -->",
         f"<!-- materializer: {provenance['materializer_id']} -->",
+    ]
+
+
+def _dependency_manifest_lines(
+    record: Mapping[str, object], variant: str
+) -> list[str]:
+    """Render one exact current or bounded legacy dependency manifest."""
+    skill = cast(str, record["skill_id"])
+    owner = cast(Mapping[str, object], record["owner"])
+    canonical_doc = cast(str, owner["canonical_doc"])
+    if variant == "current":
+        body = [
+            "contract skill",
+            f"responsibility Exposes {skill} for runtime discovery.",
+            f"upstream design ../../../{canonical_doc} owner",
+        ]
+    elif variant == "previous-dependency":
+        body = [
+            "contract skill",
+            f"responsibility Exposes {skill} as a Codex runtime discovery adapter.",
+            f"upstream design ../../../{canonical_doc} canonical skill owner",
+        ]
+    elif variant == "previous-reference":
+        body = [
+            "contract reference",
+            f"upstream implementation ../../../{canonical_doc}",
+        ]
+    else:
+        raise MaterializerError("dependency_manifest_variant", variant)
+    return ["<!--", "@dependency-start", *body, "@dependency-end", "-->"]
+
+
+def _render_shim_template(
+    record: Mapping[str, object],
+    *,
+    metadata_lines: Sequence[str],
+    dependency_variant: str,
+) -> str:
+    """Render one complete generated schema without optional sections."""
+    discovery = cast(Mapping[str, object], record["discovery"])
+    owner = cast(Mapping[str, object], record["owner"])
+    skill = cast(str, record["skill_id"])
+    description = json.dumps(cast(str, discovery["description"]), ensure_ascii=False)
+    canonical_doc = cast(str, owner["canonical_doc"])
+    canonical_link = posixpath.relpath(canonical_doc, f".agents/skills/{skill}")
+    lines = [
+        "---",
+        f"name: {discovery['name']}",
+        f"description: {description}",
+        "---",
+        *metadata_lines,
         "",
-        "<!--",
-        "@dependency-start",
-        "contract skill",
-        f"responsibility Exposes {skill} for runtime discovery.",
-        f"upstream design ../../../{canonical_doc} owner",
-        "@dependency-end",
-        "-->",
+        *_dependency_manifest_lines(record, dependency_variant),
         "",
         f"# {skill}",
         "",
@@ -702,6 +764,15 @@ def render_shim(record: Mapping[str, object]) -> str:
     return text
 
 
+def render_shim(record: Mapping[str, object]) -> str:
+    """Render the final adapter with one versioned record-digest comment."""
+    return _render_shim_template(
+        record,
+        metadata_lines=[_materialization_record_comment(record)],
+        dependency_variant="current",
+    )
+
+
 def _runtime_path(context: BuildContext, skill: str) -> Path:
     return context.root / RUNTIME_ROOT / skill / "SKILL.md"
 
@@ -709,70 +780,53 @@ def _runtime_path(context: BuildContext, skill: str) -> Path:
 def _previous_dependency_manifest_shim(
     context: BuildContext, skill: str, expected: str
 ) -> str:
-    """Render the immediate previous dependency manifest for one-step migration."""
-    canonical_doc = _string(
-        context.catalog_entries[skill].get("canonical_doc"),
-        f"{skill}.canonical_doc",
+    """Render the complete previous generated schema and dependency manifest."""
+    record = build_record(context, skill)
+    if expected != render_shim(record):
+        raise MaterializerError("expected_render_mismatch", skill)
+    return _render_shim_template(
+        record,
+        metadata_lines=_legacy_metadata_lines(record),
+        dependency_variant="previous-dependency",
     )
-    current_block = "\n".join(
-        (
-            "<!--",
-            "@dependency-start",
-            "contract skill",
-            f"responsibility Exposes {skill} for runtime discovery.",
-            f"upstream design ../../../{canonical_doc} owner",
-            "@dependency-end",
-            "-->",
-        )
-    )
-    previous_block = "\n".join(
-        (
-            "<!--",
-            "@dependency-start",
-            "contract skill",
-            f"responsibility Exposes {skill} as a Codex runtime discovery adapter.",
-            f"upstream design ../../../{canonical_doc} canonical skill owner",
-            "@dependency-end",
-            "-->",
-        )
-    )
-    if expected.count(current_block) != 1:
-        raise MaterializerError("dependency_manifest_template_mismatch", skill)
-    return expected.replace(current_block, previous_block, 1)
 
 
 def _previous_contract_reference_shim(
     context: BuildContext, skill: str, expected: str
 ) -> str | None:
-    """Render an older `contract reference` migration target if still supported."""
-    canonical_doc = _string(
-        context.catalog_entries[skill].get("canonical_doc"),
-        f"{skill}.canonical_doc",
-    )
-    current_block = "\n".join(
-        (
-            "<!--",
-            "@dependency-start",
-            "contract skill",
-            f"responsibility Exposes {skill} for runtime discovery.",
-            f"upstream design ../../../{canonical_doc} owner",
-            "@dependency-end",
-            "-->",
-        )
-    )
-    contract_reference_block = "\n".join(
-        (
-            "<!--",
-            "@dependency-start",
-            "contract reference",
-            f"upstream implementation ../../../{canonical_doc}",
-            "@dependency-end",
-            "-->",
-        )
-    )
-    if expected.count(current_block) != 1:
+    """Render the complete older generated schema with a reference manifest."""
+    record = build_record(context, skill)
+    if expected != render_shim(record):
         return None
-    return expected.replace(current_block, contract_reference_block, 1)
+    return _render_shim_template(
+        record,
+        metadata_lines=_legacy_metadata_lines(record),
+        dependency_variant="previous-reference",
+    )
+
+
+def _legacy_generated_schema_shim(
+    context: BuildContext, skill: str, expected: str
+) -> str:
+    """Render the complete immediate legacy generated schema."""
+    record = build_record(context, skill)
+    if expected != render_shim(record):
+        raise MaterializerError("expected_render_mismatch", skill)
+    return _render_shim_template(
+        record,
+        metadata_lines=_legacy_metadata_lines(record),
+        dependency_variant="current",
+    )
+
+
+def _legacy_generated_schema_matches(candidate: str, expected: str) -> bool:
+    """Match a complete old template while treating old digests as history."""
+    pieces = re.split(r"([0-9a-f]{64})", expected)
+    pattern = "".join(
+        r"[0-9a-f]{64}" if SHA256_RE.fullmatch(piece) else re.escape(piece)
+        for piece in pieces
+    )
+    return re.fullmatch(pattern, candidate) is not None
 
 
 def classify_legacy(context: BuildContext, skill: str, expected: str) -> dict[str, object]:
@@ -807,40 +861,51 @@ def classify_legacy(context: BuildContext, skill: str, expected: str) -> dict[st
             "resolution": "migrated",
             "unmatched_blocks": [],
         }
-    if body == _previous_dependency_manifest_shim(context, skill, expected):
-        return {
-            "skill_id": skill,
-            "classification": "generated_previous_dependency_manifest",
-            "resolution": "migrated",
-            "unmatched_blocks": [],
-        }
+    legacy_candidates = (
+        (
+            "generated_legacy_schema",
+            _legacy_generated_schema_shim(context, skill, expected),
+        ),
+        (
+            "generated_previous_dependency_manifest",
+            _previous_dependency_manifest_shim(context, skill, expected),
+        ),
+    )
     previous_reference = _previous_contract_reference_shim(context, skill, expected)
-    if previous_reference is not None and body == previous_reference:
-        return {
-            "skill_id": skill,
-            "classification": "generated_previous_dependency_manifest",
-            "resolution": "migrated",
-            "unmatched_blocks": [],
-        }
-    expected_sections = _markdown_sections(_markdown_body(expected))
+    if previous_reference is not None:
+        legacy_candidates = (
+            *legacy_candidates,
+            ("generated_previous_dependency_manifest", previous_reference),
+        )
+    for classification, legacy_expected in legacy_candidates:
+        if _legacy_generated_schema_matches(body, legacy_expected):
+            return {
+                "skill_id": skill,
+                "classification": classification,
+                "resolution": "migrated",
+                "unmatched_blocks": [],
+            }
     legacy_sections = _markdown_sections(_markdown_body(body))
     unmatched_blocks: list[dict[str, str]] = []
-    accepted_blocks: list[str] = []
     for locator, section in legacy_sections.items():
-        if section in expected_sections.values():
-            accepted_blocks.append(locator)
-        else:
-            unmatched_blocks.append(
-                {
-                    "locator": f"{path.relative_to(context.root).as_posix()}#{locator}",
-                    "digest": hashlib.sha256(section.encode("utf-8")).hexdigest(),
-                }
-            )
+        unmatched_blocks.append(
+            {
+                "locator": f"{path.relative_to(context.root).as_posix()}#{locator}",
+                "digest": hashlib.sha256(section.encode("utf-8")).hexdigest(),
+            }
+        )
+    if not unmatched_blocks:
+        unmatched_blocks.append(
+            {
+                "locator": path.relative_to(context.root).as_posix(),
+                "digest": hashlib.sha256(body.encode("utf-8")).hexdigest(),
+            }
+        )
     return {
         "skill_id": skill,
-        "classification": "legacy_exact_sections",
-        "resolution": "migrated" if not unmatched_blocks else "blocked",
-        "accepted_sections": accepted_blocks,
+        "classification": "legacy_schema_mismatch",
+        "resolution": "blocked",
+        "accepted_sections": [],
         "unmatched_blocks": unmatched_blocks,
         "reviewer_ref": "design:skill-runtime-shim-materialization.md#Adapter-Only--Canonical-Prose-Handling",
     }
@@ -891,6 +956,15 @@ def build_rows(context: BuildContext) -> tuple[dict[str, object], dict[str, str]
     return records, rendered, projections
 
 
+def _validate_materialization_record_comment(
+    text: str, record: Mapping[str, object], skill: str
+) -> None:
+    """Require one exact comment bound to the rebuilt owner record."""
+    expected = _materialization_record_comment(record)
+    if text.count("<!-- materialization-record:") != 1 or text.count(expected) != 1:
+        raise MaterializerError("materialization_record_mismatch", skill)
+
+
 def readback_digest(
     context: BuildContext,
     records: Mapping[str, object],
@@ -903,14 +977,20 @@ def readback_digest(
         if not path.is_file():
             raise MaterializerError("readback_missing", skill)
         content = path.read_bytes()
-        expected = render_shim(cast(Mapping[str, object], records[skill])).encode("utf-8")
+        record = cast(Mapping[str, object], records[skill])
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise MaterializerError("readback_invalid_utf8", skill) from exc
+        _validate_materialization_record_comment(text, record, skill)
+        expected = render_shim(record).encode("utf-8")
         if content != expected:
             raise MaterializerError("readback_mismatch", skill)
         rows.append(
             {
                 "skill_id": skill,
                 "content_sha256": hashlib.sha256(content).hexdigest(),
-                "record_digest": _record_digest(cast(Mapping[str, object], records[skill])),
+                "record_digest": _record_digest(record),
                 "projection_digest": projections[skill],
             }
         )
@@ -930,6 +1010,8 @@ def _staged_readback(context: BuildContext, rendered: Mapping[str, str]) -> None
         name = _mapping(frontmatter, f"{skill}.frontmatter").get("name")
         if name != skill:
             raise MaterializerError("staged_frontmatter_mismatch", skill)
+        if rendered[skill].count("<!-- materialization-record:") != 1:
+            raise MaterializerError("materialization_record_count", skill)
         if rendered[skill].count("skill_tool_commands.py show --skill") != 1:
             raise MaterializerError("command_packet_entry_count", skill)
 

@@ -25,6 +25,7 @@ from skill_shim_evaluation import (  # noqa: E402
     ProducerError,
     _host_observation,
     _packet_manifest,
+    _paired_reduction_summary,
     _validate_host_observations,
     normalize_route_result,
 )
@@ -88,6 +89,8 @@ class SkillShimEvaluationTest(unittest.TestCase):
             self.assertEqual(payload["summary"]["scenario_row_count"], 12)
             self.assertEqual(payload["summary"]["candidate_row_count"], 132)
             self.assertEqual(payload["summary"]["deterministic_reduction_status"], "pass")
+            self.assertEqual(payload["summary"]["paired_reduction_row_count"], 66)
+            self.assertEqual(payload["summary"]["non_positive_reduction_row_count"], 0)
             self.assertEqual(
                 {row["variant"] for row in payload["candidate_rows"]},
                 {"current", "generated"},
@@ -149,6 +152,91 @@ class SkillShimEvaluationTest(unittest.TestCase):
             path.write_text(json.dumps(incomplete), encoding="utf-8")
             with self.assertRaisesRegex(ProducerError, "host_observation_incomplete"):
                 _host_observation(path)
+
+    def test_deterministic_reduction_status_requires_positive_pair_reduction(self) -> None:
+        """One non-positive scenario pair must fail the all-pair status."""
+        rows = [
+            {
+                "row_type": "candidate",
+                "candidate_row_id": "candidate-scenario-current",
+                "host_envelope_id": "host-scenario-current",
+                "skill_id": "skill-openai-00",
+                "variant": "current",
+                "utf8_bytes": 500,
+                "unicode_scalars": 500,
+                "denominator_status": "valid",
+            },
+            {
+                "row_type": "candidate",
+                "candidate_row_id": "candidate-scenario-generated",
+                "host_envelope_id": "host-scenario-generated",
+                "skill_id": "skill-openai-00",
+                "variant": "generated",
+                "utf8_bytes": 500,
+                "unicode_scalars": 500,
+                "denominator_status": "valid",
+            },
+            {
+                "row_type": "candidate",
+                "candidate_row_id": "candidate-deterministic-skill-tools-00-current",
+                "host_envelope_id": "deterministic-skill-tools-00-current",
+                "skill_id": "skill-tools-00",
+                "variant": "current",
+                "utf8_bytes": 300,
+                "unicode_scalars": 300,
+                "denominator_status": "valid",
+            },
+            {
+                "row_type": "candidate",
+                "candidate_row_id": "candidate-deterministic-skill-tools-00-generated",
+                "host_envelope_id": "deterministic-skill-tools-00-generated",
+                "skill_id": "skill-tools-00",
+                "variant": "generated",
+                "utf8_bytes": 250,
+                "unicode_scalars": 250,
+                "denominator_status": "valid",
+            },
+        ]
+        scenario_rows = [
+            {
+                "scenario_id": "scenario-openai",
+                "candidate_row_id": "candidate-scenario-current",
+                "variant": "current",
+            },
+            {
+                "scenario_id": "scenario-openai",
+                "candidate_row_id": "candidate-scenario-generated",
+                "variant": "generated",
+            },
+        ]
+        self.assertEqual(
+            ("fail", 1, 1),
+            _paired_reduction_summary(rows, scenario_rows),
+        )
+
+    def test_deterministic_reduction_status_fail_closed_for_duplicate_or_missing_pairs(self) -> None:
+        """Duplicate or missing deterministic current/generated pairs fail closed."""
+        current = {
+            "row_type": "candidate",
+            "candidate_row_id": "candidate-current",
+            "host_envelope_id": "deterministic-skill-openai-00-current",
+            "skill_id": "skill-openai-00",
+            "variant": "current",
+            "utf8_bytes": 500,
+            "unicode_scalars": 500,
+            "denominator_status": "valid",
+        }
+        duplicate = dict(current)
+        duplicate["candidate_row_id"] = "candidate-current-duplicate"
+        with self.assertRaisesRegex(ProducerError, "candidate_pair_duplicate"):
+            _paired_reduction_summary(
+                [
+                    current,
+                    duplicate,
+                ]
+            )
+        with self.assertRaisesRegex(ProducerError, "candidate_pair_missing"):
+            _paired_reduction_summary([current])
 
 
 if __name__ == "__main__":

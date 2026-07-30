@@ -21,7 +21,7 @@ import tempfile
 import unicodedata
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import cast
+from typing import Protocol, cast
 
 try:
     import tomllib
@@ -29,7 +29,11 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.11+ is the supported 
     import tomli as tomllib  # type: ignore[no-redef]
 
 from evaluate_workflow_selection import load_manifest
-from skill_shim_materializer import build_context, build_record, render_shim
+from skill_shim_materializer import (  # pyright: ignore[reportMissingTypeStubs]
+    build_context,
+    build_record,
+    render_shim,
+)
 
 SCHEMA_ROUTE = "agent_canon.route_golden_case.v1"
 SCHEMA_PACKETS = "agent_canon.skill_runtime_shim.fresh_packets"
@@ -52,12 +56,25 @@ SCENARIO_CATEGORIES = (
 HOST_OBSERVATION_SCHEMA = "agent_canon.skill_runtime_shim.host_observation"
 
 
-def _expected_skill_id_from_targets(targets: Sequence[object], packet_id: str) -> str:
+class WorkflowSelectionCase(Protocol):
+    """Typed projection of one imported route manifest case."""
+
+    case_id: str
+    prompt: str
+
+
+class WorkflowSelectionManifest(Protocol):
+    """Typed projection of the imported route manifest document."""
+
+    expected_case_count: int
+    expected_generated_case_count: int
+    cases: Sequence[WorkflowSelectionCase]
+
+
+def _expected_skill_id_from_targets(targets: Sequence[str], packet_id: str) -> str:
     """Extract one canonical target skill id from manifest target files."""
-    values = []
+    values: list[str] = []
     for target in targets:
-        if not isinstance(target, str):
-            raise ProducerError(f"packet_target_type:{packet_id}")
         if target.startswith("agents/skills/") and target.endswith(".md"):
             values.append(Path(target).stem)
         elif target.startswith(".agents/skills/") and target.endswith("/SKILL.md"):
@@ -148,10 +165,15 @@ def normalize_route_result(
     stderr_text = stderr.decode("utf-8", errors="replace")
     if completed.returncode == 0:
         try:
-            route = json.loads((completed.stdout or b"").decode("utf-8"))
+            route_value: object = json.loads(
+                (completed.stdout or b"").decode("utf-8")
+            )
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ProducerError("UNMAPPED_ROUTE_FAILURE:invalid_success_json") from exc
-        if not isinstance(route, dict) or route.get("schema") != ROUTE_SCHEMA:
+        if not isinstance(route_value, dict):
+            raise ProducerError("UNMAPPED_ROUTE_FAILURE:invalid_success_schema")
+        route = cast(dict[str, object], route_value)
+        if route.get("schema") != ROUTE_SCHEMA:
             raise ProducerError("UNMAPPED_ROUTE_FAILURE:invalid_success_schema")
         if stderr:
             raise ProducerError("UNMAPPED_ROUTE_FAILURE:success_stderr")
@@ -161,7 +183,7 @@ def normalize_route_result(
             "exit_code": 0,
             "stderr_sha256": EMPTY_SHA256,
         }
-        return "pass", cast(dict[str, object], route), failure
+        return "pass", route, failure
     non_empty = [line.strip() for line in stderr_text.splitlines() if line.strip()]
     if (
         completed.returncode == 2
@@ -200,7 +222,7 @@ def route_golden(
     output: Path,
 ) -> Mapping[str, object]:
     """Run the real route CLI for every frozen manifest case."""
-    manifest_data = load_manifest(manifest)
+    manifest_data = cast(WorkflowSelectionManifest, load_manifest(manifest))
     if manifest_data.expected_case_count != 525 or manifest_data.expected_generated_case_count != 525:
         raise ProducerError("route_manifest_count_mismatch")
     if len(manifest_data.cases) != 525:
@@ -258,26 +280,34 @@ def route_golden(
 
 def _packet_manifest(path: Path) -> tuple[Mapping[str, object], list[Mapping[str, object]]]:
     """Load and validate the answer-free fresh packet manifest."""
-    raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    raw = cast(
+        Mapping[str, object],
+        tomllib.loads(path.read_text(encoding="utf-8")),
+    )
     if set(raw) != {"catalog_kind", "version", "packet_class_order", "packet"}:
         raise ProducerError("packet_manifest_unknown_field")
     if raw.get("catalog_kind") != "agent_canon_skill_runtime_shim_eval" or raw.get("version") != 1:
         raise ProducerError("packet_manifest_identity")
     if raw.get("packet_class_order") != list(PACKET_CLASSES):
         raise ProducerError("packet_class_order")
-    packets = raw.get("packet")
-    if not isinstance(packets, list) or len(packets) != len(SCENARIO_CATEGORIES):
+    packets_value = raw.get("packet")
+    if not isinstance(packets_value, list):
+        raise ProducerError("packet_count")
+    packets = cast(list[object], packets_value)
+    if len(packets) != len(SCENARIO_CATEGORIES):
         raise ProducerError("packet_count")
     required = {
         "id", "packet_class", "prompt_path", "canonical_target_files", "prompt_dependency_files",
         "scenario_id", "category", "target_skill_id", "iteration_ids", "prompt_digest",
         "method", "requirements", "report_grammar", "packet_digest",
     }
-    rows: list[dict[str, object]] = []
+    rows: list[Mapping[str, object]] = []
     for item in packets:
-        if not isinstance(item, dict) or set(item) != required:
+        if not isinstance(item, Mapping):
             raise ProducerError("packet_manifest_packet_fields")
-        row = cast(dict[str, object], item)
+        row = cast(Mapping[str, object], item)
+        if set(row) != required:
+            raise ProducerError("packet_manifest_packet_fields")
         packet_path = (path.parent.parent.parent / str(row["prompt_path"])).resolve()
         if not packet_path.is_file():
             raise ProducerError(f"missing_packet:{row['id']}")
@@ -295,9 +325,13 @@ def _packet_manifest(path: Path) -> tuple[Mapping[str, object], list[Mapping[str
         prompt_digest = sha256_bytes(packet_prompt.encode("utf-8"))
         if row["prompt_digest"] != prompt_digest:
             raise ProducerError(f"packet_prompt_digest_mismatch:{row['id']}")
-        target_files = row["canonical_target_files"]
-        if not isinstance(target_files, list):
+        target_files_value = row["canonical_target_files"]
+        if not isinstance(target_files_value, list):
             raise ProducerError(f"packet_target_files:{row['id']}")
+        target_file_items = cast(list[object], target_files_value)
+        if not all(isinstance(target, str) for target in target_file_items):
+            raise ProducerError(f"packet_target_files:{row['id']}")
+        target_files = cast(list[str], target_file_items)
         target_skill_id = row["target_skill_id"]
         if (
             not isinstance(target_skill_id, str)
@@ -305,10 +339,12 @@ def _packet_manifest(path: Path) -> tuple[Mapping[str, object], list[Mapping[str
             != target_skill_id
         ):
             raise ProducerError(f"packet_target_skill_id_mismatch:{row['id']}")
-        iteration_ids = row["iteration_ids"]
+        iteration_ids_value = row["iteration_ids"]
+        if not isinstance(iteration_ids_value, Mapping):
+            raise ProducerError(f"packet_iteration_ids:{row['id']}")
+        iteration_ids = cast(Mapping[str, object], iteration_ids_value)
         if (
-            not isinstance(iteration_ids, dict)
-            or set(iteration_ids) != set(VARIANTS)
+            set(iteration_ids) != set(VARIANTS)
             or not all(isinstance(value, str) and value for value in iteration_ids.values())
             or len(set(iteration_ids.values())) != len(VARIANTS)
         ):
@@ -340,7 +376,7 @@ def _packet_manifest(path: Path) -> tuple[Mapping[str, object], list[Mapping[str
         raise ProducerError("packet_id_duplicate")
     if len({str(row["scenario_id"]) for row in rows}) != len(rows):
         raise ProducerError("packet_scenario_duplicate")
-    return cast(Mapping[str, object], raw), [cast(Mapping[str, object], row) for row in rows]
+    return raw, rows
 
 
 def packet_receipt(root: Path, manifest: Path, model: str, profile: str, output_dir: Path) -> Mapping[str, object]:
@@ -348,7 +384,7 @@ def packet_receipt(root: Path, manifest: Path, model: str, profile: str, output_
     if model != MODEL_ID or profile != HOST_PROFILE:
         raise ProducerError("fresh_model_profile_mismatch")
     _, packets = _packet_manifest(manifest)
-    rows = []
+    rows: list[dict[str, object]] = []
     for packet in packets:
         rows.append({"id": packet["id"], "packet_class": packet["packet_class"], "prompt_path": packet["prompt_path"], "packet_digest": packet["packet_digest"]})
     payload = {
@@ -375,7 +411,7 @@ def _git_content(root: Path, path: str, revisions: Sequence[str]) -> bytes:
 
 def _host_observation(path: Path) -> dict[str, object]:
     """Read one fresh host evaluation observation."""
-    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw = cast(Mapping[str, object], json.loads(path.read_text(encoding="utf-8")))
     if not isinstance(raw, dict):
         raise ProducerError(f"host_evaluation_not_object:{path.name}")
     required = {
@@ -458,17 +494,112 @@ def _validate_host_observations(
         iteration_ids = cast(Mapping[str, object], requirement["iteration_ids"])
         if observation["iteration_id"] != iteration_ids.get(variant):
             raise ProducerError(f"host_iteration_mismatch:{scenario_id}:{variant}")
-    required_pairs = {
-        (scenario_id, variant)
-        for scenario_id in expected
-        for variant in VARIANTS
-    }
+    required_pairs: set[tuple[str, str]] = set()
+    for scenario_id in expected:
+        for variant in VARIANTS:
+            required_pairs.add((scenario_id, variant))
     missing = sorted(required_pairs - seen)
     if missing:
         scenario_id, variant = missing[0]
         raise ProducerError(f"host_observation_missing:{scenario_id}:{variant}")
     if len(observations) != len(required_pairs):
         raise ProducerError("host_observation_incomplete")
+
+
+def _paired_reduction_summary(
+    candidate_rows: Sequence[Mapping[str, object]],
+    scenario_rows: Sequence[Mapping[str, object]] = (),
+) -> tuple[str, int, int]:
+    """Validate every current/generated pair and return status/counts."""
+    candidates: dict[str, Mapping[str, object]] = {}
+    for row in candidate_rows:
+        if row.get("row_type") != "candidate":
+            raise ProducerError("candidate_row_type")
+        candidate_id = row.get("candidate_row_id")
+        if not isinstance(candidate_id, str):
+            raise ProducerError("candidate_row_id")
+        if candidate_id in candidates:
+            raise ProducerError(f"candidate_row_duplicate:{candidate_id}")
+        candidates[candidate_id] = row
+
+    pairs: dict[str, dict[str, Mapping[str, object]]] = {}
+    paired_candidate_ids: set[str] = set()
+    for scenario in scenario_rows:
+        scenario_id = scenario.get("scenario_id")
+        candidate_id = scenario.get("candidate_row_id")
+        variant = scenario.get("variant")
+        if (
+            not isinstance(scenario_id, str)
+            or not isinstance(candidate_id, str)
+            or variant not in VARIANTS
+        ):
+            raise ProducerError("scenario_candidate_identity")
+        candidate = candidates.get(candidate_id)
+        if candidate is None or candidate.get("variant") != variant:
+            raise ProducerError(f"scenario_candidate_mismatch:{scenario_id}:{variant}")
+        pair_id = f"scenario:{scenario_id}"
+        pair_values = pairs.setdefault(pair_id, {})
+        if cast(str, variant) in pair_values:
+            raise ProducerError(f"candidate_pair_duplicate:{pair_id}:{variant}")
+        pair_values[cast(str, variant)] = candidate
+        paired_candidate_ids.add(candidate_id)
+
+    for candidate_id, row in candidates.items():
+        if candidate_id in paired_candidate_ids:
+            continue
+        host_envelope_id = row.get("host_envelope_id")
+        if not isinstance(host_envelope_id, str) or not host_envelope_id.startswith("deterministic-"):
+            raise ProducerError(f"candidate_pair_unmapped:{candidate_id}")
+        skill_id = row.get("skill_id")
+        variant = row.get("variant")
+        if not isinstance(skill_id, str) or variant not in VARIANTS:
+            raise ProducerError(f"deterministic_candidate_identity:{candidate_id}")
+        if host_envelope_id != f"deterministic-{skill_id}-{variant}":
+            raise ProducerError(f"deterministic_candidate_envelope:{candidate_id}")
+        pair_id = f"deterministic:{skill_id}"
+        pair_values = pairs.setdefault(pair_id, {})
+        if cast(str, variant) in pair_values:
+            raise ProducerError(f"candidate_pair_duplicate:{pair_id}:{variant}")
+        pair_values[cast(str, variant)] = row
+        paired_candidate_ids.add(candidate_id)
+
+    positive_count = 0
+    non_positive_count = 0
+    for pair_id, pair_values in pairs.items():
+        missing: list[str] = [variant for variant in VARIANTS if variant not in pair_values]
+        if missing:
+            raise ProducerError(f"candidate_pair_missing:{pair_id}:{','.join(missing)}")
+        current = pair_values["current"]
+        generated = pair_values["generated"]
+        if current.get("skill_id") != generated.get("skill_id"):
+            raise ProducerError(f"candidate_pair_skill_mismatch:{pair_id}")
+        values = (
+            current.get("utf8_bytes"),
+            generated.get("utf8_bytes"),
+            current.get("unicode_scalars"),
+            generated.get("unicode_scalars"),
+        )
+        if not all(isinstance(value, int) for value in values):
+            raise ProducerError(f"candidate_pair_measure_invalid:{pair_id}")
+        current_bytes, generated_bytes, current_scalars, generated_scalars = cast(
+            tuple[int, int, int, int], values
+        )
+        if (
+            current.get("denominator_status") == "valid"
+            and generated.get("denominator_status") == "valid"
+            and current_bytes > generated_bytes
+            and current_scalars > generated_scalars
+        ):
+            positive_count += 1
+        else:
+            non_positive_count += 1
+    if paired_candidate_ids != set(candidates) or not pairs:
+        raise ProducerError("candidate_pair_incomplete")
+    return (
+        "pass" if non_positive_count == 0 else "fail",
+        positive_count,
+        non_positive_count,
+    )
 
 
 def measurement(
@@ -634,6 +765,9 @@ def measurement(
     current_scalars = sum(cast(int, row["unicode_scalars"]) for row in current)
     generated_scalars = sum(cast(int, row["unicode_scalars"]) for row in generated)
     valid_rows = sum(row["denominator_status"] == "valid" for row in candidate_rows)
+    pair_status, positive_pair_count, non_positive_pair_count = (
+        _paired_reduction_summary(candidate_rows, scenario_rows)
+    )
     summary = {
         "host_envelope_count": len(host_envelopes),
         "candidate_row_count": len(candidate_rows),
@@ -645,8 +779,15 @@ def measurement(
         "current_unicode_scalars_total": current_scalars,
         "generated_unicode_scalars_total": generated_scalars,
         "observed_host_input_tokens_total": sum(cast(int, row["host_input_tokens"]) for row in scenario_rows),
+        "paired_reduction_row_count": positive_pair_count + non_positive_pair_count,
+        "non_positive_reduction_row_count": non_positive_pair_count,
         "deterministic_reduction_status": (
-            "pass" if current_bytes > 0 and generated_bytes < current_bytes and (current_bytes - generated_bytes) / current_bytes >= 0.70 else "fail"
+            "pass"
+            if current_bytes > 0
+            and generated_bytes < current_bytes
+            and (current_bytes - generated_bytes) / current_bytes >= 0.70
+            and pair_status == "pass"
+            else "fail"
         ),
     }
     run_id = output.stem or f"skill-shim-{context.source_snapshot_digest[:10]}"
