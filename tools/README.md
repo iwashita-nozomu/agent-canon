@@ -18,6 +18,7 @@ downstream implementation agent_tools/generated_artifact_guard.py rejects regene
 downstream implementation agent_tools/check_design_doc_claims.py validates design-document evidence claims
 downstream implementation ../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
+downstream implementation ../rust/agent-canon/src/python_algorithm_contract.rs runs the canonical Python algorithm contract checker
 downstream implementation agent_tools/search.py coordinates purpose-based search providers
 downstream implementation agent_tools/search_index.py builds repo-local semantic search cards
 downstream design user/README.md defines stable user-facing tool entrypoint migration target
@@ -445,7 +446,7 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
 - `agent_tools/check_log_helper_names.py`
 - `agent_tools/file_surface_inventory.py`
 - `agent_tools/review_backlog_scan.sh`
-- `agent_tools/check_algorithm_module_nested_contract.py`
+- `bin/agent-canon python-algorithm-contract-check`
 - `agent_tools/agent_update_branch.sh`
 - `agent_tools/vector_search.py`
 - `oop/python/readability.py`
