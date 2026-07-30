@@ -14,8 +14,9 @@ description: "Define and validate the typed declarative devcontainer dependency 
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/dependency-design.md
+contract skill
+responsibility Exposes dependency-design as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/dependency-design.md canonical skill owner
 @dependency-end
 -->
 

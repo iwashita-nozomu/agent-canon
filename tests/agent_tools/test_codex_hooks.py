@@ -5,7 +5,7 @@
 # responsibility Tests active codex hook behavior and retired-route contract.
 # upstream implementation ../../.codex/config.toml enables hooks
 # upstream implementation ../../.codex/hooks.json declares the three active hooks
-# upstream implementation ../../.codex/hooks/hook_safety.py owns active safety leaves
+# upstream implementation ../../tools/agent_tools/hook_safety.py owns active safety leaves
 # upstream implementation ../../.codex/hooks/hook_dispatcher.py owns the typed event contract
 # downstream implementation ../../tests/agent_tools/test_hook_event_log.py validates hook telemetry
 # @dependency-end
@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import importlib.util
 import json
 import os
 import subprocess
@@ -22,7 +21,6 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from types import ModuleType
 from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -30,7 +28,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
-SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from prompt_classifier import PromptClassifierInputs, prompt_intake_signals  # noqa: E402
 
 ACTIVE_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
 RETIRED_ROUTE_TABLE = (
@@ -59,25 +58,13 @@ RETIRED_ROUTE_TABLE = (
     "task_authority_schema_guard.py",
 )
 RETIRED_ROUTE_FIELDS = {
+    "filename",
     "artifact",
     "command_or_skill",
     "decision_semantics",
     "owner",
     "profile_trigger",
 }
-
-
-def load_skill_usage_logger() -> ModuleType:
-    """Load the logger module so prompt classification can be tested without its CLI."""
-    spec = importlib.util.spec_from_file_location(
-        "agent_canon_skill_usage_logger_test", SKILL_USAGE_LOGGER
-    )
-    if spec is None or spec.loader is None:
-        raise AssertionError(f"cannot load {SKILL_USAGE_LOGGER}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 class CodexHooksTest(unittest.TestCase):
@@ -181,7 +168,8 @@ class CodexHooksTest(unittest.TestCase):
         events = cast("dict[str, dict[str, object]]", contract["events"])
         active_events = cast("list[str]", contract["active_events"])
         inactive_events = cast("list[str]", contract["inactive_events"])
-        retired_routes = cast("dict[str, dict[str, object]]", contract["retired_hook_routes"])
+        retired_rows = cast("list[dict[str, object]]", contract["retired_child_tombstones"])
+        moved_rows = cast("list[dict[str, object]]", contract["moved_source_absences"])
         active_handlers = set(cast("list[str]", contract["active_handlers"]))
 
         self.assertEqual(set(active_events), set(ACTIVE_EVENTS))
@@ -195,8 +183,10 @@ class CodexHooksTest(unittest.TestCase):
         )
         self.assertEqual(inactive_events, ["Stop"])
         self.assertEqual(set(events), set((*ACTIVE_EVENTS, "Stop")))
+        retired_routes = {cast(str, row["filename"]): row for row in retired_rows}
         self.assertEqual(set(retired_routes), set(RETIRED_ROUTE_TABLE))
-        self.assertEqual(len(retired_routes), 23)
+        self.assertEqual(len(retired_rows), 23)
+        self.assertEqual(len(moved_rows), 1)
         self.assertTrue(set(retired_routes).isdisjoint(active_handlers))
 
         for event, expected_active in (
@@ -400,14 +390,10 @@ class CodexHooksTest(unittest.TestCase):
 
     def test_prompt_intake_signals_keeps_evaluator_classification_pure(self) -> None:
         """Prompt routing remains observable without JSONL or runtime-hook side effects."""
-        logger = load_skill_usage_logger()
         cases = (
             {
                 "name": "validation-repair",
                 "prompt": "failed validation; do not delete tests or weaken oracle before repairing the failing contract",
-                "required_candidates": {"codex-task-workflow", "test-design"},
-                "required_workflows": {"codex-task-workflow"},
-                "reason_fragment": "tests_are=validation_control_surface_not_default_work_owner",
             },
             {
                 "name": "declared-skill",
@@ -418,12 +404,11 @@ class CodexHooksTest(unittest.TestCase):
             {
                 "name": "oracle-mismatch",
                 "prompt": "The test oracle has a spec mismatch; fix test design.",
-                "required_candidates": {"test-design"},
             },
             {
                 "name": "user-guided-debugging",
                 "prompt": "Use user-guided refactor cadence: show one concrete issue, patch only that target, and do not run validation unless I ask.",
-                "required_candidates": {"user-guided-debugging"},
+                "forbidden_candidates": {"user-guided-debugging"},
             },
             {
                 "name": "ordinary-docs",
@@ -433,20 +418,23 @@ class CodexHooksTest(unittest.TestCase):
             {
                 "name": "parent-repo-skill-lane",
                 "prompt": "親レポに固有スキルを置けるようにする設計修正",
-                "required_candidates": {"task-routing", "structure-refactor"},
-                "reason_fragment": "structural_concept=parent_repo_project_skill_lane",
+                "forbidden_candidates": {"task-routing", "structure-refactor"},
             },
             {
                 "name": "advisory-routing",
                 "prompt": "Which route contract applies for this repository task?",
-                "required_candidates": {"task-routing"},
                 "forbidden_candidates": {"codex-task-workflow"},
             },
         )
         for case in cases:
             with self.subTest(case=case["name"]):
-                signals = logger.prompt_intake_signals(
-                    {"hookEventName": "UserPromptSubmit", "prompt": case["prompt"]}
+                signals = prompt_intake_signals(
+                    PromptClassifierInputs(
+                        prompt=cast(str, case["prompt"]),
+                        repo_root=PROJECT_ROOT,
+                        catalog={},
+                        routing_rules={},
+                    )
                 )
                 candidates = set(signals.candidate_skills)
                 selected = set(signals.skills)

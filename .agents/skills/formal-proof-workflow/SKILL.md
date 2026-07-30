@@ -14,8 +14,9 @@ description: "Use when natural-language mathematical claims, JIT-canonical imple
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/formal-proof-workflow.md
+contract skill
+responsibility Exposes formal-proof-workflow as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/formal-proof-workflow.md canonical skill owner
 @dependency-end
 -->
 

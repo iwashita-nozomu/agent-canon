@@ -14,8 +14,9 @@ description: "Use when a task needs specialist delegation, run-bundle bootstrap,
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/subagent-bootstrap.md
+contract skill
+responsibility Exposes subagent-bootstrap as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/subagent-bootstrap.md canonical skill owner
 @dependency-end
 -->
 

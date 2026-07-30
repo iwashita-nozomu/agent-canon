@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 import re
-import shlex
 import subprocess
 import tempfile
 import shutil
@@ -462,36 +461,35 @@ def is_project_skill_lane_path(path: Path) -> bool:
 
 
 def validate_retired_command_or_skill(value: str, child: str) -> None:
-    """Require one retired route to name an installed skill or repo-owned command."""
-    if value.startswith("$"):
-        skill_id = value[1:]
+    """Validate a tombstone representation without executing or resolving it."""
+    import_grammar = re.compile(r"import-only:tools\.agent_tools\.[A-Za-z0-9_]+:[A-Za-z0-9_]+$")
+    command_grammar = re.compile(
+        r"command-only:python3 (tools/(?:agent_tools|validation)/[A-Za-z0-9_]+\.py)(?: [^\n]*)?$"
+    )
+    if import_grammar.fullmatch(value):
+        return
+    command = command_grammar.fullmatch(value)
+    if command:
+        tool_path = command.group(1)
+        raw_catalog: object = yaml.safe_load((ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8"))
+        catalog = require_mapping(raw_catalog, "tool catalog must parse as a mapping")
+        families = require_mapping(catalog.get("families", {}), "tool catalog families must be a mapping")
+        canonical_tool_roots = {
+            require_string(
+                require_mapping(
+                    families.get(family), f"tool catalog family missing: {family}"
+                ).get("root"),
+                f"tool catalog family root must be a string: {family}",
+            )
+            for family in ("agent_tools", "validation")
+        }
         ensure(
-            bool(re.fullmatch(r"[a-z0-9][a-z0-9-]*", skill_id)),
-            f"retired route {child} has invalid skill id: {value}",
-        )
-        ensure(
-            (ROOT / ".agents" / "skills" / skill_id / "SKILL.md").is_file(),
-            f"retired route {child} skill does not resolve: {value}",
+            any(tool_path.startswith(f"{path}/") for path in canonical_tool_roots),
+            f"retired route {child} command path is not a catalog-backed canonical tool: {tool_path}",
         )
         return
-    try:
-        tokens = shlex.split(value)
-    except ValueError as exc:
-        raise RuntimeError(
-            f"retired route {child} command is malformed: {value}"
-        ) from exc
-    ensure(bool(tokens), f"retired route {child} command must be non-empty")
-    command_path_index = 1 if tokens[0] in {"bash", "python", "python3", "sh"} else 0
-    ensure(
-        len(tokens) > command_path_index,
-        f"retired route {child} command lacks a repo-owned target: {value}",
-    )
-    command_path = Path(tokens[command_path_index])
-    ensure(
-        not command_path.is_absolute()
-        and (ROOT / command_path).is_file(),
-        f"retired route {child} command does not resolve: {value}",
-    )
+    grammar = re.compile(r"(?:skill-only:\$[a-z0-9][a-z0-9-]*|docs-only:tools/bin/agent-canon docs check)$")
+    ensure(bool(grammar.fullmatch(value)), f"retired route {child} has invalid tombstone representation: {value}")
 
 
 def validate_project_hooks() -> None:
@@ -544,16 +542,21 @@ def validate_project_hooks() -> None:
         ensure(isinstance(event_contract.get("matchers"), list), f"hook contract {event} matchers must be a list")
         ensure(isinstance(event_contract.get("failure"), str) and event_contract["failure"], f"hook contract {event} failure must be non-empty")
         ensure(isinstance(event_contract.get("telemetry"), str) and event_contract["telemetry"], f"hook contract {event} telemetry must be non-empty")
-    retired = require_mapping(contract.get("retired_hook_routes", {}), "retired hook routes must be a mapping")
-    ensure(not set(contract.get("active_handlers", [])).intersection(retired), "active and retired hook sets must be disjoint")
-    for child, route in retired.items():
-        route_map = require_mapping(route, f"retired route {child} must be a mapping")
+    retired = require_list(contract.get("retired_child_tombstones", []), "retired child tombstones must be a list")
+    moved = require_list(contract.get("moved_source_absences", []), "moved source absences must be a list")
+    ensure(len(retired) == 23 and len(moved) == 1, "hook retirement contract counts must be exact")
+    retired_names: set[str] = set()
+    for route in retired:
+        route_map = require_mapping(route, "retired tombstone must be a mapping")
+        child = require_string(route_map.get("filename"), "retired tombstone filename must be a string")
+        retired_names.add(child)
         for field in ("owner", "command_or_skill", "profile_trigger", "decision_semantics", "artifact"):
-            ensure(isinstance(route_map.get(field), str) and route_map[field], f"retired route {child} missing {field}")
+            ensure(isinstance(route_map.get(field), str) and route_map[field], f"retired tombstone {child} missing {field}")
         validate_retired_command_or_skill(
             cast(str, route_map["command_or_skill"]),
             child,
         )
+    ensure(not set(contract.get("active_handlers", [])).intersection(retired_names), "active and retired hook sets must be disjoint")
 
 
 def validate_generated_role_views() -> None:

@@ -14,8 +14,9 @@ description: "Use when accumulated AgentCanon eval evidence is missing, stale, o
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/agent-eval-accumulation.md
+contract skill
+responsibility Exposes agent-eval-accumulation as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/agent-eval-accumulation.md canonical skill owner
 @dependency-end
 -->
 

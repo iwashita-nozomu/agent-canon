@@ -24,6 +24,7 @@ sys.path.insert(0, str(TOOLS_ROOT))
 from skill_shim_materializer import (  # noqa: E402
     MIGRATION_BASELINE_PATH,
     MaterializerError,
+    _previous_dependency_manifest_shim,
     build_context,
     build_record,
     check,
@@ -165,6 +166,45 @@ class SkillShimMaterializerTest(unittest.TestCase):
         blocks = receipt["unmatched_blocks"]
         self.assertEqual(len(blocks), 2)
         self.assertTrue(all("locator" in block and "digest" in block for block in blocks))
+
+    def test_render_shim_contains_canonical_skill_dependency_manifest(self) -> None:
+        """The generated discovery adapter emits the registered skill manifest."""
+        context = build_context(PROJECT_ROOT)
+        rendered = render_shim(build_record(context, "agent-orchestration"))
+        self.assertIn(
+            "\n".join(
+                (
+                    "<!--",
+                    "@dependency-start",
+                    "contract skill",
+                    "responsibility Exposes agent-orchestration as a Codex runtime discovery adapter.",
+                    "upstream design ../../../agents/skills/agent-orchestration.md canonical skill owner",
+                    "@dependency-end",
+                    "-->",
+                )
+            ),
+            rendered,
+        )
+
+    def test_previous_generated_dependency_manifest_migrates_exactly(self) -> None:
+        """The immediately previous generated template is a bounded migration input."""
+        context = build_context(PROJECT_ROOT)
+        skill = "agent-orchestration"
+        expected = render_shim(build_record(context, skill))
+        previous = _previous_dependency_manifest_shim(context, skill, expected)
+        runtime_path = PROJECT_ROOT / ".agents/skills" / skill / "SKILL.md"
+        original = runtime_path.read_text(encoding="utf-8")
+        runtime_path.write_text(previous, encoding="utf-8")
+        try:
+            receipt = classify_legacy(context, skill, expected)
+        finally:
+            runtime_path.write_text(original, encoding="utf-8")
+        self.assertEqual(
+            receipt["classification"],
+            "generated_previous_dependency_manifest",
+        )
+        self.assertEqual(receipt["resolution"], "migrated")
+        self.assertEqual(receipt["unmatched_blocks"], [])
 
 
 if __name__ == "__main__":

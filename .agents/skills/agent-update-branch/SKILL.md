@@ -14,8 +14,9 @@ description: "Use when Memory, eval results, AgentCanon pins, or other agent-run
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/agent-update-branch.md
+contract skill
+responsibility Exposes agent-update-branch as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/agent-update-branch.md canonical skill owner
 @dependency-end
 -->
 

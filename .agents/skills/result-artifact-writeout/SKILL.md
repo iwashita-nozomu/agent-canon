@@ -14,8 +14,9 @@ description: "Use when writing, exporting, saving, accumulating, or reporting to
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/result-artifact-writeout.md
+contract skill
+responsibility Exposes result-artifact-writeout as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/result-artifact-writeout.md canonical skill owner
 @dependency-end
 -->
 

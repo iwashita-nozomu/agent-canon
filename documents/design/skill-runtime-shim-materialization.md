@@ -259,8 +259,9 @@ description: <discovery.description>
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../<owner.canonical_doc>
+contract skill
+responsibility Exposes <skill-id> as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/<skill-id>.md canonical skill owner
 @dependency-end
 -->
 

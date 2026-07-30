@@ -116,7 +116,7 @@ COMPLETION_COVERAGE_SCHEMA = "agent-canon.completion-coverage.v1"
 VALIDATION_RESULT_SCHEMA = "agent-canon.validation-result-projection.v1"
 VALIDATION_ROUTE_ID = "python.ruff.full"
 VALIDATION_OWNER_PATHS = (
-    ".codex/hooks/completion_review_guard.py",
+    "tools/agent_tools/review_dispatch.py",
     "tools/agent_tools/artifact_identity.py",
     "tools/agent_tools/external_artifact_binding.py",
     "tools/agent_tools/publication_integrator.py",

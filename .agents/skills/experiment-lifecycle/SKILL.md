@@ -14,8 +14,9 @@ description: "Use this skill when preparing, running, or validating experiments.
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/experiment-lifecycle.md
+contract skill
+responsibility Exposes experiment-lifecycle as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/experiment-lifecycle.md canonical skill owner
 @dependency-end
 -->
 

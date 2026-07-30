@@ -14,8 +14,9 @@ description: "Use when a task needs paper search, prior-art mapping, contradicto
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/literature-survey.md
+contract skill
+responsibility Exposes literature-survey as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/literature-survey.md canonical skill owner
 @dependency-end
 -->
 

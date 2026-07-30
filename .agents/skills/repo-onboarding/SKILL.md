@@ -14,8 +14,9 @@ description: "Use when entering an unfamiliar repository or subdirectory and you
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/repo-onboarding.md
+contract skill
+responsibility Exposes repo-onboarding as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/repo-onboarding.md canonical skill owner
 @dependency-end
 -->
 

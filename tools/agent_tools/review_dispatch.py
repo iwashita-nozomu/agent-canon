@@ -15,7 +15,7 @@
 # upstream implementation ./artifact_identity.py materializes review artifact byte identities.
 # upstream implementation ./external_artifact_binding.py maps provider readback to local events.
 # downstream implementation ./publication_integrator.py resolves current explicit APPROVE state.
-# downstream implementation ../../.codex/hooks/completion_review_guard.py blocks unresolved automatic review.
+# downstream implementation ./report_artifact_checks.py consumes unresolved automatic review evidence.
 # downstream implementation ../../tests/agent_tools/test_review_dispatch.py validates automatic-review state and routing.
 # @dependency-end
 """Drive automatic independent review from canonical repository state."""

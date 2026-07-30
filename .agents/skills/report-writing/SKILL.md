@@ -14,8 +14,9 @@ description: "Use when drafting or revising reader-facing reports, decision brie
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/report-writing.md
+contract skill
+responsibility Exposes report-writing as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/report-writing.md canonical skill owner
 @dependency-end
 -->
 

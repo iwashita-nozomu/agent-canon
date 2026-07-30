@@ -14,8 +14,9 @@ description: "Use when reviewing experiment topics, run.py files, experiment reg
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/experiment-review.md
+contract skill
+responsibility Exposes experiment-review as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/experiment-review.md canonical skill owner
 @dependency-end
 -->
 

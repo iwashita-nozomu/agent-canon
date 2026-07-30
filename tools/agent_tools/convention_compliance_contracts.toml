@@ -170,7 +170,7 @@ id = "branch_worktree_creation_guard"
 description = "Shared-checkout Git mutations and branch/worktree creation stay routed through explicit authority and the critical PreToolUse guard."
 
 [[contracts.surfaces]]
-path = ".codex/hooks/hook_safety.py"
+path = "tools/agent_tools/hook_safety.py"
 markers = [
     "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY",
     "AGENT_CANON_BRANCH_WORKTREE_REASON",
@@ -187,11 +187,11 @@ markers = [
 
 [[contracts.surfaces]]
 path = ".codex/hooks/hook_dispatcher.py"
-markers = ["HOOK_EVENT_CONTRACTS", "HookEventContract", "ACTIVE_HOOK_HANDLERS", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "hook_safety.py", "validate_projection_bytes", "execution_resource_plan_projection_guard.py", "FORMER_ACTIVE_HOOK_CHILDREN", "RETIRED_HOOK_ROUTES", "if set(RETIRED_HOOK_ROUTES) != FORMER_ACTIVE_HOOK_CHILDREN:", "if set(RETIRED_HOOK_ROUTES).intersection(ACTIVE_HOOK_HANDLERS):", "branch_worktree_guard.py"]
+markers = ["HOOK_EVENT_CONTRACTS", "HookEventContract", "ACTIVE_HOOK_HANDLERS", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "hook_safety", "validate_projection_bytes", "record_hook_invocation", "HookLogContext", "RETIRED_CHILD_TOMBSTONES", "MOVED_SOURCE_ABSENCES"]
 
 [[contracts.surfaces]]
 path = "agents/canonical/CODEX_WORKFLOW.md"
-markers = ["Branch Reuse Default", "branch_worktree_guard.py", "user が別 branch を明示", "AgentCanon branch / PR workflow", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval", "AGENT_CANON_DESTRUCTIVE_GIT_REASON=<reason>", "proven exact task ownership", "session restart", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow", "AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>"]
+markers = ["Branch Reuse Default", "tools/agent_tools/hook_safety.py", "user が別 branch を明示", "AgentCanon branch / PR workflow", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval", "AGENT_CANON_DESTRUCTIVE_GIT_REASON=<reason>", "proven exact task ownership", "session restart", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow", "AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>"]
 
 [[contracts.surfaces]]
 path = "ROOT_AGENTS.md"
@@ -203,11 +203,11 @@ markers = ["Multiple chats or sessions", "unknown dirty", "Proven exact task own
 
 [[contracts.surfaces]]
 path = ".codex/README.md"
-markers = ["active events", "legacy `Stop`", "fail-open", "RETIRED_HOOK_ROUTES", "bounded", "redacted"]
+markers = ["active events", "legacy `Stop`", "fail-open", "retired child tombstones", "bounded", "redacted"]
 
 [[contracts.surfaces]]
 path = "agents/skills/worktree-health.md"
-markers = ["agents/canonical/CODEX_WORKFLOW.md", "Branch Reuse Default", "branch_worktree_guard.py", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "git worktree list --porcelain", "git branch --show-current"]
+markers = ["agents/canonical/CODEX_WORKFLOW.md", "Branch Reuse Default", "tools/agent_tools/hook_safety.py", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "git worktree list --porcelain", "git branch --show-current"]
 
 [[contracts]]
 id = "solid_coding_contract"

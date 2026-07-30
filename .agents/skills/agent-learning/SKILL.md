@@ -14,8 +14,9 @@ description: "Use when agent-side working philosophy, interaction lessons, task 
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/agent-learning.md
+contract skill
+responsibility Exposes agent-learning as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/agent-learning.md canonical skill owner
 @dependency-end
 -->
 

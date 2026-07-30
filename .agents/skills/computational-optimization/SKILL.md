@@ -14,8 +14,9 @@ description: "Use when designing, implementing, reviewing, or diagnosing numeric
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/computational-optimization.md
+contract skill
+responsibility Exposes computational-optimization as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/computational-optimization.md canonical skill owner
 @dependency-end
 -->
 

@@ -14,8 +14,9 @@ description: "Use when rendering JIT-canonical IR records, generated Lean eviden
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/algorithm-flowchart.md
+contract skill
+responsibility Exposes algorithm-flowchart as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/algorithm-flowchart.md canonical skill owner
 @dependency-end
 -->
 

@@ -14,8 +14,9 @@ description: "Use when creating, scaffolding, planning, or implementing an MVP, 
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/mvp-skeleton.md
+contract skill
+responsibility Exposes mvp-skeleton as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/mvp-skeleton.md canonical skill owner
 @dependency-end
 -->
 

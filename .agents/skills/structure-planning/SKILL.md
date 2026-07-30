@@ -14,8 +14,9 @@ description: "Use when a report, experiment plan, Eval output, presentation stor
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/structure-planning.md
+contract skill
+responsibility Exposes structure-planning as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/structure-planning.md canonical skill owner
 @dependency-end
 -->
 

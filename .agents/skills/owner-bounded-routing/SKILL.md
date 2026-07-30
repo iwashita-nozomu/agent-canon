@@ -14,8 +14,9 @@ description: "Use for owner-bounded repository edits after routing evidence show
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/owner-bounded-routing.md
+contract skill
+responsibility Exposes owner-bounded-routing as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/owner-bounded-routing.md canonical skill owner
 @dependency-end
 -->
 

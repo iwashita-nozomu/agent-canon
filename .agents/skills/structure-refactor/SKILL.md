@@ -14,8 +14,9 @@ description: "Use when repository structure review, repo-refactor requests, expe
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/structure-refactor.md
+contract skill
+responsibility Exposes structure-refactor as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/structure-refactor.md canonical skill owner
 @dependency-end
 -->
 

@@ -14,8 +14,9 @@ description: "Use when designing reusable result visualizations that bind each f
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/result-visualize.md
+contract skill
+responsibility Exposes result-visualize as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/result-visualize.md canonical skill owner
 @dependency-end
 -->
 

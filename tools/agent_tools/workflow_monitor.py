@@ -251,6 +251,15 @@ class MonitoringEntries:
     lifecycle_evidence: LifecycleMonitoringEvidence | None = None
 
 
+@dataclass(frozen=True)
+class MonitorProjectionResult:
+    """Describe the monitor-only projection written after a canonical event."""
+
+    status: str
+    path: Path
+    error: str = ""
+
+
 EMPTY_MONITORING_ENTRIES = MonitoringEntries()
 MONITORING_LEGACY_KEYS = {
     "signals",
@@ -1428,6 +1437,19 @@ def append_monitoring(
         handle.truncate()
         handle.write("\n".join(lines).rstrip() + "\n")
     return path
+
+
+def emit_behavior_projection(report_dir: Path, event: dict[str, object]) -> MonitorProjectionResult:
+    """Project one already-assembled event without writing the canonical JSONL artifact."""
+    try:
+        encoded = json.dumps(event, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        path = append_monitoring(
+            report_dir,
+            MonitoringEntries(behavior_events=(f"behavior_event_json={encoded}",)),
+        )
+        return MonitorProjectionResult("spooled", path)
+    except Exception as exc:
+        return MonitorProjectionResult("failed", report_dir / "workflow_monitoring.md", type(exc).__name__)
 
 
 def main() -> int:

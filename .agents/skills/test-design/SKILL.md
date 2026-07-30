@@ -14,8 +14,9 @@ description: "Use after the owning implementation mechanism exists to proactivel
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/test-design.md
+contract skill
+responsibility Exposes test-design as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/test-design.md canonical skill owner
 @dependency-end
 -->
 

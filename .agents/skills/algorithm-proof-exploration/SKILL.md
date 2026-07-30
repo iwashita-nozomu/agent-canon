@@ -14,8 +14,9 @@ description: "Use when exploring, refactoring, or choosing an algorithm under pr
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/algorithm-proof-exploration.md
+contract skill
+responsibility Exposes algorithm-proof-exploration as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/algorithm-proof-exploration.md canonical skill owner
 @dependency-end
 -->
 

@@ -14,8 +14,9 @@ description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/gpu-execution.md
+contract skill
+responsibility Exposes gpu-execution as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/gpu-execution.md canonical skill owner
 @dependency-end
 -->
 

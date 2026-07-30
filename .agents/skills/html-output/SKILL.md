@@ -14,8 +14,9 @@ description: "Use when the user explicitly asks for HTML output, a browser-reada
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/html-output.md
+contract skill
+responsibility Exposes html-output as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/html-output.md canonical skill owner
 @dependency-end
 -->
 

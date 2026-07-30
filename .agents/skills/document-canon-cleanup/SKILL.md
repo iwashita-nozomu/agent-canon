@@ -14,8 +14,9 @@ description: "Use when organizing repository documents, finding non-canonical do
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/document-canon-cleanup.md
+contract skill
+responsibility Exposes document-canon-cleanup as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/document-canon-cleanup.md canonical skill owner
 @dependency-end
 -->
 

@@ -14,8 +14,9 @@ description: "Use when drafting a paper, thesis chapter, scholarly note, or othe
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/academic-writing.md
+contract skill
+responsibility Exposes academic-writing as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/academic-writing.md canonical skill owner
 @dependency-end
 -->
 

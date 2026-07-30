@@ -5,7 +5,7 @@
 # upstream design ../../agents/skills/task-routing.md task routing skill contract
 # upstream design ../../agents/skills/structure-refactor.md project .codex/.agents boundary contract
 # downstream implementation ./route.py selects public skills from structural concepts
-# downstream implementation ../../.codex/hooks/skill_usage_logger.py logs prompt routing signals
+# downstream implementation ./prompt_classifier.py consumes structural lane evidence
 # @dependency-end
 
 """Detect route-owned prompt concepts that should not live in catalog keywords."""
@@ -33,6 +33,18 @@ class EvidenceConcept(Protocol):
         """Return keyword groups by evidence category."""
         ...
 
+
+
+@dataclass(frozen=True)
+class SkillLaneEvidence:
+    """Canonical structural lane evidence passed into the pure classifier."""
+
+    schema: str
+    lane: str
+    route_skills: tuple[str, ...]
+    evidence_categories: tuple[str, ...]
+    status: str
+    source: str = "prompt_classifier"
 
 
 @dataclass(frozen=True)
@@ -196,3 +208,17 @@ def validation_failure_repair_concept_matches(
         if all(category in observed for category in concept.required_evidence_categories):
             matches.append(ValidationFailureRepairMatch(concept, observed))
     return tuple(matches)
+
+
+def detect_skill_lane_evidence(text: str) -> tuple[SkillLaneEvidence, ...]:
+    """Return observed/candidate lane records without writing telemetry."""
+    return tuple(
+        SkillLaneEvidence(
+            schema="agent-canon.skill-lane.v1",
+            lane=match.concept.name,
+            route_skills=match.concept.route_skills,
+            evidence_categories=match.observed_evidence_categories,
+            status="observed",
+        )
+        for match in structural_skill_lane_concept_matches(text)
+    )

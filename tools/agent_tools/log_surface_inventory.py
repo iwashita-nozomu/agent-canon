@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Inventories machine-readable log and hook output fields from hooks, skills, Python tools, shell tools, and Rust CLI tools.
 # upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
-# downstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks stale inventory drift
+# downstream implementation ./check_hook_retirement.py validates stale retirement inventory drift
 # downstream implementation ../../tests/agent_tools/test_log_surface_inventory.py validates field extraction and baseline checks
 # @dependency-end
 """Inventory machine-readable fields emitted by AgentCanon hooks, skills, and tools."""

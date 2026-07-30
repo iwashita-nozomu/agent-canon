@@ -134,9 +134,6 @@ paths = [
   "agents/**",
   "templates/**",
 ]
-exclude_paths = [
-  ".codex/hooks/log_archive_mount_warning.py",
-]
 protecting_tools = [
   "tools/agent_tools/check_agent_runtime_alignment.py",
   "tools/agent_tools/tool_rejection_preflight.py",
@@ -171,7 +168,6 @@ description = "Append-only hook, skill, workflow, and behavior eval evidence con
 paths = [
   "evidence",
   "evidence/**",
-  ".codex/hooks/log_archive_mount_warning.py",
   "documents/runtime/runtime-log-archive.md",
   "documents/runtime/runtime-log-archive-migration.md",
   "tools/agent_tools/runtime_log_paths.py",

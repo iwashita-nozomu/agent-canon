@@ -14,8 +14,9 @@ description: "Python 差分を pyright、pytest、ruff、型境界、API 挙動�
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/python-review.md
+contract skill
+responsibility Exposes python-review as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/python-review.md canonical skill owner
 @dependency-end
 -->
 

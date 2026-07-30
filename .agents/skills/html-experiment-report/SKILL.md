@@ -14,8 +14,9 @@ description: "Use when producing a browser-readable HTML experiment or Eval repo
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/html-experiment-report.md
+contract skill
+responsibility Exposes html-experiment-report as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/html-experiment-report.md canonical skill owner
 @dependency-end
 -->
 

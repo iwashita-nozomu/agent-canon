@@ -14,8 +14,9 @@ description: "Use when choosing short AgentCanon tool, skill, profile, check, ru
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/task-routing.md
+contract skill
+responsibility Exposes task-routing as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/task-routing.md canonical skill owner
 @dependency-end
 -->
 

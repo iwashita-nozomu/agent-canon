@@ -14,8 +14,9 @@ description: "Use when starting a new GitHub/submodule-first repository from thi
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/start-repository.md
+contract skill
+responsibility Exposes start-repository as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/start-repository.md canonical skill owner
 @dependency-end
 -->
 

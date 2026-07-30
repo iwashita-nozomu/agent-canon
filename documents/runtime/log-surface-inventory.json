@@ -4,615 +4,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 41,
-      "path": ".codex/hooks/branch_worktree_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 470,
-      "path": ".codex/hooks/cause_investigation_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_stdout",
-      "field": "<dynamic>",
-      "line": 470,
-      "path": ".codex/hooks/cause_investigation_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "candidate_id",
-      "line": 69,
-      "path": ".codex/hooks/completion_review_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "decision",
-      "line": 69,
-      "path": ".codex/hooks/completion_review_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "next_action",
-      "line": 69,
-      "path": ".codex/hooks/completion_review_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "observed_decision",
-      "line": 69,
-      "path": ".codex/hooks/completion_review_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "reason",
-      "line": 69,
-      "path": ".codex/hooks/completion_review_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "remediation",
-      "line": 69,
-      "path": ".codex/hooks/completion_review_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 250,
-      "path": ".codex/hooks/direct_rg_context_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 77,
-      "path": ".codex/hooks/execution_resource_plan_projection_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 234,
-      "path": ".codex/hooks/execution_resource_plan_projection_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "checked_file_count",
-      "line": 277,
-      "path": ".codex/hooks/first_party_library_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "event",
-      "line": 277,
-      "path": ".codex/hooks/first_party_library_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "finding_count",
-      "line": 277,
-      "path": ".codex/hooks/first_party_library_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "findings",
-      "line": 277,
-      "path": ".codex/hooks/first_party_library_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "hook_run_id",
-      "line": 277,
-      "path": ".codex/hooks/first_party_library_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "patterns",
-      "line": 277,
-      "path": ".codex/hooks/first_party_library_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "status",
-      "line": 277,
-      "path": ".codex/hooks/first_party_library_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "timestamp",
-      "line": 277,
-      "path": ".codex/hooks/first_party_library_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "tool_name",
-      "line": 277,
-      "path": ".codex/hooks/first_party_library_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 292,
-      "path": ".codex/hooks/first_party_library_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_stdout",
-      "field": "<dynamic>",
-      "line": 292,
-      "path": ".codex/hooks/first_party_library_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "decision",
-      "line": 83,
-      "path": ".codex/hooks/goal_completion_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "next_action",
-      "line": 83,
-      "path": ".codex/hooks/goal_completion_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "reason",
-      "line": 83,
-      "path": ".codex/hooks/goal_completion_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "remediation",
-      "line": 83,
-      "path": ".codex/hooks/goal_completion_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 502,
-      "path": ".codex/hooks/helper_first_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "decision",
-      "line": 489,
-      "path": ".codex/hooks/helper_first_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "next_action",
-      "line": 489,
-      "path": ".codex/hooks/helper_first_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "reason",
-      "line": 489,
-      "path": ".codex/hooks/helper_first_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "records",
-      "line": 245,
-      "path": ".codex/hooks/helper_first_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "remediation",
-      "line": 489,
-      "path": ".codex/hooks/helper_first_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "tool_status",
-      "line": 245,
-      "path": ".codex/hooks/helper_first_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_stdout",
-      "field": "<dynamic>",
-      "line": 502,
-      "path": ".codex/hooks/helper_first_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "decision",
-      "line": 489,
-      "path": ".codex/hooks/helper_first_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "next_action",
-      "line": 489,
-      "path": ".codex/hooks/helper_first_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "reason",
-      "line": 489,
-      "path": ".codex/hooks/helper_first_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "remediation",
-      "line": 489,
-      "path": ".codex/hooks/helper_first_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "changed_python_count",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "checked",
-      "line": 420,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "checked",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "command",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "domain_counts",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "event",
-      "line": 420,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "event",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "inventory_returncode",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "mode",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "payload_status",
-      "line": 420,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "payload_status",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "policy_error",
-      "line": 420,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "policy_path",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "policy_status",
-      "line": 420,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "policy_status",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "records",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "status",
-      "line": 420,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "status",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "timestamp",
-      "line": 420,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "timestamp",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "tool_name",
-      "line": 420,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "tool_name",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "violations",
-      "line": 460,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 387,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 397,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "decision",
-      "line": 433,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "decision",
-      "line": 481,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "decision",
-      "line": 495,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "next_action",
-      "line": 433,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "next_action",
-      "line": 481,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "next_action",
-      "line": 495,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "reason",
-      "line": 433,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "reason",
-      "line": 481,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "reason",
-      "line": 495,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "remediation",
-      "line": 433,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "remediation",
-      "line": 481,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "remediation",
-      "line": 495,
-      "path": ".codex/hooks/helper_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 187,
+      "line": 137,
       "path": ".codex/hooks/hook_dispatcher.py",
       "surface": "hook"
     },
@@ -620,7 +12,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 327,
+      "line": 336,
       "path": ".codex/hooks/hook_dispatcher.py",
       "surface": "hook"
     },
@@ -628,7 +20,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 381,
+      "line": 414,
       "path": ".codex/hooks/hook_dispatcher.py",
       "surface": "hook"
     },
@@ -646,998 +38,6 @@
       "field": "<dynamic>",
       "line": 116,
       "path": ".codex/hooks/hook_event_log.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 432,
-      "path": ".codex/hooks/library_implementation_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_stdout",
-      "field": "<dynamic>",
-      "line": 432,
-      "path": ".codex/hooks/library_implementation_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 121,
-      "path": ".codex/hooks/log_archive_mount_warning.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "decision",
-      "line": 163,
-      "path": ".codex/hooks/log_surface_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "next_action",
-      "line": 163,
-      "path": ".codex/hooks/log_surface_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "reason",
-      "line": 163,
-      "path": ".codex/hooks/log_surface_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "remediation",
-      "line": 163,
-      "path": ".codex/hooks/log_surface_inventory_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 492,
-      "path": ".codex/hooks/module_boundary_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_stdout",
-      "field": "<dynamic>",
-      "line": 492,
-      "path": ".codex/hooks/module_boundary_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "decision",
-      "line": 261,
-      "path": ".codex/hooks/notebook_quality_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "next_action",
-      "line": 261,
-      "path": ".codex/hooks/notebook_quality_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "reason",
-      "line": 261,
-      "path": ".codex/hooks/notebook_quality_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "remediation",
-      "line": 261,
-      "path": ".codex/hooks/notebook_quality_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "decision",
-      "line": 261,
-      "path": ".codex/hooks/notebook_quality_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "next_action",
-      "line": 261,
-      "path": ".codex/hooks/notebook_quality_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "reason",
-      "line": 261,
-      "path": ".codex/hooks/notebook_quality_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "remediation",
-      "line": 261,
-      "path": ".codex/hooks/notebook_quality_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "decision",
-      "line": 439,
-      "path": ".codex/hooks/oop_readability_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "next_action",
-      "line": 439,
-      "path": ".codex/hooks/oop_readability_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "reason",
-      "line": 439,
-      "path": ".codex/hooks/oop_readability_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "remediation",
-      "line": 439,
-      "path": ".codex/hooks/oop_readability_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 38,
-      "path": ".codex/hooks/prompt_secret_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 300,
-      "path": ".codex/hooks/reference_capture_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "active_role",
-      "line": 278,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "active_role_source",
-      "line": 278,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "authority_path",
-      "line": 278,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "changed_file_count",
-      "line": 278,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "event",
-      "line": 278,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "finding_count",
-      "line": 278,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "hook_run_id",
-      "line": 278,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "status",
-      "line": 278,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "timestamp",
-      "line": 278,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "tool_name",
-      "line": 278,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "violations",
-      "line": 278,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 295,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_stdout",
-      "field": "<dynamic>",
-      "line": 295,
-      "path": ".codex/hooks/role_write_policy_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 118,
-      "path": ".codex/hooks/runtime_log_auto_sync.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 123,
-      "path": ".codex/hooks/runtime_log_auto_sync.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "candidate_skill_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "candidate_skill_reasons",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "candidate_skills",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "candidate_tool_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "candidate_tools",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "candidate_workflow_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "candidate_workflows",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "event",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "event_declared",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "feedback_action",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "feedback_labels",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "feedback_targets",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "hook_log_namespace",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "hook_run_id",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "observed_text_field_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "observed_text_value_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "payload_fingerprint",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "payload_key_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "prompt_capture_status",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "prompt_char_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "prompt_excerpt_redacted",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "prompt_excerpt_truncated",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "prompt_feedback_detected",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "prompt_fingerprint",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "root",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "selected_skills",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "selected_tool_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "selected_tools",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "selected_workflow",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "selected_workflow_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "selected_workflows",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "skill_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "skill_selection_kind",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "skill_source_fields",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "skills",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "status",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_agent_type",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_event_kind",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_fork_context",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_invoked",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_item_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_model",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_prompt_char_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_prompt_fingerprint",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_reasoning_effort",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_target",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_target_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_targets",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "subagent_tool_name",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "timestamp",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "tool_command_verb",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "tool_input_fingerprint",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "tool_input_key_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "tool_input_keys",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "tool_name",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "tool_selection_kind",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_attribution_kind",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_context_kind",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_context_source",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_context_source_event",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_context_timestamp",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_context_workflows",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_family",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_monitor_event_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_monitor_feedback_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_monitor_report_dir",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_monitor_subagent_event_count",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_owner",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_owner_workflows",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "workflow_selection_kind",
-      "line": 1472,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "report_dir",
-      "line": 1260,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "source_event",
-      "line": 1260,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "timestamp",
-      "line": 1260,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "workflows",
-      "line": 1260,
-      "path": ".codex/hooks/skill_usage_logger.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 521,
-      "path": ".codex/hooks/style_checker_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "authority_path",
-      "line": 216,
-      "path": ".codex/hooks/task_authority_schema_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "changed_file_count",
-      "line": 216,
-      "path": ".codex/hooks/task_authority_schema_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "event",
-      "line": 216,
-      "path": ".codex/hooks/task_authority_schema_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "findings",
-      "line": 216,
-      "path": ".codex/hooks/task_authority_schema_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "hook_run_id",
-      "line": 216,
-      "path": ".codex/hooks/task_authority_schema_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "status",
-      "line": 216,
-      "path": ".codex/hooks/task_authority_schema_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "timestamp",
-      "line": 216,
-      "path": ".codex/hooks/task_authority_schema_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "tool_name",
-      "line": 216,
-      "path": ".codex/hooks/task_authority_schema_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 230,
-      "path": ".codex/hooks/task_authority_schema_guard.py",
-      "surface": "hook"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_stdout",
-      "field": "<dynamic>",
-      "line": 230,
-      "path": ".codex/hooks/task_authority_schema_guard.py",
       "surface": "hook"
     },
     {
@@ -5713,6 +4113,22 @@
       "surface": "tool"
     },
     {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 98,
+      "path": "tools/agent_tools/behavior_event_assembly.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 113,
+      "path": "tools/agent_tools/behavior_event_assembly.py",
+      "surface": "tool"
+    },
+    {
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ACTIVE_ROLES",
@@ -6516,7 +4932,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 2206,
+      "line": 2209,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
@@ -6644,7 +5060,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "convention_sources",
-      "line": 1915,
+      "line": 1772,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6652,7 +5068,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 1915,
+      "line": 1772,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6660,7 +5076,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 1915,
+      "line": 1772,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6668,7 +5084,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "tool_gates",
-      "line": 1915,
+      "line": 1772,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6676,7 +5092,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "workflow_prompts",
-      "line": 1915,
+      "line": 1772,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6684,7 +5100,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CONVENTION_COMPLIANCE_FINDING",
-      "line": 1065,
+      "line": 949,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6692,7 +5108,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE",
-      "line": 1934,
+      "line": 1791,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6700,7 +5116,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_FINDINGS",
-      "line": 1933,
+      "line": 1790,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6708,7 +5124,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_SOURCES",
-      "line": 1930,
+      "line": 1787,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6716,7 +5132,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_TOOL_GATES",
-      "line": 1931,
+      "line": 1788,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -6724,7 +5140,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_WORKFLOWS",
-      "line": 1932,
+      "line": 1789,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -7302,6 +5718,22 @@
       "field": "HARDCODED_NUMBERS_FINDINGS",
       "line": 422,
       "path": "tools/agent_tools/check_hardcoded_numbers.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 196,
+      "path": "tools/agent_tools/check_hook_retirement.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_stdout",
+      "field": "<dynamic>",
+      "line": 196,
+      "path": "tools/agent_tools/check_hook_retirement.py",
       "surface": "tool"
     },
     {
@@ -9474,25 +7906,9 @@
     },
     {
       "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "hookEventName",
-      "line": 360,
-      "path": "tools/agent_tools/evaluate_workflow_selection.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_log_helper",
-      "field": "prompt",
-      "line": 360,
-      "path": "tools/agent_tools/evaluate_workflow_selection.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
       "emitter": "key_value_literal",
       "field": "WORKFLOW_SELECTION_EVAL_CASES",
-      "line": 447,
+      "line": 437,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9500,7 +7916,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "WORKFLOW_SELECTION_EVAL_COUNT_FAILURES",
-      "line": 451,
+      "line": 441,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9508,7 +7924,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "WORKFLOW_SELECTION_EVAL_EXPECTED_CASES",
-      "line": 448,
+      "line": 438,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9516,7 +7932,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "WORKFLOW_SELECTION_EVAL_EXPECTED_GENERATED_CASES",
-      "line": 450,
+      "line": 440,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9524,7 +7940,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "WORKFLOW_SELECTION_EVAL_FAILED",
-      "line": 452,
+      "line": 442,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9532,7 +7948,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "WORKFLOW_SELECTION_EVAL_GENERATED_CASES",
-      "line": 449,
+      "line": 439,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9540,7 +7956,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "WORKFLOW_SELECTION_EVAL_RUN_ID",
-      "line": 444,
+      "line": 434,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9548,7 +7964,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "WORKFLOW_SELECTION_EVAL_SOURCE_RUN_ID",
-      "line": 445,
+      "line": 435,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9556,7 +7972,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "WORKFLOW_SELECTION_EVAL_STATUS",
-      "line": 446,
+      "line": 436,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9564,7 +7980,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKFLOW_SELECTION_EVAL_CASES",
-      "line": 539,
+      "line": 529,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9572,7 +7988,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKFLOW_SELECTION_EVAL_EXPECTED_CASES",
-      "line": 540,
+      "line": 530,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9580,7 +7996,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKFLOW_SELECTION_EVAL_EXPECTED_GENERATED_CASES",
-      "line": 542,
+      "line": 532,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9588,30 +8004,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKFLOW_SELECTION_EVAL_FAILED",
-      "line": 547,
-      "path": "tools/agent_tools/evaluate_workflow_selection.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "WORKFLOW_SELECTION_EVAL_GENERATED_CASES",
-      "line": 541,
-      "path": "tools/agent_tools/evaluate_workflow_selection.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "WORKFLOW_SELECTION_EVAL_REPORT",
-      "line": 549,
-      "path": "tools/agent_tools/evaluate_workflow_selection.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "WORKFLOW_SELECTION_EVAL_RUN_ID",
       "line": 537,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
@@ -9619,8 +8011,32 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "WORKFLOW_SELECTION_EVAL_GENERATED_CASES",
+      "line": 531,
+      "path": "tools/agent_tools/evaluate_workflow_selection.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "WORKFLOW_SELECTION_EVAL_REPORT",
+      "line": 539,
+      "path": "tools/agent_tools/evaluate_workflow_selection.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "WORKFLOW_SELECTION_EVAL_RUN_ID",
+      "line": 527,
+      "path": "tools/agent_tools/evaluate_workflow_selection.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "WORKFLOW_SELECTION_EVAL_SOURCE_RUN_ID",
-      "line": 538,
+      "line": 528,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
       "surface": "tool"
     },
@@ -9628,8 +8044,16 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKFLOW_SELECTION_EVAL_STATUS",
-      "line": 550,
+      "line": 540,
       "path": "tools/agent_tools/evaluate_workflow_selection.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 76,
+      "path": "tools/agent_tools/execution_resource_projection.py",
       "surface": "tool"
     },
     {
@@ -10196,7 +8620,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_IMPROVEMENT_GUIDE",
-      "line": 905,
+      "line": 912,
       "path": "tools/agent_tools/generate_agent_improvement_guide.py",
       "surface": "tool"
     },
@@ -11454,6 +9878,14 @@
       "field": "SYMBOL",
       "line": 2349,
       "path": "tools/agent_tools/helper_function_inventory.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 99,
+      "path": "tools/agent_tools/hook_retirement.py",
       "surface": "tool"
     },
     {
@@ -15484,7 +13916,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "structural_concept",
-      "line": 60,
+      "line": 72,
       "path": "tools/agent_tools/skill_lane_detector.py",
       "surface": "tool"
     },
@@ -15492,7 +13924,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "structural_concept",
-      "line": 88,
+      "line": 100,
       "path": "tools/agent_tools/skill_lane_detector.py",
       "surface": "tool"
     },
@@ -15508,7 +13940,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 61,
+      "line": 99,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15516,7 +13948,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "candidate_rows",
-      "line": 575,
+      "line": 667,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15524,7 +13956,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "case_count",
-      "line": 217,
+      "line": 255,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15532,7 +13964,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "cases",
-      "line": 217,
+      "line": 255,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15540,7 +13972,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "host_envelopes",
-      "line": 575,
+      "line": 667,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15548,7 +13980,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "host_profile",
-      "line": 298,
+      "line": 363,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15556,7 +13988,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "host_profile",
-      "line": 575,
+      "line": 667,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15564,7 +13996,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "model_id",
-      "line": 298,
+      "line": 363,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15572,7 +14004,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "model_id",
-      "line": 575,
+      "line": 667,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15580,7 +14012,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "normalization",
-      "line": 575,
+      "line": 667,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15588,7 +14020,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "packet_count",
-      "line": 298,
+      "line": 363,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15596,7 +14028,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "packets",
-      "line": 298,
+      "line": 363,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15604,7 +14036,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "run_id",
-      "line": 575,
+      "line": 667,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15612,7 +14044,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "scenario_rows",
-      "line": 575,
+      "line": 667,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15620,7 +14052,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 217,
+      "line": 255,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15628,7 +14060,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 298,
+      "line": 363,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15636,7 +14068,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 575,
+      "line": 667,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15644,7 +14076,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 617,
+      "line": 709,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15652,7 +14084,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_snapshot_digest",
-      "line": 575,
+      "line": 667,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15660,7 +14092,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 617,
+      "line": 709,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15668,7 +14100,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "summary",
-      "line": 575,
+      "line": 667,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15676,7 +14108,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "version",
-      "line": 217,
+      "line": 255,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15684,7 +14116,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "version",
-      "line": 298,
+      "line": 363,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15692,7 +14124,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "version",
-      "line": 575,
+      "line": 667,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15700,7 +14132,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "schema",
-      "line": 617,
+      "line": 709,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15708,7 +14140,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 617,
+      "line": 709,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15716,7 +14148,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_EVALUATION_FAILURE",
-      "line": 615,
+      "line": 707,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15724,7 +14156,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 149,
+      "line": 178,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15732,7 +14164,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 493,
+      "line": 655,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15740,7 +14172,15 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 902,
+      "line": 1073,
+      "path": "tools/agent_tools/skill_shim_materializer.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "actual",
+      "line": 262,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15748,7 +14188,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "content_delta_count",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15756,7 +14196,23 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "content_delta_paths",
-      "line": 877,
+      "line": 1048,
+      "path": "tools/agent_tools/skill_shim_materializer.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "expected",
+      "line": 262,
+      "path": "tools/agent_tools/skill_shim_materializer.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "mismatches",
+      "line": 306,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15764,7 +14220,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "projection_digests",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15772,7 +14228,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "record_digests",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15780,7 +14236,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15788,7 +14244,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_snapshot_digest",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15796,7 +14252,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15804,7 +14260,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "version",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15812,7 +14268,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "content_delta_count",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15820,7 +14276,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "content_delta_paths",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15828,7 +14284,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "projection_digests",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15836,7 +14292,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "record_digests",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15844,7 +14300,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "schema",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15852,7 +14308,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "source_snapshot_digest",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15860,7 +14316,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15868,7 +14324,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "version",
-      "line": 877,
+      "line": 1048,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15876,7 +14332,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_DELTA",
-      "line": 886,
+      "line": 1057,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15884,7 +14340,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_FAILURE",
-      "line": 904,
+      "line": 1075,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15892,7 +14348,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_FAILURE",
-      "line": 907,
+      "line": 1078,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15900,7 +14356,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_FAILURE",
-      "line": 910,
+      "line": 1081,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15908,7 +14364,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_SCHEMA",
-      "line": 879,
+      "line": 1050,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15916,7 +14372,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_STATUS",
-      "line": 880,
+      "line": 1051,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -16244,7 +14700,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "TASK_AUTHORITY_FINDING",
-      "line": 53,
+      "line": 50,
       "path": "tools/agent_tools/task_authority.py",
       "surface": "tool"
     },
@@ -17892,7 +16348,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gate_count",
-      "line": 644,
+      "line": 643,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -17900,7 +16356,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gates",
-      "line": 644,
+      "line": 643,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -17908,7 +16364,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 644,
+      "line": 643,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -17916,7 +16372,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "TOOL_REJECTION_PREDICTED_GATE",
-      "line": 636,
+      "line": 635,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -17924,7 +16380,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "TOOL_REJECTION_PREDICTED_GATES",
-      "line": 632,
+      "line": 631,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -17932,8 +16388,16 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "TOOL_REJECTION_PREFLIGHT",
-      "line": 631,
+      "line": 630,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 69,
+      "path": "tools/agent_tools/tool_selection.py",
       "surface": "tool"
     },
     {
@@ -18649,10 +17113,146 @@
       "surface": "tool"
     },
     {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "schema",
+      "line": 74,
+      "path": "tools/agent_tools/workflow_context.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "source_event",
+      "line": 74,
+      "path": "tools/agent_tools/workflow_context.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "timestamp",
+      "line": 74,
+      "path": "tools/agent_tools/workflow_context.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "workflows",
+      "line": 74,
+      "path": "tools/agent_tools/workflow_context.py",
+      "surface": "tool"
+    },
+    {
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1330,
+      "line": 1339,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "api_owner",
+      "line": 1445,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "artifact_refs",
+      "line": 1445,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "context_id",
+      "line": 1445,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "dependency_owner",
+      "line": 1445,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "event_id",
+      "line": 1445,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "evidence_refs",
+      "line": 1445,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "intent_id",
+      "line": 1445,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "outcome",
+      "line": 1445,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "owner",
+      "line": 1445,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "responsibility_unit",
+      "line": 1445,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "run_id",
+      "line": 1445,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "semantic_kind",
+      "line": 1445,
+      "path": "tools/agent_tools/workflow_monitor.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "state_owner",
+      "line": 1445,
       "path": "tools/agent_tools/workflow_monitor.py",
       "surface": "tool"
     },
@@ -18660,7 +17260,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ledger_event",
-      "line": 548,
+      "line": 557,
       "path": "tools/agent_tools/workflow_monitor.py",
       "surface": "tool"
     },
@@ -18668,7 +17268,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "runtime_feedback",
-      "line": 530,
+      "line": 539,
       "path": "tools/agent_tools/workflow_monitor.py",
       "surface": "tool"
     },
@@ -18676,7 +17276,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "tool_warning",
-      "line": 1045,
+      "line": 1054,
       "path": "tools/agent_tools/workflow_monitor.py",
       "surface": "tool"
     },
@@ -18684,7 +17284,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKFLOW_MONITORING",
-      "line": 1458,
+      "line": 1480,
       "path": "tools/agent_tools/workflow_monitor.py",
       "surface": "tool"
     },
@@ -23998,32 +22598,8 @@
     ".agents/skills/wiki-publication/SKILL.md",
     ".agents/skills/worktree-health/SKILL.md",
     ".agents/skills/worktree-start/SKILL.md",
-    ".codex/hooks/branch_worktree_guard.py",
-    ".codex/hooks/cause_investigation_guard.py",
-    ".codex/hooks/codex_runtime_summary_logger.py",
-    ".codex/hooks/completion_review_guard.py",
-    ".codex/hooks/direct_rg_context_guard.py",
-    ".codex/hooks/execution_resource_plan_projection_guard.py",
-    ".codex/hooks/first_party_library_guard.py",
-    ".codex/hooks/goal_completion_guard.py",
-    ".codex/hooks/helper_first_guard.py",
-    ".codex/hooks/helper_inventory_guard.py",
     ".codex/hooks/hook_dispatcher.py",
     ".codex/hooks/hook_event_log.py",
-    ".codex/hooks/hook_safety.py",
-    ".codex/hooks/library_implementation_guard.py",
-    ".codex/hooks/log_archive_mount_warning.py",
-    ".codex/hooks/log_surface_inventory_guard.py",
-    ".codex/hooks/module_boundary_guard.py",
-    ".codex/hooks/notebook_quality_guard.py",
-    ".codex/hooks/oop_readability_guard.py",
-    ".codex/hooks/prompt_secret_guard.py",
-    ".codex/hooks/reference_capture_guard.py",
-    ".codex/hooks/role_write_policy_guard.py",
-    ".codex/hooks/runtime_log_auto_sync.py",
-    ".codex/hooks/skill_usage_logger.py",
-    ".codex/hooks/style_checker_guard.py",
-    ".codex/hooks/task_authority_schema_guard.py",
     ".github/scripts/checkout_agent_canon_submodule.sh",
     "agents/skills/README.md",
     "agents/skills/academic-writing.md",
@@ -24110,6 +22686,7 @@
     "tools/agent_tools/agent_update_branch.sh",
     "tools/agent_tools/analyze_refactor_surface.py",
     "tools/agent_tools/artifact_identity.py",
+    "tools/agent_tools/behavior_event_assembly.py",
     "tools/agent_tools/bootstrap_agent_run.py",
     "tools/agent_tools/bootstrap_worktree_notes.py",
     "tools/agent_tools/capability_route.py",
@@ -24124,6 +22701,7 @@
     "tools/agent_tools/check_design_doc_claims.py",
     "tools/agent_tools/check_execution_time_aware_orchestration.py",
     "tools/agent_tools/check_hardcoded_numbers.py",
+    "tools/agent_tools/check_hook_retirement.py",
     "tools/agent_tools/check_log_helper_names.py",
     "tools/agent_tools/check_proof_trace_alignment.py",
     "tools/agent_tools/check_run_log_contract.py",
@@ -24147,6 +22725,7 @@
     "tools/agent_tools/evaluate_report_quality.py",
     "tools/agent_tools/evaluate_skill_workflow_prompts.py",
     "tools/agent_tools/evaluate_workflow_selection.py",
+    "tools/agent_tools/execution_resource_projection.py",
     "tools/agent_tools/export_codex_runtime_summary.py",
     "tools/agent_tools/external_artifact_binding.py",
     "tools/agent_tools/file_surface_inventory.py",
@@ -24159,6 +22738,9 @@
     "tools/agent_tools/goal_loop.py",
     "tools/agent_tools/graph_client.py",
     "tools/agent_tools/helper_function_inventory.py",
+    "tools/agent_tools/historical_skill_usage_reader.py",
+    "tools/agent_tools/hook_retirement.py",
+    "tools/agent_tools/hook_safety.py",
     "tools/agent_tools/implementation_route.py",
     "tools/agent_tools/import_responsibility.py",
     "tools/agent_tools/issue_sync.py",
@@ -24174,6 +22756,8 @@
     "tools/agent_tools/operational_ir_to_lean.py",
     "tools/agent_tools/parent_repo_readiness.py",
     "tools/agent_tools/persist_agent_memory.py",
+    "tools/agent_tools/prompt_capture.py",
+    "tools/agent_tools/prompt_classifier.py",
     "tools/agent_tools/prose_reasoning_graph.py",
     "tools/agent_tools/publication_integrator.py",
     "tools/agent_tools/reference_materializer.py",
@@ -24201,6 +22785,7 @@
     "tools/agent_tools/skill_tool_commands.py",
     "tools/agent_tools/smoke_test_research_perspective_pack.py",
     "tools/agent_tools/stablehlo_value_closure.py",
+    "tools/agent_tools/subagent_selection.py",
     "tools/agent_tools/summarize_subagent_revisions.py",
     "tools/agent_tools/surface_manifest.py",
     "tools/agent_tools/task_authority.py",
@@ -24213,6 +22798,7 @@
     "tools/agent_tools/tool_path_policy.py",
     "tools/agent_tools/tool_proof_coverage.py",
     "tools/agent_tools/tool_rejection_preflight.py",
+    "tools/agent_tools/tool_selection.py",
     "tools/agent_tools/update_lifecycle_contract.py",
     "tools/agent_tools/validate_role_write_scope.py",
     "tools/agent_tools/vector_search.py",
@@ -24221,6 +22807,7 @@
     "tools/agent_tools/waterfall_gate_check.py",
     "tools/agent_tools/wiki_publish.py",
     "tools/agent_tools/work_log.py",
+    "tools/agent_tools/workflow_context.py",
     "tools/agent_tools/workflow_monitor.py",
     "tools/agent_tools/worktree_scope_lint.py",
     "tools/agent_tools/worktree_start.py",

@@ -5,7 +5,7 @@
 contract issue
 responsibility Records the workflow defect where a simple OOP tool run expanded into hook side effects, report overproduction, and unclear timing attribution.
 upstream design ../README.md defines durable AgentCanon operational issue storage.
-upstream implementation ../../.codex/hooks/oop_readability_guard.py appends OOP hook evidence during source edits.
+upstream design ../../.agents/skills/oop-readability-check/SKILL.md owns the current OOP review route.
 upstream implementation ../../tools/oop/shared/readability_core.py provides OOP readability report mechanics.
 upstream implementation ../../tools/agent_tools/workflow_monitor.py records workflow behavior events.
 downstream design ../../.agents/skills/oop-readability-check/SKILL.md keeps mechanical OOP output and agent analysis in one skill with separate modes.

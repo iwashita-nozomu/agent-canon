@@ -83,13 +83,13 @@ control-plane file を差し引く。2026-06-06 の再解析では、`exclude_pa
 | `github-automation` | primary | `.github/**` | GitHub Actions、Issue / PR template、GitHub-facing entrypoint。 |
 | `operational-issues` | primary | `issues/**` | durable local issue files と GitHub Issue mirror metadata。 |
 | `external-skill-vendor` | primary | `vendor/**` | third-party skill など、AgentCanon 内部の external dependency 置き場。 |
-| `eval-and-hook-evidence` | cross-directory primary | `evidence/**`, `.codex/hooks/log_archive_mount_warning.py`, `documents/runtime-log-archive*.md`, `tools/agent_tools/runtime_log_*.py` | hook、skill、workflow、behavior eval の evidence と log archive control plane。 |
+| `eval-and-hook-evidence` | cross-directory primary | `evidence/**`, `documents/runtime-log-archive*.md`, `tools/agent_tools/runtime_log_*.py` | hook、skill、workflow、behavior eval の evidence と log archive control plane。 |
 
 `eval-and-hook-evidence` に移した file は、元の broad scope から除外する。
 
 | 除外元 scope | `exclude_paths` の意味 |
 | --- | --- |
-| `runtime-entrypoints` | `.codex/hooks/log_archive_mount_warning.py` は runtime directory 内にあるが、primary owner は evidence scope。 |
+| `runtime-entrypoints` | hook archive evidence is owned by the runtime archive tool surface. |
 | `shared-policy-documents` | `documents/runtime-log-archive*.md` は policy directory 内にあるが、primary owner は evidence scope。 |
 | `shared-tooling` | `tools/agent_tools/runtime_log_*.py` は tooling directory 内にあるが、primary owner は evidence scope。 |
 

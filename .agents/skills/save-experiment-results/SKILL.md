@@ -14,8 +14,9 @@ description: "Save and publish experiment run results with branch-safe retention
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/save-experiment-results.md
+contract skill
+responsibility Exposes save-experiment-results as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/save-experiment-results.md canonical skill owner
 @dependency-end
 -->
 

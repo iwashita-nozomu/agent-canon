@@ -2977,11 +2977,11 @@ def evidence_problem_components(summary: RuntimeDashboardSummary) -> tuple[Probl
         components.append(
             ProblemComponent(
                 component_type="hook",
-            name="skill_usage_logger",
+                name="prompt_classifier_and_behavior_event_assembly",
             status="missing",
             problem="prompt or tool selection evidence is missing",
             evidence=PROMPT_TOOL_EVIDENCE_TARGET,
-            next_action="repair prompt/tool evidence logging",
+                next_action="repair prompt classification and behavior-event evidence assembly",
         )
         )
     if (
@@ -3124,7 +3124,7 @@ def reference_capture_next_action(summary: RuntimeDashboardSummary) -> tuple[Das
             action="confirm reference capture hook is producing evidence",
             reason="no reference_capture_guard entries are present",
             evidence=REFERENCE_CAPTURE_EVIDENCE_TARGET,
-            owner_surface=".codex/hooks/reference_capture_guard.py",
+            owner_surface="tools/agent_tools/reference_materializer.py",
             command="python3 tools/agent_tools/generate_agent_runtime_dashboard.py --root .",
             done_condition="AGENT_RUNTIME_DASHBOARD_REFERENCE_CAPTURE_ENTRIES>0",
             issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
@@ -3155,7 +3155,7 @@ def workflow_attribution_next_action(summary: RuntimeDashboardSummary) -> tuple[
         action="repair workflow attribution logging",
         reason=f"{breakdown.entries_without_workflow} hook entries lack workflow attribution",
         evidence=WORKFLOW_ATTRIBUTION_EVIDENCE_TARGET,
-        owner_surface=".codex/hooks/skill_usage_logger.py and workflow_monitoring.md",
+            owner_surface="tools/agent_tools/behavior_event_assembly.py and workflow_monitoring.md",
         command="python3 tools/agent_tools/generate_agent_runtime_dashboard.py --root .",
         done_condition="AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING=0 or entries are explicitly exempt",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
@@ -3281,7 +3281,7 @@ def prompt_tool_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboard
         action="repair prompt and tool selection evidence",
         reason="prompt excerpts or tool selection entries are missing",
         evidence=PROMPT_TOOL_EVIDENCE_TARGET,
-        owner_surface=".codex/hooks/skill_usage_logger.py",
+            owner_surface="tools/agent_tools/behavior_event_assembly.py",
         command="python3 tools/agent_tools/generate_agent_runtime_dashboard.py --root .",
         done_condition="prompt_entries>0, tool_selection_entries>0, prompt_missing_excerpt_entries=0",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),

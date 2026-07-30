@@ -10,7 +10,7 @@
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md validation failure reader projection
 # upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
-# downstream implementation ../../.codex/hooks/execution_resource_plan_projection_guard.py validates exact coarse PostToolUse projection constants
+# downstream implementation ../agent_tools/execution_resource_projection.py validates exact coarse PostToolUse projection constants
 # downstream implementation ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
 # downstream implementation ../../templates/experiments/_template/run.py direct GPU launch is statically prohibited
 # downstream environment ../../.devcontainer/devcontainer.json selects the shared runtime receipt stages

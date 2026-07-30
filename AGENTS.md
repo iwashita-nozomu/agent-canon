@@ -8,7 +8,7 @@ upstream design documents/design/request-intent-and-update-relation.md positive 
 downstream design README.md shared canon overview must reflect runtime contract
 downstream design ROOT_AGENTS.md template-root runtime entrypoint owner map
 downstream implementation tools/agent_tools/check_agent_runtime_alignment.py validates runtime owner-map alignment
-downstream implementation .codex/hooks/branch_worktree_guard.py blocks unconfirmed shared-checkout Git mutations
+downstream implementation tools/agent_tools/hook_safety.py blocks unconfirmed shared-checkout Git mutations
 @dependency-end
 -->
 
@@ -142,7 +142,7 @@ branch/worktree and requests user direction.
 | internal routine placement | `agents/internal-routines/README.md`; `documents/structure/repo-structure-contract.toml` | `repo_structure_contract.py` |
 | design-to-implementation correspondence | `agents/internal-routines/design-implementation-correspondence.md`; `documents/design/*.md` | `check_design_doc_claims.py`; design/review readback |
 | implementation flow and handoff packet | `agents/workflows/implementation-waterfall-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md` | task run bundle review |
-| shared-checkout Git mutation and branch/worktree creation route | `agents/canonical/CODEX_WORKFLOW.md`; `.codex/hooks/branch_worktree_guard.py`; `agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
+| shared-checkout Git mutation and branch/worktree creation route | `agents/canonical/CODEX_WORKFLOW.md`; `tools/agent_tools/hook_safety.py`; `agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation routing | `documents/runtime/runtime-profiles-and-check-matrix.md` | profile-specific checks |
 | closeout evidence | `tools/agent_tools/task_close.py`; `tools/agent_tools/report_artifact_checks.py` | closeout artifact gate |
 | AgentCanon update transaction | `documents/agent-canon/agent-canon-update-route.md`; `tools/agent_tools/update_lifecycle_contract.py` | boundary-owned G1-G6 receipts; `tools/agent_tools/task_close.py` |

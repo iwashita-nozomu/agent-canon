@@ -14,8 +14,9 @@ description: "Legacy cleanup only. Use when inspecting or retiring stale WORKTRE
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/worktree-start.md
+contract skill
+responsibility Exposes worktree-start as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/worktree-start.md canonical skill owner
 @dependency-end
 -->
 

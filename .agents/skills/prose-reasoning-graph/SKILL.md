@@ -14,8 +14,9 @@ description: "Use when existing prose should be converted into a SQLite-backed s
 
 <!--
 @dependency-start
-contract reference
-upstream implementation ../../../agents/skills/prose-reasoning-graph.md
+contract skill
+responsibility Exposes prose-reasoning-graph as a Codex runtime discovery adapter.
+upstream design ../../../agents/skills/prose-reasoning-graph.md canonical skill owner
 @dependency-end
 -->
 
