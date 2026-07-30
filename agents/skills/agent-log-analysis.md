@@ -7,7 +7,6 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/runtime/runtime-log-archive.md accumulated eval and hook result storage
 upstream design ../../documents/tools/search-coordination.md coordinated search policy
 upstream design ../../documents/runtime/runtime-log-archive.md defines the external log archive mount
-upstream design https://github.com/iwashita-nozomu/agent-canon-log/pull/4 records the consumed stable branch and retention policy provenance
 downstream design issue-finding-report.md converts compact log findings into durable issues
 upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py owns structured dashboard API fields
 upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
@@ -15,6 +14,11 @@ downstream implementation ../../.agents/skills/agent-log-analysis/SKILL.md expos
 downstream design agent-eval-accumulation.md repairs missing accumulated eval family evidence
 @dependency-end
 -->
+
+The consumed stable-branch and retention policy provenance is recorded in
+[agent-canon-log PR #4](https://github.com/iwashita-nozomu/agent-canon-log/pull/4).
+This external evidence link is intentionally prose metadata; dependency headers
+contain only repository-local owner paths.
 
 ## Reader Map
 
