@@ -72,6 +72,12 @@ and lifecycle behavior is projected from the canonical owners:
 [implementation contract](documents/design/codex-spark-implementation-routing.md).
 This entrypoint does not create a second policy source.
 
+Repository-changing implementation の前には、owning design を read して
+[`agents/internal-routines/design-implementation-correspondence.md`](agents/internal-routines/design-implementation-correspondence.md)
+の clause fingerprint と対応 route を作ります。実装 handoff と review は
+その routine の forward/reverse coverage と drift block を参照し、個別
+skill に同じ universal policy を複製しません。
+
 - This file owns the template-root runtime entrypoint for Codex and points each
   runtime contract to its owner surface and checker.
 - 文書 filename は英語、本文は日本語とし、詳細は `documents/rule/README.md` を参照します。
@@ -283,6 +289,7 @@ proof obligation, or replacement unit together even when the chunk is long.
 | role behavior and stage conditions | `vendor/agent-canon/.codex/agents/*.toml`; `vendor/agent-canon/agents/agents_config.json` | `check_agent_runtime_alignment.py` |
 | skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml`; `vendor/agent-canon/.agents/skills/*/SKILL.md` | `python3 tools/agent_tools/route.py --prompt`; `check_agent_runtime_alignment.py` |
 | internal workflow routines | `vendor/agent-canon/agents/internal-routines/README.md` | `repo_structure_contract.py`; runtime alignment |
+| design-to-implementation correspondence | `vendor/agent-canon/agents/internal-routines/design-implementation-correspondence.md`; `vendor/agent-canon/documents/design/*.md` | `check_design_doc_claims.py`; design/review readback |
 | implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
 | search, read scope, and reuse survey | semantic-index, deterministic `search.py` / `search_index.py`, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
 | repo structure and root views | `vendor/agent-canon/documents/structure/repo-structure-contract.toml`; `responsibility-scope.toml`; `documents/runtime/shared-runtime-surfaces.toml` | structure/scope/import tools; `sync_agent_canon.sh` |

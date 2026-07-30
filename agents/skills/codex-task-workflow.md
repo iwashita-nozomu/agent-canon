@@ -9,11 +9,17 @@ upstream design ../COMMUNICATION_PROTOCOL.md defines pre-edit investigation and 
 upstream design ../../documents/design/dependency-manifest-design.md defines dependency manifest requirements
 upstream design ../../documents/operations/BRANCH_SCOPE.md defines Git commit correctness and push evidence
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback workflow
+upstream design ../internal-routines/design-implementation-correspondence.md design read/fingerprint/handoff correspondence route
 downstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 
 ## Reader Map
+
+implementation stage に入る前に、
+`../internal-routines/design-implementation-correspondence.md` の design read と
+clause fingerprint route を task packet に接続します。この skill は task
+stage の transport owner であり、対応 policy を複製しません。
 
 - Purpose: gives Codex a context-independent repository task execution path
   from intake through validation and closeout.

@@ -31,6 +31,12 @@ Map` to find the owner of runtime contracts, `Task Entry` to start
 repo-changing work, and `Validation` before closeout. This file routes readers;
 the detailed workflow, skill, role, profile, and closeout rules remain in the
 owner surfaces it names.
+
+Repository-changing implementation の全 stage は、
+[`agents/internal-routines/design-implementation-correspondence.md`](agents/internal-routines/design-implementation-correspondence.md)
+を先に通ります。これは各 skill に共通規則を複製するための新しい policy
+source ではなく、owning design の read、clause fingerprint、handoff、
+forward/reverse review coverage、design drift block の内部 route です。
 - After context compaction, invoke the final-objective declaration required by
   `agents/COMMUNICATION_PROTOCOL.md` section `Post-Compaction Objective
   Re-Declaration Contract` before any work resumes.
@@ -107,6 +113,7 @@ branch/worktree and requests user direction.
 | role behavior and stage conditions | `.codex/agents/*.toml`; `agents/agents_config.json` | `check_agent_runtime_alignment.py` |
 | public skill registry | `agents/skills/catalog.yaml`; `.agents/skills/*/SKILL.md` | `check_agent_runtime_alignment.py` |
 | internal routine placement | `agents/internal-routines/README.md`; `documents/structure/repo-structure-contract.toml` | `repo_structure_contract.py` |
+| design-to-implementation correspondence | `agents/internal-routines/design-implementation-correspondence.md`; `documents/design/*.md` | `check_design_doc_claims.py`; design/review readback |
 | implementation flow and handoff packet | `agents/workflows/implementation-waterfall-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md` | task run bundle review |
 | shared-checkout Git mutation and branch/worktree creation route | `agents/canonical/CODEX_WORKFLOW.md`; `.codex/hooks/branch_worktree_guard.py`; `agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation routing | `documents/runtime/runtime-profiles-and-check-matrix.md` | profile-specific checks |
