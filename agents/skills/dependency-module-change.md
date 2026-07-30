@@ -46,6 +46,31 @@ PR merge/readback 後に topic branch が削除され、clone に local-only com
 残る場合は、cleanup に `--integrated-commit <full-oid>` として統合 commit の
 evidence を渡します。省略時の canonical `origin/main` discovery を含む
 equivalence gate と hold 条件は、詳細 policy owner の cleanup gate に従います。
+computed clone path、manifest / `origin` URL、clean / untracked-zero state、tree の
+inclusion / deletion が証明されていれば、module cleanup と parent cleanup は parent と
+target clone の `agent-canon.topic.role` / `topic` marker を readback し、stale または
+missing membership marker を旧 evidence として `marker-readback=membership-mismatch` に
+明示するだけで cleanup を阻害しません。target clone の owner evidence、placement、module、
+URL、branch の不一致は従来どおり hold し、parent identity は proof 後に判断します。
+workspace clone を削除した後、managed child 以外の成果物が無い
+topic root は同じ `CLEANUP` receipt で除去されます。再 clone / `prepare` はこの route に
+追加しません。
+
+### Exact integrated cleanup command
+
+PR merge/readback 後の workspace clone cleanup は、computed path、owner evidence、
+integrated commit、same-command authority を一つの既存 CLI call に束ねます。
+
+```bash
+python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
+  --placement workspace --topic <topic> --module <path> \
+  --expected-clone <absolute-clone> \
+  --owner-evidence-sha256 <sha256> \
+  --integrated-commit <full-oid> --apply
+```
+
+この literal の CLI / ToolCall / receipt shape は変更せず、`CLEANUP` readback と
+typed hold reason を後続の PR processing が消費します。
 
 独立した replaceable responsibility を parallel に実行する場合は、vendor の clean
 状態を理由に停止せず、親の DAG packet が disjoint write scope、依存/merge order、

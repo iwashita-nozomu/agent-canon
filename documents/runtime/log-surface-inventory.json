@@ -8220,7 +8220,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTINUE_PATH",
-      "line": 646,
+      "line": 654,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8228,7 +8228,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTINUE_PATH",
-      "line": 673,
+      "line": 681,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8236,7 +8236,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTINUE_PATH",
-      "line": 732,
+      "line": 740,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8244,7 +8244,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MODULE_CHANGE",
-      "line": 1161,
+      "line": 1265,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8252,7 +8252,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MODULE_CHANGE",
-      "line": 1174,
+      "line": 1278,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8260,7 +8260,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_MODULE_CHANGE_ERROR",
-      "line": 1318,
+      "line": 1433,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8268,118 +8268,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "MODULE",
-      "line": 730,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MODULE",
-      "line": 1167,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "MODULE",
-      "line": 1190,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PARENT_ROOT",
-      "line": 644,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PARENT_ROOT",
-      "line": 671,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PARENT_ROOT",
-      "line": 1164,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PLACEMENT",
-      "line": 728,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PLACEMENT",
-      "line": 1175,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SOURCE_BASE_REF",
-      "line": 734,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SOURCE_BASE_SHA",
-      "line": 735,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SOURCE_BRANCH",
-      "line": 737,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SOURCE_CLONE",
-      "line": 645,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SOURCE_CLONE",
-      "line": 672,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SOURCE_CLONE",
-      "line": 731,
-      "path": "tools/agent_tools/dependency_module_change.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SOURCE_HEAD_SHA",
       "line": 738,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
@@ -8387,7 +8275,47 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "SOURCE_OWNER_EVIDENCE_SHA256",
+      "field": "MODULE",
+      "line": 1271,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "MODULE",
+      "line": 1294,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "PARENT_ROOT",
+      "line": 652,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "PARENT_ROOT",
+      "line": 679,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "PARENT_ROOT",
+      "line": 1268,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "PLACEMENT",
       "line": 736,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
@@ -8395,8 +8323,80 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "PLACEMENT",
+      "line": 1279,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SOURCE_BASE_REF",
+      "line": 742,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SOURCE_BASE_SHA",
+      "line": 743,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SOURCE_BRANCH",
+      "line": 745,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SOURCE_CLONE",
+      "line": 653,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SOURCE_CLONE",
+      "line": 680,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SOURCE_CLONE",
+      "line": 739,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SOURCE_HEAD_SHA",
+      "line": 746,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SOURCE_OWNER_EVIDENCE_SHA256",
+      "line": 744,
+      "path": "tools/agent_tools/dependency_module_change.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "SOURCE_REMOTE",
-      "line": 733,
+      "line": 741,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8404,7 +8404,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOPIC",
-      "line": 729,
+      "line": 737,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8412,7 +8412,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOPIC",
-      "line": 1162,
+      "line": 1266,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8420,7 +8420,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOPIC",
-      "line": 1176,
+      "line": 1280,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8428,7 +8428,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOPIC_ROOT",
-      "line": 1163,
+      "line": 1267,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
@@ -8436,7 +8436,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOPIC_ROOT",
-      "line": 1177,
+      "line": 1281,
       "path": "tools/agent_tools/dependency_module_change.py",
       "surface": "tool"
     },
