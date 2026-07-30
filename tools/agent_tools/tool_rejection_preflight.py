@@ -13,7 +13,6 @@
 # upstream design ../../tools/README.md documents tool entrypoints
 # upstream design ../../documents/tools/README.md documents user-facing tool routes
 # upstream implementation ./log_surface_inventory.py checks hook/tool/skill log-surface drift
-# upstream implementation ./tool_rejection_preflight.py owns code-edit cause evidence.
 # upstream implementation ../../.agents/skills/oop-readability-check/SKILL.md owns OOP readability review routing
 # upstream implementation ./task_authority.py owns library implementation authority.
 # upstream implementation ../bin/agent-canon owns selected style checks.
