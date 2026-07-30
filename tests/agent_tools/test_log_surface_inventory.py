@@ -108,7 +108,7 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             hook = root / ".codex" / "hooks" / "sample.py"
             hook.parent.mkdir(parents=True)
             hook.write_text("print('FIRST_FIELD=1')\n", encoding="utf-8")
-            baseline = root / "documents" / "log-surface-inventory.json"
+            baseline = root / "documents" / "runtime" / "log-surface-inventory.json"
 
             subprocess.run(
                 [
@@ -204,6 +204,46 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             )
             self.assertEqual(line_only_move.returncode, 0)
             self.assertEqual(line_only_move.stdout, "")
+
+    def test_nested_default_baseline_resolves_repository_root(self) -> None:
+        """The nested runtime baseline must derive the containing repository root."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            hook = root / ".codex" / "hooks" / "sample.py"
+            hook.parent.mkdir(parents=True)
+            hook.write_text("print('NESTED_ROOT_FIELD=1')\n", encoding="utf-8")
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--root",
+                    str(root),
+                    "--output",
+                    "documents/runtime/log-surface-inventory.json",
+                    "--quiet",
+                    ".codex",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--root",
+                    str(root),
+                    "--check",
+                    "--quiet",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
 
     def test_check_uses_vendored_baseline_when_root_baseline_is_absent(self) -> None:
         """Derived repos should check the AgentCanon baseline under vendor/."""
