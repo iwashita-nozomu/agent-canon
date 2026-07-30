@@ -86,8 +86,27 @@ class RouteToolTest(unittest.TestCase):
             "renderer_id": "route-test-renderer",
             "artifact_format": "graph_ir",
         }
-        if tool_id == "agent_canon.visualization.adapter.dependency_manifest":
-            arguments["dependency_manifest_locator"] = "reports/dependency_graph.tsv"
+        locator_fields = {
+            "agent_canon.visualization.adapter.dependency_manifest": {
+                "dependency_manifest_locator": "reports/dependency_graph.tsv",
+            },
+            "agent_canon.visualization.adapter.algorithm_flowchart": {
+                "jit_ir_locator": "reports/algorithm/ir.json",
+                "lean_evidence_locator": "reports/algorithm/lean.json",
+                "theorem_graph_locator": "reports/algorithm/theorems.json",
+            },
+            "agent_canon.visualization.adapter.document_mermaid": {
+                "document_locator": "documents/design/example.md",
+            },
+            "agent_canon.visualization.adapter.repository_graph": {
+                "repository_locator": "documents",
+            },
+            "agent_canon.visualization.adapter.knowledge_graph": {
+                "graph_locator": "documents",
+            },
+        }
+        if tool_id in locator_fields:
+            arguments.update(locator_fields[tool_id])
         return {
             "schema": "agent_canon.visualization_tool_call.v1",
             "tool_id": tool_id,
@@ -238,7 +257,9 @@ class RouteToolTest(unittest.TestCase):
                 target_is_directory=True,
             )
 
-            resolution = agent_canon_source_root.resolve_agent_canon_source_root(parent_root)
+            resolution = agent_canon_source_root.resolve_agent_canon_source_root(
+                parent_root
+            )
 
             self.assertEqual(resolution.layout, "vendored")
             self.assertEqual(resolution.current_repository_root, parent_root.resolve())
@@ -266,7 +287,9 @@ class RouteToolTest(unittest.TestCase):
             vendor_root = parent_root / "vendor" / "agent-canon"
             vendor_catalog = vendor_root / "agents" / "skills" / "catalog.yaml"
             vendor_catalog.parent.mkdir(parents=True, exist_ok=True)
-            vendor_catalog.write_text("version: 1\nskill_families: []\n", encoding="utf-8")
+            vendor_catalog.write_text(
+                "version: 1\nskill_families: []\n", encoding="utf-8"
+            )
             os.symlink(
                 standalone_root / "agents",
                 parent_root / "agents",
@@ -280,7 +303,10 @@ class RouteToolTest(unittest.TestCase):
 
     def test_route_rejects_vendor_symlink_outside_repository(self) -> None:
         """A vendor symlink escaping the parent repository fails typed resolution."""
-        with tempfile.TemporaryDirectory() as tmp_dir, tempfile.TemporaryDirectory() as outside_dir:
+        with (
+            tempfile.TemporaryDirectory() as tmp_dir,
+            tempfile.TemporaryDirectory() as outside_dir,
+        ):
             parent_root = Path(tmp_dir)
             (parent_root / ".git").touch()
             outside_root = Path(outside_dir) / "agent-canon"
@@ -316,11 +342,15 @@ class RouteToolTest(unittest.TestCase):
                 "version: 1\nskill_families: []\n",
                 encoding="utf-8",
             )
-            (root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").parent.mkdir(
+            (
+                root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml"
+            ).parent.mkdir(
                 parents=True,
                 exist_ok=True,
             )
-            (root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").write_text(
+            (
+                root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml"
+            ).write_text(
                 "version: 1\nskill_families: []\n",
                 encoding="utf-8",
             )
@@ -369,12 +399,16 @@ class RouteToolTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir) / "vendor" / "agent-canon"
-            (root / "agents" / "skills" / "catalog.yaml").parent.mkdir(parents=True, exist_ok=True)
+            (root / "agents" / "skills" / "catalog.yaml").parent.mkdir(
+                parents=True, exist_ok=True
+            )
             (root / "agents" / "skills" / "catalog.yaml").write_text(
                 "version: 1\nskill_families:\n",
                 encoding="utf-8",
             )
-            resolution = agent_canon_source_root.resolve_agent_canon_source_root(root.parent.parent)
+            resolution = agent_canon_source_root.resolve_agent_canon_source_root(
+                root.parent.parent
+            )
             self.assertEqual(resolution.layout, "vendored")
             self.assertEqual(resolution.source_root, root.resolve())
             self.assertEqual(
@@ -397,11 +431,15 @@ class RouteToolTest(unittest.TestCase):
                 "version: 1\nskill_families:\n",
                 encoding="utf-8",
             )
-            (root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").parent.mkdir(
+            (
+                root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml"
+            ).parent.mkdir(
                 parents=True,
                 exist_ok=True,
             )
-            (root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").write_text(
+            (
+                root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml"
+            ).write_text(
                 "version: 1\nskill_families:\n",
                 encoding="utf-8",
             )
@@ -542,7 +580,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("subagent-bootstrap", decision["active_skills"])
         self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
 
-    def test_prompt_routes_review_only_subagent_without_bootstrap_activation(self) -> None:
+    def test_prompt_routes_review_only_subagent_without_bootstrap_activation(
+        self,
+    ) -> None:
         """Review-only or do-not-edit prompts should not activate bootstrap."""
         result = self.run_route(
             "--prompt",
@@ -558,7 +598,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("subagent-bootstrap", decision["active_skills"])
         self.assertIn("subagent-bootstrap", decision["deferred_skills"])
 
-    def test_prompt_routes_explicit_japanese_delegation_to_subagent_bootstrap(self) -> None:
+    def test_prompt_routes_explicit_japanese_delegation_to_subagent_bootstrap(
+        self,
+    ) -> None:
         """Explicit Japanese delegation prompts should activate bootstrap as write-capable."""
         result = self.run_route(
             "--prompt",
@@ -593,7 +635,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("subagent-bootstrap", decision["active_skills"])
         self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
 
-    def test_prompt_routes_direct_review_to_change_review_without_bootstrap(self) -> None:
+    def test_prompt_routes_direct_review_to_change_review_without_bootstrap(
+        self,
+    ) -> None:
         """Direct review prompts should activate change-review, not implementation handoff."""
         for prompt in ("レビューしてください", "変更レビューして"):
             with self.subTest(prompt=prompt):
@@ -714,7 +758,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("structure-refactor", decision["matched_skills"])
         self.assertIn("structure-refactor", decision["active_skills"])
 
-    def test_prompt_docs_update_no_validation_preference_does_not_route_user_guided_debugging(self) -> None:
+    def test_prompt_docs_update_no_validation_preference_does_not_route_user_guided_debugging(
+        self,
+    ) -> None:
         """Ordinary validation preferences should not select user-guided cadence."""
         result = self.run_route(
             "--prompt",
@@ -777,25 +823,26 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("tool-finding-report", decision["related_skill_candidates"])
         self.assertIn("agent-log-analysis", decision["related_skill_candidates"])
 
-    def test_prompt_routes_explicit_code_visualization_to_code_visualization_skill(self) -> None:
+    def test_prompt_routes_explicit_code_visualization_to_code_visualization_skill(
+        self,
+    ) -> None:
         """Explicit public id should select code-visualization."""
-        result = self.run_route("--prompt", "$code-visualization で依存図を見たい", "--format", "json")
+        result = self.run_route(
+            "--prompt", "$code-visualization で依存図を見たい", "--format", "json"
+        )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
         self.assertIn("code-visualization", decision["matched_skills"])
         self.assertIn("code-visualization", decision["active_skills"])
         self.assertEqual(decision["visualization_owner_skill"], "code-visualization")
+        self.assertIsNone(decision["visualization_adapter_tool_call"])
         self.assertIsNone(decision["visualization_rejection"])
         call = decision["visualization_tool_call"]
         self.assertEqual(call["schema"], "agent_canon.visualization_tool_call.v1")
+        self.assertEqual(call["tool_id"], "agent_canon.visualization.coverage")
         self.assertEqual(
-            call["tool_id"],
-            "agent_canon.visualization.coverage",
-        )
-        self.assertEqual(
-            call["argument_schema"],
-            "agent_canon.visualization.arguments.coverage.v1",
+            call["argument_schema"], "agent_canon.visualization.arguments.coverage.v1"
         )
         self.assertEqual(
             set(call["arguments"]),
@@ -811,10 +858,30 @@ class RouteToolTest(unittest.TestCase):
             },
         )
         self.assertEqual(call["arguments"]["artifact_format"], "graph_ir")
-        self.assertEqual(call["arguments"]["literal_items"][0]["origin"], "literal_request")
-        self.assertEqual(call["arguments"]["owner_closure"][0]["origin"], "owner_closure")
+        self.assertEqual(
+            call["arguments"]["literal_items"][0]["origin"], "literal_request"
+        )
+        self.assertEqual(
+            call["arguments"]["owner_closure"][0]["origin"], "owner_closure"
+        )
 
-    def test_prompt_routes_visualization_keyword_alone_should_not_select_code_visualization(self) -> None:
+    def test_untyped_dependency_graph_prose_never_selects_adapter(self) -> None:
+        """A raw dependency-graph phrase cannot bypass the typed adapter route."""
+        result = self.run_route(
+            "--prompt",
+            "Please make a dependency graph for the repository.",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIsNone(decision["visualization_adapter_tool_call"])
+        self.assertIn(decision["visualization_rejection"], ("prose_only", None))
+
+    def test_prompt_routes_visualization_keyword_alone_should_not_select_code_visualization(
+        self,
+    ) -> None:
         """Prose keyword alone should not route to code-visualization."""
         result = self.run_route(
             "--prompt",
@@ -845,9 +912,12 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("code-visualization", decision["matched_skills"])
         self.assertIn("code-visualization", decision["active_skills"])
         self.assertEqual(decision["visualization_owner_skill"], "code-visualization")
+        self.assertIsNone(decision["visualization_adapter_tool_call"])
         self.assertIsNone(decision["visualization_rejection"])
 
-    def test_prompt_routes_code_visualization_tool_call_visible_in_text_and_markdown(self) -> None:
+    def test_prompt_routes_code_visualization_tool_call_visible_in_text_and_markdown(
+        self,
+    ) -> None:
         """Tool-call metadata remains visible in text and markdown render formats."""
         for output_format in ("text", "markdown"):
             with self.subTest(output_format=output_format):
@@ -865,8 +935,10 @@ class RouteToolTest(unittest.TestCase):
                 )
                 self.assertIn("visualization", result.stdout.lower())
 
-    def test_all_canonical_visualization_tool_ids_route_to_one_owner_call(self) -> None:
-        """Every canonical owner/adapter ToolID normalizes to the sole owner."""
+    def test_all_canonical_visualization_tool_ids_route_owner_then_selected_adapter(
+        self,
+    ) -> None:
+        """Every canonical ToolID emits the owner before its selected adapter."""
         for tool_id in (
             "agent_canon.visualization.coverage",
             "agent_canon.visualization.adapter.dependency_manifest",
@@ -890,9 +962,24 @@ class RouteToolTest(unittest.TestCase):
                     decision["visualization_tool_call"]["argument_schema"],
                     "agent_canon.visualization.arguments.coverage.v1",
                 )
+                adapter = decision["visualization_adapter_tool_call"]
+                if tool_id == "agent_canon.visualization.coverage":
+                    self.assertIsNone(adapter)
+                else:
+                    self.assertEqual(adapter["tool_id"], tool_id)
+                    self.assertEqual(
+                        adapter["argument_schema"],
+                        tool_id.replace(
+                            "agent_canon.visualization.adapter.",
+                            "agent_canon.visualization.arguments.",
+                        )
+                        + ".v1",
+                    )
                 self.assertIsNone(decision["visualization_rejection"])
 
-    def test_explicit_adapter_tool_call_normalizes_shared_arguments_to_owner(self) -> None:
+    def test_explicit_adapter_tool_call_normalizes_shared_arguments_to_owner(
+        self,
+    ) -> None:
         """A valid adapter call is validated but route emits only the owner call."""
         supplied = self.visualization_tool_call(
             tool_id="agent_canon.visualization.adapter.dependency_manifest",
@@ -923,6 +1010,19 @@ class RouteToolTest(unittest.TestCase):
             call["arguments"]["literal_items"],
             supplied_arguments["literal_items"],
         )
+        adapter = decision["visualization_adapter_tool_call"]
+        self.assertEqual(
+            adapter["tool_id"],
+            "agent_canon.visualization.adapter.dependency_manifest",
+        )
+        self.assertEqual(
+            adapter["argument_schema"],
+            "agent_canon.visualization.arguments.dependency_manifest.v1",
+        )
+        self.assertEqual(
+            adapter["arguments"]["dependency_manifest_locator"],
+            "reports/dependency_graph.tsv",
+        )
         self.assertIsNone(decision["visualization_rejection"])
 
     def test_renderer_skill_alias_keeps_code_visualization_as_owner(self) -> None:
@@ -942,6 +1042,66 @@ class RouteToolTest(unittest.TestCase):
             "agent_canon.visualization.coverage",
         )
         self.assertIn("algorithm-flowchart", decision["matched_skills"])
+
+    def test_each_explicit_adapter_tool_call_preserves_selected_schema_and_locator(
+        self,
+    ) -> None:
+        """Explicit adapter calls retain their typed adapter identity after owner routing."""
+        adapters = (
+            "dependency_manifest",
+            "algorithm_flowchart",
+            "document_mermaid",
+            "repository_graph",
+            "knowledge_graph",
+        )
+        for adapter_name in adapters:
+            with self.subTest(adapter_name=adapter_name):
+                tool_id = f"agent_canon.visualization.adapter.{adapter_name}"
+                schema = f"agent_canon.visualization.arguments.{adapter_name}.v1"
+                supplied = self.visualization_tool_call(
+                    tool_id=tool_id,
+                    argument_schema=schema,
+                )
+                result = self.run_route(
+                    "--prompt",
+                    json.dumps(supplied, sort_keys=True),
+                    "--format",
+                    "json",
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertEqual(
+                    decision["visualization_tool_call"]["tool_id"],
+                    "agent_canon.visualization.coverage",
+                )
+                self.assertEqual(
+                    decision["visualization_adapter_tool_call"]["tool_id"],
+                    tool_id,
+                )
+                self.assertEqual(
+                    decision["visualization_adapter_tool_call"]["argument_schema"],
+                    schema,
+                )
+                self.assertIsNone(decision["visualization_rejection"])
+
+    def test_adapter_argument_schema_selects_owner_then_matching_adapter(self) -> None:
+        """A typed adapter schema token is sufficient for catalog-owned routing."""
+        schema = "agent_canon.visualization.arguments.knowledge_graph.v1"
+        result = self.run_route("--prompt", schema, "--format", "json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertEqual(
+            decision["visualization_tool_call"]["tool_id"],
+            "agent_canon.visualization.coverage",
+        )
+        self.assertEqual(
+            decision["visualization_adapter_tool_call"]["tool_id"],
+            "agent_canon.visualization.adapter.knowledge_graph",
+        )
+        self.assertEqual(
+            decision["visualization_adapter_tool_call"]["argument_schema"],
+            schema,
+        )
 
     def test_visualization_tool_call_rejections_are_deterministic(self) -> None:
         """Unknown, schema, field, type, and format defects fail closed."""
@@ -1040,11 +1200,13 @@ class RouteToolTest(unittest.TestCase):
 
     def test_code_visualization_small_model_route_is_exact_and_early(self) -> None:
         """The runtime skill exposes the exact renderer route before generic guidance."""
-        runtime_text = (PROJECT_ROOT / ".agents" / "skills" / "code-visualization" / "SKILL.md").read_text(
-            encoding="utf-8"
-        )
+        runtime_text = (
+            PROJECT_ROOT / ".agents" / "skills" / "code-visualization" / "SKILL.md"
+        ).read_text(encoding="utf-8")
         direct_start = runtime_text.index("## Small-Model Direct Route")
-        canonical_read = runtime_text.index("1. Read `agents/skills/code-visualization.md`.")
+        canonical_read = runtime_text.index(
+            "1. Read `agents/skills/code-visualization.md`."
+        )
         generic_tree = runtime_text.index("1. Infer the context question")
         direct_text = runtime_text[direct_start:canonical_read]
         self.assertLess(direct_start, canonical_read)
@@ -1056,7 +1218,10 @@ class RouteToolTest(unittest.TestCase):
             self.assertIn(command, direct_text)
         self.assertNotIn("<path>", direct_text)
         self.assertNotIn("<provided-path>", direct_text)
-        self.assertIn("--scope changed` only when the request explicitly asks for changed scope", direct_text)
+        self.assertIn(
+            "--scope changed` only when the request explicitly asks for changed scope",
+            direct_text,
+        )
         self.assertIn("`--json` is invalid", direct_text)
         direct_flat = " ".join(direct_text.split())
         for invariant in (
@@ -1090,7 +1255,9 @@ class RouteToolTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        self.assertEqual(packet_result.returncode, 0, packet_result.stdout + packet_result.stderr)
+        self.assertEqual(
+            packet_result.returncode, 0, packet_result.stdout + packet_result.stderr
+        )
         self.assertNotIn("check_dependency_graph.sh", packet_result.stdout)
         self.assertNotIn("sed -n", packet_result.stdout)
         packet_payload = json.loads(packet_result.stdout)
@@ -1102,7 +1269,11 @@ class RouteToolTest(unittest.TestCase):
                 "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
             ],
         )
-        for forbidden in ("route.py", "scan_code_dependencies.py", "helper_function_inventory.py"):
+        for forbidden in (
+            "route.py",
+            "scan_code_dependencies.py",
+            "helper_function_inventory.py",
+        ):
             self.assertNotIn(forbidden, packet_payload["discovered_commands"])
         self.assertEqual(
             [
@@ -1120,14 +1291,18 @@ class RouteToolTest(unittest.TestCase):
             ],
         )
 
-    def test_code_visualization_canonical_skill_mirrors_renderer_invariant(self) -> None:
+    def test_code_visualization_canonical_skill_mirrors_renderer_invariant(
+        self,
+    ) -> None:
         """The canonical owner keeps full and changed graph routes synchronized."""
-        canonical_text = (PROJECT_ROOT / "agents" / "skills" / "code-visualization.md").read_text(
-            encoding="utf-8"
-        )
+        canonical_text = (
+            PROJECT_ROOT / "agents" / "skills" / "code-visualization.md"
+        ).read_text(encoding="utf-8")
         source_start = canonical_text.index("## Source Evidence Routes")
         source_text = canonical_text[source_start:]
-        self.assertIn("changed-scope command only when changed scope is explicit", source_text)
+        self.assertIn(
+            "changed-scope command only when changed scope is explicit", source_text
+        )
         self.assertIn("--bundle-dir reports/dependency-graph", source_text)
         self.assertNotIn("<path>", source_text)
         self.assertNotIn("<provided-path>", source_text)
@@ -1153,7 +1328,11 @@ class RouteToolTest(unittest.TestCase):
             "renderer invokes the external checker and owns checker authority",
             source_flat,
         )
-        for forbidden in ("route.py", "scan_code_dependencies.py", "helper_function_inventory.py"):
+        for forbidden in (
+            "route.py",
+            "scan_code_dependencies.py",
+            "helper_function_inventory.py",
+        ):
             self.assertNotIn(forbidden, source_text)
         for basename in (
             "dependency_graph.tsv",
@@ -1213,7 +1392,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("gpu-execution", decision["matched_skills"])
         self.assertIn("gpu-execution", decision["active_skills"])
         self.assertIn("experiment-lifecycle", decision["related_skill_candidates"])
-        self.assertIn("computational-optimization", decision["related_skill_candidates"])
+        self.assertIn(
+            "computational-optimization", decision["related_skill_candidates"]
+        )
 
     def test_prompt_routes_codex_report_document_repo_optimization(self) -> None:
         """Codex report and document based repo optimization should not fall through."""
@@ -1501,7 +1682,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=skills", result.stdout)
         self.assertIn("CANONICAL_SKILL=runtime-log-repair", result.stdout)
 
-    def test_environment_maintenance_activates_dependency_design_prerequisite(self) -> None:
+    def test_environment_maintenance_activates_dependency_design_prerequisite(
+        self,
+    ) -> None:
         """Environment maintenance must route through dependency design first."""
         result = self.run_route(
             "--prompt",
@@ -2182,8 +2365,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-orchestration", python_decision["active_skills"])
         self.assertTrue(
             any(
-                "tests_are=validation_control_surface_not_default_work_owner"
-                in reason
+                "tests_are=validation_control_surface_not_default_work_owner" in reason
                 for reason in python_decision["reasons"]
             )
         )
@@ -2488,7 +2670,9 @@ class CapabilityRouteTest(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["schema"], "agent_canon.route.capability_route.v1")
         self.assertEqual(payload["matches"][0]["skill"], "oop-type-design")
-        self.assertEqual(payload["matches"][0]["owner"], "pre_implementation_oop_type_design")
+        self.assertEqual(
+            payload["matches"][0]["owner"], "pre_implementation_oop_type_design"
+        )
         self.assertEqual(payload["matches"][0]["phase"], "pre_implementation_design")
         self.assertEqual(payload["matches"][0]["activation"], "explicit_capability")
         self.assertTrue(payload["matches"][0]["exclusive"])
@@ -2498,7 +2682,9 @@ class CapabilityRouteTest(unittest.TestCase):
 
     def test_capability_route_selects_dependency_visualization_owner(self) -> None:
         """Visualization capability maps to canonical code-visualization ownership."""
-        result = self.run_route("--capability", "dependency_manifest_graph", "--format", "json")
+        result = self.run_route(
+            "--capability", "dependency_manifest_graph", "--format", "json"
+        )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["schema"], "agent_canon.route.capability_route.v1")
@@ -2514,6 +2700,20 @@ class CapabilityRouteTest(unittest.TestCase):
         self.assertEqual(
             payload["visualization_tool_call"]["argument_schema"],
             "agent_canon.visualization.arguments.coverage.v1",
+        )
+        self.assertEqual(
+            payload["visualization_adapter_tool_call"]["tool_id"],
+            "agent_canon.visualization.adapter.dependency_manifest",
+        )
+        self.assertEqual(
+            payload["visualization_adapter_tool_call"]["argument_schema"],
+            "agent_canon.visualization.arguments.dependency_manifest.v1",
+        )
+        self.assertEqual(
+            payload["visualization_adapter_tool_call"]["arguments"][
+                "dependency_manifest_locator"
+            ],
+            "tools/agent_tools/render_dependency_manifest_graph.py",
         )
         self.assertIsNone(payload["visualization_rejection"])
 
@@ -2542,17 +2742,25 @@ class CapabilityRouteTest(unittest.TestCase):
                     "--format",
                     output_format,
                 )
-                self.assert_failure_code(result, "unknown-capability:unknown_capability", output_format=output_format)
+                self.assert_failure_code(
+                    result,
+                    "unknown-capability:unknown_capability",
+                    output_format=output_format,
+                )
 
     def test_capability_route_rejects_unknown_id(self) -> None:
         """Unknown capability IDs fail closed."""
-        result = self.run_route("--capability", "unknown_capability", "--format", "json")
+        result = self.run_route(
+            "--capability", "unknown_capability", "--format", "json"
+        )
         self.assert_failure_code(result, "unknown-capability:unknown_capability")
 
     def test_capability_route_rejects_invalid_id(self) -> None:
         """Capability IDs outside the fixed grammar fail closed."""
         result = self.run_route("--capability", "oop-type-design", "--format", "json")
-        payload = self.assert_failure_code(result, "invalid-capability-id:oop-type-design")
+        payload = self.assert_failure_code(
+            result, "invalid-capability-id:oop-type-design"
+        )
         self.assertEqual(payload["capability_ids"], [])
 
     def test_capability_route_rejects_duplicate_id(self) -> None:
@@ -2575,17 +2783,27 @@ class CapabilityRouteTest(unittest.TestCase):
                 + "\n"
                 + self.capability_entry("other-skill", owner="other_owner"),
             )
-            result = self.run_route("--root", str(root), "--capability", "oop_type_design")
+            result = self.run_route(
+                "--root", str(root), "--capability", "oop_type_design"
+            )
         self.assert_failure_code(result, "capability-owner-ambiguity:oop_type_design")
 
     def test_capability_route_rejects_duplicate_definition(self) -> None:
         """A same-skill duplicate definition is rejected."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            duplicate = self.capability_entry() + "\n" + "        - id: oop_type_design\n          owner: pre_implementation_oop_type_design\n          phase: pre_implementation_design\n          activation: explicit_capability\n          exclusive: true"
+            duplicate = (
+                self.capability_entry()
+                + "\n"
+                + "        - id: oop_type_design\n          owner: pre_implementation_oop_type_design\n          phase: pre_implementation_design\n          activation: explicit_capability\n          exclusive: true"
+            )
             self.write_catalog(root, duplicate)
-            result = self.run_route("--root", str(root), "--capability", "oop_type_design")
-        self.assert_failure_code(result, "duplicate-capability-definition:oop_type_design")
+            result = self.run_route(
+                "--root", str(root), "--capability", "oop_type_design"
+            )
+        self.assert_failure_code(
+            result, "duplicate-capability-definition:oop_type_design"
+        )
 
     def test_capability_route_rejects_multiple_capabilities(self) -> None:
         """The first capability version does not arbitrate multiple IDs."""
@@ -2610,12 +2828,16 @@ class CapabilityRouteTest(unittest.TestCase):
     def test_capability_route_rejects_missing_option_value(self) -> None:
         """A missing capability value uses the text fallback envelope."""
         result = self.run_route("--capability")
-        self.assert_failure_code(result, "missing-capability-value", output_format="text")
+        self.assert_failure_code(
+            result, "missing-capability-value", output_format="text"
+        )
 
     def test_capability_route_rejects_option_looking_capability_value(self) -> None:
         """An option token cannot become a capability ID."""
         result = self.run_route("--capability", "--format", "json")
-        self.assert_failure_code(result, "missing-capability-value", output_format="text")
+        self.assert_failure_code(
+            result, "missing-capability-value", output_format="text"
+        )
 
     def test_capability_route_rejects_unsupported_option(self) -> None:
         """Unknown raw options fail closed before argparse."""
@@ -2638,7 +2860,9 @@ class CapabilityRouteTest(unittest.TestCase):
                 "--format=json",
             )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(json.loads(result.stdout)["matches"][0]["skill"], "oop-type-design")
+        self.assertEqual(
+            json.loads(result.stdout)["matches"][0]["skill"], "oop-type-design"
+        )
 
     def test_capability_route_rejects_missing_format_value(self) -> None:
         """A missing format value uses text output."""
@@ -2663,12 +2887,16 @@ class CapabilityRouteTest(unittest.TestCase):
     def test_capability_route_rejects_invalid_format(self) -> None:
         """Invalid formats preserve the raw code and use text output."""
         result = self.run_route("--capability", "oop_type_design", "--format", "xml")
-        self.assert_failure_code(result, "invalid-capability-format:xml", output_format="text")
+        self.assert_failure_code(
+            result, "invalid-capability-format:xml", output_format="text"
+        )
 
     def test_capability_route_rejects_invalid_mode(self) -> None:
         """Invalid modes preserve the raw code and use repo-changing output."""
         result = self.run_route("--capability", "oop_type_design", "--mode", "other")
-        self.assert_failure_code(result, "invalid-capability-mode:other", output_format="text")
+        self.assert_failure_code(
+            result, "invalid-capability-mode:other", output_format="text"
+        )
 
     def test_capability_route_rejects_risk_conflict(self) -> None:
         """Non-focused risk values are outside capability mode."""
@@ -2679,13 +2907,17 @@ class CapabilityRouteTest(unittest.TestCase):
         """Omitting root uses the current repository catalog."""
         result = self.run_route("--capability", "oop_type_design", "--format", "json")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(json.loads(result.stdout)["capability_ids"], ["oop_type_design"])
+        self.assertEqual(
+            json.loads(result.stdout)["capability_ids"], ["oop_type_design"]
+        )
 
     def test_capability_root_loads_catalog_from_resolved_root(self) -> None:
         """A custom root owns both capability and related-rule loading."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            self.write_catalog(root, self.capability_entry("custom-skill", "custom_capability"))
+            self.write_catalog(
+                root, self.capability_entry("custom-skill", "custom_capability")
+            )
             result = self.run_route(
                 "--root",
                 str(root),
@@ -2695,7 +2927,9 @@ class CapabilityRouteTest(unittest.TestCase):
                 "json",
             )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(json.loads(result.stdout)["matches"][0]["skill"], "custom-skill")
+        self.assertEqual(
+            json.loads(result.stdout)["matches"][0]["skill"], "custom-skill"
+        )
 
     def test_capability_root_rejects_missing_path(self) -> None:
         """A missing root is a typed root failure."""
@@ -2710,13 +2944,17 @@ class CapabilityRouteTest(unittest.TestCase):
     def test_capability_root_rejects_non_directory(self) -> None:
         """A file root is not accepted as a repository root."""
         with tempfile.NamedTemporaryFile() as file:
-            result = self.run_route("--root", file.name, "--capability", "oop_type_design")
+            result = self.run_route(
+                "--root", file.name, "--capability", "oop_type_design"
+            )
         self.assert_route_source_root_failure(result, "agent_canon_source_root_missing")
 
     def test_capability_root_rejects_missing_catalog(self) -> None:
         """A custom root without a catalog fails closed."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            result = self.run_route("--root", tmp_dir, "--capability", "oop_type_design")
+            result = self.run_route(
+                "--root", tmp_dir, "--capability", "oop_type_design"
+            )
         self.assert_route_source_root_failure(result, "agent_canon_source_root_missing")
 
     def test_capability_root_rejects_invalid_catalog(self) -> None:
@@ -2726,15 +2964,21 @@ class CapabilityRouteTest(unittest.TestCase):
             catalog = root / "agents" / "skills" / "catalog.yaml"
             catalog.parent.mkdir(parents=True)
             catalog.write_text("skill_families: [unterminated\n", encoding="utf-8")
-            result = self.run_route("--root", tmp_dir, "--capability", "oop_type_design")
+            result = self.run_route(
+                "--root", tmp_dir, "--capability", "oop_type_design"
+            )
         self.assert_failure_code(result, "capability-root-catalog-invalid")
 
     def test_capability_catalog_rejects_unknown_field(self) -> None:
         """An unknown capability record field is rejected."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            self.write_catalog(root, self.capability_entry(extra="          extra: true"))
-            result = self.run_route("--root", str(root), "--capability", "oop_type_design")
+            self.write_catalog(
+                root, self.capability_entry(extra="          extra: true")
+            )
+            result = self.run_route(
+                "--root", str(root), "--capability", "oop_type_design"
+            )
         self.assert_failure_code(result, "capability-root-catalog-invalid")
 
     def test_capability_route_direct_unknown_id_is_fail_closed(self) -> None:
@@ -2747,8 +2991,12 @@ class CapabilityRouteTest(unittest.TestCase):
 
     def test_capability_route_failure_preserves_exact_error_fields(self) -> None:
         """Failure decisions keep the stable schema and empty match fields."""
-        result = self.run_route("--capability", "unknown_capability", "--format", "json")
-        payload = self.assert_failure_code(result, "unknown-capability:unknown_capability")
+        result = self.run_route(
+            "--capability", "unknown_capability", "--format", "json"
+        )
+        payload = self.assert_failure_code(
+            result, "unknown-capability:unknown_capability"
+        )
         self.assertEqual(payload["schema"], "agent_canon.route.capability_route.v1")
         self.assertEqual(payload["matches"], [])
         self.assertEqual(payload["skills"], [])
@@ -2757,7 +3005,9 @@ class CapabilityRouteTest(unittest.TestCase):
     def test_capability_route_invalid_format_uses_text_fallback(self) -> None:
         """Invalid format diagnostics are rendered in text mode."""
         result = self.run_route("--capability", "unknown_capability", "--format", "xml")
-        self.assert_failure_code(result, "invalid-capability-format:xml", output_format="text")
+        self.assert_failure_code(
+            result, "invalid-capability-format:xml", output_format="text"
+        )
         self.assertTrue(result.stdout.startswith("CAPABILITY_ROUTE_SCHEMA="))
 
     def test_prompt_does_not_keyword_activate_oop_type_design(self) -> None:
@@ -2806,11 +3056,14 @@ class CapabilityRouteTest(unittest.TestCase):
             ("oop_type_design",), "repo-changing", index, preflight
         )
         payload = route_module.capability_decision_to_json_data(decision)
-        self.assertEqual(payload["related_skills"]["oop-type-design"], [
-            "python-review",
-            "cpp-review",
-            "oop-readability-check",
-        ])
+        self.assertEqual(
+            payload["related_skills"]["oop-type-design"],
+            [
+                "python-review",
+                "cpp-review",
+                "oop-readability-check",
+            ],
+        )
 
 
 if __name__ == "__main__":
