@@ -28,15 +28,14 @@ TOOLS_ROOT = SOURCE_ROOT / "tools" / "agent_tools"
 if str(TOOLS_ROOT) not in sys.path:
     sys.path.insert(0, str(TOOLS_ROOT))
 
-from hook_safety import (  # noqa: E402
-    SHELL_TOOL_NAMES,
-    branch_block_payload,
-    first_block,
-    payload_prompt,
-    payload_tool_command,
-    payload_tool_name,
-    secret_block_payload,
-    secret_kind,
+from agent_canon_source_root import (  # noqa: E402
+    LAYOUT_STANDALONE,
+    resolve_agent_canon_source_root,
+)
+from behavior_event_assembly import (  # noqa: E402
+    FinalHandlerResult,
+    HookInvocationParts,
+    record_hook_invocation,
 )
 from execution_resource_projection import (  # noqa: E402
     ProjectionError,
@@ -49,10 +48,15 @@ from hook_retirement import (  # noqa: E402
     RETIRED_CHILD_TOMBSTONES,
     source_digest,
 )
-from behavior_event_assembly import (  # noqa: E402
-    FinalHandlerResult,
-    HookInvocationParts,
-    record_hook_invocation,
+from hook_safety import (  # noqa: E402
+    SHELL_TOOL_NAMES,
+    branch_block_payload,
+    first_block,
+    payload_prompt,
+    payload_tool_command,
+    payload_tool_name,
+    secret_block_payload,
+    secret_kind,
 )
 from prompt_classifier import PromptClassifierInputs, freeze  # noqa: E402
 from subagent_selection import select_subagents  # noqa: E402
@@ -64,6 +68,8 @@ OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
 HOOK_CONTRACT_SCHEMA = "agent-canon.hook-contract.v1"
 POST_TOOL_USE_INPUT_SCHEMA = "agent-canon-post-tool-use-input/v1"
 DISPATCHER_SOURCE_ROOT_ENV = "AGENT_CANON_HOOK_SOURCE_ROOT"
+WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
+ACTIVE_RUN_POINTER = Path("reports") / "agents" / ".active_run"
 MAX_HOOK_PAYLOAD_BYTES = 256 * 1024
 
 
@@ -206,16 +212,60 @@ def projection_payload(stdout: str) -> dict[str, object]:
     }
 
 
-def root_for_spool() -> Path:
+def hook_root() -> tuple[Path, bool]:
+    """Resolve the active workspace root and whether it is standalone AgentCanon."""
     override = os.environ.get(DISPATCHER_SOURCE_ROOT_ENV, "").strip()
-    return Path(override).resolve() if override else SOURCE_ROOT
+    if override:
+        return Path(override).resolve(), True
+    try:
+        resolution = resolve_agent_canon_source_root(Path.cwd())
+        return resolution.current_repository_root, resolution.layout == LAYOUT_STANDALONE
+    except Exception:
+        # Hook capture remains fail-open when a caller has no resolvable repository context.
+        return SOURCE_ROOT, True
 
 
-def spool_event(event: str, raw_payload: bytes, status: str, **telemetry: str) -> tuple[dict[str, object], HookLogContext]:
+def _active_report_target(pointer: Path) -> Path | None:
+    """Resolve one non-empty active-run pointer relative to its own directory."""
+    if not pointer.is_file():
+        return None
+    try:
+        value = pointer.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return None
+    if not value:
+        return None
+    target = Path(value)
+    if not target.is_absolute():
+        target = pointer.parent / target
+    return target.resolve()
+
+
+def resolve_report_target(root: Path, *, standalone: bool) -> Path | None:
+    """Resolve the optional workflow-monitor report target for the active root."""
+    override = os.environ.get(WORKFLOW_MONITOR_REPORT_DIR_ENV, "").strip()
+    if override:
+        target = Path(override)
+        return (root / target).resolve() if not target.is_absolute() else target.resolve()
+    target = _active_report_target(root / ACTIVE_RUN_POINTER)
+    if target is not None:
+        return target
+    if standalone:
+        return _active_report_target(root / ".active_run")
+    return None
+
+
+def spool_event(
+    event: str,
+    raw_payload: bytes,
+    status: str,
+    root: Path,
+    **telemetry: str,
+) -> tuple[dict[str, object], HookLogContext]:
     """Build one base transport entry; the caller appends it exactly once."""
     timestamp = utc_now()
     payload_fingerprint = hashlib.sha256(raw_payload).hexdigest()
-    context = HookLogContext(root_for_spool(), event)
+    context = HookLogContext(root, event)
     entry: dict[str, object] = {
         "hook_run_id": context.run_id(timestamp, payload_fingerprint),
         "timestamp": timestamp,
@@ -234,6 +284,7 @@ def prepare_parts(
     output: dict[str, object] | None,
     entry: dict[str, object],
     root: Path,
+    report_dir: Path | None,
 ) -> HookInvocationParts:
     """Construct typed assembly inputs without writing an artifact."""
     parsed = payload is not None
@@ -273,7 +324,7 @@ def prepare_parts(
         payload_fingerprint=str(entry["payload_fingerprint"]),
         timestamp=str(entry["timestamp"]),
         root=root,
-        report_dir=root,
+        report_dir=report_dir,
     )
 
 
@@ -318,18 +369,26 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
                         status = "unsuccessful_tool_response"
             except (ProjectionError, TypeError, ValueError, AssertionError):
                 status = "invalid_projection"
-    root = root_for_spool()
-    spool_entry, context = spool_event(event, raw_payload, status, **telemetry)
-    behavior = record_hook_invocation(prepare_parts(event, payload, status, output, spool_entry, root))
+    root, standalone = hook_root()
+    report_dir = resolve_report_target(root, standalone=standalone)
+    spool_entry, context = spool_event(event, raw_payload, status, root, **telemetry)
+    behavior = record_hook_invocation(
+        prepare_parts(event, payload, status, output, spool_entry, root, report_dir)
+    )
     if behavior is not None:
         spool_entry.update(behavior.as_dict())
     try:
         append_result = context.append(spool_entry)
     except Exception:
         append_result = None
-    if behavior is not None and append_result is not None and getattr(append_result, "status", "") == "spooled":
+    if (
+        behavior is not None
+        and append_result is not None
+        and getattr(append_result, "status", "") == "spooled"
+        and report_dir is not None
+    ):
         try:
-            emit_behavior_projection(root, behavior.as_dict())
+            emit_behavior_projection(report_dir, behavior.as_dict())
         except Exception:
             pass
     if output is not None:

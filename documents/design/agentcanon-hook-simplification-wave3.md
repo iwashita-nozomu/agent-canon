@@ -24,6 +24,7 @@ downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates 
 - decision: 3 active dispatcher events、inactive `Stop`、permanent tombstones、retired executable file なし
 - no compatibility surface: 旧 executable、re-export、wrapper、shim、fallback CLI は作らない
 - source checkout: fresh design clone from current `main`; implementation wave は同じ source snapshot を再読込して開始する
+- active root/report placement: dispatcher は既存 `agent_canon_source_root` の `current_repository_root` を active root とし、derived parent では親 repo、standalone では AgentCanon repoを使う。report target は `AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR`、active root `reports/agents/.active_run`、standalone `.active_run` の順で解決し、見つからない場合は spool-only とする
 - first artifact（責務/呼び出し順）: 下表を起点に `active handler -> caller owner -> record assembly -> writer/projection` の順序を固定し、以降の契約はこのテーブルに従う
 
 | artifact owner | caller path | write/projection policy |
@@ -32,6 +33,19 @@ downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates 
 | `tools/agent_tools/behavior_event_assembly.py` | direct import from dispatcher | returns `BehaviorEventRecord | None`; no I/O |
 | `.codex/hooks/hook_event_log.py` | direct import from dispatcher | no-replace per-event spool append (`<spool>/<namespace>/<hook_name>/<hook_run_id>.json`) with `spooled|duplicate|failed` result |
 | `tools/agent_tools/workflow_monitor.py` | direct import from dispatcher | emit projection only when append status is `spooled` AND behavior record exists |
+
+### Active root and report projection placement
+
+`hook_dispatcher.py` は `agent_canon_source_root.resolve_agent_canon_source_root` の既存 context を再利用し、`current_repository_root` を hook の active root として spool と report-target 解決に渡す。vendored/derived parent では親 repo、standalone layout では AgentCanon repo が active root である。fixture 用の `AGENT_CANON_HOOK_SOURCE_ROOT` は既存の明示 override としてだけ使う。
+
+report target は次の順序で一度だけ解決する。
+
+1. `AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR`（相対値は active root 基準）
+1. active root の `reports/agents/.active_run` が指す run bundle
+1. standalone layout の `<active root>/.active_run` が指す run bundle
+1. いずれも無ければ `None`
+
+active handler は `record_hook_invocation` を一回、`HookLogContext.append` を一回だけ実行する。behavior event があり、append result が `spooled` で、resolved report target がある場合だけ、その target に `emit_behavior_projection` を一回実行する。target が無い場合は spool-only とし、behavior event の `workflow_monitor_report_dir` は空文字にする。hook hot path は archive sync、Git、network を呼び出さず、source root 直下の `workflow_monitoring.md` へ fallback しない。
 
 Invalid interpretations:
 

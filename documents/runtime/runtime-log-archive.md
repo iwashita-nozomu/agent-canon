@@ -253,6 +253,17 @@ hook workflow-monitor evidence resolves the parent repo
 submodule hook calls from writing active-task evidence into stale AgentCanon
 source report bundles.
 
+The active hook dispatcher reuses the source-root context for this resolution:
+the derived parent repository is the active root, while standalone AgentCanon
+uses its own repository root. The workflow-monitor report target precedence is
+`AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR`, the active root's
+`reports/agents/.active_run`, and standalone `.active_run`; an absent target
+leaves the hook spool-only. Projection is emitted only after a `spooled`
+append for an assembled behavior event, and no source-root
+`workflow_monitoring.md` fallback is permitted. These reads and the local
+projection remain on the hook hot path without archive sync, Git, or network
+operations.
+
 The initial import from the former in-tree log surface is preserved under:
 
 ```text
