@@ -107,15 +107,20 @@ declared|resolved|canonicalized|routed|materialized|projected|read_back -> stale
 - 文字列は Unicode `NFC` に正規化してから UTF-8 bytes にする。display text は case を保持し、identifier/alias は `NFKC`、`casefold`、ASCII hyphen-case validation の順に適用する。`_`、空白、類似文字の暗黙変換はしない。
 - alias は catalog の明示的 alias field からのみ読んで、正規化後に `{alias, alias_of}` へ materialize する。alias は identity を作らず、prose、purpose、description、trigger keyword は alias/capability/adapter selector にならない。
 - object field order は kind ごとに次で固定する。`IdentityRecord=[id,digest,kind,canonical_payload]`、`Ref=[id,digest]`、`NodeProjection=[ref,kind,display_label]`、`PhaseProjection=[ref,display_label,order]`、`CommandProjection=[ref,display_label,order]`、`ToolProjection=[ref,display_label]`、`EdgeProjection=[edge_ref,source_ref,target_ref,display_label]`、`ManifestEnvelope=[manifest_ref,source_digest,identity_refs,edge_refs,coverage_refs,counts]`、`CoverageEnvelope=[coverage_ref,node_refs,phase_refs,command_refs,tool_refs,edge_refs,digests,counts]`、`ReadbackEnvelope=[readback_ref,source_digest,json_digest,mermaid_digest,projection_digests,evidence_refs,counts]`、`CheckResult=[status,failure_refs,unresolved_refs,counts]`。payload kind 内の order は `Skill=[id,catalog_locator,canonical_doc,shim,command_ids,capability_ids,phase_ids]`、`Command=[id,skill_id,logical_argv,source_locator,execution_cwd,argv_digest]`、`Capability=[id,owner_id,type,phase_id,adapter_id]`、`Tool=[id,owner_id,argument_schema_id,logical_locator]`、`ToolCall=[id,tool_id,input_refs,output_refs,locator_refs,order]`、`Phase=[id,owner_id,order]`、`Edge=[id,kind,source_id,target_id,order,attributes]` とする。これらの payload は `IdentityRecord.canonical_payload` にだけ現れる。
-- arrays は semantic order がある `order`/`logical_argv` 以外を `(kind,id,alias_of)` の順で並べる。ordered edges は `order` を持ち、入力配列の偶然の順序を意味にしない。JSON bytes は compact JSON、`ensure_ascii=false`、UTF-8、末尾改行なしとする。
-- digest は domain-separated に `SHA-256(UTF8("agent-canon/skill-tool-invocation-graph/v2\0" + kind + "\0") + canonical_json_bytes)` とする。source file digest、record digest、graph digest、projection digest は domain を分け、同じ bytes を異なる意味で再利用しない。
-- 同一 `kind,id` かつ canonical bytes が同じ重複は `duplicate_same_payload` として一件に収束し、発生件数を checker output に記録する。同一 IDで bytes が違えば `identity_collision`、異なる IDで同一 identity payload を指せば `alias_or_identity_collision`、同じ normalized alias が別 target を指せば `alias_collision`、同じ edge/ToolCall IDで relation/args が違えば typed collision、projection/envelope に payload-bearing field があれば `payload_duplicate` として fail する。
+- arrays は semantic order がある `order`/`logical_argv` 以外を `(kind,id,alias_of)` の順で並べる。ordered edges は `order` を持ち、入力配列の偶然の順序を意味にしない。JSON bytes は compact JSON、UTF-8、末尾改行なしとする。共通 packet の ASCII escaping/scalar rule は `agents/internal-routines/design-implementation-correspondence.md` と同じ canonical serializer を使う。
+- digest は次の acyclic digest DAG で計算する。identity level の `IdentityPreimage` は `UTF8(domain) || NUL || UTF8(schema) || NUL || UTF8(id) || NUL || UTF8(kind) || NUL || canonical_payload_bytes` とし、domain は `agent-canon`、schema は `skill-tool-invocation-graph.v2`、`digest=SHA-256(IdentityPreimage)` とする。preimage は digest field を含まず、domain、schema、stable semantic `id`、`kind`、canonical payload をこの順に含み、各 field 間の separator は一つの NUL byte とする。
+- 同一 `kind,id` かつ canonical preimage bytes が byte-for-byte 同じ場合だけ `duplicate_same_payload` として一件に収束する。同一 `kind,id` の preimage が一 byte でも異なれば `identity_collision`、異なる preimage が同じ digest を持てば `digest_collision`、同じ digest field が preimage と一致しなければ `digest_mismatch` とする。異なる IDで同じ identity payload を指せば `alias_or_identity_collision`、同じ normalized alias が別 target を指せば `alias_collision`、同じ edge/ToolCall IDで relation/args が違えば typed collision、projection/envelope に payload-bearing field があれば `payload_duplicate` として fail する。
+
+### Acyclic digest DAG and artifact readback
+
+digest dependency は `identity preimages → ordered Ref/edge envelopes → graph payload → generated JSON artifact` とする。identity digest を先に確定し、ordered `Ref`、`EdgeProjection`、node/phase/command/tool projection envelope を canonicalize して envelope digest を計算し、その digest refs と counts から graph payload digest を計算する。generated JSON artifact は graph/coverage/projection digest refs と compact projectionsを含むが、JSON artifact 自身の `json_digest` field を preimage から除外して `json_digest=SHA-256(domain/json + canonical_json_without_json_digest)` とする。
+
+Mermaid は graph digest と coverage digest の Ref だけを artifact metadata として保持し、`json_digest`、full JSON payload、artifact digest を保持しない。Mermaid の generated node/edge labels と Ref は parser readback が再構成して projection identity digest を計算し、graph/coverage digest refs と比較する。readback は観測した JSON/Mermaid bytes digest を `ReadbackEnvelope` の digest として記録できるが、JSON artifact は Mermaid digest を入力にせず、Mermaid は JSON digest を入力にしない。従って JSON↔Mermaid に循環依存はなく、両方が同じ graph/coverage digest DAG の下流 projection となる。
 
 ## Invariants
 
 - `SG-001` universe は現在の `catalog.yaml` の実際の 60 skill と、入力 snapshot で実際に解決された全 command/ToolID/phase を含む。固定 bucket、人工的な `20+20+10+10`、欠落を coverage とみなさない。
-- `SG-002` `catalog.yaml` は skill と catalog-owned command identity の唯一の owner、`skill-dependencies.yaml` は dependency/order/routing/parallel relation の唯一の owner、`agents/canonical/skills.md` は reader projection とする。
-- `SG-003` identity payload は一度だけ serialize し、edge、ToolCall、manifest、readback は ID/digest だけを参照する。
+- `SG-002` `catalog.yaml` は skill と catalog-owned command identity の唯一の owner、`skill-dependencies.yaml` は dependency/order/routing/parallel relation の唯一の owner、`agents/canonical/skills.md` は reader/index link parity target とする。
 - `SG-003` 各 payload は一つの `IdentityRecord {id,digest,kind,canonical_payload}` に一度だけ保存し、全 consumer は `Ref {id,digest}` を参照する。projection envelope は Ref + compact display fields、edge projection は edge/source/target Ref + compact label に限る。
 - `SG-004` durable artifact は logical repository-relative locator のみ、absolute runtime path は execution 時だけとする。
 - `SG-005` canonical serialization は field order、NFC/identifier normalization、UTF-8、domain-separated digest、array ordering を上記規則に従う。
@@ -128,6 +133,7 @@ declared|resolved|canonicalized|routed|materialized|projected|read_back -> stale
 - `SG-012` #461 で固定された log command order は immutable edge/order として `ensure → status → stage → snapshot → commit → compare/rebase → push → readback → check-clean` を保持する。外部 preflight と内部 transaction の境界を graph が混ぜない。
 - `SG-013` graph、manifest、coverage、readback、design handoff は同じ snapshot の identity/digest を参照し、stale artifact の再利用・silent refresh・partial success を許さない。
 - `SG-014` selected design clause fingerprint は graph snapshot に結び付き、implementation handoff の target/evidence と forward/reverse coverage を持つ。
+- `SG-015` identity digest、Ref/edge envelope digest、graph payload digest、JSON artifact digest、Mermaid readback digest は acyclic dependency order を守り、JSON↔Mermaid の相互 digest 依存を持たない。
 
 ## Side Effects
 
@@ -143,7 +149,7 @@ source read、normalization、digest、JSON/Mermaid projection、coverage/readba
 | embedded payload/base64 or absolute durable locator | `payload_embedded` / `absolute_locator` / `failed` | violating artifact locator |
 | adapter/capability selected before typed owner | `owner_order` / `blocked` | owner, adapter, phase edges |
 | prose keyword or existing description selected a route | `keyword_only_route` / `blocked` | reject-only guard match; no adapter verdict |
-| JSON↔Mermaid nodes/edges/order differ | `projection_mismatch` / `failed` | JSON/Mermaid digests and parser readback |
+| JSON/Mermaid projection identity or digest-DAG readback differ | `projection_mismatch` / `digest_dag_cycle` / `failed` | graph/coverage refs, recomputed projection identities, and artifact digests |
 | source/JSON/reader-link parity digest changed | `stale_artifact` / `reader_link_parity` / `failed` | changed input digest, catalog/IR digest, and selected snapshot |
 | projection/envelope contains canonical payload or full ToolCall/edge data | `payload_duplicate` / `failed` | projection Ref and offending field; canonical `IdentityRecord` locator |
 | immutable #461 order changed | `command_order_drift` / `blocked` | ordered edge sequence and clause `SG-012` |
@@ -156,7 +162,7 @@ planned checker は `tools/agent_tools/check_skill_tool_invocation_graph.py` と
 
 出力は `agent_canon.skill_tool_invocation_check.v1` の JSON とし、field order は `schema,source_snapshot,counts,identity_digests,edge_order_digest,json_digest,mermaid_digest,reader_link_parity_digest,projection_digests,failure_refs,unresolved_refs,status`、各配列は canonical sort とする。`counts` は catalog/materialized IR の `skills=60` と `commands`、さらに resolved `capabilities/tools/toolcalls/phases/edges` の実測 count を持つ。`skills.md` の行数を skill/command count に使わない。failure detail は IdentityRecord として一度だけ保存し、output は `failure_refs` を持つ。
 
-equality/readback は四段で行う。(1) source→materialized IR は catalog の skill/command と dependency relation、resolved packet の全 ID/edge/order と完全一致。(2) materialized IR→IdentityRecord/JSON は canonical field order/bytes/digest と一致。(3) 同じ JSON→generated Mermaid を parser readback し、node Ref、edge Ref/source Ref/target Ref、explicit order が JSON と完全一致する。(4) `skills.md` の link/index は catalog の canonical-doc/shim link と parity を持つが、60-row count の source ではない。入力 SHA、JSON digest、Mermaid digest、reader-link parity digest のいずれかが selected snapshot と違う、または actual nodes/edges/order が一件でも欠ける場合は `stale_artifact`/`projection_mismatch`/`reader_link_parity` として fail する。
+equality/readback は四段で行う。(1) source→materialized IR は catalog の skill/command と dependency relation、resolved packet の全 ID/edge/order と完全一致。(2) materialized IR→IdentityRecord/JSON は canonical field order/bytes/digest と一致。(3) graph/coverage digest refs から独立に generated Mermaid を parser readback し、node Ref、edge Ref/source Ref/target Ref、explicit order の projection identity digest を再計算して graph/coverage digest と完全一致させる。JSON artifact digest と Mermaid artifact/readback digest を相互入力にしない。(4) `skills.md` の link/index は catalog の canonical-doc/shim link と parity を持つが、60-row count の source ではない。入力 SHA、JSON digest、Mermaid digest、reader-link parity digest のいずれかが selected snapshot と違う、または actual nodes/edges/order が一件でも欠ける場合は `stale_artifact`/`projection_mismatch`/`reader_link_parity` として fail する。
 
 ## Current Catalog Inventory (readback evidence)
 
@@ -194,9 +200,10 @@ flowchart LR
   C["catalog.yaml\n60 skill + command IDs"] --> U["resolved source universe\nactual nodes edges order"]
   D["skill-dependencies.yaml\nrelation owner"] --> U
   R["route + command + ToolCall packets\nactual capability ToolID phase"] --> U
-  P["skills.md\nreader projection"] --> K["equality checker"]
-  U --> J["canonical JSON\nordered fields digests refs"]
-  J --> M["generated Mermaid\nactual nodes edges order"]
+  P["skills.md\nreader/index links"] --> K["equality checker"]
+  U --> G["graph payload digest\ncoverage refs"]
+  G --> J["canonical JSON\nordered fields digests refs"]
+  G --> M["generated Mermaid\ngraph+coverage refs\nactual nodes edges order"]
   J --> K
   M --> K
   K -->|equal current| A["accept readback"]
@@ -207,12 +214,13 @@ flowchart LR
 
 | clause | current/planned implementation owner | exact file / symbol | reverse mapping rule |
 | --- | --- | --- | --- |
-| `SG-001..SG-003` | current catalog/dependency owners | `agents/skills/catalog.yaml`, `agents/skills/skill-dependencies.yaml`, `agents/canonical/skills.md` | skill/command identity or relation changes map to the owning source and clause; skills.md-only changes are projection evidence |
+| `SG-001..SG-003` | current catalog/dependency owners | `agents/skills/catalog.yaml`, `agents/skills/skill-dependencies.yaml`, `agents/canonical/skills.md` | skill/command identity or relation changes map to the owning source and clause; skills.md-only changes are reader-link parity evidence |
 | `SG-004..SG-006` | planned serialization/checker owner | `tools/agent_tools/check_skill_tool_invocation_graph.py`, `tools/agent_tools/check_convention_compliance.py` | field order, normalization, digest, alias, duplicate, collision, or prose-guard changes require these clauses |
 | `SG-007..SG-008` | current route/materializer owners | `tools/agent_tools/route.py`, `tools/agent_tools/skill_route_catalog.py`, `tools/agent_tools/skill_tool_commands.py`, `tools/agent_tools/skill_dependency_map.py` | capability/owner/adapter/phase/edge changes map to the typed route or dependency clause, never to prose |
 | `SG-009..SG-011` | planned projection/readback owner | `tools/agent_tools/check_skill_tool_invocation_graph.py`; existing `check_agent_runtime_alignment.py` | any JSON/Mermaid/source/skills.md equality, stale, count, or generated-node change maps to these clauses |
 | `SG-012` | current log lifecycle owner | `tools/agent_tools/runtime_log_archive_git.py`, `documents/design/runtime-log-repository-lifecycle.md` | command order or preflight/transaction boundary changes map to SG-012 and the corresponding RL clause |
 | `SG-013..SG-014` | current/planned handoff and review owners | `tools/agent_tools/bootstrap_agent_run.py`, `agents/internal-routines/design-implementation-correspondence.md`, `agents/skills/change-review.md` | manifest/readback/design-fingerprint changes map to the clause before implementation |
+| `SG-015` | planned digest/readback owner | `tools/agent_tools/check_skill_tool_invocation_graph.py` | digest preimage, DAG level, JSON self-digest exclusion, Mermaid ref-only metadata, or circular-readback changes map to SG-015 |
 
 Reverse mapping rule: every changed behavior/path that adds, removes, renames, resolves, orders, routes, serializes, projects, or reads back a skill, command, ToolID, phase, or edge must cite one or more `SG-*` clauses and the source owner. A catalog/dependency/source change with no generated readback is incomplete; a generated artifact change with no source owner is invalid. Planned checker links are targets, not claims that production implementation changed in this workstream.
 
@@ -222,10 +230,10 @@ Reverse mapping rule: every changed behavior/path that adds, removes, renames, r
 | --- | --- | --- | --- |
 | current state | `catalog.yaml` の `skill_families` は現在 60 件で、`skill-dependencies.yaml` は同じ skill id 集合を relation owner とする | `agents/skills/catalog.yaml`, `agents/skills/skill-dependencies.yaml` | checked |
 | current state | reader/index link parity target は `agents/canonical/skills.md`、60 skill/command rows と route/command/ToolCall は `agents/skills/catalog.yaml` と `tools/agent_tools/route.py`, `skill_tool_commands.py`, `agent_team.py` が materialize する | exact implementation links and catalog headers | checked |
-| target state | source/JSON/Mermaid equality と generated actual nodes/edges/order は planned checker `tools/agent_tools/check_skill_tool_invocation_graph.py` が readback する | `SG-009..SG-011` | planned |
+| target state | source/JSON/Mermaid equality と generated actual nodes/edges/order は planned checker `tools/agent_tools/check_skill_tool_invocation_graph.py` が readback する | `SG-009..SG-011`, `SG-015` | planned |
 | assumption | `normalization` / `正規化` は本文の canonical serialization に定義した Unicode NFC/NFKC、casefold、UTF-8 の手順を指す | `SG-005`, `SG-006` | explicit |
 | scope | this workstream changes design/process contracts only; no production implementation or tests | git diff scope | explicit |
 
 ## Clause IDs
 
-この文書の design clauses は `SG-001` から `SG-014` です。clause、current/planned owner、source locator、reverse evidence は同一変更で更新し、個別 skill にこの契約を複製しません。
+この文書の design clauses は `SG-001` から `SG-015` です。clause、current/planned owner、source locator、reverse evidence は同一変更で更新し、個別 skill にこの契約を複製しません。
