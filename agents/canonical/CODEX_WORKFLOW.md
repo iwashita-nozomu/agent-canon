@@ -81,8 +81,8 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - AgentCanon source change、parent submodule pin change、`.gitmodules`
   change、AgentCanon-owned root runtime view / root-copy surface change、parent
   root sync PR は `agentcanon_structure_followup=required` です。template /
-  derived parent root で `bash tools/sync_agent_canon.sh link-root` と
-  `bash tools/sync_agent_canon.sh check` が pass した後だけ
+  derived parent root で `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root と
+  `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` check が pass した後だけ
   `agentcanon_structure_followup=pass` として closeout に使えます。
 - 承認済み protected `ensure-latest` は `.gitmodules` の URL と immutable remote branch SHA を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定し、必要な pin と root shared surface を同期します。
 - local submodule commit が remote main に含まれている場合も、read-only plan の後に current-task user approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected `apply` / latest route で parent pin を remote main へ揃えます。
@@ -173,7 +173,7 @@ file や path の欠落を見つけたときは、再作成、削除済み判定
 1. current repo で、欠落している path が root symlink view、synced root copy、shared workflow / skill / tool / memory surface、または template 由来の scaffold かを確認する
 1. template root または登録された template remote / current template main で同じ path の有無と現在の正本形を確認する
 1. `vendor/agent-canon/` と standalone `agent-canon` で同じ path の有無、rename、移動、sync 対象からの除外理由を確認する
-1. canon-owned surface なら `documents/runtime/shared-runtime-surfaces.toml`、`documents/runtime/SHARED_RUNTIME_SURFACES.md`、`tools/sync_agent_canon.sh` の manifest-backed ownership に従い、`link-root`、vendor update、standalone canon update、または意図的削除のどれかに分類する
+1. canon-owned surface なら `documents/runtime/shared-runtime-surfaces.toml`、`documents/runtime/SHARED_RUNTIME_SURFACES.md`、`vendor/agent-canon/tools/sync_agent_canon.sh` の manifest-backed ownership に従い、`link-root`、vendor update、standalone canon update、または意図的削除のどれかに分類する
 1. template と canon のどちらにも無く、task 固有に必要な file だけを新規作成候補にし、既存実装・文書で足りない理由を run bundle に残す
 
 欠落を見つけた agent は、handoff や review artifact に `missing_file_triage` として確認した template path、canon path、分類、次 action を記録します。

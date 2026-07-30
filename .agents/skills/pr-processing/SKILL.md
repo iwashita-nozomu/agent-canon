@@ -131,7 +131,7 @@ merge, both predecessor record files remain absent.
      review unit, or it has a scope table plus the split/group decision for
      every slice.
 1. For AgentCanon source PRs, merge source first, then update parent repos with
-   `make agent-canon-ensure-latest`, `bash tools/sync_agent_canon.sh link-root`,
+   `make agent-canon-ensure-latest`, `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root`,
    diff intake / repair, and the parent PR gate. Parent projection occurs once
    after source publication readback; do not rerun source correctness or engineer
    ancestry to retain internal commit ids.

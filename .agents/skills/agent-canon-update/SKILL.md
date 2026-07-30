@@ -122,8 +122,8 @@ with all four inline Git authority/reason fields in the same command segment.
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 ```
 
    Treat this as the mandatory `agentcanon_structure_followup` gate whenever

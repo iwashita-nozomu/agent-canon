@@ -66,7 +66,7 @@ packet が出力した必須 command と、task に該当する conditional comm
    - run `python3 tools/agent_tools/responsibility_scope.py --root <root> --format json > <run>/responsibility_scope.json`
    - run `python3 tools/agent_tools/import_responsibility.py --root <root> --format json > <run>/import_responsibility.json` when import boundaries are implicated
    - follow `agents/canonical/CODEX_WORKFLOW.md` `Missing File Or Path Triage` before creating or ignoring any missing path
-   - if drift is AgentCanon-owned root views or submodule state, route to `$agent-canon-update`, `make agent-canon-ensure-latest`, and `bash tools/sync_agent_canon.sh link-root` / `check` before ordinary task work
+   - if drift is AgentCanon-owned root views or submodule state, route to `$agent-canon-update`, `make agent-canon-ensure-latest`, and `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root / `check` before ordinary task work
 1. If `~/.codex` is implicated, inspect only non-secret routing metadata: config keys, project entries, user skill IDs, and project `.codex` symlink targets. Do not read or print auth, history, sessions, logs, or caches. Treat `~/.codex` as personal runtime state and edit it only when the user explicitly asked for a personal Codex configuration fix.
 1. Record the pre-task repair contract with `structure_repair_root`, `structure_surface`, detected repo profile, drift symptom, expected owner, contract/scope/import/personal-runtime artifacts, repair action, runtime boundary, and ordinary task status.
 1. Build a recursive directory responsibility graph before editing:

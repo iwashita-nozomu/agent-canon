@@ -383,6 +383,7 @@ def _load_tool_entries(root: Path) -> tuple[Mapping[str, object], ...]:
 
 def _resolve_tool_id(
     logical_command: str,
+    execution_env: Sequence[tuple[str, str]],
     execution_argv: Sequence[str],
     entries: Sequence[Mapping[str, object]],
 ) -> str | None:
@@ -398,6 +399,23 @@ def _resolve_tool_id(
         for entry in entries:
             if entry.get("path") == token:
                 return cast(str, entry["id"])
+    env = dict(execution_env)
+    if (
+        len(execution_argv) >= 4
+        and execution_argv[0] in ("python", "python3")
+        and execution_argv[1] == "-m"
+        and execution_argv[2] == "agent_tools.agent_canon_source_root"
+        and execution_argv[3] == "exec"
+        and env.get("PYTHONPATH") is not None
+    ):
+        # Canonicalize AgentCanon sync invocations expressed through the source-root
+        # owner wrapper back to the underlying sync-agent-canon ToolID.
+        sync_script = Path(execution_argv[4]) if len(execution_argv) > 4 else None
+        if (
+            sync_script is not None
+            and sync_script.as_posix().removeprefix("./") == "tools/sync_agent_canon.sh"
+        ):
+            return "sync-agent-canon"
     if execution_argv:
         executable = execution_argv[0]
         for entry in entries:
@@ -415,7 +433,9 @@ def _packets(root: Path, skill_ids: Sequence[str]) -> dict[str, SkillCommandPack
 
 def _packet_commands(
     packet: SkillCommandPacket, phase: str
-) -> tuple[tuple[str, str, str, tuple[str, ...]], ...]:
+) -> tuple[
+    tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...
+]:
     """Return one packet's resolved rows for an explicit phase."""
     if phase == "required":
         return packet.resolved_required_commands
@@ -753,7 +773,9 @@ def build_graph(root: Path) -> dict[str, object]:
     capability_refs: dict[str, dict[str, str]] = {}
     tool_refs: dict[str, dict[str, str]] = {}
     tool_ids_by_command: dict[tuple[str, str, int], str | None] = {}
-    phase_commands: dict[tuple[str, str], list[tuple[int, str, tuple[str, ...]]]] = (
+    phase_commands: dict[
+        tuple[str, str], list[tuple[int, str, str, tuple[tuple[str, str], ...], tuple[str, ...]]]
+    ] = (
         defaultdict(list)
     )
 
@@ -766,12 +788,14 @@ def build_graph(root: Path) -> dict[str, object]:
         ]
         command_ids: list[str] = []
         for phase in PHASES:
-            for index, (logical, _source_root, _execution_cwd, argv) in enumerate(
+            for index, (logical, _source_root, _execution_cwd, _execution_env, argv) in enumerate(
                 _packet_commands(packets[skill], phase)
             ):
                 command_id = f"command:{skill}:{phase}:{index:04d}"
                 command_ids.append(command_id)
-                phase_commands[(skill, phase)].append((index, logical, argv))
+                phase_commands[(skill, phase)].append(
+                    (index, logical, _execution_cwd, _execution_env, argv)
+                )
         skill_refs[skill] = identities.add(
             "skill",
             f"skill:{skill}",
@@ -845,9 +869,9 @@ def build_graph(root: Path) -> dict[str, object]:
                 phase_index,
                 phase_refs[(skill, phase)],
             )
-            for index, logical, argv in phase_commands[(skill, phase)]:
+            for index, logical, _cwd, _env, argv in phase_commands[(skill, phase)]:
                 command_id = f"command:{skill}:{phase}:{index:04d}"
-                tool_id = _resolve_tool_id(logical, argv, tools)
+                tool_id = _resolve_tool_id(logical, _env, argv, tools)
                 tool_ids_by_command[(skill, phase, index)] = tool_id
                 command_refs[(skill, phase, index)] = identities.add(
                     "command",
@@ -1038,7 +1062,7 @@ def build_graph(root: Path) -> dict[str, object]:
                 {"phase": phase, "invocation_ordinal": invocation_ordinals[skill]},
             )
             edge_order += 1
-            for index, _logical, _argv in phase_commands[(skill, phase)]:
+            for index, _logical, _cwd, _env, _argv in phase_commands[(skill, phase)]:
                 _add_edge(
                     identities,
                     edges,
@@ -1144,7 +1168,7 @@ def build_graph(root: Path) -> dict[str, object]:
         _projection_entry(command_refs[(skill, phase, index)], logical, index)
         for skill in skill_ids
         for phase in PHASES
-        for index, logical, _argv in phase_commands[(skill, phase)]
+        for index, logical, _cwd, _env, _argv in phase_commands[(skill, phase)]
     ]
     tools_projection = [
         _projection_entry(ref, tool_id) for tool_id, ref in tool_refs.items()
