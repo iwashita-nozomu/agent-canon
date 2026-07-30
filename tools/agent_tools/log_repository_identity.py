@@ -62,6 +62,24 @@ def stable_source_repository_id(remote: str) -> str:
     return f"{prefix}-{digest}"
 
 
+def _validated_override(value: str) -> str:
+    """Validate the explicit id syntax before comparing it with Git provenance."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,95}", value):
+        raise SourceRepositoryIdentityError("source_repository_id_invalid")
+    return value
+
+
+def _identity_from_remote(remote: str, override: str = "") -> str:
+    """Resolve one identity only after the remote/override relationship is proven."""
+    derived = stable_source_repository_id(remote)
+    if not override:
+        return derived
+    validated = _validated_override(override)
+    if validated != derived:
+        raise SourceRepositoryIdentityError("source_repository_id_mismatch")
+    return validated
+
+
 def source_remote(root: Path) -> str:
     """Read the source remote, with an explicit remote override for adapters."""
     override = os.environ.get(SOURCE_REMOTE_ENV, "").strip()
@@ -108,30 +126,26 @@ def _remote_from_git_config(root: Path, remote_name: str = "origin") -> str:
 
 
 def stable_source_id(root: Path) -> str:
-    """Return stable identity without consulting the filesystem path."""
+    """Return a write-authorized identity proven by the source repository remote."""
+    return source_repository_id_for_write(root)
+
+
+def source_repository_id_for_write(root: Path) -> str:
+    """Resolve the source id required before any archive publication begins."""
+    remote = source_remote(root)
     override = os.environ.get(STABLE_ID_ENV, "").strip()
-    if override:
-        if not re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,95}", override):
-            raise SourceRepositoryIdentityError("source_repository_id_invalid")
-        return override
-    return stable_source_repository_id(source_remote(root))
+    return _identity_from_remote(remote, override)
 
 
 def stable_source_id_from_runtime_env(root: Path | None = None) -> str:
     """Return a hot-path identity without starting Git or using the network."""
-    override = os.environ.get(STABLE_ID_ENV, "").strip()
-    if override:
-        if not re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,95}", override):
-            raise SourceRepositoryIdentityError("source_repository_id_invalid")
-        return override
     remote = os.environ.get(SOURCE_REMOTE_ENV, "").strip()
-    if remote:
-        return stable_source_repository_id(remote)
-    if root is not None:
+    if not remote and root is not None:
         remote_name = os.environ.get(SOURCE_REMOTE_NAME_ENV, "origin").strip() or "origin"
         remote = _remote_from_git_config(root, remote_name)
-        if remote:
-            return stable_source_repository_id(remote)
+    if remote:
+        override = os.environ.get(STABLE_ID_ENV, "").strip()
+        return _identity_from_remote(remote, override)
     return "unidentified-source"
 
 
