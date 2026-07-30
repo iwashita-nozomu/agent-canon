@@ -2168,25 +2168,6 @@ entries:
     tests:
       - tests/tools/test_publish_result_branch.py
 
-  - id: check-doc-test-triplet
-    summary: Compatibility wrapper for doc and test triplet validation.
-    path: tools/check_doc_test_triplet.py
-    family: root
-    role: compatibility
-    status: compatibility_wrapper
-    audience: internal
-    placement: compatibility_wrapper
-    command: python3 tools/check_doc_test_triplet.py
-    writes: false
-    replacement: tools/validation/triplet_validator.py
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-    tests: []
-    test_exempt_reason: Thin compatibility wrapper over validation/triplet_validator.py.
-
   - id: triplet-validator
     summary: Validates source, document, and test triplets.
     path: tools/validation/triplet_validator.py
@@ -2201,7 +2182,8 @@ entries:
     docs:
       - tools/README.md
     tests: []
-    test_exempt_reason: Consumed through the compatibility wrapper.
+    test_exempt_reason: No dedicated unit test exists; command is currently exercised through `run_comprehensive_review.sh`.
+
 
   - id: notebook-quality
     summary: Validates notebooks as readable runnable demos instead of fine-grained tests.
