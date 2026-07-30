@@ -18,7 +18,7 @@ C / C++ 差分を build 境界、header 境界、所有権、例外・error path
 
 ## Use When
 
-- `cpp/src/`, `cpp/include/`, `cpp/experiments/` 配下を触る
+- `cpp/src/`, `cpp/include/`, `cpp/tests/`, `cpp/experiments/` 配下を触る
 - `cpp/CMakeLists.txt` や native build 設定を触る
 - public header、ABI、FFI、CLI binary の挙動を変える
 - C++ documentation / Docstring projection を触る
@@ -52,9 +52,11 @@ C / C++ 差分を build 境界、header 境界、所有権、例外・error path
 
 ## Docstring projection route
 
-`agent_team.language_review_candidates` が native C/C++ implementation path（native suffix、
-`src/`、`include/`、`lib/`、`cmake/` marker）を含む changed surface に `cpp_reviewer` を
-候補として返した場合に、reviewer を起動します。convention/template documentation は同じ
+`agent_team.language_review_candidates` が native C/C++ implementation or test path（native suffix、
+`cpp/CMakeLists.txt`、`cpp/src/`、`cpp/include/`、`cpp/tests/`、`cpp/experiments/`、
+`cpp/cmake/` marker）を含む
+changed surface に `cpp_reviewer` を候補として返した場合に、reviewer を起動します。
+convention/template documentation は同じ
 path inventory から `docs_workflow_steward` が担当し、catalog capability は OOP/type design
 owner の選択に限ります。semantic clause の owner は `documents/conventions/DOCSTRING_GUIDE.md`
 へ戻します。レビューは Doxygen syntax / format、header/source anchor、native ownership

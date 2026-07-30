@@ -532,6 +532,41 @@ Makefile, registry, adapter, and topic README are one migration write set with (
 individual trace records. They are not optional follow-up prose (`D-PARENT-MIGRATION`); each is a
 consumer of the target command/path contract.
 
+### PR #468 changed-path closure and readback
+
+The review baseline is commit `3042f159ac0333463fc7430e1cdfc617b05c81a0`; the table below closes
+all 19 paths changed by that commit. Each row records an exact forward edge from a design clause to
+the projection section and an exact reverse edge from that projection to its evidence/readback.
+
+| exact changed path | forward: design clause → projection section/ref | reverse: projection section/ref → evidence/readback and design ref |
+| --- | --- | --- |
+| `.agents/skills/cpp-review/SKILL.md` | `D-COMMANDS`, `D-TEST-GRAPH` → `#Activation readback`, `#C++ Review` CMake command step | route path set and CMake command → `tools/bin/agent-canon docs check`, `RDC-CPP-REVIEW`, `D-VALIDATION` |
+| `agents/skills/cpp-review.md` | `D-PROJECT-ROOT`, `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH`, `D-COMMANDS`, `D-EXPERIMENT-LIFECYCLE` → `#Use When`, `#Required Checks`, `#Target graph readback`, `#Docstring projection route` | `cpp_reviewer` route markers, target graph, and commands → route check, C++ profile checks, `RDC-CPP-REVIEW` |
+| `agents/skills/oop-type-design.md` | `D-SOURCE-OWNERS`, `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH`, `D-RELATED-DOCUMENT-CLOSURE` → `#Static delegation and test boundary`, `#Downstream handoff and evaluation boundary` | `$cpp-review` delegation and C++ target responsibility readback → `cpp-review`, OOP/readability evidence, `D-RELATED-DOCUMENT-CLOSURE` |
+| `agents/skills/refactor-loop.md` | `D-SOURCE-OWNERS`, `D-COMMANDS`, `D-PARENT-MIGRATION` → `#C++ project migration projection` | path map, consumer/provider graph, and root-anchored commands → refactor trace/readback, `D-SOURCE-BOUNDARIES`, `D-PARENT-MIGRATION` |
+| `agents/workflows/comprehensive-refactoring-workflow.md` | `D-PARENT-MIGRATION`, `D-SOURCE-OWNERS`, `D-VALIDATION` → `#Gate A. 設計見直し`, `#Gate C. 解析ツールと合格点` | target responsibility map and C++ OOP scan paths → workflow gate readback, `D-RELATED-DOCUMENT-CLOSURE`, `D-VALIDATION` |
+| `documents/conventions/REVIEW_PROCESS.md` | `D-VALIDATION`, `D-COMMANDS` → `#Review Family の選び方`, `#実行チェック` | C++ profile commands and `not_run` design-only rule → review evidence, `RDC-REVIEW-CONVENTION`, `RDC-GITHUB-STATIC-GATES` |
+| `documents/conventions/coding-conventions-cpp.md` | `D-PROJECT-ROOT`, `D-SOURCE-OWNERS`, `D-TARGET-TYPE`, `D-COMMANDS` → `#1. 基本方針`, `#1.1 Native project boundary`, `#3.5 Header-Only Rule`, `#6 再利用` | target/owner table and same-cache commands → C++ convention readback, `RDC-CXX`, `D-TARGET-TYPE` |
+| `documents/conventions/coding-conventions-experiments.md` | `D-EXPERIMENT-GRAPH`, `D-EXPERIMENT-LIFECYCLE`, `D-GENERATED-PATHS` → `#2. ディレクトリ構成`, `#3. 実行原則` | native build/run/result separation and lifecycle arguments → experiment command/result readback, `RDC-EXPERIMENT-CONVENTION` |
+| `documents/conventions/coding-conventions-project.md` | `D-PARENT-MIGRATION`, `D-GENERATED-PATHS`, `D-COMMANDS` → `#2. ディレクトリの考え方`, `#4.6 Docker 更新時の扱い`, `#C++ command owner`, `#5. テストとレビュー`, `#6. 実験運用` | parent ownership, C++ commands, CTest, and managed result root → project convention readback, `RDC-PROJECT` |
+| `documents/conventions/coding-conventions-testing.md` | `D-TEST-GRAPH`, `D-COMMANDS` → `#2.1 C++ test ownership` | `cpp-test-<name>`, `cpp-tests`, and CTest commands → target inventory/CTest readback, `RDC-TEST-CONVENTION` |
+| `documents/conventions/object-oriented-design.md` | `D-SOURCE-OWNERS`, `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH` → `#C++ target responsibility`, `#機械評価` | provider/consumer graph and C++ OOP paths → OOP/readability evidence, `D-RELATED-DOCUMENT-CLOSURE` |
+| `documents/design/cpp-build-layout.md` | `D-RELATED-DOCUMENT-CLOSURE`, `D-PARENT-MIGRATION`, `D-VALIDATION` → `#Related Document Closure / Design Source Packet`, `#PR #468 changed-path closure and readback`, `#Validation profile and implementation handoff` | closure table, claims checker, and validation profile → `RDC-GITHUB-STATIC-GATES`, `RDC-LOCAL-READBACK-GAP`, `D-RELATED-DOCUMENT-CLOSURE` |
+| `documents/runtime/runtime-profiles-and-check-matrix.json` | `D-VALIDATION`, `D-COMMANDS`, `D-TEST-GRAPH`, `D-EXPERIMENT-LIFECYCLE` → JSON pointers `/profiles[6]/activates`, `/check_matrix[8]/required_check` | machine profile/check matrix → `check_runtime_profile_inventory.py`, rendered-doc check, `RDC-RUNTIME-MATRIX` |
+| `documents/runtime/runtime-profiles-and-check-matrix.md` | `D-VALIDATION` → `#Profile Classes` C++ row, `#Check Matrix` C/C++ row | generated reader projection → `render_runtime_profile_inventory.py --check`, JSON mirror, `RDC-RUNTIME-MATRIX` |
+| `documents/structure/repo-structure-contract.toml` | `D-PARENT-MIGRATION`, `D-SOURCE-BOUNDARIES` → `profile.id=template_or_derived_repo` `allowed_top_level`, `profile.optional[path=cpp]` | positive top-level/path ownership → `repo_structure_contract.py`, `responsibility_scope.py`, `RDC-STRUCTURE` |
+| `documents/tools/README.md` | `D-SOURCE-OWNERS`, `D-VALIDATION` → `#Tool Detail Notes` C++ OOP command block | `cpp/include cpp/src cpp/tests cpp/experiments` command → tool inventory/readability evidence, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
+| `documents/tools/oop/cpp/readability.md` | `D-SOURCE-OWNERS`, `D-VALIDATION` → `#実行例` | C++ OOP scan paths and build-evidence boundary → readability command/readback, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
+| `tools/docs/render_runtime_profile_inventory.py` | `D-VALIDATION` → `DEPENDENCY_HEADER`, `render_validation_failure_response`, `bridge_inventory_to_markdown` | JSON-to-Markdown generator output → `render_runtime_profile_inventory.py --check`, `RDC-RUNTIME-MATRIX` |
+| `tools/static_analysis/cpp/README.md` | `D-PROJECT-ROOT`, `D-SOURCE-OWNERS`, `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH`, `D-VALIDATION` → `#Default command` and native project evidence paragraph | readability plus configure/build/CTest/install/target evidence → static-analysis readback, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
+
+The review repair adds two route-owner rows without replacing any of the 19 baseline rows:
+
+| exact repair path | forward: design/runtime clause → route owner section/ref | reverse: route owner section/ref → evidence/readback |
+| --- | --- | --- |
+| `tools/agent_tools/agent_team.py` | `D-VALIDATION`, `D-PROJECT-ROOT`, runtime C++ activation set → `CPP_PATH_MARKERS`, `language_review_candidates` | `language_review_candidates(..., ("cpp/tests/...",))` returns `cpp_reviewer` → route check and `RDC-RUNTIME-MATRIX` |
+| `agents/skills/catalog.yaml` | `D-VALIDATION` and public skill projection contract → `skill_families[id=cpp-review].routing.triggers` | `route.py --prompt "cpp/tests ..."` returns `cpp-review` → catalog/runtime alignment and `D-VALIDATION` |
+
 ## Positive migration sequence
 
 | transition | input | resulting state | gate |
@@ -588,16 +623,14 @@ parallel candidate です。`W3-projection` は両方の target names と comman
 | `A0` | production target の stable implementation name は `cpp-core`、aggregate names は `cpp-tests`、`cpp-experiments`、`cpp-experiment-<name>` とする | target graph、commands、forward/reverse trace が同じ identifier を共有する |
 | `A1` | `<project>` は派生 project の CMake package/project identifier に置き換える | install package metadata は project-specific だが、source/target ownership は変わらない |
 | `A2` | native experiment run が書く summary/log schema は target implementation phase で experiment owner が確定する (`D-EXPERIMENT-LIFECYCLE`) | build output path は本設計で固定し、schema detail は experiment target source packet に残す |
+| `E3` | PR #468 review baseline is exact commit `3042f159ac0333463fc7430e1cdfc617b05c81a0`; GitHub workflow `AgentCanon Static Gates` run `30537452411` reports `status=completed`, `conclusion=success`, `head_sha=3042f159ac0333463fc7430e1cdfc617b05c81a0` | this is the fresh canonical static-gates evidence for the reviewed baseline; the repair head requires its own focused readback |
 
-### Fresh graph、claims、docs の可能範囲
+### Fresh canonical evidence and local readback boundary
 
 | check record | fresh scope and result | interpretation / next owner |
 | --- | --- | --- |
-| `RDC-FRESH-GRAPH` | managed clone の final design edit 後に canonical `graph build` を実行し、`graph_status=fresh`、`unresolved_count=0`、`uncovered_count=0` を得た | この graph は AgentCanon design source packet の fresh graph。parent に `cpp/*` を materialize する native CMake graph はまだ存在せず、`W1-root` の implementation gate に委譲する |
-| `RDC-FRESH-HEADERS` | `python3 tools/agent_tools/check_dependency_headers.py documents/design/cpp-build-layout.md` は pass | design header の全 declared canonical edge は解決済み。parent projection header は `P-*` write set の validation |
-| `RDC-FRESH-DOCS` | `tools/bin/agent-canon docs check documents/design/cpp-build-layout.md` は pass、`git diff --check` は pass | managed clone の設計文書の formatting/readability は fresh。parent README/QUICK_START/Docker/Makefile は変更していないため next phase の docs scope |
-| `RDC-FRESH-CLAIMS` | `CARGO_TARGET_DIR=/tmp/cpp-agentcanon-target python3 tools/agent_tools/check_design_doc_claims.py --root . documents/design/cpp-build-layout.md` は `checked=9`、`supported=9`、`findings=0`。設計文書自身の claim evidence は pass し、parent native CMake graph は未実装のため別 gate に残る | `D-PARENT-MIGRATION` の parent file/write-set readback と `RDC-NATIVE-CMAKE-GRAPH` の configure/build/CTest/install/experiment validation を実装 phase で実行する |
-| `RDC-FRESH-DEPENDENCY-QUERY` | focused dependency query は declared closure edges を read back したが、全 graph command は既存の unrelated cycle（`PHILOSOPHY.md → README.md`、`tools/agent_tools/github_publish.py → documents/tools/github_publish.md`）で non-pass | C++ closure edge の unresolved finding ではない。cycle repair はこの design unit に追加せず、graph owner の別 finding として保持する |
+| `RDC-GITHUB-STATIC-GATES` | GitHub Actions URL `https://github.com/iwashita-nozomu/agent-canon/actions/runs/30537452411`; workflow `AgentCanon Static Gates`; `run_id=30537452411`; `head_sha=3042f159ac0333463fc7430e1cdfc617b05c81a0`; `status=completed`; `conclusion=success` | fresh canonical evidence is bound to the exact reviewed commit/run/head tuple; it does not claim to validate the later repair head |
+| `RDC-LOCAL-READBACK-GAP` | local reviewer environment's default AgentCanon Rust invocation reported the missing `rust/agent-canon/target/debug/agent-canon` artifact, and the graph wrapper's available output was build/log text rather than canonical JSON; these are environment observations, not pass results | record this as an environment-specific readback gap; do not recover artifacts, convert non-JSON output to pass evidence, or add tests |
 | `RDC-NATIVE-CMAKE-GRAPH` | parent-side `cmake -S "$ROOT/cpp" ...`、target inventory、CTest、install、native experiment run は未実行 | parent implementation phase の fresh graph/claims gate。design-only return は command/owner/validation contract のみを主張する |
 
 ## Design-to-implementation trace

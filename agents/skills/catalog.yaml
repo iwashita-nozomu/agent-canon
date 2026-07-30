@@ -330,6 +330,17 @@ skill_families:
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: deferred
+      reason: C or C++ changed-path evidence selects the native review route.
+      triggers:
+        - ["cpp-review"]
+        - ["cpp/CMakeLists.txt"]
+        - ["cpp/src"]
+        - ["cpp/include"]
+        - ["cpp/tests"]
+        - ["cpp/experiments"]
+        - ["C++", "review"]
   - id: oop-readability-check
     purpose: Run the OOP readability checker, produce mechanical SOLID/OOP report tables, and optionally add separate agent analysis.
     canonical_doc: agents/skills/oop-readability-check.md

@@ -13,6 +13,11 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 # C++ Review
 
+## Activation readback
+
+`cpp/CMakeLists.txt`、`cpp/src/`、`cpp/include/`、`cpp/tests/`、
+`cpp/experiments/` の changed path は `cpp_reviewer` の native review route に入ります。
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
