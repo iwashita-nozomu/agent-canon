@@ -363,7 +363,7 @@ bash tools/agent_tools/review_backlog_scan.sh \
 ```bash
 python3 tools/oop/python/readability.py --format markdown python tools tests
 python3 tools/oop/python/rule_inventory.py --format markdown
-python3 tools/oop/cpp/readability.py --format markdown include src tests/cpp
+python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src cpp/tests cpp/experiments
 python3 tools/oop/cpp/rule_inventory.py --format markdown
 ```
 
@@ -402,12 +402,8 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - Python source のログ用 helper 関数名を検出します。ログを書き出す、emit する、保存する、整形する helper は `_log` から始め、`write_log_*` や `append_log_*` のような prefix を fail にします。
 - `tools/oop/python/readability.py` / `tools/oop/cpp/readability.py`
   - Python と C/C++ の OOP readability を言語別 entrypoint で機械判定します。外部 repo、bare 展開、派生 template worktree を読むときは、対象 commit、解析 path、`--exclude vendor --exclude reports` などの除外条件、Markdown / JSON report path を run bundle に残します。
-- `tools/agent_tools/check_algorithm_module_public_surface.py`
-  - `algorithm_module_protocol` を使う algorithm module の公開面を検査します。標準公開名は `InitializeConfig`、`SolveConfig`、`Problem`、`State`、`Answer`、`Info`、`Algorithm`、`initialize` だけで、余計な `__all__` entry や top-level public 定義を fail にします。
-- `tools/agent_tools/check_algorithm_module_nested_contract.py`
-  - `algorithm_module_protocol` を使う algorithm module の nested ownership を検査します。module `B` が algorithm module `A` を import して `A.initialize` や `A.Algorithm` を使う場合、`B.InitializeConfig` / `B.SolveConfig` / `B.Info` / `B.Algorithm` がそれぞれ `A.InitializeConfig` / `A.SolveConfig` / `A.Info` / `A.Algorithm` を field として持つことを確認します。
 - `tools/bin/agent-canon python-algorithm-contract-check`
-  - Python AST を JSON として抽出し、Rust 側で `algorithm_module_protocol` module の standard public surface、callable `Algorithm`、nested ownership、concrete `Info` schema を検査します。親 algorithm 側の nested field は特定 module 名に固定せず、import された amp module alias と `*.Algorithm` / `*.SolveConfig` / `*.Info` / `*.initialize` の AST usage から自動推定します。
+  - Python AST を一度 JSON として抽出し、Rust 側で `algorithm_module_protocol` module の literal `__all__`、standard public surface、callable `Algorithm`、nested ownership、concrete `Info` schema、protocol-only import、syntax diagnostics、fnmatch 方式の `--exclude` を検査します。text/JSON artifact と exit status は同じ canonical route から出力し、fixture は `tests/fixtures/python_algorithm_contract/`、CLI parity test は `rust/agent-canon/tests/python_algorithm_contract_cli.rs` にあります。
 - `tools/experiments/update_latest_result.py`
   - experiment result root の `LATEST.json` と `LATEST.md` を更新し、最新 run、summary、manifest、visual report の入口を固定します。
 - `tools/experiments/publish_result_branch.py`

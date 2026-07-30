@@ -35,6 +35,12 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
   - Python の structural duplicate analysis と module-group dependency priority
 - [agentcanon-hook-simplification-wave3.md](agentcanon-hook-simplification-wave3.md)
   - Wave 3 の3 active event、各 finalized handler から assembly への exactly-once caller contract、dispatcher exact direct import `tools.agent_tools.behavior_event_assembly:record_hook_invocation`、`RETIRED_CHILD_TOMBSTONES=23` / `MOVED_SOURCE_ABSENCES=1` / retired basenames `24`、分離した semantic event / hook event、skill logger single-owner migration、historical `skill_usage.jsonl` readback、PR #471後 current-main inventory gate、検証コーパス
+- [skill-tool-invocation-graph.md](skill-tool-invocation-graph.md)
+  - skill / capability / phase / tool / edge の identity、参照、coverage、readback
+- [runtime-log-repository-lifecycle.md](runtime-log-repository-lifecycle.md)
+  - AgentCanon-log #4 と AgentCanon #461 の runtime-log repository owner split
+- [request-intent-and-update-relation.md](request-intent-and-update-relation.md)
+  - 質問回答、明示 write clause、sparse update、既存 cleanup route の compact flow
 - [../remote-execution-repo-contract.md](../contracts/remote-execution-repo-contract.md)
   - remote execution を受ける repo の最小契約
 

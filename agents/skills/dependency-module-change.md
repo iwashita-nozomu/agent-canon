@@ -7,6 +7,7 @@ responsibility Documents the short human-facing route for dependency module chan
 upstream design ../canonical/skills.md shared skill canon registry
 upstream design ../../documents/rule/dependency-module-changes.md detailed dependency module policy
 upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace and VS Code workspace boundary
+upstream design ../../documents/design/request-intent-and-update-relation.md immediate dependency-clone cleanup projection
 downstream implementation ../../tools/agent_tools/dependency_module_change.py lifecycle tool
 downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates skill registration
 @dependency-end
@@ -16,6 +17,13 @@ downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.
 
 依存 module の source 変更、topic branch clone、remote 再構成可能性に基づく
 cleanup を同じ責務境界で扱います。
+
+### Compact integration cleanup projection
+
+`../../documents/design/request-intent-and-update-relation.md` の `LIFE-01` は merge/readback
+evidence を受けて、この owner の既存 `dependency_module_change.py cleanup --apply` を
+dispatch-ready state へ進めます。completion evidence は same-command authority、
+reconstructibility readback、および `CLEANUP` receipt です。
 
 ## 使う route
 

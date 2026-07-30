@@ -6,6 +6,7 @@ upstream design README.md workflow catalog
 upstream design ../TASK_WORKFLOWS.md workflow family routing contract
 upstream design implementation-waterfall-workflow.md staged implementation gate
 upstream design ../skills/refactor-loop.md refactor loop contract
+upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json activated validation profile owner
 upstream design ../../documents/conventions/object-oriented-design.md OOP boundary policy
 upstream design ../../documents/design/algorithm-implementation-boundary.md algorithm boundary policy
 downstream implementation ../../tools/agent_tools/analyze_refactor_surface.py static refactor surface analyzer
@@ -57,6 +58,9 @@ primary family は `Large Delivery` または `Comprehensive Development` とし
 - `Path Mapping:` old path / symbol から new path / symbol への対応。
 - `Deletion Plan:` 消す file、helper、alias、alternate route、旧 route。
 - `Removal and Caller Migration Plan:` compatibility-preservation drift と duplicate implementation を残さず、旧 entry、旧 alias、alternate route の caller migration と削除順序を固定する。
+- C++ project migration では `cpp/CMakeLists.txt`、`cpp/src`、`cpp/include`、`cpp/tests`、
+  `cpp/experiments` を target responsibility map に固定し、parent root の language-neutral
+  state、consumer-to-provider target graph、root-anchored command contract を同じ packet に置く。
 
 設計見直しは、既存コードを読まずに始めません。
 構造化された owner 探索、`git grep`、dependency graph、test inventory、必要なら `tools/agent_tools/analyze_refactor_surface.py` の baseline を取ってから target boundary を決めます。
@@ -130,7 +134,7 @@ python3 tools/oop/cpp/readability.py \
   --include-snippets \
   --exclude vendor \
   --exclude reports \
-  include src tests/cpp
+  cpp/include cpp/src cpp/tests cpp/experiments
 ```
 
 C++ tool は責務不明 type 名、巨大 class / function、public field / method 過多、base class / parameter 過多、`nullptr` runtime routing、純粋変換と副作用の混在、redundant wrapper を検出します。`OOP_READABILITY` は scalar threshold ではなく signal class で判定します。size / surface / parameter / complexity finding は boundary review signal であり、caller contract や ownership から安定した境界が読めない限り分割指示にしません。JSON / Markdown report の `typed_boundary_evidence`、`scanned_paths`、`signal_counts` を review artifact に保持します。

@@ -52,14 +52,14 @@ chat 要約だけで閉じず、raw result、human summary、manifest、report p
 
 - run-local task evidence: `reports/agents/<run-id>/`
 - normal cross-run agent report accumulation:
-  `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` on
-  `logs/<environment-key>-<chat-key>`; discover exact paths with
+  `.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/<run-id>/<snapshot-id>/`
+  on the policy-owned stable branch; discover exact paths with
   `python3 tools/agent_tools/runtime_log_archive_git.py status`
 - archived agent report snapshot:
-  `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/`
+  `.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/<run-id>/<snapshot-id>/`
 - accumulated skill / workflow eval: `.agent-canon/log-archive/eval-results/<eval-family>/<unique-id>.md`
 - hook result chronology:
-  `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl`
+  `.agent-canon/log-archive/hook-runs/<stable-source-repository-id>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl`
 - experiment raw result: `experiments/<topic>/result/<run_name>/`; use
   `save-experiment-results` for retention plan, dirty-source formal-status,
   overwrite policy, and result branch evidence
@@ -102,7 +102,9 @@ evidence.
    repo key, Codex trace key when exposed, and Git HEAD when available.
 1. Use broad `python3 tools/agent_tools/runtime_log_archive_git.py sync` only
    when intentionally collecting accumulated runtime families such as hook
-   JSONL, Codex runtime summaries, or all run-local agent reports.
+   JSONL or Codex runtime summaries. Agent reports use the immutable
+   `archive-agent-report --report-dir` route; do not project the full report
+   tree by default.
 1. Do not ask an agent to manually rewrite the report into the archive; the
    tool owns snapshot manifests and `index.jsonl`.
 1. Include enough stable identifiers to group repeats without losing chronology:

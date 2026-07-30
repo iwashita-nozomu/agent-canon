@@ -4,12 +4,14 @@
 contract policy
 responsibility Documents 実験運用規約 for this repository.
 upstream design README.md durable document index
+upstream design ../runtime/runtime-profiles-and-check-matrix.md experiment profile and validation route
 upstream design ../experiments/gpu-admission-r5-source-packet.md exact managed GPU admission and source-freeze contract
 @dependency-end
 -->
 
 
-この文書は、`experiments/` 配下の実験コード、benchmark、実験結果、実行環境の運用を扱います。
+この文書は、parent `experiments/` の managed run と、`cpp/experiments/` の native
+C++ experiment target を、build、run、result、report の責務に分けて扱います。
 研究の問い、数式、比較対象、逐次改造の記録方法は `agents/workflows/research-workflow.md` を正本とします。
 準備、実装、静的チェック、実行、結果レポートの標準手順は `agents/workflows/experiment-workflow.md` を参照してください。
 
@@ -26,33 +28,42 @@ upstream design ../experiments/gpu-admission-r5-source-packet.md exact managed G
 ## 1. 対象
 
 - 実験コード
+- native C++ experiment source と CMake target
 - benchmark コード
 - 実行ごとの生成物
 - 実験 report
 
 ## 2. ディレクトリ構成
 
-- 実験は `experiments/<topic>/` に置きます。
+- managed experiment entrypoint は `experiments/<topic>/` に置きます。
+- native C++ experiment source と target wiring は `cpp/experiments/` に置きます。
 - topic ごとに `README.md`、`run.py`、`cases.py`、`config.yaml`、`visualize.ipynb`、`result/` を基準にします。
 - `experiments/<topic>/README.md` は、その topic の実験内容、問い、比較対象、標準コマンド、設定正本、可視化 notebook、出力 schema、run_name 規則を持つ正本 entrypoint です。
 - 新規 topic は実験名を固定し、`python3 tools/experiments/create_experiment_topic.py <topic>` を実行します。create tool が `experiments/<topic>/` の scaffold、`README.md`、`provenance.toml`、registry entry を一括配置します。その後、`run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
 - 可視化は `experiments/<topic>/visualize.ipynb` の Jupyter notebook に置きます。notebook は結果確認と図表化の入口であり、正式 run の起動、細かな test、設定正本の置き場にしません。
 - topic の正本 entrypoint と smoke / formal command は `experiments/registry.toml` に集約します。
+- native target の project entrypoint は `cpp/CMakeLists.txt`、aggregate target は
+  `cpp-experiments`、individual target は `cpp-experiment-<name>` に固定します。
 - managed run は exact `experiments/registry.toml` を必須 source membership として
   freeze します。registry 欠落を optional 扱いせず、別名 registry や live source
   command へ fallback しません。
 - 1 回の run の report は `experiments/report/<run_name>.md` に置きます。
 - 複数 run をまたぐ要約や知見は `notes/experiments/` や `notes/themes/` に置きます。
+- C++ native target の build は `cmake --build "$ROOT/build/cpp/<profile>" --target
+  cpp-experiments`、run は build 済み executable から lifecycle-owned result root へ行います。
 - server 上の formal run では `result/<run_name>/run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を残します。topic 固有の追加 stdout / stderr、tool log、diagnostic log は `result/<run_name>/logs/` に置きます。
 
 ## 3. 実行原則
 
 - 1 回の run は 1 つの `run_name` と 1 つの出力先に閉じた fresh 実行として扱います。
 - partial run を正式結果として継ぎ足しません。
+- C++ native experiment の build と run を分離し、build target は result を直接 publish しません。
 - 比較条件は run 開始前に固定します。
 - 実験設定の checked-in 正本は `experiments/<topic>/config.yaml` に置きます。
 - 実験設定は Python object の暗黙状態ではなく、YAML で管理し、run 開始時に再現可能な artifact として snapshot します。
 - formal run では `result/<run_name>/config.json` と `result/<run_name>/config_source.yaml` を必須 artifact とし、seed、case 範囲、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象を run 開始前に辿れるようにします。
+- C++ native run は `--run-name`、`--config`、`--result-root` を lifecycle adapter から受け取り、
+  `experiments/<topic>/result/<run_name>/` に evidence を書きます。
 - 各 run は `result/<run_name>/logs/` を持ちます。top-level `run.log` は managed runner の統合ログとして残し、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、topic 固有の追加ログは `logs/` 配下へ分けます。
 - 巨大な生成物や raw ログを `main` の入口文書へ混ぜません。
 - main server host で実行する run は、topic README に exact command と wrapper の使い方を明記します。

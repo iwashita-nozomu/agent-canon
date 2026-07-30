@@ -5,9 +5,10 @@
 # upstream implementation ../../../tools/experiments/execution_resource_plan.py owns GPU discovery/reservation and the frozen admission plan.
 # upstream implementation ../../../tools/experiments/run_managed_experiment.py is the only authorized ExperimentRunner entrypoint and adapts main().
 # upstream implementation ../../../tools/experiments/create_experiment_topic.py copies this file.
+# upstream design ../../../documents/conventions/DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse Python projection traces.
 # upstream implementation visualize.ipynb renders the reader notebook artifact.
 # @dependency-end
-"""Template experiment entrypoint."""
+"""Provide the managed experiment entrypoint template."""
 
 from __future__ import annotations
 
@@ -21,12 +22,12 @@ DEFAULT_RUN_NAME_PREFIX = "run"
 
 
 def compact_timestamp() -> str:
-    """Return a compact UTC timestamp for managed run names."""
+    """Create a compact UTC value for managed run names."""
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
 
 
 def resolve_run_dir() -> Path:
-    """Return the managed caller-provided or default output directory."""
+    """Select the caller-provided or timestamped output directory."""
     raw_run_dir = os.environ.get("EXPERIMENT_RUN_DIR")
     if raw_run_dir:
         return Path(raw_run_dir).resolve()
@@ -38,7 +39,7 @@ def resolve_run_dir() -> Path:
 
 
 def run_case_worker(case: object, run_dir_text: str) -> object:
-    """Run one case inside a worker process."""
+    """Execute one case in worker-local context and return its serializable result."""
     # IMPLEMENT HERE: import NumPy/JAX/EQX/Optax and project modules inside the worker.
     # IMPLEMENT HERE: compute one case and return a JSON-serializable result.
     # IMPLEMENT HERE: write worker-local logs under run_dir_text/logs/ if needed.
@@ -46,7 +47,7 @@ def run_case_worker(case: object, run_dir_text: str) -> object:
 
 
 def run_experiment(run_dir) -> None:
-    """Run the topic experiment and write artifacts into ``run_dir``."""
+    """Dispatch topic cases and write their run artifacts into the output directory."""
     # IMPLEMENT HERE: import only lightweight stdlib helpers or topic-local
     # config readers needed by the parent process.
     # IMPLEMENT HERE: load cases from cases.py/config.yaml.
@@ -58,7 +59,7 @@ def run_experiment(run_dir) -> None:
 
 
 def execute_visualization_notebook(run_dir):
-    """Execute the per-run visualization notebook from the managed child."""
+    """Execute the run notebook and record its output artifact in the run directory."""
     notebook_path = Path(__file__).resolve().with_name(VISUALIZE_NOTEBOOK_NAME)
     run_dir.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
@@ -85,7 +86,7 @@ def execute_visualization_notebook(run_dir):
 
 
 def require_managed_runner_route() -> None:
-    """Reject direct topic execution outside the managed ExperimentRunner."""
+    """Require the managed runner manifest so direct topic execution fails closed."""
     if not os.environ.get("EXPERIMENT_RUN_MANIFEST"):
         raise RuntimeError(
             "managed_runner_required=tools/experiments/run_managed_experiment.py"
@@ -93,7 +94,7 @@ def require_managed_runner_route() -> None:
 
 
 def main() -> int:
-    """Run one experiment invocation without CLI arguments."""
+    """Coordinate one managed experiment run and its visualization artifact."""
     require_managed_runner_route()
     # IMPLEMENT HERE: keep main() as orchestration only. Put experiment logic in
     # run_experiment() and process-local work in run_case_worker().

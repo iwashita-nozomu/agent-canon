@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Provides report artifact checks agent workflow automation.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/design/request-intent-and-update-relation.md run-bundle temporary-state and retention readback projection
 # upstream implementation ./work_log.py reconstructs the canonical logical ledger
 # upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
 # downstream implementation ./task_close.py consumes checked CompletionCoverage at closeout

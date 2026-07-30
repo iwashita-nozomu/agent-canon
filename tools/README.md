@@ -18,6 +18,7 @@ downstream implementation agent_tools/generated_artifact_guard.py rejects regene
 downstream implementation agent_tools/check_design_doc_claims.py validates design-document evidence claims
 downstream implementation ../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
+downstream implementation ../rust/agent-canon/src/python_algorithm_contract.rs runs the canonical Python algorithm contract checker
 downstream implementation agent_tools/search.py coordinates purpose-based search providers
 downstream implementation agent_tools/search_index.py builds repo-local semantic search cards
 downstream design user/README.md defines stable user-facing tool entrypoint migration target
@@ -212,8 +213,8 @@ must not contain `agents/evals/results/` result artifacts.
 `runtime_log_archive_git.py status` validates that the mounted log archive has
 a usable Git branch/worktree state before log evidence is pushed.
 `runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>` snapshots a run bundle into
-`.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/`
-and appends `agent-reports/<repo-key>/index.jsonl`; agents do not hand-generate
+`.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/<run-id>/<snapshot-id>/`
+and appends `agent-reports/<stable-source-repository-id>/index.jsonl`; agents do not hand-generate
 archive copies of their reports.
 `run_accumulated_agent_evals.py` is the mechanical producer entrypoint for
 required eval families. It runs role, skill/workflow prompt,
@@ -353,7 +354,7 @@ findings for resilient test planning.
   - `import_responsibility.py` は Python import を AST で読み、未使用 alias、wildcard import、local file に解決できる import の responsibility-scope 越境を検査します。`responsibility-scope.toml` の `[[import_rule]]` が source scope から import 可能な target scope の正本です。repo 全体 scan では Git の `--exclude-standard` view を優先し、`.agent-canon/`、`reports/`、`target/` などの runtime / cache state は検査対象から外します。
   - `issue_sync.py` は `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by`、任意の `github_issue:` mirror field を検査し、GitHub Issue 作成 plan を出します。
   - `eval_accumulation_check.py` は mounted runtime log archive の hook JSONL と登録済み eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。agent-facing run では `--compact-out` の JSON summary を読み、stdout の finding 全件列挙を避けます。
-  - `runtime_log_archive_git.py` は mounted log archive の ensure / status / import / archive-agent-reports / sync / push 操作を担当します。`sync` は hook JSONL、eval reports、Codex runtime summary、`reports/agents/` run bundle を log repo の `logs/<repo-key>` branch にまとめて commit / push する通常経路です。hook path namespace と entry schema の読み取り検査は `eval_accumulation_check.py` に寄せ、旧 log-management checker の互換 wrapper は置きません。
+- `runtime_log_archive_git.py` は mounted log archive の ensure / status / import / archive-agent-reports / sync / push 操作を担当します。`sync` は hook JSONL、eval reports、Codex runtime summary、`reports/agents/` run bundle を log repo の policy-owned stable branch に snapshot / commit / push する通常経路です。branch identity、retention、legacy inventory は `agent-canon-log` policy owner に寄せ、ここでは重複定義しません。hook path namespace と entry schema の読み取り検査は `eval_accumulation_check.py` に寄せ、旧 log-management checker の互換 wrapper は置きません。
   - `evaluate_report_quality.py` は `evidence/agent-evals/report_quality_eval.toml` を読み、reader-facing report の source packet、evidence traceability、limitations、actionability、artifact separation、reviewer routing を評価します。`--accumulate` のときだけ append-only result を書きます。
   - `evaluate_codex_agent_roles.py` は `.codex/agents/*.toml`、`.codex/config.toml`、`agents/agents_config.json`、`agents/task_catalog.yaml` を読み、role ごとの期待動作、禁止動作、model / reasoning 設定、boundary-evidenced routing、optional runtime metric JSONL を評価します。agent-facing run では `--compact-out` の JSON summary を読み、model matrix と finding detail は artifact へ分離します。
   - `reference_materializer.py` は consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。hook が `references/**/*.md` への登録漏れを検査できるよう、参照 URL は Markdown 内に保持します。
@@ -400,7 +401,7 @@ findings for resilient test planning.
   - `update_agent_canon.sh`
     - `plan` は derived repo から `agent-canon` だけ更新するときの route を出します。
     - `latest` は通常の最新化を tool-first に実行する唯一の user-facing 入口です。safe な場合は eval / hook log の所有 route、`ensure-latest`、root view check、compiled AgentCanon tool rebuild、AgentCanon update TODO routing / acknowledge まで進めます。submodule repo の vendor local branch、dirty runtime source、diverged history、merge conflict は parent source surfaceとして継続せず、topic workspace branch clone routeを案内して停止します。
-    - eval / hook result dirty state は原則として `.agent-canon/log-archive/` へ移します。legacy `agents/evals/results/` だけが dirty な古い checkout では `runtime_log_archive_git.py import-legacy|import-eval-results --delete-source` で `.agent-canon/log-archive/legacy-import/` へ退避します。新規蓄積は `runtime_log_archive_git.py ensure` 後の archive path を使い、source tree の `agents/evals/results/` を新規作成しません。non-log dirty state は自動退避しません。
+    - eval / hook result の producer path は `runtime_log_archive_git.py ensure` 後の stable source branch archive を使います。legacy `agents/evals/results/` の inventory、migration authority、retention は `agent-canon-log` policy repository の owner route に従います。新規 producer は source tree の `agents/evals/results/` を作成せず、non-log dirty state は自動退避しません。
     - `apply` は互換用の低レベル入口です。通常の task 開始、PR merge 後の持ち帰り、手動更新は `make agent-canon-ensure-latest` または `make agent-canon-latest` から `latest` に入ります。
     - `rebuild-tools` は現在 checkout されている AgentCanon source から compiled tool cache を作り直します。
       commit SHA が同じでも Rust source が installed binary より新しければ再ビルドします。
@@ -433,7 +434,7 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
 - `run_pytest_with_logs.sh`
 - `docker_dependency_validator.sh`
 - `ci/container_config.py`
-- `check_doc_test_triplet.py`
+- `validation/triplet_validator.py`
 - `agent_tools/waterfall_gate_check.py`
 - `agent_tools/evaluate_agent_run.py`
 - `agent_tools/compare_agent_run_paths.py`
@@ -445,7 +446,7 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
 - `agent_tools/check_log_helper_names.py`
 - `agent_tools/file_surface_inventory.py`
 - `agent_tools/review_backlog_scan.sh`
-- `agent_tools/check_algorithm_module_nested_contract.py`
+- `bin/agent-canon python-algorithm-contract-check`
 - `agent_tools/agent_update_branch.sh`
 - `agent_tools/vector_search.py`
 - `oop/python/readability.py`
@@ -533,19 +534,19 @@ When a run uses skills, prompt eval evidence is required. Run
 Hook outcomes, accumulated eval reports, and archived agent report snapshots
 live in the mounted runtime log archive.
 Hook JSONL uses
-`.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`
+`.agent-canon/log-archive/hook-runs/<stable-source-repository-id>/<runtime-namespace>/<hook>.jsonl`
 eval reports use `.agent-canon/log-archive/eval-results/<family>/`, Codex runtime
-summaries use `.agent-canon/log-archive/codex-runtime/<repo-key>/chats/<conversation-id>/summary.jsonl`
-plus `.agent-canon/log-archive/codex-runtime/<repo-key>/index.jsonl`, and agent run
-reports use `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` by
+summaries use `.agent-canon/log-archive/codex-runtime/<stable-source-repository-id>/chats/<conversation-id>/summary.jsonl`
+plus `.agent-canon/log-archive/codex-runtime/<stable-source-repository-id>/index.jsonl`, and agent run
+reports use `.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/<run-id>/<snapshot-id>/` by
 default. The archive remote is
 `git@github.com:iwashita-nozomu/agent-canon-log.git`; mount, branch, and push
 rules live in `documents/runtime/runtime-log-archive.md`, and
 `tools/agent_tools/runtime_log_archive_git.py` is the normal helper for
 `ensure`, `status`, `import-legacy`, `import-eval-results`,
-`archive-agent-report`, `archive-agent-reports`, `sync`, and `push`. The Codex Stop hook calls `sync`
-best-effort, so normal runtime log and report accumulation does not require an
-agent to remember a separate push step.
+`archive-agent-report`, `archive-agent-reports`, `sync`, and `push`. The active
+dispatcher does not call `sync`; an explicit checkpoint owner must run the
+selected archive command and push/read back the stable branch.
 Temporary local hook output
 belongs in `reports/hooks/` only when a task explicitly overrides the destination
 with `AGENT_CANON_HOOK_RESULTS_DIR`, `AGENT_CANON_OOP_HOOK_LOG_PATH`, or

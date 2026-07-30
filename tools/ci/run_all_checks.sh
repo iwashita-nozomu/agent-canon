@@ -10,7 +10,8 @@
 # upstream implementation ../agent_tools/check_log_helper_names.py validates log helper naming
 # upstream implementation ../agent_tools/import_responsibility.py validates import ownership boundaries
 # upstream implementation ../validation/notebook_quality.py validates notebooks as readable runnable demos
-# upstream implementation ../agent_tools/check_algorithm_module_nested_contract.py validates nested algorithm ownership
+# upstream implementation ../bin/agent-canon invokes the canonical Rust algorithm contract checker
+# upstream implementation ../../rust/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
 # upstream implementation ../agent_tools/check_convention_compliance.py validates convention/workflow gate wiring
 # upstream implementation ../agent_tools/tool_catalog.py validates structured tool catalog
 # upstream implementation ../agent_tools/tool_drift.py validates tool/convention trace contracts
@@ -283,10 +284,10 @@ else
   EXIT_CODE=1
 fi
 if [ -d python ]; then
-  if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_algorithm_module_nested_contract.py" python 2>&1; then
-    echo "✅ algorithm module nested contract checks 成功"
+  if "$CANON_BIN" python-algorithm-contract-check --root "$WORKSPACE_ROOT" python 2>&1; then
+    echo "✅ Python algorithm contract checks 成功"
   else
-    echo "❌ algorithm module nested contract checks 失敗"
+    echo "❌ Python algorithm contract checks 失敗"
     EXIT_CODE=1
   fi
 fi

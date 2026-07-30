@@ -6,6 +6,7 @@ upstream design ./README.md documents index and discovery path
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./coding-conventions-house-style.md shared implementation style contract
 upstream design ./coding-conventions-python.md Python convention entrypoint
+upstream design ./coding-conventions-cpp.md C++ source/header ownership and target boundary
 upstream design ../design/protocols.md Protocol and type-boundary placement contract
 downstream implementation ../../tools/oop/python/readability.py Python OOP typed-boundary evidence
 downstream implementation ../../tools/oop/cpp/readability.py C++ OOP typed-boundary evidence
@@ -24,6 +25,9 @@ upstream implementation ../../tools/sync_agent_canon.sh root symlink view genera
 Python 固有の型注釈、命名、`Protocol` 配置は
 [Python コーディング規約](./coding-conventions-python.md) と
 [Protocol 設計](../design/protocols.md) を併読します。
+C++ の source/header ownership、target interface、build/test/experiment boundary は
+[C++ コーディング規約](./coding-conventions-cpp.md)、[C++ build layout](../design/cpp-build-layout.md)、
+および `cpp-review` の project-native validation route を併読します。
 
 ## この文書の読み方
 
@@ -40,6 +44,17 @@ Python 固有の型注釈、命名、`Protocol` 配置は
 - 継承は契約の特殊化に限定し、実装共有のための深い継承階層を禁止します。
 - composition を既定にし、所有する部品と lifecycle を明示します。
 - `None` を渡して内部で runtime 分岐する設計より、型、値オブジェクト、`Protocol`、`Optional` を外した別 entrypoint、または variant boundary で静的解析へ委譲します。
+
+### C++ target responsibility
+
+- `cpp-core` は production source/header と reusable target interface の owner です。
+- `cpp-test-<name>` と `cpp-experiment-<name>` は `cpp-core` を consume する consumer です。
+- `cpp-tests` と `cpp-experiments` は consumer grouping を表し、production state や
+  run/result publication を所有しません。
+- public header は `cpp/include/`、implementation は `cpp/src/`、CTest source は
+  `cpp/tests/`、native experiment source は `cpp/experiments/` に対応づけます。
+- target graph の dependency direction は consumer → provider (`test/experiment → cpp-core`)
+  とし、external effect、run config、result retention は既存 lifecycle owner に接続します。
 
 ## SOLID との対応
 
@@ -184,7 +199,7 @@ python3 tools/oop/python/rule_inventory.py
 C++ surface では次を baseline として使います。
 
 ```bash
-python3 tools/oop/cpp/readability.py include src tests/cpp
+python3 tools/oop/cpp/readability.py cpp/include cpp/src cpp/tests cpp/experiments
 python3 tools/oop/cpp/rule_inventory.py
 ```
 

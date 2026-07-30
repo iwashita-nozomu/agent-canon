@@ -70,6 +70,20 @@ upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership
   前提にする場合は、unit test ではなく smoke / integration / experiment validation
   として明示します。
 
+### 2.1 C++ test ownership
+
+- C++ test source は `cpp/tests/` に置きます。
+- `cpp/tests/CMakeLists.txt` は `cpp-test-<name>` executable、`cpp-tests` aggregate、
+  CTest registration を同じ `cpp/CMakeLists.txt` configure graph へ接続します。
+- 各 individual test executable は `cpp-core` を consume します。`cpp-tests` は build
+  grouping を提供し、CTest が execution と failure output を所有します。
+- C++ test validation は同じ profile cache を使います。
+
+```bash
+cmake --build "$ROOT/build/cpp/<profile>" --target cpp-tests
+ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure
+```
+
 ## 3. Unit Test Contract
 
 unit test は「1 つの観測可能 behavior に対する concrete example」です。

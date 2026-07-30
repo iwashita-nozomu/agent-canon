@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Provides the sole typed adapter for canonical graph status, query, and context responses.
 # upstream design ../../agents/canonical/CLI_ENTRYPOINTS.md canonical graph command contract
+# upstream design ../../documents/design/request-intent-and-update-relation.md generated graph/cache readback projection
 # upstream implementation ../../rust/agent-canon/src/graph.rs owns one-build graph and runtime-evidence persistence
 # downstream implementation ./check_dependency_headers.py consumes graph context without reparsing manifests
 # downstream implementation ./check_design_doc_claims.py consumes graph context without rederiving canonical guarantees

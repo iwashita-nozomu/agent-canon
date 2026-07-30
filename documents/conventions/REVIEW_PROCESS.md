@@ -4,6 +4,7 @@ contract reference
 responsibility Documents レビュー手順とポリシー for this repository.
 upstream design README.md durable document index
 upstream design ../../issues/README.md durable issue and GitHub mirror policy
+upstream design ../runtime/runtime-profiles-and-check-matrix.json validation profile taxonomy owner
 downstream design ../design/algorithm-implementation-boundary.md algorithm math-to-code boundary policy
 @dependency-end
 -->
@@ -44,6 +45,10 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
   - `python-review`
 - C / C++ 差分の review
   - `cpp-review`
+- C++ project layout / CMake command の差分
+  - `cpp/CMakeLists.txt` を project entrypoint とする target graph の readback
+  - `cpp/include`、`cpp/src`、`cpp/tests`、`cpp/experiments` の owner readback
+  - parent-root anchor `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` の command review
 - 大規模 refactor の review
   - `change-review`
   - `project_review`
@@ -80,9 +85,12 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
   - `python3 -m pytest tests/ -q --tb=short`
   - `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501`
 - C / C++ 差分を含む場合は、project-native configure / build / test evidence を追加します。
-  - CMake project なら `cmake -S . -B build`
-  - CMake project なら `cmake --build build`
-  - test target があれば `ctest --test-dir build`
+  - CMake project なら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`
+  - CMake project なら `cmake --build "$ROOT/build/cpp/<profile>" --parallel`
+  - test target があれば `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure`
+  - install contract があれば `cmake --install "$ROOT/build/cpp/<profile>"`
+- C++ design-only / convention-only 差分では native execution を `not_run` とし、
+  docs、dependency、target/path contract の evidence と実行 phase の未実行項目を分離します。
 - Markdown 差分を含む場合は、少なくとも `tools/bin/agent-canon docs check` を実行します。
 - checkpoint review と final acceptance review では、変更ファイルだけでなく全 repo に `bash tools/agent_tools/run_repo_dependency_review.sh` を適用し、`change_review.md` または `final_review.md` に `REPO_DEPENDENCY_REVIEW=pass` と checked path count を残します。
 - final acceptance review 前に、read-only diff-check agent に最新 diff、run bundle、request contract、schedule、dependency evidence、validation evidence を渡し、parent 自己レビューではなく独立 review decision を artifact に残します。

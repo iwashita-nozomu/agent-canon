@@ -3,9 +3,11 @@
 # contract tool
 # responsibility Provides agent team agent workflow automation.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/design/request-intent-and-update-relation.md CleanupProof, G6, and terminal close_agent receipt projection
 # upstream design ../../agents/task_catalog.yaml workflow topology and isolated skill-evaluation route
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md active design packet schema contract
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy
+# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json C++ profile path activation mapping
 # upstream implementation ./skill_tool_commands.py builds selected skill command packets.
 # upstream implementation ./implementation_route.py owns fixed-packet Spark eligibility
 # upstream implementation ./model_profile_registry.py owns profile prompt/token materialization
@@ -93,6 +95,12 @@ CPP_PATH_MARKERS = (
     "src/",
     "include/",
     "lib/",
+    "cpp/CMakeLists.txt",
+    "cpp/cmake/",
+    "cpp/src/",
+    "cpp/include/",
+    "cpp/tests/",
+    "cpp/experiments/",
 )
 DOC_SUFFIXES = {".md", ".rst", ".txt"}
 CONFIG_SUFFIXES = {".json", ".toml", ".yaml", ".yml"}

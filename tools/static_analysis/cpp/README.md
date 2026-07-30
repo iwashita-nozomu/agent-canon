@@ -15,8 +15,9 @@ project-native build/test commands.
 Default command:
 
 ```bash
-python3 tools/oop/cpp/readability.py --format markdown include src tests/cpp
+python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src cpp/tests cpp/experiments
 ```
 
-Native projects must add their configure, build, and test command evidence to
-the run bundle; the readability score is a review aid, not build evidence.
+Native projects use `cpp/CMakeLists.txt` as the source anchor and add configure,
+build, CTest, install, and consumer-to-provider target evidence to the run
+bundle. The readability score is a review aid, not build evidence.

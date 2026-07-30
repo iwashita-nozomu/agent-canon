@@ -1577,23 +1577,6 @@ entries:
     tests:
       - tests/agent_tools/test_check_run_log_contract.py
 
-  - id: check-algorithm-module-nested-contract
-    summary: Validates nested algorithm module ownership fields.
-    path: tools/agent_tools/check_algorithm_module_nested_contract.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/agent_tools/check_algorithm_module_nested_contract.py
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/design/algorithm-implementation-boundary.md
-    tests:
-      - tests/agent_tools/test_check_algorithm_module_nested_contract.py
-
   - id: python-algorithm-contract-check
     summary: Validates amp algorithm module public surface, callable Algorithm, nested ownership, and concrete Info schema with Rust analysis over Python AST JSON.
     path: rust/agent-canon/src/python_algorithm_contract.rs
@@ -1603,30 +1586,16 @@ entries:
     command: tools/bin/agent-canon python-algorithm-contract-check
     writes: false
     default_wiring:
-      ci: false
+      ci: true
       pr_check: false
     docs:
       - documents/tools/README.md
+      - tools/README.md
       - documents/design/jax_util/algorithm_module_contract.md
+      - tools/ci/run_all_checks.sh
     tests:
       - rust/agent-canon/src/python_algorithm_contract.rs
-
-  - id: check-algorithm-module-public-surface
-    summary: Validates algorithm module public API boundaries.
-    path: tools/agent_tools/check_algorithm_module_public_surface.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/agent_tools/check_algorithm_module_public_surface.py
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/design/algorithm-implementation-boundary.md
-    tests:
-      - tests/agent_tools/test_check_algorithm_module_public_surface.py
+      - rust/agent-canon/tests/python_algorithm_contract_cli.rs
 
   - id: oop-python-readability
     summary: Scores Python OOP readability risks.
@@ -2168,25 +2137,6 @@ entries:
     tests:
       - tests/tools/test_publish_result_branch.py
 
-  - id: check-doc-test-triplet
-    summary: Compatibility wrapper for doc and test triplet validation.
-    path: tools/check_doc_test_triplet.py
-    family: root
-    role: compatibility
-    status: compatibility_wrapper
-    audience: internal
-    placement: compatibility_wrapper
-    command: python3 tools/check_doc_test_triplet.py
-    writes: false
-    replacement: tools/validation/triplet_validator.py
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-    tests: []
-    test_exempt_reason: Thin compatibility wrapper over validation/triplet_validator.py.
-
   - id: triplet-validator
     summary: Validates source, document, and test triplets.
     path: tools/validation/triplet_validator.py
@@ -2201,7 +2151,8 @@ entries:
     docs:
       - tools/README.md
     tests: []
-    test_exempt_reason: Consumed through the compatibility wrapper.
+    test_exempt_reason: No dedicated unit test exists; command is currently exercised through `run_comprehensive_review.sh`.
+
 
   - id: notebook-quality
     summary: Validates notebooks as readable runnable demos instead of fine-grained tests.

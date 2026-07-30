@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Manages the ignored Git clone used for AgentCanon runtime log and report archives.
 # upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
+# upstream design ../../documents/design/request-intent-and-update-relation.md run-bundle retention receipt projection
 # upstream implementation ./runtime_log_paths.py resolves archive paths and source repo keys
 # downstream design ../../documents/runtime/runtime-log-archive.md documents this tool as the normal Git workflow
 # downstream implementation ../../tests/agent_tools/test_runtime_log_archive_git.py validates clone, branch, status, and push behavior
@@ -40,6 +41,7 @@ UTC = timezone.utc
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from log_repository_identity import source_repository_id_for_write  # noqa: E402
 from report_artifact_checks import (  # noqa: E402
     MECHANICALLY_REGENERATED_REPORT_FILE_PATTERNS,
     check_final_review_artifact,
@@ -52,7 +54,6 @@ from runtime_log_paths import (  # noqa: E402
     agent_report_archive_dir,
     codex_trace_key,
     hook_event_spool_root,
-    log_branch_key,
     log_environment_key,
     mounted_log_archive_root,
     repo_log_key,
@@ -73,7 +74,8 @@ AGENT_REPORT_EXCLUDED_FILES = frozenset({".active_run", ".mcp_inventory_cache.js
 DEFAULT_AGENT_REPORT_MAX_FILE_BYTES = 10 * 1024 * 1024
 GIT_PORCELAIN_STATUS_PATH_START = 3
 GIT_PORCELAIN_STATUS_MIN_LINE_LENGTH = GIT_PORCELAIN_STATUS_PATH_START
-REPORT_SNAPSHOT_DIGEST_CHARS = 16
+REPORT_SNAPSHOT_DIGEST_CHARS = 64
+PUBLICATION_RETRY_LIMIT = 3
 REPO_KEYED_ARCHIVE_FAMILIES = frozenset({"agent-reports", "codex-runtime", "hook-runs"})
 MANAGED_GLOBAL_ARCHIVE_FAMILIES = frozenset({"eval-results", "legacy-import"})
 BRANCH_SWITCH_COMMIT_MESSAGE = "Preserve managed runtime logs before branch switch"
@@ -303,6 +305,7 @@ class ArchivePublicationReceipt:
     archive_tree_oid: str
     dedup_index_sha256: str
     cursor_sha256: str
+    push_status: str = ""
 
 
 @dataclass
@@ -326,6 +329,29 @@ class PreparedArchiveTransaction:
         finally:
             self.lock_handle.close()
             _ACTIVE_ARCHIVE_LOCKS.discard(self.lock_path.resolve())
+
+
+@dataclass(frozen=True)
+class LegacyImportRecord:
+    """One source/destination digest record in a legacy import plan."""
+
+    source: Path
+    source_relative: str
+    destination: str | None
+    byte_count: int
+    sha256: str
+
+
+@dataclass(frozen=True)
+class LegacyImportPlan:
+    """Copy and deletion plan held until archive publication readback succeeds."""
+
+    family: str
+    legacy_root: Path
+    index_path: Path
+    inventory_sha256: str
+    records: tuple[LegacyImportRecord, ...]
+    delete_source: bool
 
 
 @dataclass(frozen=True)
@@ -702,7 +728,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ensure = subparsers.add_parser(
         "ensure",
-        help="Clone/fetch the archive and switch to logs/<environment-key>-<chat-key>.",
+        help="Clone/fetch the archive and select logs/<stable-source-repository-id>.",
     )
     ensure.add_argument("--no-fetch", action="store_true", help="Do not fetch origin before selecting the branch.")
 
@@ -721,7 +747,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     agent_reports = subparsers.add_parser(
         "archive-agent-reports",
-        help="Copy reports/agents run bundles into the current runtime archive branch.",
+        help="Snapshot reports/agents run bundles into the current runtime archive branch.",
     )
     agent_reports.add_argument(
         "--report-root",
@@ -795,14 +821,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     push = subparsers.add_parser("push", help="Commit and push append-only logs for this source repository.")
-    push.add_argument("--message", help="Commit message. Defaults to 'Append <repo-key> runtime logs'.")
+    push.add_argument("--message", help="Commit message. Defaults to 'Append <stable-source-repository-id> runtime logs'.")
     push.add_argument("--no-pull", action="store_true", help="Do not pull --rebase before pushing.")
 
     sync = subparsers.add_parser(
         "sync",
-        help="Ensure the archive, copy current agent reports, commit, and push log artifacts.",
+        help="Ensure the archive, snapshot current agent reports, commit, and push log artifacts.",
     )
-    sync.add_argument("--message", help="Commit message. Defaults to 'Append <repo-key> runtime logs'.")
+    sync.add_argument("--message", help="Commit message. Defaults to 'Append <stable-source-repository-id> runtime logs'.")
     sync.add_argument("--no-pull", action="store_true", help="Do not pull --rebase before pushing.")
     sync.add_argument("--no-push", action="store_true", help="Copy artifacts into the archive without pushing.")
     sync.add_argument("--no-agent-reports", action="store_true", help="Do not copy reports/agents artifacts.")
@@ -906,9 +932,12 @@ def build_context(args: argparse.Namespace) -> ArchiveContext:
         if args.archive_root
         else mounted_log_archive_root(canon_root).resolve()
     )
-    key = repo_log_key(source_root)
+    try:
+        key = source_repository_id_for_write(source_root)
+        branch_key = key
+    except ValueError as exc:
+        raise ArchiveGitError(f"source_identity_preflight_failed:{exc}") from exc
     env_key = log_environment_key(canon_root)
-    branch_key = log_branch_key(source_root, canon_root)
     return ArchiveContext(
         source_root=source_root,
         canon_root=canon_root,
@@ -4477,11 +4506,18 @@ def switch_to_archive_branch(context: ArchiveContext, branch: str) -> None:
     git(context.archive_root, ["switch", "-c", branch])
 
 
-def ensure_archive(context: ArchiveContext, *, fetch: bool = True) -> None:
+def ensure_archive(
+    context: ArchiveContext,
+    *,
+    fetch: bool = True,
+    allow_branch_switch: bool = True,
+) -> None:
     """Ensure the ignored clone exists and is on the runtime log branch."""
+    created = False
     if not context.archive_root.exists():
         context.archive_root.parent.mkdir(parents=True, exist_ok=True)
         run(["git", "clone", context.remote, str(context.archive_root)])
+        created = True
     if not is_archive_clone(context.archive_root):
         raise ArchiveGitError(f"archive path is not a Git clone: {context.archive_root}")
 
@@ -4493,6 +4529,13 @@ def ensure_archive(context: ArchiveContext, *, fetch: bool = True) -> None:
     current = current_branch(context)
     if current == branch:
         return
+    if created and not allow_branch_switch:
+        switch_to_archive_branch(context, branch)
+        return
+    if not allow_branch_switch:
+        raise ArchiveGitError(
+            f"archive_branch_mismatch:current={current}:expected={branch}"
+        )
     summary = archive_status_summary(context)
     if summary.dirty:
         preserve_managed_dirty_paths(context, current)
@@ -4520,6 +4563,8 @@ def _require_prepared(transaction: PreparedArchiveTransaction) -> ArchiveContext
 def prepare_archive_transaction(
     context: ArchiveContext,
     fetch: bool,
+    *,
+    allow_branch_switch: bool = False,
 ) -> PreparedArchiveTransaction:
     """Acquire the source lock, ensure once, and return one prepared boundary."""
     lock_path = (context.source_root / HOOK_SPOOL_LOCK_RELATIVE).resolve()
@@ -4536,7 +4581,11 @@ def prepare_archive_transaction(
         raise
     _ACTIVE_ARCHIVE_LOCKS.add(lock_path)
     try:
-        ensure_archive(context, fetch=fetch)
+        ensure_archive(
+            context,
+            fetch=fetch,
+            allow_branch_switch=allow_branch_switch,
+        )
         ensured_branch = current_branch(context)
         if ensured_branch != context.branch:
             raise ArchiveGitError(
@@ -5211,7 +5260,11 @@ def command_repo_key(context: ArchiveContext) -> int:
 
 def command_ensure(context: ArchiveContext, args: argparse.Namespace) -> int:
     """Ensure archive clone and branch."""
-    with prepare_archive_transaction(context, fetch=not args.no_fetch) as transaction:
+    with prepare_archive_transaction(
+        context,
+        fetch=not args.no_fetch,
+        allow_branch_switch=True,
+    ) as transaction:
         print_context(transaction.context)
         print(f"RUNTIME_LOG_ARCHIVE_CURRENT_BRANCH={transaction.ensured_branch}")
         print("RUNTIME_LOG_ARCHIVE_ENSURE=pass")
@@ -5234,6 +5287,10 @@ def command_status(context: ArchiveContext, args: argparse.Namespace) -> int:
     if args.porcelain:
         for line in status.splitlines():
             print(f"RUNTIME_LOG_ARCHIVE_PORCELAIN={line}")
+    if not summary.branch_matches:
+        print("RUNTIME_LOG_ARCHIVE_ERROR_CODE=archive_branch_mismatch")
+        print("RUNTIME_LOG_ARCHIVE_STATUS=branch_mismatch")
+        return 1
     print("RUNTIME_LOG_ARCHIVE_STATUS=pass")
     return 0
 
@@ -5262,11 +5319,297 @@ def command_check_clean(context: ArchiveContext, args: argparse.Namespace) -> in
     return 0 if clean else 1
 
 
+def _legacy_import_index_path(context: ArchiveContext) -> Path:
+    """Return the append-only index that certifies each legacy import plan."""
+    return context.archive_root / "legacy-import" / "import-index.jsonl"
+
+
+def _legacy_index_contains_inventory(path: Path, inventory_sha256: str) -> bool:
+    """Return whether an append-only legacy index already has this inventory."""
+    if not path.exists():
+        return False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(entry, dict) and entry.get("inventory_sha256") == inventory_sha256:
+            return True
+    return False
+
+
+def _legacy_import_plan(
+    transaction: PreparedArchiveTransaction,
+    *,
+    family: str,
+    legacy_root: Path,
+    destination_prefix: Path,
+    sources: list[tuple[Path, str, bool]],
+    delete_source: bool,
+) -> LegacyImportPlan:
+    """Copy and inventory legacy sources without authorizing source deletion."""
+    context = _require_prepared(transaction)
+    records: list[LegacyImportRecord] = []
+    imported = 0
+    existing = 0
+    for source, relative, should_copy in sources:
+        if not source.is_file():
+            continue
+        payload = source.read_bytes()
+        destination = (
+            (destination_prefix / Path(relative)).as_posix()
+            if should_copy
+            else None
+        )
+        target = context.archive_root / destination if destination else None
+        if target is not None:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists():
+                if target.read_bytes() != payload:
+                    raise ArchiveGitError(
+                        f"archive destination already exists with different content: {target}"
+                    )
+                existing += 1
+            else:
+                shutil.copy2(source, target)
+                imported += 1
+        records.append(
+            LegacyImportRecord(
+                source=source,
+                source_relative=relative,
+                destination=destination,
+                byte_count=len(payload),
+                sha256=_hash_bytes(payload),
+            )
+        )
+
+    for record in records:
+        try:
+            observed = record.source.read_bytes()
+        except FileNotFoundError as exc:
+            raise ArchiveGitError("legacy_source_changed_before_inventory") from exc
+        if len(observed) != record.byte_count or _hash_bytes(observed) != record.sha256:
+            raise ArchiveGitError("legacy_source_changed_before_inventory")
+
+    inventory_records = [
+        {
+            "bytes": record.byte_count,
+            "destination": record.destination,
+            "sha256": record.sha256,
+            "source": record.source_relative,
+        }
+        for record in records
+    ]
+    inventory = {
+        "family": family,
+        "files": inventory_records,
+        "schema": "agent_canon.legacy_import.v1",
+    }
+    inventory_sha256 = _hash_bytes(_canonical_compact_json(inventory))
+    index_entry = {
+        "family": family,
+        "file_count": len(records),
+        "files": inventory_records,
+        "inventory_sha256": inventory_sha256,
+        "schema": "agent_canon.legacy_import.v1",
+    }
+    index_path = _legacy_import_index_path(context)
+    if records and not _legacy_index_contains_inventory(index_path, inventory_sha256):
+        write_jsonl_once(index_path, index_entry, inventory_sha256)
+        git(context.archive_root, ["add", "--", "legacy-import"])
+    print_context(context)
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_FAMILY={family}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_ROOT={legacy_root}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_FILES={sum(1 for record in records if record.destination)}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_NEW_FILES={imported}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EXISTING_FILES={existing}")
+    concrete_records = tuple(record for record in records if record.destination)
+    preserved_records = tuple(record for record in records if record.destination is None)
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS={len(concrete_records)}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_PRESERVED={len(preserved_records)}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_NOT_IMPORTED={len(preserved_records)}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_INVENTORY_SHA256={inventory_sha256}")
+    copied_count = sum(1 for record in records if record.destination)
+    if family == "hook-runs":
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_LEGACY_ROOT={legacy_root}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_DESTINATION={destination_prefix.as_posix()}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_FILES={copied_count}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_NEW_FILES={imported}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EXISTING_FILES={existing}")
+    else:
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_ROOT={legacy_root}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DESTINATION={destination_prefix.as_posix()}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES={copied_count}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_NEW_FILES={imported}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_EXISTING_FILES={existing}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={len(concrete_records)}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED={len(preserved_records)}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED={len(preserved_records)}")
+    return LegacyImportPlan(
+        family=family,
+        legacy_root=legacy_root,
+        index_path=index_path,
+        inventory_sha256=inventory_sha256,
+        records=tuple(records),
+        delete_source=delete_source,
+    )
+
+
+def _finalize_legacy_import(
+    transaction: PreparedArchiveTransaction,
+    plan: LegacyImportPlan,
+    args: argparse.Namespace,
+) -> int:
+    """Publish first, then delete only the already-read-back legacy sources."""
+    if not plan.delete_source:
+        print("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=no")
+        if plan.family == "eval-results":
+            print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=no")
+        print("RUNTIME_LOG_ARCHIVE_IMPORT=pass")
+        return 0
+    if not plan.records:
+        print("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=no")
+        if plan.family == "eval-results":
+            print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=no")
+        print("RUNTIME_LOG_ARCHIVE_IMPORT=pass")
+        return 0
+    receipt = publish_prepared_archive(transaction, args)
+    if receipt.status != "committed" or not receipt.pushed:
+        print("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=no")
+        if plan.family == "eval-results":
+            print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=no")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT=publication_{receipt.status}")
+        return 1
+    concrete_records = tuple(record for record in plan.records if record.destination)
+    preserved_records = tuple(record for record in plan.records if record.destination is None)
+    required_paths = tuple(
+        path
+        for path in (
+            plan.index_path,
+            *(transaction.context.archive_root / record.destination
+              for record in concrete_records)
+        )
+    )
+    _verify_remote_archive_readback(transaction.context, receipt, required_paths)
+    _verify_legacy_import_readback(
+        transaction.context,
+        receipt.archive_commit_oid,
+        plan,
+        concrete_records,
+    )
+    for record in concrete_records:
+        try:
+            payload = record.source.read_bytes()
+        except FileNotFoundError as exc:
+            raise ArchiveGitError("legacy_source_changed_before_finalize") from exc
+        if len(payload) != record.byte_count or _hash_bytes(payload) != record.sha256:
+            raise ArchiveGitError("legacy_source_changed_before_finalize")
+    deleted_count = 0
+    for record in concrete_records:
+        delete_source_file(transaction.context, record.source)
+        deleted_count += 1
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS={deleted_count}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_PRESERVED={len(preserved_records)}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_NOT_IMPORTED={len(preserved_records)}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE={'yes' if deleted_count else 'no'}")
+    if plan.family == "eval-results":
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={deleted_count}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED={len(preserved_records)}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED={len(preserved_records)}")
+        print(
+            "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE="
+            f"{'yes' if deleted_count else 'no'}"
+        )
+    print("RUNTIME_LOG_ARCHIVE_IMPORT=pass")
+    return 0
+
+
+def _legacy_import_record_payload(record: LegacyImportRecord) -> dict[str, object]:
+    """Return the canonical index representation for one import record."""
+    return {
+        "bytes": record.byte_count,
+        "destination": record.destination,
+        "sha256": record.sha256,
+        "source": record.source_relative,
+    }
+
+
+def _verify_legacy_import_readback(
+    context: ArchiveContext,
+    commit_oid: str,
+    plan: LegacyImportPlan,
+    concrete_records: tuple[LegacyImportRecord, ...],
+) -> None:
+    """Certify index membership and committed blobs before source deletion."""
+    try:
+        index_relative = plan.index_path.resolve().relative_to(
+            context.archive_root.resolve()
+        )
+    except ValueError as exc:
+        raise ArchiveGitError("legacy_readback_mismatch:index_path") from exc
+    index_bytes = _archive_blob_at(context, commit_oid, index_relative)
+    entries: list[dict[str, object]] = []
+    for line in index_bytes.splitlines():
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ArchiveGitError("legacy_readback_mismatch:index_json") from exc
+        if not isinstance(entry, dict):
+            raise ArchiveGitError("legacy_readback_mismatch:index_entry_type")
+        entries.append(cast(dict[str, object], entry))
+    matches = [
+        entry
+        for entry in entries
+        if entry.get("inventory_sha256") == plan.inventory_sha256
+    ]
+    if len(matches) != 1:
+        raise ArchiveGitError("legacy_readback_mismatch:index_entry")
+    entry = matches[0]
+    expected_records = [
+        _legacy_import_record_payload(record) for record in plan.records
+    ]
+    if (
+        entry.get("family") != plan.family
+        or entry.get("schema") != "agent_canon.legacy_import.v1"
+        or entry.get("file_count") != len(expected_records)
+        or entry.get("files") != expected_records
+    ):
+        raise ArchiveGitError("legacy_readback_mismatch:index_records")
+    inventory = {
+        "family": plan.family,
+        "files": expected_records,
+        "schema": "agent_canon.legacy_import.v1",
+    }
+    if _hash_bytes(_canonical_compact_json(inventory)) != plan.inventory_sha256:
+        raise ArchiveGitError("legacy_readback_mismatch:inventory_digest")
+
+    for record in concrete_records:
+        destination = Path(cast(str, record.destination))
+        tree_entry = git(
+            context.archive_root,
+            ["cat-file", "-t", f"{commit_oid}:{destination.as_posix()}"],
+            check=False,
+        )
+        if tree_entry.returncode != 0 or tree_entry.stdout.strip() != "blob":
+            raise ArchiveGitError(
+                f"legacy_readback_mismatch:tree_membership:{destination.as_posix()}"
+            )
+        remote = _archive_blob_at(context, commit_oid, destination)
+        if len(remote) != record.byte_count or _hash_bytes(remote) != record.sha256:
+            raise ArchiveGitError(
+                f"legacy_readback_mismatch:blob_digest:{destination.as_posix()}"
+            )
+
+
 def _import_legacy_prepared(
     transaction: PreparedArchiveTransaction,
     args: argparse.Namespace,
-) -> int:
-    """Import old in-tree hook JSONL into the archive clone."""
+) -> LegacyImportPlan:
+    """Prepare old in-tree hook JSONL without deleting any source."""
     context = _require_prepared(transaction)
     legacy_root = (
         args.legacy_root.resolve()
@@ -5276,50 +5619,27 @@ def _import_legacy_prepared(
     destination_prefix = safe_archive_relative_path(args.destination_prefix)
     if context.archive_root.resolve() == legacy_root or context.archive_root.resolve() in legacy_root.parents:
         raise ArchiveGitError("legacy root cannot be inside the archive clone")
-    if not legacy_root.exists():
-        print_context(context)
-        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_LEGACY_ROOT={legacy_root}")
-        print("RUNTIME_LOG_ARCHIVE_IMPORT_FILES=0")
-        print("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=no")
-        print("RUNTIME_LOG_ARCHIVE_IMPORT=pass")
-        return 0
-
-    imported = 0
-    existing = 0
-    for source in sorted(legacy_root.rglob("*.jsonl")):
-        if not source.is_file():
-            continue
-        relative = source.relative_to(legacy_root)
-        target = context.archive_root / destination_prefix / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.exists():
-            if target.read_bytes() != source.read_bytes():
-                raise ArchiveGitError(f"archive destination already exists with different content: {target}")
-            existing += 1
-        else:
-            shutil.copy2(source, target)
-            imported += 1
-        if args.delete_source:
-            delete_source_file(context, source)
-
-    if (context.archive_root / destination_prefix).exists():
-        git(context.archive_root, ["add", "--", destination_prefix.as_posix()])
-
-    print_context(context)
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_LEGACY_ROOT={legacy_root}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_DESTINATION={destination_prefix.as_posix()}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_FILES={imported + existing}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_NEW_FILES={imported}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EXISTING_FILES={existing}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE={'yes' if args.delete_source else 'no'}")
-    print("RUNTIME_LOG_ARCHIVE_IMPORT=pass")
-    return 0
+    sources = (
+        [(source, source.relative_to(legacy_root).as_posix(), True)
+         for source in sorted(legacy_root.rglob("*.jsonl")) if source.is_file()]
+        if legacy_root.exists()
+        else []
+    )
+    return _legacy_import_plan(
+        transaction,
+        family="hook-runs",
+        legacy_root=legacy_root,
+        destination_prefix=destination_prefix,
+        sources=sources,
+        delete_source=args.delete_source,
+    )
 
 
 def command_import_legacy(context: ArchiveContext, args: argparse.Namespace) -> int:
-    """Import legacy hook logs under the sole archive transaction lock."""
+    """Import legacy hook logs and finalize deletion only after readback."""
     with prepare_archive_transaction(context, fetch=True) as transaction:
-        return _import_legacy_prepared(transaction, args)
+        plan = _import_legacy_prepared(transaction, args)
+        return _finalize_legacy_import(transaction, plan, args)
 
 
 def should_import_eval_result(relative: Path) -> bool:
@@ -5329,16 +5649,11 @@ def should_import_eval_result(relative: Path) -> bool:
     return True
 
 
-def should_delete_eval_source(relative: Path) -> bool:
-    """Return whether one imported eval source file can leave the source tree."""
-    return True
-
-
 def _import_eval_results_prepared(
     transaction: PreparedArchiveTransaction,
     args: argparse.Namespace,
-) -> int:
-    """Import old in-tree eval Markdown reports into the archive clone."""
+) -> LegacyImportPlan:
+    """Prepare old in-tree eval reports without deleting any source."""
     context = _require_prepared(transaction)
     legacy_root = (
         args.legacy_root.resolve()
@@ -5348,59 +5663,30 @@ def _import_eval_results_prepared(
     destination_prefix = safe_archive_relative_path(args.destination_prefix)
     if context.archive_root.resolve() == legacy_root or context.archive_root.resolve() in legacy_root.parents:
         raise ArchiveGitError("legacy root cannot be inside the archive clone")
-    if not legacy_root.exists():
-        print_context(context)
-        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_ROOT={legacy_root}")
-        print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES=0")
-        print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=no")
-        print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS=pass")
-        return 0
-
-    imported = 0
-    existing = 0
-    deleted = 0
-    for source in sorted(path for path in legacy_root.rglob("*") if path.is_file()):
-        relative = source.relative_to(legacy_root)
-        if not should_import_eval_result(relative):
-            continue
-        target = context.archive_root / destination_prefix / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.exists():
-            if target.read_bytes() != source.read_bytes():
-                raise ArchiveGitError(f"archive destination already exists with different content: {target}")
-            existing += 1
-        else:
-            shutil.copy2(source, target)
-            imported += 1
-        if args.delete_source and should_delete_eval_source(relative):
-            delete_source_file(context, source)
-            deleted += 1
-
-    if args.delete_source:
-        for notice in (legacy_root / "hook-runs" / "README.md",):
-            if notice.exists():
-                delete_source_file(context, notice)
-                deleted += 1
-
-    if (context.archive_root / destination_prefix).exists():
-        git(context.archive_root, ["add", "--", destination_prefix.as_posix()])
-
-    print_context(context)
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_ROOT={legacy_root}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DESTINATION={destination_prefix.as_posix()}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES={imported + existing}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_NEW_FILES={imported}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_EXISTING_FILES={existing}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={deleted}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE={'yes' if args.delete_source else 'no'}")
-    print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS=pass")
-    return 0
+    sources: list[tuple[Path, str, bool]] = []
+    if legacy_root.exists():
+        for source in sorted(path for path in legacy_root.rglob("*") if path.is_file()):
+            relative = source.relative_to(legacy_root)
+            if should_import_eval_result(relative):
+                sources.append((source, relative.as_posix(), True))
+        hook_notice = legacy_root / "hook-runs" / "README.md"
+        if hook_notice.exists():
+            sources.append((hook_notice, "hook-runs/README.md", False))
+    return _legacy_import_plan(
+        transaction,
+        family="eval-results",
+        legacy_root=legacy_root,
+        destination_prefix=destination_prefix,
+        sources=sources,
+        delete_source=args.delete_source,
+    )
 
 
 def command_import_eval_results(context: ArchiveContext, args: argparse.Namespace) -> int:
-    """Import legacy eval results under the sole archive transaction lock."""
+    """Import legacy eval results and finalize deletion only after readback."""
     with prepare_archive_transaction(context, fetch=True) as transaction:
-        return _import_eval_results_prepared(transaction, args)
+        plan = _import_eval_results_prepared(transaction, args)
+        return _finalize_legacy_import(transaction, plan, args)
 
 
 def iter_report_files(report_dir: Path) -> list[Path]:
@@ -5465,6 +5751,15 @@ def _archive_agent_report_prepared(
 
     run_id = safe_run_id(report_dir.name)
     files = iter_report_files(report_dir)
+    max_file_bytes = getattr(args, "max_file_bytes", None)
+    if max_file_bytes is not None:
+        files = [
+            path
+            for path in files
+            if not should_skip_agent_report(
+                path.relative_to(report_dir), path, max_file_bytes
+            )
+        ]
     if not files:
         raise ArchiveGitError(f"report directory has no files to archive: {report_dir}")
     snapshot_id = report_snapshot_digest(report_dir, files)
@@ -5600,40 +5895,49 @@ def copy_agent_reports_prepared(
     destination_prefix: Path,
     max_file_bytes: int,
 ) -> AgentReportArchiveSummary:
-    """Copy run-local reports/agents artifacts to the archive branch."""
+    """Snapshot each run bundle; never overwrite a mutable full-tree projection."""
     context = _require_prepared(transaction)
+    if destination_prefix != DEFAULT_AGENT_REPORT_DESTINATION:
+        raise ArchiveGitError(
+            "agent report destination is policy-owned: "
+            f"expected {DEFAULT_AGENT_REPORT_DESTINATION}"
+        )
     root = report_root_for_context(context, report_root)
     default_destination = agent_report_archive_dir(context.source_root, context.canon_root)
-    destination = (
-        default_destination
-        if destination_prefix == DEFAULT_AGENT_REPORT_DESTINATION
-        else context.archive_root / destination_prefix / context.repo_key
-    )
     if context.archive_root.resolve() == root or context.archive_root.resolve() in root.parents:
         raise ArchiveGitError("agent report root cannot be inside the archive clone")
     if not root.exists():
-        return AgentReportArchiveSummary(root, destination, 0, 0, 0, 0, 0)
+        return AgentReportArchiveSummary(root, default_destination, 0, 0, 0, 0, 0)
 
-    files = copied = updated = existing = skipped = 0
-    for source in sorted(path for path in root.rglob("*") if path.is_file()):
-        relative = source.relative_to(root)
-        if should_skip_agent_report(relative, source, max_file_bytes):
-            skipped += 1
+    files = copied = existing = skipped = 0
+    run_directories = sorted(path for path in root.iterdir() if path.is_dir())
+    for run_dir in run_directories:
+        run_files = iter_report_files(run_dir)
+        eligible = [
+            path
+            for path in run_files
+            if not should_skip_agent_report(path.relative_to(run_dir), path, max_file_bytes)
+        ]
+        skipped += len(run_files) - len(eligible)
+        if not eligible:
             continue
-        files += 1
-        target = destination / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.exists():
-            if target.read_bytes() == source.read_bytes():
-                existing += 1
-                continue
-            shutil.copy2(source, target)
-            updated += 1
-            continue
-        shutil.copy2(source, target)
-        copied += 1
+        run_id = safe_run_id(run_dir.name)
+        snapshot_id = report_snapshot_digest(run_dir, eligible)
+        destination = default_destination / run_id / snapshot_id
+        before = {
+            source.relative_to(run_dir).as_posix(): (destination / source.relative_to(run_dir)).read_bytes()
+            for source in eligible
+            if (destination / source.relative_to(run_dir)).is_file()
+        }
+        _archive_agent_report_prepared(
+            transaction,
+            argparse.Namespace(report_dir=run_dir, max_file_bytes=max_file_bytes),
+        )
+        files += len(eligible)
+        existing += len(before)
+        copied += len(eligible) - len(before)
 
-    return AgentReportArchiveSummary(root, destination, files, copied, updated, existing, skipped)
+    return AgentReportArchiveSummary(root, default_destination, files, copied, 0, existing, skipped)
 
 
 def print_agent_report_archive_summary(summary: AgentReportArchiveSummary) -> None:
@@ -5696,6 +6000,149 @@ def _publication_metadata_hashes(
     )
 
 
+def _remote_ref_oid(context: ArchiveContext) -> str:
+    """Read the exact remote branch head without trusting a stale tracking ref."""
+    result = git(
+        context.archive_root,
+        ["ls-remote", "origin", f"refs/heads/{context.branch}"],
+        check=False,
+    )
+    if result.returncode != 0:
+        return ""
+    line = result.stdout.strip().splitlines()
+    return line[0].split("\t", 1)[0] if line else ""
+
+
+def _verify_remote_archive_readback(
+    context: ArchiveContext,
+    receipt: ArchivePublicationReceipt,
+    required_paths: tuple[Path, ...],
+) -> None:
+    """Verify remote ref, commit tree, and required archive index/blob bytes."""
+    if receipt.status != "committed" or not receipt.pushed:
+        raise ArchiveGitError("archive_readback_mismatch:publication_not_committed")
+    remote_commit = _remote_ref_oid(context)
+    if not remote_commit or remote_commit != receipt.archive_commit_oid:
+        raise ArchiveGitError("archive_readback_mismatch:remote_ref")
+    remote_tree = _archive_oid(context, f"{remote_commit}^{{tree}}")
+    if not remote_tree or remote_tree != receipt.archive_tree_oid:
+        raise ArchiveGitError("archive_readback_mismatch:tree")
+    for path in required_paths:
+        try:
+            relative = path.resolve().relative_to(context.archive_root.resolve())
+        except ValueError as exc:
+            raise ArchiveGitError("archive_readback_mismatch:path") from exc
+        if not path.is_file():
+            raise ArchiveGitError("archive_readback_mismatch:missing_local_blob")
+        local = path.read_bytes()
+        remote = _archive_blob_at(context, remote_commit, relative)
+        if local != remote:
+            raise ArchiveGitError(
+                f"archive_readback_mismatch:blob:{relative.as_posix()}"
+            )
+
+
+def _rebase_to_remote(context: ArchiveContext) -> tuple[bool, str]:
+    """Rebase local append-only commits onto the fetched remote head."""
+    fetched = git(
+        context.archive_root,
+        ["fetch", "origin", context.branch],
+        check=False,
+    )
+    if fetched.returncode != 0 and _remote_ref_oid(context):
+        return False, "fetch_failed"
+    remote = _archive_oid(context, f"origin/{context.branch}")
+    local = _archive_oid(context, "HEAD")
+    if not remote or remote == local:
+        return True, "no_rebase_needed"
+    rebased = git(
+        context.archive_root,
+        ["rebase", f"origin/{context.branch}"],
+        check=False,
+    )
+    if rebased.returncode == 0:
+        return True, "rebased"
+    conflicted = git(
+        context.archive_root,
+        ["diff", "--name-only", "--diff-filter=U"],
+        check=False,
+    ).stdout.splitlines()
+    if conflicted and all(path.endswith(".jsonl") for path in conflicted):
+        for path in conflicted:
+            ours = git(context.archive_root, ["show", f":2:{path}"]).stdout
+            theirs = git(context.archive_root, ["show", f":3:{path}"]).stdout
+            merged = ours.splitlines(keepends=True)
+            seen = set(merged)
+            for line in theirs.splitlines(keepends=True):
+                if line not in seen:
+                    merged.append(line)
+                    seen.add(line)
+            Path(context.archive_root / path).write_text("".join(merged), encoding="utf-8")
+            git(context.archive_root, ["add", "--", path])
+        continued = run(
+            [
+                "env",
+                "GIT_EDITOR=true",
+                "git",
+                "-C",
+                str(context.archive_root),
+                "rebase",
+                "--continue",
+            ],
+            check=False,
+        )
+        if continued.returncode == 0:
+            return True, "rebased_jsonl_union"
+    git(context.archive_root, ["rebase", "--abort"], check=False)
+    detail = rebased.stderr.strip() or rebased.stdout.strip() or "rebase_failed"
+    return False, detail.replace("\n", " ")[:240]
+
+
+def _compare_and_push(
+    transaction: PreparedArchiveTransaction,
+    *,
+    no_pull: bool,
+) -> tuple[bool, bool, str]:
+    """Push without force, retrying only after expected-head comparison and rebase."""
+    context = _require_prepared(transaction)
+    expected = transaction.archive_head_before
+    for attempt in range(PUBLICATION_RETRY_LIMIT):
+        if attempt:
+            rebased, detail = _rebase_to_remote(context)
+            if not rebased:
+                return False, False, f"conflict:{detail}"
+            expected = _remote_ref_oid(context)
+        else:
+            fetched = git(context.archive_root, ["fetch", "origin", context.branch], check=False)
+            if fetched.returncode != 0 and _remote_ref_oid(context):
+                return False, False, "fetch_failed"
+            observed = _remote_ref_oid(context)
+            if observed != expected:
+                if no_pull:
+                    return False, False, "expected_remote_head_changed"
+                rebased, detail = _rebase_to_remote(context)
+                if not rebased:
+                    return False, False, f"conflict:{detail}"
+                expected = _remote_ref_oid(context)
+        local = _archive_oid(context, "HEAD")
+        if not local:
+            return False, False, "local_head_missing"
+        pushed = git(
+            context.archive_root,
+            ["push", "-u", "origin", f"HEAD:refs/heads/{context.branch}"],
+            check=False,
+        )
+        if pushed.returncode == 0:
+            readback = _remote_ref_oid(context)
+            if readback == local:
+                return True, True, "committed"
+            return False, False, "remote_readback_mismatch"
+        if attempt + 1 < PUBLICATION_RETRY_LIMIT and not no_pull:
+            continue
+        return False, False, "compare_and_push_conflict"
+    return False, False, "retry_limit"
+
+
 def publish_prepared_archive(
     transaction: PreparedArchiveTransaction,
     args: argparse.Namespace,
@@ -5749,8 +6196,6 @@ def publish_prepared_archive(
         if commit_created:
             ensure_commit_identity(context)
             git(context.archive_root, ["commit", "-m", message])
-        if not no_pull and remote_branch_exists(context, context.branch):
-            git(context.archive_root, ["pull", "--rebase", "--autostash", "origin", context.branch])
     except ArchiveGitError:
         commit_oid = _archive_oid(context, "HEAD")
         tree_oid = _archive_oid(context, f"{commit_oid}^{{tree}}") if commit_oid else ""
@@ -5769,11 +6214,6 @@ def publish_prepared_archive(
             cursor_sha256=cursor_sha256,
         )
 
-    push_result = git(
-        context.archive_root,
-        ["push", "-u", "origin", context.branch],
-        check=False,
-    )
     commit_oid = _archive_oid(context, "HEAD")
     tree_oid = _archive_oid(context, f"{commit_oid}^{{tree}}") if commit_oid else ""
     index_sha256, cursor_sha256 = _publication_metadata_hashes(
@@ -5781,17 +6221,24 @@ def publish_prepared_archive(
         commit_oid,
         committed_tree=True,
     )
-    status = "committed" if push_result.returncode == 0 else "uncertain"
+    pushed, push_succeeded, _push_status = _compare_and_push(
+        transaction,
+        no_pull=no_pull,
+    )
+    status = "committed" if pushed and push_succeeded else "uncertain"
+    commit_oid = _archive_oid(context, "HEAD")
+    tree_oid = _archive_oid(context, f"{commit_oid}^{{tree}}") if commit_oid else ""
     if status == "committed" and (not commit_oid or not tree_oid):
         status = "uncertain"
     return ArchivePublicationReceipt(
         status=status,
         commit_created=commit_created,
-        pushed=push_result.returncode == 0,
-        archive_commit_oid=commit_oid,
+        pushed=push_succeeded,
+        archive_commit_oid=_archive_oid(context, "HEAD"),
         archive_tree_oid=tree_oid,
         dedup_index_sha256=index_sha256,
         cursor_sha256=cursor_sha256,
+        push_status=_push_status,
     )
 
 
@@ -5802,6 +6249,7 @@ def command_push(context: ArchiveContext, args: argparse.Namespace) -> int:
         print_context(context)
         print(f"RUNTIME_LOG_ARCHIVE_COMMITTED={'yes' if receipt.commit_created else 'no'}")
         print(f"RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS={receipt.status}")
+        print(f"RUNTIME_LOG_ARCHIVE_PUSH_STATUS={receipt.push_status}")
         print(
             "RUNTIME_LOG_ARCHIVE_PUSH=pass"
             if receipt.status == "committed"
@@ -5830,7 +6278,9 @@ def command_sync(context: ArchiveContext, args: argparse.Namespace) -> int:
         receipt = publish_prepared_archive(transaction, args)
         removed = finalize_hook_spool_readback(transaction, receipt, ingest_result)
         print(f"RUNTIME_LOG_ARCHIVE_SPOOL_FINALIZED={removed}")
+        print(f"RUNTIME_LOG_ARCHIVE_COMMITTED={'yes' if receipt.commit_created else 'no'}")
         print(f"RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS={receipt.status}")
+        print(f"RUNTIME_LOG_ARCHIVE_PUSH_STATUS={receipt.push_status}")
         if receipt.status == "partial_retained":
             print("RUNTIME_LOG_ARCHIVE_SYNC_PUSH=skipped")
             print("RUNTIME_LOG_ARCHIVE_SYNC=partial_retained")
@@ -5891,6 +6341,9 @@ def main(argv: list[str] | None = None) -> int:
             print("CONTEXT_DISCOVERY_ERROR_CODE=source_unavailable")
             print("CONTEXT_DISCOVERY_APPEND=fail")
             return 1
+        message = str(exc)
+        if message.startswith("source_identity_preflight_failed:"):
+            print(f"RUNTIME_LOG_ARCHIVE_ERROR_CODE={message.split(':', 1)[1]}")
         print(f"RUNTIME_LOG_ARCHIVE_ERROR={exc}")
         print("RUNTIME_LOG_ARCHIVE=fail")
         return 1

@@ -7,6 +7,7 @@ upstream design documents/rule/README.md document filename, placement, and struc
 upstream design documents/runtime/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy.
 upstream design documents/runtime/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy.
 upstream design documents/agent-canon/template-agent-canon-audit-resolution.md audit resolution ledger for profile and gate simplification.
+upstream design documents/design/request-intent-and-update-relation.md positive rule, request authority, and sparse reconciliation projection contract.
 upstream design issues/README.md durable AgentCanon operational finding storage.
 downstream implementation tools/sync_agent_canon.sh updates AgentCanon submodule pins and shared root views.
 downstream implementation tools/agent_tools/task_start.py emits task workflow packets.
@@ -71,6 +72,38 @@ and lifecycle behavior is projected from the canonical owners:
 [communication](agents/COMMUNICATION_PROTOCOL.md), and the approved
 [implementation contract](documents/design/codex-spark-implementation-routing.md).
 This entrypoint does not create a second policy source.
+
+Repository-changing implementation の前には、owning design を read して
+[`agents/internal-routines/design-implementation-correspondence.md`](agents/internal-routines/design-implementation-correspondence.md)
+の clause fingerprint と対応 route を作ります。実装 handoff と review は
+その routine の forward/reverse coverage と drift block を参照し、個別
+skill に同じ universal policy を複製しません。
+
+## Positive Rule Contract
+
+各規約は、実行する操作、到達する状態、完了を示す証拠を肯定形で記述する。
+制約は対応する操作の事前条件・適用境界・正規代替ルートとして配置する。
+この契約の設計正本は
+[`documents/design/request-intent-and-update-relation.md`](documents/design/request-intent-and-update-relation.md)
+であり、`ROOT_AGENTS.md` はその reader route と runtime write set を所有する。
+`AGENTS.md` は同じ契約を source-tree root view として投影する。
+各変更は `operation -> resulting state -> completion evidence` の順に
+`Design-To-Implementation Trace` へ接続する。
+質問・明示 write clause・進行中 update・integration cleanup の compact flow は
+[`documents/design/request-intent-and-update-relation.md`](documents/design/request-intent-and-update-relation.md)
+から各 canonical owner へ投影する。
+Related Document Closure は DIC-010 の path+section+clause/ref receipt を owner packet が消費する。
+
+この projection は `operation -> resulting state -> completion evidence` の順で
+materialize します。質問は read scope と evidence を読み、evidence-backed answer
+complete state に到達し、回答と read-scope packet readback を完了 evidence にします。
+明示 write clause は target、operation、owner、write set、acceptance evidence を結合し、
+owner handoff-ready state に到達し、既存 write packet readback を完了 evidence にします。
+追加または変更された request clause は既存 write gate を通って active context に overlay
+され、goal/artifact/order/handoff sparse delta state に到達し、変更 clause と delta packet
+readback および context reuse または必要並列 handoff を完了 evidence にします。
+completed integration は tree/remote readback を受け、既存 cleanup executor dispatch state
+に到達し、executor receipt、CleanupProof、closeout packet readback を完了 evidence にします。
 
 - This file owns the template-root runtime entrypoint for Codex and points each
   runtime contract to its owner surface and checker.
@@ -283,6 +316,7 @@ proof obligation, or replacement unit together even when the chunk is long.
 | role behavior and stage conditions | `vendor/agent-canon/.codex/agents/*.toml`; `vendor/agent-canon/agents/agents_config.json` | `check_agent_runtime_alignment.py` |
 | skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml`; `vendor/agent-canon/.agents/skills/*/SKILL.md` | `python3 tools/agent_tools/route.py --prompt`; `check_agent_runtime_alignment.py` |
 | internal workflow routines | `vendor/agent-canon/agents/internal-routines/README.md` | `repo_structure_contract.py`; runtime alignment |
+| design-to-implementation correspondence | `vendor/agent-canon/agents/internal-routines/design-implementation-correspondence.md`; `vendor/agent-canon/documents/design/*.md` | `check_design_doc_claims.py`; design/review readback |
 | implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
 | search, read scope, and reuse survey | semantic-index, deterministic `search.py` / `search_index.py`, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
 | repo structure and root views | `vendor/agent-canon/documents/structure/repo-structure-contract.toml`; `responsibility-scope.toml`; `documents/runtime/shared-runtime-surfaces.toml` | structure/scope/import tools; `sync_agent_canon.sh` |

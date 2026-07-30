@@ -4,8 +4,11 @@ contract skill
 responsibility Documents pre-implementation OOP and type-boundary design for this repository.
 upstream design ../canonical/skills.md public skill registry and visibility contract
 upstream design ../../documents/conventions/object-oriented-design.md shared OOP boundary policy
+upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract and sparse projection skeleton
+upstream design ../../documents/conventions/coding-conventions-cpp.md C++ source/header ownership contract
 upstream design ../../documents/design/protocols.md Protocol and dependency-direction policy
 upstream design ../../documents/design/dependency-manifest-design.md dependency-header DSL
+upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
 downstream implementation ../../.agents/skills/oop-type-design/SKILL.md runtime discovery shim
 downstream implementation ../../agents/skills/catalog.yaml public skill and capability metadata
 downstream implementation ../../tools/agent_tools/route.py explicit capability route
@@ -16,6 +19,11 @@ downstream implementation ../../evidence/agent-evals/skill_workflow_prompt_eval.
 # oop-type-design
 
 ## Reader path and boundary
+
+この stage は owning design の read、clause ID/fingerprint、responsibility map
+を `../internal-routines/design-implementation-correspondence.md` の record に
+接続します。universal invariant と failure semantics は routine 側にあり、
+ここでは OOP/type contract owner の設計 packet だけを定義します。
 
 This is the pre-implementation OOP/type-design route. Invoke it explicitly with
 the capability ID `oop_type_design`:
@@ -31,6 +39,16 @@ Natural-language keywords do not activate this skill. `$oop-readability-check`,
 produce post-hoc OOP/SOLID, Python, or C/C++ evidence after an implementation
 diff exists. They do not select this design owner, and this skill does not
 duplicate their checks or scores.
+
+When the changed surface includes a Docstring or template projection, read
+`documents/conventions/DOCSTRING_GUIDE.md` as the semantic owner. The packet
+records the responsibility region, selected semantic relation, and projection
+anchor; it does not copy the guide’s clause text or force `Args`, `Returns`,
+`Raises`, or other fixed sections. The catalog capability `oop_type_design` selects this
+language-neutral OOP/type design owner only. After that owner selection, existing
+`agent_team.language_review_candidates` selects `python_reviewer` or `cpp_reviewer` for
+language implementation paths and `docs_workflow_steward` for convention/template docs.
+No new routing branch is introduced.
 
 ## Purpose
 
@@ -180,6 +198,9 @@ owners:
   changed-diff review.
 - Python lint and formatting signals: `ruff`; it remains an existing static owner.
 - C/C++ build, headers, and ownership: `$cpp-review` and its project-native checks.
+- C++ target responsibility: `cpp-core` is the provider; individual test and experiment
+  targets are consumers; root-anchored build/install paths and lifecycle-owned result paths
+  are read back from `documents/design/cpp-build-layout.md`.
 - Explicit `Any`: `python3 tools/agent_tools/check_static_any.py --submodule-aware`.
 - OOP/SOLID signals: `$oop-readability-check`; do not copy its score into this skill.
 - Dependency headers/graph: `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review --fail-missing`.

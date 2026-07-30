@@ -9,6 +9,8 @@ upstream design ../workflows/hypothesis-validation-workflow.md analysis-prioriti
 upstream design ../COMMUNICATION_PROTOCOL.md pre-edit investigation and fresh subagent context packets
 upstream design agent-orchestration.execution-contract.toml machine-readable execution contract
 upstream design ./skill-dependencies.yaml typed public-skill prerequisites, successors, ordering, and parallel relations
+upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
+upstream design ../../documents/design/request-intent-and-update-relation.md compact question, write-clause, and update-overlay flow
 downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py execution contract checker
 downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives canonical invocation order
 downstream implementation ../../tools/agent_tools/skill_dependency_map.py validates and projects the dependency graph
@@ -16,6 +18,11 @@ downstream implementation ../../tools/agent_tools/skill_dependency_map.py valida
 -->
 
 ## Reader Map
+
+設計を伴う repository-changing route では、owner selection の後に
+`../internal-routines/design-implementation-correspondence.md` を stage route
+として参照します。universal policy は同 routine にあり、この skill は route
+selection の owner だけを持ちます。
 
 - Purpose: mandatory repository-task routing that selects workflow family,
   active skills, roles, reviews, run bundle, and implementation route.
@@ -31,6 +38,27 @@ downstream implementation ../../tools/agent_tools/skill_dependency_map.py valida
 - Decision Sufficiency policy and `validate_decision_sufficiency_packet` live
   only in `Decision Sufficiency Packet`; downstream skills and tools preserve
   its verdict without defining a second validator.
+
+### Compact request/update projection
+
+`documents/design/request-intent-and-update-relation.md` is the compact design note for
+this owner: read evidence closes advisory questions with an answer, explicit write clauses
+enter the selected owner route, and in-progress input updates the existing packet with only
+changed goal/artifact/order/handoff deltas. This skill owns the semantic decision; the note
+adds no input classification or packet schema.
+Added or changed request clauses pass the existing explicit-write-clause gate before owner
+handoff; the approved effect uses the existing goal/artifact/order/handoff delta fields.
+
+The request route records three positive transitions: read scope and evidence produce an
+evidence-backed answer-complete state with answer/read-scope packet readback; an explicit write
+clause with target, operation, owner, write set, and acceptance evidence produces an owner
+handoff-ready state with existing write-packet readback; and an approved request update produces
+the changed goal/artifact/order/handoff sparse delta state with changed-clause and delta-packet
+readback. The write route materializes request clauses that carry the explicit write authority.
+
+Before handoff, this owner consumes DIC `DIC-010` and its path+section+clause/ref
+closure packet. DIC owns traversal and forward/reverse closure; this skill owns the
+request clause, explicit-write-clause gate, owner, and write-set decision.
 
 ## Purpose
 

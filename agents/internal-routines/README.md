@@ -19,6 +19,11 @@ Public skill instructions live in `agents/skills/`, are listed in
 shims. Internal routines are called by workflow stages, subagent roles, or
 public skills.
 
+## Universal design correspondence
+
+- [設計・実装対応ルート](design-implementation-correspondence.md)
+  - repository-changing implementation の前に owning design を read し、clause fingerprint、handoff、forward/reverse review coverage、design drift block を共通化します。
+
 Runtime-internal Codex skill shims, when a shim is needed for agent runtime
 activation, use `.agents/skills/_<name>/SKILL.md`. The leading underscore marks
 the shim as private; its human-facing owner remains the workflow, role, public
