@@ -226,7 +226,7 @@ flowchart LR
 
 ### Implementation record and forward/reverse mapping
 
-この実装は AgentCanon main `5b72c8e931933eda29fde16cfdb16f42fb0941a8` を設計入力として、設計文書の trace を変更する前の SHA-256 `a28cf776915d006aaffe868185816601c8feb11c7c4375b00b6caf18805c1506` に対応付けて記録します。生成 schema は `agent_canon.skill_tool_invocation_graph.v2` です。実装時点の design SHA-256 は generated graph の `design_correspondence.design_sha256` に保存し、DIC-001..DIC-009 の target/validation logical-path、全 explicit adapter の ToolID/schema、clause fingerprint、forward/reverse review をこの表と checker で満たします。
+この実装は AgentCanon final main `eeb451bd4b829e5417b810804a9d67dfb4ba570d` を設計入力として、設計文書の trace を変更する前の SHA-256 `a28cf776915d006aaffe868185816601c8feb11c7c4375b00b6caf18805c1506` に対応付けて記録します。生成 schema は `agent_canon.skill_tool_invocation_graph.v2` です。実装時点の design SHA-256 は generated graph の `design_correspondence.design_sha256` に保存し、DIC-001..DIC-009 の target/validation logical-path、全 explicit adapter の ToolID/schema、clause fingerprint、forward/reverse review をこの表と checker で満たします。
 
 Explicit adapter correspondence is part of the trace and is validated before graph materialization. The typed visualization owner is always emitted first; only the selected adapter follows it.
 

@@ -1,7 +1,7 @@
 <!-- Generated from the typed skill/tool invocation graph; do not edit by hand. -->
 # Public Skill/Tool Invocation Graph
 
-<!-- graph_digest=fc0bcdbda422131ac17651c8f87976b698f03347cb588a4a42d3de79aee39a33 coverage_digest=fbb46b6fdf907cd38a9fe607bdae09bd1b0d88fa0307ddd5e52b771ec899e955 -->
+<!-- graph_digest=7fda4b45d17f93e1c00dd3e32bf53c23326d186722cc286a5ca3f202969b5c05 coverage_digest=fbb46b6fdf907cd38a9fe607bdae09bd1b0d88fa0307ddd5e52b771ec899e955 -->
 ```mermaid
 graph LR
   subgraph responsibility_n_analysis["Responsibility: analysis"]
@@ -6009,4 +6009,4 @@ graph LR
 - `routing` and `parallel`: dashed directed edges.
 
 Coverage digest: `fbb46b6fdf907cd38a9fe607bdae09bd1b0d88fa0307ddd5e52b771ec899e955`.
-Graph digest: `fc0bcdbda422131ac17651c8f87976b698f03347cb588a4a42d3de79aee39a33`.
+Graph digest: `7fda4b45d17f93e1c00dd3e32bf53c23326d186722cc286a5ca3f202969b5c05`.
