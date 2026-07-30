@@ -29,7 +29,7 @@ activate only the profile required by the current change.
 | Docker runtime | root `docker/`, runtime packs | Dockerfile, image, pack, Jupyter, or container setup changes |
 | GitHub automation | `.github/`, PR templates, Actions helpers | GitHub Actions, PR automation, or GitHub path-constrained copies change |
 | Experiment | `experiments/`, experiment registry, managed runner tools | Experiment topics, formal runs, result summaries, or research workflows change |
-| C++ | `CMakeLists.txt`, `cmake/`, `src/`, `include/`, `lib/`, C++ OOP checks | C or C++ code, build layout, or native artifacts change |
+| C++ | parent root remains language-neutral, `cpp/CMakeLists.txt` as the single native project entry, `cpp/cmake/`, `cpp/src/`, `cpp/include/`, `cpp/tests/`, `cpp/experiments/`, C++ OOP checks, `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"` | C or C++ code, build layout, or native artifacts change |
 | Memory and learning | `memory/`, notes promotion, learning workflows | User asks to persist memory, feedback/retrospective is observed, or agent-learning is in scope |
 | Maintenance | inventories, review backlog scan, improvement guide, catalog drift tools | AgentCanon maintenance, repo-wide audit, or scheduled cleanup work |
 
@@ -107,7 +107,7 @@ Intent preservation routes:
 | Docker/devcontainer/runtime pack | `bash tools/docker_dependency_validator.sh`; `make docker-build-check` when build behavior changes |
 | GitHub workflow/PR | `python3 tools/ci/check_github_workflows.py`; relevant GitHub Actions evidence when available |
 | Experiments | `make experiment-check`; managed run evidence for formal experiment changes |
-| C/C++ | project-native configure/build/test and C++ reviewer/checker where applicable |
+| C/C++ | `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`; `cmake --build "$ROOT/build/cpp/<profile>" --parallel`; `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure`; `cmake --install "$ROOT/build/cpp/<profile>"`; project-native C++ reviewer/checker evidence, including consumer-to-provider target readback |
 | Memory/eval/hook logging | append-only artifact evidence and improvement guide/eval checks when prompts or logging fields change |
 
 ## Closeout Rule

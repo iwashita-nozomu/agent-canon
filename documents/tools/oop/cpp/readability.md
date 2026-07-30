@@ -65,14 +65,14 @@ struct、domain contract のない pass-through wrapper、`nullptr` runtime rout
 ## 実行例
 
 ```bash
-python3 tools/oop/cpp/readability.py --format markdown --include-snippets include src tests/cpp
+python3 tools/oop/cpp/readability.py --format markdown --include-snippets cpp/include cpp/src cpp/tests cpp/experiments
 ```
 
 混在 source を 1 回で見たい場合は、shared Python entrypoint に `--language all` を渡します。
 この場合、file suffix で Python / C++ を自動選択します。
 
 ```bash
-python3 tools/oop/python/readability.py --language all --format markdown python include src tests/cpp
+python3 tools/oop/python/readability.py --language all --format markdown python tools cpp tests
 ```
 
 この checker は build evidence ではありません。C++ 変更では project-native configure / build / test と併せて、OOP readability report を review 補助として扱います。

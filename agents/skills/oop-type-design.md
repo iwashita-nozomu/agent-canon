@@ -5,6 +5,7 @@ responsibility Documents pre-implementation OOP and type-boundary design for thi
 upstream design ../canonical/skills.md public skill registry and visibility contract
 upstream design ../../documents/conventions/object-oriented-design.md shared OOP boundary policy
 upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract and sparse projection skeleton
+upstream design ../../documents/conventions/coding-conventions-cpp.md C++ source/header ownership contract
 upstream design ../../documents/design/protocols.md Protocol and dependency-direction policy
 upstream design ../../documents/design/dependency-manifest-design.md dependency-header DSL
 upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
@@ -197,6 +198,9 @@ owners:
   changed-diff review.
 - Python lint and formatting signals: `ruff`; it remains an existing static owner.
 - C/C++ build, headers, and ownership: `$cpp-review` and its project-native checks.
+- C++ target responsibility: `cpp-core` is the provider; individual test and experiment
+  targets are consumers; root-anchored build/install paths and lifecycle-owned result paths
+  are read back from `documents/design/cpp-build-layout.md`.
 - Explicit `Any`: `python3 tools/agent_tools/check_static_any.py --submodule-aware`.
 - OOP/SOLID signals: `$oop-readability-check`; do not copy its score into this skill.
 - Dependency headers/graph: `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review --fail-missing`.

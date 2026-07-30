@@ -70,6 +70,24 @@ source / pin routing を参照として担当します。
 - `agents/workflows/comprehensive-refactoring-workflow.md`
 - `documents/conventions/REVIEW_PROCESS.md`
 - `agents/workflows/main-integration-workflow.md`
+- `documents/conventions/coding-conventions-cpp.md`
+- `agents/skills/cpp-review.md`
+
+## C++ project migration projection
+
+For a C++ path or build-layout refactor, the replaceable project boundary is
+`cpp/CMakeLists.txt`. The path map is `cpp/include/` for public headers,
+`cpp/src/` for production source, `cpp/tests/` for CTest-owned test targets, and
+`cpp/experiments/` for native experiment targets. The parent root remains
+language-neutral; commands use `cmake -S "$ROOT/cpp" -B
+"$ROOT/build/cpp/<profile>"` and the matching
+`$ROOT/.state/cpp-install/<profile>` install prefix.
+
+The target graph is consumer-to-provider: individual test and experiment targets
+consume `cpp-core`, while `cpp-tests` and `cpp-experiments` group builds. Run,
+config, result, and retention records remain with the existing experiment
+lifecycle and save-results owners. Refactor review reads this mapping back from
+the design trace before accepting a path or dependency-direction change.
 
 ## Required Contract
 

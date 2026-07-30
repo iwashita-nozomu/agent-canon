@@ -31,6 +31,6 @@ packet が出力した必須 command と、task に該当する conditional comm
 1. Read `agents/skills/cpp-review.md`.
 1. Fix the changed native files, headers, and related tests before validating.
 1. Run or inspect the project-native configure, build, and test commands.
-1. If the repo uses CMake, run or inspect `cmake -S . -B build`, `cmake --build build`, and `ctest --test-dir build`.
+1. If the repo uses CMake, run or inspect `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"`, `cmake --build "$ROOT/build/cpp/<profile>"`, and `ctest --test-dir "$ROOT/build/cpp/<profile>"`.
 1. Check ABI boundaries, header drift, ownership, error paths, and docs/test follow-through.
 1. Report findings before summaries.

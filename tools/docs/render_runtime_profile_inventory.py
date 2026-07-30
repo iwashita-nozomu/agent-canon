@@ -24,11 +24,11 @@ DEPENDENCY_HEADER = """<!--
 contract reference
 responsibility Defines AgentCanon runtime profiles and risk-based validation routing.
 upstream design ../../ROOT_AGENTS.md root runtime entrypoint and closeout model
-upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
+upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
 downstream design ../../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
-downstream design ../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
-downstream implementation ../ci/run_all_checks.sh repo check runner
-downstream implementation ../catalog.yaml structured tool catalog
+downstream design ../agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
+downstream implementation ../../tools/ci/run_all_checks.sh repo check runner
+downstream implementation ../../tools/catalog.yaml structured tool catalog
 @dependency-end
 -->
 """

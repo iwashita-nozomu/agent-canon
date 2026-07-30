@@ -286,21 +286,18 @@ allowed_top_level = [
   ".markdownlint.json",
   ".vscode",
   "AGENTS.md",
-  "CMakeLists.txt",
   "LICENSE",
   "Makefile",
   "QUICK_START.md",
   "README.md",
   "agents",
   "templates",
-  "cmake",
+  "cpp",
   "docker",
   "documents",
   "evidence",
   "experiments",
   "goal.md",
-  "include",
-  "lib",
   "memory",
   "notes",
   "pyproject.toml",
@@ -309,7 +306,6 @@ allowed_top_level = [
   "references",
   "responsibility-scope.toml",
   "scripts",
-  "src",
   "tests",
   "tools",
   "vendor",
@@ -374,6 +370,11 @@ category = "parent_active_contract"
 path = "docker"
 kind = "dir"
 category = "environment"
+
+[[profile.optional]]
+path = "cpp"
+kind = "dir"
+category = "native_project"
 
 [[profile.optional]]
 path = "python"
