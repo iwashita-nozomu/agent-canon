@@ -27,7 +27,11 @@ from types import MappingProxyType
 from typing import Mapping
 
 from prompt_capture import PromptCapture, capture_prompt  # noqa: E402
-from prompt_classifier import PromptClassifierInputs, PromptIntakeSignals, prompt_intake_signals  # noqa: E402
+from prompt_classifier import (  # noqa: E402
+    PromptClassifierInputs,
+    PromptIntakeSignals,
+    prompt_intake_signals,
+)
 from subagent_selection import SubagentSelection  # noqa: E402
 from tool_selection import ToolSelection  # noqa: E402
 from workflow_context import WorkflowContext  # noqa: E402
@@ -176,7 +180,7 @@ def _assemble_fields(parts: HookInvocationParts) -> dict[str, object]:
         "tool_name": tool.tool_name, "tool_selection_kind": tool.selection_kind, "tool_input_fingerprint": tool.tool_input_fingerprint, "tool_input_key_count": tool.tool_input_key_count, "tool_input_keys": list(tool.tool_input_keys), "tool_command_verb": tool.command_verb, "selected_tools": list(tool.selected_tools), "selected_tool_count": len(tool.selected_tools),
         "subagent_invoked": subagent.invoked, "subagent_event_kind": subagent.action, "subagent_tool_name": subagent.tool_name, "subagent_agent_type": subagent.agent_type, "subagent_target": subagent.target, "subagent_targets": list(subagent.targets), "subagent_target_count": len(subagent.targets) + int(bool(subagent.target)), "subagent_model": subagent.model, "subagent_reasoning_effort": subagent.reasoning_effort, "subagent_fork_context": subagent.fork_context, "subagent_prompt_fingerprint": subagent.prompt_fingerprint, "subagent_prompt_char_count": subagent.prompt_char_count, "subagent_item_count": subagent.item_count,
         "prompt_feedback_detected": bool(classifier.feedback_labels), "feedback_labels": list(classifier.feedback_labels), "feedback_targets": list(classifier.feedback_targets()), "feedback_action": classifier.feedback_action,
-        "payload_key_count": len(payload), "payload_fingerprint": parts.payload_fingerprint or _fingerprint(payload), "workflow_monitor_report_dir": str(parts.report_dir or parts.root),
+        "payload_key_count": len(payload), "payload_fingerprint": parts.payload_fingerprint or _fingerprint(payload), "workflow_monitor_report_dir": str(parts.report_dir) if parts.report_dir is not None else "",
     })
     return fields
 

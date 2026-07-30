@@ -113,11 +113,27 @@ def run(
 
 
 def _find_current_repository_root(raw_root: Path) -> Path:
-    """Find repository root by walking up for `.git`, else keep the absolute path."""
+    """Find the active parent root, including calls from its AgentCanon submodule."""
     start = raw_root if raw_root.is_absolute() else raw_root.resolve()
     for candidate in (start, *start.parents):
         if (candidate / ".git").exists():
-            return candidate.resolve()
+            repository_root = candidate.resolve()
+            if (
+                repository_root.name == "agent-canon"
+                and repository_root.parent.name == "vendor"
+            ):
+                parent_root = repository_root.parents[1]
+                expected_source = parent_root / "vendor" / "agent-canon"
+                try:
+                    is_parent_layout = (
+                        (parent_root / ".git").exists()
+                        and expected_source.resolve() == repository_root
+                    )
+                except (OSError, RuntimeError):
+                    is_parent_layout = False
+                if is_parent_layout:
+                    return parent_root.resolve()
+            return repository_root
     return start.resolve()
 
 

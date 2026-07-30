@@ -29,7 +29,10 @@ CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from prompt_classifier import PromptClassifierInputs, prompt_intake_signals  # noqa: E402
+from prompt_classifier import (  # noqa: E402
+    PromptClassifierInputs,
+    prompt_intake_signals,
+)
 
 ACTIVE_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
 RETIRED_ROUTE_TABLE = (
@@ -103,6 +106,235 @@ class CodexHooksTest(unittest.TestCase):
             text=True,
         )
         return cast("dict[str, object]", json.loads(result.stdout))
+
+    def _run_hook_in_root(
+        self,
+        root: Path,
+        event: str,
+        payload: object,
+        *,
+        extra_env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run one hook against an isolated fixture root and return its readback."""
+        raw_payload = payload if isinstance(payload, str) else json.dumps(payload)
+        return subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), event],
+            cwd=PROJECT_ROOT,
+            input=raw_payload,
+            check=True,
+            capture_output=True,
+            text=True,
+            env={
+                **os.environ,
+                **(extra_env or {}),
+                "AGENT_CANON_HOOK_SOURCE_ROOT": str(root),
+            },
+        )
+
+    def _run_hook_in_layout(
+        self,
+        cwd: Path,
+        event: str,
+        payload: object,
+        *,
+        extra_env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run one hook without the source-root test override."""
+        raw_payload = payload if isinstance(payload, str) else json.dumps(payload)
+        env = dict(os.environ)
+        for key in (
+            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR",
+            "AGENT_CANON_HOOK_SOURCE_ROOT",
+            "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR",
+            "AGENT_CANON_SOURCE_ROOT",
+            "AGENT_CANON_ROOT",
+        ):
+            env.pop(key, None)
+        env.update(extra_env or {})
+        return subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), event],
+            cwd=cwd,
+            input=raw_payload,
+            check=True,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+
+    @staticmethod
+    def _spooled_event(root: Path, pattern: str = ".agent-canon/**/*.json") -> dict[str, object]:
+        """Read the one isolated hook event emitted by a fixture invocation."""
+        paths = list(root.glob(pattern))
+        if len(paths) != 1:
+            raise AssertionError(f"expected one spooled event, found {paths}")
+        return cast("dict[str, object]", json.loads(paths[0].read_text(encoding="utf-8")))
+
+    def test_hook_report_target_precedence_and_spool_only_fallback(self) -> None:
+        """Projection follows the explicit target, while no target remains spool-only."""
+        payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            pointer_target = root / "reports" / "agents" / "pointer-run"
+            pointer_target.parent.mkdir(parents=True)
+            (pointer_target.parent / ".active_run").write_text("pointer-run\n", encoding="utf-8")
+            explicit_target = root / "explicit-run"
+            explicit_target.mkdir()
+
+            self._run_hook_in_root(
+                root,
+                "UserPromptSubmit",
+                payload,
+                extra_env={"AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(explicit_target)},
+            )
+
+            event = self._spooled_event(root)
+            self.assertEqual(event["workflow_monitor_report_dir"], str(explicit_target))
+            self.assertTrue((explicit_target / "workflow_monitoring.md").is_file())
+            self.assertFalse((pointer_target / "workflow_monitoring.md").exists())
+            self.assertFalse((root / "workflow_monitoring.md").exists())
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self._run_hook_in_root(root, "UserPromptSubmit", payload)
+
+            event = self._spooled_event(root)
+            self.assertEqual(event["workflow_monitor_report_dir"], "")
+            self.assertFalse(any(root.rglob("workflow_monitoring.md")))
+
+    def test_hook_report_target_uses_active_run_pointer(self) -> None:
+        """An active run pointer selects the run bundle relative to its pointer."""
+        payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            pointer = root / "reports" / "agents" / ".active_run"
+            pointer.parent.mkdir(parents=True)
+            pointer.write_text("pointer-run\n", encoding="utf-8")
+            target = pointer.parent / "pointer-run"
+            target.mkdir()
+
+            self._run_hook_in_root(root, "UserPromptSubmit", payload)
+
+            event = self._spooled_event(root)
+            self.assertEqual(event["workflow_monitor_report_dir"], str(target))
+            self.assertTrue((target / "workflow_monitoring.md").is_file())
+
+    def test_standalone_report_target_uses_local_active_run_pointer(self) -> None:
+        """Standalone AgentCanon may resolve its local active-run pointer."""
+        payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            target = root / "reports" / "agents" / "standalone-run"
+            target.mkdir(parents=True)
+            (root / ".active_run").write_text(
+                "reports/agents/standalone-run\n",
+                encoding="utf-8",
+            )
+
+            self._run_hook_in_root(root, "UserPromptSubmit", payload)
+
+            event = self._spooled_event(root)
+            self.assertEqual(event["workflow_monitor_report_dir"], str(target))
+            self.assertTrue((target / "workflow_monitoring.md").is_file())
+
+    def test_pointer_targets_reject_missing_and_containment_escapes(self) -> None:
+        """Pointer targets must be existing run bundles contained by reports/agents."""
+        payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
+        cases = ("missing-run", "../escape", "/absolute/escape", "symlink-escape")
+        for declared in cases:
+            with self.subTest(declared=declared), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                report_root = root / "reports" / "agents"
+                report_root.mkdir(parents=True)
+                outside = root / "outside"
+                outside.mkdir()
+                if declared == "symlink-escape":
+                    (report_root / declared).symlink_to(outside, target_is_directory=True)
+                (report_root / ".active_run").write_text(
+                    declared + "\n",
+                    encoding="utf-8",
+                )
+
+                self._run_hook_in_root(root, "UserPromptSubmit", payload)
+
+                event = self._spooled_event(root)
+                self.assertEqual(event["workflow_monitor_report_dir"], "")
+                self.assertFalse(any(root.rglob("workflow_monitoring.md")))
+                self.assertFalse((report_root / "missing-run").exists())
+
+    def test_pointer_rejects_escaped_report_root_symlink(self) -> None:
+        """The reports/agents identity itself must remain inside the active root."""
+        payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace = Path(tmp_dir)
+            root = workspace / "active-root"
+            root.mkdir()
+            outside = workspace / "outside-reports"
+            outside.mkdir()
+            target = outside / "escaped-run"
+            target.mkdir()
+            report_parent = root / "reports"
+            report_parent.mkdir()
+            (report_parent / "agents").symlink_to(outside, target_is_directory=True)
+            (outside / ".active_run").write_text("escaped-run\n", encoding="utf-8")
+
+            self._run_hook_in_root(root, "UserPromptSubmit", payload)
+
+            event = self._spooled_event(root)
+            self.assertEqual(event["workflow_monitor_report_dir"], "")
+            self.assertFalse((target / "workflow_monitoring.md").exists())
+
+    def test_resolver_failure_is_spool_only_even_with_report_override(self) -> None:
+        """A failed source-root resolution disables report projection as typed state."""
+        payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            spool = root / "spool"
+            report = root / "authority-report"
+            report.mkdir()
+
+            self._run_hook_in_layout(
+                root,
+                "UserPromptSubmit",
+                payload,
+                extra_env={
+                    "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(spool),
+                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(report),
+                },
+            )
+
+            event = self._spooled_event(spool, "**/*.json")
+            self.assertEqual(event["workflow_monitor_report_dir"], "")
+            self.assertFalse((report / "workflow_monitoring.md").exists())
+
+    def test_derived_submodule_cwd_uses_parent_active_root(self) -> None:
+        """A real vendored layout resolves the parent without the hook override."""
+        payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent = Path(tmp_dir) / "parent"
+            source = parent / "vendor" / "agent-canon"
+            catalog = source / "agents" / "skills" / "catalog.yaml"
+            (parent / ".git").mkdir(parents=True)
+            source.mkdir(parents=True)
+            (source / ".git").write_text(
+                "gitdir: ../../.git/modules/vendor/agent-canon\n",
+                encoding="utf-8",
+            )
+            catalog.parent.mkdir(parents=True)
+            catalog.write_text("skills: []\n", encoding="utf-8")
+            report = parent / "reports" / "agents" / "derived-run"
+            report.mkdir(parents=True)
+            (report.parent / ".active_run").write_text(
+                "derived-run\n",
+                encoding="utf-8",
+            )
+
+            self._run_hook_in_layout(source, "UserPromptSubmit", payload)
+
+            event = self._spooled_event(parent)
+            self.assertEqual(event["root"], str(parent))
+            self.assertEqual(event["workflow_monitor_report_dir"], str(report))
+            self.assertTrue((report / "workflow_monitoring.md").is_file())
+            self.assertFalse((source / ".agent-canon").exists())
 
     def _run_shared_checkout_guard(
         self, command: str, *, extra_env: dict[str, str] | None = None
