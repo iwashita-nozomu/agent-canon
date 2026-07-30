@@ -8,6 +8,8 @@ description: "Use this when publishing AgentCanon wiki pages to a dedicated wiki
 <!-- route: agents/skills/catalog.yaml#skill:wiki-publication.routing digest=5dad8bcc880ca607eee2a53db930c5162f3a0c1f49169bbaed2ea5e15a559909 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:wiki-publication digest=99168c55688c0e24c5211e38865ad558a1d1dfcc073db7941116a921456eaf9f -->
 <!-- commands: agents/skills/catalog.yaml#skill:wiki-publication.tool_commands digest=860e234ccbcaa0ed9d3ea41c8bc668f910ba5ed4b02c930fa122424f75b3fd7e -->
+<!-- host-config: path=../.agents/skills/wiki-publication/SKILL.md index=58 order=58 enabled=true digest=7b386bf9576224a68550e04ca96f3c5a495f43c3a433919eee547306402c9ecc -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=2eaf5b295eaf8f193243bbe650711012f5ba5853b0bf6b7f8c79b91aa110d93d -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/wiki-publication.md
 ## Canonical Skill
 
 Canonical workflow and policy: [wiki-publication](../../../agents/skills/wiki-publication.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill wiki-publication --format text`; schema `skill_tool_commands.v2`, digest: `860e234ccbcaa0ed9d3ea41c8bc668f910ba5ed4b02c930fa122424f75b3fd7e`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill wiki-publication --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

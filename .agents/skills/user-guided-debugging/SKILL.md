@@ -8,6 +8,8 @@ description: "Use when the user explicitly asks to debug, repair, or refactor on
 <!-- route: agents/skills/catalog.yaml#skill:user-guided-debugging.routing digest=e4401791a52cd66e2c19c950ef56663020c18d63f17c40a74ab0b2ca4aed9e63 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:user-guided-debugging digest=75ae011666cdaf1ab2f3f9d866013454a8601e475098b2f396bc09f9c8b54dfd -->
 <!-- commands: agents/skills/catalog.yaml#skill:user-guided-debugging.tool_commands digest=8a2ee00298e7fda0bcc90438d91c74b7f6c70640f1d1e369442ccca68e7b6333 -->
+<!-- host-config: path=../.agents/skills/user-guided-debugging/SKILL.md index=55 order=55 enabled=true digest=ff72171095201f0aad11cc75bcc2b648cc0a33d56c12307a79120981e44738c5 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=28c8524d9d9d08e0ca64668873be8b062c20ce474392d49686f65df706e73bf2 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/user-guided-debugging.md
 ## Canonical Skill
 
 Canonical workflow and policy: [user-guided-debugging](../../../agents/skills/user-guided-debugging.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill user-guided-debugging --format text`; schema `skill_tool_commands.v2`, digest: `8a2ee00298e7fda0bcc90438d91c74b7f6c70640f1d1e369442ccca68e7b6333`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill user-guided-debugging --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

@@ -8,6 +8,8 @@ description: "Use when a dependency source change, topic branch clone, or recons
 <!-- route: agents/skills/catalog.yaml#skill:dependency-module-change.routing digest=480ca2a53bcef269adb16b237607f3d3be00c07de3ab35c544a8a6351c2c7705 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:dependency-module-change digest=73f5b1d62b4728d1bfe316aefa66846e46b69218f5bece3c11ac8a4cad8d1e12 -->
 <!-- commands: agents/skills/catalog.yaml#skill:dependency-module-change.tool_commands digest=9e9f48e9152005566cf65f7567442b2f770380b368e2f4ee8d8b6849c8c98623 -->
+<!-- host-config: path=../.agents/skills/dependency-module-change/SKILL.md index=17 order=17 enabled=true digest=b07b2b4dc4ac372785a5a0fddd64c9ce6942b2041d920de051421a857d09c4c3 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=fb432b35b77e20b9c249b5c7881bdf5b7e81e9248688939c551efa6190b4521d -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/dependency-module-change.md
 ## Canonical Skill
 
 Canonical workflow and policy: [dependency-module-change](../../../agents/skills/dependency-module-change.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill dependency-module-change --format text`; schema `skill_tool_commands.v2`, digest: `9e9f48e9152005566cf65f7567442b2f770380b368e2f4ee8d8b6849c8c98623`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill dependency-module-change --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

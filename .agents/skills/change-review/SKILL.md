@@ -8,6 +8,8 @@ description: "Use for code review, doc review, or AI-generated diff review when 
 <!-- route: agents/skills/catalog.yaml#skill:change-review.routing digest=1327113effd84eb563b0a06a826d764fed93f90b71f43967e8854adfe7398c68 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:change-review digest=89501841ffb49ea788f747d5c4c84e4351caeda90514ac26da003e4fe2db1a0a -->
 <!-- commands: agents/skills/catalog.yaml#skill:change-review.tool_commands digest=5748d3caf86893020c645ea50f8bdbf3bfc441b711a2d788723b379479dc5f23 -->
+<!-- host-config: path=../.agents/skills/change-review/SKILL.md index=11 order=11 enabled=true digest=12908be23cb800b1ff57896dfafe70281ab8e23e21b504ebc8f59f146867cb53 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=185389409b891b9b048b80d9c97bddcd51aed94049dcc897e4d5864167f8ad97 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/change-review.md
 ## Canonical Skill
 
 Canonical workflow and policy: [change-review](../../../agents/skills/change-review.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill change-review --format text`; schema `skill_tool_commands.v2`, digest: `5748d3caf86893020c645ea50f8bdbf3bfc441b711a2d788723b379479dc5f23`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill change-review --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

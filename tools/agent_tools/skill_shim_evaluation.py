@@ -19,7 +19,7 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import cast
 
@@ -269,6 +269,12 @@ def _packet_manifest(path: Path) -> tuple[dict[str, object], list[dict[str, obje
         )
     if {str(row["packet_class"]) for row in rows} != set(PACKET_CLASSES):
         raise ProducerError("packet_class_coverage")
+    if {str(row["scenario_id"]) for row in rows} != set(SCENARIO_CATEGORIES):
+        raise ProducerError("packet_scenario_coverage")
+    if len({str(row["id"]) for row in rows}) != len(rows):
+        raise ProducerError("packet_id_duplicate")
+    if len({str(row["scenario_id"]) for row in rows}) != len(rows):
+        raise ProducerError("packet_scenario_duplicate")
     return cast(dict[str, object], raw), rows
 
 
@@ -313,10 +319,10 @@ def _host_observation(path: Path) -> dict[str, object]:
         "method", "observation_status",
     }
     if set(raw) - {"schema", "version", "scenario_id", "category", "packet_id", "iteration_id", "skill_id", "variant", "prompt", "input_tokens", "canonical_followup_input_tokens", "cache_fields_observed", "model_id", "host_profile", "method", "observation_status"} or not required.issubset(raw):
-        raise ProducerError(f"host_input_tokens_missing:{path.name}")
+        raise ProducerError(f"host_observation_incomplete:{path.name}")
     if raw["schema"] != HOST_OBSERVATION_SCHEMA or raw["version"] != 1:
         raise ProducerError(f"host_schema:{path.name}")
-    if raw["category"] not in SCENARIO_CATEGORIES or raw["scenario_id"] != raw["category"]:
+    if not isinstance(raw["category"], str) or not isinstance(raw["scenario_id"], str):
         raise ProducerError(f"host_category:{path.name}")
     if raw["model_id"] != MODEL_ID or raw["host_profile"] != HOST_PROFILE or raw["method"] != "fresh_read_only" or raw["observation_status"] != "pass":
         raise ProducerError(f"host_metadata:{path.name}")
@@ -333,18 +339,63 @@ def _host_observation(path: Path) -> dict[str, object]:
     return {**raw, "canonical_followup_input_tokens": followup, "cache_fields_observed": cache}
 
 
-def measurement(root: Path, model: str, profile: str, host_dir: Path, output: Path) -> dict[str, object]:
+def _validate_host_observations(
+    observations: Sequence[Mapping[str, object]], packets: Sequence[Mapping[str, object]]
+) -> None:
+    """Require one current/generated fresh observation for every manifest scenario."""
+    expected = {
+        cast(str, packet["scenario_id"]): {
+            "packet_id": cast(str, packet["id"]),
+            "category": cast(str, packet["category"]),
+        }
+        for packet in packets
+    }
+    seen: set[tuple[str, str]] = set()
+    for observation in observations:
+        scenario_id = cast(str, observation["scenario_id"])
+        variant = cast(str, observation["variant"])
+        if scenario_id not in expected:
+            raise ProducerError(f"host_observation_mismatch:unknown_scenario:{scenario_id}")
+        pair = (scenario_id, variant)
+        if pair in seen:
+            raise ProducerError(f"host_observation_duplicate:{scenario_id}:{variant}")
+        seen.add(pair)
+        requirement = expected[scenario_id]
+        if (
+            observation["packet_id"] != requirement["packet_id"]
+            or observation["category"] != requirement["category"]
+        ):
+            raise ProducerError(f"host_observation_mismatch:{scenario_id}:{variant}")
+    required_pairs = {
+        (scenario_id, variant)
+        for scenario_id in expected
+        for variant in VARIANTS
+    }
+    missing = sorted(required_pairs - seen)
+    if missing:
+        scenario_id, variant = missing[0]
+        raise ProducerError(f"host_observation_missing:{scenario_id}:{variant}")
+    if len(observations) != len(required_pairs):
+        raise ProducerError("host_observation_incomplete")
+
+
+def measurement(
+    root: Path,
+    model: str,
+    profile: str,
+    manifest: Path,
+    host_dir: Path,
+    output: Path,
+) -> dict[str, object]:
     """Build paired deterministic measurements from observed host token usage."""
     if model != MODEL_ID or profile != HOST_PROFILE:
         raise ProducerError("measurement_model_profile_mismatch")
+    _, packets = _packet_manifest(manifest)
     context = build_context(root)
     observations = [_host_observation(path) for path in sorted(host_dir.glob("*.json"))]
     if not observations:
         raise ProducerError("host_evaluations_empty")
-    pairs = {(str(row["category"]), str(row["variant"])) for row in observations}
-    expected_pairs = {(category, variant) for category in SCENARIO_CATEGORIES for variant in VARIANTS}
-    if pairs != expected_pairs or len(observations) != len(expected_pairs):
-        raise ProducerError("host_observation_pair_coverage")
+    _validate_host_observations(observations, packets)
     host_envelopes: list[dict[str, object]] = []
     candidate_rows: list[dict[str, object]] = []
     scenario_rows: list[dict[str, object]] = []
@@ -427,9 +478,8 @@ def measurement(root: Path, model: str, profile: str, host_dir: Path, output: Pa
                 "observation_status": "pass",
             }
         )
-    # The deterministic comparison covers every public skill.  Fresh host observations
-    # remain limited to the three answer-free scenarios above; these baseline rows do not
-    # invent token usage or scenario answers.
+    # The deterministic comparison covers every public skill; fresh host observations
+    # cover the six manifest scenarios without inventing token usage or answers.
     baseline_prompt = "agent-canon.skill-runtime-shim.deterministic-measurement"
     baseline_prompt_sha = sha256_bytes(baseline_prompt.encode("utf-8"))
     for skill in context.skill_ids:
@@ -545,6 +595,7 @@ def build_parser() -> argparse.ArgumentParser:
     tokens.add_argument("--root", type=Path, default=Path.cwd())
     tokens.add_argument("--model", default=MODEL_ID)
     tokens.add_argument("--profile", default=HOST_PROFILE)
+    tokens.add_argument("--manifest", type=Path, required=True)
     tokens.add_argument("--host-evaluation-dir", type=Path, required=True)
     tokens.add_argument("--output", type=Path, required=True)
     return parser
@@ -559,7 +610,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "packets":
             payload = packet_receipt(args.root.resolve(), args.manifest.resolve(), args.model, args.profile, args.output_dir.resolve())
         else:
-            payload = measurement(args.root.resolve(), args.model, args.profile, args.host_evaluation_dir.resolve(), args.output.resolve())
+            payload = measurement(args.root.resolve(), args.model, args.profile, args.manifest.resolve(), args.host_evaluation_dir.resolve(), args.output.resolve())
     except (OSError, ProducerError, ValueError, json.JSONDecodeError) as exc:
         print(f"SKILL_SHIM_EVALUATION_FAILURE={exc}")
         return 2

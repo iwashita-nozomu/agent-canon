@@ -21,13 +21,9 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-
-UTC = timezone.utc
+from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
 try:
@@ -35,7 +31,11 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
-from eval_manifest_paths import eval_manifest_path, relative_manifest_path, resolve_eval_manifest
+from eval_manifest_paths import (
+    eval_manifest_path,
+    relative_manifest_path,
+    resolve_eval_manifest,
+)
 from runtime_log_paths import agent_canon_root, eval_results_dir
 from workflow_monitor import MonitoringEntries, append_monitoring
 
@@ -200,6 +200,7 @@ class SkillEvaluatorReportParseError(ValueError):
     """One fixed malformed T14 report error; never expose free-form traceback."""
 
     def __init__(self, code: str) -> None:
+        """Bind the stable malformed-report code."""
         self.code = code
         super().__init__(code)
 
@@ -208,6 +209,7 @@ class T14EvaluationError(ValueError):
     """One fixed parent-accumulator error with a stable code attribute."""
 
     def __init__(self, code: str) -> None:
+        """Bind the stable accumulator failure code."""
         self.code = code
         super().__init__(code)
 

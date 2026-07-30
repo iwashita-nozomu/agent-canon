@@ -21,7 +21,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(TOOLS_ROOT))
 
-from skill_shim_evaluation import normalize_route_result  # noqa: E402
+from skill_shim_evaluation import (  # noqa: E402
+    ProducerError,
+    _host_observation,
+    _packet_manifest,
+    _validate_host_observations,
+    normalize_route_result,
+)
 
 
 class SkillShimEvaluationTest(unittest.TestCase):
@@ -61,6 +67,11 @@ class SkillShimEvaluationTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--model",
                     "gpt-5.4-mini",
+                    "--manifest",
+                    str(
+                        PROJECT_ROOT
+                        / "evidence/agent-evals/skill_runtime_shim_eval.toml"
+                    ),
                     "--host-evaluation-dir",
                     str(PROJECT_ROOT / "tests/fixtures/skill-runtime-shim/host-evaluations"),
                     "--output",
@@ -81,6 +92,30 @@ class SkillShimEvaluationTest(unittest.TestCase):
                 {row["variant"] for row in payload["candidate_rows"]},
                 {"current", "generated"},
             )
+
+    def test_host_pairs_fail_closed_for_every_manifest_scenario(self) -> None:
+        """Missing, duplicate, mismatched, and incomplete observations fail directly."""
+        manifest = PROJECT_ROOT / "evidence/agent-evals/skill_runtime_shim_eval.toml"
+        _, packets = _packet_manifest(manifest)
+        host_dir = PROJECT_ROOT / "tests/fixtures/skill-runtime-shim/host-evaluations"
+        rows = [_host_observation(path) for path in sorted(host_dir.glob("*.json"))]
+
+        with self.assertRaisesRegex(ProducerError, "host_observation_missing"):
+            _validate_host_observations(rows[:-1], packets)
+        with self.assertRaisesRegex(ProducerError, "host_observation_duplicate"):
+            _validate_host_observations(rows + [rows[0]], packets)
+        mismatched = [dict(row) for row in rows]
+        mismatched[0]["packet_id"] = "wrong-packet"
+        with self.assertRaisesRegex(ProducerError, "host_observation_mismatch"):
+            _validate_host_observations(mismatched, packets)
+
+        incomplete = dict(rows[0])
+        incomplete.pop("input_tokens")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir) / "incomplete.json"
+            path.write_text(json.dumps(incomplete), encoding="utf-8")
+            with self.assertRaisesRegex(ProducerError, "host_observation_incomplete"):
+                _host_observation(path)
 
 
 if __name__ == "__main__":

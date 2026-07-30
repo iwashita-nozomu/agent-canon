@@ -190,8 +190,8 @@ Treat this as the mandatory `agentcanon_structure_followup` gate whenever
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
+  python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 ```
 
 - Purpose: runtime skill for AgentCanon source updates, parent submodule pin

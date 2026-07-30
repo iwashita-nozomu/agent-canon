@@ -8,6 +8,8 @@ description: "Use when a task needs paper search, prior-art mapping, contradicto
 <!-- route: agents/skills/catalog.yaml#skill:literature-survey.routing digest=d4f4cf4a983780461a4267d1cbd74b267b0b2595afe2e206796f068577da7df3 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:literature-survey digest=fa83085b0c4dcab7ecbec02f8fc20fadb3a52c3e8858462177b53cbe99d5b90f -->
 <!-- commands: agents/skills/catalog.yaml#skill:literature-survey.tool_commands digest=a43d722eedba0cb2e2736239f1b916ab19b5c5d873852a36451c09bc37957473 -->
+<!-- host-config: path=../.agents/skills/literature-survey/SKILL.md index=31 order=31 enabled=true digest=6d264c903e463a7c36df0c9b9b49f784c79a07155aa816d7ce2206699f765bf3 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=921bfba5bc60695c6e567789be5507c64fa087dafff91ecfca8eb5a4582fa60f -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/literature-survey.md
 ## Canonical Skill
 
 Canonical workflow and policy: [literature-survey](../../../agents/skills/literature-survey.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill literature-survey --format text`; schema `skill_tool_commands.v2`, digest: `a43d722eedba0cb2e2736239f1b916ab19b5c5d873852a36451c09bc37957473`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill literature-survey --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

@@ -8,6 +8,8 @@ description: "Use when touching Docker, CI, dependencies, runtime compatibility,
 <!-- route: agents/skills/catalog.yaml#skill:environment-maintenance.routing digest=0f460d67c04f548911076ec4f526824f0a680be1083d2cb20116703055b87b5b -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:environment-maintenance digest=e81908361c85f153092adcecd138091721bedd3f3bd85127c71739767cb4ebda -->
 <!-- commands: agents/skills/catalog.yaml#skill:environment-maintenance.tool_commands digest=dc7706dab914e58caee25d54e51bb0fcc0878be047d18c98f5b716995356e37e -->
+<!-- host-config: path=../.agents/skills/environment-maintenance/SKILL.md index=20 order=20 enabled=true digest=79a46349cfed9c971dc681efa22a471bf4532c3575eeb1d9c3875fa62577b86e -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=ed63fdfdc631839804e657643526afeb2bc5a0e7f4ce714ff5b9e1446478ebb0 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/environment-maintenance.md
 ## Canonical Skill
 
 Canonical workflow and policy: [environment-maintenance](../../../agents/skills/environment-maintenance.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill environment-maintenance --format text`; schema `skill_tool_commands.v2`, digest: `dc7706dab914e58caee25d54e51bb0fcc0878be047d18c98f5b716995356e37e`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill environment-maintenance --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

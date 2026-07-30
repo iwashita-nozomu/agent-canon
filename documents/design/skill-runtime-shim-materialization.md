@@ -100,7 +100,7 @@ host の path は現在どおり ../.agents/skills/<skill>/SKILL.md とし、
 | trigger / route identity | catalog.yaml#skill:<id>.routing と route.py | route locator と route digest | trigger 配列、keyword matcher、route decision |
 | dependencies | skill-dependencies.yaml | invocation locator と digest | prerequisite/successor の再掲 |
 | command-packet identity | catalog の `tool_commands` と `skill_tool_commands.py` | packet locator、packet digest、read-only show command | command prose の再発見、独自 writer、sync facade |
-| ToolID / ToolCall / argument schema | graph/tool-packet owner (`agent_team.py` と graph design) | typed `ToolID`/`ToolCall`/argument-schema の locator と digest だけ | ToolCall payload、argument schema、ToolID の再定義 |
+| ToolID / ToolCall / argument schema | `agent_team.materialize_skill_tool_call_token(skill, phase=...)` | skill/phase 固有 ToolCall/argument-schema identity の locator と digest だけ | ToolCall payload、argument schema、ToolID の再定義 |
 | graph identity / edge | skill_dependency_map.py の source universe | 参照用 graph locator | graph edge の再 materialize |
 
 agents/canonical/skills.md は index/read parity の projection であり、60 個の
@@ -153,8 +153,8 @@ field の値は次のように固定します。
 | discovery.description | 現在の shim frontmatter の description を UTF-8/NFC の scalar として byte-preserving に catalog の discovery metadata へ移す。`purpose` の要約で置換しない |
 | discovery.shim_path | .agents/skills/<skill_id>/SKILL.md |
 | discovery.host_config_* | `.codex/config.toml` の 0-based entry index、source order、`path`、`enabled` をそのまま readback。entry digest の preimage は `path`, `enabled` のみで、index/order は config wiring identity として別途比較 |
-| owner.* | repository-relative POSIX locator。`canonical_ref` は `catalog.yaml#skill:<id>.canonical_doc`、`route_ref` は `catalog.yaml#skill:<id>.routing`、`command_ref` は `catalog.yaml#skill:<id>.tool_commands`、`tool_surface_ref` は graph/tool-packet owner の typed identity record |
-| identity.* | 各 owner の typed projection digest。trigger、dependency、ToolID、ToolCall、argument schema の payload を shim にコピーせず、各 owner の readback が同じ digest を再計算 |
+| owner.* | repository-relative POSIX locator。`canonical_ref` は `catalog.yaml#skill:<id>.canonical_doc`、`route_ref` は `catalog.yaml#skill:<id>.routing`、`command_ref` は `catalog.yaml#skill:<id>.tool_commands`、`tool_surface_ref` は `agent_team.materialize_skill_tool_call_token` の skill/phase typed identity record |
+| identity.* | 各 owner の typed projection digest。required/discovered/conditional/maintenance の非空 phase ごとに `agent_team` が materialize した ToolCall/argument-schema identity を読み、trigger、dependency、ToolID、ToolCall、argument schema の payload を shim にコピーせず、各 owner の readback が同じ digest を再計算 |
 | render.mode | 常に adapter_only。canonical prose は materialize 対象外 |
 | render.template_id | skill-runtime-shim-md-v1 |
 | render.command_packet_template_id | `skill-tool-command-packet-v2`。packet の全 phase/resolution は locator/digest 経由で保持し、shim に絶対実行 path を入れない |
@@ -178,7 +178,8 @@ canonical_json({"path":path,"enabled":enabled}))` とします。command packet 
 resolved command tuples、related skills、canonical doc、runtime skill）を
 `skill_tool_commands.v2` の field order で serialize した bytes から計算します。
 これは単なる `show` 行の digest ではありません。ToolID、ToolCall、argument-schema
-digest は graph/tool-packet owner の canonical serializer と digest domain を使い、
+digest は `agent_team.materialize_skill_tool_call_token(skill, phase=...)` の canonical
+serializer と digest domain を使い、
 shim record はそれらを `Ref={id,digest}` として参照します。
 
 ### Determinism and idempotent fixed point
@@ -252,6 +253,8 @@ description: <discovery.description>
 <!-- route: <owner.route_ref> digest=<identity.route_identity_digest> -->
 <!-- dependencies: <owner.dependency_ref> digest=<identity.dependency_identity_digest> -->
 <!-- commands: <owner.command_ref> digest=<identity.command_packet_identity_digest> -->
+<!-- host-config: path=<discovery.host_config_path> index=<discovery.host_config_index> order=<discovery.host_config_order> enabled=<discovery.host_enabled> digest=<discovery.host_config_entry_digest> -->
+<!-- toolcalls: <owner.tool_surface_ref> digest=<identity.tool_surface_identity_digest> -->
 <!-- materializer: <provenance.materializer_id> -->
 
 <!--
@@ -299,32 +302,30 @@ packet digest で保存し、`source_root`、`execution_cwd`、`execution_argv` 
 | 状態 | canonical owner | runtime file | 処理 |
 | --- | --- | --- | --- |
 | canonical_prose | agents/skills/<id>.md | adapter_only shim | 正常な v1。canonical link/digest だけを生成 |
-| legacy_adapter_only | 既存 shim の固定 adapter 節 | adapter 節 | frontmatter/link/command を readback して再生成 |
-| legacy_canonical_prose | canonical doc と重複する既存 shim prose | adapter 節へ縮退 | prose を捨てずに一致範囲を記録し、canonical doc の owner を確認 |
+| legacy_adapter_only | 既存 shim の exact generated section | adapter 節 | exact section receipt を readback して再生成 |
+| legacy_canonical_prose | canonical doc と重複する既存 shim prose | 生成停止 | canonical prose を adapter 節へ推測で縮退しない |
 | legacy_mixed_or_unknown | 未確定 | 生成停止 | shim-only の意味を自動で canonical policy に昇格せず、blocking finding として修正 |
 
 移行は current shim body を正規表現で keyword routing するものではありません。
-固定 template 節、dependency header、canonical link、Tool Commands marker だけを
-構文的に読み、残りの block は legacy_body_digest と locator 付きの finding に
-します。canonical prose については semantic similarity を oracle にせず、次の
-`LegacyResolutionRecord` を全 block に対して作ります。
+生成済み marker を持つ stale shim は通常の source-drift update として再生成できます。
+それ以外の legacy input は、frontmatter を除いた exact generated level-two section だけを
+受理します。canonical doc の first heading、semantic similarity、keyword、近接 path へ
+fallback しません。受理できない block は全件 locator/digest 付き receipt に出し、一件でも
+存在すれば per-file replace の前に generation を停止します。canonical prose については
+semantic similarity を oracle にせず、次の `LegacyResolutionRecord` を全 block に対して作ります。
 
 ~~~text
 LegacyResolutionRecord = {
-  skill_id, block_locator, legacy_body_digest, normalized_block_digest,
-  canonical_owner_ref, canonical_match_refs, unmatched_block_digest,
-  classification, resolution, reviewer_ref, record_digest
+  skill_id, classification, resolution, accepted_sections,
+  unmatched_blocks: [{locator, digest}], reviewer_ref
 }
 ~~
 
-`canonical_match_refs` は canonical doc の実在する heading/line locator の配列、
-`unmatched_block_digest` は adapter template に割り当てられない block の digest、
-`resolution` は `migrated` または `blocked` のみです。`canonical_prose` は全 block が
-canonical owner locator に対応し、legacy body digest を receipt に保存できた場合だけ
-`migrated` とします。一致範囲がない、frontmatter の owner が不明、または policy が
-shim-only だった場合は `blocked` とし、canonical policy に推測で昇格させません。
-この receipt が旧 body と新 adapter の対応 oracle であり、単なる `show` 行や LLM の
-類似判定は equivalence oracle ではありません。
+`unmatched_blocks` は adapter template に割り当てられない block の完全な locator/digest
+list、`resolution` は `migrated` または `blocked` のみです。一致範囲がない、frontmatter
+の owner が不明、または policy が shim-only だった場合は `blocked` とし、canonical policy
+に推測で昇格させません。この receipt が旧 body と新 adapter の対応 oracle であり、単なる
+`show` 行、canonical 文書の先頭 heading、LLM の類似判定は equivalence oracle ではありません。
 
 generic prompt checklist が numbered executable instruction を要求するため、生成
 adapter は上記の 1 行の numbered owner-read instruction を必ず保持します。この行は
@@ -415,8 +416,8 @@ README だけであり、上記の source/tests/eval producer diff は次の imp
 2. 各 config entry の 0-based `index`、source `order`、logical `path`、`enabled` と
    `host_config_entry_digest` を baseline receipt に固定する。順序を alphabetical に
    並べ替えたり enabled を再解釈したりしない。
-3. current frontmatter/body を分類し、全 LegacyResolutionRecord を作る。unresolved
-   row、unknown command、owner link 欠落が一つでもあれば停止する。
+3. current frontmatter/body を分類し、全 LegacyResolutionRecord を作る。unmatched block、
+   unknown command、owner link 欠落が一つでもあれば全 locator/digest receipt を出して停止する。
 4. catalog の discovery metadata と 60 records を canonicalize し、60 staged shim
    bytes、全 target digest、full command packet JSON/digest、ToolCall refs を run-local
    staging area に生成する。staging area は repository write set ではない。
@@ -825,12 +826,15 @@ python3 tools/agent_tools/skill_shim_evaluation.py packets \
   --root . --manifest evidence/agent-evals/skill_runtime_shim_eval.toml \
   --model gpt-5.4-mini --profile medium --output-dir <run-dir>/packets
 python3 tools/agent_tools/skill_shim_evaluation.py tokens \
-  --root . --model gpt-5.4-mini --host-evaluation-dir <run-dir>/host-evaluations \
+  --root . --model gpt-5.4-mini --manifest evidence/agent-evals/skill_runtime_shim_eval.toml \
+  --host-evaluation-dir <run-dir>/host-evaluations \
   --output <run-dir>/measurements/<run-id>.json
 ~~~
 
 `packets` は packet text/path/dependency/target/digest artifact と parent-only expected
-readback を分離して出し、`tokens` は host evaluation の observed `input_tokens` と
+readback を分離して出し、`tokens` は manifest の全 scenario ID ごとに current/generated
+の一意な exact pair を必須にして、missing、duplicate、packet/category mismatch、incomplete
+observation を fail-closed とします。`tokens` は host evaluation の observed `input_tokens` と
 deterministic bytes/scalars の paired rows、percentile、zero-denominator fields を出します。
 producer は repository の current CLI を subprocess で呼び、answer を prompt artifact に
 埋め込みません。各 scenario は current shim と generated shim を
@@ -872,7 +876,8 @@ python3 tools/agent_tools/skill_shim_evaluation.py route-golden \
   --route-cli tools/agent_tools/route.py \
   --output <run-dir>/route-golden.json
 python3 tools/agent_tools/skill_shim_evaluation.py tokens \
-  --root . --model gpt-5.4-mini --host-evaluation-dir <run-dir>/host-evaluations \
+  --root . --model gpt-5.4-mini --manifest evidence/agent-evals/skill_runtime_shim_eval.toml \
+  --host-evaluation-dir <run-dir>/host-evaluations \
   --output <run-dir>/measurements/<run-id>.json
 ~~~
 

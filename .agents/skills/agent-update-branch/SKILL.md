@@ -8,6 +8,8 @@ description: "Use when Memory, eval results, AgentCanon pins, or other agent-run
 <!-- route: agents/skills/catalog.yaml#skill:agent-update-branch.routing digest=4548d2cbdafa14176e2b581c3b38cd0274b8725cc036cd0596d444fef9243293 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:agent-update-branch digest=63a8f40867793c99082c96ae8f6c56737223c1b65b2156de2df6419a774e992f -->
 <!-- commands: agents/skills/catalog.yaml#skill:agent-update-branch.tool_commands digest=4048c555120573904834534af72df5a1ebcc841ac67edc44ea92339d1c55e098 -->
+<!-- host-config: path=../.agents/skills/agent-update-branch/SKILL.md index=8 order=8 enabled=true digest=2aedc750fcde32167c6281786bb47335c37d76fa946591d795e170171deb0be3 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=54de9e1b2d3dbe820082e76f0a21b7363eff3bfed074e6c3545ba05b218ec2e2 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/agent-update-branch.md
 ## Canonical Skill
 
 Canonical workflow and policy: [agent-update-branch](../../../agents/skills/agent-update-branch.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill agent-update-branch --format text`; schema `skill_tool_commands.v2`, digest: `4048c555120573904834534af72df5a1ebcc841ac67edc44ea92339d1c55e098`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill agent-update-branch --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

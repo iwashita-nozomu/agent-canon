@@ -8,6 +8,8 @@ description: "Use when processing GitHub pull requests or issue queues: inventor
 <!-- route: agents/skills/catalog.yaml#skill:pr-processing.routing digest=4a43623e00425e7a17ac09a698dc0a10620b1b5132f324301cc2c787aa59ab68 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:pr-processing digest=0ea9eac3476dae094ad8dcb6ad81cb1e80d77420bc6e108599c09c05f2f95c7b -->
 <!-- commands: agents/skills/catalog.yaml#skill:pr-processing.tool_commands digest=34b44e2f9371055eac3f2caf7bf57d7492548d016e7f33aff38b7b82d498b96d -->
+<!-- host-config: path=../.agents/skills/pr-processing/SKILL.md index=39 order=39 enabled=true digest=51649db0c121f75fa4e2aa50b98cd140bd0b9f33e730e2d0eb7298fcec7df3d0 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=80d7d43e3ac8fea6e5721d67090e115501307c7e72b9f0b4c45d219c75b5dcd3 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/pr-processing.md
 ## Canonical Skill
 
 Canonical workflow and policy: [pr-processing](../../../agents/skills/pr-processing.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill pr-processing --format text`; schema `skill_tool_commands.v2`, digest: `34b44e2f9371055eac3f2caf7bf57d7492548d016e7f33aff38b7b82d498b96d`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill pr-processing --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

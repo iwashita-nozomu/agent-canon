@@ -8,6 +8,8 @@ description: "Use when writing, exporting, saving, accumulating, or reporting to
 <!-- route: agents/skills/catalog.yaml#skill:result-artifact-writeout.routing digest=8a4143d9c15cedf7e6cbad6214ddf32cd1cba61b4d05aea0024796dc408672f4 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:result-artifact-writeout digest=26849f81147b6da479bf5b6819810a493d05e05efb12fb99bded671b1f649d4f -->
 <!-- commands: agents/skills/catalog.yaml#skill:result-artifact-writeout.tool_commands digest=b95f89b63dc60600c93ab76ce37f0707df1e8790d7a6d544f155670d9ad89cb2 -->
+<!-- host-config: path=../.agents/skills/result-artifact-writeout/SKILL.md index=45 order=45 enabled=true digest=ce515358e26679f2e64ac0534fc995820fe3b49186276e3480e2db5655a2cff3 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=98877e8db5d709053ecf2eb85b122d3ef0f56713b757d153473cf03167c1ff65 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/result-artifact-writeout.md
 ## Canonical Skill
 
 Canonical workflow and policy: [result-artifact-writeout](../../../agents/skills/result-artifact-writeout.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill result-artifact-writeout --format text`; schema `skill_tool_commands.v2`, digest: `b95f89b63dc60600c93ab76ce37f0707df1e8790d7a6d544f155670d9ad89cb2`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill result-artifact-writeout --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

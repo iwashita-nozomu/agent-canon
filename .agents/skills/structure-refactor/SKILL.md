@@ -8,6 +8,8 @@ description: "Use when repository structure review, repo-refactor requests, expe
 <!-- route: agents/skills/catalog.yaml#skill:structure-refactor.routing digest=3843a00e7ed048212731fe5ebfd8e8cbb1386f4437bf6e8ada773c84e534c447 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:structure-refactor digest=8d325ebb7ed34419da1c0d8b9f70f392b21c16394598f4f7c02598987cbb9752 -->
 <!-- commands: agents/skills/catalog.yaml#skill:structure-refactor.tool_commands digest=e218e89fb461512b16bd28f18fe91de4cb9b1c78d7b53176a346f59cfea3cc90 -->
+<!-- host-config: path=../.agents/skills/structure-refactor/SKILL.md index=50 order=50 enabled=true digest=0d0f31c01a0fcb1202cfa0d16440c329173225a63725d3e57fe68f3c893ab8a0 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=53ac9d2f2ce4cf84c2c6bf052632641fe4303fa38c89d8fd2d7c3eebc9aa958c -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/structure-refactor.md
 ## Canonical Skill
 
 Canonical workflow and policy: [structure-refactor](../../../agents/skills/structure-refactor.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill structure-refactor --format text`; schema `skill_tool_commands.v2`, digest: `e218e89fb461512b16bd28f18fe91de4cb9b1c78d7b53176a346f59cfea3cc90`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill structure-refactor --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

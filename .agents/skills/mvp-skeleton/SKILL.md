@@ -8,6 +8,8 @@ description: "Use when creating, scaffolding, planning, or implementing an MVP, 
 <!-- route: agents/skills/catalog.yaml#skill:mvp-skeleton.routing digest=32e6568f225e0f4f90cdb0c7f05bb9e64460e942a6f17059169fd61a212c8a3b -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:mvp-skeleton digest=0b5b8e1bca847516fbf435d8a9ccb0114dcdd4de7fc07b23dd8b1b09572967ee -->
 <!-- commands: agents/skills/catalog.yaml#skill:mvp-skeleton.tool_commands digest=57fef2774bdebcd4777547fe9283b3e0afe83e1d50f9b7b6d81484ea20a12418 -->
+<!-- host-config: path=../.agents/skills/mvp-skeleton/SKILL.md index=34 order=34 enabled=true digest=1aa933a6b93efce4d7b62e14bec6cc91222881e521de776051cd396b74306241 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=7235a03d568d554497be50a8bc71e90e852de3b13415edc451cc7028075c9ab4 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/mvp-skeleton.md
 ## Canonical Skill
 
 Canonical workflow and policy: [mvp-skeleton](../../../agents/skills/mvp-skeleton.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill mvp-skeleton --format text`; schema `skill_tool_commands.v2`, digest: `57fef2774bdebcd4777547fe9283b3e0afe83e1d50f9b7b6d81484ea20a12418`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill mvp-skeleton --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

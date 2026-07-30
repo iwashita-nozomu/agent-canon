@@ -8,6 +8,8 @@ description: "Sole public visualization owner for code, repository structure, ru
 <!-- route: agents/skills/catalog.yaml#skill:code-visualization.routing digest=ba012b9d0ad5ca234b17c2e7c146b4e302174af6558412ba93b1521a3c80526a -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:code-visualization digest=c55efa485014c1ffdcbc12e5fd00040320b0af1ac612a35d8f42f19513717fbe -->
 <!-- commands: agents/skills/catalog.yaml#skill:code-visualization.tool_commands digest=b04fb561222aacd9b23a10e81a5e29e7e7c1abcfc92203cf0c066eec2f180015 -->
+<!-- host-config: path=../.agents/skills/code-visualization/SKILL.md index=13 order=13 enabled=true digest=214a7aa17be76cb7211fffac6d58d4b011fe3a31ad469aa263e2060713512e7a -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=da5c6ff7a7e9fb4580f50c1b436c01a493d2baf8b384c40b9f402731097a6370 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/code-visualization.md
 ## Canonical Skill
 
 Canonical workflow and policy: [code-visualization](../../../agents/skills/code-visualization.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill code-visualization --format text`; schema `skill_tool_commands.v2`, digest: `b04fb561222aacd9b23a10e81a5e29e7e7c1abcfc92203cf0c066eec2f180015`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill code-visualization --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

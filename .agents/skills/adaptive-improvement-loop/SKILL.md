@@ -8,6 +8,8 @@ description: "Use when experiments, research, tuning, and iterative code improve
 <!-- route: agents/skills/catalog.yaml#skill:adaptive-improvement-loop.routing digest=23e1cbdbd8e61d9e73fbaebf2a031960ab1ff5f4f399f984b824432580cfe972 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:adaptive-improvement-loop digest=0faf8f774b0915b7435bd750444cdcff6ff3055e642e560595a2a5b8143e027a -->
 <!-- commands: agents/skills/catalog.yaml#skill:adaptive-improvement-loop.tool_commands digest=b2dbc0061cf096030f465f0416b322021c1216a031ef8a95dc224426020f687e -->
+<!-- host-config: path=../.agents/skills/adaptive-improvement-loop/SKILL.md index=1 order=1 enabled=true digest=ddafdf0db40744cbe296437b77a05d4642a1b9f4dcd2e7951dccd609e96d6f5f -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=f13be9837571e440debf960260efa575535cd230e2df1a34c3cae784f591a534 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/adaptive-improvement-loop.md
 ## Canonical Skill
 
 Canonical workflow and policy: [adaptive-improvement-loop](../../../agents/skills/adaptive-improvement-loop.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill adaptive-improvement-loop --format text`; schema `skill_tool_commands.v2`, digest: `b2dbc0061cf096030f465f0416b322021c1216a031ef8a95dc224426020f687e`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill adaptive-improvement-loop --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

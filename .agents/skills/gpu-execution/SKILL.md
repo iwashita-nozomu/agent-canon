@@ -8,6 +8,8 @@ description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX
 <!-- route: agents/skills/catalog.yaml#skill:gpu-execution.routing digest=33bafddb4378acdb9dcff135ab024c394854ce3398acf0990060e939be3f9502 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:gpu-execution digest=bd0ae3050ce484b65e9e4216a2da77b22f0387f8ba34965204c4f861d1fd3030 -->
 <!-- commands: agents/skills/catalog.yaml#skill:gpu-execution.tool_commands digest=4b2997c146af1e9c3443993fc2336543520c485e9e5c6d14e9484f7c81c3da02 -->
+<!-- host-config: path=../.agents/skills/gpu-execution/SKILL.md index=25 order=25 enabled=true digest=c7c302e2510e768540aa94229f89d92b4bb7b430b03fc5062750c4705d77a514 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=6aa1b1e14487b2f894118225e6564db6b7585cf5dbb14538d8cd49a1587ced76 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/gpu-execution.md
 ## Canonical Skill
 
 Canonical workflow and policy: [gpu-execution](../../../agents/skills/gpu-execution.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill gpu-execution --format text`; schema `skill_tool_commands.v2`, digest: `4b2997c146af1e9c3443993fc2336543520c485e9e5c6d14e9484f7c81c3da02`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill gpu-execution --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

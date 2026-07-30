@@ -8,6 +8,8 @@ description: "Use when the user asks to run the OOP readability checker, SOLID c
 <!-- route: agents/skills/catalog.yaml#skill:oop-readability-check.routing digest=bb3d89ba9d1db9a6007b3cef2601174b6a950c12850b566684639b217be106d1 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:oop-readability-check digest=3ceeae86534bd675b142a2760ae269df6bb49165786fdaa15876921e2db116dd -->
 <!-- commands: agents/skills/catalog.yaml#skill:oop-readability-check.tool_commands digest=223ff4fa1d40e426b7c85973b0576cd6f19dbb89497264b0f9854d67aac0e35e -->
+<!-- host-config: path=../.agents/skills/oop-readability-check/SKILL.md index=35 order=35 enabled=true digest=35954eec9fc5915008697cd5954dd5b92072d3bff1bc9fbdd1c1902d4d8b5da0 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=e1f6464cf3f3797b1d3b3b6095a077dd2e11aaa342e097bb36ec62346293cebf -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/oop-readability-check.md
 ## Canonical Skill
 
 Canonical workflow and policy: [oop-readability-check](../../../agents/skills/oop-readability-check.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill oop-readability-check --format text`; schema `skill_tool_commands.v2`, digest: `223ff4fa1d40e426b7c85973b0576cd6f19dbb89497264b0f9854d67aac0e35e`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill oop-readability-check --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

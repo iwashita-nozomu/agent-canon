@@ -8,6 +8,8 @@ description: "Use when running tools, checkers, hooks, static analysis, or struc
 <!-- route: agents/skills/catalog.yaml#skill:tool-finding-report.routing digest=c4efc1f6d5c496198e24285312873ccf59fee23f28859f6165573e2610b4de5c -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:tool-finding-report digest=73a0440bb18fb73e90cbe91c224e13749583a0c5427287daf292f3053ebe7c65 -->
 <!-- commands: agents/skills/catalog.yaml#skill:tool-finding-report.tool_commands digest=6eda060338d24a6523c50b3fa28833fcb602844d273aa72e3f228f9d41e6cea2 -->
+<!-- host-config: path=../.agents/skills/tool-finding-report/SKILL.md index=54 order=54 enabled=true digest=752712b9092f56360a7cd962f0afa9c1a7d53fbe19f1619c9bb341aa60debbbf -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=b1ac85861b792e4cf98336c6c6b0baba94e168251fb6976cb6dc56724d9da934 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/tool-finding-report.md
 ## Canonical Skill
 
 Canonical workflow and policy: [tool-finding-report](../../../agents/skills/tool-finding-report.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill tool-finding-report --format text`; schema `skill_tool_commands.v2`, digest: `6eda060338d24a6523c50b3fa28833fcb602844d273aa72e3f228f9d41e6cea2`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill tool-finding-report --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

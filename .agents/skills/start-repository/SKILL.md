@@ -8,6 +8,8 @@ description: "Use when starting a new GitHub/submodule-first repository from thi
 <!-- route: agents/skills/catalog.yaml#skill:start-repository.routing digest=833ea3b9cdd7836cde78621fbd8e242bcf8ebd3e01f76cbdcaea1baa3ad68712 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:start-repository digest=83944f0fc56d48f7819caf0fab6d949c12575b4baafefa707a5f2f0268f9eaf7 -->
 <!-- commands: agents/skills/catalog.yaml#skill:start-repository.tool_commands digest=c6b28cecb612f62c1a4e806f8c54c83d6d99961163038058a7398d111395e25e -->
+<!-- host-config: path=../.agents/skills/start-repository/SKILL.md index=48 order=48 enabled=true digest=640ca8ee221fa8687af3532c3ed7e3946174cbc3159db72bcc64e066c76be70c -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=4d6fc8e18b4ad043a8db8394398208c1c0ac4c7cd89efeb9ca1392b6032db5e2 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/start-repository.md
 ## Canonical Skill
 
 Canonical workflow and policy: [start-repository](../../../agents/skills/start-repository.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill start-repository --format text`; schema `skill_tool_commands.v2`, digest: `c6b28cecb612f62c1a4e806f8c54c83d6d99961163038058a7398d111395e25e`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill start-repository --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

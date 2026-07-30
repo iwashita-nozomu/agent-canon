@@ -32,8 +32,8 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 import yaml
-
 from agent_canon_source_root import resolve_agent_canon_source_root
+from agent_team import materialize_skill_tool_call_token
 from check_skill_frontmatter import parse_frontmatter
 from skill_dependency_map import build_graph
 from skill_route_catalog import (
@@ -67,6 +67,7 @@ class MaterializerError(RuntimeError):
     """One stable fail-closed materializer error."""
 
     def __init__(self, code: str, detail: str = "") -> None:
+        """Bind a stable machine error code and optional detail."""
         self.code = code
         self.detail = detail
         message = code if not detail else f"{code}:{detail}"
@@ -77,9 +78,19 @@ class PartialStopError(MaterializerError):
     """A per-file replace stopped after a partial runtime update."""
 
     def __init__(self, path: str, replaced: int) -> None:
+        """Bind the target that stopped and completed replace count."""
         super().__init__("partial_stop", f"path={path}:replaced={replaced}")
         self.path = path
         self.replaced = replaced
+
+
+class LegacyMigrationError(MaterializerError):
+    """A fail-closed legacy migration with every unmatched block receipt."""
+
+    def __init__(self, receipt: Sequence[Mapping[str, object]]) -> None:
+        """Preserve every legacy classification for fail-closed reporting."""
+        super().__init__("unresolved_legacy_blocks")
+        self.receipt = [dict(row) for row in receipt]
 
 
 @dataclass(frozen=True)
@@ -225,7 +236,7 @@ def _host_entries(root: Path, skill_ids: Sequence[str]) -> dict[str, HostEntry]:
             "agent-canon.host-config-entry.v1", {"path": path, "enabled": enabled}
         )
         observed[skill] = HostEntry(path, enabled, index, index, entry_digest)
-    if tuple(observed) != tuple(skill_ids) and set(observed) != set(skill_ids):
+    if set(observed) != set(skill_ids):
         raise MaterializerError("host_config_skill_set_mismatch")
     if set(observed) != set(skill_ids) or len(observed) != SKILL_COUNT:
         raise MaterializerError("host_config_count_mismatch", str(len(observed)))
@@ -297,57 +308,25 @@ def _packet_payload(packet: SkillCommandPacket, root: Path) -> dict[str, object]
     return result
 
 
-def _graph_refs(graph: Mapping[str, object], skill: str) -> tuple[dict[str, object], str]:
-    """Return typed graph refs and their per-skill tool-surface digest."""
-    skill_rows = cast(Sequence[Mapping[str, object]], graph["skills"])
-    skill_row = next((row for row in skill_rows if row["display_label"] == skill), None)
-    if skill_row is None:
-        raise MaterializerError("graph_skill_missing", skill)
-    skill_ref = cast(Mapping[str, str], skill_row["ref"])
-    command_ids = {
-        cast(str, item)
-        for record in cast(Sequence[Mapping[str, object]], graph["identity_records"])
-        if record["id"] == skill_ref["id"]
-        for item in cast(Mapping[str, object], record["canonical_payload"])["command_ids"]
-    }
-    tool_refs: dict[str, Mapping[str, str]] = {}
-    for edge in cast(Sequence[Mapping[str, object]], graph["edges"]):
-        if edge["display_label"] != "tool-resolution":
-            continue
-        source = cast(Mapping[str, str], edge["source_ref"])
-        if source["id"] not in command_ids:
-            continue
-        target = cast(Mapping[str, str], edge["target_ref"])
-        tool_refs[target["id"]] = target
-    toolcall_refs = [
-        cast(Mapping[str, str], row["ref"])
-        for row in cast(Sequence[Mapping[str, object]], graph["toolcalls"])
-    ]
-    argument_schema = {
-        "id": "agent-canon.skill-tool-commands.args.v1",
-        "digest": domain_digest(
-            "agent-canon.skill-runtime-shim.owner.argument-schema.v1",
-            {
-                "$id": "agent-canon.skill-tool-commands.args.v1",
-                "type": "object",
-                "required": ["skill", "format"],
-                "properties": {
-                    "skill": {"type": "string", "minLength": 1},
-                    "format": {"type": "string", "enum": ["json"]},
-                },
-                "additionalProperties": False,
-            },
-        ),
-    }
-    refs = {
-        "skill_ref": dict(skill_ref),
-        "tool_refs": [dict(tool_refs[key]) for key in sorted(tool_refs)],
-        "toolcall_refs": [dict(ref) for ref in toolcall_refs],
-        "argument_schema_refs": [argument_schema],
-    }
-    return refs, domain_digest(
-        "agent-canon.skill-runtime-shim.owner.tool-surface.v1", refs
+def _tool_call_refs(packet: SkillCommandPacket) -> tuple[list[dict[str, object]], str]:
+    """Read skill/phase ToolCall identities from their sole owner."""
+    phases = (
+        ("required", packet.required_commands),
+        ("discovered", packet.discovered_commands),
+        ("conditional", packet.conditional_commands),
+        ("maintenance", packet.maintenance_commands),
     )
+    refs: list[dict[str, object]] = []
+    for phase, commands in phases:
+        if not commands:
+            continue
+        token = materialize_skill_tool_call_token(packet.skill, phase=phase)
+        identity = cast(Mapping[str, object], token["identity"])
+        refs.append({"command_count": len(commands), **dict(identity)})
+    if not refs:
+        raise MaterializerError("tool_call_phase_missing", packet.skill)
+    payload = {"skill": packet.skill, "phase_refs": refs}
+    return refs, domain_digest("agent-canon.skill-runtime-shim.owner.tool-surface.v2", payload)
 
 
 def _source_snapshot_digest(root: Path, graph: Mapping[str, object], skill_ids: Sequence[str]) -> str:
@@ -420,8 +399,8 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
     canonical_path = context.root / canonical_doc
     if not canonical_path.is_file():
         raise MaterializerError("missing_canonical_doc", skill)
-    graph_refs, tool_surface_digest = _graph_refs(context.graph, skill)
     packet = context.packets[skill]
+    tool_call_refs, tool_surface_digest = _tool_call_refs(packet)
     packet_digest = domain_digest(
         "skill_tool_commands.v2", _packet_payload(packet, context.root)
     )
@@ -491,9 +470,7 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
             "materializer_id": MATERIALIZER_ID,
         },
     }
-    # The typed graph refs are intentionally consumed only while building the digest;
-    # payloads never enter the generated Markdown adapter.
-    if not graph_refs["argument_schema_refs"]:
+    if not tool_call_refs:
         raise MaterializerError("argument_schema_missing", skill)
     record_digest = domain_digest(
         "agent-canon.skill-runtime-shim.record.v1", record
@@ -527,6 +504,11 @@ def render_shim(record: Mapping[str, object]) -> str:
         f"<!-- route: {owner['route_ref']} digest={identity['route_identity_digest']} -->",
         f"<!-- dependencies: {owner['dependency_ref']} digest={identity['dependency_identity_digest']} -->",
         f"<!-- commands: {owner['command_ref']} digest={identity['command_packet_identity_digest']} -->",
+        "<!-- host-config: "
+        f"path={discovery['host_config_path']} index={discovery['host_config_index']} "
+        f"order={discovery['host_config_order']} enabled={str(discovery['host_enabled']).lower()} "
+        f"digest={discovery['host_config_entry_digest']} -->",
+        f"<!-- toolcalls: {owner['tool_surface_ref']} digest={identity['tool_surface_identity_digest']} -->",
         f"<!-- materializer: {provenance['materializer_id']} -->",
         "",
         "<!--",
@@ -541,17 +523,14 @@ def render_shim(record: Mapping[str, object]) -> str:
         "## Canonical Skill",
         "",
         f"Canonical workflow and policy: [{skill}]({canonical_link}).",
-        "Read that owner before applying the skill. This file is only the Codex discovery",
-        "adapter; it does not restate the canonical skill prose.",
         "",
         "## Tool Commands",
         "",
         "<!-- skill-tool-commands:start -->",
-        f"Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill {skill} --format text`; "
-        f"schema `skill_tool_commands.v2`, digest: `{identity['command_packet_identity_digest']}`.",
+        f"`python3 tools/agent_tools/skill_tool_commands.py show --skill {skill} --format text`",
         "<!-- skill-tool-commands:end -->",
         "",
-        "1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.",
+        "1. Read the canonical owner before applying this skill.",
         "",
     ]
     text = "\n".join(lines)
@@ -565,53 +544,116 @@ def _runtime_path(context: BuildContext, skill: str) -> Path:
 
 
 def classify_legacy(context: BuildContext, skill: str, expected: str) -> dict[str, object]:
-    """Classify one existing target without routing from its prose."""
+    """Classify one existing target using only exact generated sections."""
     path = _runtime_path(context, skill)
     if not path.is_file():
-        return {"skill_id": skill, "classification": "missing", "resolution": "blocked"}
+        return {
+            "skill_id": skill,
+            "classification": "missing",
+            "resolution": "migrated",
+            "unmatched_blocks": [],
+        }
     current = path.read_bytes()
-    if current.decode("utf-8") == expected:
-        return {"skill_id": skill, "classification": "generated", "resolution": "migrated"}
+    try:
+        body = current.decode("utf-8")
+    except UnicodeDecodeError:
+        return {
+            "skill_id": skill,
+            "classification": "invalid_utf8",
+            "resolution": "blocked",
+            "unmatched_blocks": [
+                {
+                    "locator": path.relative_to(context.root).as_posix(),
+                    "digest": hashlib.sha256(current).hexdigest(),
+                }
+            ],
+        }
+    if body == expected:
+        return {
+            "skill_id": skill,
+            "classification": "generated",
+            "resolution": "migrated",
+            "unmatched_blocks": [],
+        }
+    if "<!-- generated: agent_canon.skill_runtime_shim.v1 -->" in body:
+        return {
+            "skill_id": skill,
+            "classification": "generated_stale",
+            "resolution": "migrated",
+            "unmatched_blocks": [],
+        }
     frontmatter, error = parse_frontmatter(path)
     if error or frontmatter is None:
-        raise MaterializerError("unresolved_legacy_block", f"{skill}:{error or 'frontmatter'}")
+        return {
+            "skill_id": skill,
+            "classification": "invalid_frontmatter",
+            "resolution": "blocked",
+            "unmatched_blocks": [
+                {
+                    "locator": path.relative_to(context.root).as_posix(),
+                    "digest": hashlib.sha256(current).hexdigest(),
+                }
+            ],
+        }
     name, description = _catalog_discovery(context.catalog_entries[skill])
     if frontmatter.get("name") != name or frontmatter.get("description") != description:
-        raise MaterializerError("frontmatter_drift", skill)
-    body = current.decode("utf-8")
-    canonical_doc = f"agents/skills/{skill}.md"
-    canonical_ref_match = re.search(
-        rf"(?:\.\./)*agents/skills/{re.escape(skill)}\.md", body
-    )
-    canonical_path = context.root / canonical_doc
-    if canonical_ref_match is None and canonical_path.is_file():
-        canonical_lines = canonical_path.read_text(encoding="utf-8").splitlines()
-        heading = next(
-            (index for index, line in enumerate(canonical_lines, start=1) if line.startswith("# ")),
-            None,
-        )
-        if heading is not None:
-            canonical_match_refs = [f"{canonical_doc}:L{heading}"]
+        return {
+            "skill_id": skill,
+            "classification": "frontmatter_drift",
+            "resolution": "blocked",
+            "unmatched_blocks": [
+                {
+                    "locator": path.relative_to(context.root).as_posix(),
+                    "digest": hashlib.sha256(current).hexdigest(),
+                }
+            ],
+        }
+    expected_sections = _markdown_sections(_markdown_body(expected))
+    legacy_sections = _markdown_sections(_markdown_body(body))
+    unmatched_blocks = []
+    accepted_blocks = []
+    for locator, section in legacy_sections.items():
+        if section in expected_sections.values():
+            accepted_blocks.append(locator)
         else:
-            canonical_match_refs = []
-    elif canonical_ref_match is not None:
-        canonical_match_refs = [canonical_ref_match.group(0)]
-    else:
-        canonical_match_refs = []
-    if not canonical_match_refs:
-        raise MaterializerError("unresolved_legacy_block", skill)
+            unmatched_blocks.append(
+                {
+                    "locator": f"{path.relative_to(context.root).as_posix()}#{locator}",
+                    "digest": hashlib.sha256(section.encode("utf-8")).hexdigest(),
+                }
+            )
     return {
         "skill_id": skill,
-        "block_locator": f"{skill}:body",
-        "legacy_body_digest": hashlib.sha256(current).hexdigest(),
-        "normalized_block_digest": hashlib.sha256(body.replace("\r\n", "\n").encode()).hexdigest(),
-        "canonical_owner_ref": f"{CATALOG_PATH.as_posix()}#skill:{skill}.canonical_doc",
-        "canonical_match_refs": canonical_match_refs,
-        "unmatched_block_digest": hashlib.sha256(current).hexdigest(),
-        "classification": "legacy_canonical_prose",
-        "resolution": "migrated",
+        "classification": "legacy_exact_sections",
+        "resolution": "migrated" if not unmatched_blocks else "blocked",
+        "accepted_sections": accepted_blocks,
+        "unmatched_blocks": unmatched_blocks,
         "reviewer_ref": "design:skill-runtime-shim-materialization.md#Adapter-Only--Canonical-Prose-Handling",
     }
+
+
+def _markdown_sections(text: str) -> dict[str, str]:
+    """Return exact level-two sections with source line locators as keys."""
+    lines = text.replace("\r\n", "\n").splitlines(keepends=True)
+    starts = [index for index, line in enumerate(lines) if line.startswith("## ")]
+    sections: dict[str, str] = {}
+    for offset, start in enumerate(starts):
+        end = starts[offset + 1] if offset + 1 < len(starts) else len(lines)
+        locator = f"L{start + 1}-L{end}"
+        sections[locator] = "".join(lines[start:end])
+    preamble_end = starts[0] if starts else len(lines)
+    preamble = "".join(lines[:preamble_end]).strip()
+    if preamble:
+        sections["preamble"] = preamble + "\n"
+    return sections
+
+
+def _markdown_body(text: str) -> str:
+    """Remove only the required top-level frontmatter before section matching."""
+    match = re.match(r"\A---\n.*?\n---\n", text, flags=re.DOTALL)
+    if match is None:
+        return text
+    return text[match.end() :]
 
 
 def _projection_digest(skill: str, record: Mapping[str, object], content: bytes) -> str:
@@ -685,6 +727,8 @@ def materialize(root: Path, *, all_skills: bool = False) -> dict[str, object]:
     context = build_context(root)
     records, rendered, projections = build_rows(context)
     legacy = [classify_legacy(context, skill, rendered[skill]) for skill in context.skill_ids]
+    if any(cast(Sequence[object], row["unmatched_blocks"]) for row in legacy):
+        raise LegacyMigrationError(legacy)
     _staged_readback(context, rendered)
     delta_paths: list[str] = []
     replaced = 0
@@ -726,6 +770,7 @@ def materialize(root: Path, *, all_skills: bool = False) -> dict[str, object]:
         "content_delta_count": len(delta_paths),
         "content_delta_paths": sorted(delta_paths),
         "legacy_resolution_count": len(legacy),
+        "legacy_migration_receipt": legacy,
         "replaced_count": replaced,
         "status": "pass",
     }
@@ -818,6 +863,7 @@ def fixed_point_acceptance(root: Path) -> dict[str, object]:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the materializer command-line parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("check", "materialize", "readback"))
     parser.add_argument("--root", type=Path, default=Path.cwd())
@@ -841,6 +887,7 @@ def _print_payload(payload: Mapping[str, object], output_format: str) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the selected materializer operation."""
     args = build_parser().parse_args(argv)
     try:
         if args.command == "materialize":
@@ -849,6 +896,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload = readback(args.root, all_skills=args.all)
         else:
             payload = check(args.root, all_skills=args.all)
+    except LegacyMigrationError as exc:
+        print(
+            "SKILL_SHIM_MATERIALIZER_LEGACY_RECEIPT="
+            + json.dumps(exc.receipt, ensure_ascii=False, sort_keys=True)
+        )
+        print(f"SKILL_SHIM_MATERIALIZER_FAILURE={exc.code}:{exc.detail}")
+        return 2
     except PartialStopError as exc:
         print(f"SKILL_SHIM_MATERIALIZER_FAILURE={exc.code}:{exc.detail}")
         return 2

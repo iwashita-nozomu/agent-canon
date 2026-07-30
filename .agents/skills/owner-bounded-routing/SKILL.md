@@ -8,6 +8,8 @@ description: "Use for owner-bounded repository edits after routing evidence show
 <!-- route: agents/skills/catalog.yaml#skill:owner-bounded-routing.routing digest=f7a555da339b2fd491fcd1139f994324d489d9f17e2352d20efcd8cd0201f0b6 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:owner-bounded-routing digest=78734376c281b296991698dabce3c5ff736e7714e8024ed05981d8aa2fd90f27 -->
 <!-- commands: agents/skills/catalog.yaml#skill:owner-bounded-routing.tool_commands digest=5ecf0a08a0ba1467d27c1269eeb201c2348707be0a9157dff584ed578213d5a1 -->
+<!-- host-config: path=../.agents/skills/owner-bounded-routing/SKILL.md index=47 order=47 enabled=true digest=40cfe1d93973989cebb3cd40d230250738c41f82e3c12a0c38a076ebd4750c30 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=77d682cb34fdc8d4184ba664f58ae748d1f112659a08a4c1645fef7db05057dd -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/owner-bounded-routing.md
 ## Canonical Skill
 
 Canonical workflow and policy: [owner-bounded-routing](../../../agents/skills/owner-bounded-routing.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill owner-bounded-routing --format text`; schema `skill_tool_commands.v2`, digest: `5ecf0a08a0ba1467d27c1269eeb201c2348707be0a9157dff584ed578213d5a1`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill owner-bounded-routing --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

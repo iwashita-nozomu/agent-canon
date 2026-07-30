@@ -8,6 +8,8 @@ description: "Use when natural-language mathematical claims, JIT-canonical imple
 <!-- route: agents/skills/catalog.yaml#skill:formal-proof-workflow.routing digest=a79339fed19116d6d9d68bb12ff0a4a905cba780e759bdcfc17f4a1f78f6a827 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:formal-proof-workflow digest=2ee4adcb4c8025c50fc9b214281d46ea65a7e51a64a738941496a1f04f1f688d -->
 <!-- commands: agents/skills/catalog.yaml#skill:formal-proof-workflow.tool_commands digest=3a4889f25aef856a5b9f393a4483aad60158fe982c31c1a14fd25cd21dce198c -->
+<!-- host-config: path=../.agents/skills/formal-proof-workflow/SKILL.md index=26 order=26 enabled=true digest=1db77cefaea6aa1ca63c82933236cd185c2d24d6aeef653e8689316872fe9b9e -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=5f00532d80e310e435f86cf7bc93219cc0386bb05a9b8bb7632dd89fd5a1ac2c -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/formal-proof-workflow.md
 ## Canonical Skill
 
 Canonical workflow and policy: [formal-proof-workflow](../../../agents/skills/formal-proof-workflow.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill formal-proof-workflow --format text`; schema `skill_tool_commands.v2`, digest: `3a4889f25aef856a5b9f393a4483aad60158fe982c31c1a14fd25cd21dce198c`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill formal-proof-workflow --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

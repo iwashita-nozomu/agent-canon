@@ -8,6 +8,8 @@ description: "Use when organizing repository documents, finding non-canonical do
 <!-- route: agents/skills/catalog.yaml#skill:document-canon-cleanup.routing digest=11a5decf86b437fd0be781e15800a78a4dbbff462a61b0e477ef08dcc7db5abe -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:document-canon-cleanup digest=0bde774c2d8bcc77e63b276624588393c4eaf7245055659ff4552ac27d319d8e -->
 <!-- commands: agents/skills/catalog.yaml#skill:document-canon-cleanup.tool_commands digest=bfbad70cea95bba68ccd94c1e2e7bf6f2c121c638331b865d6e2698b17dac065 -->
+<!-- host-config: path=../.agents/skills/document-canon-cleanup/SKILL.md index=18 order=18 enabled=true digest=15c3da0e72174b107ee9708b057b7a883b1acc1fc8a4aeda395bc89c886ed432 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=86671909be565a9533494001799e5f24d7537bc9eb01adf2d52541d7ba6ded88 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/document-canon-cleanup.md
 ## Canonical Skill
 
 Canonical workflow and policy: [document-canon-cleanup](../../../agents/skills/document-canon-cleanup.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill document-canon-cleanup --format text`; schema `skill_tool_commands.v2`, digest: `bfbad70cea95bba68ccd94c1e2e7bf6f2c121c638331b865d6e2698b17dac065`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill document-canon-cleanup --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

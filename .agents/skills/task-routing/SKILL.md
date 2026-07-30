@@ -8,6 +8,8 @@ description: "Use when choosing short AgentCanon tool, skill, profile, check, ru
 <!-- route: agents/skills/catalog.yaml#skill:task-routing.routing digest=8d98862013a741d63075e56acdedc1bc49afa889b0dd6807830516ccd47ff90e -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:task-routing digest=728ab411a06957e0dfe7ba3fdc10b3e4a2816dad67a8dcc7ba9d2528b12be33e -->
 <!-- commands: agents/skills/catalog.yaml#skill:task-routing.tool_commands digest=8d50bc5876068ebf98320357f259bc3674336a3f104956b8fb27c67451d3089d -->
+<!-- host-config: path=../.agents/skills/task-routing/SKILL.md index=52 order=52 enabled=true digest=394ff3acb2242f455b3d1429afa06782f887bf88aca34d9039a1405025068c42 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=902b21cb88af4fa27b7aa4ad74c7683bb7c6553b056bdf1e57722f599e8aed0e -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/task-routing.md
 ## Canonical Skill
 
 Canonical workflow and policy: [task-routing](../../../agents/skills/task-routing.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill task-routing --format text`; schema `skill_tool_commands.v2`, digest: `8d50bc5876068ebf98320357f259bc3674336a3f104956b8fb27c67451d3089d`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill task-routing --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

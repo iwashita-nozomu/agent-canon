@@ -8,6 +8,8 @@ description: "Use when AgentCanon runtime dashboard evidence should be turned in
 <!-- route: agents/skills/catalog.yaml#skill:runtime-log-repair.routing digest=d8f8344b96314edd98afa5e599f1a6fdc07615dad08ce84ffee268534e2e1b78 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:runtime-log-repair digest=abb88dcb33ea5faf981313d7242c94577720465a96a91ed277c42834b9be83a8 -->
 <!-- commands: agents/skills/catalog.yaml#skill:runtime-log-repair.tool_commands digest=c6630e66570aceebaa644260f89d95425600e6fd94cabac20b31cc3f44a6bf1d -->
+<!-- host-config: path=../.agents/skills/runtime-log-repair/SKILL.md index=6 order=6 enabled=true digest=ef31299c1576dcda5f44e9a7ddbfaf490d3c1cd6483c493e58682d1ff70d87be -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=97d727b0ccb0857668942b25154ba25d2015edf5cf309c5b0adc8ef7418787b8 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/runtime-log-repair.md
 ## Canonical Skill
 
 Canonical workflow and policy: [runtime-log-repair](../../../agents/skills/runtime-log-repair.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill runtime-log-repair --format text`; schema `skill_tool_commands.v2`, digest: `c6630e66570aceebaa644260f89d95425600e6fd94cabac20b31cc3f44a6bf1d`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill runtime-log-repair --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.

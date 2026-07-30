@@ -8,6 +8,8 @@ description: "Use when agent-side working philosophy, interaction lessons, task 
 <!-- route: agents/skills/catalog.yaml#skill:agent-learning.routing digest=7d92634fcce7234f7eb340873ccb4d93f7e920dcba6cdbe0db55d16ae045d015 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:agent-learning digest=d119e106e2ec69ebe058ffa24352ab745c427743fa2822df9513a021cb6b11e2 -->
 <!-- commands: agents/skills/catalog.yaml#skill:agent-learning.tool_commands digest=5f56443490fe274ad861af4d9bfc23d962051938b49780315b0143b0fbc32f55 -->
+<!-- host-config: path=../.agents/skills/agent-learning/SKILL.md index=2 order=2 enabled=true digest=e85a3904a1eb06394cba8db26d43f8a336fe344c47fafa7410b6029fc1e290a4 -->
+<!-- toolcalls: tools/agent_tools/agent_team.py#materialize_skill_tool_call_token digest=5444d037c0825e783faf9ab4d98e75706e8c149e34b78e62a120aeb31b7a1e27 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -22,13 +24,11 @@ upstream implementation ../../../agents/skills/agent-learning.md
 ## Canonical Skill
 
 Canonical workflow and policy: [agent-learning](../../../agents/skills/agent-learning.md).
-Read that owner before applying the skill. This file is only the Codex discovery
-adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill agent-learning --format text`; schema `skill_tool_commands.v2`, digest: `5f56443490fe274ad861af4d9bfc23d962051938b49780315b0143b0fbc32f55`.
+`python3 tools/agent_tools/skill_tool_commands.py show --skill agent-learning --format text`
 <!-- skill-tool-commands:end -->
 
-1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
+1. Read the canonical owner before applying this skill.
