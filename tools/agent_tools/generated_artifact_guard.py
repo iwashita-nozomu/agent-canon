@@ -2,6 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Rejects mechanically regenerated report artifacts left in the source tree.
+# upstream design ../../documents/design/request-intent-and-update-relation.md generated-artifact guard readback projection
 # upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md canonical artifact placement policy
 # upstream design ../../templates/agents/closeout_gate.md closeout evidence template
 # upstream design ../../tools/README.md shared tool index

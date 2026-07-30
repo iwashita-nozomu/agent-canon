@@ -9,6 +9,7 @@ downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py transpo
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-backed claims
 downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates canonical runtime references
 downstream design ../skills/change-review.md consumes forward and reverse correspondence at review
+upstream design ../../documents/design/request-intent-and-update-relation.md compact request/update and related-document closure contract
 @dependency-end
 -->
 
@@ -25,6 +26,31 @@ downstream design ../skills/change-review.md consumes forward and reverse corres
 | implementation handoff | `agents/COMMUNICATION_PROTOCOL.md`、`agents/workflows/implementation-waterfall-workflow.md` | clause map と digest を handoff に載せる | 実装者の代わりに実装しない |
 | review | `agents/skills/change-review.md` | forward / reverse coverage と drift を判定対象にする | review policy を再定義しない |
 | evidence / validation | 各 design doc の validation route | clause と evidence の readback を残す | 成功メッセージだけで十分条件にしない |
+
+## Related Document Closure
+
+この節が Related Document Closure traversal policy の唯一の canonical owner です。
+他の design、skill、root view はこの節の clause/ref と closure receipt を消費します。
+設計 owner は handoff 前に、既存 source packet の path、section、clause/ref を使って関連文書を
+閉じます。たどる順序は、選択 design の dependency header の upstream/downstream、同 directory
+README の reader map、implementation target の dependency headers、validation/runtime owner
+docs、parent/root projection docs です。各 request clause、design clause、implementation
+target、validation route が forward/reverse で owner に接続されるまで packet を handoff-ready
+にしません。
+
+この closure は文書数、深さ、または keyword 探索で切り上げず、未読 edge が次の design/
+implementation 判断を変え得る間は owner packet を閉じた状態にします。文書本文の再言語化は
+行わず、既存 packet に path、section、clause/ref だけを保持します。実装 worker は owner
+design と closure packet を先に読み、change-review は changed path から design、owner、root
+projection の reverse drift を read-back します。
+
+closure operation は dependency edge、reader map、target header、validation/runtime owner、
+root projection をたどり、request/design/target/validation の forward/reverse join-complete
+state に到達します。completion evidence は既存 source packet の path+section+clause/ref
+closure receipt です。worker の design-read operation はこの receipt と selected design を
+implementation-ready state にし、change-review の reverse-read operation は changed path
+から design clause、owner、root projection の reverse-trace-complete state にして、各 readback
+を review evidence にします。
 
 ## Exact Data / State Model
 
@@ -77,6 +103,7 @@ read|fingerprinted|handed_off|implementing|review_ready -> drifted|blocked
 - `DIC-007` routine は capability owner、adapter、implementation owner の順序を保持し、prose keyword、近接 filename、既存の stale artifact を route verdict にしない。
 - `DIC-008` durable artifacts は repository-relative locator を持ち、absolute runtime path は execution state にしか現れない。
 - `DIC-009` この routine は case-based loophole、compatibility fallback、第二の design policy、個別 skill への全文複製を追加しない。
+- `DIC-010` related-document closure は path/section/clause/ref の source-packet evidence と forward/reverse owner join が揃った時点で handoff-ready になる。
 
 ## Side Effects
 
@@ -99,7 +126,7 @@ read|fingerprinted|handed_off|implementing|review_ready -> drifted|blocked
 ## Stage Ownership and Procedure
 
 1. `agent-orchestration` が request mode、owner、replaceable unit、implementation mechanism、validation route を固定する。
-2. 選択された owner が `design_locator` を解決し、DIC-001/002 に従って design を読む。
+2. 選択された owner が `design_locator` を解決し、DIC-001/002 と `Related Document Closure` に従って design、dependency edges、reader map、target/validation/root owner refs を読む。
 3. `oop-type-design` または該当 design owner が clause IDs、責務境界、state/invariant、implementation trace を固定する。
 4. handoff owner が `design_sha256`、clause fingerprints、allowed targets と `implementation_targets_sha256`、validation route と `validation_route_sha256`、reverse-coverage expectation を一つの参照 packet にする。
 5. implementation owner は各 change を clause ID に結び付け、追加の design divergence を作らない。
@@ -134,9 +161,10 @@ tools/bin/agent-canon docs check
 | `DIC-005..DIC-006` | current/planned review owner | `agents/skills/change-review.md`, `tools/agent_tools/check_design_doc_claims.py` | every accepted finding has forward and reverse evidence; drift is a blocker |
 | `DIC-007..DIC-008` | current routing/path owners | `tools/agent_tools/route.py`, `tools/agent_tools/agent_canon_source_root.py` | capability and locator changes map back to the clause that authorized them |
 | `DIC-009` | current canonical-document owners | `agents/internal-routines/`, `agents/skills/`, `documents/design/` | a new policy copy or loophole maps to a rejected design change |
+| `DIC-010` | current DIC routine | this routine only; owner surfaces consume `DIC-010` path/section/clause/ref receipts | dependency headers, README map, target headers, validation/runtime docs, and root projections close the forward/reverse source packet |
 
 Reverse mapping rule: any future implementation change that touches a path, schema, state transition, owner order, serialization, or validation command named by this routine must select a clause ID before editing; any clause with no current/planned owner or evidence is a design gap, not an implementation TODO. This table is the universal correspondence index; stage documents add only their owner-specific route.
 
 ## Clause IDs
 
-この routine の clause ID は `DIC-001` から `DIC-009` です。新しい clause はこの文書と対応する design trace を同一変更で更新し、個別 skill に同じ規則を再掲しません。
+この routine の clause ID は `DIC-001` から `DIC-010` です。新しい clause はこの文書と対応する design trace を同一変更で更新し、個別 skill に同じ規則を再掲しません。

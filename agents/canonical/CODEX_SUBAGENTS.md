@@ -5,6 +5,7 @@ responsibility Documents Codex Subagents for this repository.
 upstream design ../task_catalog.yaml task routing catalog
 upstream design ../agents_config.json permanent team role ownership and artifact policy
 upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md empirical evaluation packet and report contract
+upstream design ../../documents/design/request-intent-and-update-relation.md compact reuse, parallel handoff, and cleanup projection
 downstream design CODEX_WORKFLOW.md workflow consumes subagent routing contract
 downstream implementation ../../.codex/config.toml Codex runtime config consumes subagent routing
 downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP readability report reviewer role
@@ -22,6 +23,20 @@ role profile/instruction authority は `agents/model_profiles.toml` と
 project-level subagent registration と runtime budget は `.codex/config.toml` の `[agents]` と `[agents.<name>]` を正本にします。
 prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` を先に通し、
 この file は inventory と activation の入口に保ちます。
+
+## Compact request/update projection
+
+`../../documents/design/request-intent-and-update-relation.md` の handoff flow は既存
+agent context の再利用を優先し、owner/write-scope/DAG evidence が disjoint な場合だけ
+必要な並列 handoff を作ります。descendant close、reservation release、terminal handback
+はこの owner の既存 lifecycle evidence と `close_agent` receipt を使います。
+
+Compatibility evidence のある update operation は既存 agent context を reuse-ready state
+へ更新し、active packet readback を完了 evidence にします。disjoint owner/write-scope/
+dependency-order evidence のある update operation は必要な parallel handoff を
+handoff-ready state へ進め、owner handoff と dependency-order readback を完了 evidence
+にします。completed integration の readback は既存 cleanup receipt を dispatch-ready state
+へ進め、`CleanupProof`、`G6`、terminal `close_agent` receipt を closeout evidence にします。
 
 ## この文書の読み方
 

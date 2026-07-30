@@ -10,6 +10,7 @@ upstream design ../../documents/design/dependency-manifest-design.md defines dep
 upstream design ../../documents/operations/BRANCH_SCOPE.md defines Git commit correctness and push evidence
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback workflow
 upstream design ../internal-routines/design-implementation-correspondence.md design read/fingerprint/handoff correspondence route
+upstream design ../../documents/design/request-intent-and-update-relation.md compact task-packet request and update projection
 downstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -20,6 +21,26 @@ implementation stage に入る前に、
 `../internal-routines/design-implementation-correspondence.md` の design read と
 clause fingerprint route を task packet に接続します。この skill は task
 stage の transport owner であり、対応 policy を複製しません。
+
+### Compact request/update projection
+
+`documents/design/request-intent-and-update-relation.md` の flow を task packet の既存
+request clauses、active state、validation route へ投影します。質問は evidence-read と
+answer completion で閉じ、explicit write clause は owner handoff に進み、追加入力は
+既存 packet の sparse delta として read-back します。
+追加・変更 clause は既存 write gate の readback 後に、goal/artifact/order/handoff の
+既存 delta fields として task packet へ投影されます。
+
+質問の operation は evidence-read、resulting state は answer-complete、completion evidence
+は evidence-backed answer と task-packet readback です。explicit write clause の operation
+は owner handoff、resulting state は write-ready、completion evidence は owner/write-set/
+acceptance readback です。update の operation は compatible active context への overlay、
+resulting state は sparse delta、completion evidence は changed-clause と delta readback
+です。worker は selected design と DIC closure packet を implementation 前に読み、review
+は changed path から design clause への reverse trace を readback します。
+
+task packet は DIC `DIC-010` の path+section+clause/ref closure packet を保持し、
+DIC の closure readback 後に worker handoff を開始します。traversal policy は DIC が所有します。
 
 - Purpose: gives Codex a context-independent repository task execution path
   from intake through validation and closeout.

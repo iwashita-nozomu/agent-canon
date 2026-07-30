@@ -8,6 +8,7 @@ upstream design ../../documents/rule/README.md document rule canon
 upstream design ../../documents/design/README.md design canon reader route
 upstream design ../../issues/README.md durable issue and GitHub mirror policy
 upstream design ../internal-routines/design-implementation-correspondence.md forward/reverse design correspondence and drift block route
+upstream design ../../documents/design/request-intent-and-update-relation.md compact request/update and related-document closure flow
 @dependency-end
 -->
 
@@ -18,6 +19,16 @@ design-backed diff の review input は、
 `../internal-routines/design-implementation-correspondence.md` の clause
 fingerprint と forward/reverse coverage です。この skill は findings-first
 review の owner であり、universal correspondence policy は複製しません。
+
+### Related Document Closure projection
+
+review packet は DIC `DIC-010` の path+section+clause/ref closure receipt を読み、changed
+path から design/projection drift を reverse に確認します。closure traversal は DIC が所有します。
+review operation はこの receipt、changed path、design clause を結合し、forward/reverse
+coverage-complete state に到達します。completion evidence は design fingerprint、owner
+mapping、implementation target、validation route、そして changed path から design clause
+への reverse trace の readback です。実装 worker が先に読んだ design と closure packet を
+この reverse trace の基準にします。
 
 - Purpose: reviews code, docs, or generated diffs with findings first,
   prioritizing regressions, missing tests, and broken assumptions.
