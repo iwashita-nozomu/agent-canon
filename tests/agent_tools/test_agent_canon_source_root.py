@@ -2,12 +2,9 @@
 
 # @dependency-start
 # contract test
-# responsibility Verifies CLI command execution
-#              anchored to the resolved source root.
-# implementation: ../../tools/agent_tools/agent_canon_source_root.py
-#              resolves source roots.
-# implementation: ../../tools/agent_tools/skill_tool_commands.py
-#              handles delegated commands.
+# responsibility Verifies CLI command execution anchored to the resolved source root.
+# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py resolves source roots.
+# downstream implementation ../../tools/agent_tools/skill_tool_commands.py handles delegated commands.
 # @dependency-end
 
 from __future__ import annotations
