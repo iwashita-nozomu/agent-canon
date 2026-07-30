@@ -395,9 +395,9 @@ branch / PR workflow, then reflected in the template through the clean
 `vendor/agent-canon` pin and shared root views. Root view repair is owned by:
 
 ```bash
-	AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-	  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
-	PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 ```
 
 Run these commands when AgentCanon source, the submodule pin, `.gitmodules`,
@@ -425,8 +425,8 @@ For AgentCanon source, submodule pin, `.gitmodules`, root runtime view,
 root-copy surface, or parent root sync changes, closeout also cites
 `agentcanon_structure_followup=required` and
 `agentcanon_structure_followup=pass`, including the parent-root
-	request-evidence-authorized `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root and
-	`PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` check evidence.
+request-evidence-authorized `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root and
+`PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` check evidence.
 
 A no-subagents closeout is valid only for routing-only/advisory tasks, read-only
 audits, or recorded parent-direct write exceptions; cite the advisory/read-only
@@ -455,5 +455,5 @@ finding.
 - `python3 vendor/agent-canon/tools/agent_tools/check_agent_runtime_alignment.py`
 - `python3 vendor/agent-canon/tools/agent_tools/repo_structure_contract.py --root vendor/agent-canon --contract vendor/agent-canon/documents/structure/repo-structure-contract.toml`
 - `python3 vendor/agent-canon/tools/agent_tools/responsibility_scope.py --root .`
-	- `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` check
+- `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` check
 - `python3 vendor/agent-canon/tools/agent_tools/task_close.py ...`
