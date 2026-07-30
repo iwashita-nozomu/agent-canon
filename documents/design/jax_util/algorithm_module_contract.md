@@ -45,23 +45,20 @@ algorithm を包む場合は、child の ownership を親の contract field と�
 `Info` は親の summary でよく、child の詳細を run-log に出す設計は許可する。ただし
 `Info` 自体は protocol の再 export ではなく、対象 module 内の concrete class とする。
 
-根拠は次の source に固定する。
+根拠は最終 tree の次の source に固定する。
 
-- `tools/agent_tools/check_algorithm_module_public_surface.py` は標準名、literal
-  `__all__`、`STATUS_` 以外の余分な public definition、protocol-only import を検査する。
-- `tools/agent_tools/check_algorithm_module_nested_contract.py` は annotation と
-  `initialize` call から child ownership を推定し、`Problem` のみの利用と child
-  config の局所構築を exempt にする。
-- `rust/agent-canon/src/python_algorithm_contract.rs` は AST JSON を一度抽出し、
-  standard surface、callable `Algorithm`、nested `Info` を含む contract、legacy
-  stopping policy の finding を現在すでに一つの Rust report にまとめている。
+- `rust/agent-canon/src/python_algorithm_contract.rs` が単一の Rust owner として AST
+  JSON を一度抽出し、standard surface、callable `Algorithm`、nested `Info` を含む
+  contract、legacy stopping policy の finding を一つの report にまとめる。退役した
+  Python checker は互換 wrapper や別 route として残さない。
 - `tools/catalog.yaml`、`documents/tools/README.md`、`tools/ci/run_all_checks.sh`
-  は現在 Python nested route と Rust route を別 capability として持つ。CI で実行
-  されているのは Python nested route だけで、public Python route は catalog/manual
-  route に留まる。
-- dedicated fixture file は存在せず、二つの Python test が `tempfile` 内に inline
-  source を作る。Rust test は `ModuleAst` を直接構成する。このため cutover では
-  CLI artifact を読む fixture 層を追加する。
+  は `python-algorithm-contract-check` の単一 capability、CLI、CI wiring を final
+  tree の source として参照する。旧 Python implementation/test path は retire set
+  と parity matrix の履歴 evidence にだけ残り、active route の根拠にはしない。
+- `tests/fixtures/python_algorithm_contract/` の `.py.fixture` と
+  `rust/agent-canon/tests/python_algorithm_contract_cli.rs` が、CLI artifact の
+  file/module/finding/parse-error readback を固定する canonical fixture/test surface
+  である。
 
 ## Parity matrix
 
