@@ -2,9 +2,10 @@
 # contract reference
 # responsibility Holds template experiment case definitions after copying.
 # upstream design ../../../documents/experiments/experiment-registry.md defines managed experiment expectations.
+# upstream design ../../../documents/conventions/DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse Python projection traces.
 # downstream implementation run.py consumes topic-specific cases after the template is filled in.
 # @dependency-end
-"""Template case-definition placeholder."""
+"""Define topic-owned cases consumed by the managed experiment entrypoint."""
 
 # IMPLEMENT HERE: define domain cases for topic-owned reports only.
 # The managed route does not import this module as an execution entrypoint; it
