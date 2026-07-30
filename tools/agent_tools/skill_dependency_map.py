@@ -5,21 +5,25 @@
 # upstream design ../../agents/skills/catalog.yaml owns public skill identity and command phases
 # upstream design ../../agents/skills/skill-dependencies.yaml owns skill relations and invocation order
 # upstream design ../../tools/catalog.yaml owns canonical ToolIDs
+# upstream design ../../documents/design/skill-tool-invocation-graph.md owns the v2 schema and digest rules
 # upstream implementation ./skill_tool_commands.py resolves command packets and execution argv
-# upstream implementation ./visualization_contract.py owns typed owner/adapter coverage and readback
+# upstream implementation ./skill_route_catalog.py owns typed visualization owner/adapter routing
 # downstream implementation ../../documents/runtime/skill-dependency-graph.md is generated Mermaid
 # downstream implementation ../../documents/runtime/skill-dependency-graph.json is generated machine graph
+# downstream implementation ./check_skill_tool_invocation_graph.py is the public checker entrypoint
 # downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py checks graph completeness
 # @dependency-end
-"""Materialize the deterministic public skill/tool invocation graph."""
+"""Materialize and validate the deterministic public skill/tool graph."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import re
 import shlex
 import sys
+import unicodedata
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -34,6 +38,7 @@ from skill_route_catalog import (
     VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
     VISUALIZATION_OWNER_TOOL_ID,
     SkillDependencyRule,
+    build_visualization_adapter_tool_call,
     build_visualization_owner_tool_call,
     derive_skill_invocation_order,
     load_skill_catalog,
@@ -42,22 +47,16 @@ from skill_route_catalog import (
 )
 from skill_tool_commands import SkillCommandPacket, packet_for_skill
 from visualization_contract import (
-    ProjectionCoverageEntry,
     VisualizationSourceItem,
-    VisualizationSourceUniverse,
-    build_projection_coverage_manifest,
     build_source_universe,
-    readback_projection,
-    serialize_projection_coverage_manifest,
-    serialize_projection_identity,
     serialize_tool_call,
-    validate_projection_coverage,
 )
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_GRAPH_PATH = Path("documents/runtime/skill-dependency-graph.md")
 DEFAULT_JSON_PATH = Path("documents/runtime/skill-dependency-graph.json")
-GRAPH_SCHEMA = "agent_canon.skill_tool_invocation_graph.v1"
+GRAPH_SCHEMA = "agent_canon.skill_tool_invocation_graph.v2"
+CHECK_SCHEMA = "agent_canon.skill_tool_invocation_check.v1"
 GRAPH_ARTIFACT_ID = "skill-tool-invocation-graph"
 GRAPH_RENDERER_ID = VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID
 GRAPH_CAPACITY = 8192
@@ -81,7 +80,24 @@ SOURCE_KINDS = (
     "evidence",
     "time",
 )
+IDENTITY_KINDS = (
+    "skill",
+    "phase",
+    "command",
+    "tool",
+    "capability",
+    "toolcall",
+    "edge",
+    "source",
+    "manifest",
+    "coverage",
+    "readback",
+)
 GRAPH_HEADER = "<!-- Generated from the typed skill/tool invocation graph; do not edit by hand. -->"
+MERMAID_HEADER_RE = re.compile(
+    r"^<!-- graph_digest=([0-9a-f]{64}) coverage_digest=([0-9a-f]{64}) -->$"
+)
+MERMAID_KV_RE = re.compile(r"([a-z_]+)=([^ ]+)")
 
 
 class GraphCapacityError(ValueError):
@@ -96,57 +112,169 @@ class GraphCapacityError(ValueError):
         super().__init__(f"{self.code}:observed={observed}:capacity={capacity}")
 
 
+class GraphIdentityError(ValueError):
+    """Base class for typed identity/preimage failures."""
+
+    def __init__(self, code: str, detail: str) -> None:
+        """Initialize a machine-readable identity failure."""
+        self.code = code
+        self.detail = detail
+        super().__init__(f"{code}:{detail}")
+
+
+class GraphIdentityCollisionError(GraphIdentityError):
+    """Same kind/id was presented with a different canonical preimage."""
+
+    def __init__(self, detail: str) -> None:
+        """Initialize an identity collision."""
+        super().__init__("identity_collision", detail)
+
+
+class GraphDigestCollisionError(GraphIdentityError):
+    """One digest was assigned to different canonical preimages."""
+
+    def __init__(self, detail: str) -> None:
+        """Initialize a digest collision."""
+        super().__init__("digest_collision", detail)
+
+
+class GraphDigestMismatchError(GraphIdentityError):
+    """A reference or identity record has an invalid digest."""
+
+    def __init__(self, detail: str) -> None:
+        """Initialize a digest mismatch."""
+        super().__init__("digest_mismatch", detail)
+
+
+def _unicode(value: object) -> object:
+    """Normalize strings to NFC while retaining ordered JSON containers."""
+    if isinstance(value, str):
+        return unicodedata.normalize("NFC", value)
+    if isinstance(value, Mapping):
+        return {
+            unicodedata.normalize("NFC", str(key)): _unicode(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_unicode(item) for item in value]
+    if isinstance(value, tuple):
+        return [_unicode(item) for item in value]
+    return value
+
+
+def _canonical_bytes(value: object) -> bytes:
+    """Serialize compact canonical UTF-8 bytes without a trailing newline."""
+    return json.dumps(
+        _unicode(value), ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+
+
 def _canonical_json(value: object) -> str:
-    """Serialize JSON with the graph's stable key and Unicode policy."""
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    """Serialize one compact canonical JSON value."""
+    return _canonical_bytes(value).decode("utf-8")
 
 
 def _digest(value: object) -> str:
     """Return a deterministic SHA-256 digest for one JSON value."""
-    return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+    return hashlib.sha256(_canonical_bytes(value)).hexdigest()
 
 
-def _stable_id(*parts: object) -> str:
-    """Return one collision-resistant source identity."""
-    return hashlib.sha256(
-        "\x1f".join(str(part) for part in parts).encode("utf-8")
-    ).hexdigest()
+def _identity_preimage(identity_id: str, kind: str, payload: object) -> bytes:
+    """Build the SG-004 identity preimage exactly."""
+    return b"\x00".join(
+        (
+            b"agent-canon",
+            b"skill-tool-invocation-graph.v2",
+            unicodedata.normalize("NFC", identity_id).encode("utf-8"),
+            unicodedata.normalize("NFC", kind).encode("utf-8"),
+            _canonical_bytes(payload),
+        )
+    )
 
 
-def _source_item(
-    *,
-    kind: str,
-    origin: str,
-    locator: str,
-    ordinal: int,
-    payload: Mapping[str, object],
-) -> VisualizationSourceItem:
-    """Build one canonical visualization source item."""
-    if kind not in SOURCE_KINDS:
-        raise ValueError(f"skill_tool_invocation_graph_invalid_source_kind:{kind}")
-    payload_json = _canonical_json(dict(payload))
-    return {
-        "item_id": _stable_id(kind, origin, locator, ordinal, payload_json),
-        "kind": cast(Any, kind),
-        "origin": cast(Any, origin),
-        "source_locator": locator,
-        "source_start": None,
-        "source_end": None,
-        "ordinal": ordinal,
-        "payload_json": payload_json,
-    }
+def _identity_digest(identity_id: str, kind: str, payload: object) -> str:
+    """Hash an identity preimage, excluding the digest field itself."""
+    return hashlib.sha256(_identity_preimage(identity_id, kind, payload)).hexdigest()
 
 
-def _source_counts(items: Sequence[VisualizationSourceItem]) -> dict[str, int]:
-    """Count every source kind, including zero-valued kinds."""
-    counts = {kind: 0 for kind in SOURCE_KINDS}
-    for item in items:
-        counts[item["kind"]] += 1
-    return counts
+def _ref(record: Mapping[str, object]) -> dict[str, str]:
+    """Return only the stable reference part of an identity record."""
+    return {"id": cast(str, record["id"]), "digest": cast(str, record["digest"])}
+
+
+class _IdentityStore:
+    """Store each canonical payload once and issue digest-checked references."""
+
+    def __init__(self) -> None:
+        """Initialize the identity and preimage indexes."""
+        self.records: list[dict[str, object]] = []
+        self._by_key: dict[tuple[str, str], dict[str, object]] = {}
+        self._by_digest: dict[str, bytes] = {}
+        self._by_payload: dict[tuple[str, bytes], str] = {}
+
+    def add(
+        self, kind: str, identity_id: str, payload: Mapping[str, object]
+    ) -> dict[str, str]:
+        """Add or reuse one identity, rejecting collisions and payload duplication."""
+        if kind not in IDENTITY_KINDS:
+            raise ValueError(f"invalid_identity_kind:{kind}")
+        normalized = cast(Mapping[str, object], _unicode(dict(payload)))
+        preimage = _identity_preimage(identity_id, kind, normalized)
+        digest = hashlib.sha256(preimage).hexdigest()
+        key = (kind, identity_id)
+        existing = self._by_key.get(key)
+        if existing is not None:
+            if (
+                cast(str, existing["digest"]) != digest
+                or existing["canonical_payload"] != normalized
+            ):
+                raise GraphIdentityCollisionError(f"{kind}:{identity_id}")
+            return _ref(existing)
+        old_preimage = self._by_digest.get(digest)
+        if old_preimage is not None and old_preimage != preimage:
+            raise GraphDigestCollisionError(digest)
+        payload_key = (kind, _canonical_bytes(normalized))
+        old_id = self._by_payload.get(payload_key)
+        if old_id is not None:
+            raise GraphIdentityCollisionError(
+                f"payload_duplicate:{kind}:{old_id}:{identity_id}"
+            )
+        record: dict[str, object] = {
+            "id": identity_id,
+            "digest": digest,
+            "kind": kind,
+            "canonical_payload": dict(normalized),
+        }
+        self.records.append(record)
+        self._by_key[key] = record
+        self._by_digest[digest] = preimage
+        self._by_payload[payload_key] = identity_id
+        return _ref(record)
+
+    def require(self, reference: Mapping[str, object]) -> dict[str, object]:
+        """Resolve and verify one Ref."""
+        identity_id = reference.get("id")
+        digest = reference.get("digest")
+        if not isinstance(identity_id, str) or not isinstance(digest, str):
+            raise GraphDigestMismatchError("malformed_ref")
+        matches = [record for record in self.records if record["id"] == identity_id]
+        if len(matches) != 1:
+            raise GraphDigestMismatchError(f"missing_ref:{identity_id}")
+        record = matches[0]
+        if record["digest"] != digest:
+            raise GraphDigestMismatchError(f"ref:{identity_id}")
+        expected = _identity_digest(
+            identity_id,
+            cast(str, record["kind"]),
+            cast(Mapping[str, object], record["canonical_payload"]),
+        )
+        if expected != digest:
+            raise GraphDigestMismatchError(f"record:{identity_id}")
+        return record
 
 
 def _file_digest(root: Path, relative: str) -> str:
-    """Digest one required canonical source file or fail closed."""
+    """Digest one canonical source file, retaining only its logical locator."""
     path = root / relative
     if not path.is_file():
         raise ValueError(f"skill_tool_invocation_graph_missing_source:{relative}")
@@ -183,10 +311,10 @@ def _load_tool_entries(root: Path) -> tuple[Mapping[str, object], ...]:
         raise ValueError("skill_tool_invocation_graph_tool_catalog_invalid")
     entries: list[Mapping[str, object]] = []
     for entry in raw["entries"]:
-        if not isinstance(entry, Mapping):
-            raise ValueError("skill_tool_invocation_graph_tool_catalog_invalid_entry")
-        if not isinstance(entry.get("id"), str) or not isinstance(
-            entry.get("path"), str
+        if (
+            not isinstance(entry, Mapping)
+            or not isinstance(entry.get("id"), str)
+            or not isinstance(entry.get("path"), str)
         ):
             raise ValueError("skill_tool_invocation_graph_tool_catalog_invalid_entry")
         entries.append(cast(Mapping[str, object], entry))
@@ -197,9 +325,8 @@ def _resolve_tool_id(
     logical_command: str,
     execution_argv: Sequence[str],
     entries: Sequence[Mapping[str, object]],
-    root: Path,
 ) -> str | None:
-    """Resolve a command to the ToolID owner without inventing catalog rows."""
+    """Resolve a logical command to a catalog ToolID without inventing rows."""
     for entry in entries:
         command = entry.get("command")
         if isinstance(command, str) and (
@@ -207,16 +334,9 @@ def _resolve_tool_id(
         ):
             return cast(str, entry["id"])
     tokens = shlex.split(logical_command)
-    script_tokens = [token for token in tokens[1:2] if token]
-    for token in script_tokens:
-        relative = token
-        if Path(token).is_absolute():
-            try:
-                relative = str(Path(token).resolve().relative_to(root.resolve()))
-            except ValueError:
-                continue
+    for token in tokens[1:2]:
         for entry in entries:
-            if entry.get("path") == relative:
+            if entry.get("path") == token:
                 return cast(str, entry["id"])
     if execution_argv:
         executable = execution_argv[0]
@@ -246,178 +366,275 @@ def _packet_commands(
     raise ValueError(f"skill_tool_invocation_graph_unknown_phase:{phase}")
 
 
-def _build_owner_and_adapter_calls(
-    literal_items: Sequence[VisualizationSourceItem],
-    owner_items: Sequence[VisualizationSourceItem],
-    dependency_items: Sequence[VisualizationSourceItem],
-) -> tuple[dict[str, object], dict[str, object]]:
-    """Build the owner-first canonical ToolCall pair for this projection."""
-    owner_base = build_visualization_owner_tool_call(
-        "capability:dependency_manifest_graph",
-        "agents/skills/catalog.yaml#capability:dependency_manifest_graph",
-    )
-    arguments = dict(owner_base["arguments"])
-    arguments.update(
-        {
-            "literal_items": list(literal_items),
-            "owner_closure": list(owner_items),
-            "dependency_closure": list(dependency_items),
-            "artifact_id": GRAPH_ARTIFACT_ID,
-            "renderer_id": GRAPH_RENDERER_ID,
-            "artifact_format": "markdown_mermaid",
-        }
-    )
-    owner = {
-        "schema": owner_base["schema"],
-        "tool_id": VISUALIZATION_OWNER_TOOL_ID,
-        "argument_schema": VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
-        "arguments": arguments,
-    }
-    serialize_tool_call(owner)
-    adapter_arguments = dict(arguments)
-    adapter_arguments["dependency_manifest_locator"] = (
-        "agents/skills/skill-dependencies.yaml"
-    )
-    adapter = {
-        "schema": owner_base["schema"],
-        "tool_id": VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID,
-        "argument_schema": VISUALIZATION_DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA,
-        "arguments": adapter_arguments,
-    }
-    serialize_tool_call(adapter)
-    return owner, adapter
-
-
-def _coverage(
-    source_items: Sequence[VisualizationSourceItem],
-    owner_call: Mapping[str, object],
-    adapter_call: Mapping[str, object],
-) -> tuple[VisualizationSourceUniverse, dict[str, object], dict[str, object], str]:
-    """Build, read back, and validate complete typed projection coverage."""
-    literal = [item for item in source_items if item["origin"] == "literal_request"]
-    owner = [item for item in source_items if item["origin"] == "owner_closure"]
-    dependency = [
-        item for item in source_items if item["origin"] == "dependency_closure"
-    ]
-    universe = build_source_universe(
-        request_id=cast(
-            str, cast(Mapping[str, object], owner_call)["arguments"]["request_id"]
-        ),
-        literal_request=cast(
-            str, cast(Mapping[str, object], owner_call)["arguments"]["literal_request"]
-        ),
-        literal_items=literal,
-        owner_closure=owner,
-        dependency_closure=dependency,
-    )
-    entries: list[ProjectionCoverageEntry] = []
-    for item in universe["items"]:
-        identity = f"skill-tool-graph:{item['kind']}:{item['item_id']}"
-        token = serialize_projection_identity(identity)
-        entries.append(
+def _route_snapshot(rules: Sequence[object]) -> list[dict[str, object]]:
+    """Create a logical, ToolCall-free route packet snapshot."""
+    result: list[dict[str, object]] = []
+    for rule in rules:
+        typed = cast(Any, rule)
+        result.append(
             {
-                "source_item_id": item["item_id"],
-                "source_kind": item["kind"],
-                "rendered_identity": identity,
-                "artifact_locator": [token],
-                "renderer_id": GRAPH_RENDERER_ID,
-                "readback_identity": identity,
-                "payload_json": item["payload_json"],
-                "view_state": "visible",
+                "skill": typed.skill,
+                "stage_policy": typed.stage_policy,
+                "responsibility_group": typed.responsibility_group,
+                "related_skills": list(typed.related_skills),
+                "capabilities": [
+                    {
+                        "id": route.capability_id,
+                        "owner": route.owner,
+                        "phase": route.phase,
+                        "activation": route.activation,
+                        "exclusive": route.exclusive,
+                    }
+                    for route in typed.capabilities
+                ],
+                "visualization_role": typed.visualization_role,
+                "tool_id": typed.tool_id,
+                "argument_schema": typed.argument_schema,
+                "required_prerequisites": list(typed.required_prerequisites),
+                "successors": list(typed.successors),
             }
         )
-    expected_identities = {entry["readback_identity"]: entry for entry in entries}
-    readback_placeholder = {
-        "artifact_id": GRAPH_ARTIFACT_ID,
-        "artifact_format": "markdown_mermaid",
-        "renderer_id": GRAPH_RENDERER_ID,
-        "identities": expected_identities,
-        "readback_counts": _source_counts(universe["items"]),
-        "coverage_digest": "",
-        "status": "pass",
-        "violations": [],
+    return result
+
+
+def _build_owner_and_adapter_calls(
+    capability_id: str,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Invoke the typed visualization owner before its dependency adapter."""
+    owner = build_visualization_owner_tool_call(
+        f"capability:{capability_id}",
+        f"agents/skills/catalog.yaml#capability:{capability_id}",
+    )
+    serialize_tool_call(owner)
+    adapter = build_visualization_adapter_tool_call(owner)
+    serialize_tool_call(adapter)
+    return cast(dict[str, object], owner), cast(dict[str, object], adapter)
+
+
+def _legacy_source_item(
+    kind: str, origin: str, locator: str, ordinal: int, payload: Mapping[str, object]
+) -> VisualizationSourceItem:
+    """Build the source item accepted by the public owner ToolCall contract."""
+    return {
+        "item_id": _digest(
+            {
+                "kind": kind,
+                "origin": origin,
+                "locator": locator,
+                "ordinal": ordinal,
+                "payload": payload,
+            }
+        ),
+        "kind": cast(Any, kind),
+        "origin": cast(Any, origin),
+        "source_locator": locator,
+        "source_start": None,
+        "source_end": None,
+        "ordinal": ordinal,
+        # visualization_contract owns this compatibility envelope's sorted-key
+        # serializer; the v2 graph never persists this full source payload.
+        "payload_json": json.dumps(
+            payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ),
     }
-    manifest = build_projection_coverage_manifest(
-        universe,
-        artifact_id=GRAPH_ARTIFACT_ID,
-        renderer_id=GRAPH_RENDERER_ID,
-        artifact_format="markdown_mermaid",
-        entries=entries,
-        readback=cast(Any, readback_placeholder),
-    )
-    marker = serialize_projection_coverage_manifest(
-        manifest,
-        owner_tool_call=cast(Any, owner_call),
-        adapter_tool_call=cast(Any, adapter_call),
-    )
-    readback_placeholder = dict(
-        readback_projection(
-            _render_mermaid_placeholder(manifest, marker, entries),
-            "markdown_mermaid",
-            artifact_id=GRAPH_ARTIFACT_ID,
-            renderer_id=GRAPH_RENDERER_ID,
-        )
-    )
-    report = validate_projection_coverage(
-        universe,
-        manifest,
-        readback=cast(Any, readback_placeholder),
-    )
-    if report["status"] != "pass":
-        raise ValueError(
-            "skill_tool_invocation_graph_coverage_failure:"
-            + ";".join(violation["detail"] for violation in report["violations"])
-        )
-    return universe, cast(dict[str, object], manifest), readback_placeholder, marker
 
 
-def _render_mermaid_placeholder(
-    manifest: Mapping[str, object],
-    marker: str,
-    entries: Sequence[ProjectionCoverageEntry],
-) -> str:
-    """Render the coverage-only syntax used for canonical readback."""
-    tokens = [locator for entry in entries for locator in entry["artifact_locator"]]
-    return (
-        "<!-- "
-        + marker
-        + " -->\n```mermaid\ngraph LR\n"
-        + "\n".join(f"%% {token}" for token in tokens)
-        + "\n```\n"
+def _source_record(
+    identities: _IdentityStore,
+    source_inventory: list[dict[str, object]],
+    source_kind: str,
+    locator: str,
+    ordinal: int,
+    subject: Mapping[str, str] | None,
+    **extra: object,
+) -> dict[str, str]:
+    """Materialize one source locator/digest record as a Ref-only inventory item."""
+    if source_kind not in SOURCE_KINDS:
+        raise ValueError(f"invalid_source_kind:{source_kind}")
+    payload: dict[str, object] = {
+        "source_kind": source_kind,
+        "source_locator": locator,
+        "ordinal": ordinal,
+        "subject_ref": dict(subject) if subject is not None else None,
+        **extra,
+    }
+    source_id = f"source:{source_kind}:{ordinal:05d}:{_digest(payload)[:16]}"
+    source_ref = identities.add("source", source_id, payload)
+    source_inventory.append(
+        {
+            "ref": source_ref,
+            "kind": source_kind,
+            "source_locator": locator,
+            "ordinal": ordinal,
+        }
     )
+    return source_ref
 
 
-def _edge(
-    edges: list[dict[str, object]],
-    source_items: list[VisualizationSourceItem],
-    edge_type: str,
-    source: str,
-    target: str,
-    **payload: object,
+def _source_counts(source_inventory: Sequence[Mapping[str, object]]) -> dict[str, int]:
+    """Count all eight typed source categories, including zero values."""
+    counts = {kind: 0 for kind in SOURCE_KINDS}
+    for item in source_inventory:
+        counts[cast(str, item["kind"])] += 1
+    return counts
+
+
+def _ref_key(reference: Mapping[str, object]) -> tuple[str, str]:
+    """Return a stable comparison key for a Ref."""
+    return cast(str, reference["id"]), cast(str, reference["digest"])
+
+
+def _projection_entry(
+    reference: Mapping[str, str], label: str, order: int | None = None
+) -> dict[str, object]:
+    """Build a projection envelope containing a Ref and no canonical payload."""
+    result: dict[str, object] = {"ref": dict(reference), "display_label": label}
+    if order is not None:
+        result["order"] = order
+    return result
+
+
+def _validate_projection_refs(
+    graph: Mapping[str, object], identities: _IdentityStore
 ) -> None:
-    """Append one typed edge and its source evidence."""
-    edge_index = len(edges)
-    record = {
-        "edge_id": f"edge:{edge_index:04d}",
-        "edge_type": edge_type,
-        "source": source,
-        "target": target,
-        **payload,
+    """Validate every Ref-only projection against the IdentityRecord store."""
+    for field in ("skills", "phases", "commands", "tools", "capabilities", "toolcalls"):
+        for item in cast(Sequence[Mapping[str, object]], graph[field]):
+            identities.require(cast(Mapping[str, object], item["ref"]))
+            if (
+                "canonical_payload" in item
+                or "logical_argv" in item
+                or "execution_argv" in item
+            ):
+                raise ValueError(f"payload_leak:{field}")
+    for edge in cast(Sequence[Mapping[str, object]], graph["edges"]):
+        identities.require(cast(Mapping[str, object], edge["edge_ref"]))
+        identities.require(cast(Mapping[str, object], edge["source_ref"]))
+        identities.require(cast(Mapping[str, object], edge["target_ref"]))
+
+
+def _add_edge(
+    identities: _IdentityStore,
+    edges: list[dict[str, object]],
+    source_inventory: list[dict[str, object]],
+    edge_type: str,
+    source: Mapping[str, str],
+    target: Mapping[str, str],
+    order: int,
+    attributes: Mapping[str, object] | None = None,
+) -> None:
+    """Materialize one edge identity, projection, and source evidence row."""
+    if edge_type not in EDGE_TYPES:
+        raise ValueError(f"unknown_edge_type:{edge_type}")
+    edge_id = f"edge:{len(edges):05d}"
+    payload = {
+        "id": edge_id,
+        "kind": edge_type,
+        "source_id": source["id"],
+        "target_id": target["id"],
+        "order": order,
+        "attributes": dict(attributes or {}),
     }
-    edges.append(record)
-    source_items.append(
-        _source_item(
-            kind="edge",
-            origin="dependency_closure",
-            locator=f"graph:edge:{edge_index:04d}",
-            ordinal=edge_index,
-            payload=record,
-        )
+    edge_ref = identities.add("edge", edge_id, payload)
+    edges.append(
+        {
+            "edge_ref": edge_ref,
+            "source_ref": dict(source),
+            "target_ref": dict(target),
+            "display_label": edge_type,
+        }
     )
+    _source_record(
+        identities,
+        source_inventory,
+        "edge",
+        f"graph:edge:{len(edges) - 1:05d}",
+        len(edges) - 1,
+        edge_ref,
+        edge_type=edge_type,
+        source_ref=dict(source),
+        target_ref=dict(target),
+        order=order,
+    )
+
+
+def _projection_digest(graph: Mapping[str, object]) -> dict[str, str]:
+    """Digest each projection independently of downstream artifact bytes."""
+    return {
+        "nodes": _digest(
+            {
+                key: graph[key]
+                for key in (
+                    "skills",
+                    "phases",
+                    "commands",
+                    "tools",
+                    "capabilities",
+                    "toolcalls",
+                )
+            }
+        ),
+        "edges": _digest(graph["edges"]),
+        "invocation_order": _digest(graph["invocation_order"]),
+    }
+
+
+def _source_snapshot(
+    root: Path,
+    rules: Sequence[object],
+    packets: Mapping[str, SkillCommandPacket],
+    toolcall_packet: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Build the six logical source locator/digest entries required by SG-003."""
+    skill_ids = tuple(packets)
+    command_packet = [
+        {
+            "skill": skill,
+            "phase": phase,
+            "commands": [
+                {"logical_command": row[0], "logical_argv": list(shlex.split(row[0]))}
+                for row in _packet_commands(packets[skill], phase)
+            ],
+        }
+        for skill in skill_ids
+        for phase in PHASES
+    ]
+    route_packet = _route_snapshot(rules)
+    locators = {
+        "catalog_sha256": "agents/skills/catalog.yaml",
+        "dependencies_sha256": "agents/skills/skill-dependencies.yaml",
+        "reader_index_sha256": "agents/canonical/skills.md",
+        "route_packet_sha256": "agents/skills/catalog.yaml#routing",
+        "command_packet_sha256": "tools/agent_tools/skill_tool_commands.py#canonical-resolution",
+        "toolcall_packet_sha256": "agents/skills/catalog.yaml#typed-visualization-toolcalls",
+    }
+    return {
+        "catalog_sha256": _file_digest(root, locators["catalog_sha256"]),
+        "dependencies_sha256": _file_digest(root, locators["dependencies_sha256"]),
+        "reader_index_sha256": _file_digest(root, locators["reader_index_sha256"]),
+        "route_packet_sha256": _digest(route_packet),
+        "command_packet_sha256": _digest(command_packet),
+        "toolcall_packet_sha256": _digest(toolcall_packet),
+        "source_locators": locators,
+    }
+
+
+def _validate_reader_parity(root: Path) -> None:
+    """Check skills.md as a link-only reader index, never as a 60-row canon."""
+    text = (root / "agents/canonical/skills.md").read_text(encoding="utf-8")
+    required_links = (
+        "../skills/README.md",
+        "../skills/catalog.yaml",
+        "../internal-routines/README.md",
+    )
+    missing = [link for link in required_links if link not in text]
+    if missing:
+        raise ValueError("skills_md_link_parity:" + ",".join(missing))
 
 
 def build_graph(root: Path, *, capacity: int = GRAPH_CAPACITY) -> dict[str, object]:
-    """Build the complete graph payload without truncating any source identity."""
+    """Build the complete v2 graph without truncating any source identity."""
+    _validate_reader_parity(root)
     catalog = load_skill_catalog(root)
     skill_ids = tuple(
         cast(str, cast(Mapping[str, object], entry)["id"])
@@ -428,353 +645,702 @@ def build_graph(root: Path, *, capacity: int = GRAPH_CAPACITY) -> dict[str, obje
     rules = dict(load_skill_dependency_map(root, skill_ids))
     route_rules = load_skill_route_rules(root)
     route_by_skill = {rule.skill: rule for rule in route_rules}
+    if set(skill_ids) != set(rules) or set(skill_ids) != set(route_by_skill):
+        raise ValueError("skill_tool_invocation_graph_skill_identity_mismatch")
     packets = _packets(root, skill_ids)
     tools = _load_tool_entries(root)
     invocation_order = derive_skill_invocation_order(skill_ids, route_rules)
     invocation_ordinals = {skill: index for index, skill in enumerate(invocation_order)}
-    source_items: list[VisualizationSourceItem] = [
-        _source_item(
-            kind="identity",
-            origin="literal_request",
-            locator="route:capability:dependency_manifest_graph",
-            ordinal=0,
-            payload={"request": "complete public skill/tool invocation graph"},
-        ),
-        _source_item(
-            kind="module",
-            origin="owner_closure",
-            locator="agents/skills/code-visualization.md",
-            ordinal=0,
-            payload={
-                "owner_skill": "code-visualization",
-                "owner_tool_id": VISUALIZATION_OWNER_TOOL_ID,
-            },
-        ),
-    ]
-    nodes: list[dict[str, object]] = []
-    commands: list[dict[str, object]] = []
-    phases: list[dict[str, object]] = []
-    edges: list[dict[str, object]] = []
-    branches: list[dict[str, object]] = []
-    modules: dict[str, dict[str, object]] = {}
-    for ordinal, skill in enumerate(skill_ids):
+    identities = _IdentityStore()
+    source_inventory: list[dict[str, object]] = []
+    skill_refs: dict[str, dict[str, str]] = {}
+    phase_refs: dict[tuple[str, str], dict[str, str]] = {}
+    command_refs: dict[tuple[str, str, int], dict[str, str]] = {}
+    capability_refs: dict[str, dict[str, str]] = {}
+    tool_refs: dict[str, dict[str, str]] = {}
+    tool_ids_by_command: dict[tuple[str, str, int], str | None] = {}
+    phase_commands: dict[tuple[str, str], list[tuple[int, str, tuple[str, ...]]]] = (
+        defaultdict(list)
+    )
+
+    for skill in skill_ids:
         rule = rules[skill]
-        skill_node = f"skill:{skill}"
-        nodes.append(
+        phase_ids = [f"phase:{skill}:{phase}" for phase in PHASES]
+        capability_ids = [
+            f"capability:{skill}:{route.capability_id}"
+            for route in route_by_skill[skill].capabilities
+        ]
+        command_ids: list[str] = []
+        for phase in PHASES:
+            for index, (logical, _source_root, _execution_cwd, argv) in enumerate(
+                _packet_commands(packets[skill], phase)
+            ):
+                command_id = f"command:{skill}:{phase}:{index:04d}"
+                command_ids.append(command_id)
+                phase_commands[(skill, phase)].append((index, logical, argv))
+        skill_refs[skill] = identities.add(
+            "skill",
+            f"skill:{skill}",
             {
-                "node_id": skill_node,
-                "node_type": "skill",
-                "label": skill,
-                "responsibility_group": rule.responsibility_group,
-                "invocation_ordinal": invocation_ordinals[skill],
-            }
+                "id": skill,
+                "catalog_locator": f"agents/skills/catalog.yaml#skill:{skill}",
+                "canonical_doc": f"agents/skills/{skill}.md",
+                "shim": f".agents/skills/{skill}/SKILL.md",
+                "command_ids": command_ids,
+                "capability_ids": capability_ids,
+                "phase_ids": phase_ids,
+            },
         )
-        source_items.append(
-            _source_item(
-                kind="identity",
-                origin="dependency_closure",
-                locator=f"agents/skills/catalog.yaml#skill:{skill}",
-                ordinal=ordinal,
-                payload=nodes[-1],
-            )
+        _source_record(
+            identities,
+            source_inventory,
+            "identity",
+            f"agents/skills/catalog.yaml#skill:{skill}",
+            skill_ids.index(skill),
+            skill_refs[skill],
+            responsibility_group=rule.responsibility_group,
         )
-        source_items.append(
-            _source_item(
-                kind="time",
-                origin="dependency_closure",
-                locator=f"agents/skills/skill-dependencies.yaml#invocation:{skill}",
-                ordinal=invocation_ordinals[skill],
-                payload={
-                    "skill": skill,
-                    "invocation_ordinal": invocation_ordinals[skill],
+        _source_record(
+            identities,
+            source_inventory,
+            "time",
+            f"agents/skills/skill-dependencies.yaml#invocation:{skill}",
+            invocation_ordinals[skill],
+            skill_refs[skill],
+            invocation_ordinal=invocation_ordinals[skill],
+        )
+        for cap in route_by_skill[skill].capabilities:
+            capability_id = f"capability:{skill}:{cap.capability_id}"
+            capability_refs[capability_id] = identities.add(
+                "capability",
+                capability_id,
+                {
+                    "id": cap.capability_id,
+                    "owner_id": skill,
+                    "type": cap.activation,
+                    "phase_id": f"phase:{skill}:conditional",
+                    "adapter_id": VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID
+                    if cap.capability_id == "dependency_manifest_graph"
+                    else None,
                 },
             )
-        )
-        routing = route_by_skill[skill]
-        for capability in routing.capabilities:
-            branch = {
-                "skill": skill,
-                "capability_id": capability.capability_id,
-                "owner": capability.owner,
-                "phase": capability.phase,
-                "activation": capability.activation,
-                "exclusive": capability.exclusive,
-            }
-            branches.append(branch)
-            source_items.append(
-                _source_item(
-                    kind="branch",
-                    origin="dependency_closure",
-                    locator=f"agents/skills/catalog.yaml#capability:{capability.capability_id}",
-                    ordinal=len(branches) - 1,
-                    payload=branch,
-                )
+            _source_record(
+                identities,
+                source_inventory,
+                "branch",
+                f"agents/skills/catalog.yaml#capability:{cap.capability_id}",
+                len(capability_refs) - 1,
+                capability_refs[capability_id],
+                owner=cap.owner,
+                phase=cap.phase,
             )
-        for phase in PHASES:
-            phase_node = f"phase:{skill}:{phase}"
-            phase_record = {
-                "node_id": phase_node,
-                "skill": skill,
-                "phase": phase,
-                "responsibility_group": rule.responsibility_group,
-            }
-            phases.append(phase_record)
-            nodes.append({"node_type": "phase", **phase_record})
-            source_items.append(
-                _source_item(
-                    kind="phase",
-                    origin="dependency_closure",
-                    locator=f"agents/skills/catalog.yaml#skill:{skill}.tool_commands.{phase}",
-                    ordinal=PHASES.index(phase),
-                    payload=phase_record,
-                )
+
+    for skill in skill_ids:
+        for phase_index, phase in enumerate(PHASES):
+            phase_id = f"phase:{skill}:{phase}"
+            phase_refs[(skill, phase)] = identities.add(
+                "phase",
+                phase_id,
+                {"id": phase_id, "owner_id": skill, "order": phase_index},
             )
-            resolved_rows = _packet_commands(packets[skill], phase)
-            for command_index, (logical, source_root, execution_cwd, argv) in enumerate(
-                resolved_rows
-            ):
-                command_node = f"command:{skill}:{phase}:{command_index}"
-                tool_id = _resolve_tool_id(logical, argv, tools, root)
-                command_record = {
-                    "node_id": command_node,
-                    "skill": skill,
-                    "phase": phase,
-                    "ordinal": command_index,
-                    "logical_command": logical,
-                    "source_root": source_root,
-                    "execution_cwd": execution_cwd,
-                    "execution_argv": list(argv),
-                    "tool_id": tool_id,
-                }
-                commands.append(command_record)
-                nodes.append(
-                    {"node_type": "command", "label": logical, **command_record}
+            _source_record(
+                identities,
+                source_inventory,
+                "phase",
+                f"agents/skills/catalog.yaml#skill:{skill}.tool_commands.{phase}",
+                phase_index,
+                phase_refs[(skill, phase)],
+            )
+            for index, logical, argv in phase_commands[(skill, phase)]:
+                command_id = f"command:{skill}:{phase}:{index:04d}"
+                tool_id = _resolve_tool_id(logical, argv, tools)
+                tool_ids_by_command[(skill, phase, index)] = tool_id
+                command_refs[(skill, phase, index)] = identities.add(
+                    "command",
+                    command_id,
+                    {
+                        "id": command_id,
+                        "skill_id": skill,
+                        "logical_argv": list(shlex.split(logical)),
+                        "source_locator": f"agents/skills/catalog.yaml#skill:{skill}.tool_commands.{phase}[{index}]",
+                        "execution_cwd": ".",
+                        "argv_digest": _digest(list(shlex.split(logical))),
+                    },
                 )
-                source_items.append(
-                    _source_item(
-                        kind="identity",
-                        origin="dependency_closure",
-                        locator=f"agents/skills/catalog.yaml#skill:{skill}.tool_commands.{phase}[{command_index}]",
-                        ordinal=command_index,
-                        payload=command_record,
-                    )
+                _source_record(
+                    identities,
+                    source_inventory,
+                    "identity",
+                    f"agents/skills/catalog.yaml#skill:{skill}.tool_commands.{phase}[{index}]",
+                    index,
+                    command_refs[(skill, phase, index)],
+                    phase=phase,
                 )
-                source_items.append(
-                    _source_item(
-                        kind="field",
-                        origin="dependency_closure",
-                        locator=f"skill_tool_commands:{skill}:{phase}:{command_index}",
-                        ordinal=command_index,
-                        payload={
-                            "logical_command": logical,
-                            "source_root": source_root,
-                            "execution_cwd": execution_cwd,
-                            "execution_argv": list(argv),
+                _source_record(
+                    identities,
+                    source_inventory,
+                    "field",
+                    f"tools/agent_tools/skill_tool_commands.py#{skill}:{phase}:{index}",
+                    index,
+                    command_refs[(skill, phase, index)],
+                    logical_argv=list(shlex.split(logical)),
+                )
+                if tool_id is not None and tool_id not in tool_refs:
+                    entry = next(entry for entry in tools if entry["id"] == tool_id)
+                    tool_refs[tool_id] = identities.add(
+                        "tool",
+                        f"tool:{tool_id}",
+                        {
+                            "id": tool_id,
+                            "owner_id": "tools/catalog.yaml",
+                            "argument_schema_id": entry.get("argument_schema_id"),
+                            "logical_locator": cast(str, entry["path"]),
                         },
                     )
-                )
-                _edge(
-                    edges,
-                    source_items,
-                    "invocation",
-                    skill_node,
-                    phase_node,
-                    phase=phase,
-                    invocation_ordinal=invocation_ordinals[skill],
-                )
-                _edge(
-                    edges,
-                    source_items,
-                    "invocation",
-                    phase_node,
-                    command_node,
-                    phase=phase,
-                    invocation_ordinal=command_index,
-                )
-                if tool_id is not None:
-                    module_node = f"tool:{tool_id}"
-                    if tool_id not in modules:
-                        entry = next(entry for entry in tools if entry["id"] == tool_id)
-                        modules[tool_id] = {
-                            "node_id": module_node,
-                            "node_type": "tool",
-                            "tool_id": tool_id,
-                            "label": tool_id,
-                            "path": entry["path"],
-                        }
-                        nodes.append(modules[tool_id])
-                        source_items.append(
-                            _source_item(
-                                kind="module",
-                                origin="dependency_closure",
-                                locator=f"tools/catalog.yaml#tool:{tool_id}",
-                                ordinal=len(modules) - 1,
-                                payload=modules[tool_id],
-                            )
-                        )
-                    _edge(
-                        edges,
-                        source_items,
-                        "tool-resolution",
-                        command_node,
-                        module_node,
-                        tool_id=tool_id,
+                    _source_record(
+                        identities,
+                        source_inventory,
+                        "module",
+                        f"tools/catalog.yaml#tool:{tool_id}",
+                        len(tool_refs) - 1,
+                        tool_refs[tool_id],
                     )
-        for prerequisite in rule.required_prerequisites:
-            _edge(
-                edges, source_items, "prerequisite", f"skill:{prerequisite}", skill_node
-            )
-        for successor in rule.successors:
-            _edge(edges, source_items, "successor", skill_node, f"skill:{successor}")
-        for constraint in rule.order_constraints:
-            _edge(
-                edges,
-                source_items,
-                "order",
-                f"skill:{constraint.before}",
-                f"skill:{constraint.after}",
-                reason=constraint.reason,
-            )
-        for candidate in rule.routing_candidates:
-            _edge(edges, source_items, "routing", skill_node, f"skill:{candidate}")
-        for other in rule.parallel_independent:
-            if skill < other:
-                _edge(edges, source_items, "parallel", skill_node, f"skill:{other}")
-    for relative in (
-        "agents/skills/catalog.yaml",
-        "agents/skills/skill-dependencies.yaml",
-        "tools/catalog.yaml",
-        *(f"agents/skills/{skill}.md" for skill in skill_ids),
-        *(f".agents/skills/{skill}/SKILL.md" for skill in skill_ids),
+
+    capability_id = "dependency_manifest_graph"
+    if not any(
+        route.capability_id == capability_id
+        for rule in route_rules
+        for route in rule.capabilities
     ):
-        digest = _file_digest(root, relative)
-        source_items.append(
-            _source_item(
-                kind="evidence",
-                origin="dependency_closure",
-                locator=relative,
-                ordinal=0,
-                payload={"source_locator": relative, "sha256": digest},
-            )
+        raise ValueError(
+            "typed_visualization_capability_missing:dependency_manifest_graph"
         )
-    if "dependency-design" not in {
-        node["label"] for node in nodes if node["node_type"] == "skill"
-    }:
-        raise ValueError("skill_tool_invocation_graph_dependency-design_omission")
-    if any(edge["edge_type"] not in EDGE_TYPES for edge in edges):
-        raise ValueError("skill_tool_invocation_graph_unknown_edge_type")
-    if len(nodes) + len(edges) + len(source_items) > capacity:
-        raise GraphCapacityError(len(nodes) + len(edges) + len(source_items), capacity)
-    owner_items = [item for item in source_items if item["origin"] == "owner_closure"]
+    owner_call, adapter_call = _build_owner_and_adapter_calls(capability_id)
+    toolcall_summaries = (
+        {
+            "id": "toolcall:canonical-owner",
+            "tool_id": VISUALIZATION_OWNER_TOOL_ID,
+            "argument_schema_id": VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
+            "order": 0,
+            "locator_refs": [
+                "agents/skills/catalog.yaml#capability:dependency_manifest_graph"
+            ],
+        },
+        {
+            "id": "toolcall:dependency-manifest-adapter",
+            "tool_id": VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID,
+            "argument_schema_id": VISUALIZATION_DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA,
+            "order": 1,
+            "locator_refs": ["tools/agent_tools/render_dependency_manifest_graph.py"],
+        },
+    )
+    toolcall_refs: dict[str, dict[str, str]] = {}
+    for summary in toolcall_summaries:
+        toolcall_refs[cast(str, summary["id"])] = identities.add(
+            "toolcall",
+            cast(str, summary["id"]),
+            {
+                "id": summary["id"],
+                "tool_id": summary["tool_id"],
+                "input_refs": [],
+                "output_refs": [],
+                "locator_refs": summary["locator_refs"],
+                "order": summary["order"],
+            },
+        )
+    _source_record(
+        identities,
+        source_inventory,
+        "module",
+        "agents/skills/code-visualization.md",
+        0,
+        toolcall_refs["toolcall:canonical-owner"],
+        owner_tool_id=VISUALIZATION_OWNER_TOOL_ID,
+    )
+
+    # Exercise the public source-universe contract after the owner ToolCall and before the adapter.
     literal_items = [
-        item for item in source_items if item["origin"] == "literal_request"
+        _legacy_source_item(
+            "identity",
+            "literal_request",
+            "route:capability:dependency_manifest_graph",
+            0,
+            {"request": "complete public skill/tool invocation graph"},
+        )
+    ]
+    owner_items = [
+        _legacy_source_item(
+            "module",
+            "owner_closure",
+            "agents/skills/code-visualization.md",
+            0,
+            {"owner_skill": "code-visualization"},
+        )
     ]
     dependency_items = [
-        item for item in source_items if item["origin"] == "dependency_closure"
+        _legacy_source_item(
+            cast(str, item["kind"]),
+            "dependency_closure",
+            cast(str, item["source_locator"]),
+            cast(int, item["ordinal"]),
+            {"ref": item["ref"]},
+        )
+        for item in source_inventory
     ]
-    owner_call, adapter_call = _build_owner_and_adapter_calls(
-        literal_items, owner_items, dependency_items
+    source_universe = build_source_universe(
+        request_id=cast(
+            str, cast(Mapping[str, object], owner_call["arguments"])["request_id"]
+        ),
+        literal_request=cast(
+            str, cast(Mapping[str, object], owner_call["arguments"])["literal_request"]
+        ),
+        literal_items=literal_items,
+        owner_closure=owner_items,
+        dependency_closure=dependency_items,
     )
-    universe, manifest, readback, marker = _coverage(
-        source_items, owner_call, adapter_call
+    if len(source_universe["items"]) != len(literal_items) + len(owner_items) + len(
+        dependency_items
+    ):
+        raise ValueError("source_universe_omission")
+
+    source_snapshot = _source_snapshot(root, route_rules, packets, toolcall_summaries)
+    for key, locator in cast(
+        Mapping[str, str], source_snapshot["source_locators"]
+    ).items():
+        _source_record(
+            identities,
+            source_inventory,
+            "evidence",
+            locator,
+            len(source_inventory),
+            None,
+            source_name=key,
+            sha256=source_snapshot[key],
+        )
+
+    edges: list[dict[str, object]] = []
+    edge_order = 0
+    _add_edge(
+        identities,
+        edges,
+        source_inventory,
+        "order",
+        toolcall_refs["toolcall:canonical-owner"],
+        toolcall_refs["toolcall:dependency-manifest-adapter"],
+        edge_order,
+        {"reason": "owner-before-adapter"},
     )
-    graph = {
+    edge_order += 1
+    for skill in skill_ids:
+        for phase in PHASES:
+            _add_edge(
+                identities,
+                edges,
+                source_inventory,
+                "invocation",
+                skill_refs[skill],
+                phase_refs[(skill, phase)],
+                edge_order,
+                {"phase": phase, "invocation_ordinal": invocation_ordinals[skill]},
+            )
+            edge_order += 1
+            for index, _logical, _argv in phase_commands[(skill, phase)]:
+                _add_edge(
+                    identities,
+                    edges,
+                    source_inventory,
+                    "invocation",
+                    phase_refs[(skill, phase)],
+                    command_refs[(skill, phase, index)],
+                    edge_order,
+                    {"phase": phase, "command_ordinal": index},
+                )
+                edge_order += 1
+    for skill in skill_ids:
+        rule = rules[skill]
+        for prerequisite in rule.required_prerequisites:
+            _add_edge(
+                identities,
+                edges,
+                source_inventory,
+                "prerequisite",
+                skill_refs[prerequisite],
+                skill_refs[skill],
+                edge_order,
+            )
+            edge_order += 1
+        for successor in rule.successors:
+            _add_edge(
+                identities,
+                edges,
+                source_inventory,
+                "successor",
+                skill_refs[skill],
+                skill_refs[successor],
+                edge_order,
+            )
+            edge_order += 1
+        for constraint in rule.order_constraints:
+            _add_edge(
+                identities,
+                edges,
+                source_inventory,
+                "order",
+                skill_refs[constraint.before],
+                skill_refs[constraint.after],
+                edge_order,
+                {"reason": constraint.reason},
+            )
+            edge_order += 1
+        for candidate in rule.routing_candidates:
+            _add_edge(
+                identities,
+                edges,
+                source_inventory,
+                "routing",
+                skill_refs[skill],
+                skill_refs[candidate],
+                edge_order,
+            )
+            edge_order += 1
+        for other in rule.parallel_independent:
+            if skill < other:
+                _add_edge(
+                    identities,
+                    edges,
+                    source_inventory,
+                    "parallel",
+                    skill_refs[skill],
+                    skill_refs[other],
+                    edge_order,
+                )
+                edge_order += 1
+    for key, tool_id in tool_ids_by_command.items():
+        if tool_id is not None:
+            _add_edge(
+                identities,
+                edges,
+                source_inventory,
+                "tool-resolution",
+                command_refs[key],
+                tool_refs[tool_id],
+                edge_order,
+                {"tool_id": tool_id},
+            )
+            edge_order += 1
+
+    if "dependency-design" not in skill_ids:
+        raise ValueError("skill_tool_invocation_graph_dependency-design_omission")
+    if any(edge["display_label"] not in EDGE_TYPES for edge in edges):
+        raise ValueError("skill_tool_invocation_graph_unknown_edge_type")
+
+    skills_projection = [
+        {
+            **_projection_entry(skill_refs[skill], skill, invocation_ordinals[skill]),
+            "kind": "skill",
+        }
+        for skill in skill_ids
+    ]
+    phases_projection = [
+        _projection_entry(phase_refs[(skill, phase)], f"{skill}/{phase}", phase_index)
+        for skill in skill_ids
+        for phase_index, phase in enumerate(PHASES)
+    ]
+    commands_projection = [
+        _projection_entry(command_refs[(skill, phase, index)], logical, index)
+        for skill in skill_ids
+        for phase in PHASES
+        for index, logical, _argv in phase_commands[(skill, phase)]
+    ]
+    tools_projection = [
+        _projection_entry(ref, tool_id) for tool_id, ref in tool_refs.items()
+    ]
+    capabilities_projection = [
+        _projection_entry(ref, capability_id)
+        for capability_id, ref in capability_refs.items()
+    ]
+    toolcalls_projection = [
+        _projection_entry(
+            toolcall_refs[cast(str, summary["id"])],
+            cast(str, summary["tool_id"]),
+            cast(int, summary["order"]),
+        )
+        for summary in toolcall_summaries
+    ]
+    invocation_projection = [
+        {"ref": dict(skill_refs[skill]), "order": invocation_ordinals[skill]}
+        for skill in invocation_order
+    ]
+    graph: dict[str, object] = {
         "schema": GRAPH_SCHEMA,
-        "version": 1,
+        "version": 2,
         "artifact_id": GRAPH_ARTIFACT_ID,
         "skill_count": len(skill_ids),
-        "skills": [node for node in nodes if node["node_type"] == "skill"],
-        "phases": phases,
-        "commands": commands,
-        "tools": list(modules.values()),
+        "skills": skills_projection,
+        "phases": phases_projection,
+        "commands": commands_projection,
+        "tools": tools_projection,
+        "capabilities": capabilities_projection,
+        "toolcalls": toolcalls_projection,
         "edges": edges,
-        "branches": branches,
-        "invocation_order": list(invocation_order),
-        "invocation_ordinals": invocation_ordinals,
-        "source_digests": {
-            item["source_locator"]: json.loads(item["payload_json"])["sha256"]
-            for item in universe["items"]
-            if item["kind"] == "evidence"
+        "invocation_order": invocation_projection,
+        "source_snapshot": source_snapshot,
+        "source_inventory": source_inventory,
+        "source_counts": _source_counts(source_inventory),
+        "responsibility_groups": {
+            skill: rules[skill].responsibility_group for skill in skill_ids
         },
-        "canonical_owner_tool_call": owner_call,
-        "adapter_tool_calls": [adapter_call],
-        "tool_call_order": ["canonical_owner", "dependency_manifest_adapter"],
-        "visualization_source_universe": universe,
-        "projection_coverage_manifest": manifest,
-        "readback": readback,
-        "coverage_digest": manifest["coverage_digest"],
-        "source_counts": manifest["source_counts"],
-        "rendered_counts": manifest["rendered_counts"],
-        "readback_counts": manifest["readback_counts"],
-        "coverage_marker": marker,
+        "tool_call_order": [
+            "toolcall:canonical-owner",
+            "toolcall:dependency-manifest-adapter",
+        ],
+        "owner_tool_call_ref": dict(toolcall_refs["toolcall:canonical-owner"]),
+        "adapter_tool_call_ref": dict(
+            toolcall_refs["toolcall:dependency-manifest-adapter"]
+        ),
+        "projection_digests": {},
     }
-    graph["graph_digest"] = _digest(
-        {key: value for key, value in graph.items() if key != "graph_digest"}
+    graph["projection_digests"] = _projection_digest(graph)
+    identity_refs = [_ref(record) for record in identities.records]
+    edge_refs = [cast(dict[str, str], edge["edge_ref"]) for edge in edges]
+    source_digest = _digest(source_snapshot)
+    coverage_payload = {
+        "id": "coverage:skill-tool-invocation-graph",
+        "source_digest": source_digest,
+        "source_refs": identity_refs,
+        "projection_digests": graph["projection_digests"],
+        "counts": graph["source_counts"],
+    }
+    coverage_ref = identities.add(
+        "coverage", cast(str, coverage_payload["id"]), coverage_payload
     )
+    manifest_payload = {
+        "id": "manifest:skill-tool-invocation-graph",
+        "source_digest": source_digest,
+        "identity_refs": identity_refs,
+        "edge_refs": edge_refs,
+        "coverage_refs": [coverage_ref],
+        "counts": {
+            "skills": len(skills_projection),
+            "phases": len(phases_projection),
+            "commands": len(commands_projection),
+            "tools": len(tools_projection),
+            "edges": len(edges),
+        },
+    }
+    manifest_ref = identities.add(
+        "manifest", cast(str, manifest_payload["id"]), manifest_payload
+    )
+    readback_payload = {
+        "id": "readback:skill-tool-invocation-graph",
+        "source_digest": source_digest,
+        "projection_digests": graph["projection_digests"],
+        "coverage_ref": coverage_ref,
+        "manifest_ref": manifest_ref,
+        "counts": graph["source_counts"],
+    }
+    readback_ref = identities.add(
+        "readback", cast(str, readback_payload["id"]), readback_payload
+    )
+    graph["identity_records"] = identities.records
+    graph["manifest"] = {
+        "ref": manifest_ref,
+        "source_digest": source_digest,
+        "identity_refs": identity_refs,
+        "edge_refs": edge_refs,
+        "coverage_refs": [coverage_ref],
+        "counts": manifest_payload["counts"],
+    }
+    graph["coverage"] = {
+        "ref": coverage_ref,
+        "source_digest": source_digest,
+        "projection_digests": graph["projection_digests"],
+        "source_counts": graph["source_counts"],
+        "rendered_counts": graph["source_counts"],
+        "readback_counts": graph["source_counts"],
+    }
+    graph["coverage_digest"] = coverage_ref["digest"]
+    graph["manifest_digest"] = manifest_ref["digest"]
+    graph["source_digests"] = {
+        key: source_snapshot[key]
+        for key in (
+            "catalog_sha256",
+            "dependencies_sha256",
+            "reader_index_sha256",
+            "route_packet_sha256",
+            "command_packet_sha256",
+            "toolcall_packet_sha256",
+        )
+    }
+    graph["readback_ref"] = readback_ref
+    graph["graph_digest"] = _digest(
+        {
+            key: value
+            for key, value in graph.items()
+            if key not in {"graph_digest", "json_digest", "mermaid_digest", "readback"}
+        }
+    )
+    mermaid = render_graph_mermaid(graph)
+    graph["mermaid_digest"] = hashlib.sha256(mermaid.encode("utf-8")).hexdigest()
+    graph["readback"] = {
+        "ref": readback_ref,
+        "source_digest": source_digest,
+        "graph_digest": graph["graph_digest"],
+        "mermaid_digest": graph["mermaid_digest"],
+        "json_digest": "",
+        "projection_digests": graph["projection_digests"],
+        "counts": graph["source_counts"],
+    }
+    graph["json_digest"] = _digest(
+        {
+            key: value
+            for key, value in graph.items()
+            if key not in {"json_digest", "readback"}
+        }
+    )
+    graph["readback"] = dict(cast(Mapping[str, object], graph["readback"]))
+    cast(dict[str, object], graph["readback"])["json_digest"] = graph["json_digest"]
+    _validate_projection_refs(graph, identities)
+    observed = len(identities.records) + len(edges) + len(source_inventory)
+    if observed > capacity:
+        raise GraphCapacityError(observed, capacity)
     return graph
 
 
+def _projection_nodes(
+    graph: Mapping[str, object],
+) -> list[tuple[str, Mapping[str, object], int]]:
+    """Return all rendered node projections with deterministic group order."""
+    result: list[tuple[str, Mapping[str, object], int]] = []
+    for kind, field in (
+        ("skill", "skills"),
+        ("phase", "phases"),
+        ("command", "commands"),
+        ("tool", "tools"),
+        ("capability", "capabilities"),
+        ("toolcall", "toolcalls"),
+    ):
+        for index, item in enumerate(
+            cast(Sequence[Mapping[str, object]], graph[field])
+        ):
+            result.append((kind, item, index))
+    return result
+
+
 def render_graph_mermaid(graph: Mapping[str, object]) -> str:
-    """Render every graph identity in deterministic responsibility/phase groups."""
-    nodes = cast(list[Mapping[str, object]], graph["skills"])
-    all_nodes = cast(
-        list[Mapping[str, object]], graph["visualization_source_universe"]["items"]
-    )
-    del all_nodes
+    """Render one complete graph with compact Ref metadata and no manifest marker."""
     lines = [
         GRAPH_HEADER,
         "# Public Skill/Tool Invocation Graph",
         "",
-        f"<!-- {graph['coverage_marker']} -->",
+        f"<!-- graph_digest={graph['graph_digest']} coverage_digest={cast(Mapping[str, object], graph['coverage'])['ref']['digest']} -->",
         "```mermaid",
         "graph LR",
     ]
+    skills = cast(Sequence[Mapping[str, object]], graph["skills"])
     groups: dict[str, list[Mapping[str, object]]] = defaultdict(list)
-    for node in nodes:
-        groups[cast(str, node["responsibility_group"])].append(node)
+    identity_by_id = {
+        cast(str, record["id"]): record
+        for record in cast(Sequence[Mapping[str, object]], graph["identity_records"])
+    }
+    for item in skills:
+        skill_id = cast(str, cast(Mapping[str, object], item["ref"])["id"])
+        skill_name = skill_id.removeprefix("skill:")
+        responsibility_groups = cast(Mapping[str, str], graph["responsibility_groups"])
+        groups[responsibility_groups[skill_name]].append(item)
     for group in sorted(groups):
         lines.append(
             f'  subgraph responsibility_{_safe_mermaid_id(group)}["Responsibility: {_mermaid_label(group)}"]'
         )
-        for node in groups[group]:
-            node_id = _safe_mermaid_id(cast(str, node["node_id"]))
-            label = f"{node['label']} (#{node['invocation_ordinal']})"
-            lines.append(f'    {node_id}["{_mermaid_label(label)}"]')
+        for item in groups[group]:
+            reference = cast(Mapping[str, object], item["ref"])
+            identity_id = cast(str, reference["id"])
+            lines.append(
+                f"    %% node kind=skill id={identity_id} digest={reference['digest']} order={item['order']}"
+            )
+            lines.append(
+                f'    {_safe_mermaid_id(identity_id)}["{_mermaid_label(cast(str, item["display_label"]))} (#{item["order"]})"]'
+            )
         lines.append("  end")
     for phase in PHASES:
         lines.append(f'  subgraph phase_{phase}["Phase: {phase}"]')
-        for node in cast(list[Mapping[str, object]], graph["phases"]):
-            if node["phase"] == phase:
-                phase_id = _safe_mermaid_id(cast(str, node["node_id"]))
+        for item in cast(Sequence[Mapping[str, object]], graph["phases"]):
+            reference = cast(Mapping[str, object], item["ref"])
+            if cast(str, reference["id"]).endswith(f":{phase}"):
+                identity_id = cast(str, reference["id"])
                 lines.append(
-                    f'    {phase_id}{{"{_mermaid_label(str(node["skill"]))}"}}'
+                    f"    %% node kind=phase id={identity_id} digest={reference['digest']} order={item['order']}"
                 )
-        for node in cast(list[Mapping[str, object]], graph["commands"]):
-            if node["phase"] == phase:
-                command_id = _safe_mermaid_id(cast(str, node["node_id"]))
                 lines.append(
-                    f'    {command_id}["{_mermaid_label(str(node["logical_command"]))}"]'
+                    f'    {_safe_mermaid_id(identity_id)}{{"{_mermaid_label(cast(str, item["display_label"]))}"}}'
+                )
+        for item in cast(Sequence[Mapping[str, object]], graph["commands"]):
+            identity_id = cast(str, cast(Mapping[str, object], item["ref"])["id"])
+            payload = cast(
+                Mapping[str, object], identity_by_id[identity_id]["canonical_payload"]
+            )
+            if (
+                cast(str, payload["source_locator"])
+                .split(".tool_commands.", 1)[1]
+                .split("[", 1)[0]
+                == phase
+            ):
+                reference = cast(Mapping[str, object], item["ref"])
+                lines.append(
+                    f"    %% node kind=command id={identity_id} digest={reference['digest']} order={item['order']}"
+                )
+                lines.append(
+                    f'    {_safe_mermaid_id(identity_id)}["{_mermaid_label(cast(str, item["display_label"]))}"]'
                 )
         lines.append("  end")
-    if cast(list[Mapping[str, object]], graph["tools"]):
-        lines.append('  subgraph tool_catalog["ToolID catalog"]')
-        for node in cast(list[Mapping[str, object]], graph["tools"]):
+    for kind, field, title, shape in (
+        ("tool", "tools", "ToolID catalog", "[["),
+        ("capability", "capabilities", "Typed capabilities", "[["),
+        ("toolcall", "toolcalls", "ToolCall order", "[["),
+    ):
+        entries = cast(Sequence[Mapping[str, object]], graph[field])
+        if not entries:
+            continue
+        lines.append(f'  subgraph {kind}_catalog["{title}"]')
+        for item in entries:
+            reference = cast(Mapping[str, object], item["ref"])
+            identity_id = cast(str, reference["id"])
+            order = item.get("order", 0)
             lines.append(
-                f'    {_safe_mermaid_id(str(node["node_id"]))}[["{_mermaid_label(str(node["tool_id"]))}"]]'
+                f"    %% node kind={kind} id={identity_id} digest={reference['digest']} order={order}"
+            )
+            lines.append(
+                f'    {_safe_mermaid_id(identity_id)}{shape}"{_mermaid_label(cast(str, item["display_label"]))}"]]'
             )
         lines.append("  end")
-    for edge in cast(list[Mapping[str, object]], graph["edges"]):
-        source = _safe_mermaid_id(str(edge["source"]))
-        target = _safe_mermaid_id(str(edge["target"]))
-        edge_type = str(edge["edge_type"])
-        if edge_type in {"routing", "parallel"}:
-            lines.append(f'  {source} -.->|"{edge_type}"| {target}')
-        else:
-            phase = f"/{edge['phase']}" if "phase" in edge else ""
-            lines.append(f'  {source} -->|"{edge_type}{phase}"| {target}')
+    for index, source in enumerate(
+        cast(Sequence[Mapping[str, object]], graph["source_inventory"])
+    ):
+        reference = cast(Mapping[str, object], source["ref"])
+        locator = cast(str, source["source_locator"]).replace(" ", "%20")
+        lines.append(
+            f"  %% source kind={source['kind']} id={reference['id']} digest={reference['digest']} locator={locator} ordinal={source['ordinal']}"
+        )
+    for edge in cast(Sequence[Mapping[str, object]], graph["edges"]):
+        edge_ref = cast(Mapping[str, object], edge["edge_ref"])
+        source_ref = cast(Mapping[str, object], edge["source_ref"])
+        target_ref = cast(Mapping[str, object], edge["target_ref"])
+        edge_record = identity_by_id[cast(str, edge_ref["id"])]
+        payload = cast(Mapping[str, object], edge_record["canonical_payload"])
+        source_id = cast(str, source_ref["id"])
+        target_id = cast(str, target_ref["id"])
+        line_type = (
+            "-.->" if edge["display_label"] in {"routing", "parallel"} else "-->"
+        )
+        lines.append(
+            f"  %% edge id={edge_ref['id']} digest={edge_ref['digest']} type={edge['display_label']} source={source_id} source_digest={source_ref['digest']} target={target_id} target_digest={target_ref['digest']} order={payload['order']}"
+        )
+        lines.append(
+            f'  {_safe_mermaid_id(source_id)} {line_type}|"{edge["display_label"]}"| {_safe_mermaid_id(target_id)}'
+        )
     lines.extend(
         [
-            "  %% Edge legend: --> prerequisite, successor, order, invocation, tool-resolution; -.-> routing, parallel.",
+            "  %% Edge legend: solid = prerequisite, successor, order, invocation, tool-resolution; dashed = routing, parallel.",
             "```",
             "",
             "## Edge legend",
@@ -782,12 +1348,143 @@ def render_graph_mermaid(graph: Mapping[str, object]) -> str:
             "- `prerequisite`, `successor`, `order`, `invocation`, and `tool-resolution`: solid directed edges.",
             "- `routing` and `parallel`: dashed directed edges.",
             "",
+            f"Coverage digest: `{cast(Mapping[str, object], graph['coverage'])['ref']['digest']}`.",
+            f"Graph digest: `{graph['graph_digest']}`.",
+            "",
         ]
     )
-    manifest = cast(Mapping[str, object], graph["projection_coverage_manifest"])
-    for entry in cast(list[Mapping[str, object]], manifest["entries"]):
-        lines.append(f"<!-- {entry['artifact_locator'][0]} -->")
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines)
+
+
+def _parse_mermaid_metadata(
+    text: str,
+) -> tuple[
+    dict[str, str], list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]
+]:
+    """Parse generated node, edge, and source metadata from the actual Mermaid block."""
+    lines = text.splitlines()
+    headers = [line for line in lines if MERMAID_HEADER_RE.match(line)]
+    if len(headers) != 1 or "```mermaid" not in text or text.count("```mermaid") != 1:
+        raise ValueError("mermaid_readback_block_or_header")
+    header_match = MERMAID_HEADER_RE.match(headers[0])
+    assert header_match is not None
+    header = {
+        "graph_digest": header_match.group(1),
+        "coverage_digest": header_match.group(2),
+    }
+    nodes: list[dict[str, str]] = []
+    edges: list[dict[str, str]] = []
+    sources: list[dict[str, str]] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("%% node "):
+            nodes.append(dict(MERMAID_KV_RE.findall(stripped.removeprefix("%% node "))))
+        elif stripped.startswith("%% edge "):
+            edges.append(dict(MERMAID_KV_RE.findall(stripped.removeprefix("%% edge "))))
+        elif stripped.startswith("%% source "):
+            sources.append(
+                dict(MERMAID_KV_RE.findall(stripped.removeprefix("%% source ")))
+            )
+    return header, nodes, edges, sources
+
+
+def readback_mermaid(graph: Mapping[str, object], text: str) -> dict[str, object]:
+    """Compare actual Mermaid node/edge/source refs, order, and digests."""
+    header, nodes, edges, sources = _parse_mermaid_metadata(text)
+    coverage_ref = cast(
+        Mapping[str, object], cast(Mapping[str, object], graph["coverage"])["ref"]
+    )
+    if header != {
+        "graph_digest": graph["graph_digest"],
+        "coverage_digest": coverage_ref["digest"],
+    }:
+        raise ValueError("mermaid_readback_digest_mismatch")
+    expected_nodes = {
+        (
+            kind,
+            cast(str, cast(Mapping[str, object], item["ref"])["id"]),
+            cast(str, cast(Mapping[str, object], item["ref"])["digest"]),
+        )
+        for kind, item, _order in _projection_nodes(graph)
+    }
+    observed_nodes = {
+        (item.get("kind", ""), item.get("id", ""), item.get("digest", ""))
+        for item in nodes
+    }
+    if observed_nodes != expected_nodes:
+        raise ValueError("mermaid_readback_node_ref_mismatch")
+    expected_edges = set()
+    identity_by_id = {
+        cast(str, record["id"]): record
+        for record in cast(Sequence[Mapping[str, object]], graph["identity_records"])
+    }
+    for item in cast(Sequence[Mapping[str, object]], graph["edges"]):
+        edge_ref = cast(Mapping[str, object], item["edge_ref"])
+        source_ref = cast(Mapping[str, object], item["source_ref"])
+        target_ref = cast(Mapping[str, object], item["target_ref"])
+        payload = cast(
+            Mapping[str, object],
+            identity_by_id[cast(str, edge_ref["id"])]["canonical_payload"],
+        )
+        expected_edges.add(
+            (
+                edge_ref["id"],
+                edge_ref["digest"],
+                item["display_label"],
+                source_ref["id"],
+                source_ref["digest"],
+                target_ref["id"],
+                target_ref["digest"],
+                str(payload["order"]),
+            )
+        )
+    observed_edges = tuple(
+        (
+            item.get("id", ""),
+            item.get("digest", ""),
+            item.get("type", ""),
+            item.get("source", ""),
+            item.get("source_digest", ""),
+            item.get("target", ""),
+            item.get("target_digest", ""),
+            item.get("order", ""),
+        )
+        for item in edges
+    )
+    if set(observed_edges) != expected_edges or len(observed_edges) != len(
+        expected_edges
+    ):
+        raise ValueError("mermaid_readback_edge_order_or_digest_mismatch")
+    expected_sources = {
+        (
+            item["kind"],
+            cast(str, cast(Mapping[str, object], item["ref"])["id"]),
+            cast(str, cast(Mapping[str, object], item["ref"])["digest"]),
+            item["source_locator"],
+            str(item["ordinal"]),
+        )
+        for item in cast(Sequence[Mapping[str, object]], graph["source_inventory"])
+    }
+    observed_sources = {
+        (
+            item.get("kind", ""),
+            item.get("id", ""),
+            item.get("digest", ""),
+            item.get("locator", ""),
+            item.get("ordinal", ""),
+        )
+        for item in sources
+    }
+    if observed_sources != expected_sources:
+        raise ValueError("mermaid_readback_source_coverage_mismatch")
+    return {
+        "status": "pass",
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+        "source_counts": _source_counts(
+            cast(Sequence[Mapping[str, object]], graph["source_inventory"])
+        ),
+    }
 
 
 def render_mermaid(rules: Mapping[str, SkillDependencyRule]) -> str:
@@ -842,57 +1539,95 @@ def _artifact_paths(root: Path, output: Path | None = None) -> tuple[Path, Path]
     return markdown, json_path
 
 
+def _json_text(graph: Mapping[str, object]) -> str:
+    """Serialize the machine artifact with the same compact canonical policy."""
+    return _canonical_json(graph)
+
+
+def _json_digest_from_graph(graph: Mapping[str, object]) -> str:
+    """Compute JSON digest without downstream readback or its own digest."""
+    return _digest(
+        {
+            key: value
+            for key, value in graph.items()
+            if key not in {"json_digest", "readback"}
+        }
+    )
+
+
 def write_artifacts(
     root: Path, *, output: Path | None = None, capacity: int = GRAPH_CAPACITY
 ) -> tuple[Path, Path, dict[str, object]]:
-    """Generate both canonical graph artifacts atomically at the file level."""
+    """Generate both canonical graph artifacts."""
     graph = build_graph(root, capacity=capacity)
     markdown, json_path = _artifact_paths(root, output)
     markdown.parent.mkdir(parents=True, exist_ok=True)
     json_path.parent.mkdir(parents=True, exist_ok=True)
     markdown.write_text(render_graph_mermaid(graph), encoding="utf-8")
-    json_path.write_text(
-        json.dumps(graph, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    json_path.write_text(_json_text(graph), encoding="utf-8")
     return markdown, json_path, graph
+
+
+def _validate_loaded_graph(machine: Mapping[str, object]) -> None:
+    """Reject edited machine graphs before comparing their artifact bytes."""
+    if machine.get("schema") != GRAPH_SCHEMA or machine.get("version") != 2:
+        raise ValueError("skill_tool_invocation_graph_schema_mismatch")
+    skills = cast(Sequence[Mapping[str, object]], machine.get("skills", []))
+    if machine.get("skill_count") != 60 or "dependency-design" not in {
+        cast(
+            str,
+            cast(
+                Mapping[str, object], cast(Mapping[str, object], skill["ref"])["id"]
+            ).removeprefix("skill:"),
+        )
+        for skill in skills
+    }:
+        raise ValueError("dependency-design:omission")
+    if machine.get("json_digest") != _json_digest_from_graph(machine):
+        raise ValueError("json_digest:mismatch")
 
 
 def check_artifacts(root: Path, *, capacity: int = GRAPH_CAPACITY) -> dict[str, object]:
     """Fail closed on missing, edited, stale, or dependency-design-omitting artifacts."""
-    graph = build_graph(root, capacity=capacity)
+    expected = build_graph(root, capacity=capacity)
     markdown, json_path = _artifact_paths(root)
-    expected_markdown = render_graph_mermaid(graph)
-    expected_json = (
-        json.dumps(graph, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
-    )
     findings: list[str] = []
-    for path, expected in ((markdown, expected_markdown), (json_path, expected_json)):
-        if not path.is_file():
-            findings.append(f"{path.relative_to(root)}:missing")
-        elif path.read_text(encoding="utf-8") != expected:
-            findings.append(f"{path.relative_to(root)}:edited-or-stale")
-    if graph["skill_count"] != 60 or not any(
-        skill["label"] == "dependency-design"
-        for skill in cast(list[Mapping[str, object]], graph["skills"])
-    ):
-        findings.append("dependency-design:omission")
+    if not markdown.is_file():
+        findings.append(f"{markdown.relative_to(root)}:missing")
+    if not json_path.is_file():
+        findings.append(f"{json_path.relative_to(root)}:missing")
     if findings:
         raise ValueError(
             "skill_tool_invocation_graph_stale_artifact:" + ";".join(findings)
         )
-    return graph
+    actual_markdown = markdown.read_text(encoding="utf-8")
+    actual_json_text = json_path.read_text(encoding="utf-8")
+    try:
+        actual_machine = cast(Mapping[str, object], json.loads(actual_json_text))
+        _validate_loaded_graph(actual_machine)
+        readback_mermaid(expected, actual_markdown)
+    except (ValueError, json.JSONDecodeError) as exc:
+        findings.append(f"readback:{exc}")
+    if actual_markdown != render_graph_mermaid(expected):
+        findings.append(f"{markdown.relative_to(root)}:edited-or-stale")
+    if actual_json_text != _json_text(expected):
+        findings.append(f"{json_path.relative_to(root)}:edited-or-stale")
+    if findings:
+        raise ValueError(
+            "skill_tool_invocation_graph_stale_artifact:" + ";".join(findings)
+        )
+    return expected
 
 
 def check(root: Path) -> tuple[int, int, int]:
     """Validate source map and generated artifacts."""
     rules = dict(load_skill_dependency_map(root))
     graph = check_artifacts(root)
-    edge_count = len(cast(list[object], graph["edges"]))
+    edge_count = len(cast(Sequence[object], graph["edges"]))
     parallel_count = sum(
         1
-        for edge in cast(list[Mapping[str, object]], graph["edges"])
-        if edge["edge_type"] == "parallel"
+        for edge in cast(Sequence[Mapping[str, object]], graph["edges"])
+        if edge["display_label"] == "parallel"
     )
     return len(rules), edge_count, parallel_count
 
@@ -922,25 +1657,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "check":
             skill_count, edge_count, parallel_count = check(root)
             print(
-                "SKILL_DEPENDENCY_MAP=pass "
-                f"source={SKILL_DEPENDENCY_MAP_PATH} skills={skill_count}"
+                f"SKILL_DEPENDENCY_MAP=pass source={SKILL_DEPENDENCY_MAP_PATH} skills={skill_count}"
             )
             print(
-                "SKILL_TOOL_INVOCATION_GRAPH=pass "
-                f"skills={skill_count} edges={edge_count} parallel_edges={parallel_count} "
-                f"json={DEFAULT_JSON_PATH} mermaid={DEFAULT_GRAPH_PATH}"
+                f"SKILL_TOOL_INVOCATION_GRAPH=pass schema={GRAPH_SCHEMA} skills={skill_count} edges={edge_count} parallel_edges={parallel_count} json={DEFAULT_JSON_PATH} mermaid={DEFAULT_GRAPH_PATH}"
             )
             return 0
         markdown, json_path, graph = write_artifacts(
-            root,
-            output=args.output,
-            capacity=args.capacity,
+            root, output=args.output, capacity=args.capacity
         )
         print(
-            "SKILL_TOOL_INVOCATION_GRAPH=pass "
-            f"skills={graph['skill_count']} commands={len(graph['commands'])} "
-            f"tools={len(graph['tools'])} edges={len(graph['edges'])} "
-            f"json={json_path} mermaid={markdown}"
+            f"SKILL_TOOL_INVOCATION_GRAPH=pass schema={GRAPH_SCHEMA} skills={graph['skill_count']} commands={len(graph['commands'])} tools={len(graph['tools'])} edges={len(graph['edges'])} json={json_path} mermaid={markdown}"
         )
         return 0
     except GraphCapacityError as exc:

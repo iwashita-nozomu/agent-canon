@@ -1,212 +1,61 @@
-"""Focused tests for the canonical public-skill dependency dictionary."""
-
-# @dependency-start
-# contract test
-# responsibility Tests typed public-skill dependency validation and generated Mermaid coverage.
-# upstream implementation ../../tools/agent_tools/skill_dependency_map.py validates and projects the map
-# upstream implementation ../../tools/agent_tools/skill_route_catalog.py owns map parsing and route-order derivation
-# upstream design ../../agents/skills/catalog.yaml enumerates public skill identities
-# upstream design ../../agents/skills/skill-dependencies.yaml owns dependency relations
-# @dependency-end
+"""Focused tests for the v2 skill/tool invocation graph contract."""
 
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 import tempfile
 import unittest
-from copy import deepcopy
 from pathlib import Path
 
-import yaml
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "skill_dependency_map.py"
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import skill_route_catalog as catalog_module  # noqa: E402
+TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
+sys.path.insert(0, str(TOOLS_ROOT))
+
+from agent_canon_source_root import resolve_agent_canon_source_root  # noqa: E402
 from skill_dependency_map import (  # noqa: E402
     GraphCapacityError,
+    GraphDigestMismatchError,
+    GraphIdentityCollisionError,
+    _IdentityStore,
     build_graph,
-    render_mermaid,
+    check_artifacts,
+    readback_mermaid,
+    render_graph_mermaid,
 )
+from skill_route_catalog import (  # noqa: E402
+    derive_skill_invocation_order,
+    load_skill_route_rules,
+)
+from skill_tool_commands import packet_for_skill  # noqa: E402
 
 
-class SkillDependencyMapTest(unittest.TestCase):
-    """Check map identity, graph invariants, and fail-closed diagnostics."""
+class SkillToolInvocationGraphTests(unittest.TestCase):
+    """Exercise production materialization and checker obligations."""
 
-    def run_tool(self, *args: str) -> subprocess.CompletedProcess[str]:
-        """Run the dependency-map CLI from the repository root."""
-        return subprocess.run(
-            [sys.executable, str(TOOL), *args],
-            cwd=PROJECT_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-
-    def write_map(self, root: Path, payload: dict[str, object]) -> None:
-        """Write one isolated dependency-map fixture."""
-        path = root / catalog_module.SKILL_DEPENDENCY_MAP_PATH
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-
-    def base_payload(self) -> dict[str, object]:
-        """Load a mutable copy of the canonical map."""
-        path = PROJECT_ROOT / catalog_module.SKILL_DEPENDENCY_MAP_PATH
-        return deepcopy(yaml.safe_load(path.read_text(encoding="utf-8")))
-
-    def dependency_records(self, payload: dict[str, object]) -> dict[str, dict[str, object]]:
-        """Return typed-enough mutable records for focused mutation fixtures."""
-        return payload["skill_dependencies"]  # type: ignore[return-value]
-
-    def test_map_covers_every_public_catalog_skill(self) -> None:
-        """The canonical dictionary has exactly the public catalog key set."""
-        catalog = catalog_module.load_skill_catalog(PROJECT_ROOT)
-        public_ids = catalog_module._skill_ids_from_catalog(catalog)
-        rules = catalog_module.load_skill_dependency_map(PROJECT_ROOT, public_ids)
-
-        self.assertEqual(tuple(rules), public_ids)
-        self.assertEqual(len(rules), 60)
-        self.assertTrue(all(rule.responsibility_group for rule in rules.values()))
-
-    def test_check_cli_validates_canonical_map(self) -> None:
-        """The focused checker reports the source and complete public count."""
-        result = self.run_tool("check", "--root", str(PROJECT_ROOT))
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("SKILL_DEPENDENCY_MAP=pass", result.stdout)
-        self.assertIn("source=agents/skills/skill-dependencies.yaml", result.stdout)
-        self.assertIn("skills=60", result.stdout)
-
-    def test_cycle_is_rejected(self) -> None:
-        """Mutually successor-linked skills fail the static DAG check."""
-        payload = self.base_payload()
-        records = self.dependency_records(payload)
-        records["repo-onboarding"]["successors"] = ["task-routing"]
-        records["task-routing"]["successors"] = ["repo-onboarding"]
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_map(root, payload)
-            with self.assertRaisesRegex(ValueError, "skill-dependency-map-cycle"):
-                catalog_module.load_skill_dependency_map(root, tuple(records))
-
-    def test_missing_reference_is_rejected(self) -> None:
-        """A relation to a non-public skill fails closed before graph output."""
-        payload = self.base_payload()
-        records = self.dependency_records(payload)
-        records["agent-orchestration"]["successors"] = ["missing-skill"]
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_map(root, payload)
-            with self.assertRaisesRegex(
-                ValueError, "skill-dependency-map-unknown-reference"
-            ):
-                catalog_module.load_skill_dependency_map(root, tuple(records))
-
-    def test_order_contradiction_is_rejected(self) -> None:
-        """An explicit reverse order against an existing prerequisite fails."""
-        payload = self.base_payload()
-        records = self.dependency_records(payload)
-        records["repo-onboarding"]["required_prerequisites"] = ["task-routing"]
-        records["repo-onboarding"]["order_constraints"] = [
-            {"before": "repo-onboarding", "after": "task-routing", "reason": "fixture"}
-        ]
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_map(root, payload)
-            with self.assertRaisesRegex(
-                ValueError, "skill-dependency-map-order-contradiction"
-            ):
-                catalog_module.load_skill_dependency_map(root, tuple(records))
-
-    def test_research_workflow_order_matches_literature_constraint(self) -> None:
-        """Research workflow order now enforces literature-survey before execution."""
-        rules = dict(catalog_module.load_skill_dependency_map(PROJECT_ROOT))
-        research = rules["research-workflow"]
-        self.assertIn("literature-survey", research.routing_candidates)
-        self.assertIn(
-            ("literature-survey", "research-workflow"),
-            {(constraint.before, constraint.after) for constraint in research.order_constraints},
-        )
-
-    def test_parallel_relation_cannot_overlap_ordered_work(self) -> None:
-        """Parallel-independent declarations cannot contradict the DAG."""
-        payload = self.base_payload()
-        records = self.dependency_records(payload)
-        records["repo-onboarding"]["required_prerequisites"] = ["task-routing"]
-        records["repo-onboarding"]["parallel_independent"] = ["task-routing"]
-        records["task-routing"]["parallel_independent"].append("repo-onboarding")
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_map(root, payload)
-            with self.assertRaisesRegex(
-                ValueError, "skill-dependency-map-parallel-contradiction"
-            ):
-                catalog_module.load_skill_dependency_map(root, tuple(records))
-
-    def test_graph_contains_all_public_skills_and_order_metadata(self) -> None:
-        """The projection keeps every public node, groups, and typed edges."""
-        rules = dict(catalog_module.load_skill_dependency_map(PROJECT_ROOT))
-        graph = render_mermaid(rules)
-
-        self.assertIn("graph LR", graph)
-        self.assertIn("subgraph group_orchestration", graph)
-        self.assertIn('"agent-orchestration"', graph)
-        self.assertIn("prerequisite", graph)
-        self.assertIn("order", graph)
-        for skill in rules:
-            self.assertIn(f'"{skill}"', graph)
-
-    def test_graph_cli_writes_generated_artifact(self) -> None:
-        """The graph route writes one generated Markdown artifact."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            output = Path(tmp_dir) / "graph.md"
-            result = self.run_tool(
-                "graph",
-                "--root",
-                str(PROJECT_ROOT),
-                "--output",
-                str(output),
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("SKILL_TOOL_INVOCATION_GRAPH=pass", result.stdout)
-            graph = output.read_text(encoding="utf-8")
-            self.assertEqual(graph.count("```mermaid"), 1)
-            public_ids = catalog_module._skill_ids_from_catalog(
-                catalog_module.load_skill_catalog(PROJECT_ROOT)
-            )
-            self.assertEqual(sum(f'"{skill}"' in graph for skill in public_ids), 60)
-
-    def test_graph_has_complete_json_mermaid_and_typed_coverage(self) -> None:
-        """The generated schema keeps all skills, phases, commands, edges, and counts."""
-        payload = build_graph(PROJECT_ROOT)
+    def test_complete_v2_universe_and_edge_types(self) -> None:
+        """All skills, phases, resolved commands, tools, and edge kinds are present."""
+        graph = build_graph(PROJECT_ROOT)
+        self.assertEqual(graph["schema"], "agent_canon.skill_tool_invocation_graph.v2")
+        self.assertEqual(graph["skill_count"], 60)
+        self.assertEqual(len(graph["skills"]), 60)
+        self.assertEqual(len(graph["phases"]), 180)
+        self.assertEqual(len(graph["commands"]), 387)
+        self.assertGreater(len(graph["tools"]), 0)
         self.assertEqual(
-            payload["schema"], "agent_canon.skill_tool_invocation_graph.v1"
-        )
-        self.assertEqual(payload["skill_count"], 60)
-        self.assertIn(
-            "dependency-design",
-            {skill["label"] for skill in payload["skills"]},
-        )
-        self.assertEqual(
-            set(payload["source_counts"]),
+            set(graph["source_snapshot"]),
             {
-                "identity",
-                "edge",
-                "field",
-                "phase",
-                "branch",
-                "module",
-                "evidence",
-                "time",
+                "catalog_sha256",
+                "dependencies_sha256",
+                "reader_index_sha256",
+                "route_packet_sha256",
+                "command_packet_sha256",
+                "toolcall_packet_sha256",
+                "source_locators",
             },
         )
-        self.assertEqual(payload["source_counts"], payload["rendered_counts"])
-        self.assertEqual(payload["source_counts"], payload["readback_counts"])
         self.assertEqual(
-            {edge["edge_type"] for edge in payload["edges"]},
+            {edge["display_label"] for edge in graph["edges"]},
             {
                 "prerequisite",
                 "successor",
@@ -217,81 +66,205 @@ class SkillDependencyMapTest(unittest.TestCase):
                 "tool-resolution",
             },
         )
-        markdown = (
-            PROJECT_ROOT / "documents/runtime/skill-dependency-graph.md"
-        ).read_text(encoding="utf-8")
-        machine = json.loads(
-            (PROJECT_ROOT / "documents/runtime/skill-dependency-graph.json").read_text(
-                encoding="utf-8"
-            )
+        self.assertIn(
+            "dependency-design", {item["display_label"] for item in graph["skills"]}
         )
-        self.assertEqual(markdown.count("```mermaid"), 1)
-        self.assertEqual(machine["coverage_digest"], payload["coverage_digest"])
-
-    def test_every_packet_command_is_materialized_with_phase(self) -> None:
-        """Each canonical packet resolution has one graph command node and phase."""
-        payload = build_graph(PROJECT_ROOT)
-        graph_commands = {
-            (command["skill"], command["phase"], command["logical_command"])
-            for command in payload["commands"]
+        edge_pairs = {
+            (edge["display_label"], edge["source_ref"]["id"], edge["target_ref"]["id"])
+            for edge in graph["edges"]
         }
-        sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-        from agent_canon_source_root import (
-            resolve_agent_canon_source_root,  # noqa: E402
+        for skill in (item["display_label"] for item in graph["skills"]):
+            for phase in ("required", "conditional", "maintenance"):
+                self.assertIn(
+                    ("invocation", f"skill:{skill}", f"phase:{skill}:{phase}"),
+                    edge_pairs,
+                )
+        self.assertIn(
+            (
+                "order",
+                "toolcall:canonical-owner",
+                "toolcall:dependency-manifest-adapter",
+            ),
+            edge_pairs,
         )
-        from skill_tool_commands import packet_for_skill  # noqa: E402
 
+    def test_every_canonical_packet_command_has_phase_and_ref(self) -> None:
+        """Canonical command resolution is materialized once per phase/ordinal."""
+        graph = build_graph(PROJECT_ROOT)
+        records = {record["id"]: record for record in graph["identity_records"]}
+        command_projections = graph["commands"]
+        self.assertEqual(len(command_projections), 387)
         resolution = resolve_agent_canon_source_root(PROJECT_ROOT)
-        for skill in catalog_module._skill_ids_from_catalog(
-            catalog_module.load_skill_catalog(PROJECT_ROOT)
-        ):
+        for skill in (item["display_label"] for item in graph["skills"]):
             packet = packet_for_skill(resolution, skill)
             for phase, rows in (
                 ("required", packet.resolved_required_commands),
                 ("conditional", packet.resolved_conditional_commands),
                 ("maintenance", packet.resolved_maintenance_commands),
             ):
-                for row in rows:
-                    self.assertIn((skill, phase, row[0]), graph_commands)
+                for index, row in enumerate(rows):
+                    projection = next(
+                        item
+                        for item in command_projections
+                        if item["display_label"] == row[0]
+                        and records[item["ref"]["id"]]["canonical_payload"]["skill_id"]
+                        == skill
+                        and records[item["ref"]["id"]]["canonical_payload"][
+                            "source_locator"
+                        ].endswith(f".{phase}[{index}]")
+                    )
+                    self.assertEqual(
+                        records[projection["ref"]["id"]]["kind"], "command"
+                    )
 
-    def test_artifact_checker_rejects_edited_mermaid(self) -> None:
-        """The checker rejects an edited generated Mermaid artifact."""
-        path = PROJECT_ROOT / "documents/runtime/skill-dependency-graph.md"
-        original = path.read_text(encoding="utf-8")
+    def test_invocation_order_is_derived_and_command_order_is_immutable(self) -> None:
+        """Ordinals follow the existing order function and #461 report order."""
+        graph = build_graph(PROJECT_ROOT)
+        rules = load_skill_route_rules(PROJECT_ROOT)
+        skill_ids = tuple(item["display_label"] for item in graph["skills"])
+        expected_order = derive_skill_invocation_order(skill_ids, rules)
+        observed_order = tuple(
+            item["ref"]["id"].removeprefix("skill:")
+            for item in sorted(
+                graph["invocation_order"], key=lambda item: item["order"]
+            )
+        )
+        self.assertEqual(observed_order, expected_order)
+        resolution = resolve_agent_canon_source_root(PROJECT_ROOT)
+        packet = packet_for_skill(resolution, "result-artifact-writeout")
+        archive_commands = [
+            row[0]
+            for row in packet.resolved_conditional_commands
+            if "runtime_log_archive_git.py" in row[0]
+        ]
+        self.assertEqual(len(archive_commands), 2)
+        self.assertIn("archive-agent-report", archive_commands[0])
+        self.assertEqual(archive_commands[1].split()[-1], "push")
+        self.assertNotIn("sync", " ".join(archive_commands))
+        self.assertNotIn("status", " ".join(archive_commands))
+
+    def test_identity_payloads_are_unique_and_all_projections_are_refs(self) -> None:
+        """Each full payload appears once and every envelope resolves through a Ref."""
+        graph = build_graph(PROJECT_ROOT)
+        records = graph["identity_records"]
+        keys = {(record["kind"], record["id"]) for record in records}
+        payloads = {
+            (
+                record["kind"],
+                json.dumps(
+                    record["canonical_payload"],
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+            )
+            for record in records
+        }
+        self.assertEqual(len(keys), len(records))
+        self.assertEqual(len(payloads), len(records))
+        record_by_id = {record["id"]: record for record in records}
+        for field in (
+            "skills",
+            "phases",
+            "commands",
+            "tools",
+            "capabilities",
+            "toolcalls",
+        ):
+            for item in graph[field]:
+                expected_keys = {"ref", "display_label"}
+                if "order" in item:
+                    expected_keys.add("order")
+                if field == "skills":
+                    expected_keys.add("kind")
+                self.assertEqual(set(item), expected_keys)
+                ref = item["ref"]
+                self.assertEqual(record_by_id[ref["id"]]["digest"], ref["digest"])
+                self.assertNotIn("canonical_payload", item)
+        for edge in graph["edges"]:
+            for key in ("edge_ref", "source_ref", "target_ref"):
+                self.assertEqual(
+                    record_by_id[edge[key]["id"]]["digest"], edge[key]["digest"]
+                )
+
+    def test_digest_collision_and_reference_failures_are_typed(self) -> None:
+        """Identity collisions and tampered references fail with typed codes."""
+        store = _IdentityStore()
+        first = store.add("skill", "skill:sample", {"id": "sample"})
+        self.assertEqual(first, store.add("skill", "skill:sample", {"id": "sample"}))
+        with self.assertRaisesRegex(GraphIdentityCollisionError, "identity_collision"):
+            store.add("skill", "skill:sample", {"id": "different"})
+        with self.assertRaisesRegex(GraphDigestMismatchError, "digest_mismatch"):
+            store.require({"id": first["id"], "digest": "0" * 64})
+
+    def test_cross_checkout_reproducibility_and_no_absolute_runtime_paths(self) -> None:
+        """The logical graph is unchanged when the checkout root changes."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            alias = Path(tmp_dir) / "checkout-alias"
+            alias.symlink_to(PROJECT_ROOT, target_is_directory=True)
+            first = build_graph(PROJECT_ROOT)
+            second = build_graph(alias)
+        self.assertEqual(first["graph_digest"], second["graph_digest"])
+        self.assertEqual(first["json_digest"], second["json_digest"])
+        serialized = json.dumps(first, ensure_ascii=False, separators=(",", ":"))
+        self.assertNotIn(str(PROJECT_ROOT.resolve()), serialized)
+        self.assertNotRegex(serialized, r"(?:^|[\" ])/(?:mnt|tmp|home)/")
+        self.assertNotIn("execution_argv", serialized)
+        self.assertNotIn("source_root", serialized)
+
+    def test_mermaid_is_one_actual_readback_complete_block_without_base64(self) -> None:
+        """The rendered block carries graph/coverage refs and actual readback metadata."""
+        graph = build_graph(PROJECT_ROOT)
+        markdown = render_graph_mermaid(graph)
+        self.assertEqual(markdown.count("```mermaid"), 1)
+        self.assertNotIn("base64", markdown.lower())
+        self.assertNotIn("coverage_marker", markdown)
+        self.assertEqual(readback_mermaid(graph, markdown)["status"], "pass")
+        self.assertEqual(
+            graph["coverage"]["source_counts"], graph["coverage"]["rendered_counts"]
+        )
+        self.assertEqual(
+            graph["coverage"]["source_counts"], graph["coverage"]["readback_counts"]
+        )
+
+    def test_checker_rejects_stale_json_mermaid_and_dependency_design_omission(
+        self,
+    ) -> None:
+        """Edited machine or Mermaid artifacts and an omitted dependency skill fail closed."""
+        check_artifacts(PROJECT_ROOT)
+        markdown_path = PROJECT_ROOT / "documents/runtime/skill-dependency-graph.md"
+        json_path = PROJECT_ROOT / "documents/runtime/skill-dependency-graph.json"
+        original_markdown = markdown_path.read_text(encoding="utf-8")
+        original_json = json_path.read_text(encoding="utf-8")
         try:
-            path.write_text(original + "\n%% edited\n", encoding="utf-8")
-            result = self.run_tool("check", "--root", str(PROJECT_ROOT))
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("stale_artifact", result.stderr)
+            markdown_path.write_text(
+                original_markdown.replace("%% Edge legend", "%% edited Edge legend", 1),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "stale_artifact"):
+                check_artifacts(PROJECT_ROOT)
+            markdown_path.write_text(original_markdown, encoding="utf-8")
+            machine = json.loads(original_json)
+            machine["skills"] = [
+                item
+                for item in machine["skills"]
+                if item["ref"]["id"] != "skill:dependency-design"
+            ]
+            json_path.write_text(
+                json.dumps(machine, ensure_ascii=False, separators=(",", ":")),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "dependency-design:omission"):
+                check_artifacts(PROJECT_ROOT)
         finally:
-            path.write_text(original, encoding="utf-8")
+            markdown_path.write_text(original_markdown, encoding="utf-8")
+            json_path.write_text(original_json, encoding="utf-8")
 
-    def test_artifact_checker_rejects_edited_json(self) -> None:
-        """The checker rejects an edited generated JSON artifact."""
-        path = PROJECT_ROOT / "documents/runtime/skill-dependency-graph.json"
-        original = path.read_text(encoding="utf-8")
-        try:
-            path.write_text(original + "\n", encoding="utf-8")
-            result = self.run_tool("check", "--root", str(PROJECT_ROOT))
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("skill-dependency-graph.json:edited-or-stale", result.stderr)
-        finally:
-            path.write_text(original, encoding="utf-8")
-
-    def test_capacity_failure_is_typed_and_does_not_prune(self) -> None:
-        """Insufficient renderer capacity fails with a typed error."""
+    def test_capacity_error_does_not_prune_graph(self) -> None:
+        """A small capacity produces the typed failure rather than an incomplete graph."""
         with self.assertRaisesRegex(
-            GraphCapacityError,
-            "skill_tool_invocation_graph_capacity_exceeded",
+            GraphCapacityError, "skill_tool_invocation_graph_capacity_exceeded"
         ):
             build_graph(PROJECT_ROOT, capacity=1)
-
-    def test_graph_digest_is_deterministic(self) -> None:
-        """Repeated materialization has stable graph and coverage digests."""
-        first = build_graph(PROJECT_ROOT)
-        second = build_graph(PROJECT_ROOT)
-        self.assertEqual(first["graph_digest"], second["graph_digest"])
-        self.assertEqual(first["coverage_digest"], second["coverage_digest"])
 
 
 if __name__ == "__main__":

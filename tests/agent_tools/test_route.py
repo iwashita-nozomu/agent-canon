@@ -786,33 +786,33 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("code-visualization", decision["matched_skills"])
         self.assertIn("code-visualization", decision["active_skills"])
         self.assertEqual(decision["visualization_owner_skill"], "code-visualization")
+        self.assertIsNone(decision["visualization_adapter_tool_call"])
         self.assertIsNone(decision["visualization_rejection"])
         call = decision["visualization_tool_call"]
         self.assertEqual(call["schema"], "agent_canon.visualization_tool_call.v1")
-        self.assertEqual(
-            call["tool_id"],
-            "agent_canon.visualization.coverage",
-        )
-        self.assertEqual(
-            call["argument_schema"],
-            "agent_canon.visualization.arguments.coverage.v1",
-        )
+        self.assertEqual(call["tool_id"], "agent_canon.visualization.coverage")
+        self.assertEqual(call["argument_schema"], "agent_canon.visualization.arguments.coverage.v1")
         self.assertEqual(
             set(call["arguments"]),
-            {
-                "request_id",
-                "literal_request",
-                "literal_items",
-                "owner_closure",
-                "dependency_closure",
-                "artifact_id",
-                "renderer_id",
-                "artifact_format",
-            },
+            {"request_id", "literal_request", "literal_items", "owner_closure", "dependency_closure", "artifact_id", "renderer_id", "artifact_format"},
         )
         self.assertEqual(call["arguments"]["artifact_format"], "graph_ir")
         self.assertEqual(call["arguments"]["literal_items"][0]["origin"], "literal_request")
         self.assertEqual(call["arguments"]["owner_closure"][0]["origin"], "owner_closure")
+
+    def test_untyped_dependency_graph_prose_never_selects_adapter(self) -> None:
+        """A raw dependency-graph phrase cannot bypass the typed adapter route."""
+        result = self.run_route(
+            "--prompt",
+            "Please make a dependency graph for the repository.",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIsNone(decision["visualization_adapter_tool_call"])
+        self.assertIn(decision["visualization_rejection"], ("prose_only", None))
 
     def test_prompt_routes_visualization_keyword_alone_should_not_select_code_visualization(self) -> None:
         """Prose keyword alone should not route to code-visualization."""
@@ -845,6 +845,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("code-visualization", decision["matched_skills"])
         self.assertIn("code-visualization", decision["active_skills"])
         self.assertEqual(decision["visualization_owner_skill"], "code-visualization")
+        self.assertIsNone(decision["visualization_adapter_tool_call"])
         self.assertIsNone(decision["visualization_rejection"])
 
     def test_prompt_routes_code_visualization_tool_call_visible_in_text_and_markdown(self) -> None:

@@ -215,14 +215,28 @@ flowchart LR
 | clause | current/planned implementation owner | exact file / symbol | reverse mapping rule |
 | --- | --- | --- | --- |
 | `SG-001..SG-003` | current catalog/dependency owners | `agents/skills/catalog.yaml`, `agents/skills/skill-dependencies.yaml`, `agents/canonical/skills.md` | skill/command identity or relation changes map to the owning source and clause; skills.md-only changes are reader-link parity evidence |
-| `SG-004..SG-006` | planned serialization/checker owner | `tools/agent_tools/check_skill_tool_invocation_graph.py`, `tools/agent_tools/check_convention_compliance.py` | field order, normalization, digest, alias, duplicate, collision, or prose-guard changes require these clauses |
+| `SG-004..SG-006` | current serialization/identity owner | `tools/agent_tools/skill_dependency_map.py:_canonical_bytes`, `_identity_preimage`, `_IdentityStore` | field order, normalization, digest, duplicate, or collision changes require these clauses |
 | `SG-007..SG-008` | current route/materializer owners | `tools/agent_tools/route.py`, `tools/agent_tools/skill_route_catalog.py`, `tools/agent_tools/skill_tool_commands.py`, `tools/agent_tools/skill_dependency_map.py` | capability/owner/adapter/phase/edge changes map to the typed route or dependency clause, never to prose |
-| `SG-009..SG-011` | planned projection/readback owner | `tools/agent_tools/check_skill_tool_invocation_graph.py`; existing `check_agent_runtime_alignment.py` | any JSON/Mermaid/source/skills.md equality, stale, count, or generated-node change maps to these clauses |
+| `SG-009..SG-011` | current projection/readback owner | `tools/agent_tools/skill_dependency_map.py:render_graph_mermaid`, `:readback_mermaid`; `tools/agent_tools/check_skill_tool_invocation_graph.py` | any JSON/Mermaid/source/skills.md equality, stale, count, or generated-node change maps to these clauses |
 | `SG-012` | current log lifecycle owner | `tools/agent_tools/runtime_log_archive_git.py`, `documents/design/runtime-log-repository-lifecycle.md` | command order or preflight/transaction boundary changes map to SG-012 and the corresponding RL clause |
-| `SG-013..SG-014` | current/planned handoff and review owners | `tools/agent_tools/bootstrap_agent_run.py`, `agents/internal-routines/design-implementation-correspondence.md`, `agents/skills/change-review.md` | manifest/readback/design-fingerprint changes map to the clause before implementation |
-| `SG-015` | planned digest/readback owner | `tools/agent_tools/check_skill_tool_invocation_graph.py` | digest preimage, DAG level, JSON self-digest exclusion, Mermaid ref-only metadata, or circular-readback changes map to SG-015 |
+| `SG-013..SG-014` | current handoff and review owners | `tools/agent_tools/skill_dependency_map.py:build_graph`, `tools/agent_tools/check_skill_tool_invocation_graph.py`, `agents/internal-routines/design-implementation-correspondence.md` | manifest/readback/design-fingerprint changes map to the clause before implementation |
+| `SG-015` | current digest/readback owner | `tools/agent_tools/skill_dependency_map.py:_identity_preimage`, `:_json_digest_from_graph`, `:readback_mermaid`; `tools/agent_tools/check_skill_tool_invocation_graph.py` | digest preimage, DAG level, JSON self-digest exclusion, Mermaid ref-only metadata, or circular-readback changes map to SG-015 |
 
-Reverse mapping rule: every changed behavior/path that adds, removes, renames, resolves, orders, routes, serializes, projects, or reads back a skill, command, ToolID, phase, or edge must cite one or more `SG-*` clauses and the source owner. A catalog/dependency/source change with no generated readback is incomplete; a generated artifact change with no source owner is invalid. Planned checker links are targets, not claims that production implementation changed in this workstream.
+### Implementation record and forward/reverse mapping
+
+この実装は AgentCanon main `5b72c8e931933eda29fde16cfdb16f42fb0941a8` を設計入力として、設計文書の trace を変更する前の SHA-256 `a28cf776915d006aaffe868185816601c8feb11c7c4375b00b6caf18805c1506` に対応付けて記録します。生成 schema は `agent_canon.skill_tool_invocation_graph.v2` です。DIC-001..DIC-009 の target/validation logical-path、clause fingerprint、forward/reverse review をこの表で満たします。
+
+| forward clause | implementation target (logical locator / symbol) | focused evidence / validation route | reverse trigger |
+| --- | --- | --- | --- |
+| `SG-001..SG-003` | `agents/skills/catalog.yaml`; `agents/skills/skill-dependencies.yaml`; `agents/canonical/skills.md`; `tools/agent_tools/skill_tool_commands.py:packet_for_skill` | `build_graph` 60-skill equality, three phase packets, reader link parity | any owner, source snapshot, command phase, or reader link change |
+| `SG-004..SG-006` | `tools/agent_tools/skill_dependency_map.py:_IdentityStore`, `_canonical_bytes`, `_identity_preimage` | `test_identity_payloads_are_unique_and_all_projections_are_refs`; typed collision/reference tests | any payload duplication, Ref, Unicode/field-order, or digest-preimage change |
+| `SG-007..SG-008` | `tools/agent_tools/route.py:decide_skills`; `skill_dependency_map.py:_build_owner_and_adapter_calls`, `_add_edge` | capability route, owner-before-adapter ToolCall, seven edge-type and phase/order checks | any route, ToolCall, phase, edge, or untyped adapter heuristic change |
+| `SG-009..SG-011` | `skill_dependency_map.py:render_graph_mermaid`, `:readback_mermaid`, `check_artifacts` | actual one-block Mermaid readback; JSON/Mermaid exact equality and stale/omission failure | any node/edge/order/coverage/readback or generated-artifact change |
+| `SG-012` | `agents/skills/catalog.yaml:result-artifact-writeout.tool_commands.conditional`; `documents/design/runtime-log-repository-lifecycle.md` as owner evidence | `archive-agent-report → push`; runtime accumulation retains broad `sync`; lifecycle command-order test | any result writeout or runtime publication command order/boundary change |
+| `SG-013..SG-014` | `documents/design/skill-tool-invocation-graph.md` trace; `tools/agent_tools/check_skill_tool_invocation_graph.py` | `CHECK_SCHEMA=agent_canon.skill_tool_invocation_check.v1`; DIC trace and generated readback | any manifest/readback/design fingerprint or correspondence target change |
+| `SG-015` | `skill_dependency_map.py:_identity_preimage`, `:_json_digest_from_graph`, `:readback_mermaid` | graph/json/Mermaid digest equality, no circular artifact digest, no absolute locator/base64 marker | any preimage, DAG layer, self-digest, Mermaid metadata, or readback change |
+
+Reverse mapping rule: every changed behavior/path that adds, removes, renames, resolves, orders, routes, serializes, projects, or reads back a skill, command, ToolID, phase, or edge must cite one or more `SG-*` clauses and the source owner. A catalog/dependency/source change with no generated readback is incomplete; a generated artifact change with no source owner is invalid. The current implementation and checker links above are production claims, not planned targets.
 
 ## Evidence And Assumption Ledger
 
@@ -230,9 +244,9 @@ Reverse mapping rule: every changed behavior/path that adds, removes, renames, r
 | --- | --- | --- | --- |
 | current state | `catalog.yaml` の `skill_families` は現在 60 件で、`skill-dependencies.yaml` は同じ skill id 集合を relation owner とする | `agents/skills/catalog.yaml`, `agents/skills/skill-dependencies.yaml` | checked |
 | current state | reader/index link parity target は `agents/canonical/skills.md`、60 skill/command rows と route/command/ToolCall は `agents/skills/catalog.yaml` と `tools/agent_tools/route.py`, `skill_tool_commands.py`, `agent_team.py` が materialize する | exact implementation links and catalog headers | checked |
-| target state | source/JSON/Mermaid equality と generated actual nodes/edges/order は planned checker `tools/agent_tools/check_skill_tool_invocation_graph.py` が readback する | `SG-009..SG-011`, `SG-015` | planned |
+| target state | source/JSON/Mermaid equality と generated actual nodes/edges/order は `tools/agent_tools/check_skill_tool_invocation_graph.py` が readback する | `SG-009..SG-011`, `SG-015` | checked |
 | assumption | `normalization` / `正規化` は本文の canonical serialization に定義した Unicode NFC/NFKC、casefold、UTF-8 の手順を指す | `SG-005`, `SG-006` | explicit |
-| scope | this workstream changes design/process contracts only; no production implementation or tests | git diff scope | explicit |
+| scope | this workstream changes skill/tool routing, v2 graph materialization/checking, focused tests, catalog command order, and generated graph artifacts; runtime-log archive/path/lifecycle implementation remains outside scope | user request, owner map, DIC trace | fixed |
 
 ## Clause IDs
 

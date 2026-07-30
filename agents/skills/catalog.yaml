@@ -398,8 +398,6 @@ skill_families:
       conditional:
       - python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name>
         --branch experiment-results/<topic>
-      - python3 tools/agent_tools/runtime_log_archive_git.py status
-      - python3 tools/agent_tools/runtime_log_archive_git.py sync
       - python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir
         reports/agents/<run-id>
       - python3 tools/agent_tools/runtime_log_archive_git.py push

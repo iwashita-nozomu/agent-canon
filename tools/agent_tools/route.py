@@ -89,15 +89,6 @@ TOOL_NAME = "route.py"
 AreaData = tuple[str, str, str, str, tuple[str, ...], tuple[str, ...]]
 DEFAULT_ROOT = Path.cwd()
 SUBAGENT_BOOTSTRAP_SKILL = "subagent-bootstrap"
-VISUALIZATION_PROSE_TERMS = (
-    "visualization",
-    "visualize",
-    "diagram",
-    "flowchart",
-    "dependency graph",
-    "可視化",
-    "図示",
-)
 VISUALIZATION_TOOL_TOKEN_RE = re.compile(
     r"(?<![A-Za-z0-9_])agent_canon\.visualization(?:\.[a-z0-9_]+)+(?![A-Za-z0-9_])"
 )
@@ -1061,15 +1052,17 @@ def decide_skills(prompt: str, mode: str, rules: Sequence[SkillRoutingRule]) -> 
         visualization_reason,
     ) = _visualization_prompt_contract(public_prompt, rules_by_skill)
     visualization_adapter_tool_call = None
-    if visualization_tool_call is not None and any(
+    explicit_visualization_tool_ids = set(_visualization_tool_tokens(public_prompt))
+    explicit_adapter_route = any(
         rule.visualization_role == "adapter"
-        and rule.tool_id == "agent_canon.visualization.adapter.dependency_manifest"
         and (
             public_skill_name_mentioned(public_prompt, rule.skill)
-            or text_matches_group(public_prompt.lower(), ("dependency", "graph"))
+            or rule.tool_id in explicit_visualization_tool_ids
+            or rule.argument_schema in explicit_visualization_tool_ids
         )
         for rule in rules_by_skill.values()
-    ):
+    )
+    if visualization_tool_call is not None and explicit_adapter_route:
         visualization_adapter_tool_call = build_visualization_adapter_tool_call(
             visualization_tool_call
         )
