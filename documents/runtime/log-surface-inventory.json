@@ -9308,7 +9308,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 596,
+      "line": 618,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9316,7 +9316,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 700,
+      "line": 722,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9324,7 +9324,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_ACCUMULATED_REPORT",
-      "line": 519,
+      "line": 541,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9332,7 +9332,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_AUDIT_STATUS",
-      "line": 507,
+      "line": 529,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9340,7 +9340,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_CHECKS_PASSED",
-      "line": 504,
+      "line": 526,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9348,7 +9348,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_CHECKS_TOTAL",
-      "line": 503,
+      "line": 525,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9356,7 +9356,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_COMPACT_OUT",
-      "line": 523,
+      "line": 545,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9364,7 +9364,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_CRITICAL_FAILED",
-      "line": 506,
+      "line": 528,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9372,7 +9372,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_CRITICAL_TOTAL",
-      "line": 505,
+      "line": 527,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9380,7 +9380,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_DUPLICATE_CHECKLIST_IDS",
-      "line": 510,
+      "line": 532,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9388,7 +9388,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_DUPLICATE_EVAL_IDS",
-      "line": 508,
+      "line": 530,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9396,7 +9396,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_DUPLICATE_TARGETS",
-      "line": 509,
+      "line": 531,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9404,7 +9404,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_GIT_BRANCH",
-      "line": 514,
+      "line": 536,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9412,7 +9412,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_GIT_COMMIT",
-      "line": 515,
+      "line": 537,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9420,7 +9420,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_GIT_DIRTY",
-      "line": 516,
+      "line": 538,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9428,7 +9428,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_GROWTH_CANDIDATES",
-      "line": 511,
+      "line": 533,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9436,7 +9436,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_REPORT_OUT",
-      "line": 521,
+      "line": 543,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9444,7 +9444,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_RUN_ID",
-      "line": 512,
+      "line": 534,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9452,7 +9452,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_STATUS",
-      "line": 502,
+      "line": 524,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9460,7 +9460,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_USED_SKILLS",
-      "line": 513,
+      "line": 535,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
