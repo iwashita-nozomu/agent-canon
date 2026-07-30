@@ -567,6 +567,15 @@ The review repair adds two route-owner rows without replacing any of the 19 base
 | `tools/agent_tools/agent_team.py` | `D-VALIDATION`, `D-PROJECT-ROOT`, runtime C++ activation set → `CPP_PATH_MARKERS`, `language_review_candidates` | `language_review_candidates(..., ("cpp/tests/...",))` returns `cpp_reviewer` → route check and `RDC-RUNTIME-MATRIX` |
 | `agents/skills/catalog.yaml` | `D-VALIDATION` and public skill projection contract → `skill_families[id=cpp-review].routing.triggers` | `route.py --prompt "cpp/tests ..."` returns `cpp-review` → catalog/runtime alignment and `D-VALIDATION` |
 
+The catalog route repair also refreshes these generated projections from the
+same source snapshot. Their closure records generated headers, source counts,
+coverage/graph/JSON digests, and final Mermaid readback as one evidence chain.
+
+| exact generated path | forward: design/runtime clause → generated projection section/ref | reverse: generated projection section/ref → evidence/readback |
+| --- | --- | --- |
+| `documents/runtime/skill-dependency-graph.md` | `D-VALIDATION`, `D-RELATED-DOCUMENT-CLOSURE`, `SG-001..SG-003`, `SG-009..SG-011`, `SG-015` → generated `# Public Skill/Tool Invocation Graph`, `graph_digest`/`coverage_digest` header, source markers, and terminal digest lines | `tools/agent_tools/skill_dependency_map.py graph --root .` materializes the Mermaid projection; `tools/agent_tools/check_skill_tool_invocation_graph.py --root .` performs exact syntax/readback and digest equality; `tools/bin/agent-canon docs check` validates the Markdown projection |
+| `documents/runtime/skill-dependency-graph.json` | `D-VALIDATION`, `D-RELATED-DOCUMENT-CLOSURE`, `SG-001..SG-008`, `SG-013..SG-015` → generated `agent_canon.skill_tool_invocation_graph.v2` envelope, source snapshot/counts, coverage digests, and `readback` envelope | `tools/agent_tools/skill_dependency_map.py graph --root .` materializes the JSON projection from the catalog/dependency source; `tools/agent_tools/check_skill_tool_invocation_graph.py --root .` validates JSON self-digest, source counts, readback counts, and byte equality |
+
 ## Positive migration sequence
 
 | transition | input | resulting state | gate |
