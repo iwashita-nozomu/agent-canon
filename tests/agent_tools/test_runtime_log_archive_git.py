@@ -1410,6 +1410,38 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=no", pushed.stdout)
 
+    def test_import_eval_results_reports_no_deletion_when_all_records_are_preserved(self) -> None:
+        """All destinationless records report no deletion after successful readback."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+
+            hook_notice = canon / "agents" / "evals" / "results" / "hook-runs" / "README.md"
+            hook_notice.parent.mkdir(parents=True)
+            hook_notice.write_text("hook notice\n", encoding="utf-8")
+
+            imported = self.run_tool(
+                "import-eval-results",
+                "--delete-source",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(imported.returncode, 0, imported.stdout + imported.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS=0", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_PRESERVED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_NOT_IMPORTED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS=0", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=no", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=no", imported.stdout)
+            self.assertTrue(hook_notice.exists())
+
     def test_correspondence_reverse_coverage_and_root_commands_read_back(self) -> None:
         """The declared reverse map and validation commands are executable readback."""
         manifest_path = (

@@ -5505,17 +5505,22 @@ def _finalize_legacy_import(
             raise ArchiveGitError("legacy_source_changed_before_finalize") from exc
         if len(payload) != record.byte_count or _hash_bytes(payload) != record.sha256:
             raise ArchiveGitError("legacy_source_changed_before_finalize")
+    deleted_count = 0
     for record in concrete_records:
         delete_source_file(transaction.context, record.source)
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS={len(concrete_records)}")
+        deleted_count += 1
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS={deleted_count}")
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_PRESERVED={len(preserved_records)}")
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_NOT_IMPORTED={len(preserved_records)}")
-    print("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=yes")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE={'yes' if deleted_count else 'no'}")
     if plan.family == "eval-results":
-        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={len(concrete_records)}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={deleted_count}")
         print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED={len(preserved_records)}")
         print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED={len(preserved_records)}")
-        print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=yes")
+        print(
+            "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE="
+            f"{'yes' if deleted_count else 'no'}"
+        )
     print("RUNTIME_LOG_ARCHIVE_IMPORT=pass")
     return 0
 
