@@ -5,7 +5,7 @@
 # upstream design ../../documents/design/agentcanon-hook-simplification-wave3.md owns prompt capture parity.
 # downstream implementation ./prompt_classifier.py consumes PromptCapture.
 # downstream implementation ./behavior_event_assembly.py serializes prompt fields.
-# downstream test ../../tests/agent_tools/test_prompt_capture.py validates redaction and bounds.
+# downstream implementation ../../tests/agent_tools/test_prompt_capture.py validates redaction and bounds.
 # @dependency-end
 """Pure prompt capture and redaction owner."""
 

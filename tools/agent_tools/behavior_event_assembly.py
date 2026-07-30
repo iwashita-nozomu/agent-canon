@@ -11,7 +11,7 @@
 # upstream implementation ../../.codex/hooks/hook_event_log.py owns append-only transport primitives.
 # downstream implementation ./workflow_monitor.py emits the post-append projection.
 # downstream implementation ./generate_agent_runtime_dashboard.py reads canonical events.
-# downstream test ../../tests/agent_tools/test_behavior_event_assembly.py validates cardinality and fail-open behavior.
+# downstream implementation ../../tests/agent_tools/test_behavior_event_assembly.py validates cardinality and fail-open behavior.
 # @dependency-end
 """Canonical behavior-event assembly and readback owner."""
 

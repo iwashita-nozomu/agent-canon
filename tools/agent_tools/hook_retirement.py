@@ -5,7 +5,7 @@
 # upstream design ../../documents/design/agentcanon-hook-simplification-wave3.md fixes the 23-child/1-moved-source ledger.
 # downstream implementation ./check_hook_retirement.py validates absence and caller closure.
 # downstream implementation ../../.codex/hooks/hook_dispatcher.py exposes manifest readback.
-# downstream test ../../tests/agent_tools/test_hook_retirement.py validates digest and typed counts.
+# downstream implementation ../../tests/agent_tools/test_hook_retirement.py validates digest and typed counts.
 # @dependency-end
 """Single source of truth for retired hook metadata."""
 

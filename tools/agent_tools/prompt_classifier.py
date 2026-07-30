@@ -5,7 +5,7 @@
 # upstream design ../../documents/design/agentcanon-hook-simplification-wave3.md owns the pure classifier contract.
 # downstream implementation ../agent_tools/evaluate_workflow_selection.py supplies frozen catalog/routing inputs.
 # downstream implementation ./behavior_event_assembly.py consumes PromptIntakeSignals.
-# downstream test ../../tests/agent_tools/test_prompt_classifier.py validates purity and field parity.
+# downstream implementation ../../tests/agent_tools/test_prompt_classifier.py validates purity and field parity.
 # @dependency-end
 """Pure prompt-intake classifier.
 

@@ -1500,10 +1500,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            dispatcher = root / ".codex" / "hooks" / "hook_dispatcher.py"
-            dispatcher.write_text(
-                dispatcher.read_text(encoding="utf-8").replace(
-                    "branch_worktree_guard.py",
+            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "tools/agent_tools/hook_safety.py",
                     "",
                 ),
                 encoding="utf-8",
@@ -1513,7 +1513,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("branch_worktree_creation_guard", result.stdout)
-            self.assertIn("missing-marker:branch_worktree_guard.py", result.stdout)
+            self.assertIn("missing-marker:tools/agent_tools/hook_safety.py", result.stdout)
 
     def test_minimal_fixture_covers_branch_worktree_guard_surfaces(self) -> None:
         """The minimal test fixture includes every branch/worktree guard surface."""

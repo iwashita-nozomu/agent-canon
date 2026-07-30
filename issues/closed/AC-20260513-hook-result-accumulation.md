@@ -6,8 +6,8 @@ contract issue
 responsibility Records the resolved workflow defect where hook results were root-local, duplicated, and hard to use for improvement.
 upstream design ../README.md defines AgentCanon operational issue conventions
 upstream design ../../documents/runtime/runtime-log-archive.md defines hook result accumulation
-upstream implementation ../../.codex/hooks/oop_readability_guard.py records OOP hook outcomes
-upstream implementation ../../.codex/hooks/skill_usage_logger.py records skill hook outcomes
+upstream design ../../.agents/skills/oop-readability-check/SKILL.md owns the current OOP review route
+upstream implementation ../../tools/agent_tools/behavior_event_assembly.py owns canonical behavior evidence
 downstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py summarizes hook results
 @dependency-end
 -->

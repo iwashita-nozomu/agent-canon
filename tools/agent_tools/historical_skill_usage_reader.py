@@ -5,7 +5,7 @@
 # upstream design ../../documents/design/agentcanon-hook-simplification-wave3.md forbids an active producer.
 # downstream implementation ./generate_agent_improvement_guide.py consumes historical readback.
 # downstream implementation ./generate_agent_runtime_dashboard.py may consume historical migration evidence.
-# downstream test ../../tests/agent_tools/test_historical_skill_usage_reader.py validates read-only parsing.
+# downstream implementation ../../tests/agent_tools/test_historical_skill_usage_reader.py validates read-only parsing.
 # @dependency-end
 """Historical, read-only parser for the retired skill usage artifact."""
 

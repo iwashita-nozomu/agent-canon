@@ -4,7 +4,7 @@
 # responsibility Normalizes tool-selection evidence without writing telemetry.
 # upstream design ../../documents/design/agentcanon-hook-simplification-wave3.md owns tool-selection parity.
 # downstream implementation ./behavior_event_assembly.py consumes ToolSelection.
-# downstream test ../../tests/agent_tools/test_tool_selection.py validates domains and ordering.
+# downstream implementation ../../tests/agent_tools/test_tool_selection.py validates domains and ordering.
 # @dependency-end
 """Pure tool-selection owner."""
 

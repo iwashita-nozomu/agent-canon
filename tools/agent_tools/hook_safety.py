@@ -2,8 +2,8 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Owns pure secret matching, destructive Git intent classification, and redacted safety payloads.
-# upstream implementation ./hook_dispatcher.py runs these leaves in-process for active events.
-# upstream implementation ./hook_dispatcher.py is the only active caller.
+# upstream implementation ../../.codex/hooks/hook_dispatcher.py runs these leaves in-process for active events.
+# upstream implementation ../../.codex/hooks/hook_dispatcher.py is the only active caller.
 # upstream design ../../documents/codex/codex-configuration-reference.md defines active hook safety semantics.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates pure safety decisions and redaction.
 # @dependency-end

@@ -16,7 +16,7 @@
 # upstream implementation ./tool_rejection_preflight.py owns code-edit cause evidence.
 # upstream implementation ../../.agents/skills/oop-readability-check/SKILL.md owns OOP readability review routing
 # upstream implementation ./task_authority.py owns library implementation authority.
-# upstream implementation tools/bin/agent-canon owns selected style checks.
+# upstream implementation ../bin/agent-canon owns selected style checks.
 # upstream implementation ./responsibility_scope.py validates responsibility owner scopes
 # downstream implementation ../../tools/agent_tools/agent_team.py injects preflight protocol into team manifests
 # downstream implementation ../../tests/agent_tools/test_tool_rejection_preflight.py validates predicted gate routing
