@@ -11,7 +11,7 @@
 # upstream implementation ../agent_tools/import_responsibility.py validates import ownership boundaries
 # upstream implementation ../validation/notebook_quality.py validates notebooks as readable runnable demos
 # upstream implementation ../bin/agent-canon invokes the canonical Rust algorithm contract checker
-# upstream implementation ../rust/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
+# upstream implementation ../../rust/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
 # upstream implementation ../agent_tools/check_convention_compliance.py validates convention/workflow gate wiring
 # upstream implementation ../agent_tools/tool_catalog.py validates structured tool catalog
 # upstream implementation ../agent_tools/tool_drift.py validates tool/convention trace contracts

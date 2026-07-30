@@ -120,8 +120,9 @@ path に置いた fixture は、finding 0、module 0、exit 0 とする。non-al
 
 ### Exclude glob fixture oracle
 
-CLI fixture tree は `pkg/keep.py`、`pkg/generated/a.py`、
-`pkg/a_generated.py` の三 file とし、各 file は同じ valid algorithm source から作る。
+CLI fixture tree は保存時には `pkg/keep.py.fixture`、`pkg/generated/a.py.fixture`、
+`pkg/a_generated.py.fixture` とし、fixture loader が一時 tree にそれぞれ `.py` として
+materialize する。各 file は同じ valid algorithm source から作る。
 解析対象と期待値は次で固定する。
 
 | CLI invocation | excluded files | `summary.files` delta | `algorithm_modules` delta |
@@ -129,13 +130,24 @@ CLI fixture tree は `pkg/keep.py`、`pkg/generated/a.py`、
 | no explicit exclude | none | 0 | 0 |
 | `--exclude 'pkg/generated/*.py'` | `pkg/generated/a.py` | -1 | -1 |
 | `--exclude '*_generated.py'` | `pkg/a_generated.py` | -1 | -1 |
+| `--exclude '*/generated'` | none; `pkg/generated/a.py` remains discovered | 0 | 0 |
 | both options repeated | both generated files | -2 | -2 |
 
 The implementation test must invoke the public CLI, not only a private predicate, and must
 assert that `pkg/keep.py` remains in `modules` in every row. A non-glob `--exclude pkg` row
 must retain the existing path-prefix/path-part behavior. The same fixture is run through the
 Rust route after the Python checker retirement; no Python compatibility command is used for
-the target oracle.
+the target oracle. Directory traversal is retained for all rows, and the exclude predicate is
+applied only to discovered `.py` file paths; a directory-shaped glob therefore does not prune
+the directory before its Python files are discovered.
+
+### Legacy stopping fixture oracle
+
+`stopping/legacy_policy.py.fixture` is materialized as `legacy_policy.py` by the same loader.
+Its `SolveConfig.criterion: ResidualNormConvergenceCriterion` field preserves the existing Rust
+finding `legacy_stopping_policy_field` with `line=7`, `subject=criterion`, and detail
+`use imported stopping.SolveConfig so the nested algorithm contract is inferred`; the CLI
+readback is one algorithm module, one finding, zero parse errors, and exit 1.
 
 この matrix は「旧 prefix を同時に出す」互換層を意味しない。意味と診断 field を
 一つの canonical report に写し、旧 Python command、旧 catalog id、旧 CI invocation
@@ -282,8 +294,10 @@ record with `contract_classes=["Algorithm"]`, and a missing parent algorithm fie
 parent `child.InitializeConfig` finding solely from that constructor.
 
 Malformed/valid mixed fixture は、parse error の path、line、detail、ordering と、valid
-module の readback を同時に固定する。fixture directory に `00_malformed.py`（2 行目が
-syntax error）と `10_valid.py`（complete algorithm module）を置いた場合、target JSON は
+module の readback を同時に固定する。repository に保存する fixture directory には
+`00_malformed.py.fixture`（2 行目が syntax error）と `10_valid.py.fixture`（complete
+algorithm module）を置き、CLI integration test の単一 fixture loader が一時 tree へそれぞれ `00_malformed.py` と
+`10_valid.py` として materialize して public CLI を実行する。この実行時の target JSON は
 次の exact projection とする。
 
 ```json
@@ -314,10 +328,13 @@ PY_ALGORITHM_CONTRACT_PARSE_ERRORS=1
 PY_ALGORITHM_CONTRACT=fail
 ```
 
-The fixture assertion must invoke the public CLI and assert both files are discovered,
-`00_malformed.py` is sorted before `10_valid.py` in diagnostics, the valid module remains in
-`algorithm_modules`/`modules`, and the JSON/text path, 1-based line, exact `parseable` detail,
-and ordering agree.
+The single fixture loader must materialize the stored `00_malformed.py.fixture` as
+`00_malformed.py`, invoke the public CLI on that temporary tree, and assert both files are
+discovered, `00_malformed.py` is sorted before `10_valid.py` in diagnostics, the valid module
+remains in `algorithm_modules`/`modules`, and the JSON/text path, 1-based line, exact
+`parseable` detail, and ordering agree. All tracked fixture source files use the same non-`.py`
+`.py.fixture` storage boundary; this keeps intentionally malformed and valid source out of
+repository-wide Python source scanners without changing the CLI contract or fixture content.
 
 text artifact は canonical prefix だけを出す。
 
@@ -403,7 +420,8 @@ finding schema を持つためである。
 2. **Rust owner first:** `python_algorithm_contract.rs` と AST extractor を実装し、
    Rust unit test は each finding kind、Rust integration/CLI test は text/JSON、exit
    status、root-relative path/line、malformed syntax を readback する。fixture source は
-   `tests/fixtures/python_algorithm_contract/`、CLI integration は
+   `tests/fixtures/python_algorithm_contract/` に `.py.fixture` で保存し、CLI integration の
+   単一 loader が一時 tree に `.py` として materialize する。CLI integration は
    `rust/agent-canon/tests/python_algorithm_contract_cli.rs` を canonical test surface
    とする。
 3. **Route cutover:** `run_all_checks.sh` が Rust CLI を一度だけ呼ぶようにし、catalog の
@@ -455,8 +473,10 @@ finding schema を持つためである。
 - local `child.InitializeConfig()` fixture は親 `InitializeConfig` 不足を報告せず、
   `config.<field>` fixture は同じ contract class を報告する。protocol-only import は
   non-allowlisted が exact one finding、allowlisted が zero finding/zero module になる。
-- `--exclude 'pkg/generated/*.py'`、`--exclude '*_generated.py'` などの fnmatch glob と
-  repeatable exclude の union が、Python/Rust の files、modules、findings count で一致する。
+- `--exclude 'pkg/generated/*.py'`、`--exclude '*_generated.py'`、および directory-shaped
+  `--exclude '*/generated'` などの fnmatch glob と repeatable exclude の union が、
+  Python/Rust の files、modules、findings count で一致する。directory-shaped row では
+  `generated/a.py` が残る。
 - `git grep` による static closure で retired Python path、old catalog id、old CI invocation、
   old output prefix が production/docs/catalog/runtime mirror に残らないことを確認する。
 - PR #471 owner fix 統合後の clean baseline check を先に通し、pre-existing drift は別

@@ -4,8 +4,6 @@
 // upstream design ../../../documents/design/jax_util/algorithm_module_contract.md algorithm module contract
 // upstream implementation python_structure_hash.rs provides the Python-AST-to-Rust analysis pattern
 // downstream implementation main.rs exposes python-algorithm-contract-check
-// downstream test ../../../tests/fixtures/python_algorithm_contract/CLI parity fixtures
-// downstream test ../../tests/python_algorithm_contract_cli.rs CLI parity tests
 // @dependency-end
 
 use serde::Serialize;
@@ -669,11 +667,10 @@ fn collect_python_files(
     excludes: &[String],
     files: &mut BTreeSet<PathBuf>,
 ) {
-    if excluded(root, target, excludes) {
-        return;
-    }
     if target.is_file() {
-        if target.extension().and_then(|value| value.to_str()) == Some("py") {
+        if target.extension().and_then(|value| value.to_str()) == Some("py")
+            && !excluded(root, target, excludes)
+        {
             files.insert(fs::canonicalize(target).unwrap_or_else(|_| target.to_path_buf()));
         }
         return;
