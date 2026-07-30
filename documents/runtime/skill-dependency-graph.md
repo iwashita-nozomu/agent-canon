@@ -1,3 +1,13 @@
+<!--
+@dependency-start
+contract reference
+responsibility Publishes the generated public skill/tool invocation graph as the canonical Mermaid reader surface.
+upstream design ../../documents/design/skill-tool-invocation-graph.md owns the graph universe, serialization, and readback contract
+upstream implementation ../../tools/agent_tools/skill_dependency_map.py materializes the typed graph and renders the Mermaid projection
+downstream implementation ../../tools/agent_tools/check_skill_tool_invocation_graph.py validates source/artifact equality and actual Mermaid syntax readback
+downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py covers completeness, determinism, and stale-artifact failures
+@dependency-end
+-->
 <!-- Generated from the typed skill/tool invocation graph; do not edit by hand. -->
 # Public Skill/Tool Invocation Graph
 

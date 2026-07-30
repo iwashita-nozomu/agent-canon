@@ -1,5 +1,15 @@
 """Focused tests for the v2 skill/tool invocation graph contract."""
 
+# @dependency-start
+# contract test
+# responsibility Verifies the complete typed skill/tool invocation graph and its generated projections.
+# upstream design ../../documents/design/skill-tool-invocation-graph.md owns graph clauses SG-001..SG-015 and artifact readback
+# upstream implementation ../../tools/agent_tools/skill_dependency_map.py materializes identities, phases, commands, tools, edges, and Mermaid
+# upstream implementation ../../tools/agent_tools/check_skill_tool_invocation_graph.py validates generated JSON/Mermaid equality and stale artifacts
+# downstream implementation ../../documents/runtime/skill-dependency-graph.json is the generated machine-readable graph projection
+# downstream implementation ../../documents/runtime/skill-dependency-graph.md is the generated Mermaid reader projection
+# @dependency-end
+
 from __future__ import annotations
 
 import copy
