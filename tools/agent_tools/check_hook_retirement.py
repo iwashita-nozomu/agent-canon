@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
-# contract checker
+# contract tool
 # responsibility Fails closed on hook retirement manifest, absence, executable-reference, inventory, and caller-closure violations.
 # upstream design ../../documents/design/agentcanon-hook-simplification-wave3.md fixes scan roots and readback schema.
 # upstream implementation ./hook_retirement.py owns the typed tombstone manifest.
