@@ -1,0 +1,127 @@
+# 設計・実装対応ルート
+<!--
+@dependency-start
+contract agent-runtime
+responsibility Documents the universal design-to-implementation correspondence routine for repository-changing work.
+upstream design ../canonical/CODEX_WORKFLOW.md implementation entry and design-integrity route
+downstream implementation ../../tools/agent_tools/route.py selects capability and stage routes
+downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py transports design fingerprints and handoff state
+downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-backed claims
+downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates canonical runtime references
+downstream design ../skills/change-review.md consumes forward and reverse correspondence at review
+@dependency-end
+-->
+
+## Reader Map
+
+このルートは、設計正本と repository-changing implementation の間に一つの対応関係を作るための内部ルートです。読者は、まず `Invariant` と `State Model` を確認し、次に `Stage Ownership`、`Handoff Record`、`Review Readback` の順に読みます。skill 個別の説明、ToolCall schema、実装レビューの詳細は各 owner surface に残し、この文書は共通の遷移と対応キーだけを持ちます。
+
+## Responsibility / Owner Boundaries
+
+| 責務 | 正本 owner | このルートが行うこと | 行わないこと |
+| --- | --- | --- | --- |
+| 設計の内容 | `documents/design/*.md` | 選択された文書を読む、clause ID と fingerprint を確定する | 設計本文をこの routine に複製しない |
+| capability / skill の順序 | `agents/skills/agent-orchestration.md` と `agents/skills/skill-dependencies.yaml` | owner stage を呼び出す | prompt keyword で capability を決めない |
+| implementation handoff | `agents/COMMUNICATION_PROTOCOL.md`、`agents/workflows/implementation-waterfall-workflow.md` | clause map と digest を handoff に載せる | 実装者の代わりに実装しない |
+| review | `agents/skills/change-review.md` | forward / reverse coverage と drift を判定対象にする | review policy を再定義しない |
+| evidence / validation | 各 design doc の validation route | clause と evidence の readback を残す | 成功メッセージだけで十分条件にしない |
+
+## Exact Data / State Model
+
+### Record
+
+対応レコードは `agent_canon.design_implementation_correspondence.v1` とし、論理的な値を次のように固定します。
+
+```text
+CorrespondenceRecord {
+  request_id: string
+  design_locator: RepoRelativeLocator
+  design_sha256: Sha256
+  clause_ids: nonempty list<ClauseId>
+  clause_fingerprints: map<ClauseId, Sha256>
+  owner_stage: StageId
+  implementation_targets: list<RepoRelativeTarget>
+  validation_route: list<RepoRelativeCommand>
+  state: DICState
+}
+```
+
+`RepoRelativeLocator` と `RepoRelativeTarget` は repository root を基準にした `/` 区切りの locator とし、`..`、空 locator、絶対 path を拒否します。実行時だけ `ExecutionContext` が root と locator から絶対 path を解決します。handoff、manifest、ToolCall、review finding はこの値の ID、digest、論理 locator だけを参照し、同じ identity payload を再シリアライズしません。
+
+### State
+
+```text
+unresolved -> resolved -> read -> fingerprinted -> handed_off
+handed_off -> implementing -> review_ready -> accepted
+read|fingerprinted|handed_off|implementing|review_ready -> drifted|blocked
+```
+
+`drifted` は設計文書の bytes、clause の text、clause order、owner mapping、または validation route のいずれかが selected fingerprint と異なる状態です。`blocked` は必要な owner / file / evidence が欠けている状態です。
+
+## Invariants
+
+- `DIC-001` repository-changing implementation の前に、変更対象を所有する design document を解決して全文を read-back する。
+- `DIC-002` design document が absent、reader path 不明、責務境界不明、clause ID 欠落、implementation trace 欠落、または validation route 欠落なら、implementation handoff を作らず、design を先に create/fix して review する。
+- `DIC-003` selected document の bytes と各 clause の canonical text から fingerprint を一度だけ計算し、handoff と review はその ID/digest を参照する。
+- `DIC-004` implementation handoff の各 change target は一つ以上の clause ID と一つ以上の validation/evidence locator に対応する。
+- `DIC-005` implementation review は forward coverage（design clause → implementation/evidence）と reverse coverage（changed behavior/path → design clause）の両方を確認する。
+- `DIC-006` design fingerprint、owner、target、state、validation route が変わったときは `drifted` とし、design の更新・再読・再レビューまで implementation を停止する。
+- `DIC-007` routine は capability owner、adapter、implementation owner の順序を保持し、prose keyword、近接 filename、既存の stale artifact を route verdict にしない。
+- `DIC-008` durable artifacts は repository-relative locator を持ち、absolute runtime path は execution state にしか現れない。
+- `DIC-009` この routine は case-based loophole、compatibility fallback、第二の design policy、個別 skill への全文複製を追加しない。
+
+## Side Effects
+
+読取り、clause fingerprint 計算、handoff への参照追加、review readback は deterministic な side effect です。設計修正、implementation write、branch mutation、remote publication は各 owner stage の side effect であり、この routine が直接実行する副作用ではありません。design docs が複数あるときも、所有境界ごとに canonical document を選び、同一 clause payload を複数の artifact に埋め込みません。
+
+## Failure Semantics
+
+| failure | state | next action |
+| --- | --- | --- |
+| `design_missing` / `design_incomplete` | `blocked` | owner document を作成・補完し、design review 後に再読する |
+| `owner_ambiguous` | `blocked` | canonical owner map を解決するまで target を選ばない |
+| `clause_fingerprint_mismatch` | `drifted` | design を更新して fingerprint を再発行する。実装を継続しない |
+| `forward_coverage_missing` / `reverse_coverage_missing` | `blocked` | handoff または design trace を補完して review を再実行する |
+| `absolute_locator_in_durable_artifact` | `blocked` | logical locator に置換し、execution-time resolver の readback を行う |
+| `keyword_only_capability_route` | `blocked` | typed capability owner の route packet を使い、prose route を破棄する |
+
+失敗時は既存の設計、実装、manifest、readback を上書きせず、typed finding と対象の ID/digest を返します。失敗を warning に格下げする条件はありません。
+
+## Stage Ownership and Procedure
+
+1. `agent-orchestration` が request mode、owner、replaceable unit、implementation mechanism、validation route を固定する。
+2. 選択された owner が `design_locator` を解決し、DIC-001/002 に従って design を読む。
+3. `oop-type-design` または該当 design owner が clause IDs、責務境界、state/invariant、implementation trace を固定する。
+4. handoff owner が `design_sha256`、clause fingerprints、allowed targets、reverse-coverage expectation を一つの参照 packet にする。
+5. implementation owner は各 change を clause ID に結び付け、追加の design divergence を作らない。
+6. change-review owner が forward/reverse coverage、fingerprint、logical locator、owner order を read-back する。
+7. drift または coverage gap があれば `blocked` とし、design update/review を経てから handoff を再発行する。
+
+## Validation / Readback
+
+最小の validation route は次です。
+
+```bash
+python3 tools/agent_tools/check_design_doc_claims.py --root . --recursive-depth 3 <design-doc>
+python3 tools/agent_tools/check_dependency_headers.py --changed
+python3 tools/agent_tools/check_agent_runtime_alignment.py
+tools/bin/agent-canon docs check
+```
+
+レビュー時の readback は、(a) selected design bytes と `design_sha256`、(b) clause ID 集合と個別 fingerprint、(c) changed path/behavior と clause ID、(d) evidence/validation locator の four-way join が完全であることを確認します。未実装の planned owner は `planned` と明記し、current evidence と混同しません。
+
+## Design-To-Implementation Trace
+
+| clause | current/planned implementation owner | file / symbol | evidence / reverse rule |
+| --- | --- | --- | --- |
+| `DIC-001..DIC-009` | current workflow and review owners | `agents/skills/agent-orchestration.md`, `agents/skills/oop-type-design.md`, `agents/skills/change-review.md`, this routine | changed path must cite one DIC clause; missing design readback blocks |
+| `DIC-003..DIC-004` | planned transport owner | `tools/agent_tools/bootstrap_agent_run.py`, `agents/COMMUNICATION_PROTOCOL.md` | handoff identity is referenced by digest; no duplicate payload |
+| `DIC-005..DIC-006` | current/planned review owner | `agents/skills/change-review.md`, `tools/agent_tools/check_design_doc_claims.py` | every accepted finding has forward and reverse evidence; drift is a blocker |
+| `DIC-007..DIC-008` | current routing/path owners | `tools/agent_tools/route.py`, `tools/agent_tools/agent_canon_source_root.py` | capability and locator changes map back to the clause that authorized them |
+| `DIC-009` | current canonical-document owners | `agents/internal-routines/`, `agents/skills/`, `documents/design/` | a new policy copy or loophole maps to a rejected design change |
+
+Reverse mapping rule: any future implementation change that touches a path, schema, state transition, owner order, serialization, or validation command named by this routine must select a clause ID before editing; any clause with no current/planned owner or evidence is a design gap, not an implementation TODO. This table is the universal correspondence index; stage documents add only their owner-specific route.
+
+## Clause IDs
+
+この routine の clause ID は `DIC-001` から `DIC-009` です。新しい clause はこの文書と対応する design trace を同一変更で更新し、個別 skill に同じ規則を再掲しません。

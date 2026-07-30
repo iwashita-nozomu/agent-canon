@@ -7,11 +7,17 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/rule/README.md document rule canon
 upstream design ../../documents/design/README.md design canon reader route
 upstream design ../../issues/README.md durable issue and GitHub mirror policy
+upstream design ../internal-routines/design-implementation-correspondence.md forward/reverse design correspondence and drift block route
 @dependency-end
 -->
 
 
 ## Reader Map
+
+design-backed diff の review input は、
+`../internal-routines/design-implementation-correspondence.md` の clause
+fingerprint と forward/reverse coverage です。この skill は findings-first
+review の owner であり、universal correspondence policy は複製しません。
 
 - Purpose: reviews code, docs, or generated diffs with findings first,
   prioritizing regressions, missing tests, and broken assumptions.

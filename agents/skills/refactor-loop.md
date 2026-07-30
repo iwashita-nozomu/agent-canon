@@ -8,11 +8,17 @@ upstream design structure-planning.md reusable refactor structure contract
 upstream design dependency-analysis.md unified change-impact and repair-planning packet
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback loop
 upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings for refactor plans
+upstream design ../internal-routines/design-implementation-correspondence.md design read, clause fingerprint, and drift-block route
 @dependency-end
 -->
 
 
 ## Reader Map
+
+refactor target trace を固定する前に、owning design を read し、routine の
+clause fingerprint と implementation trace を参照します。refactor の change
+mapping と review はこの skill の owner ですが、design drift invariant は
+routine に委譲します。
 
 - Purpose: manage large refactors as behavior-preserving reorganizations with
   explicit scope, deltas, and review gates.

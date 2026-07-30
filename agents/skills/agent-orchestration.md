@@ -9,6 +9,7 @@ upstream design ../workflows/hypothesis-validation-workflow.md analysis-prioriti
 upstream design ../COMMUNICATION_PROTOCOL.md pre-edit investigation and fresh subagent context packets
 upstream design agent-orchestration.execution-contract.toml machine-readable execution contract
 upstream design ./skill-dependencies.yaml typed public-skill prerequisites, successors, ordering, and parallel relations
+upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
 downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py execution contract checker
 downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives canonical invocation order
 downstream implementation ../../tools/agent_tools/skill_dependency_map.py validates and projects the dependency graph
@@ -16,6 +17,11 @@ downstream implementation ../../tools/agent_tools/skill_dependency_map.py valida
 -->
 
 ## Reader Map
+
+設計を伴う repository-changing route では、owner selection の後に
+`../internal-routines/design-implementation-correspondence.md` を stage route
+として参照します。universal policy は同 routine にあり、この skill は route
+selection の owner だけを持ちます。
 
 - Purpose: mandatory repository-task routing that selects workflow family,
   active skills, roles, reviews, run bundle, and implementation route.
