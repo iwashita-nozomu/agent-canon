@@ -2292,8 +2292,8 @@ mod tests {
         fs::write(&source, "# root agents\n[Target](documents/target.md)\n")
             .expect("write vendor root agents");
         fs::write(&target_outside, "# outside target\n").expect("write outside target");
-        symlink(&target_outside, &linked_target).expect("link target outside root");
-        symlink(&vendor_root.join("ROOT_AGENTS.md"), &parent_root_agents)
+        symlink(target_outside, linked_target).expect("link target outside root");
+        symlink(vendor_root.join("ROOT_AGENTS.md"), &parent_root_agents)
             .expect("create parent root symlink");
 
         let findings =
