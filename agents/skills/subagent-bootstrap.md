@@ -6,11 +6,17 @@ responsibility Documents subagent-bootstrap for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection handoff fields
 upstream design ../internal-routines/subagent-startup.md owns the canonical private subagent startup route
+upstream design ../internal-routines/design-implementation-correspondence.md clause fingerprint and implementation handoff correspondence route
 @dependency-end
 -->
 
 
 ## Reader Map
+
+write-capable handoff の design context には、routine が発行した design
+locator、design digest、clause IDs/fingerprints、forward/reverse validation
+refs を参照として含めます。この skill は handoff lifecycle を owner とし、
+対応 policy を再掲しません。
 
 - Purpose: create run bundles and bounded subagent handoffs without losing role,
   write-scope, validation, and review evidence.

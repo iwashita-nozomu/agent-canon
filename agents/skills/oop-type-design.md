@@ -6,6 +6,7 @@ upstream design ../canonical/skills.md public skill registry and visibility cont
 upstream design ../../documents/conventions/object-oriented-design.md shared OOP boundary policy
 upstream design ../../documents/design/protocols.md Protocol and dependency-direction policy
 upstream design ../../documents/design/dependency-manifest-design.md dependency-header DSL
+upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
 downstream implementation ../../.agents/skills/oop-type-design/SKILL.md runtime discovery shim
 downstream implementation ../../agents/skills/catalog.yaml public skill and capability metadata
 downstream implementation ../../tools/agent_tools/route.py explicit capability route
@@ -16,6 +17,11 @@ downstream implementation ../../evidence/agent-evals/skill_workflow_prompt_eval.
 # oop-type-design
 
 ## Reader path and boundary
+
+この stage は owning design の read、clause ID/fingerprint、responsibility map
+を `../internal-routines/design-implementation-correspondence.md` の record に
+接続します。universal invariant と failure semantics は routine 側にあり、
+ここでは OOP/type contract owner の設計 packet だけを定義します。
 
 This is the pre-implementation OOP/type-design route. Invoke it explicitly with
 the capability ID `oop_type_design`:
