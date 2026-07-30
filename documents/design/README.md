@@ -33,6 +33,8 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
   - `experiment_runner` の契約と実行モデル
 - [python-structure-hash.md](python-structure-hash.md)
   - Python の structural duplicate analysis と module-group dependency priority
+- [agentcanon-hook-simplification-wave3.md](agentcanon-hook-simplification-wave3.md)
+  - Wave 3 の3 active event、各 finalized handler から assembly への exactly-once caller contract、dispatcher exact direct import `tools.agent_tools.behavior_event_assembly:record_hook_invocation`、`RETIRED_CHILD_TOMBSTONES=23` / `MOVED_SOURCE_ABSENCES=1` / retired basenames `24`、分離した semantic event / hook event、skill logger single-owner migration、historical `skill_usage.jsonl` readback、PR #471後 current-main inventory gate、検証コーパス
 - [../remote-execution-repo-contract.md](../contracts/remote-execution-repo-contract.md)
   - remote execution を受ける repo の最小契約
 
