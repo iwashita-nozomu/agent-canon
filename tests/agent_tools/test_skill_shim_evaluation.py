@@ -109,6 +109,39 @@ class SkillShimEvaluationTest(unittest.TestCase):
         with self.assertRaisesRegex(ProducerError, "host_observation_mismatch"):
             _validate_host_observations(mismatched, packets)
 
+        wrong_category = [dict(row) for row in rows]
+        wrong_category[0]["category"] = "toolcall-route"
+        with self.assertRaisesRegex(ProducerError, "host_observation_mismatch"):
+            _validate_host_observations(wrong_category, packets)
+
+        wrong_packet_class = [dict(row) for row in rows]
+        wrong_packet_class[0]["packet_class"] = "changed"
+        with self.assertRaisesRegex(ProducerError, "host_observation_mismatch"):
+            _validate_host_observations(wrong_packet_class, packets)
+
+        unrelated = [dict(row) for row in rows]
+        unrelated[0]["prompt"] = "UNRELATED PROMPT"
+        with self.assertRaisesRegex(ProducerError, "host_observation_unrelated_prompt"):
+            _validate_host_observations(unrelated, packets)
+
+        wrong_skill = [dict(row) for row in rows]
+        wrong_skill[0]["skill_id"] = "wrong-skill"
+        with self.assertRaisesRegex(ProducerError, "host_observation_wrong_skill_id"):
+            _validate_host_observations(wrong_skill, packets)
+
+        wrong_iteration = [dict(row) for row in rows]
+        wrong_iteration[0]["iteration_id"] = "fresh-generated-02"
+        with self.assertRaisesRegex(ProducerError, "host_iteration_mismatch"):
+            _validate_host_observations(wrong_iteration, packets)
+
+        wrong_prompt_digest = dict(rows[0])
+        wrong_prompt_digest["prompt_digest"] = "0" * 64
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir) / "wrong-prompt-digest.json"
+            path.write_text(json.dumps(wrong_prompt_digest), encoding="utf-8")
+            with self.assertRaisesRegex(ProducerError, "host_prompt_digest"):
+                _host_observation(path)
+
         incomplete = dict(rows[0])
         incomplete.pop("input_tokens")
         with tempfile.TemporaryDirectory() as tmp_dir:

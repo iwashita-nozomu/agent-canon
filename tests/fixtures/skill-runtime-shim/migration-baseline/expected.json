@@ -1,0 +1,486 @@
+{
+  "schema": "agent_canon.skill_runtime_shim.migration_baseline",
+  "version": 1,
+  "host_config_rows": [
+    {
+      "skill_id": "academic-writing",
+      "path": "../.agents/skills/academic-writing/SKILL.md",
+      "index": 0,
+      "order": 0,
+      "enabled": true,
+      "host_config_entry_digest": "16efdda96cf04b3b8f3130864c4e412a3b0b737189f28a73f932174b5b4e5e81"
+    },
+    {
+      "skill_id": "adaptive-improvement-loop",
+      "path": "../.agents/skills/adaptive-improvement-loop/SKILL.md",
+      "index": 1,
+      "order": 1,
+      "enabled": true,
+      "host_config_entry_digest": "ddafdf0db40744cbe296437b77a05d4642a1b9f4dcd2e7951dccd609e96d6f5f"
+    },
+    {
+      "skill_id": "agent-learning",
+      "path": "../.agents/skills/agent-learning/SKILL.md",
+      "index": 2,
+      "order": 2,
+      "enabled": true,
+      "host_config_entry_digest": "e85a3904a1eb06394cba8db26d43f8a336fe344c47fafa7410b6029fc1e290a4"
+    },
+    {
+      "skill_id": "agent-canon-update",
+      "path": "../.agents/skills/agent-canon-update/SKILL.md",
+      "index": 3,
+      "order": 3,
+      "enabled": true,
+      "host_config_entry_digest": "3d94459de71d170faad0e4f0bc3b513c75dc016425f05e87357eae8874ab6991"
+    },
+    {
+      "skill_id": "agent-eval-accumulation",
+      "path": "../.agents/skills/agent-eval-accumulation/SKILL.md",
+      "index": 4,
+      "order": 4,
+      "enabled": true,
+      "host_config_entry_digest": "4a3bc59e61f2ddf69c70b3ca54d90838434ab3e871f7e7ea95971c6ee57d434c"
+    },
+    {
+      "skill_id": "agent-log-analysis",
+      "path": "../.agents/skills/agent-log-analysis/SKILL.md",
+      "index": 5,
+      "order": 5,
+      "enabled": true,
+      "host_config_entry_digest": "f89b2b30129b117343bfde83af5cd62c536462d49f10a6184a44d3ce5506d1fe"
+    },
+    {
+      "skill_id": "runtime-log-repair",
+      "path": "../.agents/skills/runtime-log-repair/SKILL.md",
+      "index": 6,
+      "order": 6,
+      "enabled": true,
+      "host_config_entry_digest": "ef31299c1576dcda5f44e9a7ddbfaf490d3c1cd6483c493e58682d1ff70d87be"
+    },
+    {
+      "skill_id": "agent-orchestration",
+      "path": "../.agents/skills/agent-orchestration/SKILL.md",
+      "index": 7,
+      "order": 7,
+      "enabled": true,
+      "host_config_entry_digest": "6419733091d6d22d928bb2c54bb027a4e3f342929d406153c3fb752dddbbbe78"
+    },
+    {
+      "skill_id": "agent-update-branch",
+      "path": "../.agents/skills/agent-update-branch/SKILL.md",
+      "index": 8,
+      "order": 8,
+      "enabled": true,
+      "host_config_entry_digest": "2aedc750fcde32167c6281786bb47335c37d76fa946591d795e170171deb0be3"
+    },
+    {
+      "skill_id": "algorithm-flowchart",
+      "path": "../.agents/skills/algorithm-flowchart/SKILL.md",
+      "index": 9,
+      "order": 9,
+      "enabled": true,
+      "host_config_entry_digest": "02b2baf03a2bc0e580dc2c762c2f9d4951bd85e9a2b62c0ecac865dc496859a7"
+    },
+    {
+      "skill_id": "algorithm-proof-exploration",
+      "path": "../.agents/skills/algorithm-proof-exploration/SKILL.md",
+      "index": 10,
+      "order": 10,
+      "enabled": true,
+      "host_config_entry_digest": "0777acca6355b72061752d9395595a15801361edc64f9867929e5e1629da0727"
+    },
+    {
+      "skill_id": "change-review",
+      "path": "../.agents/skills/change-review/SKILL.md",
+      "index": 11,
+      "order": 11,
+      "enabled": true,
+      "host_config_entry_digest": "12908be23cb800b1ff57896dfafe70281ab8e23e21b504ebc8f59f146867cb53"
+    },
+    {
+      "skill_id": "codex-task-workflow",
+      "path": "../.agents/skills/codex-task-workflow/SKILL.md",
+      "index": 12,
+      "order": 12,
+      "enabled": true,
+      "host_config_entry_digest": "331959a55a170456b4147d13058534a60b19e793127abfaa38c57c3c2316a058"
+    },
+    {
+      "skill_id": "code-visualization",
+      "path": "../.agents/skills/code-visualization/SKILL.md",
+      "index": 13,
+      "order": 13,
+      "enabled": true,
+      "host_config_entry_digest": "214a7aa17be76cb7211fffac6d58d4b011fe3a31ad469aa263e2060713512e7a"
+    },
+    {
+      "skill_id": "comprehensive-development",
+      "path": "../.agents/skills/comprehensive-development/SKILL.md",
+      "index": 14,
+      "order": 14,
+      "enabled": true,
+      "host_config_entry_digest": "4b92f15236f97f5e2243b2aec298870b7f5509354887ff09e27f96797a013155"
+    },
+    {
+      "skill_id": "cpp-review",
+      "path": "../.agents/skills/cpp-review/SKILL.md",
+      "index": 15,
+      "order": 15,
+      "enabled": true,
+      "host_config_entry_digest": "c811737d445b2292420ff53bc7fea70346aa0d2265db7de0a81b8af6277ebc7e"
+    },
+    {
+      "skill_id": "dependency-analysis",
+      "path": "../.agents/skills/dependency-analysis/SKILL.md",
+      "index": 16,
+      "order": 16,
+      "enabled": true,
+      "host_config_entry_digest": "1d9d577b9c93bb33347214482f051a7a9c55a06b5b4a74041db32929c10336c9"
+    },
+    {
+      "skill_id": "dependency-module-change",
+      "path": "../.agents/skills/dependency-module-change/SKILL.md",
+      "index": 17,
+      "order": 17,
+      "enabled": true,
+      "host_config_entry_digest": "b07b2b4dc4ac372785a5a0fddd64c9ce6942b2041d920de051421a857d09c4c3"
+    },
+    {
+      "skill_id": "document-canon-cleanup",
+      "path": "../.agents/skills/document-canon-cleanup/SKILL.md",
+      "index": 18,
+      "order": 18,
+      "enabled": true,
+      "host_config_entry_digest": "15c3da0e72174b107ee9708b057b7a883b1acc1fc8a4aeda395bc89c886ed432"
+    },
+    {
+      "skill_id": "dependency-design",
+      "path": "../.agents/skills/dependency-design/SKILL.md",
+      "index": 19,
+      "order": 19,
+      "enabled": true,
+      "host_config_entry_digest": "8c86f15dab383367f6a51f45d3b4f8f1b96218fd8df192105f09018b161e6d19"
+    },
+    {
+      "skill_id": "environment-maintenance",
+      "path": "../.agents/skills/environment-maintenance/SKILL.md",
+      "index": 20,
+      "order": 20,
+      "enabled": true,
+      "host_config_entry_digest": "79a46349cfed9c971dc681efa22a471bf4532c3575eeb1d9c3875fa62577b86e"
+    },
+    {
+      "skill_id": "experiment-lifecycle",
+      "path": "../.agents/skills/experiment-lifecycle/SKILL.md",
+      "index": 21,
+      "order": 21,
+      "enabled": true,
+      "host_config_entry_digest": "3a6ee651764f3859c6c7ee6f74fe0cfbd88f22d8530c4788be88ec06ef86b855"
+    },
+    {
+      "skill_id": "save-experiment-results",
+      "path": "../.agents/skills/save-experiment-results/SKILL.md",
+      "index": 22,
+      "order": 22,
+      "enabled": true,
+      "host_config_entry_digest": "44afdd56a8d415ba86aea58a5b08d20afb04c233878620703787d344e1a167ea"
+    },
+    {
+      "skill_id": "experiment-review",
+      "path": "../.agents/skills/experiment-review/SKILL.md",
+      "index": 23,
+      "order": 23,
+      "enabled": true,
+      "host_config_entry_digest": "c905879b94a2b7a15d1882eea5c68931f6478368405b389cd7dac61478e92e04"
+    },
+    {
+      "skill_id": "computational-optimization",
+      "path": "../.agents/skills/computational-optimization/SKILL.md",
+      "index": 24,
+      "order": 24,
+      "enabled": true,
+      "host_config_entry_digest": "e377f1de08e651e8584170695b5319b5ddb6fa200e9ce205479b09de64a73138"
+    },
+    {
+      "skill_id": "gpu-execution",
+      "path": "../.agents/skills/gpu-execution/SKILL.md",
+      "index": 25,
+      "order": 25,
+      "enabled": true,
+      "host_config_entry_digest": "c7c302e2510e768540aa94229f89d92b4bb7b430b03fc5062750c4705d77a514"
+    },
+    {
+      "skill_id": "formal-proof-workflow",
+      "path": "../.agents/skills/formal-proof-workflow/SKILL.md",
+      "index": 26,
+      "order": 26,
+      "enabled": true,
+      "host_config_entry_digest": "1db77cefaea6aa1ca63c82933236cd185c2d24d6aeef653e8689316872fe9b9e"
+    },
+    {
+      "skill_id": "lean-algorithm-design",
+      "path": "../.agents/skills/lean-algorithm-design/SKILL.md",
+      "index": 27,
+      "order": 27,
+      "enabled": true,
+      "host_config_entry_digest": "ab6f01aa1a928986418f8c7dd27bee4fe3ce2b55f69f572231154b29316578d0"
+    },
+    {
+      "skill_id": "html-experiment-report",
+      "path": "../.agents/skills/html-experiment-report/SKILL.md",
+      "index": 28,
+      "order": 28,
+      "enabled": true,
+      "host_config_entry_digest": "d7268b61b2922286dd155804eb9910dd17a2221b6770683972833a9d43e01ff4"
+    },
+    {
+      "skill_id": "html-output",
+      "path": "../.agents/skills/html-output/SKILL.md",
+      "index": 29,
+      "order": 29,
+      "enabled": true,
+      "host_config_entry_digest": "c4ec1dce0bd1abeb7bec6307300eef340ba5a0f7227a043f883e1eae5213a20e"
+    },
+    {
+      "skill_id": "issue-finding-report",
+      "path": "../.agents/skills/issue-finding-report/SKILL.md",
+      "index": 30,
+      "order": 30,
+      "enabled": true,
+      "host_config_entry_digest": "96d9fc1a22351541f3f828f8b304de9bd26447e3acd102a4ff760baf6763c069"
+    },
+    {
+      "skill_id": "literature-survey",
+      "path": "../.agents/skills/literature-survey/SKILL.md",
+      "index": 31,
+      "order": 31,
+      "enabled": true,
+      "host_config_entry_digest": "6d264c903e463a7c36df0c9b9b49f784c79a07155aa816d7ce2206699f765bf3"
+    },
+    {
+      "skill_id": "long-form-writing",
+      "path": "../.agents/skills/long-form-writing/SKILL.md",
+      "index": 32,
+      "order": 32,
+      "enabled": true,
+      "host_config_entry_digest": "af870fd90e853f762027d3a98fb5f773c4562a434782b1b28086ec85a374380f"
+    },
+    {
+      "skill_id": "md-style-check",
+      "path": "../.agents/skills/md-style-check/SKILL.md",
+      "index": 33,
+      "order": 33,
+      "enabled": true,
+      "host_config_entry_digest": "7a3ac978788819d40f8971bb4ae144110b73a92dcb83119974a02fd05cfee345"
+    },
+    {
+      "skill_id": "mvp-skeleton",
+      "path": "../.agents/skills/mvp-skeleton/SKILL.md",
+      "index": 34,
+      "order": 34,
+      "enabled": true,
+      "host_config_entry_digest": "1aa933a6b93efce4d7b62e14bec6cc91222881e521de776051cd396b74306241"
+    },
+    {
+      "skill_id": "oop-readability-check",
+      "path": "../.agents/skills/oop-readability-check/SKILL.md",
+      "index": 35,
+      "order": 35,
+      "enabled": true,
+      "host_config_entry_digest": "35954eec9fc5915008697cd5954dd5b92072d3bff1bc9fbdd1c1902d4d8b5da0"
+    },
+    {
+      "skill_id": "oop-type-design",
+      "path": "../.agents/skills/oop-type-design/SKILL.md",
+      "index": 36,
+      "order": 36,
+      "enabled": true,
+      "host_config_entry_digest": "b0d9540db2c7d5711ee389f8d219293a9d3ddb268e334a8e30710450f269c03d"
+    },
+    {
+      "skill_id": "paper-writing",
+      "path": "../.agents/skills/paper-writing/SKILL.md",
+      "index": 37,
+      "order": 37,
+      "enabled": true,
+      "host_config_entry_digest": "b3609b710ca0036c6bfb3ddf69e3c6420e4782647946aee0b542a12c38c2b727"
+    },
+    {
+      "skill_id": "prose-reasoning-graph",
+      "path": "../.agents/skills/prose-reasoning-graph/SKILL.md",
+      "index": 38,
+      "order": 38,
+      "enabled": true,
+      "host_config_entry_digest": "dbe642d512e8d6814d3a94ab57e8bb0398a8ccd633834d0b00f78c37c89945e8"
+    },
+    {
+      "skill_id": "pr-processing",
+      "path": "../.agents/skills/pr-processing/SKILL.md",
+      "index": 39,
+      "order": 39,
+      "enabled": true,
+      "host_config_entry_digest": "51649db0c121f75fa4e2aa50b98cd140bd0b9f33e730e2d0eb7298fcec7df3d0"
+    },
+    {
+      "skill_id": "python-review",
+      "path": "../.agents/skills/python-review/SKILL.md",
+      "index": 40,
+      "order": 40,
+      "enabled": true,
+      "host_config_entry_digest": "fd7a0c49e7dac4f41331546c3975870cc940ac51d26cf35736ec7e601891eebd"
+    },
+    {
+      "skill_id": "refactor-loop",
+      "path": "../.agents/skills/refactor-loop/SKILL.md",
+      "index": 41,
+      "order": 41,
+      "enabled": true,
+      "host_config_entry_digest": "fce6be9807d9daa6713da41c152c4e708f77a8e471036279ead98271d50b3bae"
+    },
+    {
+      "skill_id": "repo-onboarding",
+      "path": "../.agents/skills/repo-onboarding/SKILL.md",
+      "index": 42,
+      "order": 42,
+      "enabled": true,
+      "host_config_entry_digest": "16b4e5777598ec36fed8a45421ee4334dee036422e3af9823dd317b131f00b3c"
+    },
+    {
+      "skill_id": "report-writing",
+      "path": "../.agents/skills/report-writing/SKILL.md",
+      "index": 43,
+      "order": 43,
+      "enabled": true,
+      "host_config_entry_digest": "6d9b8a7235722467ce4d415df0cfac1c690b5f203e3fa35b4e659d07529b6d83"
+    },
+    {
+      "skill_id": "research-workflow",
+      "path": "../.agents/skills/research-workflow/SKILL.md",
+      "index": 44,
+      "order": 44,
+      "enabled": true,
+      "host_config_entry_digest": "285448f3431a0e261f2937bf9b66685a72d42782cddcc4c60b7b0029f2ef3573"
+    },
+    {
+      "skill_id": "result-artifact-writeout",
+      "path": "../.agents/skills/result-artifact-writeout/SKILL.md",
+      "index": 45,
+      "order": 45,
+      "enabled": true,
+      "host_config_entry_digest": "ce515358e26679f2e64ac0534fc995820fe3b49186276e3480e2db5655a2cff3"
+    },
+    {
+      "skill_id": "result-visualize",
+      "path": "../.agents/skills/result-visualize/SKILL.md",
+      "index": 46,
+      "order": 46,
+      "enabled": true,
+      "host_config_entry_digest": "53329bbd8b765a97d0a9ac56cb76473d39bb664e7287e25401c6a1f1a88963ae"
+    },
+    {
+      "skill_id": "owner-bounded-routing",
+      "path": "../.agents/skills/owner-bounded-routing/SKILL.md",
+      "index": 47,
+      "order": 47,
+      "enabled": true,
+      "host_config_entry_digest": "40cfe1d93973989cebb3cd40d230250738c41f82e3c12a0c38a076ebd4750c30"
+    },
+    {
+      "skill_id": "start-repository",
+      "path": "../.agents/skills/start-repository/SKILL.md",
+      "index": 48,
+      "order": 48,
+      "enabled": true,
+      "host_config_entry_digest": "640ca8ee221fa8687af3532c3ed7e3946174cbc3159db72bcc64e066c76be70c"
+    },
+    {
+      "skill_id": "structure-planning",
+      "path": "../.agents/skills/structure-planning/SKILL.md",
+      "index": 49,
+      "order": 49,
+      "enabled": true,
+      "host_config_entry_digest": "1000f2083ee4f5d109d68123bc299fd159218407e01a156738bd338bb0074e05"
+    },
+    {
+      "skill_id": "structure-refactor",
+      "path": "../.agents/skills/structure-refactor/SKILL.md",
+      "index": 50,
+      "order": 50,
+      "enabled": true,
+      "host_config_entry_digest": "0d0f31c01a0fcb1202cfa0d16440c329173225a63725d3e57fe68f3c893ab8a0"
+    },
+    {
+      "skill_id": "subagent-bootstrap",
+      "path": "../.agents/skills/subagent-bootstrap/SKILL.md",
+      "index": 51,
+      "order": 51,
+      "enabled": true,
+      "host_config_entry_digest": "35374e14178a863d506b218db710d6a0ad5e2d30c8848e127b93ab3d04a9e07a"
+    },
+    {
+      "skill_id": "task-routing",
+      "path": "../.agents/skills/task-routing/SKILL.md",
+      "index": 52,
+      "order": 52,
+      "enabled": true,
+      "host_config_entry_digest": "394ff3acb2242f455b3d1429afa06782f887bf88aca34d9039a1405025068c42"
+    },
+    {
+      "skill_id": "test-design",
+      "path": "../.agents/skills/test-design/SKILL.md",
+      "index": 53,
+      "order": 53,
+      "enabled": true,
+      "host_config_entry_digest": "91079aa77cf92012bdc204fe02e5fb6331ff8deeb15528378023c6d2f39fdbae"
+    },
+    {
+      "skill_id": "tool-finding-report",
+      "path": "../.agents/skills/tool-finding-report/SKILL.md",
+      "index": 54,
+      "order": 54,
+      "enabled": true,
+      "host_config_entry_digest": "752712b9092f56360a7cd962f0afa9c1a7d53fbe19f1619c9bb341aa60debbbf"
+    },
+    {
+      "skill_id": "user-guided-debugging",
+      "path": "../.agents/skills/user-guided-debugging/SKILL.md",
+      "index": 55,
+      "order": 55,
+      "enabled": true,
+      "host_config_entry_digest": "ff72171095201f0aad11cc75bcc2b648cc0a33d56c12307a79120981e44738c5"
+    },
+    {
+      "skill_id": "user-preference-sync",
+      "path": "../.agents/skills/user-preference-sync/SKILL.md",
+      "index": 56,
+      "order": 56,
+      "enabled": true,
+      "host_config_entry_digest": "8ecdd9a5c5e40840f3e60c0406ffb2e866e9da25c087eb8cf3ef33bf9a29543e"
+    },
+    {
+      "skill_id": "worktree-health",
+      "path": "../.agents/skills/worktree-health/SKILL.md",
+      "index": 57,
+      "order": 57,
+      "enabled": true,
+      "host_config_entry_digest": "c9412634358e928f06f3272452702f0c21cb5de4147c8bbeb047067fdb7923ee"
+    },
+    {
+      "skill_id": "wiki-publication",
+      "path": "../.agents/skills/wiki-publication/SKILL.md",
+      "index": 58,
+      "order": 58,
+      "enabled": true,
+      "host_config_entry_digest": "7b386bf9576224a68550e04ca96f3c5a495f43c3a433919eee547306402c9ecc"
+    },
+    {
+      "skill_id": "worktree-start",
+      "path": "../.agents/skills/worktree-start/SKILL.md",
+      "index": 59,
+      "order": 59,
+      "enabled": true,
+      "host_config_entry_digest": "71c574ba3e80788dfd5df899f1722608b7ba9306939ddce50ae93f37732f76b7"
+    }
+  ]
+}

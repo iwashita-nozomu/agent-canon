@@ -21,10 +21,10 @@ import posixpath
 import re
 import tempfile
 import unicodedata
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import cast
+from typing import Any, TypedDict, cast
 
 try:
     import tomllib
@@ -34,7 +34,6 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility.
 import yaml
 from agent_canon_source_root import resolve_agent_canon_source_root
 from agent_team import materialize_skill_tool_call_token
-from check_skill_frontmatter import parse_frontmatter
 from skill_dependency_map import build_graph
 from skill_route_catalog import (
     SkillDependencyRule,
@@ -51,16 +50,24 @@ FIXED_POINT_SCHEMA = "agent_canon.skill_runtime_shim.fixed_point"
 MATERIALIZER_ID = "skill_shim_materializer.v1"
 TEMPLATE_ID = "skill-runtime-shim-md-v1"
 COMMAND_PACKET_TEMPLATE_ID = "skill-tool-command-packet-v2"
+MIGRATION_BASELINE_PATH = Path(
+    "tests/fixtures/skill-runtime-shim/migration-baseline/expected.json"
+)
+MIGRATION_BASELINE_SCHEMA = "agent_canon.skill_runtime_shim.migration_baseline"
 RUNTIME_ROOT = Path(".agents/skills")
 CATALOG_PATH = Path("agents/skills/catalog.yaml")
 DEPENDENCY_PATH = Path("agents/skills/skill-dependencies.yaml")
 CONFIG_PATH = Path(".codex/config.toml")
 GRAPH_PATH = Path("documents/runtime/skill-dependency-graph.json")
 SKILL_COUNT = 60
+HOST_CONFIG_PATH_RE = re.compile(
+    r"^\.\./\.agents/skills/[a-z0-9]+(?:-[a-z0-9]+)*/SKILL\.md$"
+)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 ABSOLUTE_LOCATOR_RE = re.compile(
     r"(?<![A-Za-z0-9._~/<>-])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+"
 )
+MaterializeToolCallFn = Callable[[str, str], dict[str, object]]
 
 
 class MaterializerError(RuntimeError):
@@ -93,6 +100,25 @@ class LegacyMigrationError(MaterializerError):
         self.receipt = [dict(row) for row in receipt]
 
 
+class MigrationBaselineRow(TypedDict):
+    """One immutable migration baseline record."""
+
+    skill_id: str
+    path: str
+    index: int
+    order: int
+    enabled: bool
+    host_config_entry_digest: str
+
+
+class MigrationBaselineDocument(TypedDict):
+    """Versioned receipt fixture for migration baseline comparison."""
+
+    schema: str
+    version: int
+    host_config_rows: list[MigrationBaselineRow]
+
+
 @dataclass(frozen=True)
 class HostEntry:
     """One read-only host skill configuration entry."""
@@ -117,6 +143,7 @@ class BuildContext:
     packets: Mapping[str, SkillCommandPacket]
     graph: Mapping[str, object]
     source_snapshot_digest: str
+    migration_baseline: Mapping[str, MigrationBaselineRow]
 
 
 def _normalize_string(value: str, *, identifier: bool = False) -> str:
@@ -138,9 +165,11 @@ def _canonical_value(value: object) -> object:
     if value is None:
         raise MaterializerError("null_not_allowed")
     if isinstance(value, Mapping):
-        return {str(key): _canonical_value(item) for key, item in value.items()}
+        mapping = _mapping(dict(cast(dict[str, object], value)), "canonical_value")
+        return {str(key): _canonical_value(item) for key, item in mapping.items()}
     if isinstance(value, (list, tuple)):
-        return [_canonical_value(item) for item in value]
+        sequence = cast(list[object] | tuple[object, ...], value)
+        return [_canonical_value(item) for item in sequence]
     raise MaterializerError("unsupported_canonical_value", type(value).__name__)
 
 
@@ -164,9 +193,118 @@ def file_digest(path: Path) -> str:
 
 
 def _mapping(value: object, field: str) -> Mapping[str, object]:
-    if not isinstance(value, Mapping) or not all(isinstance(key, str) for key in value):
+    if not isinstance(value, Mapping):
         raise MaterializerError("invalid_mapping", field)
-    return cast(Mapping[str, object], value)
+    return dict(cast(dict[str, object], value))
+
+
+def _int(value: object, field: str) -> int:
+    if not isinstance(value, int):
+        raise MaterializerError("invalid_integer", field)
+    return value
+
+
+def _load_migration_baseline(
+    root: Path, skill_ids: Sequence[str]
+) -> Mapping[str, MigrationBaselineRow]:
+    """Load and validate the immutable migration baseline fixture."""
+    path = root / MIGRATION_BASELINE_PATH
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise MaterializerError("migration_baseline_unreadable", str(exc)) from exc
+    if not isinstance(payload, Mapping):
+        raise MaterializerError("migration_baseline_invalid_rows", "host_config_rows")
+    payload_map = _mapping(payload, "migration_baseline")
+    if payload_map.get("schema") != MIGRATION_BASELINE_SCHEMA:
+        raise MaterializerError("migration_baseline_invalid_schema", str(payload_map.get("schema")))
+    if payload_map.get("version") != VERSION:
+        raise MaterializerError("migration_baseline_invalid_version", str(payload_map.get("version")))
+    raw_rows = payload_map.get("host_config_rows")
+    if not isinstance(raw_rows, list):
+        raise MaterializerError("migration_baseline_invalid_rows", "host_config_rows")
+    raw_rows_list = cast(list[object], raw_rows)
+    rows: dict[str, MigrationBaselineRow] = {}
+    for index, raw_row in enumerate(raw_rows_list):
+        row = _mapping(raw_row, f"host_config_rows[{index}]")
+        skill_id = _string(row.get("skill_id"), f"host_config_rows[{index}].skill_id")
+        _normalize_string(skill_id, identifier=True)
+        path = _string(row.get("path"), f"host_config_rows[{index}].path")
+        if not HOST_CONFIG_PATH_RE.fullmatch(path):
+            raise MaterializerError("migration_baseline_invalid_path", path)
+        if skill_id in rows:
+            raise MaterializerError("migration_baseline_duplicate_skill", skill_id)
+        rows[skill_id] = {
+            "skill_id": skill_id,
+            "path": path,
+            "index": _int(
+                row.get("index"), f"host_config_rows[{index}].index"
+            ),
+            "order": _int(
+                row.get("order"), f"host_config_rows[{index}].order"
+            ),
+            "enabled": _bool(
+                row.get("enabled"), f"host_config_rows[{index}].enabled"
+            ),
+            "host_config_entry_digest": _string(
+                row.get("host_config_entry_digest"),
+                f"host_config_rows[{index}].host_config_entry_digest",
+            ),
+        }
+        if not SHA256_RE.fullmatch(rows[skill_id]["host_config_entry_digest"]):
+            raise MaterializerError(
+                "migration_baseline_invalid_host_config_digest",
+                rows[skill_id]["host_config_entry_digest"],
+            )
+    if set(rows) != set(skill_ids):
+        raise MaterializerError(
+            "migration_baseline_skill_set_mismatch",
+            json.dumps({"expected": sorted(skill_ids), "actual": sorted(rows)}, ensure_ascii=False),
+        )
+    if len(rows) != SKILL_COUNT:
+        raise MaterializerError("migration_baseline_count_mismatch", str(len(rows)))
+    return rows
+
+
+def _assert_migration_baseline(
+    baseline: Mapping[str, MigrationBaselineRow],
+    hosts: Mapping[str, HostEntry],
+) -> None:
+    """Fail closed when live host wiring does not match baseline fixture."""
+    if set(baseline) != set(hosts):
+        raise MaterializerError("migration_baseline_skill_set_mismatch")
+    mismatches: list[dict[str, object]] = []
+    for skill, live in sorted(hosts.items()):
+        expected = baseline[skill]
+        if live.path != expected["path"]:
+            mismatches.append({"skill_id": skill, "field": "path", "expected": expected["path"], "actual": live.path})
+        if live.index != expected["index"] or live.order != expected["order"]:
+            mismatches.append(
+                {
+                    "skill_id": skill,
+                    "field": "index_order",
+                    "expected": {"index": expected["index"], "order": expected["order"]},
+                    "actual": {"index": live.index, "order": live.order},
+                }
+            )
+        if live.enabled != expected["enabled"]:
+            mismatches.append(
+                {"skill_id": skill, "field": "enabled", "expected": expected["enabled"], "actual": live.enabled}
+            )
+        if live.digest != expected["host_config_entry_digest"]:
+            mismatches.append(
+                {
+                    "skill_id": skill,
+                    "field": "host_config_entry_digest",
+                    "expected": expected["host_config_entry_digest"],
+                    "actual": live.digest,
+                }
+            )
+    if mismatches:
+        raise MaterializerError(
+            "migration_baseline_mismatch",
+            json.dumps({"mismatches": mismatches}, ensure_ascii=False, sort_keys=True),
+        )
 
 
 def _string(value: object, field: str) -> str:
@@ -189,7 +327,7 @@ def _catalog_entries(root: Path) -> tuple[tuple[str, ...], dict[str, Mapping[str
         raise MaterializerError("catalog_invalid", "skill_families")
     ids: list[str] = []
     entries: dict[str, Mapping[str, object]] = {}
-    for index, raw in enumerate(families):
+    for index, raw in enumerate(cast(list[object], families)):
         entry = _mapping(raw, f"skill_families[{index}]")
         skill = _string(entry.get("id"), f"skill_families[{index}].id")
         _normalize_string(skill, identifier=True)
@@ -197,13 +335,9 @@ def _catalog_entries(root: Path) -> tuple[tuple[str, ...], dict[str, Mapping[str
             raise MaterializerError("catalog_duplicate", skill)
         discovery = _mapping(entry.get("discovery"), f"{skill}.discovery")
         discovery_name = _string(discovery.get("name"), f"{skill}.discovery.name")
-        discovery_description = _string(
-            discovery.get("description"), f"{skill}.discovery.description"
-        )
+        _string(discovery.get("description"), f"{skill}.discovery.description")
         if discovery_name != skill:
             raise MaterializerError("discovery_name_mismatch", skill)
-        if not isinstance(discovery_description, str):
-            raise MaterializerError("discovery_description_invalid", skill)
         ids.append(skill)
         entries[skill] = entry
     if len(ids) != SKILL_COUNT:
@@ -215,27 +349,37 @@ def _host_entries(root: Path, skill_ids: Sequence[str]) -> dict[str, HostEntry]:
     """Read host config order/path/enabled state without rewriting config."""
     try:
         raw = tomllib.loads((root / CONFIG_PATH).read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
+    except OSError as exc:
         raise MaterializerError("host_config_unavailable", str(exc)) from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise MaterializerError("host_config_unavailable", str(exc)) from exc
+    raw = cast(dict[str, object], raw)
     skills = _mapping(raw.get("skills"), "skills")
-    entries = skills.get("config")
-    if not isinstance(entries, list):
+    raw_entries = skills.get("config")
+    if not isinstance(raw_entries, list):
         raise MaterializerError("host_config_invalid", "skills.config")
     observed: dict[str, HostEntry] = {}
-    for index, raw_entry in enumerate(entries):
+    for index, raw_entry in enumerate(cast(list[object], raw_entries)):
         entry = _mapping(raw_entry, f"skills.config[{index}]")
         path = _string(entry.get("path"), f"skills.config[{index}].path")
         enabled = _bool(entry.get("enabled"), f"skills.config[{index}].enabled")
-        path_parts = Path(path).as_posix().split("/")
-        if len(path_parts) < 3 or path_parts[-1] != "SKILL.md" or path_parts[-3] != "skills":
+        if not HOST_CONFIG_PATH_RE.fullmatch(path):
             raise MaterializerError("host_config_path_mismatch", path)
-        skill = path_parts[-2]
+        skill = path[len("../.agents/skills/") : -len("/SKILL.md")]
+        if skill not in skill_ids:
+            raise MaterializerError("host_config_unknown_skill", skill)
+        expected_path = f"../.agents/skills/{skill}/SKILL.md"
+        if path != expected_path:
+            raise MaterializerError("host_config_path_mismatch", path)
+        order = index
+        if "order" in entry:
+            order = _int(entry.get("order"), f"skills.config[{index}].order")
         if skill in observed:
             raise MaterializerError("host_config_duplicate", skill)
         entry_digest = domain_digest(
             "agent-canon.host-config-entry.v1", {"path": path, "enabled": enabled}
         )
-        observed[skill] = HostEntry(path, enabled, index, index, entry_digest)
+        observed[skill] = HostEntry(path, enabled, index, order, entry_digest)
     if set(observed) != set(skill_ids):
         raise MaterializerError("host_config_skill_set_mismatch")
     if set(observed) != set(skill_ids) or len(observed) != SKILL_COUNT:
@@ -279,30 +423,42 @@ def _packet_payload(packet: SkillCommandPacket, root: Path) -> dict[str, object]
     for field in SkillCommandPacket.__dataclass_fields__:
         value = getattr(packet, field)
         if field.startswith("resolved_"):
-            rows = []
-            for logical, source_root, execution_cwd, root_bindings, argv in value:
-                resolved_argv = []
+            rows: list[list[object]] = []
+            resolved_commands = cast(
+                tuple[
+                    tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]],
+                    ...,
+                ],
+                value,
+            )
+            for logical, _source_root, _execution_cwd, root_bindings, argv in resolved_commands:
+                resolved_argv: list[str] = []
                 for token in argv:
                     token_path = Path(token)
+                    normalized_token = token
                     if token_path.is_absolute():
                         try:
-                            token = "@root/" + token_path.resolve().relative_to(root.resolve()).as_posix()
+                            normalized_token = "@root/" + token_path.resolve().relative_to(
+                                root.resolve()
+                            ).as_posix()
                         except ValueError:
-                            token = "@absolute"
-                    resolved_argv.append(token)
-                normalized_bindings = []
-                for key, binding in root_bindings:
+                            normalized_token = "@absolute"
+                    resolved_argv.append(normalized_token)
+                normalized_bindings: list[list[str]] = []
+                for binding_key, binding in root_bindings:
                     binding_path = Path(binding)
                     if binding_path.is_absolute():
                         try:
-                            binding = "@root/" + binding_path.resolve().relative_to(root.resolve()).as_posix()
+                            binding = "@root/" + binding_path.resolve().relative_to(
+                                root.resolve()
+                            ).as_posix()
                         except ValueError:
                             binding = "@absolute"
-                    normalized_bindings.append([key, binding])
+                    normalized_bindings.append([binding_key, binding])
                 rows.append([logical, "@root", "@root", normalized_bindings, resolved_argv])
             result[field] = rows
         elif isinstance(value, tuple):
-            result[field] = list(value)
+            result[field] = list(cast(tuple[object, ...], value))
         else:
             result[field] = value
     return result
@@ -320,7 +476,10 @@ def _tool_call_refs(packet: SkillCommandPacket) -> tuple[list[dict[str, object]]
     for phase, commands in phases:
         if not commands:
             continue
-        token = materialize_skill_tool_call_token(packet.skill, phase=phase)
+        token = cast(
+            dict[str, object],
+            cast(Any, materialize_skill_tool_call_token)(packet.skill, phase=phase),
+        )
         identity = cast(Mapping[str, object], token["identity"])
         refs.append({"command_count": len(commands), **dict(identity)})
     if not refs:
@@ -350,6 +509,8 @@ def build_context(root: Path) -> BuildContext:
     root = root.resolve()
     skill_ids, entries = _catalog_entries(root)
     hosts = _host_entries(root, skill_ids)
+    baseline = _load_migration_baseline(root, skill_ids)
+    _assert_migration_baseline(baseline, hosts)
     try:
         routes = {rule.skill: rule for rule in load_skill_route_rules(root)}
         dependencies = dict(load_skill_dependency_map(root, skill_ids))
@@ -375,6 +536,7 @@ def build_context(root: Path) -> BuildContext:
         packets,
         graph,
         _source_snapshot_digest(root, graph, skill_ids),
+        baseline,
     )
 
 
@@ -575,43 +737,10 @@ def classify_legacy(context: BuildContext, skill: str, expected: str) -> dict[st
             "resolution": "migrated",
             "unmatched_blocks": [],
         }
-    if "<!-- generated: agent_canon.skill_runtime_shim.v1 -->" in body:
-        return {
-            "skill_id": skill,
-            "classification": "generated_stale",
-            "resolution": "migrated",
-            "unmatched_blocks": [],
-        }
-    frontmatter, error = parse_frontmatter(path)
-    if error or frontmatter is None:
-        return {
-            "skill_id": skill,
-            "classification": "invalid_frontmatter",
-            "resolution": "blocked",
-            "unmatched_blocks": [
-                {
-                    "locator": path.relative_to(context.root).as_posix(),
-                    "digest": hashlib.sha256(current).hexdigest(),
-                }
-            ],
-        }
-    name, description = _catalog_discovery(context.catalog_entries[skill])
-    if frontmatter.get("name") != name or frontmatter.get("description") != description:
-        return {
-            "skill_id": skill,
-            "classification": "frontmatter_drift",
-            "resolution": "blocked",
-            "unmatched_blocks": [
-                {
-                    "locator": path.relative_to(context.root).as_posix(),
-                    "digest": hashlib.sha256(current).hexdigest(),
-                }
-            ],
-        }
     expected_sections = _markdown_sections(_markdown_body(expected))
     legacy_sections = _markdown_sections(_markdown_body(body))
-    unmatched_blocks = []
-    accepted_blocks = []
+    unmatched_blocks: list[dict[str, str]] = []
+    accepted_blocks: list[str] = []
     for locator, section in legacy_sections.items():
         if section in expected_sections.values():
             accepted_blocks.append(locator)
@@ -683,7 +812,7 @@ def readback_digest(
     projections: Mapping[str, str],
 ) -> str:
     """Hash the 60-row actual target readback manifest."""
-    rows = []
+    rows: list[dict[str, str]] = []
     for skill in sorted(context.skill_ids):
         path = _runtime_path(context, skill)
         if not path.is_file():
@@ -803,7 +932,7 @@ def check(root: Path, *, all_skills: bool = False) -> dict[str, object]:
     context = build_context(root)
     records, rendered, projections = build_rows(context)
     _staged_readback(context, rendered)
-    drift = []
+    drift: list[str] = []
     for skill in context.skill_ids:
         path = _runtime_path(context, skill)
         if not path.is_file() or path.read_bytes() != rendered[skill].encode("utf-8"):

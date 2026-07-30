@@ -12,14 +12,18 @@ from __future__ import annotations
 
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(TOOLS_ROOT))
 
 from skill_shim_materializer import (  # noqa: E402
+    MIGRATION_BASELINE_PATH,
+    MaterializerError,
     build_context,
     build_record,
     check,
@@ -65,6 +69,80 @@ class SkillShimMaterializerTest(unittest.TestCase):
             runtime_path.write_text(original, encoding="utf-8")
         self.assertEqual(result["status"], "fail")
         self.assertIn(runtime_path.relative_to(PROJECT_ROOT).as_posix(), result["content_delta_paths"])
+
+    def test_migration_baseline_blocks_host_config_mismatch(self) -> None:
+        """Mismatching host config row must fail closed before migration."""
+        baseline_path = PROJECT_ROOT / MIGRATION_BASELINE_PATH
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        rows = baseline["host_config_rows"]
+        if not rows:
+            raise AssertionError("migration baseline is empty")
+        mutated = json.loads(json.dumps(baseline))
+        rows_mutated = []
+        for index, row in enumerate(mutated["host_config_rows"]):
+            if index == 0:
+                row = dict(row)
+                row["host_config_entry_digest"] = "0" * 64
+            rows_mutated.append(row)
+        mutated["host_config_rows"] = rows_mutated
+        with tempfile.TemporaryDirectory() as tmpdir:
+            staged = Path(tmpdir) / "baseline.json"
+            staged.write_text(json.dumps(mutated, ensure_ascii=False, indent=2), encoding="utf-8")
+            with patch(
+                "skill_shim_materializer.MIGRATION_BASELINE_PATH",
+                Path(staged),
+            ):
+                with self.assertRaises(MaterializerError) as context:
+                    build_context(PROJECT_ROOT)
+        self.assertEqual(context.exception.code, "migration_baseline_mismatch")
+        self.assertIn("migration_baseline_mismatch", str(context.exception))
+
+    def test_host_config_path_requires_exact_skill_root_path(self) -> None:
+        """Only ../.agents/skills/<id>/SKILL.md is accepted as canonical host path."""
+        config_path = PROJECT_ROOT / ".codex/config.toml"
+        original = config_path.read_text(encoding="utf-8")
+        skill = "agent-orchestration"
+        current = f'path = "../.agents/skills/{skill}/SKILL.md"'
+        replacement = f'path = "../../.agents/skills/{skill}/SKILL.md"'
+        self.assertIn(current, original)
+        config_path.write_text(original.replace(current, replacement, 1), encoding="utf-8")
+        try:
+            with self.assertRaises(MaterializerError) as context:
+                build_context(PROJECT_ROOT)
+        finally:
+            config_path.write_text(original, encoding="utf-8")
+        self.assertEqual(context.exception.code, "host_config_path_mismatch")
+        self.assertIn("host_config_path_mismatch", str(context.exception))
+
+    def test_legacy_classification_blocks_tool_commands_only(self) -> None:
+        """Generated section-only bodies must keep all unmatched blocks and remain blocked."""
+        context = build_context(PROJECT_ROOT)
+        skill = "agent-orchestration"
+        runtime_path = PROJECT_ROOT / ".agents/skills" / skill / "SKILL.md"
+        expected = render_shim(build_record(context, skill))
+        original = runtime_path.read_text(encoding="utf-8")
+        runtime_path.write_text(
+            "<!-- generated: agent_canon.skill_runtime_shim.v1 -->\n"
+            "## Tool Commands\n"
+            "python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text\n",
+            encoding="utf-8",
+        )
+        try:
+            receipt = classify_legacy(context, skill, expected)
+        finally:
+            runtime_path.write_text(original, encoding="utf-8")
+        self.assertEqual(receipt["resolution"], "blocked")
+        self.assertEqual(receipt["classification"], "legacy_exact_sections")
+        self.assertEqual(len(receipt["unmatched_blocks"]), 2)
+        locators = [entry["locator"] for entry in receipt["unmatched_blocks"]]
+        self.assertIn(
+            f"{runtime_path.relative_to(PROJECT_ROOT).as_posix()}#preamble",
+            locators,
+        )
+        self.assertIn(
+            f"{runtime_path.relative_to(PROJECT_ROOT).as_posix()}#L2-L3",
+            locators,
+        )
 
     def test_legacy_receipt_lists_every_unmatched_block(self) -> None:
         """Legacy prose is rejected without a canonical-heading fallback."""

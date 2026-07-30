@@ -4,10 +4,12 @@
   "scenario_id": "parent-subagent-instruction",
   "category": "parent-subagent-instruction",
   "packet_id": "shim-parent-subagent-instruction-v1",
+  "packet_class": "full",
   "iteration_id": "fresh-generated-01",
   "skill_id": "subagent-bootstrap",
   "variant": "generated",
-  "prompt": "Inspect parent and subagent instruction ownership through the canonical owner.",
+  "prompt": "A parent agent must delegate one implementation responsibility. Inspect the discovery\nadapter and its canonical owner, then report the parent and subagent instruction boundary.\nKeep the evaluation read-only and do not assign work from adapter prose.\n",
+  "prompt_digest": "3864c2552648a0342fa6e957d528ca210d1fe712538b8cac7996136e30bdcd20",
   "input_tokens": 592,
   "canonical_followup_input_tokens": 181,
   "cache_fields_observed": {

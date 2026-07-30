@@ -4,10 +4,12 @@
   "scenario_id": "failure-argparse-normalization",
   "category": "failure-argparse-normalization",
   "packet_id": "shim-failure-argparse-normalization-v1",
+  "packet_class": "changed",
   "iteration_id": "fresh-generated-01",
   "skill_id": "agent-orchestration",
   "variant": "generated",
-  "prompt": "Classify an argparse route failure without inventing execution payload.",
+  "prompt": "A route command returned an argparse usage error. Inspect the adapter and canonical owner,\nthen report the normalized failure boundary without inventing a command or an execution payload.\nKeep the evaluation read-only.\n",
+  "prompt_digest": "a82826d53ee43e0096ea312f9d36f9864ab8b10ed1a84cf51059d20565771365",
   "input_tokens": 577,
   "canonical_followup_input_tokens": 170,
   "cache_fields_observed": {

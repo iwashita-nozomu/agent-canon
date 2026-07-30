@@ -52,6 +52,44 @@ SCENARIO_CATEGORIES = (
 HOST_OBSERVATION_SCHEMA = "agent_canon.skill_runtime_shim.host_observation"
 
 
+def _expected_skill_id_from_targets(targets: Sequence[object], packet_id: str) -> str:
+    """Extract one canonical target skill id from manifest target files."""
+    values = []
+    for target in targets:
+        if not isinstance(target, str):
+            raise ProducerError(f"packet_target_type:{packet_id}")
+        if target.startswith("agents/skills/") and target.endswith(".md"):
+            values.append(Path(target).stem)
+        elif target.startswith(".agents/skills/") and target.endswith("/SKILL.md"):
+            values.append(Path(target).parent.name)
+    if not values:
+        raise ProducerError(f"packet_target_skill_id:{packet_id}")
+    if len(set(values)) != 1:
+        raise ProducerError(f"packet_target_skill_id_ambiguous:{packet_id}")
+    return values[0]
+
+
+def _prompt_under_test(content: str, packet_id: str) -> str:
+    """Extract the prompt body for a packet from its Prompt Under Test section."""
+    lines = content.splitlines()
+    start = None
+    for index, line in enumerate(lines):
+        if line.strip() == "## Prompt Under Test":
+            start = index + 1
+            break
+    if start is None:
+        raise ProducerError(f"packet_prompt_section_missing:{packet_id}")
+    body: list[str] = []
+    for line in lines[start:]:
+        if line.startswith("## "):
+            break
+        body.append(line)
+    prompt_body = "\n".join(body).strip()
+    if not prompt_body:
+        raise ProducerError(f"packet_prompt_empty:{packet_id}")
+    return normalize_text(prompt_body)
+
+
 class ProducerError(ValueError):
     """Raised when an evaluation input or observed process result is unmapped."""
 
@@ -104,7 +142,7 @@ def normalize_route_result(
     completed: subprocess.CompletedProcess[bytes],
     *,
     mode: str,
-) -> tuple[str, dict[str, object], dict[str, object]]:
+) -> tuple[str, Mapping[str, object], Mapping[str, object]]:
     """Map only the approved route CLI results into a golden row."""
     stderr = completed.stderr or b""
     stderr_text = stderr.decode("utf-8", errors="replace")
@@ -160,7 +198,7 @@ def route_golden(
     manifest: Path,
     route_cli: Path,
     output: Path,
-) -> dict[str, object]:
+) -> Mapping[str, object]:
     """Run the real route CLI for every frozen manifest case."""
     manifest_data = load_manifest(manifest)
     if manifest_data.expected_case_count != 525 or manifest_data.expected_generated_case_count != 525:
@@ -215,10 +253,10 @@ def route_golden(
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return payload
+    return cast(Mapping[str, object], payload)
 
 
-def _packet_manifest(path: Path) -> tuple[dict[str, object], list[dict[str, object]]]:
+def _packet_manifest(path: Path) -> tuple[Mapping[str, object], list[Mapping[str, object]]]:
     """Load and validate the answer-free fresh packet manifest."""
     raw = tomllib.loads(path.read_text(encoding="utf-8"))
     if set(raw) != {"catalog_kind", "version", "packet_class_order", "packet"}:
@@ -232,7 +270,8 @@ def _packet_manifest(path: Path) -> tuple[dict[str, object], list[dict[str, obje
         raise ProducerError("packet_count")
     required = {
         "id", "packet_class", "prompt_path", "canonical_target_files", "prompt_dependency_files",
-        "scenario_id", "category", "method", "requirements", "report_grammar", "packet_digest",
+        "scenario_id", "category", "target_skill_id", "iteration_ids", "prompt_digest",
+        "method", "requirements", "report_grammar", "packet_digest",
     }
     rows: list[dict[str, object]] = []
     for item in packets:
@@ -252,15 +291,41 @@ def _packet_manifest(path: Path) -> tuple[dict[str, object], list[dict[str, obje
             raise ProducerError(f"packet_class:{row['id']}")
         if row["scenario_id"] != row["category"] or row["category"] not in SCENARIO_CATEGORIES:
             raise ProducerError(f"packet_category:{row['id']}")
+        packet_prompt = _prompt_under_test(content, cast(str, row["id"]))
+        prompt_digest = sha256_bytes(packet_prompt.encode("utf-8"))
+        if row["prompt_digest"] != prompt_digest:
+            raise ProducerError(f"packet_prompt_digest_mismatch:{row['id']}")
+        target_files = row["canonical_target_files"]
+        if not isinstance(target_files, list):
+            raise ProducerError(f"packet_target_files:{row['id']}")
+        target_skill_id = row["target_skill_id"]
+        if (
+            not isinstance(target_skill_id, str)
+            or _expected_skill_id_from_targets(target_files, cast(str, row["id"]))
+            != target_skill_id
+        ):
+            raise ProducerError(f"packet_target_skill_id_mismatch:{row['id']}")
+        iteration_ids = row["iteration_ids"]
+        if (
+            not isinstance(iteration_ids, dict)
+            or set(iteration_ids) != set(VARIANTS)
+            or not all(isinstance(value, str) and value for value in iteration_ids.values())
+            or len(set(iteration_ids.values())) != len(VARIANTS)
+        ):
+            raise ProducerError(f"packet_iteration_ids:{row['id']}")
         rows.append(
             {
                 "id": row["id"],
                 "scenario_id": row["scenario_id"],
                 "category": row["category"],
                 "packet_class": row["packet_class"],
+                "packet_prompt": packet_prompt,
+                "packet_prompt_sha256": prompt_digest,
                 "prompt_path": str(row["prompt_path"]),
-                "canonical_target_files": row["canonical_target_files"],
+                "canonical_target_files": target_files,
                 "prompt_dependency_files": row["prompt_dependency_files"],
+                "target_skill_id": target_skill_id,
+                "iteration_ids": dict(iteration_ids),
                 "method": row["method"],
                 "requirements": row["requirements"],
                 "report_grammar": row["report_grammar"],
@@ -275,10 +340,10 @@ def _packet_manifest(path: Path) -> tuple[dict[str, object], list[dict[str, obje
         raise ProducerError("packet_id_duplicate")
     if len({str(row["scenario_id"]) for row in rows}) != len(rows):
         raise ProducerError("packet_scenario_duplicate")
-    return cast(dict[str, object], raw), rows
+    return cast(Mapping[str, object], raw), [cast(Mapping[str, object], row) for row in rows]
 
 
-def packet_receipt(root: Path, manifest: Path, model: str, profile: str, output_dir: Path) -> dict[str, object]:
+def packet_receipt(root: Path, manifest: Path, model: str, profile: str, output_dir: Path) -> Mapping[str, object]:
     """Emit packet receipts without adding answers or expected commands."""
     if model != MODEL_ID or profile != HOST_PROFILE:
         raise ProducerError("fresh_model_profile_mismatch")
@@ -296,7 +361,7 @@ def packet_receipt(root: Path, manifest: Path, model: str, profile: str, output_
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "packet-receipt.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return payload
+    return cast(Mapping[str, object], payload)
 
 
 def _git_content(root: Path, path: str, revisions: Sequence[str]) -> bytes:
@@ -315,19 +380,30 @@ def _host_observation(path: Path) -> dict[str, object]:
         raise ProducerError(f"host_evaluation_not_object:{path.name}")
     required = {
         "schema", "version", "scenario_id", "category", "packet_id", "iteration_id",
-        "skill_id", "variant", "prompt", "input_tokens", "model_id", "host_profile",
+        "packet_class", "skill_id", "variant", "prompt", "prompt_digest", "input_tokens",
+        "model_id", "host_profile",
         "method", "observation_status",
     }
-    if set(raw) - {"schema", "version", "scenario_id", "category", "packet_id", "iteration_id", "skill_id", "variant", "prompt", "input_tokens", "canonical_followup_input_tokens", "cache_fields_observed", "model_id", "host_profile", "method", "observation_status"} or not required.issubset(raw):
+    if set(raw) - {"schema", "version", "scenario_id", "category", "packet_id", "iteration_id", "packet_class", "skill_id", "variant", "prompt", "prompt_digest", "input_tokens", "canonical_followup_input_tokens", "cache_fields_observed", "model_id", "host_profile", "method", "observation_status"} or not required.issubset(raw):
         raise ProducerError(f"host_observation_incomplete:{path.name}")
     if raw["schema"] != HOST_OBSERVATION_SCHEMA or raw["version"] != 1:
         raise ProducerError(f"host_schema:{path.name}")
     if not isinstance(raw["category"], str) or not isinstance(raw["scenario_id"], str):
         raise ProducerError(f"host_category:{path.name}")
+    if not isinstance(raw["prompt"], str) or not raw["prompt"]:
+        raise ProducerError(f"host_prompt:{path.name}")
+    if (
+        not isinstance(raw["prompt_digest"], str)
+        or sha256_bytes(normalize_text(raw["prompt"]).encode("utf-8"))
+        != raw["prompt_digest"]
+    ):
+        raise ProducerError(f"host_prompt_digest:{path.name}")
     if raw["model_id"] != MODEL_ID or raw["host_profile"] != HOST_PROFILE or raw["method"] != "fresh_read_only" or raw["observation_status"] != "pass":
         raise ProducerError(f"host_metadata:{path.name}")
     if raw["variant"] not in VARIANTS:
         raise ProducerError(f"host_variant:{path.name}")
+    if not isinstance(raw["skill_id"], str) or not raw["skill_id"]:
+        raise ProducerError(f"host_skill_id:{path.name}")
     if isinstance(raw["input_tokens"], bool) or not isinstance(raw["input_tokens"], int) or raw["input_tokens"] < 0:
         raise ProducerError(f"host_input_tokens_invalid:{path.name}")
     followup = raw.get("canonical_followup_input_tokens", 0)
@@ -347,6 +423,10 @@ def _validate_host_observations(
         cast(str, packet["scenario_id"]): {
             "packet_id": cast(str, packet["id"]),
             "category": cast(str, packet["category"]),
+            "packet_class": cast(str, packet["packet_class"]),
+            "packet_prompt_sha256": cast(str, packet["packet_prompt_sha256"]),
+            "target_skill_id": cast(str, packet["target_skill_id"]),
+            "iteration_ids": cast(Mapping[str, object], packet["iteration_ids"]),
         }
         for packet in packets
     }
@@ -361,11 +441,23 @@ def _validate_host_observations(
             raise ProducerError(f"host_observation_duplicate:{scenario_id}:{variant}")
         seen.add(pair)
         requirement = expected[scenario_id]
+        observed_prompt_digest = sha256_bytes(normalize_text(str(observation["prompt"])).encode("utf-8"))
         if (
             observation["packet_id"] != requirement["packet_id"]
             or observation["category"] != requirement["category"]
+            or observation["packet_class"] != requirement["packet_class"]
         ):
             raise ProducerError(f"host_observation_mismatch:{scenario_id}:{variant}")
+        if observation["skill_id"] != requirement["target_skill_id"]:
+            raise ProducerError(f"host_observation_wrong_skill_id:{scenario_id}:{variant}")
+        if (
+            observation["prompt_digest"] != requirement["packet_prompt_sha256"]
+            or observed_prompt_digest != requirement["packet_prompt_sha256"]
+        ):
+            raise ProducerError(f"host_observation_unrelated_prompt:{scenario_id}:{variant}")
+        iteration_ids = cast(Mapping[str, object], requirement["iteration_ids"])
+        if observation["iteration_id"] != iteration_ids.get(variant):
+            raise ProducerError(f"host_iteration_mismatch:{scenario_id}:{variant}")
     required_pairs = {
         (scenario_id, variant)
         for scenario_id in expected
@@ -386,7 +478,7 @@ def measurement(
     manifest: Path,
     host_dir: Path,
     output: Path,
-) -> dict[str, object]:
+) -> Mapping[str, object]:
     """Build paired deterministic measurements from observed host token usage."""
     if model != MODEL_ID or profile != HOST_PROFILE:
         raise ProducerError("measurement_model_profile_mismatch")
@@ -443,7 +535,7 @@ def measurement(
             candidate_text = generated_contents[skill]
         else:
             candidate_text = _git_content(root, f".agents/skills/{skill}/SKILL.md", ("origin/main", "HEAD" )).decode("utf-8")
-        candidate_bytes, candidate_scalars, normalized_candidate = deterministic_measure(candidate_text)
+        _, _, normalized_candidate = deterministic_measure(candidate_text)
         combined = normalize_text(envelope_bytes.decode("utf-8") + "\n" + candidate_text).encode("utf-8")
         candidate_row_id = f"candidate-{index:04d}"
         candidate_rows.append(
@@ -573,7 +665,7 @@ def measurement(
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return payload
+    return cast(Mapping[str, object], payload)
 
 
 def build_parser() -> argparse.ArgumentParser:
