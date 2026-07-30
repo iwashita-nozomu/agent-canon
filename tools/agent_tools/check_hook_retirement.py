@@ -14,11 +14,9 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import subprocess
 import sys
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
 
 from hook_retirement import (
     CALLER_AUDIT_ROOTS,

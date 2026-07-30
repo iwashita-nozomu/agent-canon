@@ -28,7 +28,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 138,
+      "line": 137,
       "path": ".codex/hooks/hook_dispatcher.py",
       "surface": "hook"
     },
@@ -36,7 +36,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 337,
+      "line": 336,
       "path": ".codex/hooks/hook_dispatcher.py",
       "surface": "hook"
     },
@@ -44,7 +44,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 415,
+      "line": 414,
       "path": ".codex/hooks/hook_dispatcher.py",
       "surface": "hook"
     },
@@ -4948,7 +4948,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 2188,
+      "line": 2187,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
@@ -5740,7 +5740,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 163,
+      "line": 161,
       "path": "tools/agent_tools/check_hook_retirement.py",
       "surface": "tool"
     },
@@ -5748,7 +5748,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 163,
+      "line": 161,
       "path": "tools/agent_tools/check_hook_retirement.py",
       "surface": "tool"
     },

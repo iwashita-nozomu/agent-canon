@@ -47,7 +47,6 @@ from hook_event_log import HookLogContext, utc_now  # noqa: E402
 from hook_retirement import (  # noqa: E402
     MOVED_SOURCE_ABSENCES,
     RETIRED_CHILD_TOMBSTONES,
-    TOMBSTONE_SCHEMA,
     source_digest,
 )
 from behavior_event_assembly import (  # noqa: E402

@@ -2977,11 +2977,11 @@ def evidence_problem_components(summary: RuntimeDashboardSummary) -> tuple[Probl
         components.append(
             ProblemComponent(
                 component_type="hook",
-            name="skill_usage_logger",
+                name="prompt_classifier_and_behavior_event_assembly",
             status="missing",
             problem="prompt or tool selection evidence is missing",
             evidence=PROMPT_TOOL_EVIDENCE_TARGET,
-            next_action="repair prompt/tool evidence logging",
+                next_action="repair prompt classification and behavior-event evidence assembly",
         )
         )
     if (
