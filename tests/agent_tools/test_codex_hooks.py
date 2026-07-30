@@ -261,6 +261,28 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertFalse(any(root.rglob("workflow_monitoring.md")))
                 self.assertFalse((report_root / "missing-run").exists())
 
+    def test_pointer_rejects_escaped_report_root_symlink(self) -> None:
+        """The reports/agents identity itself must remain inside the active root."""
+        payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace = Path(tmp_dir)
+            root = workspace / "active-root"
+            root.mkdir()
+            outside = workspace / "outside-reports"
+            outside.mkdir()
+            target = outside / "escaped-run"
+            target.mkdir()
+            report_parent = root / "reports"
+            report_parent.mkdir()
+            (report_parent / "agents").symlink_to(outside, target_is_directory=True)
+            (outside / ".active_run").write_text("escaped-run\n", encoding="utf-8")
+
+            self._run_hook_in_root(root, "UserPromptSubmit", payload)
+
+            event = self._spooled_event(root)
+            self.assertEqual(event["workflow_monitor_report_dir"], "")
+            self.assertFalse((target / "workflow_monitoring.md").exists())
+
     def test_resolver_failure_is_spool_only_even_with_report_override(self) -> None:
         """A failed source-root resolution disables report projection as typed state."""
         payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}

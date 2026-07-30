@@ -284,7 +284,13 @@ def _active_report_target(
     else:
         target = report_root / declared
     try:
+        resolved_active_root = active_root.resolve()
         resolved_report_root = report_root.resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
+    if resolved_active_root not in resolved_report_root.parents:
+        return None
+    try:
         resolved_target = target.resolve()
     except (OSError, RuntimeError, ValueError):
         return None

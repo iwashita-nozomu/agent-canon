@@ -45,7 +45,7 @@ report target は次の順序で一度だけ解決する。
 1. standalone layout の `<active root>/.active_run` が指す既存 run bundle
 1. いずれも無ければ `None`
 
-pointer value は相対 path のみを受理し、`..`、absolute path、および symlink resolution 後に active root の `reports/agents` から外れる target を `None` とする。`reports/agents` 自体ではなく、その strict descendant である既存 directory だけが run-bundle target である。明示 env override はこの containment を適用しない authority route だが、既存 directory であることは必要とする。
+pointer value は相対 path のみを受理し、`..` と absolute path を `None` とする。resolved `reports/agents` identity 自体が resolved active root の strict descendant であることを先に検証し、report root の symlink escape を `None` とする。その後、symlink resolution 後の target が resolved `reports/agents` の strict descendant であることを検証する。`reports/agents` 自体ではなく、その strict descendant である既存 directory だけが run-bundle target である。明示 env override はこの containment を適用しない authority route だが、既存 directory であることは必要とする。
 
 active handler は `record_hook_invocation` を一回、`HookLogContext.append` を一回だけ実行する。behavior event があり、append result が `spooled` で、resolved report target がある場合だけ、その target に `emit_behavior_projection` を一回実行する。target が無い場合、または root resolution が `failed` の場合は spool-only とし、behavior event の `workflow_monitor_report_dir` は空文字にする。hook hot path は archive sync、Git、network を呼び出さず、source root 直下の `workflow_monitoring.md` へ fallback しない。
 
