@@ -50,9 +50,11 @@ git grep -l -E 'hook_dispatcher|hook_safety|execution_resource_plan_projection_g
 git grep -n -E 'hook_dispatcher|hook_safety|execution_resource_plan_projection_guard|prompt_secret_guard|branch_worktree_guard|skill_usage_logger|hook_event_log|RETIRED_HOOK_ROUTES|retired_hook_routes' -- .codex tools agents documents tests templates responsibility-scope.toml
 git grep -n -E 'check_convention_compliance|convention_compliance_contracts|generate_agent_runtime_dashboard|skill_lane_detector|run_python_quality_checks|report_artifact_checks|worktree-health|gpu-admission-r5-source-packet' -- .codex tools agents documents tests templates responsibility-scope.toml
 python3 .codex/hooks/hook_dispatcher.py --contract
-python3 tools/agent_tools/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json
-git rev-parse main
-git show main:documents/runtime/log-surface-inventory.json
+baseline=$(mktemp documents/runtime/wave3-inventory-baseline.XXXXXX)
+git show 94283c909ebd8862942f69d9bf92923ff90e3592:documents/runtime/log-surface-inventory.json > "$baseline"
+printf 'LOG_SURFACE_BASELINE_COMMIT=94283c909ebd8862942f69d9bf92923ff90e3592\n'
+printf 'LOG_SURFACE_BASELINE_CONTENT_SHA256=%s\n' "$(sha256sum "$baseline" | awk '{print $1}')"
+python3 tools/agent_tools/log_surface_inventory.py --root . --check --baseline "$baseline"
 python3 tools/agent_tools/check_agent_runtime_alignment.py
 ```
 
@@ -609,7 +611,7 @@ The parser aggregates malformed records without aborting the batch: `malformed_b
 
 ### Inventory emitter and generated readback
 
-`tools/agent_tools/log_surface_inventory.py` remains the sole inventory emitter. Its generated `documents/runtime/log-surface-inventory.json` keeps `schema_version: 1`, sorted `scanned_files`, and sorted records `{path,surface,emitter,field,line,certainty}`. The log-inventory gate is evaluated against the current `main` baseline after PR #471, never against a pre-PR-471 checkout or a stale vendored snapshot. The implementation validation packet records `baseline_branch=main`, `baseline_floor_pr=471`, `baseline_selector=current-main-after-pr-471`, and the exact `git rev-parse main` commit used for readback; an unproven or pre-471 baseline fails closed. After migration:
+`tools/agent_tools/log_surface_inventory.py` remains the sole inventory emitter. Its generated `documents/runtime/log-surface-inventory.json` keeps `schema_version: 1`, sorted `scanned_files`, and sorted records `{path,surface,emitter,field,line,certainty}`. The log-inventory gate materializes the tracked baseline from `94283c909ebd8862942f69d9bf92923ff90e3592` with `git show` and passes that temporary file to the existing `--baseline` option. The implementation validation packet records `LOG_SURFACE_BASELINE_COMMIT=94283c909ebd8862942f69d9bf92923ff90e3592` and the `sha256sum` content digest of the materialized file; an unproven baseline fails closed. After migration:
 
 - `.codex/hooks/skill_usage_logger.py` is absent from both `scanned_files` and `records`;
 - `tools/agent_tools/prompt_capture.py`, `tools/agent_tools/prompt_classifier.py`, `tools/agent_tools/tool_selection.py`, `tools/agent_tools/subagent_selection.py`, `tools/agent_tools/workflow_context.py`, `tools/agent_tools/behavior_event_assembly.py`, `tools/agent_tools/skill_lane_detector.py`, `tools/agent_tools/workflow_monitor.py`, `tools/agent_tools/generate_agent_runtime_dashboard.py`, and `tools/agent_tools/generate_agent_improvement_guide.py` are present with their new static/dynamic fields or read-only consumer surfaces;
@@ -644,7 +646,7 @@ The parser aggregates malformed records without aborting the batch: `malformed_b
 | `tools/agent_tools/workflow_monitor.py` | import-only `emit_behavior_projection(report_dir, event) -> MonitorProjectionResult`; existing `--behavior-event` CLI is the equivalent explicit projection route | consumes the assembled record and writes only `behavior_event_json=<JSON>` projection lines/monitor Markdown; it does not assemble or append canonical JSONL |
 | `generate_agent_runtime_dashboard.py` | existing read-only dashboard CLI; `agent-canon.behavior-readback.v1` oracle and parser aggregation | reads active behavior events and monitor projections; retains prompt/tool/feedback/subagent/workflow/lane metrics |
 | `generate_agent_improvement_guide.py` | existing read-only guide CLI | consumes `historical_skill_usage_reader.py` for archived `skill_usage.jsonl` and active dashboard evidence; no active emission |
-| `log_surface_inventory.py` | existing `--check --baseline --baseline-ref current-main-after-pr-471` and generated JSON | emits updated inventory once after all path migrations, using the post-PR-471 current-main baseline |
+| `log_surface_inventory.py` | existing `--check --baseline <materialized-94283c9-inventory>` and generated JSON | emits updated inventory once after all path migrations, using the tracked `94283c909ebd8862942f69d9bf92923ff90e3592` baseline |
 
 ## Exact implementation write set and fixture corpus
 
@@ -708,7 +710,7 @@ Exact fixture and test corpus:
 - transport/readback separation: no direct shared `behavior_events.jsonl` append path is asserted in hot-path; `HookLogContext.append` to no-replace per-event spool and `runtime_log_archive_git` checkpointing to `behavior_events` JSONL are tested separately in the same run;
 - pure-owner tests: `test_prompt_capture.py`, `test_prompt_classifier.py`, `test_tool_selection.py`, `test_subagent_selection.py`, `test_workflow_context.py`, `test_behavior_event_assembly.py`, `test_historical_skill_usage_reader.py`, `test_hook_safety.py`, `test_execution_resource_projection.py`, and `test_hook_retirement.py` prove import side-effect absence, immutable-input/no-subprocess behavior, domain/nullability, parity, event identity/cardinality, historical parser separation, and tombstone guard behavior; `test_codex_hooks.py` proves the dispatcher caller contract and ordering.
 
-Target validation commands are `python3 tools/agent_tools/check_hook_retirement.py --root . --check`, `python3 tools/agent_tools/check_agent_runtime_alignment.py`, `python3 tools/agent_tools/check_convention_compliance.py`, `python3 tools/agent_tools/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json --baseline-ref current-main-after-pr-471`, `tools/bin/agent-canon docs check` on changed Markdown, the focused pytest corpus above, `python3 tools/agent_tools/responsibility_scope.py --root .`, and the repository dependency review selected by the implementation profile. The inventory command must resolve the baseline from current `main` after PR #471 and record its exact commit; a vendored or pre-471 baseline is invalid.
+Target validation commands are `python3 tools/agent_tools/check_hook_retirement.py --root . --check`, `python3 tools/agent_tools/check_agent_runtime_alignment.py`, `python3 tools/agent_tools/check_convention_compliance.py`, and the existing inventory command with the temporary baseline materialized from `94283c909ebd8862942f69d9bf92923ff90e3592` in the reproducible audit command above. They also include `tools/bin/agent-canon docs check` on changed Markdown, the focused pytest corpus above, `python3 tools/agent_tools/responsibility_scope.py --root .`, and the repository dependency review selected by the implementation profile. The evidence records the base commit and SHA-256 of the materialized baseline; a baseline without both values is invalid.
 
 No code implementation, compatibility wrapper, parent pin update, root-view sync, branch publication, or commit is authorized by this design wave.
 

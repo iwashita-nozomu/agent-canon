@@ -4948,7 +4948,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 2187,
+      "line": 2209,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
@@ -5740,7 +5740,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 161,
+      "line": 196,
       "path": "tools/agent_tools/check_hook_retirement.py",
       "surface": "tool"
     },
@@ -5748,7 +5748,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 161,
+      "line": 196,
       "path": "tools/agent_tools/check_hook_retirement.py",
       "surface": "tool"
     },

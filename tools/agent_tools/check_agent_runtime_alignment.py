@@ -462,11 +462,33 @@ def is_project_skill_lane_path(path: Path) -> bool:
 
 def validate_retired_command_or_skill(value: str, child: str) -> None:
     """Validate a tombstone representation without executing or resolving it."""
-    grammar = re.compile(
-        r"(?:import-only:tools\.agent_tools\.[A-Za-z0-9_]+:[A-Za-z0-9_]+|"
-        r"command-only:python3 tools/agent_tools/[A-Za-z0-9_]+\.py(?: [^\n]*)?|"
-        r"skill-only:\$[a-z0-9][a-z0-9-]*|docs-only:tools/bin/agent-canon docs check)$"
+    import_grammar = re.compile(r"import-only:tools\.agent_tools\.[A-Za-z0-9_]+:[A-Za-z0-9_]+$")
+    command_grammar = re.compile(
+        r"command-only:python3 (tools/(?:agent_tools|validation)/[A-Za-z0-9_]+\.py)(?: [^\n]*)?$"
     )
+    if import_grammar.fullmatch(value):
+        return
+    command = command_grammar.fullmatch(value)
+    if command:
+        tool_path = command.group(1)
+        raw_catalog: object = yaml.safe_load((ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8"))
+        catalog = require_mapping(raw_catalog, "tool catalog must parse as a mapping")
+        families = require_mapping(catalog.get("families", {}), "tool catalog families must be a mapping")
+        canonical_tool_roots = {
+            require_string(
+                require_mapping(
+                    families.get(family), f"tool catalog family missing: {family}"
+                ).get("root"),
+                f"tool catalog family root must be a string: {family}",
+            )
+            for family in ("agent_tools", "validation")
+        }
+        ensure(
+            any(tool_path.startswith(f"{path}/") for path in canonical_tool_roots),
+            f"retired route {child} command path is not a catalog-backed canonical tool: {tool_path}",
+        )
+        return
+    grammar = re.compile(r"(?:skill-only:\$[a-z0-9][a-z0-9-]*|docs-only:tools/bin/agent-canon docs check)$")
     ensure(bool(grammar.fullmatch(value)), f"retired route {child} has invalid tombstone representation: {value}")
 
 

@@ -294,10 +294,10 @@ An explicit legacy `*.jsonl` hook override maps to sibling directory
 `<override>.events/`; the hot path never appends a shared JSONL file and never
 falls back to host `~/.codex` state.
 
-`hooks/log_archive_mount_warning.py` is a standalone explicit mount check, not
-an active lifecycle hook. Run it when preparing an archive checkpoint; the
-active dispatcher only writes bounded fingerprint events to the local spool
-and never inspects or mounts an archive.
+`python3 tools/agent_tools/runtime_log_archive_git.py ensure` is the explicit
+mount check for an archive checkpoint. The active dispatcher only writes
+bounded fingerprint events to the local spool and never inspects or mounts an
+archive.
 
 ## Push
 
@@ -395,11 +395,10 @@ RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH=logs/<stable-source-repository-id>
 RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR=<agent-canon>/.agent-canon/log-archive/agent-reports/<stable-source-repository-id>
 ```
 
-`hooks/runtime_log_auto_sync.py` is a standalone compatibility route for an
-explicit archive checkpoint; it is not registered for `Stop`. Run
-`python3 tools/agent_tools/runtime_log_archive_git.py sync` from the
-administrative checkpoint owner. The active dispatcher has no archive, Git,
-network, SSH, or auto-sync dependency.
+Run `python3 tools/agent_tools/runtime_log_archive_git.py sync` from the
+administrative checkpoint owner when an explicit archive checkpoint is due.
+The active dispatcher has no archive, Git, network, SSH, or auto-sync
+dependency.
 
 ## Legacy in-tree migration
 

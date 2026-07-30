@@ -92,6 +92,18 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
 
+    def test_retired_command_accepts_catalog_backed_validation_owner(self) -> None:
+        """A tombstone may route to a canonical validation tool in the catalog."""
+        runtime_alignment.validate_retired_command_or_skill(
+            "command-only:python3 tools/validation/notebook_quality.py",
+            "notebook_quality_guard.py",
+        )
+        with self.assertRaisesRegex(RuntimeError, "invalid tombstone representation"):
+            runtime_alignment.validate_retired_command_or_skill(
+                "command-only:python3 tools/ci/not_registered.py",
+                "notebook_quality_guard.py",
+            )
+
     def test_permanent_team_mapping_requires_every_configured_role(self) -> None:
         """The CODEX_SUBAGENTS mapping should not omit configured team roles."""
         config = load_team_config()

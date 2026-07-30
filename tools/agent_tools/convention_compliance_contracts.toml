@@ -252,7 +252,7 @@ markers = ["agents/canonical/CODEX_WORKFLOW.md", "Branch Reuse Default", "tools/
 
 [[contracts.surfaces]]
 path = "agents/skills/worktree-health.md"
-markers = ["agents/canonical/CODEX_WORKFLOW.md", "Branch Reuse Default", "branch_worktree_guard.py", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "git worktree list --porcelain", "git branch --show-current"]
+markers = ["agents/canonical/CODEX_WORKFLOW.md", "Branch Reuse Default", "tools/agent_tools/hook_safety.py", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "git worktree list --porcelain", "git branch --show-current"]
 
 [[contracts]]
 id = "solid_coding_contract"

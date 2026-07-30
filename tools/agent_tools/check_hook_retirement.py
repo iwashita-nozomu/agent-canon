@@ -24,7 +24,6 @@ from hook_retirement import (
     MOVED_SOURCE_ABSENCES,
     RETIRED_CHILD_TOMBSTONES,
     TOMBSTONE_SCHEMA,
-    retired_filenames,
     source_digest,
 )
 
@@ -40,7 +39,7 @@ EXECUTABLE_SCAN_PATHS = (
     "tools/validation/notebook_quality.py",
 )
 METADATA_ALLOWLIST = {"tools/agent_tools/hook_retirement.py", "documents/design/agentcanon-hook-simplification-wave3.md"}
-_COMMAND_RE = re.compile(r"^(?:import-only:tools\.agent_tools\.[A-Za-z0-9_]+:[A-Za-z0-9_]+|command-only:python3 tools/agent_tools/[A-Za-z0-9_]+\.py(?: [^\n]*)?|skill-only:\$[A-Za-z0-9][A-Za-z0-9_-]*|docs-only:tools/bin/agent-canon docs check)$")
+_COMMAND_RE = re.compile(r"^(?:import-only:tools\.agent_tools\.[A-Za-z0-9_]+:[A-Za-z0-9_]+|command-only:python3 tools/(?:agent_tools|validation)/[A-Za-z0-9_]+\.py(?: [^\n]*)?|skill-only:\$[A-Za-z0-9][A-Za-z0-9_-]*|docs-only:tools/bin/agent-canon docs check)$")
 
 
 def _files(root: Path, relative: str) -> list[Path]:
@@ -59,7 +58,12 @@ def _all_audit_files(root: Path) -> list[Path]:
     return sorted(set(result))
 
 
-def _matches(root: Path, files: list[Path], token: str) -> list[dict[str, object]]:
+def _matches(
+    root: Path,
+    files: list[Path],
+    tokens: list[str],
+    retirement_kind: str,
+) -> list[dict[str, object]]:
     result: list[dict[str, object]] = []
     for path in files:
         try:
@@ -67,8 +71,16 @@ def _matches(root: Path, files: list[Path], token: str) -> list[dict[str, object
         except (OSError, UnicodeDecodeError):
             continue
         for line_number, line in enumerate(lines, start=1):
-            if token in line:
-                result.append({"basename": token, "path": path.relative_to(root).as_posix(), "line": line_number, "token": token})
+            for token in tokens:
+                if token in line:
+                    result.append(
+                        {
+                            "path": path.relative_to(root).as_posix(),
+                            "line": line_number,
+                            "retirement_kind": retirement_kind,
+                            "token": token,
+                        }
+                    )
     return result
 
 
@@ -85,23 +97,39 @@ def _active_events(root: Path) -> tuple[list[str], list[str]]:
 def contract_payload(root: Path) -> dict[str, object]:
     children = [asdict(row) for row in RETIRED_CHILD_TOMBSTONES]
     moved = [asdict(row) for row in MOVED_SOURCE_ABSENCES]
-    basenames = sorted(set(retired_filenames()))
+    child_basenames = sorted({row.filename for row in RETIRED_CHILD_TOMBSTONES})
+    moved_source_old_paths = sorted(
+        f".codex/hooks/{row.filename}" for row in MOVED_SOURCE_ABSENCES
+    )
     audit_files = _all_audit_files(root)
-    matches = [match for basename in basenames for match in _matches(root, audit_files, basename)]
+    child_matches = _matches(
+        root, audit_files, child_basenames, "retired_child_basename"
+    )
+    moved_matches = _matches(
+        root, audit_files, moved_source_old_paths, "moved_source_old_path"
+    )
+    matches = child_matches + moved_matches
     executable_references: list[dict[str, object]] = []
     executable_files = [path for relative in EXECUTABLE_SCAN_PATHS for path in _files(root, relative)]
-    for basename in basenames:
-        for match in _matches(root, executable_files, basename):
+    for tokens, retirement_kind in (
+        (child_basenames, "retired_child_basename"),
+        (moved_source_old_paths, "moved_source_old_path"),
+    ):
+        for match in _matches(root, executable_files, tokens, retirement_kind):
             if match["path"] not in METADATA_ALLOWLIST:
-                executable_references.append({"path": match["path"], "line": match["line"], "token": basename})
+                executable_references.append(match)
     present_files = [f".codex/hooks/{name.filename}" for name in RETIRED_CHILD_TOMBSTONES if (root / ".codex" / "hooks" / name.filename).exists()]
-    present_files.extend([f".codex/hooks/{name.filename}" for name in MOVED_SOURCE_ABSENCES if (root / ".codex" / "hooks" / name.filename).exists()])
+    present_files.extend([old_path for old_path in moved_source_old_paths if (root / old_path).exists()])
     inventory_paths: list[str] = []
     inventory = root / "documents/runtime/log-surface-inventory.json"
     if inventory.exists():
         try:
             text = inventory.read_text(encoding="utf-8")
-            inventory_paths = [token for token in basenames if token in text or f".codex/hooks/{token}" in text]
+            inventory_paths = [
+                token
+                for token in child_basenames + moved_source_old_paths
+                if token in text
+            ]
         except OSError:
             inventory_paths = ["inventory_unreadable"]
     artifacts = [
@@ -115,14 +143,21 @@ def contract_payload(root: Path) -> dict[str, object]:
         "schema": TOMBSTONE_SCHEMA,
         "retired_child_tombstones": children,
         "moved_source_absences": moved,
-        "counts": {"retired_child_tombstones": len(children), "moved_source_absences": len(moved), "retired_filenames": len(basenames)},
+        "counts": {"retired_child_tombstones": len(children), "moved_source_absences": len(moved), "retired_filenames": len(child_basenames) + len(moved_source_old_paths)},
         "active_events": active,
         "inactive_events": inactive,
         "source_digest": source_digest(),
         "missing_files": sorted(present_files),
         "executable_references": sorted(executable_references, key=lambda item: (str(item["path"]), int(item["line"]), str(item["token"]))),
         "generated_inventory_paths": sorted(inventory_paths),
-        "caller_audit": {"schema": CALLER_AUDIT_SCHEMA, "basenames": basenames, "matches": matches, "malformed_matches": malformed, "artifacts": artifacts},
+        "caller_audit": {
+            "schema": CALLER_AUDIT_SCHEMA,
+            "retired_child_basenames": child_basenames,
+            "moved_source_old_paths": moved_source_old_paths,
+            "matches": matches,
+            "malformed_matches": malformed,
+            "artifacts": artifacts,
+        },
     }
 
 
