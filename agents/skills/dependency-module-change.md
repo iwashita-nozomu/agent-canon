@@ -54,6 +54,22 @@ missing membership marker は旧 evidence として `marker-readback=membership-
 topic root は同じ `CLEANUP` receipt で除去されます。再 clone / `prepare` はこの route に
 追加しません。
 
+### Exact integrated cleanup command
+
+PR merge/readback 後の workspace clone cleanup は、computed path、owner evidence、
+integrated commit、same-command authority を一つの既存 CLI call に束ねます。
+
+```bash
+python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
+  --placement workspace --topic <topic> --module <path> \
+  --expected-clone <absolute-clone> \
+  --owner-evidence-sha256 <sha256> \
+  --integrated-commit <full-oid> --apply
+```
+
+この literal の CLI / ToolCall / receipt shape は変更せず、`CLEANUP` readback と
+typed hold reason を後続の PR processing が消費します。
+
 独立した replaceable responsibility を parallel に実行する場合は、vendor の clean
 状態を理由に停止せず、親の DAG packet が disjoint write scope、依存/merge order、
 validation、reviewer ownership を固定した後で、次の typed route を使います。

@@ -121,9 +121,13 @@ conflict-successor handling. Unknown permission never implies push authority.
 ## Post-merge Dependency Cleanup
 
 After source merge/readback, dispatch the existing dependency-module cleanup route
+using the exact literal in [`dependency-module-change`](dependency-module-change.md#exact-integrated-cleanup-command),
 with the exact computed clone path and the full integrated commit OID when local
 topic commits remain after squash merge. A clean worktree, zero untracked files,
-and exact remote tree inclusion/deletion proof are the cleanup oracle. Stale or
+and exact remote tree inclusion/deletion proof are the cleanup oracle. The
+integrated commit must be reachable from `origin/main` and descend from
+`topic_base`; an empty `topic_base..HEAD` changed-path set additionally requires
+remote retention of the local HEAD. Stale or
 missing dependency membership markers are historical evidence: preserve their
 `marker-readback=membership-mismatch` in the cleanup receipt, but do not hold
 cleanup for that marker alone. Dirty state, wrong integrated commit, or

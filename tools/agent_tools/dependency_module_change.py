@@ -533,12 +533,19 @@ def _existing_topic_parent(topic_root: Path, topic: str) -> Path | None:
     return candidates[0] if candidates else None
 
 
-def _resolve_topic_parent(root: Path, topic: str, *, create: bool) -> Path:
+def _resolve_topic_parent(
+    root: Path, topic: str, *, create: bool, allow_stale_membership: bool = False
+) -> Path:
     """Resolve the parent clone even when --root points at a module clone."""
     topic_slug = _slug(topic, "topic")
     topic_root = _topic_workspace(root, topic, create=create)
     if root.parent == topic_root:
-        selected = _inspect(root, role="parent", topic=topic_slug)
+        selected = _inspect(
+            root,
+            role="parent",
+            topic=topic_slug,
+            allow_stale_membership=allow_stale_membership,
+        )
         if selected.state == "ready":
             return root
         existing = _existing_topic_parent(topic_root, topic_slug)
@@ -939,8 +946,20 @@ def _tree_entry(
     )
 
 
+def _remote_ref_contains_commit(path: Path, commit: str) -> bool:
+    """Return whether any fetched remote ref retains the selected commit."""
+    refs = _run_git(
+        path, ["for-each-ref", "--format=%(refname)", "refs/remotes"]
+    ).splitlines()
+    return any(
+        _git_succeeds(path, ["merge-base", "--is-ancestor", commit, ref])
+        for ref in refs
+    )
+
+
 def _integrated_commit_failure(
     path: Path,
+    topic_base: str,
     topic_paths: tuple[str, ...],
     topic_tip: str,
     integrated_commit: str,
@@ -955,6 +974,13 @@ def _integrated_commit_failure(
         ["merge-base", "--is-ancestor", integrated_commit, INTEGRATION_REMOTE_REF],
     ):
         return "integrated-commit-not-reachable-from-origin-main"
+    if not _git_succeeds(
+        path,
+        ["merge-base", "--is-ancestor", topic_base, integrated_commit],
+    ):
+        return "integrated-commit-not-descendant-of-topic-base"
+    if not topic_paths and not _remote_ref_contains_commit(path, topic_tip):
+        return "integrated-commit-empty-topic-without-remote-tip"
     try:
         for changed_path in topic_paths:
             topic_entry = _tree_entry(path, topic_tip, changed_path)
@@ -971,13 +997,16 @@ def _integrated_commit_failure(
 
 
 def _discover_integrated_commit(
-    path: Path, topic_paths: tuple[str, ...], topic_tip: str
+    path: Path, topic_base: str, topic_paths: tuple[str, ...], topic_tip: str
 ) -> str | None:
     """Find the newest equivalent commit on the canonical fetched main ref."""
     for candidate in _run_git(
         path, ["rev-list", "--first-parent", INTEGRATION_REMOTE_REF]
     ).splitlines():
-        if _integrated_commit_failure(path, topic_paths, topic_tip, candidate) is None:
+        if (
+            _integrated_commit_failure(path, topic_base, topic_paths, topic_tip, candidate)
+            is None
+        ):
             return candidate
     return None
 
@@ -991,23 +1020,29 @@ def _cleanup_readiness(path: Path, integrated_commit: str | None = None) -> str 
         return "dirty-worktree-index-or-untracked"
     if sum(line.startswith("worktree ") for line in _run_git(path, ["worktree", "list", "--porcelain"]).splitlines()) > 1:
         return "linked-worktree-present"
-    if _run_git(path, ["rev-list", "--all", "--not", "--remotes"]).strip():
-        try:
-            topic_base = _run_git(path, ["merge-base", "HEAD", INTEGRATION_REMOTE_REF]).strip()
-        except GitCommandError:
-            return "integrated-commit-base-unavailable"
-        if not topic_base:
-            return "integrated-commit-base-unavailable"
-        topic_tip = _run_git(path, ["rev-parse", "HEAD"]).strip()
+    topic_tip = _run_git(path, ["rev-parse", "HEAD"]).strip()
+    try:
+        topic_base = _run_git(path, ["merge-base", topic_tip, INTEGRATION_REMOTE_REF]).strip()
+    except GitCommandError:
+        return "integrated-commit-base-unavailable"
+    if not topic_base:
+        return "integrated-commit-base-unavailable"
+    unique_topic_commits = _run_git(
+        path,
+        ["rev-list", f"{topic_base}..{topic_tip}", "--not", "--remotes"],
+    ).strip()
+    if unique_topic_commits or integrated_commit is not None:
         try:
             topic_paths = _topic_changed_paths(path, topic_base, topic_tip)
         except GitCommandError:
             return "integrated-commit-evidence-unreadable"
         if integrated_commit is not None:
-            failure = _integrated_commit_failure(path, topic_paths, topic_tip, integrated_commit)
+            failure = _integrated_commit_failure(
+                path, topic_base, topic_paths, topic_tip, integrated_commit
+            )
             if failure is not None:
                 return failure
-        elif _discover_integrated_commit(path, topic_paths, topic_tip) is None:
+        elif _discover_integrated_commit(path, topic_base, topic_paths, topic_tip) is None:
             return "unique-local-commits"
     return None
 
@@ -1085,6 +1120,33 @@ def _cleanup_parent(
     )
     if not expected.is_absolute() or expected != parent_root:
         raise DependencyModuleChangeError(f"--expected-parent must exactly equal {parent_root}")
+    inspection = _inspect(parent_root, role="parent", topic=topic)
+    if inspection.state == "membership-mismatch":
+        inspection = _inspect(
+            parent_root,
+            role="parent",
+            topic=topic,
+            allow_stale_membership=True,
+        )
+        print("CLEANUP parent marker-readback=membership-mismatch")
+    for module in modules:
+        candidate = parent_root.parent / module.basename
+        child_inspection = _inspect(
+            candidate,
+            role="module",
+            module=module,
+            topic=topic,
+            module_url=_resolve_module_url(parent_root, module.url),
+        )
+        if child_inspection.state == "membership-mismatch":
+            print(
+                f"CLEANUP module={module.path} "
+                f"marker-readback=membership-mismatch path={candidate}"
+            )
+    reason = _cleanup_readiness(parent_root, integrated_commit)
+    if reason:
+        print(f"CLEANUP parent action=hold reason={reason}")
+        return
     blockers = _module_path_states(parent_root, modules, topic)
     if blockers:
         details = ", ".join(f"{item.path} ({item.state})" for item in blockers)
@@ -1100,22 +1162,8 @@ def _cleanup_parent(
             "parent clone cleanup refused by unknown topic entries: "
             + ", ".join(str(item) for item in unknown)
         )
-    inspection = _inspect(parent_root, role="parent", topic=topic)
-    marker_readback = inspection.state
-    if inspection.state == "membership-mismatch":
-        inspection = _inspect(
-            parent_root,
-            role="parent",
-            topic=topic,
-            allow_stale_membership=True,
-        )
-        print(f"CLEANUP parent marker-readback={marker_readback}")
     if inspection.state != "ready":
         print(f"CLEANUP parent action=hold reason={inspection.state}")
-        return
-    reason = _cleanup_readiness(parent_root, integrated_commit)
-    if reason:
-        print(f"CLEANUP parent action=hold reason={reason}")
         return
     if not apply:
         print(f"CLEANUP parent action=would-remove path={parent_root}")
@@ -1320,14 +1368,28 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.integrated_commit,
             )
             return 0
-        parent_root = _resolve_topic_parent(root, args.topic, create=False)
+        parent_cleanup = args.command == "cleanup" and args.parent
+        parent_root = _resolve_topic_parent(
+            root,
+            args.topic,
+            create=False,
+            allow_stale_membership=parent_cleanup,
+        )
         if not parent_root.is_dir():
             raise DependencyModuleChangeError(f"topic parent clone is absent: {parent_root}")
-        parent_inspection = _inspect(parent_root, role="parent", topic=topic)
-        if parent_inspection.state != "ready":
-            raise DependencyModuleChangeError(
-                f"topic parent clone failed identity validation: {parent_root} ({parent_inspection.state})"
+        if parent_cleanup:
+            parent_inspection = _inspect(
+                parent_root,
+                role="parent",
+                topic=topic,
+                allow_stale_membership=True,
             )
+        else:
+            parent_inspection = _inspect(parent_root, role="parent", topic=topic)
+            if parent_inspection.state != "ready":
+                raise DependencyModuleChangeError(
+                    f"topic parent clone failed identity validation: {parent_root} ({parent_inspection.state})"
+                )
         modules = _parse_gitmodules(parent_root)
         if args.command == "status":
             _status(parent_root, modules, topic)

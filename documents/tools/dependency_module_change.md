@@ -53,11 +53,20 @@ remote 再構成可能性を要求します。
 `SOURCE_BRANCH`、`SOURCE_HEAD_SHA` が source identity です。workspace cleanup は
 `--owner-evidence-sha256` の exact match と Git / manifest identity validation を要求します。
 topic branch deletion 後に local-only commit が残る場合の `--integrated-commit` は
-PR merge/readback の full OID を渡す typed integration evidence です。省略時の
+PR merge/readback の full OID を渡す typed integration evidence です。candidate は
+fetch 済みの `refs/remotes/origin/main` から到達でき、かつ
+`topic_base = merge-base(HEAD, refs/remotes/origin/main)` の descendant である必要が
+あります。`topic_base..HEAD` の changed/deleted path set を作り、各 path の最終
+tree entry（object/blob OID, mode, type）または absence が integrated commit の
+最終 tree と一致するときだけ cleanup を許可します。changed path set が空の場合は、
+同一 content の過去 commitや unpushed allow-empty commitを誤って証明しないため、
+topic HEAD が fetched remote の integrated history または remote topic head に保持
+されている readback も要求します。readback がなければ
+`integrated-commit-empty-topic-without-remote-tip` で hold します。省略時の
 canonical discovery と exact final-tree entry equivalence/hold semantics は
-dependency-module policy owner を参照します。`agent-canon.topic.role` / `topic` の
-stale または missing membership marker は旧 evidence として
-`marker-readback=membership-mismatch` を receipt に残し、clean/tree gate の成立後は
-cleanup を阻害しません。owner evidence、placement、module、URL、branch の不一致は
-hold します。workspace clone の削除後に computed topic root が空なら、同じ receipt で
+dependency-module policy owner を参照します。parent cleanup は strict membership
+marker precheck より先にこの proof/readback を行い、role/topic marker の stale または
+missing を `marker-readback=membership-mismatch` として診断出力します。proof が
+pass した後に owner evidence、placement、module、URL、branch の strict identity を
+検査します。workspace clone の削除後に computed topic root が空なら、同じ receipt で
 topic root も削除します。

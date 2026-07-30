@@ -174,6 +174,28 @@ def _commit_file(repo: Path, filename: str, content: str, message: str) -> str:
     return _commit_staged(repo, message)
 
 
+def _commit_empty(repo: Path, message: str) -> str:
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            message,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return run_git(repo, "rev-parse", "HEAD")
+
+
 def _integrate_topic(
     tmp_path: Path,
     remote: Path,
@@ -1137,6 +1159,41 @@ def test_cleanup_holds_unreachable_integrated_commit_oid(tmp_path: Path) -> None
     assert clone.exists()
 
 
+def test_cleanup_holds_integrated_commit_before_topic_base(tmp_path: Path) -> None:
+    remote = create_remote(tmp_path)
+    advance_remote_main(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    topic = "before-topic-base"
+    topic_branch = "feature/before-topic-base"
+    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
+    clone = workspace_module_clone(parent, topic=topic)
+    _commit_file(clone, "topic.txt", "topic\n", "topic change")
+    integrated_commit = run_git(remote, "rev-parse", "main^")
+
+    held = invoke(
+        parent,
+        "cleanup",
+        "--placement",
+        "workspace",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--owner-evidence-sha256",
+        owner_evidence_sha(parent),
+        "--integrated-commit",
+        integrated_commit,
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert held.returncode == 0, held.stderr
+    assert "integrated-commit-not-descendant-of-topic-base" in held.stdout
+    assert clone.exists()
+
+
 def test_cleanup_holds_non_equivalent_integrated_commit(tmp_path: Path) -> None:
     remote = create_remote(tmp_path)
     parent = create_parent(tmp_path, remote)
@@ -1184,6 +1241,50 @@ def test_cleanup_holds_non_equivalent_integrated_commit(tmp_path: Path) -> None:
 
     assert held.returncode == 0, held.stderr
     assert "integrated-commit-not-equivalent" in held.stdout
+    assert clone.exists()
+
+
+def test_cleanup_rejects_unpushed_allow_empty_after_same_content_commit(
+    tmp_path: Path,
+) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    topic = "empty-topic-proof"
+    topic_branch = "feature/empty-topic-proof"
+    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
+    clone = workspace_module_clone(parent, topic=topic)
+    _commit_empty(clone, "same content topic commit")
+    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
+    integrated_commit = _integrate_topic(
+        tmp_path,
+        remote,
+        topic_branch,
+        squash=True,
+        delete_topic_branch=True,
+    )
+    _commit_empty(clone, "unpushed allow-empty topic commit")
+
+    held = invoke(
+        parent,
+        "cleanup",
+        "--placement",
+        "workspace",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--owner-evidence-sha256",
+        owner_evidence_sha(parent),
+        "--integrated-commit",
+        integrated_commit,
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert held.returncode == 0, held.stderr
+    assert "integrated-commit-empty-topic-without-remote-tip" in held.stdout
     assert clone.exists()
 
 
@@ -1246,6 +1347,54 @@ def test_cleanup_removes_reconstructible_module_then_parent_and_topic(tmp_path: 
     )
     assert parent_removed.returncode == 0, parent_removed.stderr
     assert not topic_root(parent).exists()
+
+
+def test_parent_cleanup_reports_stale_marker_before_integrated_proof(
+    tmp_path: Path,
+) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    assert prepare(parent).returncode == 0
+    clone = module_clone(parent)
+    removed = invoke(
+        topic_parent(parent),
+        "cleanup",
+        "--topic",
+        TOPIC,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--apply",
+        env=cleanup_env(),
+    )
+    assert removed.returncode == 0, removed.stderr
+    parent_clone = topic_parent(parent)
+    run_git(parent_clone, "config", "--local", "--unset", "agent-canon.topic.role")
+    _commit_empty(parent_clone, "unpushed parent allow-empty")
+    integrated_commit = run_git(parent_clone, "rev-parse", "origin/main")
+
+    held = invoke(
+        parent_clone,
+        "cleanup",
+        "--topic",
+        TOPIC,
+        "--parent",
+        "--expected-parent",
+        str(parent_clone),
+        "--integrated-commit",
+        integrated_commit,
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert held.returncode == 0, held.stderr
+    marker = "marker-readback=membership-mismatch"
+    proof = "integrated-commit-empty-topic-without-remote-tip"
+    assert marker in held.stdout
+    assert proof in held.stdout
+    assert held.stdout.index(marker) < held.stdout.index(proof)
+    assert parent_clone.exists()
 
 
 def test_parent_cleanup_refuses_identity_invalid_expected_module_path(tmp_path: Path) -> None:

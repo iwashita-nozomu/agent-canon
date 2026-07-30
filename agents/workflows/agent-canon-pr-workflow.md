@@ -67,13 +67,19 @@ modify a parent checkout or pin.
   materialized to the same PR and the PR head readback confirms identity.
 - After merge/readback, cleanup may consume the same full integrated-commit
   receipt even when the source clone retains local topic commits from a squash
-  merge. Exact computed path, clean/untracked-zero state, and per-path final-tree
-  inclusion/deletion are authoritative; stale or missing membership markers are
-  read back as `marker-readback=membership-mismatch` and do not block cleanup by
-  themselves. Dirty state, URL/branch/owner evidence mismatch, and wrong or
-  non-equivalent integrated commits still hold. Once the managed child is removed,
-  an empty topic container is removed by that same receipt; no re-clone or
-  `prepare` repair is inserted.
+  merge. The integrated commit must be reachable from fetched `origin/main` and be
+  a descendant of `topic_base = merge-base(HEAD, origin/main)`. Exact computed path,
+  clean/untracked-zero state, and per-path final-tree inclusion/deletion are
+  authoritative. When `topic_base..HEAD` has unique commits but no changed paths,
+  cleanup additionally requires readback that the local HEAD is retained by a
+  fetched remote integrated history or remote topic head; this rejects an old
+  same-content commit followed by an unpushed allow-empty commit. Stale or missing
+  membership markers are read back as `marker-readback=membership-mismatch` before
+  the proof result and do not block cleanup by themselves. Dirty state, URL/branch/
+  owner evidence mismatch, a wrong-base integrated commit, missing remote-tip
+  evidence, and non-equivalent integrated commits still hold. Once the managed
+  child is removed, an empty topic container is removed by that same receipt; no
+  re-clone or `prepare` repair is inserted.
 - For open PR repair work in this lane, always check out the PR remote head
   branch in the source clone, merge latest `origin/main`, and resolve conflicts.
   Then make a local commit on the same branch, push to that same branch,
