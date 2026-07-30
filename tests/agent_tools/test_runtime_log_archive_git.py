@@ -40,6 +40,17 @@ from tools.agent_tools.runtime_log_paths import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "runtime_log_archive_git.py"
+LIFECYCLE_REVERSE_COVERAGE = {
+    "tools/agent_tools/log_repository_identity.py": {"RL-001", "RL-003", "RL-006", "RL-015"},
+    "tools/agent_tools/runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-015"},
+    "tools/agent_tools/check_agent_canon_log_policy.py": {"RL-009", "RL-010", "RL-012"},
+    "tests/agent_tools/test_log_repository_lifecycle.py": {"RL-001", "RL-002", "RL-003", "RL-005", "RL-006", "RL-007", "RL-008"},
+    "tests/agent_tools/test_runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-014", "RL-015"},
+    "tests/agent_tools/test_agent_canon_log_policy.py": {"RL-009", "RL-010", "RL-012"},
+    "documents/design/runtime-log-repository-lifecycle.md": {"RL-001", "RL-002", "RL-003", "RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-009", "RL-010", "RL-011", "RL-012", "RL-013", "RL-014", "RL-015"},
+    "documents/runtime/runtime-log-archive-migration.md": {"RL-009", "RL-010", "RL-011", "RL-012", "RL-015"},
+    "documents/design/runtime-log-repository-lifecycle-correspondence.json": {"RL-014"},
+}
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import runtime_log_archive_git  # noqa: E402
 
@@ -1339,10 +1350,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
-            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=no", pushed.stdout)
 
-    def test_import_eval_results_moves_reports_and_removes_source_tree(self) -> None:
-        """import-eval-results should archive legacy reports and delete source notices."""
+    def test_import_eval_results_preserves_destinationless_hook_notice(self) -> None:
+        """Only concrete imported records may be deleted after readback proof."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             source = root / "project"
@@ -1374,9 +1385,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertEqual(imported.returncode, 0, imported.stdout + imported.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES=3", imported.stdout)
-            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS=4", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS=3", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED=1", imported.stdout)
             self.assertFalse(root_notice.exists())
-            self.assertFalse(hook_notice.exists())
+            self.assertTrue(hook_notice.exists())
             self.assertFalse(family_notice.exists())
             self.assertFalse(report.exists())
 
@@ -1384,6 +1397,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertTrue((archive / "README.md").exists())
             self.assertTrue((archive / "skill-workflow-prompt" / family_notice.name).exists())
             self.assertTrue((archive / "skill-workflow-prompt" / report.name).exists())
+            self.assertFalse((archive / "hook-runs" / hook_notice.name).exists())
 
             pushed = self.run_tool(
                 "push",
@@ -1394,7 +1408,182 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
-            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=no", pushed.stdout)
+
+    def test_import_eval_results_reports_no_deletion_when_all_records_are_preserved(self) -> None:
+        """All destinationless records report no deletion after successful readback."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+
+            hook_notice = canon / "agents" / "evals" / "results" / "hook-runs" / "README.md"
+            hook_notice.parent.mkdir(parents=True)
+            hook_notice.write_text("hook notice\n", encoding="utf-8")
+
+            imported = self.run_tool(
+                "import-eval-results",
+                "--delete-source",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(imported.returncode, 0, imported.stdout + imported.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS=0", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_PRESERVED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_NOT_IMPORTED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS=0", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=no", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=no", imported.stdout)
+            self.assertTrue(hook_notice.exists())
+
+    def test_correspondence_reverse_coverage_and_root_commands_read_back(self) -> None:
+        """The declared reverse map and validation commands are executable readback."""
+        manifest_path = (
+            PROJECT_ROOT
+            / "documents"
+            / "design"
+            / "runtime-log-repository-lifecycle-correspondence.json"
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        targets = {item["path"] for item in manifest["implementation_targets"]}
+        changed = set(
+            subprocess.check_output(
+                ["git", "diff", "--name-only", "origin/main...HEAD"],
+                cwd=PROJECT_ROOT,
+                text=True,
+            ).splitlines()
+        )
+        changed.update(
+            subprocess.check_output(
+                ["git", "diff", "--name-only"], cwd=PROJECT_ROOT, text=True
+            ).splitlines()
+        )
+        changed.update(
+            subprocess.check_output(
+                ["git", "ls-files", "--others", "--exclude-standard"],
+                cwd=PROJECT_ROOT,
+                text=True,
+            ).splitlines()
+        )
+        self.assertEqual(targets, changed)
+        self.assertNotIn("tools/agent_tools/runtime_log_paths.py", targets)
+        reverse_coverage = LIFECYCLE_REVERSE_COVERAGE
+        self.assertEqual(set(reverse_coverage), targets)
+        clause_ids = set(manifest["clause_ids"])
+        for path, clauses in reverse_coverage.items():
+            self.assertTrue(clauses, path)
+            self.assertTrue(set(clauses) <= clause_ids, path)
+
+        for route in manifest["validation_route"]:
+            self.assertEqual(route["cwd"], ".")
+            route_env = os.environ.copy()
+            route_env.pop("AGENT_CANON_SOURCE_REPOSITORY_REMOTE", None)
+            route_env.pop("AGENT_CANON_SOURCE_REPOSITORY_ID", None)
+            result = subprocess.run(
+                route["argv"],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=route_env,
+            )
+            self.assertEqual(
+                result.returncode,
+                0,
+                f"{route['argv']!r}:\n{result.stdout}\n{result.stderr}",
+            )
+
+    def test_legacy_delete_waits_for_remote_readback_and_retains_on_failure(self) -> None:
+        """Legacy source remains when archive push fails, then deletes after retry readback."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            legacy = canon / "agents" / "evals" / "results" / "hook-runs" / "old-runtime"
+            legacy.mkdir(parents=True)
+            source_log = legacy / "skill_usage.jsonl"
+            source_log.write_text("{\"hook_run_id\":\"retained\"}\n", encoding="utf-8")
+            reject_hook = remote / "hooks" / "pre-receive"
+            reject_hook.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            reject_hook.chmod(reject_hook.stat().st_mode | stat.S_IXUSR)
+
+            failed = self.run_tool(
+                "import-legacy",
+                "--delete-source",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertTrue(source_log.exists())
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=no", failed.stdout)
+            reject_hook.unlink()
+
+            recovered = self.run_tool(
+                "import-legacy",
+                "--delete-source",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(recovered.returncode, 0, recovered.stdout + recovered.stderr)
+            self.assertFalse(source_log.exists())
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=yes", recovered.stdout)
+
+    def test_normal_sync_and_push_have_no_source_delete_authority(self) -> None:
+        """Normal runtime publication cannot delete a legacy source file."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            legacy = canon / "agents" / "evals" / "results" / "hook-runs"
+            legacy.mkdir(parents=True)
+            source_log = legacy / "normal-sync.jsonl"
+            source_log.write_text("retained\n", encoding="utf-8")
+            synced = self.run_tool(
+                "sync",
+                "--no-agent-reports",
+                "--no-push",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
+            pushed = self.run_tool("push", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
+            self.assertTrue(source_log.exists())
+
+    def test_preflight_and_internal_transaction_order_is_explicit(self) -> None:
+        """The public sync entry and publication helper preserve the design state order."""
+        sync_source = inspect.getsource(runtime_log_archive_git.command_sync)
+        publish_source = inspect.getsource(runtime_log_archive_git.publish_prepared_archive)
+        self.assertLess(sync_source.index("prepare_archive_transaction"), sync_source.index("snapshot_hook_spool_events"))
+        for earlier, later in (
+            ("stage_archive_paths", "ensure_commit_identity"),
+            ("ensure_commit_identity", "_compare_and_push"),
+        ):
+            self.assertLess(publish_source.index(earlier), publish_source.index(later))
+        for function in (
+            runtime_log_archive_git.command_sync,
+            runtime_log_archive_git.command_push,
+            runtime_log_archive_git.publish_prepared_archive,
+        ):
+            self.assertNotIn("delete_source_file", inspect.getsource(function))
+        compare_source = inspect.getsource(runtime_log_archive_git._compare_and_push)
+        self.assertNotIn("--force", compare_source)
+        self.assertNotIn('"merge"', compare_source)
 
     def test_archive_agent_report_snapshots_run_bundle_and_pushes(self) -> None:
         """archive-agent-report should copy a run bundle into agent-reports."""

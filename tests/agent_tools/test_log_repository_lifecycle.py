@@ -23,8 +23,11 @@ from unittest.mock import patch
 
 from tools.agent_tools.agent_canon_source_root import resolve_agent_canon_source_root
 from tools.agent_tools.log_repository_identity import (
+    SourceRepositoryIdentityError,
     normalize_remote,
+    source_repository_id_for_write,
     stable_log_branch,
+    stable_source_id_from_runtime_env,
     stable_source_repository_id,
 )
 from tools.agent_tools.runtime_log_paths import repo_log_key
@@ -82,9 +85,13 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
         remote: Path,
         *args: str,
         archive_root: Path | None = None,
+        extra_env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Invoke the archive tool against one synthetic source and remote."""
         global_args = [] if archive_root is None else ["--archive-root", str(archive_root)]
+        env = self.env.copy()
+        if extra_env:
+            env.update(extra_env)
         return subprocess.run(
             [
                 os.environ.get("PYTHON", "python3"),
@@ -98,7 +105,7 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
-            env=self.env,
+            env=env,
         )
 
     def test_same_remote_different_paths_share_stable_branch(self) -> None:
@@ -128,6 +135,85 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
             stable_source_repository_id("https://github.com/owner/a.git"),
             stable_source_repository_id("https://github.com/owner/b.git"),
         )
+
+    def test_matching_id_override_requires_remote_provenance(self) -> None:
+        """A matching explicit id is accepted only with its normalized remote."""
+        expected = stable_source_repository_id(self.env["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"])
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_CANON_SOURCE_REPOSITORY_REMOTE": self.env["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"],
+                "AGENT_CANON_SOURCE_REPOSITORY_ID": expected,
+            },
+        ):
+            self.assertEqual(source_repository_id_for_write(Path("/tmp/source")), expected)
+
+    def test_mismatched_or_unavailable_identity_is_typed_before_write(self) -> None:
+        """Mismatch and missing remote fail before the archive clone can be created."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = self.source(root, "source")
+            canon = root / "canon"
+            canon.mkdir()
+            remote = self.make_remote(root)
+            mismatch = self.run_tool(
+                source,
+                canon,
+                remote,
+                "ensure",
+                archive_root=canon / ".agent-canon" / "log-archive",
+                extra_env={"AGENT_CANON_SOURCE_REPOSITORY_ID": "a" * 24},
+            )
+            self.assertEqual(mismatch.returncode, 1)
+            self.assertIn("source_repository_id_mismatch", mismatch.stdout)
+            self.assertFalse((canon / ".agent-canon" / "log-archive").exists())
+            unavailable_source = root / "unavailable-source"
+            unavailable_source.mkdir()
+            git(unavailable_source, "init", "-q")
+            unavailable_canon = root / "unavailable-canon"
+            unavailable_canon.mkdir()
+            unavailable = self.run_tool(
+                unavailable_source,
+                unavailable_canon,
+                remote,
+                "push",
+                extra_env={
+                    "AGENT_CANON_SOURCE_REPOSITORY_REMOTE": "",
+                    "AGENT_CANON_SOURCE_REPOSITORY_ID": "b" * 24,
+                },
+            )
+            self.assertEqual(unavailable.returncode, 1)
+            self.assertIn("source_remote_required", unavailable.stdout)
+            self.assertFalse((unavailable_canon / ".agent-canon" / "log-archive").exists())
+
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_CANON_SOURCE_REPOSITORY_REMOTE": self.env["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"],
+                "AGENT_CANON_SOURCE_REPOSITORY_ID": "not-the-derived-id",
+            },
+        ):
+            with self.assertRaises(SourceRepositoryIdentityError) as raised:
+                source_repository_id_for_write(Path("/tmp/source"))
+            self.assertEqual(str(raised.exception), "source_repository_id_mismatch")
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_CANON_SOURCE_REPOSITORY_REMOTE": "",
+                "AGENT_CANON_SOURCE_REPOSITORY_ID": "a" * 24,
+            },
+        ):
+            with self.assertRaises(SourceRepositoryIdentityError) as raised:
+                source_repository_id_for_write(Path("/tmp/source"))
+            self.assertEqual(str(raised.exception), "source_remote_required")
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_CANON_SOURCE_REPOSITORY_REMOTE": "",
+                "AGENT_CANON_SOURCE_REPOSITORY_ID": "a" * 24,
+            },
+        ):
+            self.assertEqual(stable_source_id_from_runtime_env(), "unidentified-source")
 
     def test_remote_matrix_strips_case_insensitive_git_suffix(self) -> None:
         """SSH and HTTPS forms strip a case-insensitive .git suffix equally."""
