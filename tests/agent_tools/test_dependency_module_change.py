@@ -899,6 +899,59 @@ def test_cleanup_holds_whitespace_only_integrated_content_mismatch(tmp_path: Pat
     assert clone.exists()
 
 
+def test_cleanup_holds_file_directory_tree_path_alias(tmp_path: Path) -> None:
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    topic = "file-directory-alias-topic"
+    topic_branch = "feature/file-directory-alias"
+    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
+    clone = workspace_module_clone(parent, topic=topic)
+    _commit_file(clone, "foo", "same content\n", "topic file")
+    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
+
+    integration = tmp_path / "file-directory-alias-integration"
+    subprocess.run(
+        ["git", "clone", "--branch", "main", str(remote), str(integration)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    run_git(integration, "config", "user.name", "Test")
+    run_git(integration, "config", "user.email", "test@example.invalid")
+    run_git(integration, "fetch", "origin", topic_branch)
+    run_git(integration, "merge", "--squash", f"origin/{topic_branch}")
+    run_git(integration, "rm", "-f", "foo")
+    (integration / "foo").mkdir()
+    (integration / "foo" / "bar").write_text("same content\n", encoding="utf-8")
+    run_git(integration, "add", "foo/bar")
+    integrated_commit = _commit_staged(integration, "file-directory alias squash")
+    run_git(integration, "push", "origin", "main")
+    run_git(integration, "push", "origin", "--delete", topic_branch)
+
+    held = invoke(
+        parent,
+        "cleanup",
+        "--placement",
+        "workspace",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--expected-clone",
+        str(clone),
+        "--owner-evidence-sha256",
+        owner_evidence_sha(parent),
+        "--integrated-commit",
+        integrated_commit,
+        "--apply",
+        env=cleanup_env(),
+    )
+
+    assert held.returncode == 0, held.stderr
+    assert "integrated-commit-not-equivalent" in held.stdout
+    assert clone.exists()
+
+
 def test_cleanup_holds_conflict_resolved_content_different_squash(tmp_path: Path) -> None:
     remote = create_remote(tmp_path)
     parent = create_parent(tmp_path, remote)

@@ -878,13 +878,17 @@ def _topic_changed_paths(path: Path, topic_base: str, topic_tip: str) -> tuple[s
             ["diff", "--name-only", "--no-renames", topic_base, topic_tip],
             result.stderr.decode(errors="replace"),
         )
-    return tuple(item.decode(errors="surrogateescape") for item in result.stdout.split(b"\0") if item)
+    return tuple(
+        item.decode("utf-8", errors="surrogateescape")
+        for item in result.stdout.split(b"\0")
+        if item
+    )
 
 
 def _tree_entry(
     path: Path, commit: str, changed_path: str
-) -> tuple[str, str, str] | None:
-    """Read one exact tree entry as ``(object, mode, type)`` or absence."""
+) -> tuple[str, str, str, str] | None:
+    """Read one tree entry as ``(path, object, mode, type)`` or absence."""
     result = subprocess.run(
         [
             "git",
@@ -916,7 +920,7 @@ def _tree_entry(
             ["ls-tree", "-r", "-z", commit, "--", changed_path],
             "expected exactly one tree entry",
         )
-    metadata, _ = records[0].split(b"\t", 1)
+    metadata, returned_path = records[0].split(b"\t", 1)
     fields = metadata.split()
     if len(fields) != 3:
         raise GitCommandError(
@@ -926,6 +930,7 @@ def _tree_entry(
         )
     object_mode, object_type, object_id = fields
     return (
+        returned_path.decode("utf-8", errors="surrogateescape"),
         object_id.decode("ascii"),
         object_mode.decode("ascii"),
         object_type.decode("ascii"),
@@ -950,9 +955,13 @@ def _integrated_commit_failure(
         return "integrated-commit-not-reachable-from-origin-main"
     try:
         for changed_path in topic_paths:
-            if _tree_entry(path, topic_tip, changed_path) != _tree_entry(
-                path, integrated_commit, changed_path
-            ):
+            topic_entry = _tree_entry(path, topic_tip, changed_path)
+            integrated_entry = _tree_entry(path, integrated_commit, changed_path)
+            if topic_entry is not None and topic_entry[0] != changed_path:
+                return "integrated-commit-not-equivalent"
+            if integrated_entry is not None and integrated_entry[0] != changed_path:
+                return "integrated-commit-not-equivalent"
+            if topic_entry != integrated_entry:
                 return "integrated-commit-not-equivalent"
     except GitCommandError:
         return "integrated-commit-evidence-unreadable"
