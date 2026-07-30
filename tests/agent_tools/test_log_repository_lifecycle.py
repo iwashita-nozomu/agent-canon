@@ -1,5 +1,15 @@
 """Synthetic tests for stable runtime log repository lifecycle behavior."""
 
+# @dependency-start
+# contract test
+# responsibility Verifies stable identity, root resolution, and runtime archive lifecycle behavior.
+# upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive contract
+# upstream implementation ../../tools/agent_tools/log_repository_identity.py resolves stable source identity
+# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py resolves source and canon roots
+# upstream implementation ../../tools/agent_tools/runtime_log_paths.py derives runtime archive paths
+# upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py publishes archive snapshots and refs
+# @dependency-end
+
 from __future__ import annotations
 
 import inspect
