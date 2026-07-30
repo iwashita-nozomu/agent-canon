@@ -1,13 +1,14 @@
 // @dependency-start
 // contract implementation
-// responsibility Checks Python amp algorithm-module public surface and nested ownership from AST JSON.
+// responsibility Checks Python algorithm-module public surface, nested ownership, and diagnostics from AST JSON.
 // upstream design ../../../documents/design/jax_util/algorithm_module_contract.md algorithm module contract
 // upstream implementation python_structure_hash.rs provides the Python-AST-to-Rust analysis pattern
 // downstream implementation main.rs exposes python-algorithm-contract-check
 // @dependency-end
 
+use serde::Serialize;
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -38,6 +39,7 @@ const EXPECTED_PUBLIC_NAMES: &[&str] = &[
 ];
 
 const CONTRACT_CLASSES: &[&str] = &["InitializeConfig", "SolveConfig", "Info", "Algorithm"];
+const ALLOWED_EXTRA_PUBLIC_PREFIXES: &[&str] = &["STATUS_"];
 
 const NON_ALGORITHM_IMPORT_ALLOWLIST: &[&str] = &[
     "python/jax_util/base",
@@ -67,24 +69,16 @@ import pathlib
 import sys
 
 
-EXPECTED_PUBLIC_NAMES = {
-    "InitializeConfig",
-    "SolveConfig",
-    "Problem",
-    "State",
-    "Answer",
-    "Info",
-    "Algorithm",
-    "initialize",
-}
-
-
 def module_name(root, path):
     relative = pathlib.Path(path).resolve().relative_to(pathlib.Path(root).resolve())
     without_suffix = relative.with_suffix("")
     if without_suffix.name == "__init__":
         without_suffix = without_suffix.parent
     return ".".join(without_suffix.parts)
+
+
+def relative_path(root, path):
+    return str(pathlib.Path(path).resolve().relative_to(pathlib.Path(root).resolve())).replace("\\", "/")
 
 
 def ref_name(node):
@@ -127,20 +121,56 @@ def imports_algorithm_module_protocol(tree):
 
 
 def public_definitions(tree):
-    names = []
+    definitions = []
     for node in tree.body:
-        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, ast.ClassDef):
             if not node.name.startswith("_"):
-                names.append({"name": node.name, "line": getattr(node, "lineno", 1)})
+                definitions.append({"name": node.name, "line": getattr(node, "lineno", 1), "kind": "class"})
+        elif isinstance(node, ast.FunctionDef):
+            if not node.name.startswith("_"):
+                definitions.append({"name": node.name, "line": getattr(node, "lineno", 1), "kind": "function"})
+        elif isinstance(node, ast.AsyncFunctionDef):
+            if not node.name.startswith("_"):
+                definitions.append({"name": node.name, "line": getattr(node, "lineno", 1), "kind": "async_function"})
         elif isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name) and not target.id.startswith("_") and target.id != "__all__":
-                    names.append({"name": target.id, "line": getattr(node, "lineno", 1)})
+                    definitions.append({"name": target.id, "line": getattr(node, "lineno", 1), "kind": "assignment"})
         elif isinstance(node, ast.AnnAssign):
             target = node.target
-            if isinstance(target, ast.Name) and not target.id.startswith("_"):
-                names.append({"name": target.id, "line": getattr(node, "lineno", 1)})
+            if isinstance(target, ast.Name) and not target.id.startswith("_") and target.id != "__all__":
+                definitions.append({"name": target.id, "line": getattr(node, "lineno", 1), "kind": "annotation"})
+    return definitions
+
+
+def literal_string_sequence(value):
+    if not isinstance(value, (ast.List, ast.Tuple, ast.Set)):
+        return None
+    names = []
+    for element in value.elts:
+        if not isinstance(element, ast.Constant) or not isinstance(element.value, str):
+            return None
+        names.append(element.value)
     return names
+
+
+def all_state(tree):
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
+        ):
+            names = literal_string_sequence(node.value)
+            if names is None:
+                return {"state": "dynamic", "names": [], "line": getattr(node, "lineno", 1)}
+            return {"state": "literal", "names": names, "line": getattr(node, "lineno", 1)}
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "__all__":
+            if node.value is None:
+                return {"state": "dynamic", "names": [], "line": getattr(node, "lineno", 1)}
+            names = literal_string_sequence(node.value)
+            if names is None:
+                return {"state": "dynamic", "names": [], "line": getattr(node, "lineno", 1)}
+            return {"state": "literal", "names": names, "line": getattr(node, "lineno", 1)}
+    return {"state": "missing", "names": [], "line": 1}
 
 
 def imported_aliases(tree):
@@ -150,13 +180,14 @@ def imported_aliases(tree):
             for alias in node.names:
                 if alias.name.endswith("algorithm_module_protocol"):
                     continue
-                aliases.append(
-                    {
-                        "alias": alias.asname or alias.name.rsplit(".", 1)[-1],
-                        "module": alias.name,
-                        "line": getattr(node, "lineno", 1),
-                    }
-                )
+                aliases.append({
+                    "alias": alias.asname or alias.name.rsplit(".", 1)[-1],
+                    "module": alias.name,
+                    "from_module": "",
+                    "name": "",
+                    "level": 0,
+                    "line": getattr(node, "lineno", 1),
+                })
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
             if module.endswith("algorithm_module_protocol"):
@@ -164,35 +195,27 @@ def imported_aliases(tree):
             for alias in node.names:
                 if alias.name == "algorithm_module_protocol":
                     continue
-                if node.level:
-                    imported = "." * node.level + module
-                    imported = f"{imported}.{alias.name}" if module else imported
-                else:
-                    imported = f"{module}.{alias.name}" if module else alias.name
-                aliases.append(
-                    {
-                        "alias": alias.asname or alias.name,
-                        "module": imported,
-                        "from_module": module,
-                        "name": alias.name,
-                        "level": node.level,
-                        "line": getattr(node, "lineno", 1),
-                    }
-                )
+                imported = "." * node.level + module
+                if module:
+                    imported = f"{imported}.{alias.name}"
+                aliases.append({
+                    "alias": alias.asname or alias.name,
+                    "module": imported,
+                    "from_module": module,
+                    "name": alias.name,
+                    "level": node.level,
+                    "line": getattr(node, "lineno", 1),
+                })
     return aliases
 
 
 def top_level_aliases(tree):
     aliases = {}
     for node in tree.body:
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            value = node.value
-            if value is not None:
-                aliases[node.target.id] = annotation_text(value)
-        elif isinstance(node, ast.Assign) and len(node.targets) == 1:
-            target = node.targets[0]
-            if isinstance(target, ast.Name):
-                aliases[target.id] = annotation_text(node.value)
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
+            aliases[node.target.id] = annotation_text(node.value)
+        elif isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            aliases[node.targets[0].id] = annotation_text(node.value)
     return aliases
 
 
@@ -209,26 +232,40 @@ def class_defs(tree):
         methods = []
         for child in node.body:
             if isinstance(child, ast.AnnAssign):
-                target = ref_name(child.target)
-                fields.append(
-                    {
-                        "name": target,
-                        "annotation": annotation_text(child.annotation),
-                        "line": getattr(child, "lineno", getattr(node, "lineno", 1)),
-                    }
-                )
+                fields.append({
+                    "name": ref_name(child.target),
+                    "annotation": annotation_text(child.annotation),
+                    "line": getattr(child, "lineno", getattr(node, "lineno", 1)),
+                })
             elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 methods.append(child.name)
-        classes.append(
-            {
-                "name": node.name,
-                "line": getattr(node, "lineno", 1),
-                "bases": base_facts(node),
-                "fields": fields,
-                "methods": methods,
-            }
-        )
+        classes.append({
+            "name": node.name,
+            "line": getattr(node, "lineno", 1),
+            "bases": base_facts(node),
+            "fields": fields,
+            "methods": methods,
+        })
     return classes
+
+
+def uses_parent_config_field(node):
+    return any(
+        isinstance(child, ast.Attribute)
+        and isinstance(child.value, ast.Name)
+        and child.value.id == "config"
+        for child in ast.walk(node)
+    )
+
+
+def is_local_child_config(node, dependency_alias):
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "InitializeConfig"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == dependency_alias
+    )
 
 
 class UsageVisitor(ast.NodeVisitor):
@@ -237,6 +274,7 @@ class UsageVisitor(ast.NodeVisitor):
         self.alias_attrs = {}
         self.calls = []
         self.references = []
+        self.initialize_calls = []
 
     def visit_Attribute(self, node):
         if isinstance(node.value, ast.Name) and node.value.id in self.aliases:
@@ -253,6 +291,19 @@ class UsageVisitor(ast.NodeVisitor):
         name = ref_name(node.func)
         if name:
             self.calls.append({"name": name, "line": getattr(node, "lineno", 1)})
+        if (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr == "initialize"
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id in self.aliases
+        ):
+            first_arg = node.args[0] if node.args else None
+            self.initialize_calls.append({
+                "alias": node.func.value.id,
+                "line": getattr(node, "lineno", 1),
+                "uses_parent_config": uses_parent_config_field(first_arg),
+                "local_child_config": is_local_child_config(first_arg, node.func.value.id),
+            })
         self.generic_visit(node)
 
 
@@ -260,11 +311,10 @@ def usage(tree, aliases):
     visitor = UsageVisitor(alias["alias"] for alias in aliases)
     visitor.visit(tree)
     return {
-        "alias_attrs": {
-            key: sorted(value) for key, value in sorted(visitor.alias_attrs.items())
-        },
+        "alias_attrs": {key: sorted(value) for key, value in sorted(visitor.alias_attrs.items())},
         "calls": visitor.calls,
         "references": visitor.references,
+        "initialize_calls": visitor.initialize_calls,
     }
 
 
@@ -277,22 +327,32 @@ def main():
         try:
             text = pathlib.Path(path).read_text(encoding="utf-8")
             tree = ast.parse(text, filename=path)
-        except Exception as exc:
-            errors.append({"path": str(path), "error": str(exc)})
+        except SyntaxError as exc:
+            errors.append({
+                "path": relative_path(root, path),
+                "line": exc.lineno or 1,
+                "kind": "syntax_error",
+                "detail": "parseable",
+            })
             continue
+        except Exception as exc:
+            print(f"AST extractor failed for {path}: {exc}", file=sys.stderr)
+            raise
         aliases = imported_aliases(tree)
-        modules.append(
-            {
-                "path": str(pathlib.Path(path).resolve().relative_to(pathlib.Path(root).resolve())).replace("\\", "/"),
-                "module": module_name(root, path),
-                "imports_amp": imports_algorithm_module_protocol(tree),
-                "public_definitions": public_definitions(tree),
-                "imports": aliases,
-                "aliases": top_level_aliases(tree),
-                "classes": class_defs(tree),
-                "usage": usage(tree, aliases),
-            }
-        )
+        state = all_state(tree)
+        modules.append({
+            "path": relative_path(root, path),
+            "module": module_name(root, path),
+            "imports_amp": imports_algorithm_module_protocol(tree),
+            "public_definitions": public_definitions(tree),
+            "all_state": state["state"],
+            "all_names": state["names"],
+            "all_line": state["line"],
+            "imports": aliases,
+            "aliases": top_level_aliases(tree),
+            "classes": class_defs(tree),
+            "usage": usage(tree, aliases),
+        })
     print(json.dumps({"modules": modules, "errors": errors}, sort_keys=True))
 
 
@@ -315,17 +375,34 @@ enum OutputFormat {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+enum AllState {
+    Missing,
+    Dynamic,
+    Literal,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ModuleAst {
     path: String,
     module: String,
     imports_amp: bool,
-    public_definitions: BTreeMap<String, usize>,
+    public_definitions: BTreeMap<String, PublicDefinitionAst>,
+    all_state: AllState,
+    all_names: Vec<String>,
+    all_line: usize,
     imports: BTreeMap<String, ImportAst>,
     aliases: BTreeMap<String, String>,
     classes: BTreeMap<String, ClassAst>,
     alias_attrs: BTreeMap<String, BTreeSet<String>>,
     calls: Vec<NamedLine>,
     references: Vec<NamedLine>,
+    initialize_calls: Vec<InitializeCallAst>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PublicDefinitionAst {
+    line: usize,
+    kind: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -359,6 +436,14 @@ struct NamedLine {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct InitializeCallAst {
+    alias: String,
+    line: usize,
+    uses_parent_config: bool,
+    local_child_config: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Finding {
     path: String,
     line: usize,
@@ -386,13 +471,65 @@ impl Finding {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct ParseError {
+    path: String,
+    line: usize,
+    kind: String,
+    detail: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct DependencyReport {
+    alias: String,
+    module: String,
+    contract_classes: Vec<String>,
+    sources: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct ModuleReport {
+    path: String,
+    public_names: Vec<String>,
+    all_names: Vec<String>,
+    dependencies: Vec<DependencyReport>,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct Report {
     files: usize,
     algorithm_modules: Vec<String>,
+    modules: Vec<ModuleReport>,
     findings: Vec<Finding>,
-    parse_errors: Vec<String>,
+    parse_errors: Vec<ParseError>,
     format: OutputFormat,
+}
+
+#[derive(Debug, Serialize)]
+struct JsonSummary {
+    files: usize,
+    algorithm_modules: usize,
+    findings: usize,
+    parse_errors: usize,
+    status: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct JsonFinding<'a> {
+    path: &'a str,
+    line: usize,
+    kind: &'a str,
+    subject: &'a str,
+    detail: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct JsonReport<'a> {
+    summary: JsonSummary,
+    algorithm_modules: &'a [String],
+    modules: &'a [ModuleReport],
+    parse_errors: &'a [ParseError],
+    findings: Vec<JsonFinding<'a>>,
 }
 
 pub fn run(args: &[String]) -> i32 {
@@ -442,7 +579,7 @@ impl Args {
                     index += 2;
                 }
                 value if value.starts_with("--") => {
-                    return Err(format!("unknown argument {value}"));
+                    return Err(format!("unknown argument {value}"))
                 }
                 value => {
                     paths.push(value.to_string());
@@ -475,20 +612,8 @@ fn run_check(args: Args) -> Result<Report, String> {
         .cloned()
         .unwrap_or_default()
         .iter()
-        .map(|error| {
-            format!(
-                "{}:{}",
-                error
-                    .get("path")
-                    .and_then(Value::as_str)
-                    .unwrap_or("<unknown>"),
-                error
-                    .get("error")
-                    .and_then(Value::as_str)
-                    .unwrap_or("parse-error")
-            )
-        })
-        .collect::<Vec<_>>();
+        .map(parse_parse_error)
+        .collect::<Result<Vec<_>, _>>()?;
     let modules = payload
         .get("modules")
         .and_then(Value::as_array)
@@ -502,10 +627,11 @@ fn run_check(args: Args) -> Result<Report, String> {
         .filter(|module| module_is_algorithm(module))
         .map(|module| module.path.clone())
         .collect::<Vec<_>>();
-    let findings = analyze_modules(&modules);
+    let (findings, reports) = analyze_modules(&modules);
     Ok(Report {
         files: files.len(),
         algorithm_modules,
+        modules: reports,
         findings,
         parse_errors,
         format: args.format,
@@ -541,11 +667,10 @@ fn collect_python_files(
     excludes: &[String],
     files: &mut BTreeSet<PathBuf>,
 ) {
-    if excluded(root, target, excludes) {
-        return;
-    }
     if target.is_file() {
-        if target.extension().and_then(|value| value.to_str()) == Some("py") {
+        if target.extension().and_then(|value| value.to_str()) == Some("py")
+            && !excluded(root, target, excludes)
+        {
             files.insert(fs::canonicalize(target).unwrap_or_else(|_| target.to_path_buf()));
         }
         return;
@@ -567,20 +692,92 @@ fn excluded(root: &Path, path: &Path, excludes: &[String]) -> bool {
         return true;
     }
     let relative_text = relative.to_string_lossy().replace('\\', "/");
-    excludes.iter().any(|pattern| {
-        let pattern = pattern.trim().trim_matches('/');
-        !pattern.is_empty()
-            && (relative_text == pattern
-                || relative_text.starts_with(&format!("{pattern}/"))
-                || relative_text.split('/').any(|part| part == pattern))
+    excludes.iter().any(|raw_pattern| {
+        let pattern = raw_pattern.trim().trim_matches('/');
+        if pattern.is_empty() {
+            return false;
+        }
+        if pattern.chars().any(|character| "*?[]".contains(character)) {
+            return fnmatchcase(&relative_text, pattern);
+        }
+        relative_text == pattern
+            || relative_text.starts_with(&format!("{pattern}/"))
+            || relative_text.split('/').any(|part| part == pattern)
     })
 }
 
+fn fnmatchcase(value: &str, pattern: &str) -> bool {
+    let value = value.chars().collect::<Vec<_>>();
+    let pattern = pattern.chars().collect::<Vec<_>>();
+    let mut cache = HashMap::new();
+    fn matches(
+        value: &[char],
+        pattern: &[char],
+        value_index: usize,
+        pattern_index: usize,
+        cache: &mut HashMap<(usize, usize), bool>,
+    ) -> bool {
+        if let Some(result) = cache.get(&(value_index, pattern_index)) {
+            return *result;
+        }
+        let result = if pattern_index == pattern.len() {
+            value_index == value.len()
+        } else if pattern[pattern_index] == '*' {
+            matches(value, pattern, value_index, pattern_index + 1, cache)
+                || (value_index < value.len()
+                    && matches(value, pattern, value_index + 1, pattern_index, cache))
+        } else if value_index == value.len() {
+            false
+        } else if pattern[pattern_index] == '?' {
+            matches(value, pattern, value_index + 1, pattern_index + 1, cache)
+        } else if pattern[pattern_index] == '[' {
+            if let Some((next, matched)) =
+                match_character_class(&value[value_index], pattern, pattern_index)
+            {
+                matched && matches(value, pattern, value_index + 1, next, cache)
+            } else {
+                value[value_index] == '['
+                    && matches(value, pattern, value_index + 1, pattern_index + 1, cache)
+            }
+        } else {
+            value[value_index] == pattern[pattern_index]
+                && matches(value, pattern, value_index + 1, pattern_index + 1, cache)
+        };
+        cache.insert((value_index, pattern_index), result);
+        result
+    }
+    matches(&value, &pattern, 0, 0, &mut cache)
+}
+
+fn match_character_class(value: &char, pattern: &[char], start: usize) -> Option<(usize, bool)> {
+    let mut index = start + 1;
+    if index >= pattern.len() {
+        return None;
+    }
+    let negated = matches!(pattern[index], '!' | '^');
+    if negated {
+        index += 1;
+    }
+    let mut matched = false;
+    let mut has_member = false;
+    while index < pattern.len() && pattern[index] != ']' {
+        has_member = true;
+        if index + 2 < pattern.len() && pattern[index + 1] == '-' && pattern[index + 2] != ']' {
+            matched |= pattern[index] <= *value && *value <= pattern[index + 2];
+            index += 3;
+        } else {
+            matched |= pattern[index] == *value;
+            index += 1;
+        }
+    }
+    if index >= pattern.len() || !has_member {
+        return None;
+    }
+    Some((index + 1, if negated { !matched } else { matched }))
+}
+
 fn extract_ast_modules(root: &Path, files: &[PathBuf]) -> Result<Value, String> {
-    let request = json!({
-        "root": root,
-        "files": files,
-    });
+    let request = json!({"root": root, "files": files});
     let mut child = Command::new("python3")
         .arg("-c")
         .arg(AST_EXTRACTOR)
@@ -611,6 +808,15 @@ fn extract_ast_modules(root: &Path, files: &[PathBuf]) -> Result<Value, String> 
         .map_err(|error| format!("failed to parse AST extractor JSON: {error}"))
 }
 
+fn parse_parse_error(value: &Value) -> Result<ParseError, String> {
+    Ok(ParseError {
+        path: string_field(value, "path")?,
+        line: usize_field(value, "line")?,
+        kind: string_field(value, "kind")?,
+        detail: string_field(value, "detail")?,
+    })
+}
+
 fn parse_module_ast(value: Value) -> Result<ModuleAst, String> {
     let path = string_field(&value, "path")?;
     let imports = value
@@ -633,6 +839,38 @@ fn parse_module_ast(value: Value) -> Result<ModuleAst, String> {
         .into_iter()
         .map(|item| (item.0, item.1))
         .collect::<BTreeMap<_, _>>();
+    let public_definitions = value
+        .get("public_definitions")
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("{path}: public_definitions must be array"))?
+        .iter()
+        .map(parse_public_definition)
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .map(|item| (item.0, item.1))
+        .collect::<BTreeMap<_, _>>();
+    let all_state = match string_field(&value, "all_state")?.as_str() {
+        "missing" => AllState::Missing,
+        "dynamic" => AllState::Dynamic,
+        "literal" => AllState::Literal,
+        state => return Err(format!("{path}: invalid all_state {state}")),
+    };
+    let all_names = value
+        .get("all_names")
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("{path}: all_names must be array"))?
+        .iter()
+        .filter_map(Value::as_str)
+        .map(str::to_string)
+        .collect();
+    let initialize_calls = value
+        .get("usage")
+        .and_then(|usage| usage.get("initialize_calls"))
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("{path}: initialize_calls must be array"))?
+        .iter()
+        .map(parse_initialize_call)
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(ModuleAst {
         path,
         module: string_field(&value, "module")?,
@@ -640,7 +878,10 @@ fn parse_module_ast(value: Value) -> Result<ModuleAst, String> {
             .get("imports_amp")
             .and_then(Value::as_bool)
             .unwrap_or(false),
-        public_definitions: parse_public_definitions(&value)?,
+        public_definitions,
+        all_state,
+        all_names,
+        all_line: usize_field(&value, "all_line")?,
         imports,
         aliases: parse_string_map(value.get("aliases"))?,
         classes,
@@ -657,6 +898,33 @@ fn parse_module_ast(value: Value) -> Result<ModuleAst, String> {
                 .and_then(|usage| usage.get("references"))
                 .unwrap_or(&Value::Null),
         )?,
+        initialize_calls,
+    })
+}
+
+fn parse_public_definition(value: &Value) -> Result<(String, PublicDefinitionAst), String> {
+    let name = string_field(value, "name")?;
+    Ok((
+        name,
+        PublicDefinitionAst {
+            line: usize_field(value, "line")?,
+            kind: string_field(value, "kind")?,
+        },
+    ))
+}
+
+fn parse_initialize_call(value: &Value) -> Result<InitializeCallAst, String> {
+    Ok(InitializeCallAst {
+        alias: string_field(value, "alias")?,
+        line: usize_field(value, "line")?,
+        uses_parent_config: value
+            .get("uses_parent_config")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        local_child_config: value
+            .get("local_child_config")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
     })
 }
 
@@ -731,17 +999,6 @@ fn parse_class_ast(value: &Value) -> Result<(String, ClassAst), String> {
     ))
 }
 
-fn parse_public_definitions(value: &Value) -> Result<BTreeMap<String, usize>, String> {
-    value
-        .get("public_definitions")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default()
-        .iter()
-        .map(|item| Ok((string_field(item, "name")?, usize_field(item, "line")?)))
-        .collect::<Result<BTreeMap<_, _>, String>>()
-}
-
 fn parse_string_map(value: Option<&Value>) -> Result<BTreeMap<String, String>, String> {
     let Some(Value::Object(entries)) = value else {
         return Ok(BTreeMap::new());
@@ -810,21 +1067,33 @@ fn usize_field(value: &Value, field: &str) -> Result<usize, String> {
         .ok_or_else(|| format!("field {field} must be a positive integer"))
 }
 
-fn analyze_modules(modules: &[ModuleAst]) -> Vec<Finding> {
-    let mut findings = Vec::new();
-    let algorithm_modules = modules
+fn analyze_modules(modules: &[ModuleAst]) -> (Vec<Finding>, Vec<ModuleReport>) {
+    let algorithm_module_names = modules
         .iter()
         .filter(|module| module_is_algorithm(module))
         .map(|module| module.module.clone())
         .collect::<BTreeSet<_>>();
+    let mut findings = Vec::new();
+    let mut reports = Vec::new();
     for module in modules {
-        if !module_is_algorithm(module) {
-            continue;
+        if !module.imports_amp || module_has_expected_public_name(module) {
+            if module_is_algorithm(module) {
+                findings.extend(analyze_algorithm_module_surface(module));
+                let (nested_findings, dependencies) =
+                    analyze_nested_contract(module, &algorithm_module_names);
+                findings.extend(nested_findings);
+                findings.extend(analyze_legacy_stopping_usage(module));
+                reports.push(module_report(module, dependencies));
+            }
+        } else if !is_allowed_non_algorithm_import(&module.path) {
+            findings.push(Finding::new(
+                &module.path,
+                1,
+                "non_algorithm_protocol_import",
+                "algorithm_module_protocol",
+                "define-standard-public-surface-or-remove-import",
+            ));
         }
-        findings.extend(analyze_algorithm_module_surface(module));
-        let algorithm_aliases = algorithm_aliases(module, &algorithm_modules);
-        findings.extend(analyze_nested_contract(module, &algorithm_aliases));
-        findings.extend(analyze_legacy_stopping_usage(module));
     }
     findings.sort_by(|left, right| {
         left.path
@@ -832,27 +1101,264 @@ fn analyze_modules(modules: &[ModuleAst]) -> Vec<Finding> {
             .then_with(|| left.line.cmp(&right.line))
             .then_with(|| left.kind.cmp(&right.kind))
             .then_with(|| left.subject.cmp(&right.subject))
+            .then_with(|| left.detail.cmp(&right.detail))
     });
+    findings.dedup_by(|right, left| {
+        right.path == left.path
+            && right.line == left.line
+            && right.kind == left.kind
+            && right.subject == left.subject
+            && right.detail == left.detail
+    });
+    reports.sort_by(|left, right| left.path.cmp(&right.path));
+    (findings, reports)
+}
+
+fn module_report(
+    module: &ModuleAst,
+    dependencies: BTreeMap<String, DependencyReport>,
+) -> ModuleReport {
+    ModuleReport {
+        path: module.path.clone(),
+        public_names: module.public_definitions.keys().cloned().collect(),
+        all_names: module.all_names.clone(),
+        dependencies: dependencies.into_values().collect(),
+    }
+}
+
+fn module_has_expected_public_name(module: &ModuleAst) -> bool {
+    module
+        .public_definitions
+        .keys()
+        .any(|name| EXPECTED_PUBLIC_NAMES.contains(&name.as_str()))
+}
+
+fn is_allowed_non_algorithm_import(relative: &str) -> bool {
+    NON_ALGORITHM_IMPORT_ALLOWLIST
+        .iter()
+        .any(|prefix| relative == *prefix || relative.starts_with(&format!("{prefix}/")))
+}
+
+fn module_is_algorithm(module: &ModuleAst) -> bool {
+    module.imports_amp && module_has_expected_public_name(module)
+}
+
+fn analyze_algorithm_module_surface(module: &ModuleAst) -> Vec<Finding> {
+    let mut findings = Vec::new();
+    if !matches!(module.all_state, AllState::Literal) {
+        let kind = if matches!(module.all_state, AllState::Dynamic) {
+            "dynamic_all"
+        } else {
+            "missing_all"
+        };
+        findings.push(Finding::new(
+            &module.path,
+            module.all_line,
+            kind,
+            "__all__",
+            "literal-standard-public-names-required",
+        ));
+    }
+    let all_name_set = module.all_names.iter().cloned().collect::<BTreeSet<_>>();
+    for name in all_name_set.difference(&expected_public_name_set()) {
+        if !is_allowed_extra_public_name(name) {
+            findings.push(Finding::new(
+                &module.path,
+                module.all_line,
+                "extra_all",
+                name,
+                "remove-from-__all__",
+            ));
+        }
+    }
+    for name in expected_public_name_set().difference(&all_name_set) {
+        findings.push(Finding::new(
+            &module.path,
+            module.all_line,
+            "missing_all_name",
+            name,
+            "add-to-__all__",
+        ));
+    }
+    for (name, definition) in &module.public_definitions {
+        if !EXPECTED_PUBLIC_NAMES.contains(&name.as_str()) && !is_allowed_extra_public_name(name) {
+            findings.push(Finding::new(
+                &module.path,
+                definition.line,
+                "extra_public_definition",
+                name,
+                "make-private-or-remove",
+            ));
+        }
+    }
+    for name in
+        expected_public_name_set().difference(&module.public_definitions.keys().cloned().collect())
+    {
+        findings.push(Finding::new(
+            &module.path,
+            module.all_line,
+            "missing_public_definition",
+            name,
+            "define-standard-public-name",
+        ));
+    }
+    match module.classes.get("Algorithm") {
+        Some(class_node) if class_node.methods.contains("__call__") => {}
+        Some(class_node) => findings.push(Finding::new(
+            &module.path,
+            class_node.line,
+            "algorithm_not_callable",
+            "Algorithm",
+            "define __call__(Problem, State, SolveConfig) returning Answer, State, Info",
+        )),
+        None => findings.push(Finding::new(
+            &module.path,
+            module
+                .public_definitions
+                .get("Algorithm")
+                .map(|definition| definition.line)
+                .unwrap_or(1),
+            "missing_algorithm_function_object",
+            "Algorithm",
+            "define callable Algorithm",
+        )),
+    }
+    if let Some(info) = module.public_definitions.get("Info") {
+        if info.kind != "class" {
+            findings.push(Finding::new(
+                &module.path,
+                info.line,
+                "info_not_concrete",
+                "Info",
+                "define concrete class Info",
+            ));
+        }
+    }
     findings
 }
 
-fn algorithm_aliases(module: &ModuleAst, algorithm_modules: &BTreeSet<String>) -> BTreeSet<String> {
-    module
-        .imports
+fn expected_public_name_set() -> BTreeSet<String> {
+    EXPECTED_PUBLIC_NAMES
         .iter()
-        .filter_map(|(alias, import)| {
-            let candidates = import_candidate_modules(&module.module, import);
-            if candidates
-                .iter()
-                .any(|candidate| module_name_matches(candidate, algorithm_modules))
-            {
-                return Some(alias.clone());
-            }
-            module.alias_attrs.get(alias).and_then(|attrs| {
-                (!required_contract_classes(attrs).is_empty()).then(|| alias.clone())
-            })
-        })
+        .map(|name| (*name).to_string())
         .collect()
+}
+
+fn is_allowed_extra_public_name(name: &str) -> bool {
+    ALLOWED_EXTRA_PUBLIC_PREFIXES
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
+}
+
+fn analyze_nested_contract(
+    module: &ModuleAst,
+    algorithm_module_names: &BTreeSet<String>,
+) -> (Vec<Finding>, BTreeMap<String, DependencyReport>) {
+    let requirements = nested_requirements(module);
+    let mut dependencies = BTreeMap::new();
+    for ((alias, contract_class), sources) in &requirements {
+        let dependency_module = dependency_module(module, alias, algorithm_module_names);
+        let key = format!("{alias}\0{dependency_module}");
+        let dependency = dependencies.entry(key).or_insert_with(|| DependencyReport {
+            alias: alias.clone(),
+            module: dependency_module,
+            contract_classes: Vec::new(),
+            sources: Vec::new(),
+        });
+        if !dependency.contract_classes.contains(contract_class) {
+            dependency.contract_classes.push(contract_class.clone());
+        }
+        for source in sources {
+            if !dependency.sources.contains(source) {
+                dependency.sources.push(source.clone());
+            }
+        }
+    }
+    for dependency in dependencies.values_mut() {
+        dependency.contract_classes.sort();
+        dependency.sources.sort();
+    }
+    let mut findings = Vec::new();
+    for ((alias, contract_class), _) in requirements {
+        let Some(class_node) = module.classes.get(&contract_class) else {
+            findings.push(Finding::new(
+                &module.path,
+                1,
+                "missing_contract_class",
+                &format!("{alias}.{contract_class}"),
+                &format!("define {contract_class}"),
+            ));
+            continue;
+        };
+        if class_annotations_contain(module, class_node, &alias, &contract_class) {
+            continue;
+        }
+        let detail = nested_field_detail(module, class_node, &alias, &contract_class);
+        findings.push(Finding::new(
+            &module.path,
+            class_node.line,
+            "missing_nested_field",
+            &format!("{alias}.{contract_class}"),
+            &detail,
+        ));
+    }
+    (findings, dependencies)
+}
+
+fn nested_requirements(module: &ModuleAst) -> BTreeMap<(String, String), BTreeSet<String>> {
+    let mut requirements = BTreeMap::new();
+    for contract_class in CONTRACT_CLASSES {
+        let Some(class_node) = module.classes.get(*contract_class) else {
+            continue;
+        };
+        for field in &class_node.fields {
+            for dependency_alias in module.imports.keys() {
+                for dependency_class in CONTRACT_CLASSES {
+                    if annotation_contains_dependency(
+                        module,
+                        &field.annotation,
+                        dependency_alias,
+                        dependency_class,
+                    ) {
+                        requirements
+                            .entry((dependency_alias.clone(), (*dependency_class).to_string()))
+                            .or_insert_with(BTreeSet::new)
+                            .insert("annotation".to_string());
+                    }
+                }
+            }
+        }
+    }
+    for call in &module.initialize_calls {
+        requirements
+            .entry((call.alias.clone(), "Algorithm".to_string()))
+            .or_insert_with(BTreeSet::new)
+            .insert("initialize_call".to_string());
+        if call.uses_parent_config && !call.local_child_config {
+            requirements
+                .entry((call.alias.clone(), "InitializeConfig".to_string()))
+                .or_insert_with(BTreeSet::new)
+                .insert("initialize_parent_config".to_string());
+        }
+    }
+    requirements
+}
+
+fn dependency_module(
+    module: &ModuleAst,
+    alias: &str,
+    algorithm_module_names: &BTreeSet<String>,
+) -> String {
+    let Some(import) = module.imports.get(alias) else {
+        return alias.to_string();
+    };
+    let candidates = import_candidate_modules(&module.module, import);
+    candidates
+        .iter()
+        .find(|candidate| algorithm_module_names.contains(*candidate))
+        .cloned()
+        .or_else(|| candidates.last().cloned())
+        .unwrap_or_else(|| import.module.trim_start_matches('.').to_string())
 }
 
 fn import_candidate_modules(current_module: &str, import: &ImportAst) -> Vec<String> {
@@ -891,135 +1397,22 @@ fn resolve_relative_import(
     if drop_count > package.len() {
         return None;
     }
-    let keep = package.len() - drop_count;
-    package.truncate(keep);
+    package.truncate(package.len() - drop_count);
     if !from_module.is_empty() {
         package.extend(from_module.split('.').map(str::to_string));
     }
     (!package.is_empty()).then(|| package.join("."))
 }
 
-fn module_name_matches(candidate: &str, algorithm_modules: &BTreeSet<String>) -> bool {
-    let normalized = candidate.trim_start_matches('.');
-    algorithm_modules.iter().any(|module| {
-        module == normalized
-            || module
-                .strip_prefix("python.")
-                .map(|tail| tail == normalized)
-                .unwrap_or(false)
-            || normalized
-                .strip_prefix("python.")
-                .map(|tail| tail == module)
-                .unwrap_or(false)
-            || module.ends_with(&format!(".{normalized}"))
-    })
-}
-
-fn module_is_algorithm(module: &ModuleAst) -> bool {
-    if !module.imports_amp {
-        return false;
-    }
-    if module
-        .public_definitions
-        .keys()
-        .any(|name| EXPECTED_PUBLIC_NAMES.contains(&name.as_str()))
-    {
-        return true;
-    }
-    !NON_ALGORITHM_IMPORT_ALLOWLIST
-        .iter()
-        .any(|prefix| module.path == *prefix || module.path.starts_with(&format!("{prefix}/")))
-}
-
-fn analyze_algorithm_module_surface(module: &ModuleAst) -> Vec<Finding> {
-    let mut findings = Vec::new();
-    for name in EXPECTED_PUBLIC_NAMES {
-        if !module.public_definitions.contains_key(*name) {
-            findings.push(Finding::new(
-                &module.path,
-                1,
-                "missing_algorithm_public_surface",
-                name,
-                "define standard amp algorithm module public surface",
-            ));
-        }
-    }
-    match module.classes.get("Algorithm") {
-        Some(class_node) if class_node.methods.contains("__call__") => {}
-        Some(class_node) => findings.push(Finding::new(
-            &module.path,
-            class_node.line,
-            "algorithm_not_callable",
-            "Algorithm",
-            "define __call__(Problem, State, SolveConfig) returning Answer, State, Info",
-        )),
-        None => findings.push(Finding::new(
-            &module.path,
-            1,
-            "missing_algorithm_function_object",
-            "Algorithm",
-            "define callable Algorithm",
-        )),
-    }
-    findings
-}
-
-fn analyze_nested_contract(
+fn annotation_contains_dependency(
     module: &ModuleAst,
-    algorithm_aliases: &BTreeSet<String>,
-) -> Vec<Finding> {
-    let mut findings = Vec::new();
-    for (dependency_alias, attrs) in &module.alias_attrs {
-        if !algorithm_aliases.contains(dependency_alias) {
-            continue;
-        }
-        let required = required_contract_classes(attrs);
-        if required.is_empty() {
-            continue;
-        }
-        for contract_class in required {
-            let Some(class_node) = module.classes.get(&contract_class) else {
-                findings.push(Finding::new(
-                    &module.path,
-                    1,
-                    "missing_contract_class",
-                    &format!("{dependency_alias}.{contract_class}"),
-                    &format!("define {contract_class}"),
-                ));
-                continue;
-            };
-            if class_annotations_contain(module, class_node, dependency_alias, &contract_class) {
-                continue;
-            }
-            let detail = nested_field_detail(module, class_node, dependency_alias, &contract_class);
-            findings.push(Finding::new(
-                &module.path,
-                class_node.line,
-                "missing_nested_field",
-                &format!("{dependency_alias}.{contract_class}"),
-                &detail,
-            ));
-        }
-    }
-    findings
-}
-
-fn required_contract_classes(attrs: &BTreeSet<String>) -> Vec<String> {
-    let mut required = BTreeSet::new();
-    for attr in attrs {
-        if CONTRACT_CLASSES.contains(&attr.as_str()) {
-            required.insert(attr.clone());
-        }
-    }
-    if attrs.contains("initialize") {
-        for class_name in CONTRACT_CLASSES {
-            required.insert((*class_name).to_string());
-        }
-    }
-    if required.is_empty() && attrs.len() == 1 && attrs.contains("Problem") {
-        return Vec::new();
-    }
-    required.into_iter().collect()
+    annotation: &str,
+    dependency_alias: &str,
+    dependency_class: &str,
+) -> bool {
+    let required = format!("{dependency_alias}.{dependency_class}");
+    annotation.contains(&required)
+        || expand_annotation(annotation, &module.aliases).contains(&required)
 }
 
 fn class_annotations_contain(
@@ -1028,10 +1421,13 @@ fn class_annotations_contain(
     dependency_alias: &str,
     dependency_class: &str,
 ) -> bool {
-    let required = format!("{dependency_alias}.{dependency_class}");
     class_node.fields.iter().any(|field| {
-        field.annotation.contains(&required)
-            || expand_annotation(&field.annotation, &module.aliases).contains(&required)
+        annotation_contains_dependency(
+            module,
+            &field.annotation,
+            dependency_alias,
+            dependency_class,
+        )
     })
 }
 
@@ -1055,13 +1451,12 @@ fn nested_field_detail(
 ) -> String {
     let field_hint = dependency_alias.to_lowercase();
     let generic = format!("amp.{dependency_class}");
-    let untyped = class_node.fields.iter().find(|field| {
+    if let Some(field) = class_node.fields.iter().find(|field| {
         field.name.to_lowercase().contains(&field_hint)
             && (field.annotation == "Any"
                 || field.annotation.contains(&generic)
                 || expand_annotation(&field.annotation, &module.aliases).contains(&generic))
-    });
-    if let Some(field) = untyped {
+    }) {
         return format!(
             "field-{}-uses-{}; annotate as {}.{}",
             field.name, field.annotation, dependency_alias, dependency_class
@@ -1072,20 +1467,13 @@ fn nested_field_detail(
 
 fn analyze_legacy_stopping_usage(module: &ModuleAst) -> Vec<Finding> {
     let mut findings = Vec::new();
-    let solve_config = module.classes.get("SolveConfig");
-    if let Some(class_node) = solve_config {
+    if let Some(class_node) = module.classes.get("SolveConfig") {
         for field in &class_node.fields {
             if STOPPING_POLICY_TYPES.iter().any(|name| {
                 annotation_mentions(module, &field.annotation, name)
                     && !module_defines_name(module, name)
             }) {
-                findings.push(Finding::new(
-                    &module.path,
-                    field.line,
-                    "legacy_stopping_policy_field",
-                    &field.name,
-                    "use imported stopping.SolveConfig so the nested algorithm contract is inferred",
-                ));
+                findings.push(Finding::new(&module.path, field.line, "legacy_stopping_policy_field", &field.name, "use imported stopping.SolveConfig so the nested algorithm contract is inferred"));
             }
         }
     }
@@ -1117,32 +1505,44 @@ fn annotation_mentions(module: &ModuleAst, annotation: &str, needle: &str) -> bo
 fn render_report(report: &Report) {
     match report.format {
         OutputFormat::Json => {
+            let payload = JsonReport {
+                summary: JsonSummary {
+                    files: report.files,
+                    algorithm_modules: report.algorithm_modules.len(),
+                    findings: report.findings.len(),
+                    parse_errors: report.parse_errors.len(),
+                    status: if report.findings.is_empty() && report.parse_errors.is_empty() {
+                        "pass"
+                    } else {
+                        "fail"
+                    },
+                },
+                algorithm_modules: &report.algorithm_modules,
+                modules: &report.modules,
+                parse_errors: &report.parse_errors,
+                findings: report
+                    .findings
+                    .iter()
+                    .map(|finding| JsonFinding {
+                        path: &finding.path,
+                        line: finding.line,
+                        kind: &finding.kind,
+                        subject: &finding.subject,
+                        detail: &finding.detail,
+                    })
+                    .collect(),
+            };
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({
-                    "summary": {
-                        "files": report.files,
-                        "algorithm_modules": report.algorithm_modules.len(),
-                        "findings": report.findings.len(),
-                        "parse_errors": report.parse_errors.len(),
-                        "status": if report.findings.is_empty() && report.parse_errors.is_empty() { "pass" } else { "fail" },
-                    },
-                    "algorithm_modules": report.algorithm_modules,
-                    "parse_errors": report.parse_errors,
-                    "findings": report.findings.iter().map(|finding| json!({
-                        "path": finding.path,
-                        "line": finding.line,
-                        "kind": finding.kind,
-                        "subject": finding.subject,
-                        "detail": finding.detail,
-                    })).collect::<Vec<_>>(),
-                }))
-                .expect("json payload serializes")
+                serde_json::to_string_pretty(&payload).expect("json payload serializes")
             );
         }
         OutputFormat::Text => {
             for error in &report.parse_errors {
-                println!("PY_ALGORITHM_CONTRACT_PARSE_ERROR={error}");
+                println!(
+                    "PY_ALGORITHM_CONTRACT_PARSE_ERROR={}:{}:parseable",
+                    error.path, error.line
+                );
             }
             for finding in &report.findings {
                 println!("{}", finding.render());
@@ -1153,6 +1553,10 @@ fn render_report(report: &Report) {
                 report.algorithm_modules.len()
             );
             println!("PY_ALGORITHM_CONTRACT_FINDINGS={}", report.findings.len());
+            println!(
+                "PY_ALGORITHM_CONTRACT_PARSE_ERRORS={}",
+                report.parse_errors.len()
+            );
             println!(
                 "PY_ALGORITHM_CONTRACT={}",
                 if report.findings.is_empty() && report.parse_errors.is_empty() {
@@ -1187,37 +1591,43 @@ mod tests {
     }
 
     fn algorithm_module() -> ModuleAst {
-        let mut public_definitions = BTreeMap::new();
-        for name in EXPECTED_PUBLIC_NAMES {
-            public_definitions.insert((*name).to_string(), 1);
-        }
+        let public_definitions = EXPECTED_PUBLIC_NAMES
+            .iter()
+            .map(|name| {
+                (
+                    (*name).to_string(),
+                    PublicDefinitionAst {
+                        line: 1,
+                        kind: if *name == "Info" || *name == "Algorithm" {
+                            "class".to_string()
+                        } else {
+                            "function".to_string()
+                        },
+                    },
+                )
+            })
+            .collect();
         ModuleAst {
             path: "python/pkg/parent.py".to_string(),
             module: "python.pkg.parent".to_string(),
             imports_amp: true,
             public_definitions,
-            imports: BTreeMap::from([
-                (
-                    "child".to_string(),
-                    ImportAst {
-                        module: ".child".to_string(),
-                        from_module: String::new(),
-                        imported_name: "child".to_string(),
-                        level: 1,
-                        line: 1,
-                    },
-                ),
-                (
-                    "stopping".to_string(),
-                    ImportAst {
-                        module: "python.jax_util.base.stopping".to_string(),
-                        from_module: String::new(),
-                        imported_name: String::new(),
-                        level: 0,
-                        line: 2,
-                    },
-                ),
-            ]),
+            all_state: AllState::Literal,
+            all_names: EXPECTED_PUBLIC_NAMES
+                .iter()
+                .map(|name| (*name).to_string())
+                .collect(),
+            all_line: 1,
+            imports: BTreeMap::from([(
+                "child".to_string(),
+                ImportAst {
+                    module: ".child".to_string(),
+                    from_module: String::new(),
+                    imported_name: "child".to_string(),
+                    level: 1,
+                    line: 1,
+                },
+            )]),
             aliases: BTreeMap::new(),
             classes: BTreeMap::from([
                 (
@@ -1230,164 +1640,95 @@ mod tests {
                 ),
                 (
                     "SolveConfig".to_string(),
-                    class(
-                        6,
-                        vec![
-                            field("child_solve", "child.SolveConfig"),
-                            field("stopping", "stopping.SolveConfig"),
-                        ],
-                        &[],
-                    ),
+                    class(6, vec![field("child_solve", "child.SolveConfig")], &[]),
                 ),
-                (
-                    "Info".to_string(),
-                    class(
-                        9,
-                        vec![
-                            field("child_info", "child.Info"),
-                            field("stopping_info", "stopping.Info"),
-                        ],
-                        &[],
-                    ),
-                ),
+                ("Problem".to_string(), class(9, Vec::new(), &[])),
+                ("State".to_string(), class(12, Vec::new(), &[])),
+                ("Answer".to_string(), class(15, Vec::new(), &[])),
+                ("Info".to_string(), class(18, Vec::new(), &[])),
                 (
                     "Algorithm".to_string(),
                     class(
-                        12,
-                        vec![
-                            field("child_algorithm", "child.Algorithm"),
-                            field("stopping_algorithm", "stopping.Algorithm"),
-                        ],
+                        21,
+                        vec![field("child_algorithm", "child.Algorithm")],
                         &["__call__"],
                     ),
                 ),
             ]),
-            alias_attrs: BTreeMap::from([
-                (
-                    "child".to_string(),
-                    ["initialize".to_string()].into_iter().collect(),
-                ),
-                (
-                    "stopping".to_string(),
-                    [
-                        "Algorithm".to_string(),
-                        "Info".to_string(),
-                        "SolveConfig".to_string(),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
-            ]),
+            alias_attrs: BTreeMap::new(),
             calls: Vec::new(),
-            references: vec![NamedLine {
-                name: "stopping.SolveConfig".to_string(),
-                line: 6,
+            references: Vec::new(),
+            initialize_calls: vec![InitializeCallAst {
+                alias: "child".to_string(),
+                line: 30,
+                uses_parent_config: true,
+                local_child_config: false,
             }],
         }
     }
 
     #[test]
-    fn compliant_nested_and_stopping_contract_passes() {
-        let modules = vec![algorithm_module()];
-        assert_eq!(analyze_modules(&modules), Vec::new());
+    fn compliant_nested_contract_passes_and_records_sources() {
+        let (findings, reports) = analyze_modules(&[algorithm_module()]);
+        assert!(findings.is_empty());
+        assert_eq!(
+            reports[0].dependencies[0].contract_classes,
+            vec!["Algorithm", "InitializeConfig", "SolveConfig"]
+        );
+        assert_eq!(
+            reports[0].dependencies[0].sources,
+            vec!["annotation", "initialize_call", "initialize_parent_config"]
+        );
     }
 
     #[test]
-    fn missing_child_info_is_reported() {
+    fn local_child_config_does_not_require_parent_initialize_config() {
         let mut module = algorithm_module();
         module
             .classes
-            .get_mut("Info")
-            .expect("Info fixture")
+            .get_mut("InitializeConfig")
+            .unwrap()
             .fields
-            .retain(|field| field.name != "child_info");
-        let findings = analyze_modules(&[module]);
-        assert!(findings.iter().any(|finding| {
-            finding.kind == "missing_nested_field" && finding.subject == "child.Info"
-        }));
-    }
-
-    #[test]
-    fn direct_base_stopping_policy_is_reported() {
-        let mut module = algorithm_module();
-        module.classes.insert(
-            "SolveConfig".to_string(),
-            class(
-                6,
-                vec![field("stopping", "ResidualNormConvergenceCriterion")],
-                &[],
-            ),
-        );
-        module.calls.push(NamedLine {
-            name: "residual_converged".to_string(),
-            line: 44,
-        });
-        let findings = analyze_modules(&[module]);
-        assert!(findings
-            .iter()
-            .any(|finding| finding.kind == "legacy_stopping_policy_field"));
-        assert!(findings
-            .iter()
-            .any(|finding| finding.kind == "stopping_primitive_direct_call"));
-    }
-
-    #[test]
-    fn stopping_primitive_definition_module_is_not_legacy_usage() {
-        let mut module = algorithm_module();
-        module
-            .public_definitions
-            .insert("RuntimeToleranceConfig".to_string(), 20);
-        module
-            .public_definitions
-            .insert("residual_tolerance".to_string(), 40);
-        module.classes.insert(
-            "RuntimeToleranceConfig".to_string(),
-            class(20, Vec::new(), &[]),
-        );
-        module.classes.insert(
-            "SolveConfig".to_string(),
-            class(
-                6,
-                vec![field("runtime_tolerance", "RuntimeToleranceConfig")],
-                &[],
-            ),
-        );
-        module.calls.push(NamedLine {
-            name: "residual_tolerance".to_string(),
-            line: 44,
-        });
-        let findings = analyze_modules(&[module]);
+            .clear();
+        module.initialize_calls[0].uses_parent_config = false;
+        module.initialize_calls[0].local_child_config = true;
+        let (findings, reports) = analyze_modules(&[module]);
         assert!(!findings
             .iter()
-            .any(|finding| finding.kind == "legacy_stopping_policy_field"));
-        assert!(!findings
-            .iter()
-            .any(|finding| finding.kind == "stopping_primitive_direct_call"));
+            .any(|finding| finding.subject == "child.InitializeConfig"));
+        assert_eq!(
+            reports[0].dependencies[0].contract_classes,
+            vec!["Algorithm", "SolveConfig"]
+        );
     }
 
     #[test]
-    fn amp_algorithm_module_requires_standard_surface_and_callable_algorithm() {
-        let mut public_definitions = BTreeMap::new();
-        public_definitions.insert("Algorithm".to_string(), 20);
+    fn protocol_only_import_is_one_finding_and_not_a_module() {
         let module = ModuleAst {
-            path: "python/pkg/thin_algorithm.py".to_string(),
-            module: "python.pkg.thin_algorithm".to_string(),
+            path: "helper.py".to_string(),
+            module: "helper".to_string(),
             imports_amp: true,
-            public_definitions,
+            public_definitions: BTreeMap::new(),
+            all_state: AllState::Missing,
+            all_names: Vec::new(),
+            all_line: 1,
             imports: BTreeMap::new(),
             aliases: BTreeMap::new(),
-            classes: BTreeMap::from([("Stopping".to_string(), class(20, Vec::new(), &[]))]),
+            classes: BTreeMap::new(),
             alias_attrs: BTreeMap::new(),
             calls: Vec::new(),
             references: Vec::new(),
+            initialize_calls: Vec::new(),
         };
-        let findings = analyze_modules(&[module]);
-        assert!(findings
-            .iter()
-            .any(|finding| finding.kind == "missing_algorithm_public_surface"
-                && finding.subject == "Info"));
-        assert!(findings
-            .iter()
-            .any(|finding| finding.kind == "missing_algorithm_function_object"));
+        let (findings, reports) = analyze_modules(&[module]);
+        assert_eq!(reports.len(), 0);
+        assert_eq!(findings[0].kind, "non_algorithm_protocol_import");
+    }
+
+    #[test]
+    fn glob_matching_matches_fnmatchcase_shapes() {
+        assert!(fnmatchcase("pkg/generated/a.py", "pkg/generated/*.py"));
+        assert!(fnmatchcase("pkg/a_generated.py", "*_generated.py"));
+        assert!(!fnmatchcase("pkg/keep.py", "*_generated.py"));
     }
 }
