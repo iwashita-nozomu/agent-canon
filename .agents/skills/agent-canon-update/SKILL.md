@@ -4,10 +4,10 @@ description: "Use when updating AgentCanon itself, refreshing a vendored vendor/
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:agent-canon-update -->
-<!-- canonical: agents/skills/agent-canon-update.md sha256=1e6b140dcdb7896b589d74e05cc1af28d286495c21d780b38d21007e619120fe -->
+<!-- canonical: agents/skills/agent-canon-update.md sha256=8eb5b177eb693f022b9af4bdd66261db0af42fdd804644c80f0825897a0d91d3 -->
 <!-- route: agents/skills/catalog.yaml#skill:agent-canon-update.routing digest=4ba74601f6db489caeb39270fe520ace1621e68f68b8848d97103b8ee2103614 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:agent-canon-update digest=674cd72a8044b4c5520f0208a04f7bcd191f318bacfe9141c69567653f263692 -->
-<!-- commands: agents/skills/catalog.yaml#skill:agent-canon-update.tool_commands digest=5561d7685a1445cf68ac6b40a4da47f9793a4d0d8749e243a1026da0ab259295 -->
+<!-- commands: agents/skills/catalog.yaml#skill:agent-canon-update.tool_commands digest=6f47e09b79e918a2d33664939f965e529b087652c54386db3700b70f6edb5ba3 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill agent-canon-update --format text`; schema `skill_tool_commands.v2`, digest: `5561d7685a1445cf68ac6b40a4da47f9793a4d0d8749e243a1026da0ab259295`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill agent-canon-update --format text`; schema `skill_tool_commands.v2`, digest: `6f47e09b79e918a2d33664939f965e529b087652c54386db3700b70f6edb5ba3`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

@@ -1675,6 +1675,14 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "AGENT_CANON_COMMIT_REQUEST_EVIDENCE",
+      "line": 192,
+      "path": "agents/skills/agent-canon-update.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "closeout_gate",
       "line": 165,
       "path": "agents/skills/agent-log-analysis.md",
@@ -9204,7 +9212,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "REPORT_QUALITY_EVAL_CHECKS",
-      "line": 310,
+      "line": 320,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9212,7 +9220,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "REPORT_QUALITY_EVAL_CRITICAL_FAILED",
-      "line": 312,
+      "line": 322,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9220,7 +9228,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "REPORT_QUALITY_EVAL_FAILED",
-      "line": 311,
+      "line": 321,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9228,7 +9236,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "REPORT_QUALITY_EVAL_RUN_ID",
-      "line": 307,
+      "line": 317,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9236,7 +9244,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "REPORT_QUALITY_EVAL_STATUS",
-      "line": 308,
+      "line": 318,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9244,7 +9252,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "REPORT_QUALITY_EVAL_TARGETS",
-      "line": 309,
+      "line": 319,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9252,7 +9260,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "REPORT_QUALITY_EVAL_CHECKS",
-      "line": 380,
+      "line": 390,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9260,7 +9268,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "REPORT_QUALITY_EVAL_CRITICAL_FAILED",
-      "line": 382,
+      "line": 392,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9268,7 +9276,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "REPORT_QUALITY_EVAL_FAILED",
-      "line": 381,
+      "line": 391,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9276,7 +9284,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "REPORT_QUALITY_EVAL_REPORT",
-      "line": 384,
+      "line": 394,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9284,7 +9292,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "REPORT_QUALITY_EVAL_RUN_ID",
-      "line": 378,
+      "line": 388,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9292,7 +9300,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "REPORT_QUALITY_EVAL_STATUS",
-      "line": 385,
+      "line": 395,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9300,7 +9308,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "REPORT_QUALITY_EVAL_TARGETS",
-      "line": 379,
+      "line": 389,
       "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
@@ -9308,7 +9316,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 618,
+      "line": 629,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9316,7 +9324,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 722,
+      "line": 733,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9324,7 +9332,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_ACCUMULATED_REPORT",
-      "line": 541,
+      "line": 552,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9332,7 +9340,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_AUDIT_STATUS",
-      "line": 529,
+      "line": 540,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9340,78 +9348,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_CHECKS_PASSED",
-      "line": 526,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_CHECKS_TOTAL",
-      "line": 525,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_COMPACT_OUT",
-      "line": 545,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_CRITICAL_FAILED",
-      "line": 528,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_CRITICAL_TOTAL",
-      "line": 527,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_DUPLICATE_CHECKLIST_IDS",
-      "line": 532,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_DUPLICATE_EVAL_IDS",
-      "line": 530,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_DUPLICATE_TARGETS",
-      "line": 531,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_GIT_BRANCH",
-      "line": 536,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_GIT_COMMIT",
       "line": 537,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
@@ -9419,7 +9355,31 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "EVAL_GIT_DIRTY",
+      "field": "EVAL_CHECKS_TOTAL",
+      "line": 536,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_COMPACT_OUT",
+      "line": 556,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_CRITICAL_FAILED",
+      "line": 539,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_CRITICAL_TOTAL",
       "line": 538,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
@@ -9427,15 +9387,7 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "EVAL_GROWTH_CANDIDATES",
-      "line": 533,
-      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "EVAL_REPORT_OUT",
+      "field": "EVAL_DUPLICATE_CHECKLIST_IDS",
       "line": 543,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
@@ -9443,8 +9395,64 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "EVAL_DUPLICATE_EVAL_IDS",
+      "line": 541,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_DUPLICATE_TARGETS",
+      "line": 542,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_GIT_BRANCH",
+      "line": 547,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_GIT_COMMIT",
+      "line": 548,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_GIT_DIRTY",
+      "line": 549,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_GROWTH_CANDIDATES",
+      "line": 544,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "EVAL_REPORT_OUT",
+      "line": 554,
+      "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "EVAL_RUN_ID",
-      "line": 534,
+      "line": 545,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9452,7 +9460,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_STATUS",
-      "line": 524,
+      "line": 535,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -9460,7 +9468,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "EVAL_USED_SKILLS",
-      "line": 535,
+      "line": 546,
       "path": "tools/agent_tools/evaluate_skill_workflow_prompts.py",
       "surface": "tool"
     },
@@ -15412,7 +15420,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 496,
+      "line": 516,
       "path": "tools/agent_tools/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -15420,7 +15428,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1328,
+      "line": 1352,
       "path": "tools/agent_tools/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -15428,7 +15436,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1329,
+      "line": 1353,
       "path": "tools/agent_tools/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -15436,7 +15444,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1338,
+      "line": 1362,
       "path": "tools/agent_tools/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -15444,7 +15452,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_DEPENDENCY_MAP",
-      "line": 1879,
+      "line": 1903,
       "path": "tools/agent_tools/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -15452,7 +15460,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_INVOCATION_GRAPH",
-      "line": 1882,
+      "line": 1906,
       "path": "tools/agent_tools/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -15460,7 +15468,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_INVOCATION_GRAPH",
-      "line": 1887,
+      "line": 1911,
       "path": "tools/agent_tools/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -15468,7 +15476,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_INVOCATION_GRAPH",
-      "line": 1892,
+      "line": 1916,
       "path": "tools/agent_tools/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -15500,7 +15508,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 52,
+      "line": 61,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15508,7 +15516,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "candidate_rows",
-      "line": 498,
+      "line": 525,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15516,7 +15524,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "case_count",
-      "line": 208,
+      "line": 217,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15524,7 +15532,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "cases",
-      "line": 208,
+      "line": 217,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15532,7 +15540,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "host_envelopes",
-      "line": 498,
+      "line": 525,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15540,7 +15548,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "host_profile",
-      "line": 279,
+      "line": 292,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15548,7 +15556,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "host_profile",
-      "line": 498,
+      "line": 525,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15556,7 +15564,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "model_id",
-      "line": 279,
+      "line": 292,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15564,7 +15572,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "model_id",
-      "line": 498,
+      "line": 525,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15572,7 +15580,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "normalization",
-      "line": 498,
+      "line": 525,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15580,7 +15588,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "packet_count",
-      "line": 279,
+      "line": 292,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15588,7 +15596,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "packets",
-      "line": 279,
+      "line": 292,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15596,7 +15604,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "run_id",
-      "line": 498,
+      "line": 525,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15604,7 +15612,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "scenario_rows",
-      "line": 498,
+      "line": 525,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15612,7 +15620,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 208,
+      "line": 217,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15620,7 +15628,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 279,
+      "line": 292,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15628,7 +15636,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 498,
+      "line": 525,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15636,7 +15644,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 539,
+      "line": 566,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15644,7 +15652,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_snapshot_digest",
-      "line": 498,
+      "line": 525,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15652,7 +15660,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 539,
+      "line": 566,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15660,7 +15668,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "summary",
-      "line": 498,
+      "line": 525,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15668,7 +15676,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "version",
-      "line": 208,
+      "line": 217,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15676,7 +15684,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "version",
-      "line": 279,
+      "line": 292,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15684,7 +15692,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "version",
-      "line": 498,
+      "line": 525,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15692,7 +15700,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "schema",
-      "line": 539,
+      "line": 566,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15700,7 +15708,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 539,
+      "line": 566,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15708,7 +15716,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_EVALUATION_FAILURE",
-      "line": 537,
+      "line": 564,
       "path": "tools/agent_tools/skill_shim_evaluation.py",
       "surface": "tool"
     },
@@ -15724,7 +15732,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 508,
+      "line": 516,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15732,7 +15740,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "content_delta_count",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15740,7 +15748,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "content_delta_paths",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15748,7 +15756,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "projection_digests",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15756,7 +15764,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "record_digests",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15764,7 +15772,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15772,7 +15780,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_snapshot_digest",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15780,7 +15788,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15788,7 +15796,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "version",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15796,7 +15804,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "content_delta_count",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15804,7 +15812,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "content_delta_paths",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15812,7 +15820,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "projection_digests",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15820,7 +15828,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "record_digests",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15828,7 +15836,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "schema",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15836,7 +15844,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "source_snapshot_digest",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15844,7 +15852,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15852,7 +15860,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "version",
-      "line": 823,
+      "line": 831,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15860,7 +15868,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_DELTA",
-      "line": 832,
+      "line": 840,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15868,7 +15876,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_FAILURE",
-      "line": 845,
+      "line": 853,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15876,7 +15884,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_FAILURE",
-      "line": 848,
+      "line": 856,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15884,7 +15892,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_SCHEMA",
-      "line": 825,
+      "line": 833,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15892,7 +15900,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_STATUS",
-      "line": 826,
+      "line": 834,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15900,7 +15908,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 499,
+      "line": 536,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15908,7 +15916,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 511,
+      "line": 537,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15916,7 +15924,23 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 534,
+      "line": 551,
+      "path": "tools/agent_tools/skill_tool_commands.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 552,
+      "path": "tools/agent_tools/skill_tool_commands.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 575,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15924,7 +15948,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 541,
+      "line": 582,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15932,7 +15956,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 541,
+      "line": 582,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15940,7 +15964,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 534,
+      "line": 575,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15948,7 +15972,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 541,
+      "line": 582,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15956,7 +15980,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 541,
+      "line": 582,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15964,7 +15988,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_CANONICAL_DOC",
-      "line": 482,
+      "line": 517,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15972,7 +15996,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_FINDING",
-      "line": 189,
+      "line": 199,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15980,7 +16004,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_RUNTIME_SKILL",
-      "line": 481,
+      "line": 516,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15988,7 +16012,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_SKILL",
-      "line": 480,
+      "line": 515,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -15996,7 +16020,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS",
-      "line": 554,
+      "line": 595,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -16004,7 +16028,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS_FINDINGS",
-      "line": 553,
+      "line": 594,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -16012,7 +16036,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS_SOURCE_ROOT_FAILURE",
-      "line": 527,
+      "line": 568,
       "path": "tools/agent_tools/skill_tool_commands.py",
       "surface": "tool"
     },

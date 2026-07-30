@@ -7,7 +7,7 @@ description: "Use before implementation to define language-neutral OOP/type cont
 <!-- canonical: agents/skills/oop-type-design.md sha256=f66ca06f84062514db0f0bee00dd233bef080f2cfde073f04f0571cd15af72c0 -->
 <!-- route: agents/skills/catalog.yaml#skill:oop-type-design.routing digest=6ce93686d6bc10719b32c72429e99c7e24edb207cce42d19bef8814de3e27efe -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:oop-type-design digest=06f18f43f9a0adccc3656e2ee451a055fa2f2ff4b9913f42e2648d1c54991605 -->
-<!-- commands: agents/skills/catalog.yaml#skill:oop-type-design.tool_commands digest=7d33462104c351f2b1e8a6c14d0601750e7d5252eeb8842a416e39e24317833f -->
+<!-- commands: agents/skills/catalog.yaml#skill:oop-type-design.tool_commands digest=dd942d417025a47486b5b1bef55b5e40d026df197d69229a134cb45303e0639c -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill oop-type-design --format text`; schema `skill_tool_commands.v2`, digest: `7d33462104c351f2b1e8a6c14d0601750e7d5252eeb8842a416e39e24317833f`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill oop-type-design --format text`; schema `skill_tool_commands.v2`, digest: `dd942d417025a47486b5b1bef55b5e40d026df197d69229a134cb45303e0639c`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

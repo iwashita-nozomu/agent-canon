@@ -7,7 +7,7 @@ description: "Use for code review, doc review, or AI-generated diff review when 
 <!-- canonical: agents/skills/change-review.md sha256=b5543d9fee9908311195b15371a958f60b20f753840c5cb6b11fade6c4bb7743 -->
 <!-- route: agents/skills/catalog.yaml#skill:change-review.routing digest=1327113effd84eb563b0a06a826d764fed93f90b71f43967e8854adfe7398c68 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:change-review digest=89501841ffb49ea788f747d5c4c84e4351caeda90514ac26da003e4fe2db1a0a -->
-<!-- commands: agents/skills/catalog.yaml#skill:change-review.tool_commands digest=84cff9440a8f625151bc13421207cd3740540521d623442eca3def642e72f168 -->
+<!-- commands: agents/skills/catalog.yaml#skill:change-review.tool_commands digest=5748d3caf86893020c645ea50f8bdbf3bfc441b711a2d788723b379479dc5f23 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill change-review --format text`; schema `skill_tool_commands.v2`, digest: `84cff9440a8f625151bc13421207cd3740540521d623442eca3def642e72f168`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill change-review --format text`; schema `skill_tool_commands.v2`, digest: `5748d3caf86893020c645ea50f8bdbf3bfc441b711a2d788723b379479dc5f23`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

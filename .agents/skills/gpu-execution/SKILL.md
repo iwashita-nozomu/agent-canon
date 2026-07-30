@@ -7,7 +7,7 @@ description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX
 <!-- canonical: agents/skills/gpu-execution.md sha256=11baaaa3c5011c6b9b9c23d75a4eb5891783d65a22ad05ef5fa87323d91474d9 -->
 <!-- route: agents/skills/catalog.yaml#skill:gpu-execution.routing digest=33bafddb4378acdb9dcff135ab024c394854ce3398acf0990060e939be3f9502 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:gpu-execution digest=bd0ae3050ce484b65e9e4216a2da77b22f0387f8ba34965204c4f861d1fd3030 -->
-<!-- commands: agents/skills/catalog.yaml#skill:gpu-execution.tool_commands digest=5f8e33ef7f2752e7f76351e083bb0e21e2dfcf0d89c76fdd49e4959688985536 -->
+<!-- commands: agents/skills/catalog.yaml#skill:gpu-execution.tool_commands digest=4b2997c146af1e9c3443993fc2336543520c485e9e5c6d14e9484f7c81c3da02 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill gpu-execution --format text`; schema `skill_tool_commands.v2`, digest: `5f8e33ef7f2752e7f76351e083bb0e21e2dfcf0d89c76fdd49e4959688985536`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill gpu-execution --format text`; schema `skill_tool_commands.v2`, digest: `4b2997c146af1e9c3443993fc2336543520c485e9e5c6d14e9484f7c81c3da02`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

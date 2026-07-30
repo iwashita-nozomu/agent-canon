@@ -7,7 +7,7 @@ description: "Use when memory/USER_PREFERENCES.md should be distilled into stabl
 <!-- canonical: agents/skills/user-preference-sync.md sha256=037632daa77de3d214f4e936a407ef1139b1d671b059144a215899fe84808b5d -->
 <!-- route: agents/skills/catalog.yaml#skill:user-preference-sync.routing digest=3eb5cd69e76e742532b465c4c680c619cc9abc036c9b57bf2beefba9139dd659 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:user-preference-sync digest=5113f4858ea6e5f5908a72dd70dae33d5ad1b81206103eaec3a0ed1dcf763c4d -->
-<!-- commands: agents/skills/catalog.yaml#skill:user-preference-sync.tool_commands digest=d29ba274c3851d88b5a3cf7ffb09c58ece8987dfe32a14f3f4d0f738b250cd80 -->
+<!-- commands: agents/skills/catalog.yaml#skill:user-preference-sync.tool_commands digest=3f1bb68455c515701c8ce1c15be4611c8b49ab6e45bea28230567d56cefbebdd -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill user-preference-sync --format text`; schema `skill_tool_commands.v2`, digest: `d29ba274c3851d88b5a3cf7ffb09c58ece8987dfe32a14f3f4d0f738b250cd80`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill user-preference-sync --format text`; schema `skill_tool_commands.v2`, digest: `3f1bb68455c515701c8ce1c15be4611c8b49ab6e45bea28230567d56cefbebdd`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

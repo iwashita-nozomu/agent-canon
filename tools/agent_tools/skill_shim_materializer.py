@@ -269,7 +269,7 @@ def _packet_payload(packet: SkillCommandPacket, root: Path) -> dict[str, object]
         value = getattr(packet, field)
         if field.startswith("resolved_"):
             rows = []
-            for logical, source_root, execution_cwd, argv in value:
+            for logical, source_root, execution_cwd, root_bindings, argv in value:
                 resolved_argv = []
                 for token in argv:
                     token_path = Path(token)
@@ -279,7 +279,16 @@ def _packet_payload(packet: SkillCommandPacket, root: Path) -> dict[str, object]
                         except ValueError:
                             token = "@absolute"
                     resolved_argv.append(token)
-                rows.append([logical, "@root", "@root", resolved_argv])
+                normalized_bindings = []
+                for key, binding in root_bindings:
+                    binding_path = Path(binding)
+                    if binding_path.is_absolute():
+                        try:
+                            binding = "@root/" + binding_path.resolve().relative_to(root.resolve()).as_posix()
+                        except ValueError:
+                            binding = "@absolute"
+                    normalized_bindings.append([key, binding])
+                rows.append([logical, "@root", "@root", normalized_bindings, resolved_argv])
             result[field] = rows
         elif isinstance(value, tuple):
             result[field] = list(value)

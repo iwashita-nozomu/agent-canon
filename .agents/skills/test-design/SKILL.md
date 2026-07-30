@@ -7,7 +7,7 @@ description: "Use after the owning implementation mechanism exists to proactivel
 <!-- canonical: agents/skills/test-design.md sha256=e4c3ac2dd202624abdf6536ce6dc360862d3aa7572212842291e4730227d71e6 -->
 <!-- route: agents/skills/catalog.yaml#skill:test-design.routing digest=49dd312bd2d10ce4758f4d5adb13180c50c2a60f73d4880b0538dc3a47f651d3 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:test-design digest=ab8ae849289317fe7c67f4fe4b20109754d2b80aa7603cf6dc5b33da4bd26cbe -->
-<!-- commands: agents/skills/catalog.yaml#skill:test-design.tool_commands digest=2fb5ea1fc782726bef51e7b4ddd0143f9a4cfee68b9b08fee834eeb169bf963f -->
+<!-- commands: agents/skills/catalog.yaml#skill:test-design.tool_commands digest=a152f74773f241b740a7ee0dbf8adeada0150a21cbbd6104e80a069ab53f9523 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill test-design --format text`; schema `skill_tool_commands.v2`, digest: `2fb5ea1fc782726bef51e7b4ddd0143f9a4cfee68b9b08fee834eeb169bf963f`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill test-design --format text`; schema `skill_tool_commands.v2`, digest: `a152f74773f241b740a7ee0dbf8adeada0150a21cbbd6104e80a069ab53f9523`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

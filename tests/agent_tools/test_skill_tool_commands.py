@@ -170,20 +170,19 @@ class SkillToolCommandsTest(unittest.TestCase):
         """Start-repository plans resolve scripts without pathifying Bash options."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
-            (root / "agents" / "skills" / "catalog.yaml").write_text(
-                STANDALONE_CATALOG,
-                encoding="utf-8",
-            )
             self.write_skill(
                 root,
                 "start-repository",
+                "```bash\npython3 tools/agent_tools/example.py\n```\n",
+            )
+            (root / "agents" / "skills" / "start-repository.md").write_text(
                 (
                     "```bash\n"
                     "bash scripts/start_repository.sh --validate-only\n"
                     "bash -c 'scripts/start_repository.sh --validate-only'\n"
                     "python3 tools/agent_tools/example.py --root .\n"
                     "bash ./tools/agent_tools/example.sh --root .\n"
+                    "PYTHONPATH=tools python3 tools/agent_tools/example.py check\n"
                     "python3 tools/agent_tools/example.py .\n"
                     "bash ./tools/agent_tools/example.sh .\n"
                     "python3 tools/agent_tools/example.py --root /tmp/explicit\n"
@@ -191,6 +190,7 @@ class SkillToolCommandsTest(unittest.TestCase):
                     "python3 tools/agent_tools/example.py --root=. .\n"
                     "```\n"
                 ),
+                encoding="utf-8",
             )
 
             result = self.run_tool(
@@ -209,7 +209,7 @@ class SkillToolCommandsTest(unittest.TestCase):
             }
             expected_root = str(root.resolve())
             self.assertEqual(
-                resolved["bash scripts/start_repository.sh --validate-only"][3],
+                resolved["bash scripts/start_repository.sh --validate-only"][4],
                 [
                     "bash",
                     f"{expected_root}/scripts/start_repository.sh",
@@ -217,7 +217,7 @@ class SkillToolCommandsTest(unittest.TestCase):
                 ],
             )
             self.assertEqual(
-                resolved["bash -c 'scripts/start_repository.sh --validate-only'"][3],
+                resolved["bash -c 'scripts/start_repository.sh --validate-only'"][4],
                 ["bash", "-c", "scripts/start_repository.sh --validate-only"],
             )
             self.assertIn(
@@ -237,27 +237,27 @@ class SkillToolCommandsTest(unittest.TestCase):
                 expected_root,
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root ."][3][0],
+                resolved["python3 tools/agent_tools/example.py --root ."][4][0],
                 "python3",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root ."][3][1],
+                resolved["python3 tools/agent_tools/example.py --root ."][4][1],
                 f"{expected_root}/tools/agent_tools/example.py",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root ."][3][2],
+                resolved["python3 tools/agent_tools/example.py --root ."][4][2],
                 "--root",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root ."][3][3],
+                resolved["python3 tools/agent_tools/example.py --root ."][4][3],
                 expected_root,
             )
             self.assertEqual(
-                resolved["bash ./tools/agent_tools/example.sh --root ."][3][0],
+                resolved["bash ./tools/agent_tools/example.sh --root ."][4][0],
                 "bash",
             )
             self.assertEqual(
-                resolved["bash ./tools/agent_tools/example.sh --root ."][3][1],
+                resolved["bash ./tools/agent_tools/example.sh --root ."][4][1],
                 f"{expected_root}/tools/agent_tools/example.sh",
             )
             self.assertIn(
@@ -265,23 +265,23 @@ class SkillToolCommandsTest(unittest.TestCase):
                 resolved,
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][3][0],
+                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][4][0],
                 "python3",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][3][1],
+                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][4][1],
                 f"{expected_root}/tools/agent_tools/example.py",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][3][2],
+                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][4][2],
                 "--root",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][3][3],
+                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][4][3],
                 "/tmp/explicit",
             )
             self.assertEqual(
-                len(resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][3]),
+                len(resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][4]),
                 4,
             )
             self.assertIn(
@@ -289,15 +289,15 @@ class SkillToolCommandsTest(unittest.TestCase):
                 resolved,
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=."][3][0],
+                resolved["python3 tools/agent_tools/example.py --root=."][4][0],
                 "python3",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=."][3][1],
+                resolved["python3 tools/agent_tools/example.py --root=."][4][1],
                 f"{expected_root}/tools/agent_tools/example.py",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=."][3][2],
+                resolved["python3 tools/agent_tools/example.py --root=."][4][2],
                 f"--root={expected_root}",
             )
             self.assertIn(
@@ -305,19 +305,19 @@ class SkillToolCommandsTest(unittest.TestCase):
                 resolved,
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=. ."][3][0],
+                resolved["python3 tools/agent_tools/example.py --root=. ."][4][0],
                 "python3",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=. ."][3][1],
+                resolved["python3 tools/agent_tools/example.py --root=. ."][4][1],
                 f"{expected_root}/tools/agent_tools/example.py",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=. ."][3][2],
+                resolved["python3 tools/agent_tools/example.py --root=. ."][4][2],
                 f"--root={expected_root}",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=. ."][3][3],
+                resolved["python3 tools/agent_tools/example.py --root=. ."][4][3],
                 ".",
             )
             self.assertIn(
@@ -325,15 +325,15 @@ class SkillToolCommandsTest(unittest.TestCase):
                 resolved,
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py ."][3][0],
+                resolved["python3 tools/agent_tools/example.py ."][4][0],
                 "python3",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py ."][3][1],
+                resolved["python3 tools/agent_tools/example.py ."][4][1],
                 f"{expected_root}/tools/agent_tools/example.py",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py ."][3][2],
+                resolved["python3 tools/agent_tools/example.py ."][4][2],
                 ".",
             )
             self.assertIn(
@@ -341,16 +341,32 @@ class SkillToolCommandsTest(unittest.TestCase):
                 resolved,
             )
             self.assertEqual(
-                resolved["bash ./tools/agent_tools/example.sh ."][3][0],
+                resolved["bash ./tools/agent_tools/example.sh ."][4][0],
                 "bash",
             )
             self.assertEqual(
-                resolved["bash ./tools/agent_tools/example.sh ."][3][1],
+                resolved["bash ./tools/agent_tools/example.sh ."][4][1],
                 f"{expected_root}/tools/agent_tools/example.sh",
             )
             self.assertEqual(
-                resolved["bash ./tools/agent_tools/example.sh ."][3][2],
+                resolved["bash ./tools/agent_tools/example.sh ."][4][2],
                 ".",
+            )
+            self.assertIn(
+                "PYTHONPATH=tools python3 tools/agent_tools/example.py check",
+                resolved,
+            )
+            self.assertEqual(
+                resolved["PYTHONPATH=tools python3 tools/agent_tools/example.py check"][3],
+                [["PYTHONPATH", "tools"]],
+            )
+            self.assertEqual(
+                resolved["PYTHONPATH=tools python3 tools/agent_tools/example.py check"][4],
+                [
+                    "python3",
+                    f"{expected_root}/tools/agent_tools/example.py",
+                    "check",
+                ],
             )
 
     def test_show_resolves_fallback_only_skill_with_command_plan(self) -> None:
@@ -376,7 +392,7 @@ class SkillToolCommandsTest(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertEqual(payload["discovered_commands"], [])
             self.assertEqual(len(payload["resolved_discovered_commands"]), 1)
-            logical, source_root, execution_cwd, argv = payload[
+            logical, source_root, execution_cwd, execution_env, argv = payload[
                 "resolved_discovered_commands"
             ][0]
             expected_root = str(root.resolve())
@@ -385,6 +401,7 @@ class SkillToolCommandsTest(unittest.TestCase):
                 "python3 tools/agent_tools/route.py --prompt '<user request>' --format json",
             )
             self.assertEqual(source_root, expected_root)
+            self.assertEqual(execution_env, [])
             self.assertEqual(execution_cwd, expected_root)
             self.assertEqual(argv[0], "python3")
             self.assertEqual(argv[1], f"{expected_root}/tools/agent_tools/route.py")

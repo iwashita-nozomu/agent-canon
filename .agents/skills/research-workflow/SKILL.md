@@ -7,7 +7,7 @@ description: "Use when a task needs external research, comparison design, iterat
 <!-- canonical: agents/skills/research-workflow.md sha256=5f62bb10ed2a514ffa2b35c7f6e961b3fffbd6e6edbab51a7bf97248e6de15a2 -->
 <!-- route: agents/skills/catalog.yaml#skill:research-workflow.routing digest=18f8d33e3ae6a501fce57ae7b9cc9862538ee0dc0a06879d8c4456eecd135434 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:research-workflow digest=20b0cbfb5c92228a8528791bd30c17ffdf5fae7660146f6e17e3421d2979fb84 -->
-<!-- commands: agents/skills/catalog.yaml#skill:research-workflow.tool_commands digest=96f707eecc25738566e646d7258cdb6e174908726bd6cf36eb48b3dbc7238013 -->
+<!-- commands: agents/skills/catalog.yaml#skill:research-workflow.tool_commands digest=61cc70c7bd73b05fc6ffba8d759b999f48267823af59bf2f6c1f25cd7ff7d102 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill research-workflow --format text`; schema `skill_tool_commands.v2`, digest: `96f707eecc25738566e646d7258cdb6e174908726bd6cf36eb48b3dbc7238013`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill research-workflow --format text`; schema `skill_tool_commands.v2`, digest: `61cc70c7bd73b05fc6ffba8d759b999f48267823af59bf2f6c1f25cd7ff7d102`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

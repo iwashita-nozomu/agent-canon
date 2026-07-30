@@ -4,10 +4,10 @@ description: "Use when starting a new GitHub/submodule-first repository from thi
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:start-repository -->
-<!-- canonical: agents/skills/start-repository.md sha256=b0ea7179a6b1c709868c1c1e2ac6f0462fd9b8d1b3da6b774450a235fb934915 -->
+<!-- canonical: agents/skills/start-repository.md sha256=b8082ae1184f6e31e396757bcfda0cdd4de7732f25aafd01e8a57b2f7561cc19 -->
 <!-- route: agents/skills/catalog.yaml#skill:start-repository.routing digest=833ea3b9cdd7836cde78621fbd8e242bcf8ebd3e01f76cbdcaea1baa3ad68712 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:start-repository digest=83944f0fc56d48f7819caf0fab6d949c12575b4baafefa707a5f2f0268f9eaf7 -->
-<!-- commands: agents/skills/catalog.yaml#skill:start-repository.tool_commands digest=33ea72446f4d0e3e98eb2610226e78cc1cac985acbc9d69ba3e8d00f6d80bd34 -->
+<!-- commands: agents/skills/catalog.yaml#skill:start-repository.tool_commands digest=c6b28cecb612f62c1a4e806f8c54c83d6d99961163038058a7398d111395e25e -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill start-repository --format text`; schema `skill_tool_commands.v2`, digest: `33ea72446f4d0e3e98eb2610226e78cc1cac985acbc9d69ba3e8d00f6d80bd34`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill start-repository --format text`; schema `skill_tool_commands.v2`, digest: `c6b28cecb612f62c1a4e806f8c54c83d6d99961163038058a7398d111395e25e`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

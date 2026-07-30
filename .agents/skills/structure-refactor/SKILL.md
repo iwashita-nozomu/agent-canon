@@ -4,10 +4,10 @@ description: "Use when repository structure review, repo-refactor requests, expe
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:structure-refactor -->
-<!-- canonical: agents/skills/structure-refactor.md sha256=2ffff618ad0987ecc7e0f7e3be15e38e45de483fbd272daa624d5cae60453145 -->
+<!-- canonical: agents/skills/structure-refactor.md sha256=2a2d92fdc92e7976c835c8bc177e0a07bd1fc724721e0d7786105dc165b9957c -->
 <!-- route: agents/skills/catalog.yaml#skill:structure-refactor.routing digest=3843a00e7ed048212731fe5ebfd8e8cbb1386f4437bf6e8ada773c84e534c447 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:structure-refactor digest=8d325ebb7ed34419da1c0d8b9f70f392b21c16394598f4f7c02598987cbb9752 -->
-<!-- commands: agents/skills/catalog.yaml#skill:structure-refactor.tool_commands digest=06dbd083769e373fb23513270a69283bd44bdc65d6e7dd8fc1728b7fcf8f05a9 -->
+<!-- commands: agents/skills/catalog.yaml#skill:structure-refactor.tool_commands digest=e218e89fb461512b16bd28f18fe91de4cb9b1c78d7b53176a346f59cfea3cc90 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill structure-refactor --format text`; schema `skill_tool_commands.v2`, digest: `06dbd083769e373fb23513270a69283bd44bdc65d6e7dd8fc1728b7fcf8f05a9`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill structure-refactor --format text`; schema `skill_tool_commands.v2`, digest: `e218e89fb461512b16bd28f18fe91de4cb9b1c78d7b53176a346f59cfea3cc90`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

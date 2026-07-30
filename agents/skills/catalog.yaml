@@ -194,8 +194,8 @@ skill_families:
       conditional:
       - tools/bin/agent-canon docs check <changed-markdown-paths>
       - make agent-canon-ensure-latest
-      - bash tools/sync_agent_canon.sh link-root
-      - bash tools/sync_agent_canon.sh check
+      - PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+      - PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
       - python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt>
         --providers text,semantic,vector,tool,header-deps,code-deps --format json
       - python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>
@@ -710,8 +710,8 @@ skill_families:
       required: []
       conditional:
       - make agent-canon-update-plan
-      - bash tools/sync_agent_canon.sh link-root
-      - bash tools/sync_agent_canon.sh check
+      - PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+      - PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
       - python3 tools/agent_tools/agent_canon_update_todos.py status
       - python3 tools/agent_tools/agent_canon_update_todos.py plan --write
       - make agent-canon-ensure-latest
@@ -784,7 +784,7 @@ skill_families:
       - gh pr view
       - gh pr checks
       - make agent-canon-ensure-latest
-      - bash tools/sync_agent_canon.sh link-root
+      - PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
       - python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --owner codex
         --workspace-root "$PWD"
       - gh pr view <n> --json ...
@@ -1134,7 +1134,7 @@ skill_families:
       - python3 tools/agent_tools/import_responsibility.py --root <root> --format json
         > <run>/import_responsibility.json
       - make agent-canon-ensure-latest
-      - bash tools/sync_agent_canon.sh link-root
+      - PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
       - agent-canon structured-analysis document-inventory --root <root>
       - python3 tools/agent_tools/responsibility_scope.py --root <root> --format json
       - python3 tools/agent_tools/prose_reasoning_graph.py check-document <readme-path>

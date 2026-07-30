@@ -4,10 +4,10 @@ description: "Use when Codex needs a context-independent execution path for a re
 ---
 <!-- generated: agent_canon.skill_runtime_shim.v1 -->
 <!-- source: agents/skills/catalog.yaml#skill:codex-task-workflow -->
-<!-- canonical: agents/skills/codex-task-workflow.md sha256=69280b6126478abe94dc734a4b2f1e11c0e73b40ff6af4b2bac4de65c254c75a -->
+<!-- canonical: agents/skills/codex-task-workflow.md sha256=047323aa293163a6feee3b1561f57da751726151829a5b9eed22afca36e8d869 -->
 <!-- route: agents/skills/catalog.yaml#skill:codex-task-workflow.routing digest=b62ef8a5d9dc51d40389f5adf349b920943c2308ed63611356e325874293760b -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:codex-task-workflow digest=2af7374d7e96f1a1fad66ce67b13639c9d2be77e05a5860b6868d2139d327afb -->
-<!-- commands: agents/skills/catalog.yaml#skill:codex-task-workflow.tool_commands digest=ee5089af5326e568668d92a75a1d0c2fa029b473595b9bada276842eca11865a -->
+<!-- commands: agents/skills/catalog.yaml#skill:codex-task-workflow.tool_commands digest=2da88620dbd973c3caba0a131a13ea99fa0323a286eaa9105ed64c9c537d8a38 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill codex-task-workflow --format text`; schema `skill_tool_commands.v2`, digest: `ee5089af5326e568668d92a75a1d0c2fa029b473595b9bada276842eca11865a`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill codex-task-workflow --format text`; schema `skill_tool_commands.v2`, digest: `2da88620dbd973c3caba0a131a13ea99fa0323a286eaa9105ed64c9c537d8a38`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

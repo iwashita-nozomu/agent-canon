@@ -7,7 +7,7 @@ description: "Use when creating, scaffolding, planning, or implementing an MVP, 
 <!-- canonical: agents/skills/mvp-skeleton.md sha256=09afe3de3faf18ef47df7db81e2eb0e9616815b41a9dd4f310d4ebe5cbb68444 -->
 <!-- route: agents/skills/catalog.yaml#skill:mvp-skeleton.routing digest=32e6568f225e0f4f90cdb0c7f05bb9e64460e942a6f17059169fd61a212c8a3b -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:mvp-skeleton digest=0b5b8e1bca847516fbf435d8a9ccb0114dcdd4de7fc07b23dd8b1b09572967ee -->
-<!-- commands: agents/skills/catalog.yaml#skill:mvp-skeleton.tool_commands digest=b39796e94dba3d17b1f4e930d50867a7c1d042eeafee6a9f8e36e7298f7e1fa9 -->
+<!-- commands: agents/skills/catalog.yaml#skill:mvp-skeleton.tool_commands digest=57fef2774bdebcd4777547fe9283b3e0afe83e1d50f9b7b6d81484ea20a12418 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill mvp-skeleton --format text`; schema `skill_tool_commands.v2`, digest: `b39796e94dba3d17b1f4e930d50867a7c1d042eeafee6a9f8e36e7298f7e1fa9`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill mvp-skeleton --format text`; schema `skill_tool_commands.v2`, digest: `57fef2774bdebcd4777547fe9283b3e0afe83e1d50f9b7b6d81484ea20a12418`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

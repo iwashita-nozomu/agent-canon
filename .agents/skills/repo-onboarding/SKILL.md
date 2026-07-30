@@ -7,7 +7,7 @@ description: "Use when entering an unfamiliar repository or subdirectory and you
 <!-- canonical: agents/skills/repo-onboarding.md sha256=75d59ce92962442d084dc0ce637837815b2948d14c814150f5835c91792c0486 -->
 <!-- route: agents/skills/catalog.yaml#skill:repo-onboarding.routing digest=1d6e0fde0de0427d4bec430a8a7fd41fcd31f1456b967ba68a4e374f018e44f5 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:repo-onboarding digest=d367ae94b3aff8b85cf348905dcd3c2e012dbbd0c14da2b7e3ce0774a32607f9 -->
-<!-- commands: agents/skills/catalog.yaml#skill:repo-onboarding.tool_commands digest=0ef9d5a5b66314227cc1193c58087a60454608cbf746029720c959809247ecca -->
+<!-- commands: agents/skills/catalog.yaml#skill:repo-onboarding.tool_commands digest=8ccf92064c07eb62f6fe93373fd5878bde2216fdbf1f0a3c9fed2b9539fe6d9e -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill repo-onboarding --format text`; schema `skill_tool_commands.v2`, digest: `0ef9d5a5b66314227cc1193c58087a60454608cbf746029720c959809247ecca`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill repo-onboarding --format text`; schema `skill_tool_commands.v2`, digest: `8ccf92064c07eb62f6fe93373fd5878bde2216fdbf1f0a3c9fed2b9539fe6d9e`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

@@ -7,7 +7,7 @@ description: "Legacy cleanup only. Use when inspecting or retiring stale WORKTRE
 <!-- canonical: agents/skills/worktree-start.md sha256=9a65991d0ac390f6bc064a2255c592186505ef3ecd38537deabf7556ae5b09ec -->
 <!-- route: agents/skills/catalog.yaml#skill:worktree-start.routing digest=f9cb6b221d17d0308bd040347c11e94ddab13575ca018a72f23e2020ad098eba -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:worktree-start digest=a3a886ec15c580c1586816563a2dd29fdc3d03db0757a415f63f01309926f73e -->
-<!-- commands: agents/skills/catalog.yaml#skill:worktree-start.tool_commands digest=7f3f195ccf4aaef1447728299a30b1f513e045f79387330f24c943ab1b5b69fb -->
+<!-- commands: agents/skills/catalog.yaml#skill:worktree-start.tool_commands digest=a26b693fc2f90117e305b1f8b7c6b738ee4ff51547912f5389e7df944e4e689b -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill worktree-start --format text`; schema `skill_tool_commands.v2`, digest: `7f3f195ccf4aaef1447728299a30b1f513e045f79387330f24c943ab1b5b69fb`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill worktree-start --format text`; schema `skill_tool_commands.v2`, digest: `a26b693fc2f90117e305b1f8b7c6b738ee4ff51547912f5389e7df944e4e689b`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

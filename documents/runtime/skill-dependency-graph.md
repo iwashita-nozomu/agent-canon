@@ -11,7 +11,7 @@ downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py c
 <!-- Generated from the typed skill/tool invocation graph; do not edit by hand. -->
 # Public Skill/Tool Invocation Graph
 
-<!-- graph_digest=7f02e1b17ec8290227ca7d2a01ea3efc6b09b64a26f0aad60790643dcc60f481 coverage_digest=6d5bfed57c92e27d0c8707c4aa543bc4d1cee2dfb08970a3e6c3f118403651fc -->
+<!-- graph_digest=952b36ecdec953d11d811a9a442c5776f6ecafae20268df84a045c13f415100a coverage_digest=3961cbd56036a9dab4150bfb910e7baafc7173fb1b9777bd0597c22e3e27924e -->
 ```mermaid
 graph LR
   subgraph responsibility_n_analysis["Responsibility: analysis"]
@@ -451,10 +451,10 @@ graph LR
     n_command_codex_task_workflow_conditional_0000["tools/bin/agent-canon docs check '<changed-markdown-paths>' (order=0; ref=93283021206a3866429f0d7d31137e48624587e5391be5f38fa788feb7996b45)"]
     %% node kind=command id=command:codex-task-workflow:conditional:0001 digest=3c44c801d08f0d2b8e805468d2dfeafa452e6f77dfd5dd5fb60f1bcfc8cbff93 order=1
     n_command_codex_task_workflow_conditional_0001["make agent-canon-ensure-latest (order=1; ref=3c44c801d08f0d2b8e805468d2dfeafa452e6f77dfd5dd5fb60f1bcfc8cbff93)"]
-    %% node kind=command id=command:codex-task-workflow:conditional:0002 digest=aefaffb2205cb4580908002dda67d5bf982ace21b0b2fa7f15d4f506a7c7675a order=2
-    n_command_codex_task_workflow_conditional_0002["bash tools/sync_agent_canon.sh link-root (order=2; ref=aefaffb2205cb4580908002dda67d5bf982ace21b0b2fa7f15d4f506a7c7675a)"]
-    %% node kind=command id=command:codex-task-workflow:conditional:0003 digest=d6737527957e9e62a2b1e9d8e4970436928414e9c0017bccd504462bf5889a37 order=3
-    n_command_codex_task_workflow_conditional_0003["bash tools/sync_agent_canon.sh check (order=3; ref=d6737527957e9e62a2b1e9d8e4970436928414e9c0017bccd504462bf5889a37)"]
+    %% node kind=command id=command:codex-task-workflow:conditional:0002 digest=70ab8e554bf99b9002d420d0ad3540589feca2115b856ce3ecd85c85667e648c order=2
+    n_command_codex_task_workflow_conditional_0002["PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root (order=2; ref=70ab8e554bf99b9002d420d0ad3540589feca2115b856ce3ecd85c85667e648c)"]
+    %% node kind=command id=command:codex-task-workflow:conditional:0003 digest=df23f66e3e1dab5786816b3af209cc4d7208da0a330278ad8924a74a488dc32f order=3
+    n_command_codex_task_workflow_conditional_0003["PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check (order=3; ref=df23f66e3e1dab5786816b3af209cc4d7208da0a330278ad8924a74a488dc32f)"]
     %% node kind=command id=command:codex-task-workflow:conditional:0004 digest=2b88c49b9835d399914fff8d91e14a88dfd007f8ca4de76a31b49a525baacaec order=4
     n_command_codex_task_workflow_conditional_0004["python3 tools/agent_tools/search.py --query-file '<request-or-design-question.txt>' --providers text,semantic,vector,tool,header-deps,code-deps --format json (order=4; ref=2b88c49b9835d399914fff8d91e14a88dfd007f8ca4de76a31b49a525baacaec)"]
     %% node kind=command id=command:codex-task-workflow:conditional:0005 digest=212276e0f4dda598c754b0a5bce870cdce5dcc4583e35cd2a750f1c37be593e4 order=5
@@ -577,10 +577,10 @@ graph LR
     n_command_agent_eval_accumulation_conditional_0005["python3 tools/agent_tools/run_accumulated_agent_evals.py (order=5; ref=73899bfcfe1fba49ee0ee457c90c064de3455a4a1c2890853d7b9558abf6211e)"]
     %% node kind=command id=command:agent-canon-update:conditional:0000 digest=60f77231cf46a63dff9817305226914237ff7bf8a4428184ad6e34b23cea7fb5 order=0
     n_command_agent_canon_update_conditional_0000["make agent-canon-update-plan (order=0; ref=60f77231cf46a63dff9817305226914237ff7bf8a4428184ad6e34b23cea7fb5)"]
-    %% node kind=command id=command:agent-canon-update:conditional:0001 digest=b1fa8d8973c115d4a963e00a3ff6d72ec2005aac26e0631f91d3385e7cbd06ee order=1
-    n_command_agent_canon_update_conditional_0001["bash tools/sync_agent_canon.sh link-root (order=1; ref=b1fa8d8973c115d4a963e00a3ff6d72ec2005aac26e0631f91d3385e7cbd06ee)"]
-    %% node kind=command id=command:agent-canon-update:conditional:0002 digest=f4b0aa8e991325d3e3bfb8c79d9021615bab31d7d2aec1e78f9a6e488389a117 order=2
-    n_command_agent_canon_update_conditional_0002["bash tools/sync_agent_canon.sh check (order=2; ref=f4b0aa8e991325d3e3bfb8c79d9021615bab31d7d2aec1e78f9a6e488389a117)"]
+    %% node kind=command id=command:agent-canon-update:conditional:0001 digest=7bc7685a69b301448326fe5e081ae6079b98a4dc36dc0c9873821652d0ca2f7b order=1
+    n_command_agent_canon_update_conditional_0001["PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root (order=1; ref=7bc7685a69b301448326fe5e081ae6079b98a4dc36dc0c9873821652d0ca2f7b)"]
+    %% node kind=command id=command:agent-canon-update:conditional:0002 digest=30ce3d5492a46d7303701d0c5f72503bdbf658623d63629f576b86a0e4de341d order=2
+    n_command_agent_canon_update_conditional_0002["PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check (order=2; ref=30ce3d5492a46d7303701d0c5f72503bdbf658623d63629f576b86a0e4de341d)"]
     %% node kind=command id=command:agent-canon-update:conditional:0003 digest=c86cd4349809695417a8069887437cccae8630adfe123eb8cbca487d6a5946d5 order=3
     n_command_agent_canon_update_conditional_0003["python3 tools/agent_tools/agent_canon_update_todos.py status (order=3; ref=c86cd4349809695417a8069887437cccae8630adfe123eb8cbca487d6a5946d5)"]
     %% node kind=command id=command:agent-canon-update:conditional:0004 digest=e549ae3949f3e9f2b998ca055543ccbbc21f3f36ffda013a22d3796a2b262988 order=4
@@ -601,8 +601,8 @@ graph LR
     n_command_pr_processing_conditional_0003["gh pr checks (order=3; ref=ed4b75d61e0cf84c8e0a83e713974fe725b311d4c3359c07e530031437486227)"]
     %% node kind=command id=command:pr-processing:conditional:0004 digest=69b6950a0b3f70f03f45cfadf4d04a070bed5d893524d2dee2785dc71c68baf1 order=4
     n_command_pr_processing_conditional_0004["make agent-canon-ensure-latest (order=4; ref=69b6950a0b3f70f03f45cfadf4d04a070bed5d893524d2dee2785dc71c68baf1)"]
-    %% node kind=command id=command:pr-processing:conditional:0005 digest=e8a7b3e8a843bfdd10fe5af0d17c10309d800588aadeb9f5e544b41a0b8b9d6e order=5
-    n_command_pr_processing_conditional_0005["bash tools/sync_agent_canon.sh link-root (order=5; ref=e8a7b3e8a843bfdd10fe5af0d17c10309d800588aadeb9f5e544b41a0b8b9d6e)"]
+    %% node kind=command id=command:pr-processing:conditional:0005 digest=e50396763313d77902b10e0bb204ab725f16e1dd022de20d1ad0bdf0986ff35b order=5
+    n_command_pr_processing_conditional_0005["PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root (order=5; ref=e50396763313d77902b10e0bb204ab725f16e1dd022de20d1ad0bdf0986ff35b)"]
     %% node kind=command id=command:pr-processing:conditional:0006 digest=9d3524f6592f99bd7dc801fcf90b13e4e136073ba42256f8161336a0d9b8cf11 order=6
     n_command_pr_processing_conditional_0006["python3 tools/agent_tools/bootstrap_agent_run.py --task '<task>' --owner codex --workspace-root '$PWD' (order=6; ref=9d3524f6592f99bd7dc801fcf90b13e4e136073ba42256f8161336a0d9b8cf11)"]
     %% node kind=command id=command:pr-processing:conditional:0007 digest=e9b5bd33140b46805cec6cde83e46e35878534bdb1af27023c180601fde6556f order=7
@@ -663,8 +663,8 @@ graph LR
     n_command_structure_refactor_conditional_0004["python3 tools/agent_tools/import_responsibility.py --root '<root>' --format json '>' '<run>/import_responsibility.json' (order=4; ref=2d6957eece747f932db6c31d9af04faac119d63a8f2891c36118c517c6b13867)"]
     %% node kind=command id=command:structure-refactor:conditional:0005 digest=a630786f8234199c2bc6dca5ea1276a1968ba38f915b6536d11b2f1db941759e order=5
     n_command_structure_refactor_conditional_0005["make agent-canon-ensure-latest (order=5; ref=a630786f8234199c2bc6dca5ea1276a1968ba38f915b6536d11b2f1db941759e)"]
-    %% node kind=command id=command:structure-refactor:conditional:0006 digest=66803fb1eb4c8c50188f6574490fa5850561ba3a15b4063a8191aaa32edcb53b order=6
-    n_command_structure_refactor_conditional_0006["bash tools/sync_agent_canon.sh link-root (order=6; ref=66803fb1eb4c8c50188f6574490fa5850561ba3a15b4063a8191aaa32edcb53b)"]
+    %% node kind=command id=command:structure-refactor:conditional:0006 digest=5dc8677215a7a5a4d4d88386ea45846a5f6932b304dea1c928418c4bc78226e6 order=6
+    n_command_structure_refactor_conditional_0006["PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root (order=6; ref=5dc8677215a7a5a4d4d88386ea45846a5f6932b304dea1c928418c4bc78226e6)"]
     %% node kind=command id=command:structure-refactor:conditional:0007 digest=8c328d9e9ed64a6611d8a1eb5f31db127f9296e6ab48e72809a14197f84b0fcd order=7
     n_command_structure_refactor_conditional_0007["agent-canon structured-analysis document-inventory --root '<root>' (order=7; ref=8c328d9e9ed64a6611d8a1eb5f31db127f9296e6ab48e72809a14197f84b0fcd)"]
     %% node kind=command id=command:structure-refactor:conditional:0008 digest=7699976e6b8b5d68edb922faa5b7a14dc0b281b7bf6d2109a50d84774cc6b184 order=8
@@ -1624,11 +1624,11 @@ graph LR
   %% source kind=field id=source:field:00000:92a44a55744e2ea5 digest=66a8e177d685c0a6cb3e77e0c74f785aa72c12e01ec9350ab134d6d506792eeb locator=tools/agent_tools/skill_tool_commands.py#codex-task-workflow:conditional:0 ordinal=0
   %% source kind=identity id=source:identity:00001:40af41e9a11d1436 digest=202ff127981edd12cad06c98f947fe630464a07c3c04de76d6134a63bb3e5722 locator=agents/skills/catalog.yaml#skill:codex-task-workflow.tool_commands.conditional[1] ordinal=1
   %% source kind=field id=source:field:00001:bcc56c9e8b0f1deb digest=f2f0a58280ca905b7ab04c8f7b3cd9ffd78479bdb30dd80c851d09d321a71600 locator=tools/agent_tools/skill_tool_commands.py#codex-task-workflow:conditional:1 ordinal=1
-  %% source kind=identity id=source:identity:00002:81cef7108c5cf153 digest=de5df9b2bdc8575196ee8ead777f908c93cf69f6300f0a53396e5247ae1b4fb8 locator=agents/skills/catalog.yaml#skill:codex-task-workflow.tool_commands.conditional[2] ordinal=2
-  %% source kind=field id=source:field:00002:042e7c9a0a7700c6 digest=9d99f5e40acfb2f4fb021b3631c8bbb6f86d4e2e31339a2e755c8f92a61cc570 locator=tools/agent_tools/skill_tool_commands.py#codex-task-workflow:conditional:2 ordinal=2
+  %% source kind=identity id=source:identity:00002:f3ed157bf97dc3f3 digest=a6f1dff86135a0cbcfeb4a36acd39982af3c0735bb48330262334cb8e03ddae1 locator=agents/skills/catalog.yaml#skill:codex-task-workflow.tool_commands.conditional[2] ordinal=2
+  %% source kind=field id=source:field:00002:1d150d38ce9f9433 digest=c920c2f7d22b4014d1de315e8c7834a50f589118d10076ce90e17edccb781fb6 locator=tools/agent_tools/skill_tool_commands.py#codex-task-workflow:conditional:2 ordinal=2
   %% source kind=module id=source:module:00008:0a8cf886baf62381 digest=21f78f09c6f0865fd30fb9e37926473690a5c537036f76e43fe5c867dbc1b7d5 locator=tools/catalog.yaml#tool:sync-agent-canon ordinal=8
-  %% source kind=identity id=source:identity:00003:70d0706ca858eaa9 digest=075a7deeb826ff8a3158a6151e8a2552bd24010e6c5c53d5ad9bc5801950d6b1 locator=agents/skills/catalog.yaml#skill:codex-task-workflow.tool_commands.conditional[3] ordinal=3
-  %% source kind=field id=source:field:00003:e96ec45b0d13416c digest=804dee4cff50a3895218b33898a27edbab32704e3f17f1a74e7f59082291cdbe locator=tools/agent_tools/skill_tool_commands.py#codex-task-workflow:conditional:3 ordinal=3
+  %% source kind=identity id=source:identity:00003:3044bd279c0cb1b0 digest=a3f74c778150ff60112858619f831986e2ac6549d64f16eb0b95e1caa6ccd260 locator=agents/skills/catalog.yaml#skill:codex-task-workflow.tool_commands.conditional[3] ordinal=3
+  %% source kind=field id=source:field:00003:fc7e1072dc96b3ff digest=bf53b121bc1252b972925118c8cc42df1606b33bf4cdf922e29bbe0c93a0a3a3 locator=tools/agent_tools/skill_tool_commands.py#codex-task-workflow:conditional:3 ordinal=3
   %% source kind=identity id=source:identity:00004:ae01b54279a16d5f digest=78122620ac1d3671f21e7c289f052954c74bca3bb2d067748ec0a15bc1e2ba17 locator=agents/skills/catalog.yaml#skill:codex-task-workflow.tool_commands.conditional[4] ordinal=4
   %% source kind=field id=source:field:00004:7c0a35c7a1b48d14 digest=bffd6e7679d6dc38a0392f0bcef84787f46045ff841688599dc8b424de4501a6 locator=tools/agent_tools/skill_tool_commands.py#codex-task-workflow:conditional:4 ordinal=4
   %% source kind=identity id=source:identity:00005:3055bc520676eecb digest=d5334b16518fc0da8593011fefdf2080a018f5d3699f3ea51b9170eac1c599f5 locator=agents/skills/catalog.yaml#skill:codex-task-workflow.tool_commands.conditional[5] ordinal=5
@@ -1874,10 +1874,10 @@ graph LR
   %% source kind=phase id=source:phase:00001:93921f4cb2bcc782 digest=922eb06ce1f1a54cce2d5e9966f2abf9dd6a5daf7b9336bbe443104cafae226f locator=agents/skills/catalog.yaml#skill:agent-canon-update.tool_commands.conditional ordinal=1
   %% source kind=identity id=source:identity:00000:15e55e371cc507ca digest=acb73ebf9af8d6ffb49b3bebdc70e2b1aa1cd6aba539a5062b8197a67b743e0e locator=agents/skills/catalog.yaml#skill:agent-canon-update.tool_commands.conditional[0] ordinal=0
   %% source kind=field id=source:field:00000:89ca02efba1ce79c digest=706ed252dc4441bd6618b8ab9e1d11d7fe753124763d9d1cdbd3713111061f33 locator=tools/agent_tools/skill_tool_commands.py#agent-canon-update:conditional:0 ordinal=0
-  %% source kind=identity id=source:identity:00001:7a99729867df52b4 digest=4cce821434044eccc0a9fe0dfc720df5a1e90d2243f15a364b9dd2e369a3892d locator=agents/skills/catalog.yaml#skill:agent-canon-update.tool_commands.conditional[1] ordinal=1
-  %% source kind=field id=source:field:00001:0842596f1d501bfa digest=839a2abfbb4540b3fdf41313682448c25cf25279024465612e5d90cd3fcc6f50 locator=tools/agent_tools/skill_tool_commands.py#agent-canon-update:conditional:1 ordinal=1
-  %% source kind=identity id=source:identity:00002:6f7acd10cf9a54f6 digest=56c42b0f5b9e128701016a619de9490cbf8c94a175205e55eaa47ff65b07ff9d locator=agents/skills/catalog.yaml#skill:agent-canon-update.tool_commands.conditional[2] ordinal=2
-  %% source kind=field id=source:field:00002:d020b556a5b52827 digest=f19846d49bc8a0a3883f69377c30573a0489159ecc822aa1604ac080198dca5e locator=tools/agent_tools/skill_tool_commands.py#agent-canon-update:conditional:2 ordinal=2
+  %% source kind=identity id=source:identity:00001:642f96dd779da45b digest=415788ffa429b67b5bac42778cbeb9969aa74b5cf7cd6430f9691902af71135e locator=agents/skills/catalog.yaml#skill:agent-canon-update.tool_commands.conditional[1] ordinal=1
+  %% source kind=field id=source:field:00001:3db888f5b3168b31 digest=801bbc69b623df8168382496f1f4d2e15f5166c2d3f8b3ee62fac0f573b8764c locator=tools/agent_tools/skill_tool_commands.py#agent-canon-update:conditional:1 ordinal=1
+  %% source kind=identity id=source:identity:00002:febc69ff7fc2ba29 digest=a8bdb59381770b9eaa744bdfbd258bb9d5a7fe1d42ef32b95c8a1045154b8a37 locator=agents/skills/catalog.yaml#skill:agent-canon-update.tool_commands.conditional[2] ordinal=2
+  %% source kind=field id=source:field:00002:4c70993134d63df3 digest=f94ecbbc55ccf058c3be1215ca55563d906b81662fa85b165bfe94c30fb5ade3 locator=tools/agent_tools/skill_tool_commands.py#agent-canon-update:conditional:2 ordinal=2
   %% source kind=identity id=source:identity:00003:7fd814d648018e89 digest=6c93615d072c2bccd83afa53ac8c9ca07efeb077704a7ceb376ae8dcf27caf11 locator=agents/skills/catalog.yaml#skill:agent-canon-update.tool_commands.conditional[3] ordinal=3
   %% source kind=field id=source:field:00003:12a4bd3f0074bd2c digest=e15dbc808bce13961d635b399f4eaf6c386e2b7164911dbca92ae17af0eed725 locator=tools/agent_tools/skill_tool_commands.py#agent-canon-update:conditional:3 ordinal=3
   %% source kind=module id=source:module:00027:fc3e21692b905bbd digest=3339d7141ebe2b07a3d6111260934a5867da935e645cf4fad3780fafd647e2a7 locator=tools/catalog.yaml#tool:agent-canon-update-todos ordinal=27
@@ -1914,8 +1914,8 @@ graph LR
   %% source kind=field id=source:field:00003:c72cb94113029f3a digest=e40c01c561d5c938a96112be5a6cabe947d908b16f96fb46794c22183128ef9a locator=tools/agent_tools/skill_tool_commands.py#pr-processing:conditional:3 ordinal=3
   %% source kind=identity id=source:identity:00004:c301ebfd2843d0f9 digest=1ff6552359625ba318346a943c4492d48b96bc202eb1342d209c589e20f00d40 locator=agents/skills/catalog.yaml#skill:pr-processing.tool_commands.conditional[4] ordinal=4
   %% source kind=field id=source:field:00004:5901a17d6001056b digest=d37707d00fad9037368d04d7ae8a63c2e3c4b890e9a812650c7134e7a45747fa locator=tools/agent_tools/skill_tool_commands.py#pr-processing:conditional:4 ordinal=4
-  %% source kind=identity id=source:identity:00005:3e5c0c8bd0acc762 digest=dd4a9fdb3295b9f94c555c6936815b5dd6cb74be4dbdf335cdec589e4f65ef4f locator=agents/skills/catalog.yaml#skill:pr-processing.tool_commands.conditional[5] ordinal=5
-  %% source kind=field id=source:field:00005:2367a0f7468b8d38 digest=600515a1a53fa2775a1a088074d38f3356015feddea1620c1c3a4b0793aeba4b locator=tools/agent_tools/skill_tool_commands.py#pr-processing:conditional:5 ordinal=5
+  %% source kind=identity id=source:identity:00005:6d0de62090b9a1bd digest=95429ec02433343b2540197d968c381ce150f77b06beba51e212b7c7b70d826a locator=agents/skills/catalog.yaml#skill:pr-processing.tool_commands.conditional[5] ordinal=5
+  %% source kind=field id=source:field:00005:cf1dadcf172e88f2 digest=98262f0d05592e7ea90a07c3c43235ddfb7c75e9043c8fa34574dddc7abe120b locator=tools/agent_tools/skill_tool_commands.py#pr-processing:conditional:5 ordinal=5
   %% source kind=identity id=source:identity:00006:b4646b5d60cef63e digest=363c5bde55d63023d5d91bf0a3cdabd60029456f9daaa19e0fb8d8d16d220bec locator=agents/skills/catalog.yaml#skill:pr-processing.tool_commands.conditional[6] ordinal=6
   %% source kind=field id=source:field:00006:2c0dcccc60ea4ed4 digest=6b50745368a6f1c922b1b17c7b41a68a98f61aada08216c9b8acd82ef3c5a9da locator=tools/agent_tools/skill_tool_commands.py#pr-processing:conditional:6 ordinal=6
   %% source kind=identity id=source:identity:00007:8f1f3003ff930afb digest=44746ed3464915093690bad74dfbb89687247fc20de63a0d7bbeff4a28015c6c locator=agents/skills/catalog.yaml#skill:pr-processing.tool_commands.conditional[7] ordinal=7
@@ -2052,8 +2052,8 @@ graph LR
   %% source kind=module id=source:module:00034:445e7d3fecb48f4b digest=700b8491b893ed967a4fe10b71d570fa2dea8a6e473e4c5562967d1ed2b4fbb0 locator=tools/catalog.yaml#tool:import-responsibility ordinal=34
   %% source kind=identity id=source:identity:00005:6ac12032f2fb2630 digest=5e056886be68bac65d54057c5eaa0dbbbd72f88624ec07d52651c6f0bc110c0f locator=agents/skills/catalog.yaml#skill:structure-refactor.tool_commands.conditional[5] ordinal=5
   %% source kind=field id=source:field:00005:b98a96d38b1ba6c8 digest=87efd405e6631eede5d6dddff2b1540767c66b31b265f4a35766b059f5318a70 locator=tools/agent_tools/skill_tool_commands.py#structure-refactor:conditional:5 ordinal=5
-  %% source kind=identity id=source:identity:00006:ff58c008ac098a0d digest=2754d1a1f17b0331d8c3499d3e424df8ee89cbd647b0e756993a009188da3fdf locator=agents/skills/catalog.yaml#skill:structure-refactor.tool_commands.conditional[6] ordinal=6
-  %% source kind=field id=source:field:00006:aa2b32f110af2cb1 digest=b124e6d156d3c6a1ac13ae0d060bbb03829b1959fe8299d96168cabd78ed5114 locator=tools/agent_tools/skill_tool_commands.py#structure-refactor:conditional:6 ordinal=6
+  %% source kind=identity id=source:identity:00006:454e794022c4ffc2 digest=97812a3d365bfd23bcb4ef630057c7f08819fa586f4ef5c4f5c0231b26e581c2 locator=agents/skills/catalog.yaml#skill:structure-refactor.tool_commands.conditional[6] ordinal=6
+  %% source kind=field id=source:field:00006:0a1f6f7be6b31cfe digest=b96455bef3c5a05325135fc61b524f50739472ed277711151285281c60c59575 locator=tools/agent_tools/skill_tool_commands.py#structure-refactor:conditional:6 ordinal=6
   %% source kind=identity id=source:identity:00007:e1b358ab5638010c digest=b3939f5e0aacee388c5379db0064745e42dd0132e9d852a64c58aabc9f0075ba locator=agents/skills/catalog.yaml#skill:structure-refactor.tool_commands.conditional[7] ordinal=7
   %% source kind=field id=source:field:00007:0a9a48d8b3e9a59c digest=885e70933d3fa9b5f2735c0bc5b2307f01a8dc20503f3bdbfe276ee79d9f73b0 locator=tools/agent_tools/skill_tool_commands.py#structure-refactor:conditional:7 ordinal=7
   %% source kind=identity id=source:identity:00008:422cae3dafc184a5 digest=8b820ad03f03f727071192ec624244ed1907f54dbd702faab667f0295a6c7001 locator=agents/skills/catalog.yaml#skill:structure-refactor.tool_commands.conditional[8] ordinal=8
@@ -2545,11 +2545,11 @@ graph LR
   %% source kind=identity id=source:identity:00001:da5027f2199bd6ea digest=4969a18f9d605925a2b2f989bb915e7862983138a2de927d78655f34169e639d locator=agents/skills/catalog.yaml#skill:wiki-publication.tool_commands.maintenance[1] ordinal=1
   %% source kind=field id=source:field:00001:14bc3d8302d7e647 digest=3a77b3beafe7cf5dc16dbe2e816dc54375388b88bf268c7ca6f20dc62c25f675 locator=tools/agent_tools/skill_tool_commands.py#wiki-publication:maintenance:1 ordinal=1
   %% source kind=module id=source:module:00000:efcc8c1d91224b3c digest=929389bbc1c9cd97297a6137e33d39eafb83ad7ccb941f49da39bd7d31bbd642 locator=agents/skills/code-visualization.md ordinal=0
-  %% source kind=evidence id=source:evidence:01129:f162bdd0c6bdf7b6 digest=970ec99ba32b5a903dcbd917dd8631eb224def6fbe880f6b4329b3d0b31e93b2 locator=agents/skills/catalog.yaml ordinal=1129
+  %% source kind=evidence id=source:evidence:01129:5fca6fc4de9226cd digest=7f6bcca4fb08f1d9103739f10f18277292faa7bab12fd9afa0e6deebcfdcf86d locator=agents/skills/catalog.yaml ordinal=1129
   %% source kind=evidence id=source:evidence:01130:e68b1c8fd9872eda digest=4835520a3c1adeab1a8ba5a71a4e04e011cc6261b640878ac6392ad862bf5594 locator=agents/skills/skill-dependencies.yaml ordinal=1130
   %% source kind=evidence id=source:evidence:01131:c0f5298f73143db0 digest=64768dce949e06133a493bd7752a5269f73d39dcadaa830da58dd733be05e1dd locator=agents/canonical/skills.md ordinal=1131
   %% source kind=evidence id=source:evidence:01132:d837cc660e8af7c8 digest=71491826efc35fc3d361f4950994d51a50edd26f0b2c097ca07168a28f566b71 locator=agents/skills/catalog.yaml#routing ordinal=1132
-  %% source kind=evidence id=source:evidence:01133:e382a04f007c040e digest=e853fe5d51626a62d14079fe1190b6394164d77731d1427fc3bc5a350723f076 locator=tools/agent_tools/skill_tool_commands.py#canonical-resolution ordinal=1133
+  %% source kind=evidence id=source:evidence:01133:20f690c9fbcd3bad digest=891cf70715d915d888b4eac4f5e017769207192a0a010d04b7a61ad7e6e9e473 locator=tools/agent_tools/skill_tool_commands.py#canonical-resolution ordinal=1133
   %% source kind=evidence id=source:evidence:01134:3be5ae955f1fada8 digest=4fc9221fb6870de6edd9635cef89154a7cccb6fc134193e5b5c2920750682cd6 locator=agents/skills/catalog.yaml#typed-visualization-toolcalls ordinal=1134
   %% source kind=edge id=source:edge:00000:fc6e388d1a034763 digest=4caf05610f97ddedb2b303961308da403f7e2584df7eafeba152bc11b136a9ad locator=graph:edge:00000 ordinal=0
   %% source kind=edge id=source:edge:00001:393efbc033d17a1f digest=a4edc37be2840ecbec90abb3f94b178c30e71666802659057a798bb4c967dc9c locator=graph:edge:00001 ordinal=1
@@ -2598,8 +2598,8 @@ graph LR
   %% source kind=edge id=source:edge:00044:c8e77d78f417ee41 digest=4c13840726eaff18d66c2dc2c0146338e63f0f20cdfb99e7f219864385a00324 locator=graph:edge:00044 ordinal=44
   %% source kind=edge id=source:edge:00045:a1443e460da8a9cb digest=895407754dea2b337513ddbdefd5d9499abb517d7a7ef367080044e745cb9329 locator=graph:edge:00045 ordinal=45
   %% source kind=edge id=source:edge:00046:e2c7ad07c07924fb digest=9039636f2902d3c0fef3589319d6e9c8d5398544cdc01b56c96de3edc36ae5d8 locator=graph:edge:00046 ordinal=46
-  %% source kind=edge id=source:edge:00047:defa39c513c499e9 digest=8a5c8fe81ab56524c5c3bbf7d5677a03f938ecd2a88cd8912d1128a0330422bc locator=graph:edge:00047 ordinal=47
-  %% source kind=edge id=source:edge:00048:45f56bc14253647b digest=cfb51edeaedf8a72029a54d170b944b475d358944c402b59db77750f6d5393a9 locator=graph:edge:00048 ordinal=48
+  %% source kind=edge id=source:edge:00047:61357134abac5e9c digest=5a2850c0f028a1c8f2385851245eda42190c6e431d6ccb3c480dfffde73174b5 locator=graph:edge:00047 ordinal=47
+  %% source kind=edge id=source:edge:00048:e303eab2d6d764a7 digest=95ababf4b89a7f31d4876dc7201632be3a5de3b9efeeb4806c8196195cd4e87c locator=graph:edge:00048 ordinal=48
   %% source kind=edge id=source:edge:00049:152aa8a80630d4c4 digest=ae81578c71349dc3857f7f0665b3db4e9895ee9b9aa926f045297ff5f8b30f5b locator=graph:edge:00049 ordinal=49
   %% source kind=edge id=source:edge:00050:a51da7d09b8fd1bc digest=45cbf958e318e96e4ac225d4f1f4dda7e86eb180dd20fdaa03b7d2802225d949 locator=graph:edge:00050 ordinal=50
   %% source kind=edge id=source:edge:00051:d9a703a7b56970ba digest=ad31a908f83c89069f881b250056d277581508ef9a9bc2dc3768bdb65eaaf238 locator=graph:edge:00051 ordinal=51
@@ -2736,8 +2736,8 @@ graph LR
   %% source kind=edge id=source:edge:00182:a8b126357d5d3bf2 digest=d598946d9e524a1963851f0e76a2e500f6f826d31c1b0213fdf1e1f9bc6a3aaf locator=graph:edge:00182 ordinal=182
   %% source kind=edge id=source:edge:00183:a389f23c6b547d51 digest=be48ce1ff9263f98fd11fa4bed9320713c8f9d9d3492b371cdb55da876c4ba87 locator=graph:edge:00183 ordinal=183
   %% source kind=edge id=source:edge:00184:350ce5f7639550d9 digest=331edef50d463e8cec9e1f1915ff13e8777109f1ae26781653ff52fc433cb493 locator=graph:edge:00184 ordinal=184
-  %% source kind=edge id=source:edge:00185:e7c34faa0a9fca50 digest=d379ddcab6cf0bfee15d164787db70429db15ee74c2d9360c44be8d41faab1e0 locator=graph:edge:00185 ordinal=185
-  %% source kind=edge id=source:edge:00186:9f5341406816d643 digest=7b83f65863f2adab7fa609c3d0eb333e2c93cc0e8856446921c1ae962ce56e2a locator=graph:edge:00186 ordinal=186
+  %% source kind=edge id=source:edge:00185:3f7d1fae6ec8431d digest=688bbdef083869f97b5fcc0ab9a8eee6c6c3a2b8ebd763c0f8095528c4209d08 locator=graph:edge:00185 ordinal=185
+  %% source kind=edge id=source:edge:00186:4c877717fd7e4b83 digest=4d791d2a15b716ebbfc5da28b85630ff0faa9a4371ff4ad4f80fb0993a0680b6 locator=graph:edge:00186 ordinal=186
   %% source kind=edge id=source:edge:00187:383ef075a59de191 digest=38e3853a7e334038e8a923959ed8982415a1bdb312da1684bb4a31bd7fdd1000 locator=graph:edge:00187 ordinal=187
   %% source kind=edge id=source:edge:00188:a87397ceb6610d9a digest=d8e071bd5750f70123ebe9506a3b4a76de1b8cafbef6346ce68eacbbdeee70f0 locator=graph:edge:00188 ordinal=188
   %% source kind=edge id=source:edge:00189:aca69701b6761679 digest=607cf5e6e1057309b181359e94d4ae4c80eab71e4f24caa5ff9722866feaabc9 locator=graph:edge:00189 ordinal=189
@@ -2758,7 +2758,7 @@ graph LR
   %% source kind=edge id=source:edge:00204:435f9a5923c51b3d digest=3d3d0344b96ff524281b40197d120d9bd4b6f910c5c49547b386db6a3cbef66e locator=graph:edge:00204 ordinal=204
   %% source kind=edge id=source:edge:00205:d0af3c9e3afaf874 digest=3d38965f6c294b820a97fd41bd2056ae4dea1cb72190e95bbecaaeeca0b1eb58 locator=graph:edge:00205 ordinal=205
   %% source kind=edge id=source:edge:00206:345bc3b7e13d998c digest=f14ed7a17e4f580aacfc2c74fc538359507a3381d52ce3dbe174484c799ed1ba locator=graph:edge:00206 ordinal=206
-  %% source kind=edge id=source:edge:00207:32d15ddb81e5428b digest=4bba6b6176c8d75d1296dad9f8a84f83849781fd9cf9c647ddf3cd7e3a8a63e9 locator=graph:edge:00207 ordinal=207
+  %% source kind=edge id=source:edge:00207:c87ac54abc1f0c6d digest=ab5052dccbc568cbaa3a9fdead7bd1471eecf7b5dc2f20bfb87fcf83d51c3eae locator=graph:edge:00207 ordinal=207
   %% source kind=edge id=source:edge:00208:bea63ba69fe04d95 digest=c18a5a80ea83aa6a177189f426c2d0abee5641b048d34cc60acf7f2cafe6e28b locator=graph:edge:00208 ordinal=208
   %% source kind=edge id=source:edge:00209:2434b521bf438095 digest=2ab05eed0dab212a7eb9cb5aaf48d2c21140e14c86e6005287e7d2295431b5b7 locator=graph:edge:00209 ordinal=209
   %% source kind=edge id=source:edge:00210:5dfd9dd5eb6ae98e digest=3a3efab116e9bf548188871f896d38e0471e401c4c452f7c9a5a98925948b8eb locator=graph:edge:00210 ordinal=210
@@ -2839,7 +2839,7 @@ graph LR
   %% source kind=edge id=source:edge:00285:802d0b7965788b17 digest=52eb0e1dacf883e85b6c0dda3751f38a773c4f2d2cb82ba7bc7ac62d15650f2b locator=graph:edge:00285 ordinal=285
   %% source kind=edge id=source:edge:00286:762f73142b9e0793 digest=9f6247209f554a6b77361c63f25ce16ee6373c40bd8a13e9106bc655cb9f444e locator=graph:edge:00286 ordinal=286
   %% source kind=edge id=source:edge:00287:9e8f7fe3e3060f71 digest=90bb705eee8979cf7055075a830f7384f46acf545bfd620f04111ff88e3e658c locator=graph:edge:00287 ordinal=287
-  %% source kind=edge id=source:edge:00288:909968fc9bf31448 digest=e5331191d83fa0f89f493e7c9f289315d6bfe26b172077354704a15ef35b8dec locator=graph:edge:00288 ordinal=288
+  %% source kind=edge id=source:edge:00288:594b7db29f1ab627 digest=ac78c23d1aed0996005423c9e10dfc2a6f4c8f0f18dd5a480d1eca5e65f6a821 locator=graph:edge:00288 ordinal=288
   %% source kind=edge id=source:edge:00289:557f8c8e1a129673 digest=6bf36daba5189099c4205cbdbdf0cb9a29a9d7a13e56bfee22d8d8d6278c22d0 locator=graph:edge:00289 ordinal=289
   %% source kind=edge id=source:edge:00290:f6d1b123495f8347 digest=71e1c0d6e0447c1fff4db3772a09687b8442338f221a4ead9b45e8e14d9d6f45 locator=graph:edge:00290 ordinal=290
   %% source kind=edge id=source:edge:00291:8c335896f8f2ee6e digest=08c247b2a426771e9304fc8373fb5303dcb1c8449a6fc695faaaa1a7ee7e415d locator=graph:edge:00291 ordinal=291
@@ -3418,8 +3418,8 @@ graph LR
   %% source kind=edge id=source:edge:00864:21dd13e9775dad06 digest=b64df18d96d9cfd2a6c8166a9b4a9dfa856cb9fb0343706cf5245a115ccf7473 locator=graph:edge:00864 ordinal=864
   %% source kind=edge id=source:edge:00865:3f558aab072a6ad5 digest=9a94c186cd021b88617e747d725ceaf414fabeecbd6a510a8dac3e81c3de0a0e locator=graph:edge:00865 ordinal=865
   %% source kind=edge id=source:edge:00866:7d35c0de75748301 digest=fe552cc505085f92e50c76596a6489dc205f6b9a4f7c279f4661e48c8504fcb1 locator=graph:edge:00866 ordinal=866
-  %% source kind=edge id=source:edge:00867:1c1c326619ee4ce7 digest=34357d13028e3c3a3a278f02d4bdb986705678f23e95cb1a4dbb4abe597f4541 locator=graph:edge:00867 ordinal=867
-  %% source kind=edge id=source:edge:00868:f8048bf8a5e434ad digest=93fc5188a0c7016b091562a572c680a9771901cdd1beea20f3175d741719f40b locator=graph:edge:00868 ordinal=868
+  %% source kind=edge id=source:edge:00867:ffe60383f0423340 digest=00e1a409a8e3189840ec57491d4416f08f7a603f3b1d05a67788d1e742085e6c locator=graph:edge:00867 ordinal=867
+  %% source kind=edge id=source:edge:00868:fbb1fe91e16779d0 digest=770fe16ae0d9a77aa4bb5d189c65504033ed72c26bbcff3155b62b4f53a09178 locator=graph:edge:00868 ordinal=868
   %% source kind=edge id=source:edge:00869:00d828710c76bc6c digest=76c8b4ea57e16e084e80375f34658aaf9a63d005862636c68b8fd3a6927554dc locator=graph:edge:00869 ordinal=869
   %% source kind=edge id=source:edge:00870:5f414d5490105870 digest=d51e129e8c258bde1cb2c46209023cb1f463f2b822ad6d0b03f8e41d14fdcf3e locator=graph:edge:00870 ordinal=870
   %% source kind=edge id=source:edge:00871:2f7d4dcb0525f5e6 digest=4b3c846d2bfde7defe39f910079c73c681cf71d72ce3d759b8ba186072261262 locator=graph:edge:00871 ordinal=871
@@ -3502,8 +3502,8 @@ graph LR
   %% source kind=edge id=source:edge:00948:f93b5608f1e84db8 digest=db00ff9d461479beb6c43cb489e5bc078effdd64d30ec62885ff0349a2fa7340 locator=graph:edge:00948 ordinal=948
   %% source kind=edge id=source:edge:00949:ff83f971ad1b3a80 digest=6693f7cdf1489e815fedb2cea05fc7eb3ffc947bcbff7833893385dbd2e406a7 locator=graph:edge:00949 ordinal=949
   %% source kind=edge id=source:edge:00950:2363826eceb3a3de digest=47590b1f16480d30a6cd5d6ef0c7f94b41c16a607fd065ff17b50bdeb474b817 locator=graph:edge:00950 ordinal=950
-  %% source kind=edge id=source:edge:00951:e4f97f49bffc5a7b digest=5943c1456ae45da885c10ba85e75b4bc00759309b43f32fe4a5860890bd44ebd locator=graph:edge:00951 ordinal=951
-  %% source kind=edge id=source:edge:00952:69af894b615c11cb digest=3e28aa0c4a0f69b70f4e28be1be64294473eff85c6a6090402b39bec3a2583fd locator=graph:edge:00952 ordinal=952
+  %% source kind=edge id=source:edge:00951:0266e7c3bc58b2a2 digest=7a959c75b86e1509c34e4a3acfb3eb871d07d3cdef33b7077464d30cc362032c locator=graph:edge:00951 ordinal=951
+  %% source kind=edge id=source:edge:00952:80f032a50a59b2f8 digest=0725ad037a272247316f7d2bca3f328cd7f981ac9095e7e7f427b6457839c925 locator=graph:edge:00952 ordinal=952
   %% source kind=edge id=source:edge:00953:3e2339faa3872b7b digest=1ecca3b50a64bd73581d6556fbee95651a0fd41a2c5ce1e699f2cdefaf984815 locator=graph:edge:00953 ordinal=953
   %% source kind=edge id=source:edge:00954:9fee3170a6bf8c50 digest=cda7d1196a15d64eaf519a78eadd1c97d70b65eaddb07351a7880ff6530b1b9b locator=graph:edge:00954 ordinal=954
   %% source kind=edge id=source:edge:00955:2c4e062fa214a5a1 digest=2cfcdb910d43785fe4d7b484ad71c302085dca298d10e2d4935ca8fc344459e2 locator=graph:edge:00955 ordinal=955
@@ -3511,7 +3511,7 @@ graph LR
   %% source kind=edge id=source:edge:00957:f66c843f51d8a375 digest=37f3d971f8dd8076861bf3f9010e1303412d908ea694b260d13ba91c885c3150 locator=graph:edge:00957 ordinal=957
   %% source kind=edge id=source:edge:00958:a6d4cc3cf17fd5d5 digest=5c5c2a638800578a9ee32cf32389a0b0bb5a005af7843554ada048524cebb18a locator=graph:edge:00958 ordinal=958
   %% source kind=edge id=source:edge:00959:6885445cffe97084 digest=a77962e6027515b0fd72e1569b5ab1bf58680d74d534ff9b0418156a0c650221 locator=graph:edge:00959 ordinal=959
-  %% source kind=edge id=source:edge:00960:b4d4cb2038f3ef96 digest=b953c1fdd0916a11232e0fb461d27b4d6290f2e7abe2dc44150e08196ec64cc9 locator=graph:edge:00960 ordinal=960
+  %% source kind=edge id=source:edge:00960:b8dc613ca06f21e5 digest=7e62d56a9a1e59a07bfdf6f59f98906dbfe431fa822c6cd265a4f56595ba482a locator=graph:edge:00960 ordinal=960
   %% source kind=edge id=source:edge:00961:a4b233617988184a digest=fca12919e60a85005f4f7afdf997133bece2f4e946a8767d2aabf7bbd72d98d7 locator=graph:edge:00961 ordinal=961
   %% source kind=edge id=source:edge:00962:b36ad581dc25dee4 digest=c435cb0e54c141ba3531e35473e72f687c801d76faa287fcda37d2fa207ef790 locator=graph:edge:00962 ordinal=962
   %% source kind=edge id=source:edge:00963:be7dce338b058cce digest=39cbc7b8970d1be89671301f93ef3b610d45139c33086e851cf7ab4f0df6a1f2 locator=graph:edge:00963 ordinal=963
@@ -3552,7 +3552,7 @@ graph LR
   %% source kind=edge id=source:edge:00998:10419a5f4b3ab3dd digest=bd575a4c0ec59fdbef24e59ee37b682ff73a7b299874dc3a7bdaaf1c3b937220 locator=graph:edge:00998 ordinal=998
   %% source kind=edge id=source:edge:00999:b0ccefcae4de9945 digest=b032b6e8b5594a73f010021564666db5ae70f7c8735429a8b56fe18556e20c1d locator=graph:edge:00999 ordinal=999
   %% source kind=edge id=source:edge:01000:0a4a71b4dffa5130 digest=9f72c38d1290bb265edac0f6d0bd4fd3e12aaa234e074279204585bd381efd64 locator=graph:edge:01000 ordinal=1000
-  %% source kind=edge id=source:edge:01001:bba2953ed62bbcb6 digest=73bacdc185ef6371e57d682cc30b8f9405e67970cf3e4e97d1015981a16e6f08 locator=graph:edge:01001 ordinal=1001
+  %% source kind=edge id=source:edge:01001:ebdf0d5a2a9cbc4b digest=903b4f7d826dd6e999f41b822afdeb89e9b7e528b3f5f069f95aa9e3a28ab938 locator=graph:edge:01001 ordinal=1001
   %% source kind=edge id=source:edge:01002:ecd124f8cd82ba30 digest=8a5a5a1cb6348dbb0308406778224c1d071264aa2ab17ed0555565eebd30d083 locator=graph:edge:01002 ordinal=1002
   %% source kind=edge id=source:edge:01003:469b291e13cf22ad digest=a608e229beeb64cb4a3ba23726d49544f758ae7e14eaa8bc254303c80e4c336d locator=graph:edge:01003 ordinal=1003
   %% source kind=edge id=source:edge:01004:0100b9755a7ab1dd digest=2e79a8c4fdb230ed2dfbb9f12d74ea780de768a4d7f5516fbdce534ccbb0c689 locator=graph:edge:01004 ordinal=1004
@@ -3798,9 +3798,9 @@ graph LR
   n_phase_codex_task_workflow_conditional -->|"invocation (order=45; ref=504db9350957301ac654d7297c5a4625d2e99d888ff4f0b960a4ffc564165de5)"| n_command_codex_task_workflow_conditional_0000
   %% edge id=edge:00046 digest=8e3e8e55427b4a99c14a3da45fa98313e8dc674b85d810bd11eba98932eca25d type=invocation source=phase:codex-task-workflow:conditional source_digest=f50fb26f17ca4816f1670a2e6880c2909c293410c7a6ad46a55b388a0e8645a6 target=command:codex-task-workflow:conditional:0001 target_digest=3c44c801d08f0d2b8e805468d2dfeafa452e6f77dfd5dd5fb60f1bcfc8cbff93 order=46
   n_phase_codex_task_workflow_conditional -->|"invocation (order=46; ref=8e3e8e55427b4a99c14a3da45fa98313e8dc674b85d810bd11eba98932eca25d)"| n_command_codex_task_workflow_conditional_0001
-  %% edge id=edge:00047 digest=258f0c1d3c9ea7762b5b268a01f3815a87a91bddf86e0070dafb66357a206ea3 type=invocation source=phase:codex-task-workflow:conditional source_digest=f50fb26f17ca4816f1670a2e6880c2909c293410c7a6ad46a55b388a0e8645a6 target=command:codex-task-workflow:conditional:0002 target_digest=aefaffb2205cb4580908002dda67d5bf982ace21b0b2fa7f15d4f506a7c7675a order=47
+  %% edge id=edge:00047 digest=258f0c1d3c9ea7762b5b268a01f3815a87a91bddf86e0070dafb66357a206ea3 type=invocation source=phase:codex-task-workflow:conditional source_digest=f50fb26f17ca4816f1670a2e6880c2909c293410c7a6ad46a55b388a0e8645a6 target=command:codex-task-workflow:conditional:0002 target_digest=70ab8e554bf99b9002d420d0ad3540589feca2115b856ce3ecd85c85667e648c order=47
   n_phase_codex_task_workflow_conditional -->|"invocation (order=47; ref=258f0c1d3c9ea7762b5b268a01f3815a87a91bddf86e0070dafb66357a206ea3)"| n_command_codex_task_workflow_conditional_0002
-  %% edge id=edge:00048 digest=33a491f58424bd939bfad2038a1b4f4de3575abb46a082967fef589761e5aa14 type=invocation source=phase:codex-task-workflow:conditional source_digest=f50fb26f17ca4816f1670a2e6880c2909c293410c7a6ad46a55b388a0e8645a6 target=command:codex-task-workflow:conditional:0003 target_digest=d6737527957e9e62a2b1e9d8e4970436928414e9c0017bccd504462bf5889a37 order=48
+  %% edge id=edge:00048 digest=33a491f58424bd939bfad2038a1b4f4de3575abb46a082967fef589761e5aa14 type=invocation source=phase:codex-task-workflow:conditional source_digest=f50fb26f17ca4816f1670a2e6880c2909c293410c7a6ad46a55b388a0e8645a6 target=command:codex-task-workflow:conditional:0003 target_digest=df23f66e3e1dab5786816b3af209cc4d7208da0a330278ad8924a74a488dc32f order=48
   n_phase_codex_task_workflow_conditional -->|"invocation (order=48; ref=33a491f58424bd939bfad2038a1b4f4de3575abb46a082967fef589761e5aa14)"| n_command_codex_task_workflow_conditional_0003
   %% edge id=edge:00049 digest=4e5410c6e2edd4c5f86742e3074577829cd6907b55d39ef71ec3ef5c64bf43b6 type=invocation source=phase:codex-task-workflow:conditional source_digest=f50fb26f17ca4816f1670a2e6880c2909c293410c7a6ad46a55b388a0e8645a6 target=command:codex-task-workflow:conditional:0004 target_digest=2b88c49b9835d399914fff8d91e14a88dfd007f8ca4de76a31b49a525baacaec order=49
   n_phase_codex_task_workflow_conditional -->|"invocation (order=49; ref=4e5410c6e2edd4c5f86742e3074577829cd6907b55d39ef71ec3ef5c64bf43b6)"| n_command_codex_task_workflow_conditional_0004
@@ -4074,9 +4074,9 @@ graph LR
   n_skill_agent_canon_update -->|"invocation (order=183; ref=96af1843c92b369b36523f9c1a1d77eb48902eb8ec8e03cfcefe6c1aa2ebebd0)"| n_phase_agent_canon_update_conditional
   %% edge id=edge:00184 digest=49704207eb50f685b58e8fd665a6d1f19742fdd63e65d52ef628ad6156b39e04 type=invocation source=phase:agent-canon-update:conditional source_digest=606089780ef715ca7ce061637f1bd4e1d1fb66df15cfd52d290aa9eed497db91 target=command:agent-canon-update:conditional:0000 target_digest=60f77231cf46a63dff9817305226914237ff7bf8a4428184ad6e34b23cea7fb5 order=184
   n_phase_agent_canon_update_conditional -->|"invocation (order=184; ref=49704207eb50f685b58e8fd665a6d1f19742fdd63e65d52ef628ad6156b39e04)"| n_command_agent_canon_update_conditional_0000
-  %% edge id=edge:00185 digest=bfd0ee58ac973429052c6fe0f01434ca9fa93c5cf1592063a2435daf0918bf36 type=invocation source=phase:agent-canon-update:conditional source_digest=606089780ef715ca7ce061637f1bd4e1d1fb66df15cfd52d290aa9eed497db91 target=command:agent-canon-update:conditional:0001 target_digest=b1fa8d8973c115d4a963e00a3ff6d72ec2005aac26e0631f91d3385e7cbd06ee order=185
+  %% edge id=edge:00185 digest=bfd0ee58ac973429052c6fe0f01434ca9fa93c5cf1592063a2435daf0918bf36 type=invocation source=phase:agent-canon-update:conditional source_digest=606089780ef715ca7ce061637f1bd4e1d1fb66df15cfd52d290aa9eed497db91 target=command:agent-canon-update:conditional:0001 target_digest=7bc7685a69b301448326fe5e081ae6079b98a4dc36dc0c9873821652d0ca2f7b order=185
   n_phase_agent_canon_update_conditional -->|"invocation (order=185; ref=bfd0ee58ac973429052c6fe0f01434ca9fa93c5cf1592063a2435daf0918bf36)"| n_command_agent_canon_update_conditional_0001
-  %% edge id=edge:00186 digest=dc399e30105a651230c2b402c730988241d80c64cec6a026fb9ed8103230097a type=invocation source=phase:agent-canon-update:conditional source_digest=606089780ef715ca7ce061637f1bd4e1d1fb66df15cfd52d290aa9eed497db91 target=command:agent-canon-update:conditional:0002 target_digest=f4b0aa8e991325d3e3bfb8c79d9021615bab31d7d2aec1e78f9a6e488389a117 order=186
+  %% edge id=edge:00186 digest=dc399e30105a651230c2b402c730988241d80c64cec6a026fb9ed8103230097a type=invocation source=phase:agent-canon-update:conditional source_digest=606089780ef715ca7ce061637f1bd4e1d1fb66df15cfd52d290aa9eed497db91 target=command:agent-canon-update:conditional:0002 target_digest=30ce3d5492a46d7303701d0c5f72503bdbf658623d63629f576b86a0e4de341d order=186
   n_phase_agent_canon_update_conditional -->|"invocation (order=186; ref=dc399e30105a651230c2b402c730988241d80c64cec6a026fb9ed8103230097a)"| n_command_agent_canon_update_conditional_0002
   %% edge id=edge:00187 digest=6f21edc78441f3d5370d68426ea62ca3dd407469af34711c9c38c8f2408675fc type=invocation source=phase:agent-canon-update:conditional source_digest=606089780ef715ca7ce061637f1bd4e1d1fb66df15cfd52d290aa9eed497db91 target=command:agent-canon-update:conditional:0003 target_digest=c86cd4349809695417a8069887437cccae8630adfe123eb8cbca487d6a5946d5 order=187
   n_phase_agent_canon_update_conditional -->|"invocation (order=187; ref=6f21edc78441f3d5370d68426ea62ca3dd407469af34711c9c38c8f2408675fc)"| n_command_agent_canon_update_conditional_0003
@@ -4118,7 +4118,7 @@ graph LR
   n_phase_pr_processing_conditional -->|"invocation (order=205; ref=4e52ca7a6b2536a50639b19f5857bd68e3b12c940cf2ab9fb55ed2f58c416859)"| n_command_pr_processing_conditional_0003
   %% edge id=edge:00206 digest=a51e7b3b7941bf35f849ab18587cca86516d71d105283fc84ec22172f3737fdb type=invocation source=phase:pr-processing:conditional source_digest=3ada680adfd35d00fbab535c20daede47a529b35ee4682bc4e5685b430a841f8 target=command:pr-processing:conditional:0004 target_digest=69b6950a0b3f70f03f45cfadf4d04a070bed5d893524d2dee2785dc71c68baf1 order=206
   n_phase_pr_processing_conditional -->|"invocation (order=206; ref=a51e7b3b7941bf35f849ab18587cca86516d71d105283fc84ec22172f3737fdb)"| n_command_pr_processing_conditional_0004
-  %% edge id=edge:00207 digest=ef16c21049cd98c7c97a393504327c6b3e7541d9f1685cad55e050def7d85e1f type=invocation source=phase:pr-processing:conditional source_digest=3ada680adfd35d00fbab535c20daede47a529b35ee4682bc4e5685b430a841f8 target=command:pr-processing:conditional:0005 target_digest=e8a7b3e8a843bfdd10fe5af0d17c10309d800588aadeb9f5e544b41a0b8b9d6e order=207
+  %% edge id=edge:00207 digest=ef16c21049cd98c7c97a393504327c6b3e7541d9f1685cad55e050def7d85e1f type=invocation source=phase:pr-processing:conditional source_digest=3ada680adfd35d00fbab535c20daede47a529b35ee4682bc4e5685b430a841f8 target=command:pr-processing:conditional:0005 target_digest=e50396763313d77902b10e0bb204ab725f16e1dd022de20d1ad0bdf0986ff35b order=207
   n_phase_pr_processing_conditional -->|"invocation (order=207; ref=ef16c21049cd98c7c97a393504327c6b3e7541d9f1685cad55e050def7d85e1f)"| n_command_pr_processing_conditional_0005
   %% edge id=edge:00208 digest=95d6e2f433819f32d61ebf15bce8a87baee6fe3ffb191f9500b2929827099076 type=invocation source=phase:pr-processing:conditional source_digest=3ada680adfd35d00fbab535c20daede47a529b35ee4682bc4e5685b430a841f8 target=command:pr-processing:conditional:0006 target_digest=9d3524f6592f99bd7dc801fcf90b13e4e136073ba42256f8161336a0d9b8cf11 order=208
   n_phase_pr_processing_conditional -->|"invocation (order=208; ref=95d6e2f433819f32d61ebf15bce8a87baee6fe3ffb191f9500b2929827099076)"| n_command_pr_processing_conditional_0006
@@ -4280,7 +4280,7 @@ graph LR
   n_phase_structure_refactor_conditional -->|"invocation (order=286; ref=f071031c1716367717299ce40d6da47512ccdd130ce218573ab306a717767af1)"| n_command_structure_refactor_conditional_0004
   %% edge id=edge:00287 digest=92c0cc47020faf36d99f6adec7ffa44b5027428b5d6d10e2aef088201dd84cd4 type=invocation source=phase:structure-refactor:conditional source_digest=113493d6bb193ff179998e4307ad6ef8d9803c9b4a2af316275f860484089499 target=command:structure-refactor:conditional:0005 target_digest=a630786f8234199c2bc6dca5ea1276a1968ba38f915b6536d11b2f1db941759e order=287
   n_phase_structure_refactor_conditional -->|"invocation (order=287; ref=92c0cc47020faf36d99f6adec7ffa44b5027428b5d6d10e2aef088201dd84cd4)"| n_command_structure_refactor_conditional_0005
-  %% edge id=edge:00288 digest=4af198e77b853f92b715c798bd3f74aec9e0ab3d56a151cc1d2604698147f908 type=invocation source=phase:structure-refactor:conditional source_digest=113493d6bb193ff179998e4307ad6ef8d9803c9b4a2af316275f860484089499 target=command:structure-refactor:conditional:0006 target_digest=66803fb1eb4c8c50188f6574490fa5850561ba3a15b4063a8191aaa32edcb53b order=288
+  %% edge id=edge:00288 digest=4af198e77b853f92b715c798bd3f74aec9e0ab3d56a151cc1d2604698147f908 type=invocation source=phase:structure-refactor:conditional source_digest=113493d6bb193ff179998e4307ad6ef8d9803c9b4a2af316275f860484089499 target=command:structure-refactor:conditional:0006 target_digest=5dc8677215a7a5a4d4d88386ea45846a5f6932b304dea1c928418c4bc78226e6 order=288
   n_phase_structure_refactor_conditional -->|"invocation (order=288; ref=4af198e77b853f92b715c798bd3f74aec9e0ab3d56a151cc1d2604698147f908)"| n_command_structure_refactor_conditional_0006
   %% edge id=edge:00289 digest=4c2ed2fecc9b78dbffe4c777d0ca9642ad220b6fbb722b092c1a987aa3285ad0 type=invocation source=phase:structure-refactor:conditional source_digest=113493d6bb193ff179998e4307ad6ef8d9803c9b4a2af316275f860484089499 target=command:structure-refactor:conditional:0007 target_digest=8c328d9e9ed64a6611d8a1eb5f31db127f9296e6ab48e72809a14197f84b0fcd order=289
   n_phase_structure_refactor_conditional -->|"invocation (order=289; ref=4c2ed2fecc9b78dbffe4c777d0ca9642ad220b6fbb722b092c1a987aa3285ad0)"| n_command_structure_refactor_conditional_0007
@@ -5438,9 +5438,9 @@ graph LR
   n_command_start_repository_maintenance_0000 -->|"tool-resolution (order=865; ref=b1435593d0fcb41cea1e6a138c1332ceed5755a6e5391b2d3da0adaff55bbbda)"| n_tool_check_skill_frontmatter
   %% edge id=edge:00866 digest=561d8ac74f14a121443e6a910b0e2fe272bd8266e74a18a31aa9dfb2df963a49 type=tool-resolution source=command:start-repository:maintenance:0001 source_digest=518fdb7d00b51671f98d1b314556fac20f9cc19ef494edbcd07f67c432a8a327 target=tool:skill-tool-commands target_digest=9817677188d1c939fc278ae6aaa651ba0b00ebb13024fe9add2a997444b67b29 order=866
   n_command_start_repository_maintenance_0001 -->|"tool-resolution (order=866; ref=561d8ac74f14a121443e6a910b0e2fe272bd8266e74a18a31aa9dfb2df963a49)"| n_tool_skill_tool_commands
-  %% edge id=edge:00867 digest=ad7a60101f84201dc4baeb52a3c3a1fbc1f04ca67c3639b8222241be1bcd5082 type=tool-resolution source=command:codex-task-workflow:conditional:0002 source_digest=aefaffb2205cb4580908002dda67d5bf982ace21b0b2fa7f15d4f506a7c7675a target=tool:sync-agent-canon target_digest=06452bcb8d104903bfca97240ff5b4b396992017d457be856133e5ed4891a585 order=867
+  %% edge id=edge:00867 digest=ad7a60101f84201dc4baeb52a3c3a1fbc1f04ca67c3639b8222241be1bcd5082 type=tool-resolution source=command:codex-task-workflow:conditional:0002 source_digest=70ab8e554bf99b9002d420d0ad3540589feca2115b856ce3ecd85c85667e648c target=tool:sync-agent-canon target_digest=06452bcb8d104903bfca97240ff5b4b396992017d457be856133e5ed4891a585 order=867
   n_command_codex_task_workflow_conditional_0002 -->|"tool-resolution (order=867; ref=ad7a60101f84201dc4baeb52a3c3a1fbc1f04ca67c3639b8222241be1bcd5082)"| n_tool_sync_agent_canon
-  %% edge id=edge:00868 digest=b6f9f77f565816c74084be01e120ece5af7a47b998ad45791b46a48f7bf613bc type=tool-resolution source=command:codex-task-workflow:conditional:0003 source_digest=d6737527957e9e62a2b1e9d8e4970436928414e9c0017bccd504462bf5889a37 target=tool:sync-agent-canon target_digest=06452bcb8d104903bfca97240ff5b4b396992017d457be856133e5ed4891a585 order=868
+  %% edge id=edge:00868 digest=b6f9f77f565816c74084be01e120ece5af7a47b998ad45791b46a48f7bf613bc type=tool-resolution source=command:codex-task-workflow:conditional:0003 source_digest=df23f66e3e1dab5786816b3af209cc4d7208da0a330278ad8924a74a488dc32f target=tool:sync-agent-canon target_digest=06452bcb8d104903bfca97240ff5b4b396992017d457be856133e5ed4891a585 order=868
   n_command_codex_task_workflow_conditional_0003 -->|"tool-resolution (order=868; ref=b6f9f77f565816c74084be01e120ece5af7a47b998ad45791b46a48f7bf613bc)"| n_tool_sync_agent_canon
   %% edge id=edge:00869 digest=cebcb81df79b0b1265c51c5bd3edcd1534474f2cf3a9f85a27bbd00a233f89d7 type=tool-resolution source=command:codex-task-workflow:conditional:0004 source_digest=2b88c49b9835d399914fff8d91e14a88dfd007f8ca4de76a31b49a525baacaec target=tool:agent-search target_digest=aaa70aebcb61335ae67b37bd10e7f46c9bd9e0cfdc18d8e1255f4890f25134dc order=869
   n_command_codex_task_workflow_conditional_0004 -->|"tool-resolution (order=869; ref=cebcb81df79b0b1265c51c5bd3edcd1534474f2cf3a9f85a27bbd00a233f89d7)"| n_tool_agent_search
@@ -5606,9 +5606,9 @@ graph LR
   n_command_agent_eval_accumulation_maintenance_0000 -->|"tool-resolution (order=949; ref=f34b8ecf940782eb78c00aa157b6a66938462413ce0c67647c39288c46440df5)"| n_tool_check_skill_frontmatter
   %% edge id=edge:00950 digest=5b63cbd3f2574c5fc8145cb16c2bace8418e8e90d4e347d1084fd29419827662 type=tool-resolution source=command:agent-eval-accumulation:maintenance:0001 source_digest=ac3180d49f79802f6ac385e4d97a39cb7f2c611bbd143f7021e2083e9914e4ba target=tool:skill-tool-commands target_digest=9817677188d1c939fc278ae6aaa651ba0b00ebb13024fe9add2a997444b67b29 order=950
   n_command_agent_eval_accumulation_maintenance_0001 -->|"tool-resolution (order=950; ref=5b63cbd3f2574c5fc8145cb16c2bace8418e8e90d4e347d1084fd29419827662)"| n_tool_skill_tool_commands
-  %% edge id=edge:00951 digest=7f0763f22d38469af584f7eecf9ce4732cb053175a4742b7cbb9992a9845a541 type=tool-resolution source=command:agent-canon-update:conditional:0001 source_digest=b1fa8d8973c115d4a963e00a3ff6d72ec2005aac26e0631f91d3385e7cbd06ee target=tool:sync-agent-canon target_digest=06452bcb8d104903bfca97240ff5b4b396992017d457be856133e5ed4891a585 order=951
+  %% edge id=edge:00951 digest=7f0763f22d38469af584f7eecf9ce4732cb053175a4742b7cbb9992a9845a541 type=tool-resolution source=command:agent-canon-update:conditional:0001 source_digest=7bc7685a69b301448326fe5e081ae6079b98a4dc36dc0c9873821652d0ca2f7b target=tool:sync-agent-canon target_digest=06452bcb8d104903bfca97240ff5b4b396992017d457be856133e5ed4891a585 order=951
   n_command_agent_canon_update_conditional_0001 -->|"tool-resolution (order=951; ref=7f0763f22d38469af584f7eecf9ce4732cb053175a4742b7cbb9992a9845a541)"| n_tool_sync_agent_canon
-  %% edge id=edge:00952 digest=33309830ce5d3c06d818425f59e765370173a85e9797cad1bf4b3a347ca84874 type=tool-resolution source=command:agent-canon-update:conditional:0002 source_digest=f4b0aa8e991325d3e3bfb8c79d9021615bab31d7d2aec1e78f9a6e488389a117 target=tool:sync-agent-canon target_digest=06452bcb8d104903bfca97240ff5b4b396992017d457be856133e5ed4891a585 order=952
+  %% edge id=edge:00952 digest=33309830ce5d3c06d818425f59e765370173a85e9797cad1bf4b3a347ca84874 type=tool-resolution source=command:agent-canon-update:conditional:0002 source_digest=30ce3d5492a46d7303701d0c5f72503bdbf658623d63629f576b86a0e4de341d target=tool:sync-agent-canon target_digest=06452bcb8d104903bfca97240ff5b4b396992017d457be856133e5ed4891a585 order=952
   n_command_agent_canon_update_conditional_0002 -->|"tool-resolution (order=952; ref=33309830ce5d3c06d818425f59e765370173a85e9797cad1bf4b3a347ca84874)"| n_tool_sync_agent_canon
   %% edge id=edge:00953 digest=9f195184d96452a3da31f78e4191f85f700a141869393ad2e01751d041f035fd type=tool-resolution source=command:agent-canon-update:conditional:0003 source_digest=c86cd4349809695417a8069887437cccae8630adfe123eb8cbca487d6a5946d5 target=tool:agent-canon-update-todos target_digest=bfbbd68559b0fbc742c5fe34c33ff0c6ae808e684b5cc3510654e82879b760a9 order=953
   n_command_agent_canon_update_conditional_0003 -->|"tool-resolution (order=953; ref=9f195184d96452a3da31f78e4191f85f700a141869393ad2e01751d041f035fd)"| n_tool_agent_canon_update_todos
@@ -5624,7 +5624,7 @@ graph LR
   n_command_dependency_module_change_maintenance_0000 -->|"tool-resolution (order=958; ref=8c9643f557630dae496b5c10209d17a24f9037239464c16fa185de304bdf4929)"| n_tool_check_skill_frontmatter
   %% edge id=edge:00959 digest=0d819681e8d9957889e6b32135c4fab2178da286e07bd33da75fa38d9341a7e0 type=tool-resolution source=command:dependency-module-change:maintenance:0001 source_digest=edc90ee00c8ef2849e4a1e5b992e67e2222079c39b5a5c9a9e103efcf3e4626f target=tool:skill-tool-commands target_digest=9817677188d1c939fc278ae6aaa651ba0b00ebb13024fe9add2a997444b67b29 order=959
   n_command_dependency_module_change_maintenance_0001 -->|"tool-resolution (order=959; ref=0d819681e8d9957889e6b32135c4fab2178da286e07bd33da75fa38d9341a7e0)"| n_tool_skill_tool_commands
-  %% edge id=edge:00960 digest=62093ba690402ecf8bbee3f4b6d7c080b67e03086fee11c6e0187db217390f66 type=tool-resolution source=command:pr-processing:conditional:0005 source_digest=e8a7b3e8a843bfdd10fe5af0d17c10309d800588aadeb9f5e544b41a0b8b9d6e target=tool:sync-agent-canon target_digest=06452bcb8d104903bfca97240ff5b4b396992017d457be856133e5ed4891a585 order=960
+  %% edge id=edge:00960 digest=62093ba690402ecf8bbee3f4b6d7c080b67e03086fee11c6e0187db217390f66 type=tool-resolution source=command:pr-processing:conditional:0005 source_digest=e50396763313d77902b10e0bb204ab725f16e1dd022de20d1ad0bdf0986ff35b target=tool:sync-agent-canon target_digest=06452bcb8d104903bfca97240ff5b4b396992017d457be856133e5ed4891a585 order=960
   n_command_pr_processing_conditional_0005 -->|"tool-resolution (order=960; ref=62093ba690402ecf8bbee3f4b6d7c080b67e03086fee11c6e0187db217390f66)"| n_tool_sync_agent_canon
   %% edge id=edge:00961 digest=c566706c687548dca05d28d3c605e0d0ba82b4581064376792d92304da2c0f55 type=tool-resolution source=command:pr-processing:conditional:0006 source_digest=9d3524f6592f99bd7dc801fcf90b13e4e136073ba42256f8161336a0d9b8cf11 target=tool:bootstrap-agent-run target_digest=5e71cd52611b7c1aff440d008608b9a69b8f24d5fab3be2d52868da52653af5f order=961
   n_command_pr_processing_conditional_0006 -->|"tool-resolution (order=961; ref=c566706c687548dca05d28d3c605e0d0ba82b4581064376792d92304da2c0f55)"| n_tool_bootstrap_agent_run
@@ -5706,7 +5706,7 @@ graph LR
   n_command_structure_refactor_conditional_0003 -->|"tool-resolution (order=999; ref=f75f7a372ee73f86f5ea32882090bef33e5b62f797ac8f58bf5d8ecf98710c17)"| n_tool_responsibility_scope
   %% edge id=edge:01000 digest=2b4ac9a160c336f00424d224e50ca54d0167658c577a96ca43cb2ce557c78e1c type=tool-resolution source=command:structure-refactor:conditional:0004 source_digest=2d6957eece747f932db6c31d9af04faac119d63a8f2891c36118c517c6b13867 target=tool:import-responsibility target_digest=e8d8c98174f71256696326a2691a1e68756c6bcfd12dc15c075bbf87472a0212 order=1000
   n_command_structure_refactor_conditional_0004 -->|"tool-resolution (order=1000; ref=2b4ac9a160c336f00424d224e50ca54d0167658c577a96ca43cb2ce557c78e1c)"| n_tool_import_responsibility
-  %% edge id=edge:01001 digest=fac704912f4468922f553cc0763ff33bc6f26b53846370bf4b3695bc716625f7 type=tool-resolution source=command:structure-refactor:conditional:0006 source_digest=66803fb1eb4c8c50188f6574490fa5850561ba3a15b4063a8191aaa32edcb53b target=tool:sync-agent-canon target_digest=06452bcb8d104903bfca97240ff5b4b396992017d457be856133e5ed4891a585 order=1001
+  %% edge id=edge:01001 digest=fac704912f4468922f553cc0763ff33bc6f26b53846370bf4b3695bc716625f7 type=tool-resolution source=command:structure-refactor:conditional:0006 source_digest=5dc8677215a7a5a4d4d88386ea45846a5f6932b304dea1c928418c4bc78226e6 target=tool:sync-agent-canon target_digest=06452bcb8d104903bfca97240ff5b4b396992017d457be856133e5ed4891a585 order=1001
   n_command_structure_refactor_conditional_0006 -->|"tool-resolution (order=1001; ref=fac704912f4468922f553cc0763ff33bc6f26b53846370bf4b3695bc716625f7)"| n_tool_sync_agent_canon
   %% edge id=edge:01002 digest=8522072578ee18d854d2f0bed8d8005112a086e9a71810dd6dbd51061f9aa0f5 type=tool-resolution source=command:structure-refactor:conditional:0008 source_digest=7699976e6b8b5d68edb922faa5b7a14dc0b281b7bf6d2109a50d84774cc6b184 target=tool:responsibility-scope target_digest=54c7595a71b8771aeebde5b9f883960ea9628e370e061ffd8eb051f315a60587 order=1002
   n_command_structure_refactor_conditional_0008 -->|"tool-resolution (order=1002; ref=8522072578ee18d854d2f0bed8d8005112a086e9a71810dd6dbd51061f9aa0f5)"| n_tool_responsibility_scope
@@ -6018,5 +6018,5 @@ graph LR
 - `prerequisite`, `successor`, `order`, `invocation`, and `tool-resolution`: solid directed edges.
 - `routing` and `parallel`: dashed directed edges.
 
-Coverage digest: `6d5bfed57c92e27d0c8707c4aa543bc4d1cee2dfb08970a3e6c3f118403651fc`.
-Graph digest: `7f02e1b17ec8290227ca7d2a01ea3efc6b09b64a26f0aad60790643dcc60f481`.
+Coverage digest: `3961cbd56036a9dab4150bfb910e7baafc7173fb1b9777bd0597c22e3e27924e`.
+Graph digest: `952b36ecdec953d11d811a9a442c5776f6ecafae20268df84a045c13f415100a`.

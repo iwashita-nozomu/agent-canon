@@ -7,7 +7,7 @@ description: "Use when a large refactor should run as a behavior-preserving refa
 <!-- canonical: agents/skills/refactor-loop.md sha256=21755d7f6fa239d0cd90acf8672346166e947ab8ade6a62778c3fc4412c61476 -->
 <!-- route: agents/skills/catalog.yaml#skill:refactor-loop.routing digest=2fb076b8062b21194ce598f2396fd841cb7e932f04f5429e229f8001d095c0f3 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:refactor-loop digest=c2075a67d124d4b7aec3dfd31d2d9cd2ab181bb53adaaff8a752e614c9f5fe72 -->
-<!-- commands: agents/skills/catalog.yaml#skill:refactor-loop.tool_commands digest=a9d49937251e18e25631807d7668e425f481a301bbe0f01dd05a624365bea9fe -->
+<!-- commands: agents/skills/catalog.yaml#skill:refactor-loop.tool_commands digest=def1fc5effa57453bbf898dee64d5874ba491645eb6e1a7f27f6de7a6c338a1a -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill refactor-loop --format text`; schema `skill_tool_commands.v2`, digest: `a9d49937251e18e25631807d7668e425f481a301bbe0f01dd05a624365bea9fe`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill refactor-loop --format text`; schema `skill_tool_commands.v2`, digest: `def1fc5effa57453bbf898dee64d5874ba491645eb6e1a7f27f6de7a6c338a1a`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

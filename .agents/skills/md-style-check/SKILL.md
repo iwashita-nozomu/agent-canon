@@ -7,7 +7,7 @@ description: "Use when Markdown files changed, docs formatter/fixer output must 
 <!-- canonical: agents/skills/md-style-check.md sha256=f340f6279455f30cb01b24cfcd0849c8e28f07797927fa364fe0b16d87a85927 -->
 <!-- route: agents/skills/catalog.yaml#skill:md-style-check.routing digest=426e39d6eba9366369b3bd6b16d48d3ff8e4e37fec98ba679e79704e9a737c76 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:md-style-check digest=234e511e80ba3cc7a9dcd412ab4d182d04bd53fbadc416a79d946f0d123b49e7 -->
-<!-- commands: agents/skills/catalog.yaml#skill:md-style-check.tool_commands digest=4c15f64eb1db60c5ffcdd089e56ba0ebcc05a95569c6ac63524320b6f3c916a4 -->
+<!-- commands: agents/skills/catalog.yaml#skill:md-style-check.tool_commands digest=a1cbf8920bccbd0bc2cff9a6ba80cab4bf7100a274bf4ce3a737e0e062f8c927 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill md-style-check --format text`; schema `skill_tool_commands.v2`, digest: `4c15f64eb1db60c5ffcdd089e56ba0ebcc05a95569c6ac63524320b6f3c916a4`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill md-style-check --format text`; schema `skill_tool_commands.v2`, digest: `a1cbf8920bccbd0bc2cff9a6ba80cab4bf7100a274bf4ce3a737e0e062f8c927`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

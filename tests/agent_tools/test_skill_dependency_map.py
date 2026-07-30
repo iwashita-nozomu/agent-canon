@@ -29,8 +29,10 @@ from skill_dependency_map import (  # noqa: E402
     GraphIdentityCollisionError,
     _canonical_bytes,
     _IdentityStore,
+    _load_tool_entries,
     _json_digest_from_graph,
     _normalize_identifier,
+    _resolve_tool_id,
     build_graph,
     check_artifacts,
     readback_mermaid,
@@ -161,6 +163,35 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         self.assertNotIn("sync", " ".join(archive_commands))
         self.assertNotIn("status", " ".join(archive_commands))
 
+    def test_tool_resolution_edges_are_readback_complete(self) -> None:
+        """Every resolved tool ID from command packets is represented as a tool-resolution edge."""
+        graph = build_graph(PROJECT_ROOT)
+        tools = _load_tool_entries(PROJECT_ROOT)
+        resolution = resolve_agent_canon_source_root(PROJECT_ROOT)
+        skill_ids = tuple(item["display_label"] for item in graph["skills"])
+        expected = set()
+        for skill in skill_ids:
+            packet = packet_for_skill(resolution, skill)
+            for phase, rows in (
+                ("required", packet.resolved_required_commands),
+                ("conditional", packet.resolved_conditional_commands),
+                ("maintenance", packet.resolved_maintenance_commands),
+            ):
+                for index, row in enumerate(rows):
+                    _, _, _, env, argv = row
+                    tool_id = _resolve_tool_id(row[0], env, argv, tools)
+                    if tool_id is not None:
+                        expected.add((f"command:{skill}:{phase}:{index:04d}", f"tool:{tool_id}"))
+        actual = {
+            (
+                edge["source_ref"]["id"],
+                edge["target_ref"]["id"],
+            )
+            for edge in graph["edges"]
+            if edge["display_label"] == "tool-resolution"
+        }
+        self.assertEqual(actual, expected)
+
     def test_identity_payloads_are_unique_and_all_projections_are_refs(self) -> None:
         """Each full payload appears once and every envelope resolves through a Ref."""
         graph = build_graph(PROJECT_ROOT)
@@ -246,7 +277,7 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         self.assertNotIn(str(PROJECT_ROOT.resolve()), serialized)
         self.assertNotRegex(serialized, r"(?:^|[\" ])/(?:mnt|tmp|home)/")
         self.assertNotIn("execution_argv", serialized)
-        self.assertNotIn("source_root", serialized)
+        self.assertNotIn('"source_root"', serialized)
 
     def test_mermaid_is_one_actual_readback_complete_block_without_base64(self) -> None:
         """The rendered block carries graph/coverage refs and actual readback metadata."""

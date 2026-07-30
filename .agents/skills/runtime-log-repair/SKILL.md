@@ -7,7 +7,7 @@ description: "Use when AgentCanon runtime dashboard evidence should be turned in
 <!-- canonical: agents/skills/runtime-log-repair.md sha256=bb2bced6862644fd84069c8ffa77fc277056d5c8da6d2b7cff24d4f2ee0ff303 -->
 <!-- route: agents/skills/catalog.yaml#skill:runtime-log-repair.routing digest=d8f8344b96314edd98afa5e599f1a6fdc07615dad08ce84ffee268534e2e1b78 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:runtime-log-repair digest=abb88dcb33ea5faf981313d7242c94577720465a96a91ed277c42834b9be83a8 -->
-<!-- commands: agents/skills/catalog.yaml#skill:runtime-log-repair.tool_commands digest=8309c0984e3269a292e73187e46ea11ceeacfa14075b8d7ebe235a07790cbf33 -->
+<!-- commands: agents/skills/catalog.yaml#skill:runtime-log-repair.tool_commands digest=c6630e66570aceebaa644260f89d95425600e6fd94cabac20b31cc3f44a6bf1d -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill runtime-log-repair --format text`; schema `skill_tool_commands.v2`, digest: `8309c0984e3269a292e73187e46ea11ceeacfa14075b8d7ebe235a07790cbf33`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill runtime-log-repair --format text`; schema `skill_tool_commands.v2`, digest: `c6630e66570aceebaa644260f89d95425600e6fd94cabac20b31cc3f44a6bf1d`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

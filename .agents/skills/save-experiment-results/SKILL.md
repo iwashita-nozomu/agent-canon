@@ -7,7 +7,7 @@ description: "Save and publish experiment run results with branch-safe retention
 <!-- canonical: agents/skills/save-experiment-results.md sha256=f45d464220f67b69367d8f130a18ad4dfd0cd33e2070c0450e5038ea55a10661 -->
 <!-- route: agents/skills/catalog.yaml#skill:save-experiment-results.routing digest=e7e6280de33c4d5de334534d96aafeba109d07e8d74a991011280cd421cb98c5 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:save-experiment-results digest=539cd7169bf4ed079238078c3fa60d4cdde46f613832f05a11281d4b04febd40 -->
-<!-- commands: agents/skills/catalog.yaml#skill:save-experiment-results.tool_commands digest=82ead84c462ffbe69d203d7752820b2bce4a486d2539fd51b5b0e2a4c41bb633 -->
+<!-- commands: agents/skills/catalog.yaml#skill:save-experiment-results.tool_commands digest=3b7d68ab11f3857ac007f05495e6c8ceef43c45ce2938b65b6e3c5c2c216091e -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill save-experiment-results --format text`; schema `skill_tool_commands.v2`, digest: `82ead84c462ffbe69d203d7752820b2bce4a486d2539fd51b5b0e2a4c41bb633`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill save-experiment-results --format text`; schema `skill_tool_commands.v2`, digest: `3b7d68ab11f3857ac007f05495e6c8ceef43c45ce2938b65b6e3c5c2c216091e`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

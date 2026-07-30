@@ -280,7 +280,7 @@ At the start and end of each iteration:
 If Codex goals and `goal.md` disagree, repair `goal.md` or the Codex goal view
 before changing code. The repo-owned `goal.md` wins for durable state.
 If `goal.md` resolves into `vendor/agent-canon/`, run
-`bash tools/sync_agent_canon.sh link-root` or replace it with a repo-local
+`PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root` or replace it with a repo-local
 contract before trusting `goal_loop.py status`.
 
 ## Efficiency Rule

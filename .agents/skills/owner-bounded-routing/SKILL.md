@@ -7,7 +7,7 @@ description: "Use for owner-bounded repository edits after routing evidence show
 <!-- canonical: agents/skills/owner-bounded-routing.md sha256=b91114a26c3137132d728630460fb861ef5772632c327d0ce0917f304db0653e -->
 <!-- route: agents/skills/catalog.yaml#skill:owner-bounded-routing.routing digest=f7a555da339b2fd491fcd1139f994324d489d9f17e2352d20efcd8cd0201f0b6 -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:owner-bounded-routing digest=78734376c281b296991698dabce3c5ff736e7714e8024ed05981d8aa2fd90f27 -->
-<!-- commands: agents/skills/catalog.yaml#skill:owner-bounded-routing.tool_commands digest=35b4a5c022a081c53a5b25a644a6287a8d4f1d72eb6e9d5f6779af12f2b910c0 -->
+<!-- commands: agents/skills/catalog.yaml#skill:owner-bounded-routing.tool_commands digest=5ecf0a08a0ba1467d27c1269eeb201c2348707be0a9157dff584ed578213d5a1 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill owner-bounded-routing --format text`; schema `skill_tool_commands.v2`, digest: `35b4a5c022a081c53a5b25a644a6287a8d4f1d72eb6e9d5f6779af12f2b910c0`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill owner-bounded-routing --format text`; schema `skill_tool_commands.v2`, digest: `5ecf0a08a0ba1467d27c1269eeb201c2348707be0a9157dff584ed578213d5a1`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

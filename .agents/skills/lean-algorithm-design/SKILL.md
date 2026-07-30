@@ -7,7 +7,7 @@ description: "Use when an algorithm should be designed and checked in Lean befor
 <!-- canonical: agents/skills/lean-algorithm-design.md sha256=982f62d5b1cc384c71b2dd3a75ce58b78442ebcb740b7f73631d60a333faeeaf -->
 <!-- route: agents/skills/catalog.yaml#skill:lean-algorithm-design.routing digest=5edb27b25833419ae869d230f09c139f295a28ea19d91a1460b6e607f8ac3f2f -->
 <!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:lean-algorithm-design digest=bc6dd72981e8a98f4a593452ecf0e54ecba92c74b7a65ceb51ac776a9a944a72 -->
-<!-- commands: agents/skills/catalog.yaml#skill:lean-algorithm-design.tool_commands digest=5f6d285786edee318e075ef39b3ae369c10b4a4d3f6733381fa800a9ddf277ae -->
+<!-- commands: agents/skills/catalog.yaml#skill:lean-algorithm-design.tool_commands digest=5a1ed099748a6a6deb125a6e94a3ec826032982c52b1b1954dda388d6750e326 -->
 <!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
@@ -28,7 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill lean-algorithm-design --format text`; schema `skill_tool_commands.v2`, digest: `5f6d285786edee318e075ef39b3ae369c10b4a4d3f6733381fa800a9ddf277ae`.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill lean-algorithm-design --format text`; schema `skill_tool_commands.v2`, digest: `5a1ed099748a6a6deb125a6e94a3ec826032982c52b1b1954dda388d6750e326`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
