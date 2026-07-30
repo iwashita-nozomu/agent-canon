@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import os
 import stat
 import tempfile
 import unittest
@@ -73,4 +72,3 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             )
             with self.assertRaises(SourceRootFailure):
                 run(parser, resolver=lambda _: self._mock_resolution(root))
-
