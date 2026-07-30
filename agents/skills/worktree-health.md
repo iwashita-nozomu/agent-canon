@@ -4,6 +4,7 @@
 contract skill
 responsibility Documents worktree-health for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../../documents/design/request-intent-and-update-relation.md compact merge/readback and existing cleanup projection
 @dependency-end
 -->
 
@@ -11,6 +12,16 @@ upstream design ../canonical/skills.md skill canon registry
 ## Purpose
 
 現在の checkout が、task authority、run bundle、branch、未コミット差分、conflict risk の観点で健全かを確認します。
+
+### Compact request/update projection
+
+`../../documents/design/request-intent-and-update-relation.md` の lifecycle flow は merge
+と readback の直後にこの skill の health/readback route へ接続します。health、scope、linked
+worktree、clean status の evidence を既存 cleanup executor と closeout packet に返します。
+merge/readback operation は tree/remote evidence を確認し、cleanup-dispatch-ready state に
+到達します。completion evidence は selected existing cleanup executor の receipt、scratch
+cleanup または typed retention receipt、CleanupProof、closeout packet readback です。cleanup
+executor の選択と実行は各 owner route が行い、この skill は health/readback evidence を返します。
 
 ## Use When
 

@@ -4,6 +4,7 @@
 contract agent-runtime
 responsibility Documents Agent Communication Protocol for this repository.
 upstream design README.md agent canon overview
+upstream design ../documents/design/request-intent-and-update-relation.md compact active-context and handoff projection
 downstream design skills/agent-orchestration.md routes pre-edit investigation before path selection
 downstream design skills/codex-task-workflow.md consumes pre-edit investigation and context capsules
 downstream design skills/subagent-bootstrap.md consumes fresh subagent context capsules
@@ -25,6 +26,29 @@ downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predi
 - Use `## Pre-Edit Repository Investigation Packet` before selecting edit paths, and `## Fresh Subagent Context Capsule` before launching or reusing any run-local subagent.
 - For chunked reading, start from the packet type required by the current transition and read only the fields needed to make that transition auditable.
 - After context compaction, follow `## Post-Compaction Objective Re-Declaration Contract` before any resumed action.
+
+### Compact request/update projection
+
+`../documents/design/request-intent-and-update-relation.md` is the compact flow connected to
+this protocol's active context, write-scope, and handoff. Deltas attach to existing
+capsules/packets, compatible context is reused, and only disjoint scope receives a separate
+handoff. Transport schema and context ownership remain here.
+Approved request effects travel through the existing goal/artifact/order/handoff delta fields;
+write authority remains with the existing owner/write-scope packet.
+
+An evidence-read operation reaches an answer-complete state and returns an evidence-backed
+answer/read-scope receipt. An explicit write-clause operation reaches an owner-handoff state and
+returns the existing owner/write-scope/acceptance readback. An approved update operation overlays
+the compatible active context and reaches a goal/artifact/order/handoff sparse-delta state; its
+completion evidence is the changed-clause and delta packet readback.
+
+The closure packet is transported as path+section+clause/ref references; DIC owns
+traversal and closure decisions, while this protocol owns capsule visibility and
+handoff transport.
+
+After completed integration tree/remote readback, this protocol records the dispatch of the
+existing owner cleanup executors and transports their receipts into the closeout packet. The
+cleanup executors retain their existing owners and receipt formats.
 
 ## 基本ルール
 

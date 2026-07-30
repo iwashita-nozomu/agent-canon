@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Manages the ignored Git clone used for AgentCanon runtime log and report archives.
 # upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
+# upstream design ../../documents/design/request-intent-and-update-relation.md run-bundle retention receipt projection
 # upstream implementation ./runtime_log_paths.py resolves archive paths and source repo keys
 # downstream design ../../documents/runtime/runtime-log-archive.md documents this tool as the normal Git workflow
 # downstream implementation ../../tests/agent_tools/test_runtime_log_archive_git.py validates clone, branch, status, and push behavior

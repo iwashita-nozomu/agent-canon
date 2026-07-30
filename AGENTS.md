@@ -4,6 +4,7 @@
 contract agent-runtime
 responsibility Documents AgentCanon Repository Instructions for this repository.
 downstream design documents/rule/README.md document filename, placement, and structure rules.
+upstream design documents/design/request-intent-and-update-relation.md positive rule, request authority, and sparse reconciliation projection contract.
 downstream design README.md shared canon overview must reflect runtime contract
 downstream design ROOT_AGENTS.md template-root runtime entrypoint owner map
 downstream implementation tools/agent_tools/check_agent_runtime_alignment.py validates runtime owner-map alignment
@@ -31,6 +32,32 @@ Map` to find the owner of runtime contracts, `Task Entry` to start
 repo-changing work, and `Validation` before closeout. This file routes readers;
 the detailed workflow, skill, role, profile, and closeout rules remain in the
 owner surfaces it names.
+
+## Positive Rule Contract
+
+各規約は、実行する操作、到達する状態、完了を示す証拠を肯定形で記述する。
+制約は対応する操作の事前条件・適用境界・正規代替ルートとして配置する。
+この契約の設計正本は
+[`documents/design/request-intent-and-update-relation.md`](documents/design/request-intent-and-update-relation.md)
+であり、`ROOT_AGENTS.md` はその canonical reader route を所有する。
+`AGENTS.md` は同じ契約を source-tree root view として投影する。
+各変更は `operation -> resulting state -> completion evidence` の順に
+`Design-To-Implementation Trace` へ接続する。
+質問・明示 write clause・進行中 update・integration cleanup の compact flow は
+[`documents/design/request-intent-and-update-relation.md`](documents/design/request-intent-and-update-relation.md)
+から各 canonical owner へ投影する。
+Related Document Closure は DIC-010 の path+section+clause/ref receipt を owner packet が消費する。
+
+この projection は `operation -> resulting state -> completion evidence` の順で
+materialize します。質問は read scope と evidence を読み、evidence-backed answer
+complete state に到達し、回答と read-scope packet readback を完了 evidence にします。
+明示 write clause は target、operation、owner、write set、acceptance evidence を結合し、
+owner handoff-ready state に到達し、既存 write packet readback を完了 evidence にします。
+追加または変更された request clause は既存 write gate を通って active context に overlay
+され、goal/artifact/order/handoff sparse delta state に到達し、変更 clause と delta packet
+readback および context reuse または必要並列 handoff を完了 evidence にします。
+completed integration は tree/remote readback を受け、既存 cleanup executor dispatch state
+に到達し、executor receipt、CleanupProof、closeout packet readback を完了 evidence にします。
 
 Repository-changing implementation の全 stage は、
 [`agents/internal-routines/design-implementation-correspondence.md`](agents/internal-routines/design-implementation-correspondence.md)

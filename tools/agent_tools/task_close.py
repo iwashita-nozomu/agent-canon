@@ -8,6 +8,7 @@
 # upstream implementation ./update_lifecycle_contract.py owns gate, cleanup, handback, and terminal ToolCall identities.
 # upstream design ../../templates/agents/closeout_gate.md defines closeout status contract
 # upstream design ../../templates/agents/agent_evaluation.md defines evaluation contract
+# upstream design ../../documents/design/request-intent-and-update-relation.md cleanup/readback receipt closeout projection
 # downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests closeout
 # @dependency-end
 """Evaluate whether one run bundle is ready for a user-facing completion report."""

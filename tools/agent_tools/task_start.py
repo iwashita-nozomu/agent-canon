@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Provides task start agent workflow automation.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/design/request-intent-and-update-relation.md request-clause and sparse goal/artifact/order/handoff projection
 # @dependency-end
 
 """Start one agent-task run with machine-generated workflow and review hints."""

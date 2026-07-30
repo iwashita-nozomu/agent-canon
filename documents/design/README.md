@@ -37,6 +37,8 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
   - skill / capability / phase / tool / edge の identity、参照、coverage、readback
 - [runtime-log-repository-lifecycle.md](runtime-log-repository-lifecycle.md)
   - AgentCanon-log #4 と AgentCanon #461 の runtime-log repository owner split
+- [request-intent-and-update-relation.md](request-intent-and-update-relation.md)
+  - 質問回答、明示 write clause、sparse update、既存 cleanup route の compact flow
 - [../remote-execution-repo-contract.md](../contracts/remote-execution-repo-contract.md)
   - remote execution を受ける repo の最小契約
 
