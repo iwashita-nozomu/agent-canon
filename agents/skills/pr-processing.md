@@ -118,6 +118,24 @@ reviews, and contributor diff are retained through draft/ready,
 changes-requested, external-review, closed-head, multiple-remote, merge, and
 conflict-successor handling. Unknown permission never implies push authority.
 
+## Post-merge Dependency Cleanup
+
+After source merge/readback, dispatch the existing dependency-module cleanup route
+using the exact literal in [`dependency-module-change`](dependency-module-change.md#exact-integrated-cleanup-command),
+with the exact computed clone path and the full integrated commit OID when local
+topic commits remain after squash merge. A clean worktree, zero untracked files,
+and exact remote tree inclusion/deletion proof are the cleanup oracle. The
+integrated commit must be reachable from `origin/main` and descend from
+`topic_base`; an empty `topic_base..HEAD` changed-path set additionally requires
+remote retention of the local HEAD. Stale or
+missing dependency membership markers are historical evidence: preserve their
+`marker-readback=membership-mismatch` in the cleanup receipt, but do not hold
+cleanup for that marker alone. Dirty state, wrong integrated commit, or
+URL/branch/owner evidence mismatch remains a hold. Other artifacts in the topic
+container are preserved; an empty computed topic container is removed by the
+same receipt after its managed child is removed. Do not re-clone or re-run
+`prepare` as a repair step.
+
 ## PR Log Report Contract
 
 PR 作成 / 更新は、GitHub 上の PR body と、選択された場合の durable run-local
