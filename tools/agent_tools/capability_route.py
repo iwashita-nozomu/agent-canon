@@ -18,11 +18,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from skill_route_catalog import (
+    VISUALIZATION_OWNER_SKILL,
     CapabilityId,
     CapabilityIndex,
     VisualizationOwnerSkill,
     VisualizationRejection,
-    VISUALIZATION_OWNER_SKILL,
+    build_visualization_adapter_tool_call,
     build_visualization_owner_tool_call,
     capability_id_from_raw,
     freeze_related_skill_mapping,
@@ -107,6 +108,7 @@ class CapabilityRouteDecision:
     reasons: tuple[str, ...]
     visualization_owner_skill: VisualizationOwnerSkill | None
     visualization_tool_call: ToolCall | None
+    visualization_adapter_tool_call: ToolCall | None
     visualization_rejection: VisualizationRejection | None
 
     def __post_init__(self) -> None:
@@ -406,6 +408,7 @@ def capability_failure_decision(
         reasons=(),
         visualization_owner_skill=None,
         visualization_tool_call=None,
+        visualization_adapter_tool_call=None,
         visualization_rejection=None,
     )
 
@@ -446,6 +449,7 @@ def decide_capabilities(
     )
     visualization_owner_skill: VisualizationOwnerSkill | None = None
     visualization_tool_call: ToolCall | None = None
+    visualization_adapter_tool_call: ToolCall | None = None
     visualization_rejection: VisualizationRejection | None = None
     if visualization_requested:
         if (
@@ -467,6 +471,13 @@ def decide_capabilities(
             except ValueError as exc:
                 visualization_rejection = visualization_rejection_from_error(exc)
                 visualization_owner_skill = None
+            if (
+                visualization_tool_call is not None
+                and match.capability_id == "dependency_manifest_graph"
+            ):
+                visualization_adapter_tool_call = build_visualization_adapter_tool_call(
+                    visualization_tool_call
+                )
     return CapabilityRouteDecision(
         schema=CAPABILITY_SCHEMA,
         route="capability-selection",
@@ -487,5 +498,6 @@ def decide_capabilities(
         reasons=(f"{match.skill}:{reason}",),
         visualization_owner_skill=visualization_owner_skill,
         visualization_tool_call=visualization_tool_call,
+        visualization_adapter_tool_call=visualization_adapter_tool_call,
         visualization_rejection=visualization_rejection,
     )

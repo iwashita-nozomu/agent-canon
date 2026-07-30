@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -24,7 +25,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "skill_dependency_map.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import skill_route_catalog as catalog_module  # noqa: E402
-from skill_dependency_map import render_mermaid  # noqa: E402
+from skill_dependency_map import (  # noqa: E402
+    GraphCapacityError,
+    build_graph,
+    render_mermaid,
+)
 
 
 class SkillDependencyMapTest(unittest.TestCase):
@@ -166,13 +171,127 @@ class SkillDependencyMapTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("SKILL_DEPENDENCY_GRAPH=pass", result.stdout)
+            self.assertIn("SKILL_TOOL_INVOCATION_GRAPH=pass", result.stdout)
             graph = output.read_text(encoding="utf-8")
             self.assertEqual(graph.count("```mermaid"), 1)
             public_ids = catalog_module._skill_ids_from_catalog(
                 catalog_module.load_skill_catalog(PROJECT_ROOT)
             )
             self.assertEqual(sum(f'"{skill}"' in graph for skill in public_ids), 60)
+
+    def test_graph_has_complete_json_mermaid_and_typed_coverage(self) -> None:
+        """The generated schema keeps all skills, phases, commands, edges, and counts."""
+        payload = build_graph(PROJECT_ROOT)
+        self.assertEqual(
+            payload["schema"], "agent_canon.skill_tool_invocation_graph.v1"
+        )
+        self.assertEqual(payload["skill_count"], 60)
+        self.assertIn(
+            "dependency-design",
+            {skill["label"] for skill in payload["skills"]},
+        )
+        self.assertEqual(
+            set(payload["source_counts"]),
+            {
+                "identity",
+                "edge",
+                "field",
+                "phase",
+                "branch",
+                "module",
+                "evidence",
+                "time",
+            },
+        )
+        self.assertEqual(payload["source_counts"], payload["rendered_counts"])
+        self.assertEqual(payload["source_counts"], payload["readback_counts"])
+        self.assertEqual(
+            {edge["edge_type"] for edge in payload["edges"]},
+            {
+                "prerequisite",
+                "successor",
+                "order",
+                "routing",
+                "parallel",
+                "invocation",
+                "tool-resolution",
+            },
+        )
+        markdown = (
+            PROJECT_ROOT / "documents/runtime/skill-dependency-graph.md"
+        ).read_text(encoding="utf-8")
+        machine = json.loads(
+            (PROJECT_ROOT / "documents/runtime/skill-dependency-graph.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(markdown.count("```mermaid"), 1)
+        self.assertEqual(machine["coverage_digest"], payload["coverage_digest"])
+
+    def test_every_packet_command_is_materialized_with_phase(self) -> None:
+        """Each canonical packet resolution has one graph command node and phase."""
+        payload = build_graph(PROJECT_ROOT)
+        graph_commands = {
+            (command["skill"], command["phase"], command["logical_command"])
+            for command in payload["commands"]
+        }
+        sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+        from agent_canon_source_root import (
+            resolve_agent_canon_source_root,  # noqa: E402
+        )
+        from skill_tool_commands import packet_for_skill  # noqa: E402
+
+        resolution = resolve_agent_canon_source_root(PROJECT_ROOT)
+        for skill in catalog_module._skill_ids_from_catalog(
+            catalog_module.load_skill_catalog(PROJECT_ROOT)
+        ):
+            packet = packet_for_skill(resolution, skill)
+            for phase, rows in (
+                ("required", packet.resolved_required_commands),
+                ("conditional", packet.resolved_conditional_commands),
+                ("maintenance", packet.resolved_maintenance_commands),
+            ):
+                for row in rows:
+                    self.assertIn((skill, phase, row[0]), graph_commands)
+
+    def test_artifact_checker_rejects_edited_mermaid(self) -> None:
+        """The checker rejects an edited generated Mermaid artifact."""
+        path = PROJECT_ROOT / "documents/runtime/skill-dependency-graph.md"
+        original = path.read_text(encoding="utf-8")
+        try:
+            path.write_text(original + "\n%% edited\n", encoding="utf-8")
+            result = self.run_tool("check", "--root", str(PROJECT_ROOT))
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("stale_artifact", result.stderr)
+        finally:
+            path.write_text(original, encoding="utf-8")
+
+    def test_artifact_checker_rejects_edited_json(self) -> None:
+        """The checker rejects an edited generated JSON artifact."""
+        path = PROJECT_ROOT / "documents/runtime/skill-dependency-graph.json"
+        original = path.read_text(encoding="utf-8")
+        try:
+            path.write_text(original + "\n", encoding="utf-8")
+            result = self.run_tool("check", "--root", str(PROJECT_ROOT))
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("skill-dependency-graph.json:edited-or-stale", result.stderr)
+        finally:
+            path.write_text(original, encoding="utf-8")
+
+    def test_capacity_failure_is_typed_and_does_not_prune(self) -> None:
+        """Insufficient renderer capacity fails with a typed error."""
+        with self.assertRaisesRegex(
+            GraphCapacityError,
+            "skill_tool_invocation_graph_capacity_exceeded",
+        ):
+            build_graph(PROJECT_ROOT, capacity=1)
+
+    def test_graph_digest_is_deterministic(self) -> None:
+        """Repeated materialization has stable graph and coverage digests."""
+        first = build_graph(PROJECT_ROOT)
+        second = build_graph(PROJECT_ROOT)
+        self.assertEqual(first["graph_digest"], second["graph_digest"])
+        self.assertEqual(first["coverage_digest"], second["coverage_digest"])
 
 
 if __name__ == "__main__":

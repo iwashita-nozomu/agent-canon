@@ -2515,6 +2515,20 @@ class CapabilityRouteTest(unittest.TestCase):
             payload["visualization_tool_call"]["argument_schema"],
             "agent_canon.visualization.arguments.coverage.v1",
         )
+        self.assertEqual(
+            payload["visualization_adapter_tool_call"]["tool_id"],
+            "agent_canon.visualization.adapter.dependency_manifest",
+        )
+        self.assertEqual(
+            payload["visualization_adapter_tool_call"]["argument_schema"],
+            "agent_canon.visualization.arguments.dependency_manifest.v1",
+        )
+        self.assertEqual(
+            payload["visualization_adapter_tool_call"]["arguments"][
+                "dependency_manifest_locator"
+            ],
+            "tools/agent_tools/render_dependency_manifest_graph.py",
+        )
         self.assertIsNone(payload["visualization_rejection"])
 
     def test_capability_route_renders_all_formats(self) -> None:

@@ -28,7 +28,11 @@ from agent_canon_source_root import (
     SourceRootFailure,
     resolve_agent_canon_source_root,
 )
-from route import load_skill_related_map, load_skill_required_tool_commands
+from route import (
+    load_skill_related_map,
+    load_skill_required_tool_commands,
+    load_skill_tool_commands,
+)
 
 DEFAULT_ROOT = Path.cwd()
 RUNTIME_SKILL_ROOT = Path(".agents/skills")
@@ -43,6 +47,10 @@ COMMAND_TEMPLATE = (
 PROMPT_PLACEHOLDER = "<user request>"
 FALLBACK_COMMAND = (
     f'python3 tools/agent_tools/route.py --prompt "{PROMPT_PLACEHOLDER}" --format json'
+)
+LEGACY_MAINTENANCE_COMMANDS = (
+    "python3 tools/agent_tools/check_skill_frontmatter.py --root .",
+    "python3 tools/agent_tools/skill_tool_commands.py check",
 )
 COMMON_RESOLUTION_WORDING = (
     "論理コマンドは、実行前に AgentCanon source root を基準として解決します。"
@@ -141,7 +149,7 @@ ISSUE_CONTRACT_FORBIDDEN: dict[str, tuple[tuple[str, re.Pattern[str]], ...]] = {
 
 @dataclass(frozen=True)
 class SkillCommandPacket:
-    """Commands discovered for one runtime skill."""
+    """Catalog-owned command phases resolved for one runtime skill."""
 
     skill: str
     runtime_skill: str
@@ -149,8 +157,12 @@ class SkillCommandPacket:
     related_skills: tuple[str, ...]
     required_commands: tuple[str, ...]
     discovered_commands: tuple[str, ...]
+    conditional_commands: tuple[str, ...]
+    maintenance_commands: tuple[str, ...]
     resolved_required_commands: tuple[tuple[str, str, str, tuple[str, ...]], ...]
     resolved_discovered_commands: tuple[tuple[str, str, str, tuple[str, ...]], ...]
+    resolved_conditional_commands: tuple[tuple[str, str, str, tuple[str, ...]], ...]
+    resolved_maintenance_commands: tuple[tuple[str, str, str, tuple[str, ...]], ...]
     validation_commands: tuple[str, ...]
 
 
@@ -325,30 +337,39 @@ def build_command_plan(logical_command: str, source_root: Path) -> CommandPlan:
 
 
 def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillCommandPacket:
-    """Build one command packet from runtime and human-facing skill files."""
+    """Build one command packet from catalog-owned command phases."""
     source_root = root_resolution.source_root
     root = source_root
     runtime_path = runtime_skill_path(root, skill)
     canon_path = canonical_skill_doc(root, skill)
-    texts: list[str] = []
-    for path in (runtime_path, canon_path):
-        if path.is_file():
-            texts.append(path.read_text(encoding="utf-8", errors="replace"))
-    discovered = unique_preserve_order(
-        command for text in texts for command in iter_command_lines(text)
-    )
-    required = load_skill_required_tool_commands(root).get(skill, ())
+    spec = load_skill_tool_commands(root).get(skill)
+    if spec is not None and spec.structured:
+        required = spec.required
+        conditional = spec.conditional
+        maintenance = spec.maintenance
+        conditional_for_resolution = conditional
+    else:
+        # Minimal fixture roots may still exercise the legacy readback route;
+        # canonical AgentCanon entries always take the structured branch above.
+        texts: list[str] = []
+        for path in (runtime_path, canon_path):
+            if path.is_file():
+                texts.append(path.read_text(encoding="utf-8", errors="replace"))
+        conditional = unique_preserve_order(
+            command for text in texts for command in iter_command_lines(text)
+        )
+        conditional_for_resolution = conditional or (FALLBACK_COMMAND,)
+        required = load_skill_required_tool_commands(root).get(skill, ())
+        maintenance = LEGACY_MAINTENANCE_COMMANDS
     resolved_required = tuple(
         build_command_plan(command, source_root) for command in required
     )
-    conditional_commands = discovered or (FALLBACK_COMMAND,)
-    resolved_discovered = tuple(
+    resolved_conditional = tuple(
         build_command_plan(command, source_root)
-        for command in conditional_commands
+        for command in conditional_for_resolution
     )
-    validation = (
-        "python3 tools/agent_tools/check_skill_frontmatter.py --root .",
-        "python3 tools/agent_tools/skill_tool_commands.py check",
+    resolved_maintenance = tuple(
+        build_command_plan(command, source_root) for command in maintenance
     )
     related_skills = related_skills_for(root, skill)
     return SkillCommandPacket(
@@ -357,7 +378,9 @@ def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillComman
         canonical_doc=repo_relative(root, canon_path),
         related_skills=related_skills,
         required_commands=required,
-        discovered_commands=discovered,
+        discovered_commands=conditional,
+        conditional_commands=conditional,
+        maintenance_commands=maintenance,
         resolved_required_commands=tuple(
             (
                 plan.logical_command,
@@ -374,9 +397,27 @@ def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillComman
                 plan.execution_cwd,
                 plan.execution_argv,
             )
-            for plan in resolved_discovered
+            for plan in resolved_conditional
         ),
-        validation_commands=validation,
+        resolved_conditional_commands=tuple(
+            (
+                plan.logical_command,
+                plan.source_root,
+                plan.execution_cwd,
+                plan.execution_argv,
+            )
+            for plan in resolved_conditional
+        ),
+        resolved_maintenance_commands=tuple(
+            (
+                plan.logical_command,
+                plan.source_root,
+                plan.execution_cwd,
+                plan.execution_argv,
+            )
+            for plan in resolved_maintenance
+        ),
+        validation_commands=maintenance,
     )
 
 
@@ -517,10 +558,7 @@ def render_packet_text(packet: SkillCommandPacket) -> str:
             )
         )
     lines.append("SKILL_TOOL_COMMANDS_CONDITIONAL:")
-    if packet.discovered_commands:
-        lines.extend(f"- {command}" for command in packet.discovered_commands)
-    else:
-        lines.append(f"- {FALLBACK_COMMAND}")
+    lines.extend(f"- {command}" for command in packet.conditional_commands)
     lines.append("SKILL_TOOL_COMMANDS_CONDITIONAL_RESOLUTION:")
     for command, source_root, execution_cwd, argv in packet.resolved_discovered_commands:
         lines.extend(
@@ -533,7 +571,7 @@ def render_packet_text(packet: SkillCommandPacket) -> str:
         )
     lines.append("SKILL_TOOL_COMMANDS_MAINTENANCE_ONLY:")
     lines.append("- Run these only when editing skill command sections or checking skill-tool drift.")
-    lines.extend(f"- {command}" for command in packet.validation_commands)
+    lines.extend(f"- {command}" for command in packet.maintenance_commands)
     return "\n".join(lines)
 
 
