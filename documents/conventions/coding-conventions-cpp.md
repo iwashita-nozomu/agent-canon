@@ -3,7 +3,6 @@
 contract policy
 responsibility Documents C++ コーディング規約 for this repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
-upstream design ../design/cpp-build-layout.md native target identity and build layout
 upstream design ./DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse projection traces
 downstream design ../design/algorithm-implementation-boundary.md algorithm math-to-code boundary policy for C++ implementations
 @dependency-end
@@ -23,12 +22,27 @@ layout と build tree の正本は [cpp-build-layout.md](../design/cpp-build-lay
 - 例外や分岐が多くなる設計は避けます。
 - 数値計算の安定性を意識し、前提条件をコメントで明示します。
 - template 既定の C++ 実装形態は header-only にします。
-- root `CMakeLists.txt` を canonical entrypoint にします。
-- `cmake/` は helper module、`include/` は public header 兼 template 既定の実装置き場、`tests/cpp/` は test/smoke source に固定します。
+- `cpp/CMakeLists.txt` を唯一の C++ project entrypoint にします。
+- `cpp/cmake/` は project-local helper module、`cpp/include/` は public header、
+  `cpp/src/` は production implementation、`cpp/tests/` は CTest source、
+  `cpp/experiments/` は native experiment source と target wiring に固定します。
+- parent root は language-neutral な入口として保ち、C++ command は `cpp` を
+  source anchor にして実行します。
+
+## 1.1 Native project boundary
+
+| owner | path/state | evidence command |
+| --- | --- | --- |
+| project | `cpp/CMakeLists.txt` が `cpp/src`、`cpp/include`、`cpp/tests`、`cpp/experiments` を同一 configure graph に登録する | `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` |
+| production | `cpp-core` が public header と production source を提供する | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-core` |
+| tests | `cpp-test-<name>` が `cpp-core` を consume し、CTest が実行を所有する | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-tests`; `ctest --test-dir "$ROOT/build/cpp/<profile>"` |
+| experiments | `cpp-experiment-<name>` が `cpp-core` を consume し、build と run を分離する | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-experiments` |
 
 ## 禁止事項
 
-- `src/` は header-only で収まらない特例実装だけに使います。新規 template 利用で最初から `src/` に実装を書くことを禁止します。
+- `cpp/src/` は production translation unit の所有先です。header-only の `cpp-core` は
+  `cpp/include/` を中心に構成し、translation unit と artifact の選択は source/artifact
+  contract として設計記録へ残します。
 - in-source build を禁止します。`build/cpp/<profile>/` を使います。
 
 ## 2. 命名規則
@@ -43,10 +57,10 @@ layout と build tree の正本は [cpp-build-layout.md](../design/cpp-build-lay
 
 ## 3.5 Header-Only Rule
 
-- template 既定では C++ 実装を持ちません。派生 repo で C++ を追加する場合は `include/<project>/*.hpp` を既定にします。
+- template 既定では C++ 実装を持ちません。派生 repo で C++ を追加する場合は `cpp/include/<project>/*.hpp` を既定にします。
 - focused helper、policy class、FFI binding helper、shape/stride 変換、artifact loader helper は header-only にします。
-- `src/` に `.cc` / `.cpp` を置くのは、compile time、link time、ODR、外部 library 事情で header-only が不適切だと説明できる場合だけにします。
-- `src/` を使うときは、なぜ header-only では駄目かを設計文書か change note に残さなければなりません。
+- `cpp/src/` に `.cc` / `.cpp` を置くのは、compile time、link time、ODR、外部 library 事情で header-only が不適切だと説明できる場合だけにします。
+- `cpp/src/` を使うときは、なぜ header-only では駄目かを設計文書か change note に残さなければなりません。
 
 ## 4. コメント
 
@@ -76,7 +90,7 @@ design fact を再定義しません。
 
 ```bash
 python3 tools/agent_tools/check_hardcoded_numbers.py \
-  include src tests/cpp \
+  cpp/include cpp/src cpp/tests cpp/experiments \
   --exclude vendor \
   --exclude reports
 ```
@@ -85,10 +99,10 @@ python3 tools/agent_tools/check_hardcoded_numbers.py \
 
 - bounded かつ決定的な入力で検証します。
 - 期待結果が分かるケース（対角行列、既知解など）を優先します。
-- `jax.export` と C++ をつなぐ変更では、project-local smoke target を追加し、少なくとも `python3 tools/ci/check_jax_export_stack.py` と `cmake --build build/cpp/<profile> --target <project-cpp-smoke-target>` を通します。
+- `jax.export` と C++ をつなぐ変更では、project-local smoke target を追加し、少なくとも `python3 tools/ci/check_jax_export_stack.py` と `cmake --build "$ROOT/build/cpp/<profile>" --target <project-cpp-smoke-target>` を通します。
 
 ## 6. 再利用
 
 - 再利用する local install tree は `.state/cpp-install/<profile>/` に置きます。
 - optional な local `jax.export` artifact は project-local `.state/<project>/jax-export/<profile>/` のように用途名を含む path に置きます。
-- `docker/Dockerfile`、`docker/requirements.txt`、`CMakeLists.txt`、`cmake/`、optional `jax/jaxlib` version、calling convention が変わったら rebuild します。
+- `docker/Dockerfile`、`docker/requirements.txt`、`cpp/CMakeLists.txt`、`cpp/cmake/`、optional `jax/jaxlib` version、calling convention が変わったら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` から rebuild します。

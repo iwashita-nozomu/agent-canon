@@ -6,6 +6,7 @@ responsibility Documents cpp-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ./catalog.yaml public skill and capability projection
 upstream design ./skill-dependencies.yaml prerequisite and reviewer order
+upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json C++ validation profile owner
 upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract and sparse C++ projection
 @dependency-end
 -->
@@ -17,8 +18,8 @@ C / C++ 差分を build 境界、header 境界、所有権、例外・error path
 
 ## Use When
 
-- `src/`, `include/`, `lib/` 配下を触る
-- `CMakeLists.txt` や native build 設定を触る
+- `cpp/src/`, `cpp/include/`, `cpp/tests/`, `cpp/experiments/` 配下を触る
+- `cpp/CMakeLists.txt` や native build 設定を触る
 - public header、ABI、FFI、CLI binary の挙動を変える
 - C++ documentation / Docstring projection を触る
 - `bootstrap_agent_run.py` の changed path 判定で `cpp_reviewer` が自動で足された
@@ -27,7 +28,10 @@ C / C++ 差分を build 境界、header 境界、所有権、例外・error path
 
 - project-native configure / build / test evidence
 - `ctest` があるならその結果
-- CMake project なら `cmake -S . -B build` と `cmake --build build` の結果
+- CMake project なら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`、
+  `cmake --build "$ROOT/build/cpp/<profile>" --parallel`、
+  `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure` の結果
+- install contract がある場合は `cmake --install "$ROOT/build/cpp/<profile>"` の結果
 
 ## Core References
 
@@ -36,11 +40,23 @@ C / C++ 差分を build 境界、header 境界、所有権、例外・error path
 - `documents/conventions/coding-conventions-testing.md`
 - `documents/conventions/REVIEW_PROCESS.md`
 
+## Target graph readback
+
+- `cpp/CMakeLists.txt` が単一の native project entry として `cpp/src`、`cpp/include`、
+  `cpp/tests`、`cpp/experiments` を同じ configure graph に接続します。
+- `cpp-test-<name>` と `cpp-experiment-<name>` は `cpp-core` を consume し、
+  `cpp-tests` と `cpp-experiments` は build grouping を提供します。
+- root anchor、build tree、install prefix は `$ROOT/cpp`、`$ROOT/build/cpp/<profile>`、
+  `$ROOT/.state/cpp-install/<profile>` に read back します。run/result publication は
+  experiment lifecycle owner に残します。
+
 ## Docstring projection route
 
-`agent_team.language_review_candidates` が native C/C++ implementation path（native suffix、
-`src/`、`include/`、`lib/`、`cmake/` marker）を含む changed surface に `cpp_reviewer` を
-候補として返した場合に、reviewer を起動します。convention/template documentation は同じ
+`agent_team.language_review_candidates` が native C/C++ implementation or test path（native suffix、
+`cpp/CMakeLists.txt`、`cpp/src/`、`cpp/include/`、`cpp/tests/`、`cpp/experiments/`、
+`cpp/cmake/` marker）を含む
+changed surface に `cpp_reviewer` を候補として返した場合に、reviewer を起動します。
+convention/template documentation は同じ
 path inventory から `docs_workflow_steward` が担当し、catalog capability は OOP/type design
 owner の選択に限ります。semantic clause の owner は `documents/conventions/DOCSTRING_GUIDE.md`
 へ戻します。レビューは Doxygen syntax / format、header/source anchor、native ownership

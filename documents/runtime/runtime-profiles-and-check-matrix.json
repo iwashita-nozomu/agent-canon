@@ -65,12 +65,15 @@
     {
       "profile": "C++",
       "activates": [
-        "`CMakeLists.txt`",
-        "`cmake/`",
-        "`src/`",
-        "`include/`",
-        "`lib/`",
-        "C++ OOP checks"
+        "parent root remains language-neutral",
+        "`cpp/CMakeLists.txt` as the single native project entry",
+        "`cpp/cmake/`",
+        "`cpp/src/`",
+        "`cpp/include/`",
+        "`cpp/tests/`",
+        "`cpp/experiments/`",
+        "C++ OOP checks",
+        "`cmake -S \"$ROOT/cpp\" -B \"$ROOT/build/cpp/<profile>\" -DCMAKE_INSTALL_PREFIX=\"$ROOT/.state/cpp-install/<profile>\"`"
       ],
       "required_when": "C or C++ code, build layout, or native artifacts change"
     },
@@ -233,7 +236,11 @@
     {
       "changed_surface": "C/C++",
       "required_check": [
-        "project-native configure/build/test and C++ reviewer/checker where applicable"
+        "`cmake -S \"$ROOT/cpp\" -B \"$ROOT/build/cpp/<profile>\" -DCMAKE_INSTALL_PREFIX=\"$ROOT/.state/cpp-install/<profile>\"`",
+        "`cmake --build \"$ROOT/build/cpp/<profile>\" --parallel`",
+        "`ctest --test-dir \"$ROOT/build/cpp/<profile>\" --output-on-failure`",
+        "`cmake --install \"$ROOT/build/cpp/<profile>\"`",
+        "project-native C++ reviewer/checker evidence, including consumer-to-provider target readback"
       ]
     },
     {

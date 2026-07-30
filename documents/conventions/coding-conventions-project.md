@@ -32,8 +32,11 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 - `scripts/` は repo-local bootstrap の入口です。template 固有の初期化、slug 置換、bare remote 初期化だけをここに置きます。
 - `docker/` は template / project の runtime image、build library、dependency pack の定義です。
 - `.devcontainer/` は AgentCanon-owned shared runtime ergonomics です。Codex、agent 用 npm / Node、GitHub CLI / `gh`、auth mount、attach status はここで扱います。
-- `experiments/` は実験コードと生成物の置き場です。
-- `python/`, `src/`, `include/`, `lib/` は実装スロットです。全部を使う必要はありません。
+- `experiments/` は Python managed experiment の registry、run、result、report の正本です。
+- `cpp/` は native C++ project の正本です。`cpp/CMakeLists.txt` が project entrypoint、
+  `cpp/src/`、`cpp/include/`、`cpp/tests/`、`cpp/experiments/` が target ownership を持ちます。
+- `python/` は Python implementation の正本です。parent root は language-neutral な
+  command/document entry として保ちます。
 - C++ を使う場合の build layout は `documents/design/cpp-build-layout.md` を正本にします。
 - Bash 実装は用途で置き場所を固定します。shared automation の Bash は `tools/`、repo-local bootstrap の Bash は `scripts/` に置きます。
 
@@ -90,10 +93,26 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 - Docker runtime の再利用 surface は `docker/packs/*.toml`、`docker/codex-container-profiles.toml`、`docker/python-execution-rules.toml` を正本にし、path 分岐は各 surface の契約へ集約します。
 - Docker runtime、runtime pack、devcontainer 生成導線を変えた場合は `python3 tools/ci/container_config.py` を通し、`docker/Dockerfile`、`docker/packs/*.toml`、`.devcontainer/` の整合を確認します。
 - main server host の path、mount、builder 前提は `documents/contracts/server-host-contract.md` と `templates/documents/server_runtime_layout.template.toml` を正本にし、実行経路を都度記録して共有します。
-- C++ を使う場合の canonical CMake entrypoint は root `CMakeLists.txt` です。`src/` や `include/` の下に別 root を増やす場合は、まず `CMakeLists.txt` を維持したままの代替設計が成立するかを確認し、追加 root が必要な場合は run bundle で理由を示します。
-- template 既定では C++ 実装を持ちません。C++ を追加する project では `include/` を実装の主置き場にし、`src/` は特例実装だけに使います。
+- C++ の canonical project entrypoint は `cpp/CMakeLists.txt` です。parent root は
+  language-neutral に保ち、C++ は explicit な `cpp` source directory から configure します。
+- template 既定では C++ 実装を持ちません。C++ を追加する project では `cpp/include/`
+  を public header の所有先、`cpp/src/` を production source の所有先として、
+  source/artifact contract に対応する `cpp-core` target を構成します。
 - C++ build は out-of-source とし、`build/cpp/<profile>/` を使います。
 - 再利用する local install tree は `.state/cpp-install/<profile>/` に置きます。optional な local `jax.export` artifact は用途名を含む `.state/<project>/...` 配下に分離します。
+
+### C++ command owner
+
+`cpp/CMakeLists.txt` が project identity と profile cache を所有し、parent command
+surface は同じ anchor を呼び出します。
+
+```bash
+cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" \
+  -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"
+cmake --build "$ROOT/build/cpp/<profile>" --target cpp-tests
+ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure
+cmake --install "$ROOT/build/cpp/<profile>"
+```
 
 ## 4.7 Legacy Forwarder Migration Rule
 
@@ -108,19 +127,25 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 - Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth setup、host mount 方針は `CONTAINER_OPERATIONS.md` の手順で扱います。
 - host-global install 由来の要件は `CONTAINER_OPERATIONS.md` / `docker/` の更新対象として収束させます。
 - CI でも使う tool は、共有運用ルートへ反映して運用します。
-- `src/` や `include/` の下に別 CMake root を増やす場合は、`run bundle` に代替根拠を先に置いてから進めます。原則は `CMakeLists.txt` を基準に継続します。
+- `cpp/` の下に nested manifest を追加する場合は `cpp/CMakeLists.txt` の同一 configure
+  graph に接続し、nested manifest は project identity を持たず target ownership を
+  宣言します。
 - legacy forwarder / migration wrapper が出した `fix-now` 移行警告は、移行方針を示した `run bundle` / `issue` / PR body を blocker として残してから作業再開します。
 
 ## 5. テストとレビュー
 
-- 実装変更には、対応するテストまたは検証手順を同じ変更でそろえます。
+- 実装変更には、対応するテストまたは検証手順を同じ変更でそろえます。C++ test source
+  は `cpp/tests/`、CTest registration は `cpp/tests/CMakeLists.txt` が所有します。
 - 仕上げ前に `make ci-quick`、必要に応じて `make ci` を流します。
 - 文書変更ではリンク切れと記述の入口整合を確認します。
 - legacy forwarder / migration wrapper の warning policy は `python3 tools/agent_tools/check_convention_compliance.py` で確認します。
 
 ## 6. 実験運用
 
-- 実験コードと生成物は `experiments/` 配下に集約します。
+- Python managed experiment の registry、run、result、report は `experiments/` 配下に集約します。
+- Native C++ experiment source と target は `cpp/experiments/` に置き、build は
+  `cpp-experiment-<name>`、run は lifecycle-owned `experiments/<topic>/result/<run_name>/`
+  へ分離します。
 - 1 回の run は fresh 実行として扱います。
 - 正式結果は planned run と acceptance criteria が揃った実行から採用します。
 - 複数 run をまたぐ知見は `notes/experiments/` または `notes/themes/` に残します。
