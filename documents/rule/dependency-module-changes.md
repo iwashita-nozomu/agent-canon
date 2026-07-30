@@ -127,18 +127,37 @@ clone削除後に同じgateで削除できます。topic rootが空なら topic 
 - `git fetch --all --prune` が成功する。
 - worktree、index、untracked files が空である。
 - linked worktree が追加で登録されていない。
-- fetch 後の `git rev-list --all --not --remotes` が空であるか、後述の
-  integrated-commit evidence gate が pass する。
+- computed clone path と実際の `origin` URL は引き続き Git / manifest で検証する。
+  `agent-canon.topic.role` と `agent-canon.topic.topic` の membership marker は
+  旧来の所属 evidence として readback するが、stale または missing であることだけを
+  cleanup の拒否理由にしない。marker の readback は `marker-readback=membership-mismatch`
+  として `CLEANUP` receipt に残す。owner evidence、placement、module、URL、branch の
+  不一致は従来どおり hold する。
+- `topic_base = git merge-base HEAD refs/remotes/origin/main` を計算し、
+  `topic_base..HEAD` のうち fetched remote refs に到達できない unique commit を
+  検査する。unique commit がなければこの evidence gate は pass し、残る場合は
+  後述の integrated-commit evidence gate が pass する。
 - local-only commit が残る場合は、PR merge/readback が返した full OID を
   `--integrated-commit <full-oid>` で渡すか、canonical な
   `refs/remotes/origin/main` first-parent history から tool が deterministic に
   discover した integrated commit を使う。candidate は `origin/main` reachable
-  である必要がある。tool は common/base commit と topic HEAD の
-  `git diff --name-only --no-renames -z` で topic path set を作り、各 path の
-  `git ls-tree -r -z` entry `(object/blob OID, mode, type)` または absence が
-  integrated commit の最終 tree と exact 一致することを確認する。integration 側の
-  topic 外 path は比較対象外とし、patch-id や path/status digest は認可根拠に
+  で、かつ `topic_base` の descendant である必要がある。tool は `topic_base` と
+  topic HEAD の `git diff --name-only --no-renames -z` で topic path set を作り、
+  各 path の `git ls-tree -r -z` entry `(object/blob OID, mode, type)` または
+  absence が integrated commit の最終 tree と exact 一致することを確認する。
+  topic path set が空でも、同一 content の過去 commitや unpushed allow-empty
+  commitを取り違えないよう、topic HEAD 自体が fetched remote の integrated
+  history または remote topic head に保持されている証拠を要求する。証拠がなければ
+  `integrated-commit-empty-topic-without-remote-tip` で hold する。integration
+  側の topic 外 path は比較対象外とし、patch-id や path/status digest は認可根拠に
   使わない。
+- module cleanup と parent cleanup は共通の parent marker readback を先に行い、
+  role/topic membership marker の stale または missing を
+  `marker-readback=membership-mismatch` の diagnostic として receipt に残す。
+  target clone の exact path、target clone の非membership identity、clean/tree proof、
+  integrated commit readback に到達し、proof が pass した後に parent の strict
+  identity と managed-child 状態を確認する。membership marker だけを main precheck
+  の blocker にしない。
 - `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY` とその reason、
   `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` とその
   reason が同じ command segment から渡されている。
@@ -170,6 +189,9 @@ surface の状態だけを完成形として残します。
   `origin/main` の canonical discovery を使い、equivalence を証明できなければ
   hold する。
 - `cleanup --placement workspace[{-continuation}] --topic <topic> --module <path> --expected-clone <absolute-path> --owner-evidence-sha256 <sha256>`: workspace placement の computed clone だけを扱い、exact expected evidence SHA と marker identity を検証してから同じ cleanup gate を適用する。
+- workspace placement の module clone を同じ gate で削除した後、computed topic root に
+  managed child 以外の成果物が無ければ、同じ `CLEANUP` receipt で topic root も削除する。
+  他の成果物は保持し、再 clone / `prepare` を暗黙に行わない。
 - `cleanup --topic <topic> --parent --expected-parent <absolute-path>`: module cloneが
   無い場合だけparent cloneと空topic rootを同じgateで削除する。
 

@@ -62,6 +62,11 @@ executor の選択と実行は各 owner route が行い、この skill は healt
 - `git worktree list --porcelain` で duplicate / stale worktree が無いか確認している
 - branch / worktree 作成 route は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と `branch_worktree_guard.py` に委譲し、この skill は診断 command と `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>` の存在だけを確認している
 - carry-over すべき note、report、result の置き場が消える前提になっていない
+- dependency clone cleanup では、exact computed path、clean / untracked-zero
+  state、remote integrated tree readback を health evidence として確認する。
+  stale / missing membership marker は `marker-readback=membership-mismatch` として
+  残る旧 evidence であり、それだけで cleanup hold にしない。managed child の除去後に
+  他成果物の無い topic container が同じ cleanup receipt で除去されたことを確認する。
 
 ## Default Sequence
 

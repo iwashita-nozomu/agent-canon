@@ -52,7 +52,7 @@ it. A collision keeps the current checkout unchanged and returns to the user.
 1. Reuse the current branch if it already owns this canon-pin lane.
 1. Otherwise request user direction and approval for `agent-updates/canon-pin/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the four-field same-segment guard contract.
 1. Update the AgentCanon submodule pin, `.agent-canon/update-state.toml`, and root runtime links.
-1. Run `bash tools/sync_agent_canon.sh plan`, `bash tools/sync_agent_canon.sh check`, and `bash tools/agent_tools/agent_update_branch.sh validate canon-pin`.
+1. Run `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh plan`, `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check`, and `bash tools/agent_tools/agent_update_branch.sh validate canon-pin`.
 1. Commit with the AgentCanon target commit in the message.
 1. Push the branch.
 

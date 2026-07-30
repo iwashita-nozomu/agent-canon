@@ -393,6 +393,7 @@ def _inspect(
     owner_evidence_sha256: str | None = None,
     topic_identity: str | None = None,
     module_url: str | None = None,
+    allow_stale_membership: bool = False,
 ) -> CloneInspection:
     if not path.exists() and not path.is_symlink():
         return CloneInspection(path, "absent")
@@ -410,7 +411,7 @@ def _inspect(
     marker_module = _marker(path, "module")
     marker_url = _marker(path, "url")
     marker_branch = _marker(path, "branch")
-    if marker_role != role or marker_topic != topic:
+    if not allow_stale_membership and (marker_role != role or marker_topic != topic):
         return CloneInspection(path, "membership-mismatch", marker_role, marker_module, remote, marker_branch, actual)
     if placement is not None and _marker(path, "placement") != placement:
         return CloneInspection(path, "placement-mismatch", marker_role, marker_module, remote, marker_branch, actual)
@@ -532,12 +533,19 @@ def _existing_topic_parent(topic_root: Path, topic: str) -> Path | None:
     return candidates[0] if candidates else None
 
 
-def _resolve_topic_parent(root: Path, topic: str, *, create: bool) -> Path:
+def _resolve_topic_parent(
+    root: Path, topic: str, *, create: bool, allow_stale_membership: bool = False
+) -> Path:
     """Resolve the parent clone even when --root points at a module clone."""
     topic_slug = _slug(topic, "topic")
     topic_root = _topic_workspace(root, topic, create=create)
     if root.parent == topic_root:
-        selected = _inspect(root, role="parent", topic=topic_slug)
+        selected = _inspect(
+            root,
+            role="parent",
+            topic=topic_slug,
+            allow_stale_membership=allow_stale_membership,
+        )
         if selected.state == "ready":
             return root
         existing = _existing_topic_parent(topic_root, topic_slug)
@@ -938,8 +946,20 @@ def _tree_entry(
     )
 
 
+def _remote_ref_contains_commit(path: Path, commit: str) -> bool:
+    """Return whether any fetched remote ref retains the selected commit."""
+    refs = _run_git(
+        path, ["for-each-ref", "--format=%(refname)", "refs/remotes"]
+    ).splitlines()
+    return any(
+        _git_succeeds(path, ["merge-base", "--is-ancestor", commit, ref])
+        for ref in refs
+    )
+
+
 def _integrated_commit_failure(
     path: Path,
+    topic_base: str,
     topic_paths: tuple[str, ...],
     topic_tip: str,
     integrated_commit: str,
@@ -954,6 +974,13 @@ def _integrated_commit_failure(
         ["merge-base", "--is-ancestor", integrated_commit, INTEGRATION_REMOTE_REF],
     ):
         return "integrated-commit-not-reachable-from-origin-main"
+    if not _git_succeeds(
+        path,
+        ["merge-base", "--is-ancestor", topic_base, integrated_commit],
+    ):
+        return "integrated-commit-not-descendant-of-topic-base"
+    if not topic_paths and not _remote_ref_contains_commit(path, topic_tip):
+        return "integrated-commit-empty-topic-without-remote-tip"
     try:
         for changed_path in topic_paths:
             topic_entry = _tree_entry(path, topic_tip, changed_path)
@@ -970,13 +997,16 @@ def _integrated_commit_failure(
 
 
 def _discover_integrated_commit(
-    path: Path, topic_paths: tuple[str, ...], topic_tip: str
+    path: Path, topic_base: str, topic_paths: tuple[str, ...], topic_tip: str
 ) -> str | None:
     """Find the newest equivalent commit on the canonical fetched main ref."""
     for candidate in _run_git(
         path, ["rev-list", "--first-parent", INTEGRATION_REMOTE_REF]
     ).splitlines():
-        if _integrated_commit_failure(path, topic_paths, topic_tip, candidate) is None:
+        if (
+            _integrated_commit_failure(path, topic_base, topic_paths, topic_tip, candidate)
+            is None
+        ):
             return candidate
     return None
 
@@ -990,23 +1020,29 @@ def _cleanup_readiness(path: Path, integrated_commit: str | None = None) -> str 
         return "dirty-worktree-index-or-untracked"
     if sum(line.startswith("worktree ") for line in _run_git(path, ["worktree", "list", "--porcelain"]).splitlines()) > 1:
         return "linked-worktree-present"
-    if _run_git(path, ["rev-list", "--all", "--not", "--remotes"]).strip():
-        try:
-            topic_base = _run_git(path, ["merge-base", "HEAD", INTEGRATION_REMOTE_REF]).strip()
-        except GitCommandError:
-            return "integrated-commit-base-unavailable"
-        if not topic_base:
-            return "integrated-commit-base-unavailable"
-        topic_tip = _run_git(path, ["rev-parse", "HEAD"]).strip()
+    topic_tip = _run_git(path, ["rev-parse", "HEAD"]).strip()
+    try:
+        topic_base = _run_git(path, ["merge-base", topic_tip, INTEGRATION_REMOTE_REF]).strip()
+    except GitCommandError:
+        return "integrated-commit-base-unavailable"
+    if not topic_base:
+        return "integrated-commit-base-unavailable"
+    unique_topic_commits = _run_git(
+        path,
+        ["rev-list", f"{topic_base}..{topic_tip}", "--not", "--remotes"],
+    ).strip()
+    if unique_topic_commits or integrated_commit is not None:
         try:
             topic_paths = _topic_changed_paths(path, topic_base, topic_tip)
         except GitCommandError:
             return "integrated-commit-evidence-unreadable"
         if integrated_commit is not None:
-            failure = _integrated_commit_failure(path, topic_paths, topic_tip, integrated_commit)
+            failure = _integrated_commit_failure(
+                path, topic_base, topic_paths, topic_tip, integrated_commit
+            )
             if failure is not None:
                 return failure
-        elif _discover_integrated_commit(path, topic_paths, topic_tip) is None:
+        elif _discover_integrated_commit(path, topic_base, topic_paths, topic_tip) is None:
             return "unique-local-commits"
     return None
 
@@ -1022,6 +1058,21 @@ def _require_cleanup_authority() -> None:
     raise DependencyModuleChangeError("cleanup --apply requires same-command authority/reason fields")
 
 
+def _inspect_cleanup_parent(parent_root: Path, topic: str) -> CloneInspection:
+    """Read parent membership before cleanup proof without making it a blocker."""
+    strict = _inspect(parent_root, role="parent", topic=topic)
+    if strict.state != "membership-mismatch":
+        return strict
+    relaxed = _inspect(
+        parent_root,
+        role="parent",
+        topic=topic,
+        allow_stale_membership=True,
+    )
+    print("CLEANUP parent marker-readback=membership-mismatch")
+    return relaxed
+
+
 def _cleanup_module(
     parent_root: Path,
     topic: str,
@@ -1029,6 +1080,7 @@ def _cleanup_module(
     expected: Path,
     apply: bool,
     integrated_commit: str | None = None,
+    parent_inspection: CloneInspection | None = None,
 ) -> None:
     clone = parent_root.parent / module.basename
     clone = _assert_safe_contained_path(parent_root.parent, clone, "module cleanup clone")
@@ -1041,6 +1093,17 @@ def _cleanup_module(
         topic=topic,
         module_url=_resolve_module_url(parent_root, module.url),
     )
+    marker_readback = inspection.state
+    if inspection.state == "membership-mismatch":
+        inspection = _inspect(
+            clone,
+            role="module",
+            module=module,
+            topic=topic,
+            module_url=_resolve_module_url(parent_root, module.url),
+            allow_stale_membership=True,
+        )
+        print(f"CLEANUP module={module.path} marker-readback={marker_readback}")
     if inspection.state == "absent":
         print(f"CLEANUP module={module.path} action=hold reason=absent")
         return
@@ -1050,6 +1113,12 @@ def _cleanup_module(
     reason = _cleanup_readiness(clone, integrated_commit)
     if reason:
         print(f"CLEANUP module={module.path} action=hold reason={reason}")
+        return
+    if parent_inspection is not None and parent_inspection.state != "ready":
+        print(
+            f"CLEANUP module={module.path} action=hold "
+            f"reason=parent-{parent_inspection.state}"
+        )
         return
     if not apply:
         print(f"CLEANUP module={module.path} action=would-remove path={clone}")
@@ -1067,12 +1136,32 @@ def _cleanup_parent(
     expected: Path,
     apply: bool,
     integrated_commit: str | None = None,
+    parent_inspection: CloneInspection | None = None,
 ) -> None:
     parent_root = _assert_safe_contained_path(
         parent_root.parent, parent_root, "parent cleanup clone"
     )
     if not expected.is_absolute() or expected != parent_root:
         raise DependencyModuleChangeError(f"--expected-parent must exactly equal {parent_root}")
+    inspection = parent_inspection or _inspect_cleanup_parent(parent_root, topic)
+    for module in modules:
+        candidate = parent_root.parent / module.basename
+        child_inspection = _inspect(
+            candidate,
+            role="module",
+            module=module,
+            topic=topic,
+            module_url=_resolve_module_url(parent_root, module.url),
+        )
+        if child_inspection.state == "membership-mismatch":
+            print(
+                f"CLEANUP module={module.path} "
+                f"marker-readback=membership-mismatch path={candidate}"
+            )
+    reason = _cleanup_readiness(parent_root, integrated_commit)
+    if reason:
+        print(f"CLEANUP parent action=hold reason={reason}")
+        return
     blockers = _module_path_states(parent_root, modules, topic)
     if blockers:
         details = ", ".join(f"{item.path} ({item.state})" for item in blockers)
@@ -1088,13 +1177,8 @@ def _cleanup_parent(
             "parent clone cleanup refused by unknown topic entries: "
             + ", ".join(str(item) for item in unknown)
         )
-    inspection = _inspect(parent_root, role="parent", topic=topic)
     if inspection.state != "ready":
         print(f"CLEANUP parent action=hold reason={inspection.state}")
-        return
-    reason = _cleanup_readiness(parent_root, integrated_commit)
-    if reason:
-        print(f"CLEANUP parent action=hold reason={reason}")
         return
     if not apply:
         print(f"CLEANUP parent action=would-remove path={parent_root}")
@@ -1138,6 +1222,22 @@ def _cleanup_workspace(
         owner_evidence_sha256=owner_evidence_sha256,
         module_url=_resolve_module_url(root, module.url),
     )
+    marker_readback = inspection.state
+    if inspection.state == "membership-mismatch":
+        inspection = _inspect(
+            clone,
+            role="module",
+            module=module,
+            topic=_topic_name(topic),
+            placement=placement,
+            owner_evidence_sha256=owner_evidence_sha256,
+            module_url=_resolve_module_url(root, module.url),
+            allow_stale_membership=True,
+        )
+        print(
+            f"CLEANUP module={module.path} placement={placement} "
+            f"marker-readback={marker_readback}"
+        )
     if inspection.state == "absent":
         print(f"CLEANUP module={module.path} placement={placement} action=hold reason=absent")
         return
@@ -1155,6 +1255,10 @@ def _cleanup_workspace(
     clone = _assert_safe_contained_path(topic_root, clone, "workspace cleanup clone")
     shutil.rmtree(clone)
     print(f"CLEANUP module={module.path} placement={placement} action=removed path={clone}")
+    if topic_root != CONTAINER_WORKSPACE_ROOT and topic_root.exists() and not any(topic_root.iterdir()):
+        _assert_safe_contained_path(root, topic_root, "workspace cleanup topic root")
+        topic_root.rmdir()
+        print(f"CLEANUP topic action=removed path={topic_root}")
 
 
 def _status(parent_root: Path, modules: tuple[DependencyModule, ...], topic: str) -> None:
@@ -1279,11 +1383,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.integrated_commit,
             )
             return 0
-        parent_root = _resolve_topic_parent(root, args.topic, create=False)
+        cleanup_command = args.command == "cleanup"
+        parent_root = _resolve_topic_parent(
+            root,
+            args.topic,
+            create=False,
+            allow_stale_membership=cleanup_command,
+        )
         if not parent_root.is_dir():
             raise DependencyModuleChangeError(f"topic parent clone is absent: {parent_root}")
-        parent_inspection = _inspect(parent_root, role="parent", topic=topic)
-        if parent_inspection.state != "ready":
+        if cleanup_command:
+            parent_inspection = _inspect_cleanup_parent(parent_root, topic)
+        else:
+            parent_inspection = _inspect(parent_root, role="parent", topic=topic)
+        if not cleanup_command and parent_inspection.state != "ready":
             raise DependencyModuleChangeError(
                 f"topic parent clone failed identity validation: {parent_root} ({parent_inspection.state})"
             )
@@ -1300,6 +1413,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 Path(args.expected_parent).absolute(),
                 args.apply,
                 args.integrated_commit,
+                parent_inspection,
             )
         else:
             if not args.expected_clone:
@@ -1312,6 +1426,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 Path(args.expected_clone).absolute(),
                 args.apply,
                 args.integrated_commit,
+                parent_inspection,
             )
         return 0
     except (DependencyModuleChangeError, OSError) as exc:

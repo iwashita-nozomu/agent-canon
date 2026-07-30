@@ -9,7 +9,10 @@
 
 from __future__ import annotations
 
+import argparse
 import os
+import subprocess
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -39,6 +42,74 @@ class RootResolution:
     source_root: Path
     layout: str
     canon_root: Path
+
+
+def _default_pythonpath(*, root: Path) -> str:
+    """Build a deterministic pythonpath for delegated owner-owned command execution."""
+    tools_path = str(root / "tools")
+    repository_tools_path = str(root.resolve() / "tools")
+    extra = os.environ.get("PYTHONPATH", "").strip()
+    if extra:
+        return ":".join((tools_path, repository_tools_path, extra))
+    return ":".join((tools_path, repository_tools_path))
+
+
+def _resolve_executable(root_resolution: RootResolution, command: str) -> Path:
+    """Resolve a command path under the resolved source root."""
+    resolved = Path(command)
+    if not resolved.is_absolute():
+        resolved = root_resolution.source_root / resolved
+    resolved = resolved.resolve()
+    if not _is_within(resolved, root_resolution.source_root):
+        raise SourceRootFailure(
+            "agent_canon_source_root_command_escape",
+            f"Command resolves outside source root: {resolved}",
+        )
+    if not resolved.is_file():
+        raise SourceRootFailure(
+            "agent_canon_source_root_command_missing",
+            f"Command path does not exist: {resolved}",
+        )
+    return resolved
+
+
+def _run_subcommand(resolution: RootResolution, command: Sequence[str]) -> int:
+    """Execute a delegated command inside the resolved AgentCanon owner root."""
+    if not command:
+        raise SourceRootFailure("agent_canon_source_root_command_missing", "No command provided")
+    executable = _resolve_executable(resolution, command[0])
+    env = os.environ.copy()
+    env["PYTHONPATH"] = _default_pythonpath(root=resolution.source_root)
+    process = subprocess.run(
+        (str(executable), *command[1:]),
+        cwd=resolution.source_root.as_posix(),
+        env=env,
+        check=False,
+    )
+    return process.returncode
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Create the CLI parser."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="mode")
+    parser_exec = subparsers.add_parser("exec")
+    parser_exec.add_argument("command")
+    parser_exec.add_argument("args", nargs=argparse.REMAINDER)
+    return parser
+
+
+def run(
+    parser: argparse.Namespace,
+    resolver: Callable[[Path], RootResolution] | None = None,
+) -> int:
+    """Run the owner-bound command delegation."""
+    if resolver is None:
+        resolver = resolve_agent_canon_source_root
+    if parser.mode != "exec":
+        raise SystemExit("agent_canon_source_root requires the `exec` subcommand")
+    resolution = resolver(Path.cwd())
+    return _run_subcommand(resolution, (parser.command, *tuple(parser.args)))
 
 
 def _find_current_repository_root(raw_root: Path) -> Path:
@@ -190,3 +261,18 @@ def resolve_agent_canon_source_root(
         layout=layout,
         canon_root=source_root,
     )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """CLI entrypoint."""
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        return run(args)
+    except SourceRootFailure as exc:
+        print(f"agent_canon_source_root: {exc.code}: {exc.detail}")
+        return 1
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

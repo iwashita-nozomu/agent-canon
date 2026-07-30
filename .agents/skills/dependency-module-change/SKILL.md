@@ -28,6 +28,20 @@ python3 tools/agent_tools/skill_tool_commands.py show --skill dependency-module-
 packet が出力した必須 command と、task に該当する conditional command を実行してください。
 <!-- skill-tool-commands:end -->
 
+## Exact cleanup invocation
+
+PR merge/readback 後に local topic commits が残る workspace clone は、次の既存
+CLI literal を使います。`--expected-clone`、`--owner-evidence-sha256`、
+`--integrated-commit`、`--apply` を同じ call に保持します。
+
+```bash
+python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
+  --placement workspace --topic <topic> --module <path> \
+  --expected-clone <absolute-clone> \
+  --owner-evidence-sha256 <sha256> \
+  --integrated-commit <full-oid> --apply
+```
+
 1. Read `documents/rule/dependency-module-changes.md` as the only detailed policy owner.
    Its [`AgentCanon parent state decision table`](../../../documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table)
    owns parent state and dirty fallback topic identity; this runtime shim does

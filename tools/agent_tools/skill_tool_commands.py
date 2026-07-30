@@ -88,6 +88,7 @@ COMMAND_PREFIXES = (
     "ruff ",
     "tools/",
 )
+ASSIGNMENT_TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=.*")
 INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 ISSUE_CONTRACT_MARKERS: dict[str, tuple[tuple[str, str], ...]] = {
     "experiment-lifecycle": (
@@ -159,10 +160,18 @@ class SkillCommandPacket:
     discovered_commands: tuple[str, ...]
     conditional_commands: tuple[str, ...]
     maintenance_commands: tuple[str, ...]
-    resolved_required_commands: tuple[tuple[str, str, str, tuple[str, ...]], ...]
-    resolved_discovered_commands: tuple[tuple[str, str, str, tuple[str, ...]], ...]
-    resolved_conditional_commands: tuple[tuple[str, str, str, tuple[str, ...]], ...]
-    resolved_maintenance_commands: tuple[tuple[str, str, str, tuple[str, ...]], ...]
+    resolved_required_commands: tuple[
+        tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...
+    ]
+    resolved_discovered_commands: tuple[
+        tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...
+    ]
+    resolved_conditional_commands: tuple[
+        tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...
+    ]
+    resolved_maintenance_commands: tuple[
+        tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...
+    ]
     validation_commands: tuple[str, ...]
 
 
@@ -173,6 +182,7 @@ class CommandPlan:
     logical_command: str
     source_root: str
     execution_cwd: str
+    execution_env: tuple[tuple[str, str], ...]
     execution_argv: tuple[str, ...]
 
 
@@ -271,7 +281,16 @@ def is_command_candidate(value: str) -> bool:
     """Return whether a string is command-shaped enough for a packet."""
     if value.endswith("/"):
         return False
-    return value.startswith(COMMAND_PREFIXES)
+    tokens = value.split()
+    token_index = 0
+    while token_index < len(tokens):
+        if not ASSIGNMENT_TOKEN_RE.fullmatch(tokens[token_index]):
+            break
+        token_index += 1
+    if token_index >= len(tokens):
+        return False
+    normalized = " ".join(tokens[token_index:])
+    return normalized.startswith(COMMAND_PREFIXES)
 
 
 def unique_preserve_order(values: Iterable[str]) -> tuple[str, ...]:
@@ -295,16 +314,27 @@ def build_command_plan(logical_command: str, source_root: Path) -> CommandPlan:
     resolved_root = str(source_root.resolve())
     source_root_as_path = source_root.resolve()
     raw_tokens = shlex.split(logical_command)
+    token_index = 0
+    env_assignments: dict[str, str] = {}
+    while token_index < len(raw_tokens):
+        token = raw_tokens[token_index]
+        if ASSIGNMENT_TOKEN_RE.fullmatch(token):
+            key, value = token.split("=", maxsplit=1)
+            env_assignments[key] = value
+            token_index += 1
+            continue
+        break
+    tokens = raw_tokens[token_index:]
     resolved: list[str] = []
     skip_next_root = False
 
-    for index, token in enumerate(raw_tokens):
-        if token == "--root" and index + 1 < len(raw_tokens):
+    for index, token in enumerate(tokens):
+        if token == "--root" and index + 1 < len(tokens):
             resolved.append(token)
-            if raw_tokens[index + 1] == ".":
+            if tokens[index + 1] == ".":
                 resolved.append(resolved_root)
             else:
-                resolved.append(raw_tokens[index + 1])
+                resolved.append(tokens[index + 1])
             skip_next_root = True
             continue
         if skip_next_root:
@@ -316,7 +346,7 @@ def build_command_plan(logical_command: str, source_root: Path) -> CommandPlan:
         if index == 0 and token in SCRIPT_INTERPRETERS:
             resolved.append(token)
             continue
-        if index == 1 and raw_tokens[0] in SCRIPT_INTERPRETERS:
+        if index == 1 and tokens[0] in SCRIPT_INTERPRETERS:
             resolved.append(
                 str((source_root_as_path / token).resolve())
                 if token.startswith(SOURCE_ROOT_SCRIPT_PREFIXES)
@@ -332,6 +362,7 @@ def build_command_plan(logical_command: str, source_root: Path) -> CommandPlan:
         logical_command=normalized,
         source_root=resolved_root,
         execution_cwd=resolved_root,
+        execution_env=tuple((key, env_assignments[key]) for key in env_assignments),
         execution_argv=tuple(resolved),
     )
 
@@ -386,6 +417,7 @@ def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillComman
                 plan.logical_command,
                 plan.source_root,
                 plan.execution_cwd,
+                plan.execution_env,
                 plan.execution_argv,
             )
             for plan in resolved_required
@@ -395,6 +427,7 @@ def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillComman
                 plan.logical_command,
                 plan.source_root,
                 plan.execution_cwd,
+                plan.execution_env,
                 plan.execution_argv,
             )
             for plan in resolved_conditional
@@ -404,6 +437,7 @@ def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillComman
                 plan.logical_command,
                 plan.source_root,
                 plan.execution_cwd,
+                plan.execution_env,
                 plan.execution_argv,
             )
             for plan in resolved_conditional
@@ -413,6 +447,7 @@ def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillComman
                 plan.logical_command,
                 plan.source_root,
                 plan.execution_cwd,
+                plan.execution_env,
                 plan.execution_argv,
             )
             for plan in resolved_maintenance
@@ -548,24 +583,30 @@ def render_packet_text(packet: SkillCommandPacket) -> str:
     ]
     lines.extend(f"- {command}" for command in packet.required_commands)
     lines.append("SKILL_TOOL_COMMANDS_REQUIRED_RESOLUTION:")
-    for command, source_root, execution_cwd, argv in packet.resolved_required_commands:
+    for command, source_root, execution_cwd, env, argv in (
+        packet.resolved_required_commands
+    ):
         lines.extend(
             (
                 f"- logical={command}",
                 f"- source_root={source_root}",
                 f"- execution_cwd={execution_cwd}",
+                f"- execution_env={json.dumps(list(env))}",
                 f"- execution_argv={json.dumps(list(argv))}",
             )
         )
     lines.append("SKILL_TOOL_COMMANDS_CONDITIONAL:")
     lines.extend(f"- {command}" for command in packet.conditional_commands)
     lines.append("SKILL_TOOL_COMMANDS_CONDITIONAL_RESOLUTION:")
-    for command, source_root, execution_cwd, argv in packet.resolved_discovered_commands:
+    for command, source_root, execution_cwd, env, argv in (
+        packet.resolved_discovered_commands
+    ):
         lines.extend(
             (
                 f"- logical={command}",
                 f"- source_root={source_root}",
                 f"- execution_cwd={execution_cwd}",
+                f"- execution_env={json.dumps(list(env))}",
                 f"- execution_argv={json.dumps(list(argv))}",
             )
         )
