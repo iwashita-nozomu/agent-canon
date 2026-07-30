@@ -13,13 +13,16 @@ downstream implementation ../../tools/agent_tools/eval_accumulation_check.py val
 # Runtime Log Archive Migration
 
 This document is procedure-only. It covers one-time or occasional migration of
-old in-tree runtime logs into the external archive. Archive ownership, branch
-policy, and steady-state mount rules stay in `documents/runtime/runtime-log-archive.md`.
+old in-tree runtime logs into the external archive. Archive ownership, stable
+branch policy, and steady-state mount rules stay in
+`documents/runtime/runtime-log-archive.md` and the `agent-canon-log` policy
+repository.
 General artifact retention rules stay in
 `documents/experiments/result-log-retention-and-visualization.md`.
 
-This document is the AgentCanon-side migration procedure for old hook JSONL and
-accumulated eval reports that still exist under `agents/evals/results/`.
+This document is the AgentCanon-side boundary for old hook JSONL and accumulated
+eval reports that still exist under `agents/evals/results/`. The policy-owner
+inventory and any future branch migration are executed in `agent-canon-log`.
 
 Runtime hook JSONL and accumulated eval reports belong in the external archive
 repository mounted at `.agent-canon/log-archive/`. AgentCanon source keeps
@@ -36,53 +39,45 @@ reader-facing documentation, schemas, and tool tests, but no
 - Boundary: steady-state archive ownership and retention policy stay in
   `runtime-log-archive.md` and `result-log-retention-and-visualization.md`.
 
-## Required Migration Steps
+No migration, branch deletion, merge, rewrite, or source cleanup is performed
+by the lifecycle redesign. The log repository policy branch contains a
+deterministic read-only inventory of every legacy `logs/*` ref and the `main`
+legacy-import tree.
 
-Run the commands from the AgentCanon repository root.
+## Required Future Migration Steps
 
-1. Mount or repair the archive clone.
+Run the policy command from a checked-out `agent-canon-log` policy repository;
+run any source inspection from the explicitly named source repository.
+
+1. Generate and review the policy-owner dry-run inventory.
 
    ```bash
-   python3 tools/agent_tools/runtime_log_archive_git.py ensure
+   cd <agent-canon-log-checkout>
+   python3 tools/runtime_log_policy.py --root . inventory \
+     --output docs/migration/legacy-inventory.json
    ```
 
-1. Inventory old in-tree hook JSONL and eval reports.
+1. Attach an explicit authority manifest naming each selected legacy branch,
+   normalized source remote, expected source head, and destination stable branch.
 
    ```bash
+   cd <explicit-source-repository>
    find agents/evals/results/hook-runs -type f -name '*.jsonl' -print 2>/dev/null | sort
    find agents/evals/results -type f -name '*.md' -print 2>/dev/null | sort
    ```
 
-1. Copy old JSONL into the archive and remove the source files.
+1. Execute only the separately reviewed migration implementation with the
+   authority manifest. Producers must compare the expected remote head, push
+   without force, and retain source snapshots on conflict.
 
-   ```bash
-   python3 tools/agent_tools/runtime_log_archive_git.py import-legacy --delete-source
-   ```
+1. Read back every destination remote ref and verify the exact expected head,
+   tree, and content digest. A failed or uncertain readback blocks cleanup.
 
-1. Copy old eval reports into the archive and remove the source files.
+1. Retain legacy refs and `main` legacy-import data until a later policy
+   decision explicitly authorizes retention changes.
 
-   ```bash
-   python3 tools/agent_tools/runtime_log_archive_git.py import-eval-results --delete-source
-   ```
-
-1. Commit and push the archive branch.
-
-   ```bash
-   python3 tools/agent_tools/runtime_log_archive_git.py push \
-     --message "Import legacy AgentCanon logs"
-   ```
-
-1. Verify that AgentCanon source no longer contains raw hook JSONL or eval
-   report artifacts or the old result tree.
-
-   ```bash
-   test ! -e agents/evals/results
-   python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
-   ```
-
-1. If `agents/evals/results/` is empty after import, remove the directory from
-   Git. The migration notice and schema pointers now live in
-   `documents/runtime/runtime-log-archive.md` and `evidence/agent-evals/README.md`.
+The old `import-legacy --delete-source` and `import-eval-results --delete-source`
+commands remain historical procedures, not a route for this redesign.
 
 ## Current Migration Evidence
 

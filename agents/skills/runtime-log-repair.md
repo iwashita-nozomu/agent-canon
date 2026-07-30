@@ -94,6 +94,10 @@ closeout_gate=<command or dashboard field that proves routed repair completion>
 
 ## Boundaries
 
+Archive branch identity, legacy inventory, retention, and migration authority
+belong to the `agent-canon-log` policy repository. This skill routes dashboard
+evidence and does not duplicate those policy definitions.
+
 - Raw log compaction and dashboard API schema belong to `$agent-log-analysis`
   and `generate_agent_runtime_dashboard.py`.
 - Eval producer loops belong to `$agent-eval-accumulation`.

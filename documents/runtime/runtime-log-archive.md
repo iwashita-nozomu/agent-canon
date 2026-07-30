@@ -143,27 +143,22 @@ Use this table first when deciding where a report is kept:
 | Purpose | Source During Work | Durable Location | Command |
 | --- | --- | --- | --- |
 | Current task run bundle | `<source-repo>/reports/agents/<run-id>/` | none until archived | `bootstrap_agent_run.py` / task tools create it |
-| Normal accumulated agent reports | `<source-repo>/reports/agents/` | `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` on branch `logs/<environment-key>-<chat-key>` | `python3 tools/agent_tools/runtime_log_archive_git.py sync` |
-| Immutable run-bundle snapshot | `<source-repo>/reports/agents/<run-id>/` | `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/` plus `index.jsonl` on branch `logs/<environment-key>-<chat-key>` | `archive-agent-report --report-dir reports/agents/<run-id>` then `push` |
-| Hook chronology | `<source-repo>/.agent-canon/runtime-event-spool/hook-events/<repo-key>/` | `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl` on branch `logs/<environment-key>-<chat-key>` | hooks publish per-event files; explicit `sync` checkpoints them |
+| Normal accumulated agent reports | `<source-repo>/reports/agents/` | `.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/<run-id>/<snapshot-id>/` plus append-only `index.jsonl` on the stable branch | `python3 tools/agent_tools/runtime_log_archive_git.py sync` |
+| Immutable run-bundle snapshot | `<source-repo>/reports/agents/<run-id>/` | `.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/<run-id>/<snapshot-id>/` plus `index.jsonl` on the stable branch | `archive-agent-report --report-dir reports/agents/<run-id>` then `push` |
+| Hook chronology | `<source-repo>/.agent-canon/runtime-event-spool/hook-events/<stable-source-repository-id>/` | `.agent-canon/log-archive/hook-runs/<stable-source-repository-id>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl` on the stable branch | hooks publish per-event files; explicit `sync` checkpoints them |
 | Accumulated eval reports | eval producer output | `.agent-canon/log-archive/eval-results/<family>/<eval-run-id>-<status>*.md` | `run_accumulated_agent_evals.py --run-id <run-id>` |
-| Codex runtime summaries | local Codex runtime state | `.agent-canon/log-archive/codex-runtime/<repo-key>/chats/<conversation-id>/summary-<agent-canon-commit>.jsonl` | `export_codex_runtime_summary.py` then `sync` |
+| Codex runtime summaries | local Codex runtime state | `.agent-canon/log-archive/codex-runtime/<stable-source-repository-id>/chats/<conversation-id>/summary-<agent-canon-commit>.jsonl` | `export_codex_runtime_summary.py` then `sync` |
 
 In short: work in `reports/agents/<run-id>/`; retain across runs in
-`.agent-canon/log-archive/` on `logs/<environment-key>-<chat-key>`.
+`.agent-canon/log-archive/` on `logs/<stable-source-repository-id>`.
 `runtime_log_archive_git.py status` prints the resolved
 `RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL`,
 `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH`, and
 `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR` values for the current source repo.
-The branch key is `<environment-key>-<chat-key>`. `<environment-key>` comes
-from `AGENT_CANON_LOG_ENV`, devcontainer / Compose / Codespace metadata, or a
-host fallback. `<chat-key>` comes from `CODEX_THREAD_ID`, `CODEX_SESSION_ID`,
-or `CODEX_CONVERSATION_ID`; Codex lifecycle hooks also promote top-level
-payload trace fields such as `session_id`, `conversation_id`, and `thread_id`
-to `CODEX_THREAD_ID` before active hook telemetry is spooled. Non-chat CLI / CI runs use the
-explicit fallback `no-chat-<repo-key>`. The source isolation key remains
-`<repo-key>` inside the branch tree, so one chat branch can still separate
-parent repo and standalone AgentCanon evidence by path.
+The branch key is the stable source repository ID derived from the normalized
+Git remote. SSH / HTTPS, optional `.git`, host case, and repository case are
+normalized by the log repository policy. Chat/session trace values remain in
+metadata and paths but never affect branch identity.
 
 Projected hook JSONL filenames and Codex runtime summary filenames carry the
 AgentCanon checkout commit key, not the source repo commit. Hot-path event bytes
@@ -176,15 +171,15 @@ Existing trace metadata remains available through `codex_trace_key` and
 Normal hook writers use one independent file per event:
 
 ```text
-<source-repo>/.agent-canon/runtime-event-spool/hook-events/<repo-key>/<runtime-namespace>/<hook-name>/<hook-run-id>.json
+<source-repo>/.agent-canon/runtime-event-spool/hook-events/<stable-source-repository-id>/<runtime-namespace>/<hook-name>/<hook-run-id>.json
 ```
 
 The explicit checkpoint projects those immutable event bytes to:
 
 ```text
-.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl
-.agent-canon/log-archive/hook-runs/<repo-key>/.spool-index.jsonl
-.agent-canon/log-archive/hook-runs/<repo-key>/.spool-cursor.json
+.agent-canon/log-archive/hook-runs/<stable-source-repository-id>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl
+.agent-canon/log-archive/hook-runs/<stable-source-repository-id>/.spool-index.jsonl
+.agent-canon/log-archive/hook-runs/<stable-source-repository-id>/.spool-cursor.json
 ```
 
 `event_id` is exactly `hook_run_id`; `event_sha256` is the SHA-256 of canonical
@@ -218,25 +213,27 @@ reports or leave regenerated stdout/stderr captures in the source tree.
 Immutable agent report archive snapshots use:
 
 ```text
-.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/
-.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl
+.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/<run-id>/<snapshot-id>/
+.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/index.jsonl
 ```
 
 Codex runtime summary exporters use per-chat summary files plus one
 cross-chat index:
 
 ```text
-.agent-canon/log-archive/codex-runtime/<repo-key>/chats/<conversation-id>/summary-<agent-canon-commit>.jsonl
-.agent-canon/log-archive/codex-runtime/<repo-key>/index.jsonl
+.agent-canon/log-archive/codex-runtime/<stable-source-repository-id>/chats/<conversation-id>/summary-<agent-canon-commit>.jsonl
+.agent-canon/log-archive/codex-runtime/<stable-source-repository-id>/index.jsonl
 ```
 
-Normal `sync` / `archive-agent-reports` copies of agent run reports use:
+Normal `sync` / `archive-agent-reports` snapshots of agent run reports use:
 
 ```text
-.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/
+.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/<run-id>/<snapshot-id>/
+.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/index.jsonl
 ```
 
-`<repo-key>` is derived from the source repository root name plus a short hash.
+`<stable-source-repository-id>` is derived from the normalized source Git
+remote by the `agent-canon-log` policy repository.
 `<agent-canon-commit>` is the short HEAD SHA of the AgentCanon checkout that
 provided the hook or exporter code; when no AgentCanon Git HEAD is readable,
 the filename uses `no-git-head`.
@@ -261,10 +258,12 @@ legacy-import/eval-results/
 
 ## Branch Policy
 
-- `main` stores archive-level policy, merge attributes, and one-time imports.
-- Normal runtime writes use `logs/<environment-key>-<chat-key>` branches.
-- Non-chat CLI / CI runtime writes use
-  `logs/<environment-key>-no-chat-<repo-key>` branches.
+- `main` stores archive-level policy, merge attributes, and preserved
+  legacy-import data.
+- Normal runtime writes use exactly one stable branch per normalized source
+  remote: `logs/<stable-source-repository-id>`.
+- Stable source identity is owned by the `agent-canon-log` policy repository;
+  filesystem paths and chat/session IDs are metadata only.
 - Source repos do not update AgentCanon source branches or template submodule
   pins when runtime logs change.
 - JSONL files are append-only. The log repo uses `*.jsonl merge=union` so
@@ -280,6 +279,10 @@ python3 tools/agent_tools/runtime_log_archive_git.py ensure
 it or inspect the archive. Hook writers publish only to the fixed-depth local
 spool under the source repository, so an absent archive, a different archive
 branch, or a held Git index cannot block hook completion.
+
+`status` returns typed nonzero `archive_branch_mismatch` when the mounted clone
+is not on the policy-selected stable branch. All write routes check the branch
+before staging or mutating archive data; they do not silently switch branches.
 
 Set `AGENT_CANON_HOOK_EVENT_SPOOL_DIR` to select another container-visible
 spool root. `AGENT_CANON_HOOK_RESULTS_DIR` maps to its `.event-spool/` child.
@@ -301,8 +304,9 @@ python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 ```
 
 Do not copy raw hook JSONL or accumulated eval reports back into AgentCanon
-source. Do not copy or rewrite agent run bundles into source-tree mirror reports
-for retention; use `archive-agent-report --report-dir reports/agents/<run-id>`.
+source. Do not copy or rewrite agent run bundles into mutable source-tree mirror
+reports for retention; `sync` and `archive-agent-report` use immutable
+content-addressed snapshots and append-only indexes.
 Analysis artifacts such as SQLite caches and dashboards belong to each source
 repo's ignored `reports/.cache/` or `reports/agent-runtime-dashboard/` paths.
 
@@ -320,10 +324,12 @@ Normal unattended operation uses one command:
 python3 tools/agent_tools/runtime_log_archive_git.py sync
 ```
 
-`sync` acquires the nonblocking source lock, ensures the archive exactly once,
+`sync` acquires the nonblocking source lock, checks the policy-selected branch,
 snapshots the fixed spool set, validates canonical bytes, updates the hook
 projection, dedup index, and cursor, copies requested agent reports, and then
-stages/commits/pulls/pushes once. It reads back the exact commit, tree, index,
+stages/commits/compares/pushes once. Concurrent writers fetch the expected
+remote head, rebase bounded append-only changes without force, and read back
+the exact remote ref. It reads back the exact commit, tree, index,
 cursor, and projection identities before deleting only the covered spool
 files. Concurrent hook writers publish independent files and events outside
 the captured snapshot remain for the next checkpoint. It skips
@@ -364,7 +370,7 @@ python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
 `RUNTIME_LOG_ARCHIVE_FOREIGN_TREE=no`; that line catches already committed
 unrelated repo-key directories, not only uncommitted dirt. The source repo key,
 the AgentCanon repo key, and the source repo key of the AgentCanon superproject
-are associated keys for the same chat branch and do not count as foreign dirty
+are associated keys for the same stable source branch and do not count as foreign dirty
 or foreign tree entries. A foreign dirty or foreign tree finding means logs for
 an unrelated `<repo-key>` were written while the archive worktree was on the
 current runtime branch. Treat that as a log repository operation blocker:
@@ -381,8 +387,8 @@ Read these lines first:
 
 ```text
 RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL=<source-repo>/reports/agents
-RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH=logs/<environment-key>-<chat-key>
-RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR=<agent-canon>/.agent-canon/log-archive/agent-reports/<repo-key>
+RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH=logs/<stable-source-repository-id>
+RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR=<agent-canon>/.agent-canon/log-archive/agent-reports/<stable-source-repository-id>
 ```
 
 `hooks/runtime_log_auto_sync.py` is a standalone compatibility route for an
@@ -391,31 +397,13 @@ explicit archive checkpoint; it is not registered for `Stop`. Run
 administrative checkpoint owner. The active dispatcher has no archive, Git,
 network, SSH, or auto-sync dependency.
 
-## Legacy In-Tree Migration
+## Legacy in-tree migration
 
-If `agents/evals/results/hook-runs/` contains old `*.jsonl`, migrate it with
-`documents/runtime/runtime-log-archive-migration.md`. The normal command is:
-
-```bash
-python3 tools/agent_tools/runtime_log_archive_git.py import-legacy --delete-source
-python3 tools/agent_tools/runtime_log_archive_git.py push \
-  --message "Import legacy AgentCanon hook logs"
-```
-
-The AgentCanon source tree must not keep hook JSONL or eval report artifacts.
-Raw hook streams move to `legacy-import/hook-runs/` in the log archive.
-
-If `agents/evals/results/` contains old accumulated eval reports, migrate them
-with:
-
-```bash
-python3 tools/agent_tools/runtime_log_archive_git.py import-eval-results --delete-source
-python3 tools/agent_tools/runtime_log_archive_git.py push \
-  --message "Import legacy AgentCanon eval results"
-```
-
-The AgentCanon source tree keeps no `agents/evals/results/` tree. Accumulated
-eval report families move to `legacy-import/eval-results/` in the log archive.
+`agent-canon-log` owns the read-only legacy inventory, source-to-stable mapping,
+future migration authority, and retention policy. The AgentCanon producer does
+not migrate, delete, merge, or rewrite legacy branches. It preserves all
+legacy `logs/*` branches and `main` legacy-import data, and consumes only a
+policy-owner manifest for any future administrative operation.
 
 When invoking the helper from a wrapper repository, keep the AgentCanon
 submodule as the working directory and let the tool derive the superproject
