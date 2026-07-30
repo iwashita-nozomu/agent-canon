@@ -253,6 +253,15 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         graph = build_graph(PROJECT_ROOT)
         markdown = render_graph_mermaid(graph)
         self.assertEqual(markdown.count("```mermaid"), 1)
+        self.assertIn("@dependency-start", markdown)
+        self.assertIn(
+            "upstream design ../../documents/design/skill-tool-invocation-graph.md",
+            markdown,
+        )
+        self.assertIn(
+            "downstream implementation ../../tools/agent_tools/check_skill_tool_invocation_graph.py",
+            markdown,
+        )
         self.assertNotIn("base64", markdown.lower())
         self.assertNotIn("coverage_marker", markdown)
         self.assertEqual(readback_mermaid(graph, markdown)["status"], "pass")
