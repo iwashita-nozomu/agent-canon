@@ -31,7 +31,7 @@ downstream implementation ../../tools/agent_tools/check_convention_compliance.py
 | --- | --- | --- | --- |
 | skill identity と skill-owned command identity | `agents/skills/catalog.yaml` | `skill_route_catalog.py`, `skill_tool_commands.py` | `id`、canonical doc、shim、`tool_commands`、capability metadata をここからだけ読む。別の一覧は identity owner ではない |
 | prerequisite / successor / order / parallel relation | `agents/skills/skill-dependencies.yaml` | `skill_dependency_map.py`, `route.py` | 関係、順序、routing candidate をここからだけ読む。prompt や prose で再定義しない |
-| reader-facing catalog | `agents/canonical/skills.md` | catalog projection generator / checker | `catalog.yaml` の読者 projection。skill/command identityを新規定義しない |
+| reader/index link parity | `agents/canonical/skills.md` | catalog/materialized-IR checker | `catalog.yaml` の canonical-doc/shim link を読む。60-row skill/command identityを新規定義しない |
 | typed capability / owner / phase route | `route.py` の typed route packet と owner surface | `route.py` | explicit typed capability と owner を解決する。prose keyword は選択器ではない |
 | resolved command packet | `skill_tool_commands.py` | command packet output | catalog の command identity を実行 argv、logical locator、packet digest に解決する |
 | ToolID / ToolCall / manifest | orchestration/tool packet owner | `agent_team.py`, `bootstrap_agent_run.py` | materialized records は既存 identity の ID/digest を参照し、prose から発見しない |
@@ -49,40 +49,47 @@ schema は `agent_canon.skill_tool_invocation_graph.v2` とする。checker の�
 
 ```text
 SourceUniverse {
-  source_snapshot: {catalog_sha256, dependencies_sha256, skills_projection_sha256,
+  source_snapshot: {catalog_sha256, dependencies_sha256, reader_index_sha256,
                     route_packet_sha256, command_packet_sha256, toolcall_packet_sha256}
-  skills: every catalog.skill_families entry                 # 現在60件
-  commands: every catalog-owned tool_commands entry resolved by packet owner
-  capabilities: every typed capability returned by the selected route
-  tools: every resolved ToolID / ToolCall tool identity
-  phases: every phase returned by route and orchestration packets
-  edges: every actual prerequisite, successor, order, routing, owner-before-adapter,
-         tool/phase, and parallel-independent relation
+  identity_records: every unique IdentityRecord, stored once
+  skill_refs: every catalog.skill_families entry                 # 現在60件
+  command_refs: every catalog-owned tool_commands entry resolved by packet owner
+  capability_refs: every typed capability returned by the selected route
+  tool_refs: every resolved ToolID / ToolCall tool identity
+  phase_refs: every phase returned by route and orchestration packets
+  toolcall_refs: every resolved ToolCall IdentityRecord Ref
+  edge_projections: every actual prerequisite, successor, order, routing,
+                    owner-before-adapter, tool/phase, and parallel-independent relation
   order: explicit integer order for each ordered invocation, not edge-list position
 }
 ```
 
-`skills` は catalog の全 `skill_families` と完全一致しなければならない。`commands`、`capabilities`、`tools`、`phases` は固定件数で切らず、選択された全 command/ToolID/phase を解決する。`edges` は `skill-dependencies.yaml` の全 relation に加え、実際の route/ToolCall/phase packet が返す typed relation を含む。未知の edge、source にない edge、未解決 command、未解決 ToolID/phase は success に数えない。
+`skill_refs` は catalog の全 `skill_families` と完全一致しなければならない。`command_refs`、`capability_refs`、`tool_refs`、`phase_refs`、`toolcall_refs` は固定件数で切らず、選択された全 command/ToolID/phase/ToolCall を解決する。`edge_projections` は `skill-dependencies.yaml` の全 relation に加え、実際の route/ToolCall/phase packet が返す typed relation を含む。full payload は `identity_records` にだけ存在し、projection/Ref list に再掲しない。未知の edge、source にない edge、未解決 command、未解決 ToolID/phase は success に数えない。
 
-`agents/canonical/skills.md` はこの universe の reader projection であり、identity source ではない。projection に掲載された skill/command が catalog にない場合、または catalog の identity が projection と異なる場合は stale とする。
+`agents/canonical/skills.md` は reader/index link parity の検査対象に限られ、60-row projection でも identity source でもない。60 skill/command rows は `agents/skills/catalog.yaml` と resolved/materialized IR から生成する。`skills.md` の canonical-doc/shim link が catalog の id と対応しない、link target が stale、または未登録 id を指す場合だけ reader-link parity failure とする。
 
-### Canonical records and references
+### Canonical identity records, references, and projection envelopes
 
 ```text
-Identity {kind, id, canonical_payload, digest, logical_locator?}
-Skill {id, catalog_locator, canonical_doc, shim, command_ids, capability_ids, phase_ids}
-Command {id, skill_id, logical_argv, source_locator, execution_cwd, argv_digest}
-Capability {id, owner_id, type, phase_id, adapter_id?}
-Tool {id, owner_id, argument_schema_id, logical_locator?}
-ToolCall {id, tool_id, input_refs, output_refs, locator_refs, order}
-Phase {id, owner_id, order}
-Edge {id, kind, source_id, target_id, order, attributes}
-Manifest {id, source_snapshot_ref, identity_refs, edge_refs, coverage_ref}
-Readback {id, source_digest, json_digest, mermaid_digest, observed_counts, failures, status}
+IdentityRecord {id, digest, kind, canonical_payload}
+Ref {id, digest}
+NodeProjection {ref: Ref, kind, display_label}
+PhaseProjection {ref: Ref, display_label, order}
+CommandProjection {ref: Ref, display_label, order}
+ToolProjection {ref: Ref, display_label}
+EdgeProjection {edge_ref: Ref, source_ref: Ref, target_ref: Ref, display_label}
+ManifestEnvelope {manifest_ref: Ref, source_digest, identity_refs, edge_refs, coverage_refs, counts}
+CoverageEnvelope {coverage_ref: Ref, node_refs, phase_refs, command_refs, tool_refs, edge_refs, digests, counts}
+ReadbackEnvelope {readback_ref: Ref, source_digest, json_digest, mermaid_digest, projection_digests, evidence_refs, counts}
+CheckResult {status, failure_refs, unresolved_refs, counts}
 ExecutionContext {root_abs, resolved_locators, expires_at=invocation_end}
 ```
 
-identity payload は identity store で一度だけ canonical serialization する。edge、ToolCall、manifest、readback、coverage、handoff は `id` と `digest` の `Ref` だけを持ち、payload の inline copy、full-manifest base64、absolute path を持たない。durable artifact の locator は `/` 区切りの logical repository-relative locator とし、絶対 path、`..`、`.`、empty segment、NUL を拒否する。absolute runtime path は execution context でだけ解決し、終了時に破棄する。
+`IdentityRecord` は identity store に一度だけ保存する唯一の payload-bearing record である。`canonical_payload` に skill、phase、command、capability、tool、ToolCall、edge、manifest、coverage、readback、failure の全 payload を保持し、同じ payload を別 record、projection、manifest、readbackへ複製しない。`Ref` は exact な `{id,digest}` だけを持つ。
+
+node、phase、command、tool の projection envelope は、先頭の `Ref` と compact display fields だけを持つ。`kind`、`order`、`display_label` は表示・並び順用であり、identity、route、adapter、argument schema、argv、owner、edge relation を決定する authority ではない。edge projection は exact に `edge_ref + source_ref + target_ref + display_label` とし、full edge payload と full ToolCall payload は対応する `IdentityRecord` の `canonical_payload` にだけ存在する。projection、manifest、readback、coverage に canonical payload、argv、argument schema、attributes、failure prose、full-manifest base64、absolute path を埋め込まない。
+
+`ManifestEnvelope`、`CoverageEnvelope`、`ReadbackEnvelope` は ordered `Ref`、digest、counts だけを保持する。status、failure reason、unresolved detail は `CheckResult` の `failure_refs`/`unresolved_refs` から参照し、envelope に payload として重複しない。durable artifact の locator は `/` 区切りの logical repository-relative locator とし、絶対 path、`..`、`.`、empty segment、NUL を拒否する。absolute runtime path は execution context でだけ解決し、終了時に破棄する。
 
 ### Lifecycle state
 
@@ -99,24 +106,25 @@ declared|resolved|canonicalized|routed|materialized|projected|read_back -> stale
 
 - 文字列は Unicode `NFC` に正規化してから UTF-8 bytes にする。display text は case を保持し、identifier/alias は `NFKC`、`casefold`、ASCII hyphen-case validation の順に適用する。`_`、空白、類似文字の暗黙変換はしない。
 - alias は catalog の明示的 alias field からのみ読んで、正規化後に `{alias, alias_of}` へ materialize する。alias は identity を作らず、prose、purpose、description、trigger keyword は alias/capability/adapter selector にならない。
-- object field order は kind ごとに次で固定する。`Identity=[kind,id,canonical_payload,digest,logical_locator]`、`Skill=[id,catalog_locator,canonical_doc,shim,command_ids,capability_ids,phase_ids]`、`Command=[id,skill_id,logical_argv,source_locator,execution_cwd,argv_digest]`、`Capability=[id,owner_id,type,phase_id,adapter_id]`、`Tool=[id,owner_id,argument_schema_id,logical_locator]`、`ToolCall=[id,tool_id,input_refs,output_refs,locator_refs,order]`、`Phase=[id,owner_id,order]`、`Edge=[id,kind,source_id,target_id,order,attributes]`、`Manifest=[id,source_snapshot_ref,identity_refs,edge_refs,coverage_ref]`、`Readback=[id,source_digest,json_digest,mermaid_digest,observed_counts,failures,status]`。
+- object field order は kind ごとに次で固定する。`IdentityRecord=[id,digest,kind,canonical_payload]`、`Ref=[id,digest]`、`NodeProjection=[ref,kind,display_label]`、`PhaseProjection=[ref,display_label,order]`、`CommandProjection=[ref,display_label,order]`、`ToolProjection=[ref,display_label]`、`EdgeProjection=[edge_ref,source_ref,target_ref,display_label]`、`ManifestEnvelope=[manifest_ref,source_digest,identity_refs,edge_refs,coverage_refs,counts]`、`CoverageEnvelope=[coverage_ref,node_refs,phase_refs,command_refs,tool_refs,edge_refs,digests,counts]`、`ReadbackEnvelope=[readback_ref,source_digest,json_digest,mermaid_digest,projection_digests,evidence_refs,counts]`、`CheckResult=[status,failure_refs,unresolved_refs,counts]`。payload kind 内の order は `Skill=[id,catalog_locator,canonical_doc,shim,command_ids,capability_ids,phase_ids]`、`Command=[id,skill_id,logical_argv,source_locator,execution_cwd,argv_digest]`、`Capability=[id,owner_id,type,phase_id,adapter_id]`、`Tool=[id,owner_id,argument_schema_id,logical_locator]`、`ToolCall=[id,tool_id,input_refs,output_refs,locator_refs,order]`、`Phase=[id,owner_id,order]`、`Edge=[id,kind,source_id,target_id,order,attributes]` とする。これらの payload は `IdentityRecord.canonical_payload` にだけ現れる。
 - arrays は semantic order がある `order`/`logical_argv` 以外を `(kind,id,alias_of)` の順で並べる。ordered edges は `order` を持ち、入力配列の偶然の順序を意味にしない。JSON bytes は compact JSON、`ensure_ascii=false`、UTF-8、末尾改行なしとする。
 - digest は domain-separated に `SHA-256(UTF8("agent-canon/skill-tool-invocation-graph/v2\0" + kind + "\0") + canonical_json_bytes)` とする。source file digest、record digest、graph digest、projection digest は domain を分け、同じ bytes を異なる意味で再利用しない。
-- 同一 `kind,id` かつ canonical bytes が同じ重複は `duplicate_same_payload` として一件に収束し、発生件数を checker output に記録する。同一 IDで bytes が違えば `identity_collision`、異なる IDで同一 identity payload を指せば `alias_or_identity_collision`、同じ normalized alias が別 target を指せば `alias_collision`、同じ edge/ToolCall IDで relation/args が違えば typed collision として fail する。
+- 同一 `kind,id` かつ canonical bytes が同じ重複は `duplicate_same_payload` として一件に収束し、発生件数を checker output に記録する。同一 IDで bytes が違えば `identity_collision`、異なる IDで同一 identity payload を指せば `alias_or_identity_collision`、同じ normalized alias が別 target を指せば `alias_collision`、同じ edge/ToolCall IDで relation/args が違えば typed collision、projection/envelope に payload-bearing field があれば `payload_duplicate` として fail する。
 
 ## Invariants
 
 - `SG-001` universe は現在の `catalog.yaml` の実際の 60 skill と、入力 snapshot で実際に解決された全 command/ToolID/phase を含む。固定 bucket、人工的な `20+20+10+10`、欠落を coverage とみなさない。
 - `SG-002` `catalog.yaml` は skill と catalog-owned command identity の唯一の owner、`skill-dependencies.yaml` は dependency/order/routing/parallel relation の唯一の owner、`agents/canonical/skills.md` は reader projection とする。
 - `SG-003` identity payload は一度だけ serialize し、edge、ToolCall、manifest、readback は ID/digest だけを参照する。
+- `SG-003` 各 payload は一つの `IdentityRecord {id,digest,kind,canonical_payload}` に一度だけ保存し、全 consumer は `Ref {id,digest}` を参照する。projection envelope は Ref + compact display fields、edge projection は edge/source/target Ref + compact label に限る。
 - `SG-004` durable artifact は logical repository-relative locator のみ、absolute runtime path は execution 時だけとする。
 - `SG-005` canonical serialization は field order、NFC/identifier normalization、UTF-8、domain-separated digest、array ordering を上記規則に従う。
 - `SG-006` duplicate/collision/alias ambiguity は silent merge せず typed failure とする。prose keyword は reject-only guard であり adapter、capability、skill、ToolID の選択に使わない。
 - `SG-007` typed capability owner と phase が確定してから adapter、ToolCall、実行を materialize する。adapter は owner の代わりに capability を発見しない。
 - `SG-008` dependency、order、routing、owner-before-adapter、tool/phase、parallel edge は source owner と resolved packet の実際の集合を保持し、prompt や hand-authored Mermaid で再定義しない。
-- `SG-009` source、JSON、Mermaid、skills.md projection は同一 source snapshot と digest refs を持ち、差分は stale artifact failure とする。
+- `SG-009` source、JSON、Mermaid、skills.md reader/index links は同一 source snapshot と digest refs を持つ。skills.md は60-row projectionではなく link parity targetであり、差分は stale/reader-link failure とする。
 - `SG-010` Mermaid は checker が source universe から生成した実際の全 nodes/edges/order の projection であり、compact labels、一つの complete block、full-manifest base64 の不在を満たす。
-- `SG-011` checker は source↔JSON↔Mermaid の identity/edge/order equality、current input digest、reader projection equality、actual coverage を readback する。欠落・未知・重複・stale は fail-closed とする。
+- `SG-011` checker は source↔materialized IR↔JSON↔Mermaid の identity/edge/order equality、current input digest、skills.md reader/index link parity、actual coverage を readback する。欠落・未知・重複・payload duplicate・stale は fail-closed とする。
 - `SG-012` #461 で固定された log command order は immutable edge/order として `ensure → status → stage → snapshot → commit → compare/rebase → push → readback → check-clean` を保持する。外部 preflight と内部 transaction の境界を graph が混ぜない。
 - `SG-013` graph、manifest、coverage、readback、design handoff は同じ snapshot の identity/digest を参照し、stale artifact の再利用・silent refresh・partial success を許さない。
 - `SG-014` selected design clause fingerprint は graph snapshot に結び付き、implementation handoff の target/evidence と forward/reverse coverage を持つ。
@@ -136,18 +144,19 @@ source read、normalization、digest、JSON/Mermaid projection、coverage/readba
 | adapter/capability selected before typed owner | `owner_order` / `blocked` | owner, adapter, phase edges |
 | prose keyword or existing description selected a route | `keyword_only_route` / `blocked` | reject-only guard match; no adapter verdict |
 | JSON↔Mermaid nodes/edges/order differ | `projection_mismatch` / `failed` | JSON/Mermaid digests and parser readback |
-| source/JSON/reader projection digest changed | `stale_artifact` / `failed` | changed input digest and selected snapshot |
+| source/JSON/reader-link parity digest changed | `stale_artifact` / `reader_link_parity` / `failed` | changed input digest, catalog/IR digest, and selected snapshot |
+| projection/envelope contains canonical payload or full ToolCall/edge data | `payload_duplicate` / `failed` | projection Ref and offending field; canonical `IdentityRecord` locator |
 | immutable #461 order changed | `command_order_drift` / `blocked` | ordered edge sequence and clause `SG-012` |
 
 既存の prose terms（`purpose`、`description`、`triggers`、`keyword`、`related`、`adapter` を含む）は compatibility 用の reject-only guard である。guard は無効な入力を拒否するだけで、adapter/capability/ToolID/skill を選ばない。選択は `agents/skills/catalog.yaml`、`agents/skills/skill-dependencies.yaml`、`tools/agent_tools/route.py` の explicit identity と relation に限る。
 
 ## Checker Contract: Inputs / Outputs / Equality
 
-planned checker は `tools/agent_tools/check_skill_tool_invocation_graph.py` とする。入力は `agents/skills/catalog.yaml`、`agents/skills/skill-dependencies.yaml`、`agents/canonical/skills.md`、selected route output、`skill_tool_commands.py` の全 command packet、`agent_team.py` の ToolID/ToolCall packet、phase/order/parallel materializer、selected source commit である。checker はこれらを一度読み、同じ `SourceUniverse` から canonical JSON と Mermaid を生成する。手書き JSON/Mermaid を source として受け入れない。
+planned checker は `tools/agent_tools/check_skill_tool_invocation_graph.py` とする。入力は `agents/skills/catalog.yaml`、`agents/skills/skill-dependencies.yaml`、`agents/canonical/skills.md`、selected route output、`skill_tool_commands.py` の全 command packet、`agent_team.py` の ToolID/ToolCall packet、phase/order/parallel materializer、selected source commit である。checker は catalog/materialized IR から60 skill/command rowsを生成し、`skills.md` は canonical-doc/shim の reader/index link parity だけに使い、同じ `SourceUniverse` から canonical JSON と Mermaid を生成する。手書き JSON/Mermaid を source として受け入れない。
 
-出力は `agent_canon.skill_tool_invocation_check.v1` の JSON とし、field order は `schema,source_snapshot,counts,identity_digests,edge_order_digest,json_digest,mermaid_digest,projection_digests,failures,unresolved,status`、各配列は canonical sort とする。`counts` は `skills=60`（現在 snapshot）と、resolved `commands/capabilities/tools/toolcalls/phases/edges` の実測 count を持つ。`failures` は typed code、owner、logical locator、expected digest、observed digest を持つ。
+出力は `agent_canon.skill_tool_invocation_check.v1` の JSON とし、field order は `schema,source_snapshot,counts,identity_digests,edge_order_digest,json_digest,mermaid_digest,reader_link_parity_digest,projection_digests,failure_refs,unresolved_refs,status`、各配列は canonical sort とする。`counts` は catalog/materialized IR の `skills=60` と `commands`、さらに resolved `capabilities/tools/toolcalls/phases/edges` の実測 count を持つ。`skills.md` の行数を skill/command count に使わない。failure detail は IdentityRecord として一度だけ保存し、output は `failure_refs` を持つ。
 
-equality/readback は三段で行う。(1) source→universe は catalog skill/command と dependency relation、resolved packet の全 ID/edge/order と完全一致。(2) universe→JSON は canonical field order/bytes/digest と一致。(3) 同じ JSON→generated Mermaid を parser readback し、node ID、edge kind/source/target、explicit order が JSON と完全一致する。skills.md projection の skill/command rows と catalog digest も一致させる。入力 SHA、JSON digest、Mermaid digest、projection digest のいずれかが selected snapshot と違う、または actual nodes/edges/order が一件でも欠ける場合は `stale_artifact`/`projection_mismatch` として fail する。
+equality/readback は四段で行う。(1) source→materialized IR は catalog の skill/command と dependency relation、resolved packet の全 ID/edge/order と完全一致。(2) materialized IR→IdentityRecord/JSON は canonical field order/bytes/digest と一致。(3) 同じ JSON→generated Mermaid を parser readback し、node Ref、edge Ref/source Ref/target Ref、explicit order が JSON と完全一致する。(4) `skills.md` の link/index は catalog の canonical-doc/shim link と parity を持つが、60-row count の source ではない。入力 SHA、JSON digest、Mermaid digest、reader-link parity digest のいずれかが selected snapshot と違う、または actual nodes/edges/order が一件でも欠ける場合は `stale_artifact`/`projection_mismatch`/`reader_link_parity` として fail する。
 
 ## Current Catalog Inventory (readback evidence)
 
@@ -212,7 +221,7 @@ Reverse mapping rule: every changed behavior/path that adds, removes, renames, r
 | kind | statement | evidence / owner | status |
 | --- | --- | --- | --- |
 | current state | `catalog.yaml` の `skill_families` は現在 60 件で、`skill-dependencies.yaml` は同じ skill id 集合を relation owner とする | `agents/skills/catalog.yaml`, `agents/skills/skill-dependencies.yaml` | checked |
-| current state | reader projection は `agents/canonical/skills.md`、route/command/ToolCall は `tools/agent_tools/route.py`, `skill_tool_commands.py`, `agent_team.py` が materialize する | exact implementation links and catalog headers | checked |
+| current state | reader/index link parity target は `agents/canonical/skills.md`、60 skill/command rows と route/command/ToolCall は `agents/skills/catalog.yaml` と `tools/agent_tools/route.py`, `skill_tool_commands.py`, `agent_team.py` が materialize する | exact implementation links and catalog headers | checked |
 | target state | source/JSON/Mermaid equality と generated actual nodes/edges/order は planned checker `tools/agent_tools/check_skill_tool_invocation_graph.py` が readback する | `SG-009..SG-011` | planned |
 | assumption | `normalization` / `正規化` は本文の canonical serialization に定義した Unicode NFC/NFKC、casefold、UTF-8 の手順を指す | `SG-005`, `SG-006` | explicit |
 | scope | this workstream changes design/process contracts only; no production implementation or tests | git diff scope | explicit |

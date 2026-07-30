@@ -139,6 +139,7 @@ snapshot は source bytes を size/hash 付きで一度読み、同一 source �
 - `RL-012` retention deletion は external policy authority が選択した route でのみ実行し、AgentCanon は missing authority を blocked とする。
 - `RL-013` command order、state transition、remote relationship、identity override の変更は既存 snapshot/readback と比較し、design drift を implementation に流さない。
 - `RL-014` design handoff は `implementation_targets` と `validation_route` の ordered packet digest を持ち、observed packet が digest と違えば blocked である。
+- `RL-015` current implementation が override/remote relationship の検証、legacy copy/readback/inventory/commit 後の deletion order、または explicit authority boundary を満たさない場合、contract を緩和せず design drift として blocked にする。実装差異は override validation や deletion order の省略理由にならない。
 
 ## Side Effects
 
@@ -210,6 +211,7 @@ AgentCanon-log PR #4 (merge `9f101301`) owns archive policy, stable branch polic
 | `RL-009..RL-012` | external policy + current legacy command owner | #4 `docs/migration/legacy-inventory.json`; `runtime_log_archive_git.py:command_import_legacy`, `:command_import_eval_results`; `documents/runtime/runtime-log-archive-migration.md` | branch preservation, mapping, deletion, or retention changes require external authority and exact inventory evidence |
 | `RL-013` | current command/readback owner | `runtime_log_archive_git.py:command_sync`, `:command_push`, `:command_check_clean`; `documents/runtime/runtime-log-archive.md` | public command/order/remote-readback changes are design drift until reviewed |
 | `RL-014` | universal correspondence routine | `agents/internal-routines/design-implementation-correspondence.md` | every implementation target and validation route packet carries ordered list plus digest; observed drift blocks |
+| `RL-015` | current identity/legacy owners and design review owner | `tools/agent_tools/log_repository_identity.py`, `runtime_log_archive_git.py:command_import_legacy`, `:command_import_eval_results`, `agents/internal-routines/design-implementation-correspondence.md` | implementation mismatch cannot weaken override validation, explicit authority, or copy/readback/inventory/commit-before-delete order |
 
 Reverse mapping rule: every changed implementation path, public command, identity field, remote relationship, archive state, branch/ref operation, snapshot field, lock/retry behavior, legacy disposition, retention reference, deletion boundary, or readback field must cite one or more `RL-*` clauses. A current implementation link without clause evidence is incomplete; a planned link is not a claim that production code or tests changed.
 
@@ -217,7 +219,7 @@ Reverse mapping rule: every changed implementation path, public command, identit
 
 | kind | statement | evidence / owner | status |
 | --- | --- | --- | --- |
-| request contract | #4/#461 owner split、stable identity/root/branch/snapshot/concurrency/legacy/retention、preflight/transaction split、42 evidence、delete boundary | user request; `RL-001..RL-014` | fixed |
+| request contract | #4/#461 owner split、stable identity/root/branch/snapshot/concurrency/legacy/retention、preflight/transaction split、42 evidence、delete boundary | user request; `RL-001..RL-015` | fixed |
 | external fixed evidence | merge `9f101301` inventory has exact 42 remote legacy refs, 42 mapping rows, main import observation, read-only blockers | [policy artifact](https://github.com/iwashita-nozomu/agent-canon-log/blob/9f10130184539beaebe8991bbcfb5665d476fbe5/docs/migration/legacy-inventory.json), `docs/migration/legacy-inventory.json` | checked |
 | current state | AgentCanon #461 consumer adapter exists for identity, root, paths, snapshots, locks, bounded push, legacy import parser, and readback | exact implementation links above; lifecycle tests | checked |
 | target state | external policy owns retention/deletion while AgentCanon owns consumer lifecycle and exact readback | `documents/runtime/runtime-log-archive.md`, PR #4 | fixed |
@@ -227,4 +229,4 @@ Reverse mapping rule: every changed implementation path, public command, identit
 
 ## Clause IDs
 
-この文書の design clauses は `RL-001` から `RL-014` です。#4 policy owner と #461 consumer owner を混ぜる変更、stable identity を path/chat に戻す変更、42 legacy evidence を省略する変更、`--delete-source` を通常 sync/push に広げる変更、immutable snapshot を mutable mirror に戻す変更、または exact command order を省略する変更は implementation ではなく design drift として扱います。
+この文書の design clauses は `RL-001` から `RL-015` です。#4 policy owner と #461 consumer owner を混ぜる変更、stable identity を path/chat に戻す変更、42 legacy evidence を省略する変更、`--delete-source` を通常 sync/push に広げる変更、override validation や copy/readback/inventory/commit-before-delete order を現行実装との差異を理由に緩和する変更、immutable snapshot を mutable mirror に戻す変更、または exact command order を省略する変更は implementation ではなく design drift として扱います。

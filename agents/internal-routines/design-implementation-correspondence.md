@@ -48,9 +48,11 @@ CorrespondenceRecord {
 }
 ```
 
-`RepoRelativeLocator` と `RepoRelativeTarget` は repository root を基準にした `/` 区切りの locator とし、`..`、空 locator、絶対 path を拒否します。実行時だけ `ExecutionContext` が root と locator から絶対 path を解決します。handoff、manifest、ToolCall、review finding はこの値の ID、digest、論理 locator だけを参照し、同じ identity payload を再シリアライズしません。
+`RepoRelativeTarget` と `RepoRelativeCommand` は次の object field order を持つ。`RepoRelativeTarget=[path,owner_stage,change_kind]`、`RepoRelativeCommand=[argv,cwd,owner_stage]`。target の `path` と command の `cwd` は repository root 基準 `/` 区切りの logical locator とし、`..`、`.`、empty segment、絶対 path、NUL を拒否する。`owner_stage` は lower hyphen-case の `StageId`、`change_kind` は `add|modify|delete` の enum、`argv` は shell command string ではなく順序を持つ token list とする。
 
-`implementation_targets` は変更を許可された ordered logical target のリスト、`validation_route` はその変更を検証する ordered logical command のリストです。各リストは Unicode NFC、UTF-8、compact canonical JSON（field order は `items` のみ）へ一度だけ serialize し、それぞれ domain-separated に `SHA-256(UTF8("agent-canon/design-implementation-correspondence/v1\0implementation_targets\0") + bytes)`、`SHA-256(UTF8("agent-canon/design-implementation-correspondence/v1\0validation_route\0") + bytes)` を計算します。handoff は list の再掲を必要とせず、list reference と対応 digest を運びます。実装 owner と reviewer は実際に選択・実行した logical list を read-back して digest と比較し、target の追加・削除・順序変更または validation command の変更を `packet_scope_drift` として扱います。
+canonical scalar は「Unicode NFC 正規化後の UTF-8 string、NUL/CR/LF/control character なし、schema が trim を指定しない限り byte-preserving の文字列」とする。`path`/`cwd` は locator validation、`owner_stage` は lower hyphen-case validation、`change_kind` は enum validation、`argv` 各 token は case を保持して scalar validation を行う。object は上記 field order、target/command list は handoff における意味のある順序を保持し、compact JSON、`ensure_ascii=false`、UTF-8、末尾改行なしで一度だけ serialize する。handoff、manifest、ToolCall、review finding はこの値の ID、digest、論理 locator だけを参照し、同じ identity payload を再シリアライズしません。
+
+`implementation_targets` は変更を許可された `RepoRelativeTarget` の ordered list、`validation_route` はその変更を検証する `RepoRelativeCommand` の ordered list です。各 list は上記 object field order と canonical scalar を使い、canonical JSON の top-level field order `[items]` で一度だけ serialize する。それぞれ domain-separated に `SHA-256(UTF8("agent-canon/design-implementation-correspondence/v1\0implementation_targets\0") + bytes)`、`SHA-256(UTF8("agent-canon/design-implementation-correspondence/v1\0validation_route\0") + bytes)` を計算する。handoff は list の payload 再掲を必要とせず、list reference と対応 digest を運ぶ。実装 owner と reviewer は実際に選択・実行した logical list を read-back して digest と比較し、target の追加・削除・順序変更または validation command の変更を `packet_scope_drift` として扱う。
 
 ### State
 
@@ -114,6 +116,12 @@ tools/bin/agent-canon docs check
 ```
 
 レビュー時の readback は、(a) selected design bytes と `design_sha256`、(b) clause ID 集合と個別 fingerprint、(c) changed path/behavior と clause ID、(d) `implementation_targets` とその digest、(e) `validation_route` とその digest、(f) evidence locator の six-way join が完全であることを確認します。未実装の planned owner は `planned` と明記し、current evidence と混同しません。
+
+## Evidence And Assumption Ledger
+
+| kind | statement | evidence / owner | status |
+| --- | --- | --- | --- |
+| assumption | `正規化` は canonical scalar に定義した Unicode NFC、UTF-8、control/NUL 拒否、schema-defined validation の手順を指す | `RepoRelativeTarget` / `RepoRelativeCommand` canonical scalar contract above | explicit |
 
 ## Design-To-Implementation Trace
 
