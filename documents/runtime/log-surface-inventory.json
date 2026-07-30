@@ -3380,7 +3380,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_ALGORITHM_CONTRACT",
-      "line": 409,
+      "line": 546,
       "path": "rust/agent-canon/src/python_algorithm_contract.rs",
       "surface": "tool"
     },
@@ -3388,7 +3388,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_ALGORITHM_CONTRACT_FILES",
-      "line": 1150,
+      "line": 1550,
       "path": "rust/agent-canon/src/python_algorithm_contract.rs",
       "surface": "tool"
     },
@@ -3396,7 +3396,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_ALGORITHM_CONTRACT_FINDING",
-      "line": 410,
+      "line": 547,
       "path": "rust/agent-canon/src/python_algorithm_contract.rs",
       "surface": "tool"
     },
@@ -3404,15 +3404,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_ALGORITHM_CONTRACT_FINDINGS",
-      "line": 1155,
-      "path": "rust/agent-canon/src/python_algorithm_contract.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "PY_ALGORITHM_CONTRACT_PARSE_ERROR",
-      "line": 1145,
+      "line": 1555,
       "path": "rust/agent-canon/src/python_algorithm_contract.rs",
       "surface": "tool"
     },
@@ -6638,190 +6630,6 @@
       "field": "ALGORITHM_CONFIG_RUNTIME_DEFAULT_ERRORS",
       "line": 1039,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "findings",
-      "line": 522,
-      "path": "tools/agent_tools/check_algorithm_module_nested_contract.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "modules",
-      "line": 522,
-      "path": "tools/agent_tools/check_algorithm_module_nested_contract.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "summary",
-      "line": 522,
-      "path": "tools/agent_tools/check_algorithm_module_nested_contract.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "findings",
-      "line": 522,
-      "path": "tools/agent_tools/check_algorithm_module_nested_contract.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "modules",
-      "line": 522,
-      "path": "tools/agent_tools/check_algorithm_module_nested_contract.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "summary",
-      "line": 522,
-      "path": "tools/agent_tools/check_algorithm_module_nested_contract.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_NESTED_CONTRACT_FINDING",
-      "line": 81,
-      "path": "tools/agent_tools/check_algorithm_module_nested_contract.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ALGORITHM_NESTED_CONTRACT",
-      "line": 539,
-      "path": "tools/agent_tools/check_algorithm_module_nested_contract.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ALGORITHM_NESTED_CONTRACT_DEPENDENCIES",
-      "line": 537,
-      "path": "tools/agent_tools/check_algorithm_module_nested_contract.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ALGORITHM_NESTED_CONTRACT_FILES",
-      "line": 535,
-      "path": "tools/agent_tools/check_algorithm_module_nested_contract.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ALGORITHM_NESTED_CONTRACT_FINDINGS",
-      "line": 538,
-      "path": "tools/agent_tools/check_algorithm_module_nested_contract.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ALGORITHM_NESTED_CONTRACT_MODULES",
-      "line": 536,
-      "path": "tools/agent_tools/check_algorithm_module_nested_contract.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "findings",
-      "line": 372,
-      "path": "tools/agent_tools/check_algorithm_module_public_surface.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "modules",
-      "line": 372,
-      "path": "tools/agent_tools/check_algorithm_module_public_surface.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "summary",
-      "line": 372,
-      "path": "tools/agent_tools/check_algorithm_module_public_surface.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "findings",
-      "line": 372,
-      "path": "tools/agent_tools/check_algorithm_module_public_surface.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "modules",
-      "line": 372,
-      "path": "tools/agent_tools/check_algorithm_module_public_surface.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "summary",
-      "line": 372,
-      "path": "tools/agent_tools/check_algorithm_module_public_surface.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "ALGORITHM_PUBLIC_SURFACE_FINDING",
-      "line": 69,
-      "path": "tools/agent_tools/check_algorithm_module_public_surface.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ALGORITHM_PUBLIC_SURFACE",
-      "line": 388,
-      "path": "tools/agent_tools/check_algorithm_module_public_surface.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ALGORITHM_PUBLIC_SURFACE_FILES",
-      "line": 385,
-      "path": "tools/agent_tools/check_algorithm_module_public_surface.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ALGORITHM_PUBLIC_SURFACE_FINDINGS",
-      "line": 387,
-      "path": "tools/agent_tools/check_algorithm_module_public_surface.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ALGORITHM_PUBLIC_SURFACE_MODULES",
-      "line": 386,
-      "path": "tools/agent_tools/check_algorithm_module_public_surface.py",
       "surface": "tool"
     },
     {
@@ -20348,7 +20156,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_CHECKS",
-      "line": 230,
+      "line": 231,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -20356,7 +20164,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DOCS_CHECKS",
-      "line": 396,
+      "line": 397,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -20364,7 +20172,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "EXPERIMENT_REGISTRY",
-      "line": 408,
+      "line": 409,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -20372,7 +20180,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "GITHUB_WORKFLOW_CHECKS",
-      "line": 378,
+      "line": 379,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -20380,7 +20188,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "PR_GATE_RECEIPT",
-      "line": 172,
+      "line": 173,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -24269,8 +24077,6 @@
     "tools/agent_tools/check_agent_canon_log_policy.py",
     "tools/agent_tools/check_agent_runtime_alignment.py",
     "tools/agent_tools/check_algorithm_config_partition.py",
-    "tools/agent_tools/check_algorithm_module_nested_contract.py",
-    "tools/agent_tools/check_algorithm_module_public_surface.py",
     "tools/agent_tools/check_convention_compliance.py",
     "tools/agent_tools/check_dependency_graph.sh",
     "tools/agent_tools/check_dependency_header_format.sh",

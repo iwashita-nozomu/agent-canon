@@ -65,11 +65,9 @@ legacy subtree wording is unrelated to tool import disposition.
 | `scripts/tools/tfidf_similar_docs.py` | `tools/docs/tfidf_similar_docs.py` | Promoted as dependency-free similarity helper. |
 | `scripts/read_conventions.sh` and `scripts/view_conventions.sh` | `tools/oop/python/rule_inventory.py`, `tools/oop/cpp/rule_inventory.py` | Reimplemented as repo-neutral, language-specific OOP rule inventories instead of project-root convention viewers. |
 | `scripts/restructure_code_review_skill.py` | Source repository only | Not promoted because it rewrites one historical skill layout. AgentCanon legacy tool storage is retired. |
-| `vendor/agent-canon/tools/agent_tools/check_algorithm_module_nested_contract.py` | `tools/agent_tools/check_algorithm_module_nested_contract.py` | Promoted from jax_solver_util submodule diff as a repo-neutral algorithm module ownership checker. |
 | `vendor/agent-canon/tools/experiments/update_latest_result.py` | `tools/experiments/update_latest_result.py` | Promoted from jax_solver_util submodule diff as a latest-result pointer helper. |
 | OOP readability local diff | `tools/oop/shared/readability_core.py` with `tools/oop/python/readability.py` and `tools/oop/cpp/readability.py` entrypoints | Promoted algorithm-protocol contract-class exemption so intentional value contracts are not reported as thin classes. |
 | OOP readability follow-up local diff | `tools/oop/shared/readability_core.py` with `tools/oop/python/readability.py` and `tools/oop/cpp/readability.py` entrypoints | Promoted public-boundary filtering and algorithm config factory exemptions. |
-| `vendor/agent-canon/tools/agent_tools/check_algorithm_module_nested_contract.py` follow-up local diff | `tools/agent_tools/check_algorithm_module_nested_contract.py` | Promoted explicit summary return type so the checker avoids `Any`. |
 | `vendor/agent-canon/tools/experiments/update_latest_result.py` follow-up local diff | `tools/experiments/update_latest_result.py` | Promoted deterministic nanosecond timestamp tie-break for latest-result selection. |
 | `vendor/agent-canon/tools/__init__.py` and `tools/experiments/__init__.py` | `tools/__init__.py`, `tools/experiments/__init__.py` | Promoted package markers used by shared tool tests. |
 
@@ -106,9 +104,9 @@ Markdown tooling that already has newer AgentCanon behavior.
 
 ## Additional Local Preference Captured
 
-jax_solver_util had a local AgentCanon memory note requiring OOP readability,
-public surface, and nested-contract checks in implementation/experiment paths.
-The shared canon now keeps the nested-contract checker and runs it from
+jax_solver_util had a local AgentCanon memory note requiring OOP readability
+and algorithm-contract checks in implementation/experiment paths. The shared
+canon now keeps the single Rust algorithm-contract checker and runs it from
 `tools/ci/run_all_checks.sh` when a repo has a `python/` tree.
 
 The jax_solver_util local diff that excluded `python/jax_util`,
