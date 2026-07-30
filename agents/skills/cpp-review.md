@@ -4,6 +4,9 @@
 contract skill
 responsibility Documents cpp-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ./catalog.yaml public skill and capability projection
+upstream design ./skill-dependencies.yaml prerequisite and reviewer order
+upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract and sparse C++ projection
 @dependency-end
 -->
 
@@ -17,6 +20,7 @@ C / C++ 差分を build 境界、header 境界、所有権、例外・error path
 - `src/`, `include/`, `lib/` 配下を触る
 - `CMakeLists.txt` や native build 設定を触る
 - public header、ABI、FFI、CLI binary の挙動を変える
+- C++ documentation / Docstring projection を触る
 - `bootstrap_agent_run.py` の changed path 判定で `cpp_reviewer` が自動で足された
 
 ## Required Checks
@@ -28,8 +32,22 @@ C / C++ 差分を build 境界、header 境界、所有権、例外・error path
 ## Core References
 
 - `documents/conventions/coding-conventions-cpp.md`
+- `documents/conventions/DOCSTRING_GUIDE.md`
 - `documents/conventions/coding-conventions-testing.md`
 - `documents/conventions/REVIEW_PROCESS.md`
+
+## Docstring projection route
+
+C++ surface が選ばれた場合は、catalog の `cpp-review` route と skill dependency order を
+使って reviewer を起動し、semantic clause の owner は
+`documents/conventions/DOCSTRING_GUIDE.md` へ戻します。レビューは Doxygen syntax / format、
+header/source anchor、native ownership evidence と、target responsibility region に選択した
+semantic delta が対応するかを確認します。signature、namespace、field、型事実を comment に
+複製せず、`@param`、`@return`、`@throws` の全 tag を意味契約の gate にしません。
+
+Docstring または規約だけの差分では native build を追加せず、design/header/static evidence
+で完了します。native source、header、ABI、または build configuration が変わった場合だけ
+project-native configure / build / test route を起動します。
 
 ## Expected Outcome
 

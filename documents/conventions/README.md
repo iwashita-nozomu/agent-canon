@@ -24,6 +24,9 @@ repo 全体で先に見るのは、言語非依存の規約です。
 
 ## 補足規約
 
+- [DOCSTRING_GUIDE.md](DOCSTRING_GUIDE.md)
+  - **最初に読む正本**: semantic contract、canonical template skeleton、sparse trace、
+    projection route、review decision matrix
 - [coding-conventions-house-style.md](coding-conventions-house-style.md)
 - [coding-conventions-python.md](coding-conventions-python.md)
 - [coding-conventions-cpp.md](coding-conventions-cpp.md)

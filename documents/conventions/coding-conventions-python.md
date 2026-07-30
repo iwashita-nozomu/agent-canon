@@ -3,6 +3,7 @@
 contract policy
 responsibility Documents Python コーディング規約 for this repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ./DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse projection traces
 downstream design ../design/algorithm-implementation-boundary.md algorithm math-to-code boundary policy for Python implementations
 downstream design ./object-oriented-design.md general OOP policy for Python class decisions
 @dependency-end
@@ -16,7 +17,7 @@ downstream design ./object-oriented-design.md general OOP policy for Python clas
 
 ## この文書の読み方
 
-この入口文書は、Python 実装で最初に確認する scope、型注釈、アルゴリズム境界、OOP、配置、命名、数値リテラル、pyright / pytest の導線をまとめます。まずクイックスタートで関連規約へ飛び、よくある間違いと Docstring テンプレートで公開境界の最小形を確認します。後半は行長、import と責務境界、helper-first 禁止、SOLID、目次、変更後チェックを読むための索引です。
+この入口文書は、Python 実装で最初に確認する scope、型注釈、アルゴリズム境界、OOP、配置、命名、数値リテラル、pyright / pytest の導線をまとめます。まずクイックスタートで関連規約へ飛び、よくある間違いと [Docstring Semantic Contract](./DOCSTRING_GUIDE.md) の Python adapter で公開境界の最小形を確認します。後半は行長、import と責務境界、helper-first 禁止、SOLID、目次、変更後チェックを読むための索引です。
 
 ## クイックスタート
 
@@ -47,43 +48,25 @@ def load_config(path: Path) -> dict[str, str]:
     return {"path": str(path)}
 ```
 
-## Docstring テンプレート
+## Docstring projection
 
-**モジュール docstring**
+Docstring の意味契約と canonical skeleton は [DOCSTRING_GUIDE.md](./DOCSTRING_GUIDE.md) が
+所有します。この文書は Python adapter として、次の syntax / format だけを選びます。
 
-```python
-"""module_name の概要。
+- triple-quoted string、indentation、quote style、Google / NumPy / PEP 257-compatible な見出しを使う。
+- 各 module、class、function は responsibility を一文で示し、guide の reviewer matrix が選んだ semantic delta だけを続ける。
+- `Args`、`Returns`、`Raises`、`Yields` は読者の判断に必要な relation がある場合だけ使い、全欄を強制しない。
+- signature、annotation、namespace、access modifier、field、公開名を Docstring に再掲しない。既存の static surface と design trace が十分なら projection を省略する。
 
-このモジュールは [責務] を担当します。
+Docstring の semantic clause、omission、owner return、projection anchor は guide の sparse
+trace record へ戻します。`__all__` と公開 export は次の Python public-surface owner が扱い、
+Docstring の意味契約へ混ぜません。
 
-公開インターフェース:
-    PublicClass: [簡潔な説明]
-    public_function: [簡潔な説明]
+## Python public surface
 
-参考資料:
-    - documents/conventions/coding-conventions-python.md
-"""
-```
-
-**関数 docstring**
-
-```python
-from pathlib import Path
-
-
-def load_config(path: Path) -> dict[str, str]:
-    """設定ファイルを読み込む。
-
-    Args:
-        path: 設定ファイルへの path。
-
-    Returns:
-        読み込んだ設定値。
-
-    Raises:
-        FileNotFoundError: path が存在しない場合。
-    """
-```
+`__all__`、package export、先頭 `_` による公開境界は Python 規約の owner です。公開名の
+選択と wildcard import の扱いは [coding-conventions-house-style.md](./coding-conventions-house-style.md)
+に従い、Docstring は公開名の一覧を複製しません。
 
 ## 現在の対象
 

@@ -3,6 +3,8 @@
 contract policy
 responsibility Documents C++ コーディング規約 for this repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../design/cpp-build-layout.md native target identity and build layout
+upstream design ./DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse projection traces
 downstream design ../design/algorithm-implementation-boundary.md algorithm math-to-code boundary policy for C++ implementations
 @dependency-end
 -->
@@ -51,6 +53,19 @@ layout と build tree の正本は [cpp-build-layout.md](../design/cpp-build-lay
 - 数式・アルゴリズムの前提を丁寧に書きます。
 - 近似や数値安定性の注意点を必ず記述します。
 - 実装 boundary が担う式、state、guard、alternate route を Boundary Map と一致させます。
+
+### Docstring / native documentation projection
+
+意味契約と canonical skeleton は [DOCSTRING_GUIDE.md](./DOCSTRING_GUIDE.md) が所有し、この
+文書は C++ adapter として Doxygen-compatible comment、宣言 / header placement、native
+ownership boundary の syntax と format を選びます。責務の一文に、reviewer matrix が選んだ
+algorithm、failure、side effect、ownership の semantic delta だけを加えます。
+
+signature、namespace、access modifier、field、型事実の列挙は comment に複製しません。
+`@param`、`@return`、`@throws` などの tag は読者の判断に必要な relation がある場合だけ
+使い、全宣言に固定しません。target identity と header/source anchor は
+[cpp-build-layout.md](../design/cpp-build-layout.md) へ戻し、Docstring projection はその
+design fact を再定義しません。
 
 ## 4.5 数値リテラル
 
