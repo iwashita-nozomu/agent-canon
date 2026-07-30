@@ -21,6 +21,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2]
@@ -70,6 +71,7 @@ POST_TOOL_USE_INPUT_SCHEMA = "agent-canon-post-tool-use-input/v1"
 DISPATCHER_SOURCE_ROOT_ENV = "AGENT_CANON_HOOK_SOURCE_ROOT"
 WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
 ACTIVE_RUN_POINTER = Path("reports") / "agents" / ".active_run"
+REPORT_ROOT_RELATIVE = ACTIVE_RUN_POINTER.parent
 MAX_HOOK_PAYLOAD_BYTES = 256 * 1024
 
 
@@ -81,6 +83,28 @@ class HookEventContract:
     matchers: tuple[str, ...]
     failure: str
     telemetry: str
+
+
+class HookRootStatus(Enum):
+    """Typed active-root resolution outcomes used by the projection gate."""
+
+    RESOLVED = "resolved"
+    OVERRIDE = "override"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class HookRootState:
+    """Bind one spool root to its optional report-projection capability."""
+
+    active_root: Path
+    standalone: bool
+    status: HookRootStatus
+
+    @property
+    def report_projection_enabled(self) -> bool:
+        """Derive projection capability from the typed resolution outcome."""
+        return self.status is not HookRootStatus.FAILED
 
 
 HOOK_EVENT_CONTRACTS: dict[str, HookEventContract] = {
@@ -212,46 +236,93 @@ def projection_payload(stdout: str) -> dict[str, object]:
     }
 
 
-def hook_root() -> tuple[Path, bool]:
-    """Resolve the active workspace root and whether it is standalone AgentCanon."""
+def hook_root() -> HookRootState:
+    """Resolve the active workspace root and report-projection capability."""
     override = os.environ.get(DISPATCHER_SOURCE_ROOT_ENV, "").strip()
     if override:
-        return Path(override).resolve(), True
+        return HookRootState(
+            active_root=Path(override).resolve(),
+            standalone=True,
+            status=HookRootStatus.OVERRIDE,
+        )
     try:
         resolution = resolve_agent_canon_source_root(Path.cwd())
-        return resolution.current_repository_root, resolution.layout == LAYOUT_STANDALONE
+        return HookRootState(
+            active_root=resolution.current_repository_root,
+            standalone=resolution.layout == LAYOUT_STANDALONE,
+            status=HookRootStatus.RESOLVED,
+        )
     except Exception:
-        # Hook capture remains fail-open when a caller has no resolvable repository context.
-        return SOURCE_ROOT, True
+        # Spool capture remains fail-open, but unresolved roots cannot project reports.
+        return HookRootState(
+            active_root=SOURCE_ROOT,
+            standalone=False,
+            status=HookRootStatus.FAILED,
+        )
 
 
-def _active_report_target(pointer: Path) -> Path | None:
-    """Resolve one non-empty active-run pointer relative to its own directory."""
-    if not pointer.is_file():
-        return None
+def _active_report_target(
+    pointer: Path,
+    *,
+    active_root: Path,
+    report_root: Path,
+) -> Path | None:
+    """Resolve one contained, existing run-bundle directory from a pointer."""
     try:
+        if not pointer.is_file():
+            return None
         value = pointer.read_text(encoding="utf-8").strip()
-    except (OSError, UnicodeError):
+    except (OSError, UnicodeError, ValueError):
         return None
     if not value:
         return None
-    target = Path(value)
-    if not target.is_absolute():
-        target = pointer.parent / target
-    return target.resolve()
+    declared = Path(value)
+    if declared.is_absolute() or ".." in declared.parts:
+        return None
+    if declared.parts[:2] == REPORT_ROOT_RELATIVE.parts:
+        target = active_root / declared
+    else:
+        target = report_root / declared
+    try:
+        resolved_report_root = report_root.resolve()
+        resolved_target = target.resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
+    if resolved_report_root not in resolved_target.parents:
+        return None
+    return resolved_target if resolved_target.is_dir() else None
 
 
-def resolve_report_target(root: Path, *, standalone: bool) -> Path | None:
+def resolve_report_target(state: HookRootState) -> Path | None:
     """Resolve the optional workflow-monitor report target for the active root."""
+    if not state.report_projection_enabled:
+        return None
     override = os.environ.get(WORKFLOW_MONITOR_REPORT_DIR_ENV, "").strip()
     if override:
         target = Path(override)
-        return (root / target).resolve() if not target.is_absolute() else target.resolve()
-    target = _active_report_target(root / ACTIVE_RUN_POINTER)
+        try:
+            resolved = (
+                (state.active_root / target).resolve()
+                if not target.is_absolute()
+                else target.resolve()
+            )
+        except (OSError, RuntimeError, ValueError):
+            return None
+        return resolved if resolved.is_dir() else None
+    report_root = state.active_root / REPORT_ROOT_RELATIVE
+    target = _active_report_target(
+        state.active_root / ACTIVE_RUN_POINTER,
+        active_root=state.active_root,
+        report_root=report_root,
+    )
     if target is not None:
         return target
-    if standalone:
-        return _active_report_target(root / ".active_run")
+    if state.standalone:
+        return _active_report_target(
+            state.active_root / ".active_run",
+            active_root=state.active_root,
+            report_root=report_root,
+        )
     return None
 
 
@@ -369,11 +440,25 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
                         status = "unsuccessful_tool_response"
             except (ProjectionError, TypeError, ValueError, AssertionError):
                 status = "invalid_projection"
-    root, standalone = hook_root()
-    report_dir = resolve_report_target(root, standalone=standalone)
-    spool_entry, context = spool_event(event, raw_payload, status, root, **telemetry)
+    root_state = hook_root()
+    report_dir = resolve_report_target(root_state)
+    spool_entry, context = spool_event(
+        event,
+        raw_payload,
+        status,
+        root_state.active_root,
+        **telemetry,
+    )
     behavior = record_hook_invocation(
-        prepare_parts(event, payload, status, output, spool_entry, root, report_dir)
+        prepare_parts(
+            event,
+            payload,
+            status,
+            output,
+            spool_entry,
+            root_state.active_root,
+            report_dir,
+        )
     )
     if behavior is not None:
         spool_entry.update(behavior.as_dict())

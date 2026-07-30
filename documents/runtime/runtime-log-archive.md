@@ -255,14 +255,22 @@ source report bundles.
 
 The active hook dispatcher reuses the source-root context for this resolution:
 the derived parent repository is the active root, while standalone AgentCanon
-uses its own repository root. The workflow-monitor report target precedence is
+uses its own repository root. A derived invocation keeps the parent active root
+even when its current directory is inside `vendor/agent-canon`. A typed
+source-root resolution failure disables report projection and leaves the event
+spool-only; `SOURCE_ROOT` is not a report fallback. The workflow-monitor report
+target precedence is
 `AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR`, the active root's
 `reports/agents/.active_run`, and standalone `.active_run`; an absent target
-leaves the hook spool-only. Projection is emitted only after a `spooled`
-append for an assembled behavior event, and no source-root
-`workflow_monitoring.md` fallback is permitted. These reads and the local
-projection remain on the hook hot path without archive sync, Git, or network
-operations.
+leaves the hook spool-only. Pointer values must be relative, resolve to an
+existing directory strictly below the active root's `reports/agents`, and stay
+contained after symlink resolution; traversal, absolute, missing, and escaping
+targets resolve to no report. The explicit environment target is a separate
+authority route that may be outside `reports/agents`, but it must already be a
+directory. Projection is emitted only after a `spooled` append for an assembled
+behavior event, and no source-root `workflow_monitoring.md` fallback is
+permitted. These reads and the local projection remain on the hook hot path
+without archive sync, Git, or network operations.
 
 The initial import from the former in-tree log surface is preserved under:
 

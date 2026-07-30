@@ -20,9 +20,11 @@ TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(TOOLS_ROOT))
 
 from agent_canon_source_root import (  # noqa: E402
+    LAYOUT_VENDORED,
     RootResolution,
     SourceRootFailure,
     build_parser,
+    resolve_agent_canon_source_root,
     run,
 )
 
@@ -84,3 +86,24 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             )
             with self.assertRaises(SourceRootFailure):
                 run(parser, resolver=lambda _: self._mock_resolution(root))
+
+    def test_vendored_submodule_cwd_resolves_parent_as_active_root(self) -> None:
+        """Resolve the derived parent even when invocation starts in the submodule."""
+        with tempfile.TemporaryDirectory() as workspace:
+            parent = Path(workspace) / "parent"
+            source = parent / "vendor" / "agent-canon"
+            catalog = source / "agents" / "skills" / "catalog.yaml"
+            (parent / ".git").mkdir(parents=True)
+            source.mkdir(parents=True)
+            (source / ".git").write_text(
+                "gitdir: ../../.git/modules/vendor/agent-canon\n",
+                encoding="utf-8",
+            )
+            catalog.parent.mkdir(parents=True)
+            catalog.write_text("skills: []\n", encoding="utf-8")
+
+            resolution = resolve_agent_canon_source_root(source / "tools")
+
+            self.assertEqual(resolution.current_repository_root, parent.resolve())
+            self.assertEqual(resolution.source_root, source.resolve())
+            self.assertEqual(resolution.layout, LAYOUT_VENDORED)
