@@ -1339,7 +1339,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
-            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=no", pushed.stdout)
 
     def test_import_eval_results_moves_reports_and_removes_source_tree(self) -> None:
         """import-eval-results should archive legacy reports and delete source notices."""
@@ -1394,7 +1394,93 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
-            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=no", pushed.stdout)
+
+    def test_legacy_delete_waits_for_remote_readback_and_retains_on_failure(self) -> None:
+        """Legacy source remains when archive push fails, then deletes after retry readback."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            legacy = canon / "agents" / "evals" / "results" / "hook-runs" / "old-runtime"
+            legacy.mkdir(parents=True)
+            source_log = legacy / "skill_usage.jsonl"
+            source_log.write_text("{\"hook_run_id\":\"retained\"}\n", encoding="utf-8")
+            reject_hook = remote / "hooks" / "pre-receive"
+            reject_hook.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            reject_hook.chmod(reject_hook.stat().st_mode | stat.S_IXUSR)
+
+            failed = self.run_tool(
+                "import-legacy",
+                "--delete-source",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertTrue(source_log.exists())
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=no", failed.stdout)
+            reject_hook.unlink()
+
+            recovered = self.run_tool(
+                "import-legacy",
+                "--delete-source",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(recovered.returncode, 0, recovered.stdout + recovered.stderr)
+            self.assertFalse(source_log.exists())
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=yes", recovered.stdout)
+
+    def test_normal_sync_and_push_have_no_source_delete_authority(self) -> None:
+        """Normal runtime publication cannot delete a legacy source file."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            legacy = canon / "agents" / "evals" / "results" / "hook-runs"
+            legacy.mkdir(parents=True)
+            source_log = legacy / "normal-sync.jsonl"
+            source_log.write_text("retained\n", encoding="utf-8")
+            synced = self.run_tool(
+                "sync",
+                "--no-agent-reports",
+                "--no-push",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
+            pushed = self.run_tool("push", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
+            self.assertTrue(source_log.exists())
+
+    def test_preflight_and_internal_transaction_order_is_explicit(self) -> None:
+        """The public sync entry and publication helper preserve the design state order."""
+        sync_source = inspect.getsource(runtime_log_archive_git.command_sync)
+        publish_source = inspect.getsource(runtime_log_archive_git.publish_prepared_archive)
+        self.assertLess(sync_source.index("prepare_archive_transaction"), sync_source.index("snapshot_hook_spool_events"))
+        for earlier, later in (
+            ("stage_archive_paths", "ensure_commit_identity"),
+            ("ensure_commit_identity", "_compare_and_push"),
+        ):
+            self.assertLess(publish_source.index(earlier), publish_source.index(later))
+        for function in (
+            runtime_log_archive_git.command_sync,
+            runtime_log_archive_git.command_push,
+            runtime_log_archive_git.publish_prepared_archive,
+        ):
+            self.assertNotIn("delete_source_file", inspect.getsource(function))
+        compare_source = inspect.getsource(runtime_log_archive_git._compare_and_push)
+        self.assertNotIn("--force", compare_source)
+        self.assertNotIn('"merge"', compare_source)
 
     def test_archive_agent_report_snapshots_run_bundle_and_pushes(self) -> None:
         """archive-agent-report should copy a run bundle into agent-reports."""

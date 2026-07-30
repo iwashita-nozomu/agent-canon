@@ -1,0 +1,62 @@
+{
+  "request_id": "runtime-log-repository-lifecycle-post-merge-20260730",
+  "design_locator": "documents/design/runtime-log-repository-lifecycle.md",
+  "design_sha256": "7317bd436c46dfb24d0da0a73050631d2f91ceccce21e672613bf00b29472672",
+  "clause_ids": [
+    "RL-001",
+    "RL-002",
+    "RL-003",
+    "RL-004",
+    "RL-005",
+    "RL-006",
+    "RL-007",
+    "RL-008",
+    "RL-009",
+    "RL-010",
+    "RL-011",
+    "RL-012",
+    "RL-013",
+    "RL-014",
+    "RL-015"
+  ],
+  "clause_fingerprints": {
+    "RL-001": "6c2f289fa4e088bc964ecabc64caef42d198d43f00d357396823bc38104562b4",
+    "RL-002": "ee94e787323c23fba7f85c724cb30fefc5c4630217421599671a12b4ed5eef89",
+    "RL-003": "d7ecc75abd9c2097900de5f7511d92dc0748c9f85b8d63ed8be9d06e3bb5b627",
+    "RL-004": "2422d124fb2835c5748d3296fb49dde69adf622fd133e7bf341e2982ceab1b4e",
+    "RL-005": "b05d71db53a2ecb3392ee611e0f6e71714663901fee5dc4a3872ef914b9c424a",
+    "RL-006": "5e83658750162690bf569df9e5ab669e1bb2892cacaeb19814c8d7bb72b36fbf",
+    "RL-007": "46330a94fd79431cb9e28c45e9c5849c88cd93e55061d93d38188a7cd654c49f",
+    "RL-008": "378036ebc74b1f13690611cb136986a3b488388debd1e1bf80ff4e8ad39f0d43",
+    "RL-009": "872db8571609171b6a53c3e10510d215d0e68bd3fcf2a0d4358b85ccdd8c0b52",
+    "RL-010": "575439284046451f2ed2912e22165416831f3a7ed36f04431cc405af0aa6c3ef",
+    "RL-011": "5d857b59eabf5677e573d3209fe2666397ebfbdbb14801ba6110737275b21363",
+    "RL-012": "8ef8d568ee0342b413ecf78971e0e1f0d3ef85c9894f9bef50a25353efaa1493",
+    "RL-013": "b5a7b28822fd7b0d7143df5e3fb59bdf91c1bfcf75d6ef9996593ff63ad6d097",
+    "RL-014": "01e539b5dd3db299f10688de2a449643b895d63f910c242c0df255b763b8cf45",
+    "RL-015": "d6a3a0f2b64df51e4dbe3d6a2b598df60c531ce44eb8a7105330bf28f619c4b2"
+  },
+  "owner_stage": "implementation",
+  "implementation_targets": [
+    {"path": "tools/agent_tools/log_repository_identity.py", "owner_stage": "implementation", "change_kind": "modify"},
+    {"path": "tools/agent_tools/runtime_log_paths.py", "owner_stage": "implementation", "change_kind": "modify"},
+    {"path": "tools/agent_tools/runtime_log_archive_git.py", "owner_stage": "implementation", "change_kind": "modify"},
+    {"path": "tools/agent_tools/check_agent_canon_log_policy.py", "owner_stage": "implementation", "change_kind": "add"},
+    {"path": "tests/agent_tools/test_log_repository_lifecycle.py", "owner_stage": "validation", "change_kind": "modify"},
+    {"path": "tests/agent_tools/test_runtime_log_archive_git.py", "owner_stage": "validation", "change_kind": "modify"},
+    {"path": "tests/agent_tools/test_agent_canon_log_policy.py", "owner_stage": "validation", "change_kind": "add"},
+    {"path": "documents/design/runtime-log-repository-lifecycle.md", "owner_stage": "design", "change_kind": "modify"},
+    {"path": "documents/design/runtime-log-repository-lifecycle-correspondence.json", "owner_stage": "design", "change_kind": "add"}
+  ],
+  "implementation_targets_sha256": "e92842d6a2eadeeac84fa7764fbb1a8ca7d2f2dfba88e39cb7bbc7308db14852",
+  "validation_route": [
+    {"argv": ["python3", "-m", "unittest", "tests.agent_tools.test_log_repository_lifecycle"], "cwd": "tests/agent_tools", "owner_stage": "validation"},
+    {"argv": ["python3", "-m", "unittest", "tests.agent_tools.test_agent_canon_log_policy"], "cwd": "tests/agent_tools", "owner_stage": "validation"},
+    {"argv": ["python3", "-m", "unittest", "tests.agent_tools.test_runtime_log_archive_git.RuntimeLogArchiveGitTest.test_legacy_delete_waits_for_remote_readback_and_retains_on_failure"], "cwd": "tests/agent_tools", "owner_stage": "validation"},
+    {"argv": ["python3", "-m", "unittest", "tests.agent_tools.test_runtime_log_archive_git.RuntimeLogArchiveGitTest.test_normal_sync_and_push_have_no_source_delete_authority"], "cwd": "tests/agent_tools", "owner_stage": "validation"},
+    {"argv": ["python3", "-m", "unittest", "tests.agent_tools.test_runtime_log_archive_git.RuntimeLogArchiveGitTest.test_preflight_and_internal_transaction_order_is_explicit"], "cwd": "tests/agent_tools", "owner_stage": "validation"},
+    {"argv": ["python3", "tools/agent_tools/check_agent_canon_log_policy.py", "--commit", "9f10130184539beaebe8991bbcfb5665d476fbe5"], "cwd": "tools/agent_tools", "owner_stage": "validation"}
+  ],
+  "validation_route_sha256": "5ea94f4cb3333e440d412aabe55a821d111337ce23e27627778dbebba60b7751",
+  "state": "review_ready"
+}

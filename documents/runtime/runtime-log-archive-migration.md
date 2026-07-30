@@ -39,10 +39,12 @@ reader-facing documentation, schemas, and tool tests, but no
 - Boundary: steady-state archive ownership and retention policy stay in
   `runtime-log-archive.md` and `result-log-retention-and-visualization.md`.
 
-No migration, branch deletion, merge, rewrite, or source cleanup is performed
-by the lifecycle redesign. The log repository policy branch contains a
+No legacy branch migration, branch deletion, merge, or rewrite is performed by
+the lifecycle redesign. The log repository policy branch contains a
 deterministic read-only inventory of every legacy `logs/*` ref and the `main`
-legacy-import tree.
+legacy-import tree. AgentCanon import commands are limited to source-tree
+cleanup: they may delete only mapped source files after archive commit, tree,
+import-index, remote push, and exact ref/blob readback succeed.
 
 ## Required Future Migration Steps
 
@@ -68,7 +70,10 @@ run any source inspection from the explicitly named source repository.
 
 1. Execute only the separately reviewed migration implementation with the
    authority manifest. Producers must compare the expected remote head, push
-   without force, and retain source snapshots on conflict.
+   without force, and retain source snapshots on conflict. The AgentCanon-side
+   `import-legacy --delete-source` and `import-eval-results --delete-source`
+   commands are the only source-delete routes; normal `sync` and `push` have no
+   delete authority.
 
 1. Read back every destination remote ref and verify the exact expected head,
    tree, and content digest. A failed or uncertain readback blocks cleanup.
@@ -76,8 +81,10 @@ run any source inspection from the explicitly named source repository.
 1. Retain legacy refs and `main` legacy-import data until a later policy
    decision explicitly authorizes retention changes.
 
-The old `import-legacy --delete-source` and `import-eval-results --delete-source`
-commands remain historical procedures, not a route for this redesign.
+The import commands create append-only `legacy-import/import-index.jsonl`
+evidence before publication. A failed copy, digest/inventory check, commit,
+push, or readback leaves every source file in place. The flag is not a shortcut
+for policy-owner branch migration or retention deletion.
 
 ## Current Migration Evidence
 
@@ -90,8 +97,10 @@ The 2026-05-25 migration imported the old AgentCanon hook JSONL into:
 
 The migrated set contains the former repo/runtime directories for
 `docomo_bt_management`, `jax_solver_util`, a retired model-development workspace, `project_template`,
-`workspace`, plus the old top-level hook JSONL files. AgentCanon now stages
-those old JSONL files for deletion and keeps the migration notice README.
+`workspace`, plus the old top-level hook JSONL files. AgentCanon now records
+those files in `legacy-import/import-index.jsonl` and deletes them only in the
+explicit post-readback finalize phase; failed or uncertain publication keeps
+the source files and local archive evidence.
 
 The same migration imported the former accumulated eval result families for
 skill/workflow prompts, retired responsibility analysis, workflow selection,
