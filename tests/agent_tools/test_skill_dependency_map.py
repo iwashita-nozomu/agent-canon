@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import sys
 import tempfile
@@ -14,10 +15,12 @@ sys.path.insert(0, str(TOOLS_ROOT))
 
 from agent_canon_source_root import resolve_agent_canon_source_root  # noqa: E402
 from skill_dependency_map import (  # noqa: E402
-    GraphCapacityError,
     GraphDigestMismatchError,
     GraphIdentityCollisionError,
+    _canonical_bytes,
     _IdentityStore,
+    _json_digest_from_graph,
+    _normalize_identifier,
     build_graph,
     check_artifacts,
     readback_mermaid,
@@ -42,6 +45,11 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         self.assertEqual(len(graph["phases"]), 180)
         self.assertEqual(len(graph["commands"]), 387)
         self.assertGreater(len(graph["tools"]), 0)
+        correspondence = graph["design_correspondence"]
+        self.assertEqual(len(correspondence["clause_ids"]), 15)
+        self.assertEqual(len(correspondence["dic_clause_ids"]), 9)
+        self.assertEqual(len(correspondence["implementation_target_paths"]), 11)
+        self.assertEqual(len(correspondence["adapter_pairs"]), 5)
         self.assertEqual(
             set(graph["source_snapshot"]),
             {
@@ -193,8 +201,27 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         self.assertEqual(first, store.add("skill", "skill:sample", {"id": "sample"}))
         with self.assertRaisesRegex(GraphIdentityCollisionError, "identity_collision"):
             store.add("skill", "skill:sample", {"id": "different"})
+        with self.assertRaisesRegex(
+            GraphIdentityCollisionError, "payload_duplicate:skill:skill:sample"
+        ):
+            store.add("phase", "phase:sample", {"id": "sample"})
         with self.assertRaisesRegex(GraphDigestMismatchError, "digest_mismatch"):
             store.require({"id": first["id"], "digest": "0" * 64})
+
+    def test_canonical_bytes_sort_maps_and_normalize_identifier_aliases(self) -> None:
+        """Nested insertion order and approved Unicode identifier aliases are stable."""
+        first = {
+            "z": {"b": 2, "a": 1},
+            "id": "Ｆｏｏ",
+            "alias": "ＦＯＯ",
+        }
+        second = {
+            "alias": "foo",
+            "id": "foo",
+            "z": {"a": 1, "b": 2},
+        }
+        self.assertEqual(_canonical_bytes(first), _canonical_bytes(second))
+        self.assertEqual(_normalize_identifier("Ｆｏｏ"), "foo")
 
     def test_cross_checkout_reproducibility_and_no_absolute_runtime_paths(self) -> None:
         """The logical graph is unchanged when the checkout root changes."""
@@ -225,6 +252,39 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         self.assertEqual(
             graph["coverage"]["source_counts"], graph["coverage"]["readback_counts"]
         )
+
+    def test_mermaid_syntax_removal_fails_even_when_comments_remain(self) -> None:
+        """Actual node and edge statements, not comments, are the readback authority."""
+        graph = build_graph(PROJECT_ROOT)
+        markdown = render_graph_mermaid(graph)
+        node_line = next(
+            line
+            for line in markdown.splitlines()
+            if line.lstrip().startswith("n_skill_dependency_design[")
+        )
+        without_node = markdown.replace(node_line + "\n", "", 1)
+        with self.assertRaisesRegex(ValueError, "actual_node"):
+            readback_mermaid(graph, without_node)
+        edge_line = next(
+            line
+            for line in markdown.splitlines()
+            if line.strip().startswith("n_") and "-->" in line
+        )
+        without_edge = markdown.replace(edge_line + "\n", "", 1)
+        with self.assertRaisesRegex(ValueError, "actual_edge"):
+            readback_mermaid(graph, without_edge)
+
+    def test_json_digest_preimage_excludes_downstream_artifact_fields(self) -> None:
+        """JSON self/readback/Mermaid fields remain outside the acyclic preimage."""
+        graph = build_graph(PROJECT_ROOT)
+        baseline = _json_digest_from_graph(graph)
+        changed = copy.deepcopy(graph)
+        changed["mermaid_digest"] = "f" * 64
+        changed["readback"]["mermaid_digest"] = "e" * 64
+        changed["readback"]["json_digest"] = "d" * 64
+        self.assertEqual(_json_digest_from_graph(changed), baseline)
+        changed["artifact_id"] = "edited"
+        self.assertNotEqual(_json_digest_from_graph(changed), baseline)
 
     def test_checker_rejects_stale_json_mermaid_and_dependency_design_omission(
         self,
@@ -258,13 +318,6 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         finally:
             markdown_path.write_text(original_markdown, encoding="utf-8")
             json_path.write_text(original_json, encoding="utf-8")
-
-    def test_capacity_error_does_not_prune_graph(self) -> None:
-        """A small capacity produces the typed failure rather than an incomplete graph."""
-        with self.assertRaisesRegex(
-            GraphCapacityError, "skill_tool_invocation_graph_capacity_exceeded"
-        ):
-            build_graph(PROJECT_ROOT, capacity=1)
 
 
 if __name__ == "__main__":

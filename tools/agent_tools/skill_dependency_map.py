@@ -33,6 +33,7 @@ import yaml
 from agent_canon_source_root import resolve_agent_canon_source_root
 from skill_route_catalog import (
     SKILL_DEPENDENCY_MAP_PATH,
+    VISUALIZATION_ADAPTER_TOOL_IDS,
     VISUALIZATION_DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA,
     VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID,
     VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
@@ -47,6 +48,7 @@ from skill_route_catalog import (
 )
 from skill_tool_commands import SkillCommandPacket, packet_for_skill
 from visualization_contract import (
+    TOOL_ARGUMENT_SCHEMAS,
     VisualizationSourceItem,
     build_source_universe,
     serialize_tool_call,
@@ -59,7 +61,6 @@ GRAPH_SCHEMA = "agent_canon.skill_tool_invocation_graph.v2"
 CHECK_SCHEMA = "agent_canon.skill_tool_invocation_check.v1"
 GRAPH_ARTIFACT_ID = "skill-tool-invocation-graph"
 GRAPH_RENDERER_ID = VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID
-GRAPH_CAPACITY = 8192
 PHASES = ("required", "conditional", "maintenance")
 EDGE_TYPES = (
     "prerequisite",
@@ -69,6 +70,22 @@ EDGE_TYPES = (
     "parallel",
     "invocation",
     "tool-resolution",
+)
+DESIGN_LOCATOR = "documents/design/skill-tool-invocation-graph.md"
+DESIGN_CLAUSE_IDS = tuple(f"SG-{index:03d}" for index in range(1, 16))
+DIC_CLAUSE_IDS = tuple(f"DIC-{index:03d}" for index in range(1, 10))
+IMPLEMENTATION_TRACE_PATHS = (
+    "agents/skills/catalog.yaml",
+    "documents/design/skill-tool-invocation-graph.md",
+    "documents/runtime/skill-dependency-graph.json",
+    "documents/runtime/skill-dependency-graph.md",
+    "tests/agent_tools/test_route.py",
+    "tests/agent_tools/test_skill_dependency_map.py",
+    "tools/agent_tools/check_skill_tool_invocation_graph.py",
+    "tools/agent_tools/capability_route.py",
+    "tools/agent_tools/route.py",
+    "tools/agent_tools/skill_dependency_map.py",
+    "tools/agent_tools/skill_route_catalog.py",
 )
 SOURCE_KINDS = (
     "identity",
@@ -98,18 +115,34 @@ MERMAID_HEADER_RE = re.compile(
     r"^<!-- graph_digest=([0-9a-f]{64}) coverage_digest=([0-9a-f]{64}) -->$"
 )
 MERMAID_KV_RE = re.compile(r"([a-z_]+)=([^ ]+)")
+MERMAID_NODE_RE = re.compile(
+    r'^\s+(n_[A-Za-z0-9_]+)(?:\[\["(.*)"\]\]|\["(.*)"\]|\{"(.*)"\})$'
+)
+MERMAID_EDGE_RE = re.compile(
+    r'^\s+(n_[A-Za-z0-9_]+)\s+(-\.->|-->)\|"(.*)"\|\s+(n_[A-Za-z0-9_]+)$'
+)
+MERMAID_REF_LABEL_RE = re.compile(r"^(.*) \(ref=([0-9a-f]{64})\)$")
+MERMAID_ORDERED_LABEL_RE = re.compile(r"^(.*) \(order=([0-9]+); ref=([0-9a-f]{64})\)$")
 
-
-class GraphCapacityError(ValueError):
-    """Typed fail-closed renderer capacity error."""
-
-    code = "skill_tool_invocation_graph_capacity_exceeded"
-
-    def __init__(self, observed: int, capacity: int) -> None:
-        """Initialize a stable capacity diagnostic."""
-        self.observed = observed
-        self.capacity = capacity
-        super().__init__(f"{self.code}:observed={observed}:capacity={capacity}")
+_IDENTIFIER_FIELDS = frozenset(
+    {
+        "adapter_id",
+        "alias",
+        "alias_of",
+        "argument_schema_id",
+        "capability_id",
+        "edge_id",
+        "id",
+        "kind",
+        "owner_id",
+        "phase_id",
+        "schema",
+        "skill_id",
+        "source_id",
+        "target_id",
+        "tool_id",
+    }
+)
 
 
 class GraphIdentityError(ValueError):
@@ -146,26 +179,39 @@ class GraphDigestMismatchError(GraphIdentityError):
         super().__init__("digest_mismatch", detail)
 
 
-def _unicode(value: object) -> object:
-    """Normalize strings to NFC while retaining ordered JSON containers."""
+def _normalize_identifier(value: str) -> str:
+    """Apply the approved NFKC/casefold identifier normalization."""
+    if not isinstance(value, str):
+        raise TypeError("identifier must be a string")
+    return unicodedata.normalize("NFKC", value).casefold()
+
+
+def _canonicalize(value: object, field: str | None = None) -> object:
+    """Normalize display text and identifiers recursively before sorting maps."""
     if isinstance(value, str):
+        if field in _IDENTIFIER_FIELDS:
+            return _normalize_identifier(value)
         return unicodedata.normalize("NFC", value)
     if isinstance(value, Mapping):
         return {
-            unicodedata.normalize("NFC", str(key)): _unicode(item)
+            unicodedata.normalize("NFC", str(key)): _canonicalize(item, str(key))
             for key, item in value.items()
         }
     if isinstance(value, list):
-        return [_unicode(item) for item in value]
+        return [_canonicalize(item, field) for item in value]
     if isinstance(value, tuple):
-        return [_unicode(item) for item in value]
+        return [_canonicalize(item, field) for item in value]
     return value
 
 
 def _canonical_bytes(value: object) -> bytes:
-    """Serialize compact canonical UTF-8 bytes without a trailing newline."""
+    """Serialize compact UTF-8 bytes with recursively sorted mapping keys."""
     return json.dumps(
-        _unicode(value), ensure_ascii=False, separators=(",", ":")
+        _canonicalize(value),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
     ).encode("utf-8")
 
 
@@ -185,8 +231,8 @@ def _identity_preimage(identity_id: str, kind: str, payload: object) -> bytes:
         (
             b"agent-canon",
             b"skill-tool-invocation-graph.v2",
-            unicodedata.normalize("NFC", identity_id).encode("utf-8"),
-            unicodedata.normalize("NFC", kind).encode("utf-8"),
+            _normalize_identifier(identity_id).encode("utf-8"),
+            _normalize_identifier(kind).encode("utf-8"),
             _canonical_bytes(payload),
         )
     )
@@ -210,7 +256,7 @@ class _IdentityStore:
         self.records: list[dict[str, object]] = []
         self._by_key: dict[tuple[str, str], dict[str, object]] = {}
         self._by_digest: dict[str, bytes] = {}
-        self._by_payload: dict[tuple[str, bytes], str] = {}
+        self._by_payload: dict[bytes, tuple[str, str]] = {}
 
     def add(
         self, kind: str, identity_id: str, payload: Mapping[str, object]
@@ -218,10 +264,12 @@ class _IdentityStore:
         """Add or reuse one identity, rejecting collisions and payload duplication."""
         if kind not in IDENTITY_KINDS:
             raise ValueError(f"invalid_identity_kind:{kind}")
-        normalized = cast(Mapping[str, object], _unicode(dict(payload)))
-        preimage = _identity_preimage(identity_id, kind, normalized)
+        canonical_kind = _normalize_identifier(kind)
+        canonical_id = _normalize_identifier(identity_id)
+        normalized = cast(Mapping[str, object], _canonicalize(dict(payload)))
+        preimage = _identity_preimage(canonical_id, canonical_kind, normalized)
         digest = hashlib.sha256(preimage).hexdigest()
-        key = (kind, identity_id)
+        key = (canonical_kind, canonical_id)
         existing = self._by_key.get(key)
         if existing is not None:
             if (
@@ -233,22 +281,23 @@ class _IdentityStore:
         old_preimage = self._by_digest.get(digest)
         if old_preimage is not None and old_preimage != preimage:
             raise GraphDigestCollisionError(digest)
-        payload_key = (kind, _canonical_bytes(normalized))
-        old_id = self._by_payload.get(payload_key)
-        if old_id is not None:
+        payload_key = _canonical_bytes(normalized)
+        old_identity = self._by_payload.get(payload_key)
+        if old_identity is not None:
+            old_kind, old_id = old_identity
             raise GraphIdentityCollisionError(
-                f"payload_duplicate:{kind}:{old_id}:{identity_id}"
+                f"payload_duplicate:{old_kind}:{old_id}:{canonical_kind}:{canonical_id}"
             )
         record: dict[str, object] = {
-            "id": identity_id,
+            "id": canonical_id,
             "digest": digest,
-            "kind": kind,
+            "kind": canonical_kind,
             "canonical_payload": dict(normalized),
         }
         self.records.append(record)
         self._by_key[key] = record
         self._by_digest[digest] = preimage
-        self._by_payload[payload_key] = identity_id
+        self._by_payload[payload_key] = (canonical_kind, canonical_id)
         return _ref(record)
 
     def require(self, reference: Mapping[str, object]) -> dict[str, object]:
@@ -257,14 +306,15 @@ class _IdentityStore:
         digest = reference.get("digest")
         if not isinstance(identity_id, str) or not isinstance(digest, str):
             raise GraphDigestMismatchError("malformed_ref")
-        matches = [record for record in self.records if record["id"] == identity_id]
+        canonical_id = _normalize_identifier(identity_id)
+        matches = [record for record in self.records if record["id"] == canonical_id]
         if len(matches) != 1:
             raise GraphDigestMismatchError(f"missing_ref:{identity_id}")
         record = matches[0]
         if record["digest"] != digest:
             raise GraphDigestMismatchError(f"ref:{identity_id}")
         expected = _identity_digest(
-            identity_id,
+            canonical_id,
             cast(str, record["kind"]),
             cast(Mapping[str, object], record["canonical_payload"]),
         )
@@ -632,9 +682,43 @@ def _validate_reader_parity(root: Path) -> None:
         raise ValueError("skills_md_link_parity:" + ",".join(missing))
 
 
-def build_graph(root: Path, *, capacity: int = GRAPH_CAPACITY) -> dict[str, object]:
+def _validate_design_correspondence(root: Path) -> dict[str, object]:
+    """Require forward and reverse trace coverage before materialization."""
+    design_path = root / DESIGN_LOCATOR
+    if not design_path.is_file():
+        raise ValueError("design_correspondence_missing:design_locator")
+    design_text = design_path.read_text(encoding="utf-8")
+    required_tokens = (*DESIGN_CLAUSE_IDS, *DIC_CLAUSE_IDS, *IMPLEMENTATION_TRACE_PATHS)
+    missing = [token for token in required_tokens if token not in design_text]
+    adapter_pairs = tuple(
+        (tool_id, TOOL_ARGUMENT_SCHEMAS[tool_id])
+        for tool_id in VISUALIZATION_ADAPTER_TOOL_IDS
+    )
+    missing_pairs = [
+        f"{tool_id}|{argument_schema}"
+        for tool_id, argument_schema in adapter_pairs
+        if tool_id not in design_text or argument_schema not in design_text
+    ]
+    if missing or missing_pairs:
+        detail = ",".join((*missing, *missing_pairs))
+        raise ValueError(f"design_correspondence_missing:{detail}")
+    return {
+        "design_locator": DESIGN_LOCATOR,
+        "design_sha256": _file_digest(root, DESIGN_LOCATOR),
+        "clause_ids": list(DESIGN_CLAUSE_IDS),
+        "dic_clause_ids": list(DIC_CLAUSE_IDS),
+        "implementation_target_paths": list(IMPLEMENTATION_TRACE_PATHS),
+        "adapter_pairs": [
+            {"tool_id": tool_id, "argument_schema": argument_schema}
+            for tool_id, argument_schema in adapter_pairs
+        ],
+    }
+
+
+def build_graph(root: Path) -> dict[str, object]:
     """Build the complete v2 graph without truncating any source identity."""
     _validate_reader_parity(root)
+    design_correspondence = _validate_design_correspondence(root)
     catalog = load_skill_catalog(root)
     skill_ids = tuple(
         cast(str, cast(Mapping[str, object], entry)["id"])
@@ -1087,6 +1171,7 @@ def build_graph(root: Path, *, capacity: int = GRAPH_CAPACITY) -> dict[str, obje
         "source_snapshot": source_snapshot,
         "source_inventory": source_inventory,
         "source_counts": _source_counts(source_inventory),
+        "design_correspondence": design_correspondence,
         "responsibility_groups": {
             skill: rules[skill].responsibility_group for skill in skill_ids
         },
@@ -1195,15 +1280,12 @@ def build_graph(root: Path, *, capacity: int = GRAPH_CAPACITY) -> dict[str, obje
         {
             key: value
             for key, value in graph.items()
-            if key not in {"json_digest", "readback"}
+            if key not in {"json_digest", "readback", "mermaid_digest"}
         }
     )
     graph["readback"] = dict(cast(Mapping[str, object], graph["readback"]))
     cast(dict[str, object], graph["readback"])["json_digest"] = graph["json_digest"]
     _validate_projection_refs(graph, identities)
-    observed = len(identities.records) + len(edges) + len(source_inventory)
-    if observed > capacity:
-        raise GraphCapacityError(observed, capacity)
     return graph
 
 
@@ -1225,6 +1307,26 @@ def _projection_nodes(
         ):
             result.append((kind, item, index))
     return result
+
+
+def _rendered_node_label(item: Mapping[str, object]) -> str:
+    """Render a node's display, order, and digest into actual Mermaid syntax."""
+    reference = cast(Mapping[str, object], item["ref"])
+    display = _mermaid_label(cast(str, item["display_label"]))
+    digest = cast(str, reference["digest"])
+    if "order" in item:
+        return f"{display} (order={item['order']}; ref={digest})"
+    return f"{display} (ref={digest})"
+
+
+def _rendered_edge_label(
+    edge: Mapping[str, object], payload: Mapping[str, object]
+) -> str:
+    """Render an edge's type, order, and digest into actual Mermaid syntax."""
+    edge_ref = cast(Mapping[str, object], edge["edge_ref"])
+    return (
+        f"{edge['display_label']} (order={payload['order']}; ref={edge_ref['digest']})"
+    )
 
 
 def render_graph_mermaid(graph: Mapping[str, object]) -> str:
@@ -1259,7 +1361,7 @@ def render_graph_mermaid(graph: Mapping[str, object]) -> str:
                 f"    %% node kind=skill id={identity_id} digest={reference['digest']} order={item['order']}"
             )
             lines.append(
-                f'    {_safe_mermaid_id(identity_id)}["{_mermaid_label(cast(str, item["display_label"]))} (#{item["order"]})"]'
+                f'    {_safe_mermaid_id(identity_id)}["{_rendered_node_label(item)}"]'
             )
         lines.append("  end")
     for phase in PHASES:
@@ -1272,7 +1374,7 @@ def render_graph_mermaid(graph: Mapping[str, object]) -> str:
                     f"    %% node kind=phase id={identity_id} digest={reference['digest']} order={item['order']}"
                 )
                 lines.append(
-                    f'    {_safe_mermaid_id(identity_id)}{{"{_mermaid_label(cast(str, item["display_label"]))}"}}'
+                    f'    {_safe_mermaid_id(identity_id)}{{"{_rendered_node_label(item)}"}}'
                 )
         for item in cast(Sequence[Mapping[str, object]], graph["commands"]):
             identity_id = cast(str, cast(Mapping[str, object], item["ref"])["id"])
@@ -1290,7 +1392,7 @@ def render_graph_mermaid(graph: Mapping[str, object]) -> str:
                     f"    %% node kind=command id={identity_id} digest={reference['digest']} order={item['order']}"
                 )
                 lines.append(
-                    f'    {_safe_mermaid_id(identity_id)}["{_mermaid_label(cast(str, item["display_label"]))}"]'
+                    f'    {_safe_mermaid_id(identity_id)}["{_rendered_node_label(item)}"]'
                 )
         lines.append("  end")
     for kind, field, title, shape in (
@@ -1310,7 +1412,7 @@ def render_graph_mermaid(graph: Mapping[str, object]) -> str:
                 f"    %% node kind={kind} id={identity_id} digest={reference['digest']} order={order}"
             )
             lines.append(
-                f'    {_safe_mermaid_id(identity_id)}{shape}"{_mermaid_label(cast(str, item["display_label"]))}"]]'
+                f'    {_safe_mermaid_id(identity_id)}{shape}"{_rendered_node_label(item)}"]]'
             )
         lines.append("  end")
     for index, source in enumerate(
@@ -1336,7 +1438,7 @@ def render_graph_mermaid(graph: Mapping[str, object]) -> str:
             f"  %% edge id={edge_ref['id']} digest={edge_ref['digest']} type={edge['display_label']} source={source_id} source_digest={source_ref['digest']} target={target_id} target_digest={target_ref['digest']} order={payload['order']}"
         )
         lines.append(
-            f'  {_safe_mermaid_id(source_id)} {line_type}|"{edge["display_label"]}"| {_safe_mermaid_id(target_id)}'
+            f'  {_safe_mermaid_id(source_id)} {line_type}|"{_rendered_edge_label(edge, payload)}"| {_safe_mermaid_id(target_id)}'
         )
     lines.extend(
         [
@@ -1388,9 +1490,66 @@ def _parse_mermaid_metadata(
     return header, nodes, edges, sources
 
 
+def _parse_mermaid_syntax(
+    text: str,
+) -> tuple[dict[str, str], list[dict[str, str]]]:
+    """Parse actual Mermaid node/edge statements, never their comments."""
+    lines = text.splitlines()
+    try:
+        start = lines.index("```mermaid") + 1
+        end = lines.index("```", start)
+    except ValueError as exc:
+        raise ValueError("mermaid_readback_block_or_header") from exc
+    actual_nodes: dict[str, str] = {}
+    actual_edges: list[dict[str, str]] = []
+    for line in lines[start:end]:
+        if line.lstrip().startswith("%%"):
+            continue
+        node_match = MERMAID_NODE_RE.match(line)
+        edge_match = MERMAID_EDGE_RE.match(line)
+        if node_match is not None:
+            label = next(
+                group for group in node_match.groups()[1:] if group is not None
+            )
+            node_id = node_match.group(1)
+            if node_id in actual_nodes:
+                raise ValueError(f"mermaid_readback_duplicate_node:{node_id}")
+            actual_nodes[node_id] = label
+        elif edge_match is not None:
+            actual_edges.append(
+                {
+                    "source": edge_match.group(1),
+                    "arrow": edge_match.group(2),
+                    "label": edge_match.group(3),
+                    "target": edge_match.group(4),
+                }
+            )
+    return actual_nodes, actual_edges
+
+
+def _parse_actual_node_label(label: str) -> tuple[str, int | None, str]:
+    """Recover actual display, order, and digest from a Mermaid node label."""
+    ordered = MERMAID_ORDERED_LABEL_RE.fullmatch(label)
+    if ordered is not None:
+        return ordered.group(1), int(ordered.group(2)), ordered.group(3)
+    plain = MERMAID_REF_LABEL_RE.fullmatch(label)
+    if plain is not None:
+        return plain.group(1), None, plain.group(2)
+    raise ValueError("mermaid_readback_node_label_missing_ref")
+
+
+def _parse_actual_edge_label(label: str) -> tuple[str, int, str]:
+    """Recover actual edge type, order, and digest from a Mermaid edge label."""
+    match = re.fullmatch(r"(.*) \(order=([0-9]+); ref=([0-9a-f]{64})\)", label)
+    if match is None:
+        raise ValueError("mermaid_readback_edge_label_missing_ref")
+    return match.group(1), int(match.group(2)), match.group(3)
+
+
 def readback_mermaid(graph: Mapping[str, object], text: str) -> dict[str, object]:
     """Compare actual Mermaid node/edge/source refs, order, and digests."""
     header, nodes, edges, sources = _parse_mermaid_metadata(text)
+    actual_nodes, actual_edges = _parse_mermaid_syntax(text)
     coverage_ref = cast(
         Mapping[str, object], cast(Mapping[str, object], graph["coverage"])["ref"]
     )
@@ -1399,6 +1558,60 @@ def readback_mermaid(graph: Mapping[str, object], text: str) -> dict[str, object
         "coverage_digest": coverage_ref["digest"],
     }:
         raise ValueError("mermaid_readback_digest_mismatch")
+    expected_actual_nodes: dict[str, tuple[str, int | None, str]] = {}
+    for kind, item, _index in _projection_nodes(graph):
+        reference = cast(Mapping[str, object], item["ref"])
+        expected_actual_nodes[_safe_mermaid_id(cast(str, reference["id"]))] = (
+            _mermaid_label(cast(str, item["display_label"])),
+            cast(int, item["order"]) if "order" in item else None,
+            cast(str, reference["digest"]),
+        )
+    observed_actual_nodes = {
+        node_id: _parse_actual_node_label(label)
+        for node_id, label in actual_nodes.items()
+    }
+    if observed_actual_nodes != expected_actual_nodes:
+        raise ValueError("mermaid_readback_actual_node_order_or_digest_mismatch")
+    identity_by_id = {
+        cast(str, record["id"]): record
+        for record in cast(Sequence[Mapping[str, object]], graph["identity_records"])
+    }
+    expected_actual_edges: set[tuple[str, str, str, str, str, int]] = set()
+    for item in cast(Sequence[Mapping[str, object]], graph["edges"]):
+        edge_ref = cast(Mapping[str, object], item["edge_ref"])
+        source_ref = cast(Mapping[str, object], item["source_ref"])
+        target_ref = cast(Mapping[str, object], item["target_ref"])
+        payload = cast(
+            Mapping[str, object],
+            identity_by_id[cast(str, edge_ref["id"])]["canonical_payload"],
+        )
+        expected_actual_edges.add(
+            (
+                _safe_mermaid_id(cast(str, source_ref["id"])),
+                "-.->" if item["display_label"] in {"routing", "parallel"} else "-->",
+                _safe_mermaid_id(cast(str, target_ref["id"])),
+                cast(str, item["display_label"]),
+                cast(str, edge_ref["digest"]),
+                cast(int, payload["order"]),
+            )
+        )
+    observed_actual_edges: set[tuple[str, str, str, str, str, int]] = set()
+    for item in actual_edges:
+        edge_type, order, digest = _parse_actual_edge_label(item["label"])
+        observed_actual_edges.add(
+            (
+                item["source"],
+                item["arrow"],
+                item["target"],
+                edge_type,
+                digest,
+                order,
+            )
+        )
+    if observed_actual_edges != expected_actual_edges or len(actual_edges) != len(
+        expected_actual_edges
+    ):
+        raise ValueError("mermaid_readback_actual_edge_order_or_digest_mismatch")
     expected_nodes = {
         (
             kind,
@@ -1414,10 +1627,6 @@ def readback_mermaid(graph: Mapping[str, object], text: str) -> dict[str, object
     if observed_nodes != expected_nodes:
         raise ValueError("mermaid_readback_node_ref_mismatch")
     expected_edges = set()
-    identity_by_id = {
-        cast(str, record["id"]): record
-        for record in cast(Sequence[Mapping[str, object]], graph["identity_records"])
-    }
     for item in cast(Sequence[Mapping[str, object]], graph["edges"]):
         edge_ref = cast(Mapping[str, object], item["edge_ref"])
         source_ref = cast(Mapping[str, object], item["source_ref"])
@@ -1545,21 +1754,21 @@ def _json_text(graph: Mapping[str, object]) -> str:
 
 
 def _json_digest_from_graph(graph: Mapping[str, object]) -> str:
-    """Compute JSON digest without downstream readback or its own digest."""
+    """Compute JSON digest without downstream artifact/readback digests."""
     return _digest(
         {
             key: value
             for key, value in graph.items()
-            if key not in {"json_digest", "readback"}
+            if key not in {"json_digest", "readback", "mermaid_digest"}
         }
     )
 
 
 def write_artifacts(
-    root: Path, *, output: Path | None = None, capacity: int = GRAPH_CAPACITY
+    root: Path, *, output: Path | None = None
 ) -> tuple[Path, Path, dict[str, object]]:
     """Generate both canonical graph artifacts."""
-    graph = build_graph(root, capacity=capacity)
+    graph = build_graph(root)
     markdown, json_path = _artifact_paths(root, output)
     markdown.parent.mkdir(parents=True, exist_ok=True)
     json_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1587,9 +1796,9 @@ def _validate_loaded_graph(machine: Mapping[str, object]) -> None:
         raise ValueError("json_digest:mismatch")
 
 
-def check_artifacts(root: Path, *, capacity: int = GRAPH_CAPACITY) -> dict[str, object]:
+def check_artifacts(root: Path) -> dict[str, object]:
     """Fail closed on missing, edited, stale, or dependency-design-omitting artifacts."""
-    expected = build_graph(root, capacity=capacity)
+    expected = build_graph(root)
     markdown, json_path = _artifact_paths(root)
     findings: list[str] = []
     if not markdown.is_file():
@@ -1645,7 +1854,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     graph_parser.add_argument("--root", type=Path, default=DEFAULT_ROOT)
     graph_parser.add_argument("--output", type=Path, default=None)
-    graph_parser.add_argument("--capacity", type=int, default=GRAPH_CAPACITY)
     return parser
 
 
@@ -1663,16 +1871,11 @@ def main(argv: list[str] | None = None) -> int:
                 f"SKILL_TOOL_INVOCATION_GRAPH=pass schema={GRAPH_SCHEMA} skills={skill_count} edges={edge_count} parallel_edges={parallel_count} json={DEFAULT_JSON_PATH} mermaid={DEFAULT_GRAPH_PATH}"
             )
             return 0
-        markdown, json_path, graph = write_artifacts(
-            root, output=args.output, capacity=args.capacity
-        )
+        markdown, json_path, graph = write_artifacts(root, output=args.output)
         print(
             f"SKILL_TOOL_INVOCATION_GRAPH=pass schema={GRAPH_SCHEMA} skills={graph['skill_count']} commands={len(graph['commands'])} tools={len(graph['tools'])} edges={len(graph['edges'])} json={json_path} mermaid={markdown}"
         )
         return 0
-    except GraphCapacityError as exc:
-        print(f"SKILL_TOOL_INVOCATION_GRAPH=fail code={exc}", file=sys.stderr)
-        return 3
     except (OSError, ValueError, yaml.YAMLError) as exc:
         print(f"SKILL_TOOL_INVOCATION_GRAPH=fail reason={exc}", file=sys.stderr)
         return 2
