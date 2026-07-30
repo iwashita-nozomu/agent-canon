@@ -1,87 +1,45 @@
 ---
 name: computational-optimization
-description: Use when designing, implementing, reviewing, or diagnosing numerical optimization, solvers, preconditioners, convergence, gradients, Jacobians, Hessians, KKT conditions, tolerances, or optimization benchmarks; fixes the mathematical and validation contract before code or experiment changes.
+description: "Use when designing, implementing, reviewing, or diagnosing numerical optimization, solvers, preconditioners, convergence, gradients, Jacobians, Hessians, KKT conditions, tolerances, or optimization benchmarks; fixes the mathematical and validation contract before code or experiment changes."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:computational-optimization -->
+<!-- canonical: agents/skills/computational-optimization.md sha256=0c70d53b1fc9100fcd6b1c1b8f7e63238bf6fdaffbeb9da0b8c42b9a56c16336 -->
+<!-- route: agents/skills/catalog.yaml#skill:computational-optimization.routing digest=3cd1e4900875547f684079e08bf0383aca540e652b56f911493a9b7e4231b27f -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:computational-optimization digest=7513bdc9961d503677724d22a087ed8075b4e8e1c91a5f543cbb45e1d8264a4e -->
+<!-- commands: agents/skills/catalog.yaml#skill:computational-optimization.tool_commands digest=f017a3cded113d914f275481c9203eddcd67eaee0a5fd48bc3e4915b3f5c37ea -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Computational Optimization for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
-upstream design ../../../agents/skills/computational-optimization.md human-facing skill contract
-upstream design ../../../agents/skills/research-workflow.md research outer-loop boundary
-upstream design ../../../agents/skills/experiment-lifecycle.md experiment execution boundary
-upstream design ../../../agents/skills/test-design.md adversarial test design boundary
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/computational-optimization.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
+# computational-optimization
 
-# Computational Optimization
+## Canonical Skill
+
+Canonical workflow and policy: [computational-optimization](../../../agents/skills/computational-optimization.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill computational-optimization --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill computational-optimization --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `f017a3cded113d914f275481c9203eddcd67eaee0a5fd48bc3e4915b3f5c37ea`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/computational-optimization.md`.
-1. Use this skill for optimizer, solver, preconditioner, residual, KKT, convergence, derivative, tolerance, or numerical benchmark work.
-1. Before implementation or experiment runs, fix an optimization contract: objective or residual, variables, constraints, derivatives, algorithm state, stopping policy, numerical invariants, and failure semantics.
-1. Route mathematical runtime checks, diagnostic gates, stopping checks, test
-   oracles, and proof obligations through the `mathematical necessity gate`:
-   connect each one to the public contract, iteration map, stopping scalar,
-   failure semantics, accepted theorem target, or approved design acceptance
-   criterion before adding it to implementation or validation evidence.
-1. For iterative solvers, treat convergence evidence as a theorem about the
-   implemented iteration map and stopping scalar, e.g.
-   `z_next = Step_impl(Problem, Config, z)` and
-   `R_impl(Problem, Config, z)`. If this map cannot satisfy the target theorem
-   under the accepted problem/config/backend assumptions, change the algorithmic
-   mechanism itself. Do not add proof-only `Info` fields, diagnostic gates, or
-   extra runtime checks merely to satisfy the proof.
-1. When tool-side routing returns `numerical_iterative_algorithm_contract`, build
-   an explicit route packet before code changes: `iteration_map`,
-   `stopping_scalar`, `state_tuple`, `reuse_surface`, `failure_semantics`, and
-   `validation_surface`. Prefer existing solver/library/framework primitives or
-   repo helpers as the first implementation surface, and keep correctness
-   validation separate from experiment or benchmark evidence.
-1. For algorithm fixes, enter through the optimization contract and implemented
-   mechanism before changing tests. Record the public entrypoint, recurrence or
-   state transition, invariant, stopping or acceptance scalar, and failure
-   semantics; then select the code-side repair route. Existing tests are
-   symptom and placement evidence, while expected values, tolerances, and new
-   oracle cases are updated after the algorithm route is fixed.
-1. Do not make the theorem pass by fixing the backend, device, compiler route,
-   runtime target, or dtype unless the user request, approved design, runtime
-   profile, public API, or config explicitly fixes that backend. Backend-specific
-   data is evidence for the active profile, not a replacement for the
-   optimization contract. Missing backend evidence is
-   `backend_evidence_blocker`.
-1. For JAX/XLA/IREE iterative solvers, keep lowering-friendly loop structure in
-   the implementation: do not feed residual / convergence / breakdown status
-   produced inside `lax.while_loop` back into the next `cond`, and normalize
-   Python scalar settings to dtype-specific JAX arrays at the JIT boundary. Use
-   `documents/conventions/python/15_jax_rules.md` as the detailed code-writing
-   rule.
-1. If the task includes external method comparison or claims, also use `$research-workflow`; if it includes a concrete run protocol or rerun decision, also use `$experiment-lifecycle`.
-1. If code changes are needed, use `$test-design` after the optimization
-   contract and algorithmic repair route are fixed, and include exact small
-   cases, ill-conditioned cases, constraint-boundary cases, derivative checks,
-   non-finite guards, and not-converged status handling when relevant.
-1. Do not green numerical tests by relaxing tolerances, deleting assertions,
-   skipping cases, changing expected values to match current output, or running
-   computational tests on CPU; using CPU as substitute evidence is a validation
-   blocker, not pass evidence. Solver, optimizer, JAX/XLA/IREE lowering,
-   convergence, residual, benchmark, and experiment validation must run on the
-   GPU target or be recorded as `gpu_validation_blocker=<reason>`.
-1. Diagnose failed runs by first bad iteration, finite state before failure, residual components, reference norm, tolerance, status flag, and unconfirmed hypotheses; do not infer cause only from the final NaN, Inf, or residual.
-1. Keep correctness evidence separate from performance evidence; benchmark claims need reproducibility and confounder review.
-1. Route review by risk: `scientific_computing_reviewer` for math/numerical risk, `benchmark_reviewer` for performance claims, `$python-review` or `$cpp-review` for implementation diffs, and `$report-writing` for reader-facing claims.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

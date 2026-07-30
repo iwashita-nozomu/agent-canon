@@ -1,63 +1,45 @@
 ---
 name: dependency-module-change
-description: Use when a dependency source change, topic branch clone, or reconstructibility-based clone cleanup is required.
+description: "Use when a dependency source change, topic branch clone, or reconstructibility-based clone cleanup is required."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:dependency-module-change -->
+<!-- canonical: agents/skills/dependency-module-change.md sha256=b3e465fe9ddb6bd549150755cab979652501c0aa5970f05e6a0aef66a070ddef -->
+<!-- route: agents/skills/catalog.yaml#skill:dependency-module-change.routing digest=480ca2a53bcef269adb16b237607f3d3be00c07de3ab35c544a8a6351c2c7705 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:dependency-module-change digest=73f5b1d62b4728d1bfe316aefa66846e46b69218f5bece3c11ac8a4cad8d1e12 -->
+<!-- commands: agents/skills/catalog.yaml#skill:dependency-module-change.tool_commands digest=1e039b7e06b6ad59fbbf4d6b9d7b6836e5e5f81a7bcf9316f992573d6a00afa4 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Routes dependency module changes to the general source-clone policy and lifecycle tool.
-upstream design ../../../documents/rule/dependency-module-changes.md generic dependency module change policy
-upstream design ../../../agents/skills/catalog.yaml public skill registry and routing metadata
-upstream implementation ../../../tools/agent_tools/dependency_module_change.py lifecycle tool
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/dependency-module-change.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
-# Dependency Module Change
+# dependency-module-change
+
+## Canonical Skill
+
+Canonical workflow and policy: [dependency-module-change](../../../agents/skills/dependency-module-change.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill dependency-module-change --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill dependency-module-change --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `1e039b7e06b6ad59fbbf4d6b9d7b6836e5e5f81a7bcf9316f992573d6a00afa4`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-1. Read `documents/rule/dependency-module-changes.md` as the only detailed policy owner.
-   Its [`AgentCanon parent state decision table`](../../../documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table)
-   owns parent state and dirty fallback topic identity; this runtime shim does
-   not duplicate that table.
-1. Classify the work as source-edit, pin/update, or read-only. Create/reuse a topic workspace clone only for an owner-evidenced source edit, and require `--topic`, `--module`, `--branch`, and `--owner-evidence`; use `--parent-branch` for a pin PR branch.
-1. In parent mode, source-edit default route is `vendor/<module>` on a topic-named
-   branch. `workspace/<topic-slug>/<module-basename>` fallback is used only when that
-   parent vendor checkout is occupied by another topic's dirty state. `main` 上の
-   親 vendor は source 編集の開始点とせず、topic branch の作成へ遷移します。
-   Parent pin/root projection is a separate pass state: clean `main` with
-   submodule worktree `HEAD == :$PREFIX` from the staged index.
-   When the parent packet proves independent replaceable responsibilities with disjoint
-   write scope, dependency/merge order, validation route, and reviewer ownership, the
-   parent may explicitly select `prepare --placement workspace` even when vendor is
-   clean. That typed fresh route creates only the computed
-   `workspace/<topic-slug>/<module-basename>` clone from latest `origin/main`, and
-   refuses an existing local or remote task branch. A continuation must use the separate
-   `--placement workspace-continuation` route; the fresh route does not continue implicitly.
-   Neither route creates a parent clone or a compatibility path.
-1. For dependency source recovery on corrupted state, wrong write target, merge-conflict
-   failure, or unexpected delta, do not reverse patch/restore. Rebuild from
-   `origin/main` clean checkout, re-apply intended topic commits only, and
-   reopen a successor branch/PR if unmaterialized diff remains.
-1. Use `cleanup` as a dry-run first. Apply deletion only with the exact expected clone path and the required same-command authority environment; its remote reconstructibility gate is independent of PR/pin/root-sync state.
-   When PR merge/readback deleted the topic branch but local commits remain, pass
-   the typed `--integrated-commit <full-oid>` evidence from that merge/readback
-   (or leave it unset for the canonical `origin/main` discovery route). The
-   detailed equivalence and hold policy remains owned by
-   `documents/rule/dependency-module-changes.md`.
-1. If a parent update command proposes to preserve or merge dirty vendor source
-   state, stop. Use the independent clone only through the typed workspace route
-   or the decision table's dirty fallback; otherwise use the typed repair/rebuild
-   route. Do not add a compatibility or fallback topology.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

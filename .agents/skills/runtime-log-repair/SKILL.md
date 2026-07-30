@@ -1,64 +1,45 @@
 ---
 name: runtime-log-repair
-description: Use when AgentCanon runtime dashboard evidence should be turned into owner-routed repair work, including dashboard next actions, repair failing hook evidence, hook entries status=fail, missing actual wave rows, workflow attribution gaps, consulted source URLs, reference missing URLs, AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL, AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING, or AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS.
+description: "Use when AgentCanon runtime dashboard evidence should be turned into owner-routed repair work, including dashboard next actions, repair failing hook evidence, hook entries status=fail, missing actual wave rows, workflow attribution gaps, consulted source URLs, reference missing URLs, AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL, AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING, or AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:runtime-log-repair -->
+<!-- canonical: agents/skills/runtime-log-repair.md sha256=c4274d0df9c2a45a8f8ecba547697ae8b76ecf45672849f297401d7f2cdf9d3e -->
+<!-- route: agents/skills/catalog.yaml#skill:runtime-log-repair.routing digest=d8f8344b96314edd98afa5e599f1a6fdc07615dad08ce84ffee268534e2e1b78 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:runtime-log-repair digest=abb88dcb33ea5faf981313d7242c94577720465a96a91ed277c42834b9be83a8 -->
+<!-- commands: agents/skills/catalog.yaml#skill:runtime-log-repair.tool_commands digest=8309c0984e3269a292e73187e46ea11ceeacfa14075b8d7ebe235a07790cbf33 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Runtime Log Repair for this repository.
-upstream design ../../../agents/skills/runtime-log-repair.md documents the human-facing skill
-upstream design ../../../agents/skills/agent-log-analysis.md structured dashboard analysis and finding route packets
-upstream design ../../../agents/skills/agent-eval-accumulation.md accumulated eval repair loop
-upstream design ../../../agents/skills/result-artifact-writeout.md durable raw and summary artifact writeout
-upstream design ../../../agents/skills/issue-finding-report.md durable issue candidate writing
-upstream implementation ../../../tools/agent_tools/generate_agent_runtime_dashboard.py owns dashboard API fields
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/runtime-log-repair.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
-# Runtime Log Repair
+# runtime-log-repair
+
+## Canonical Skill
+
+Canonical workflow and policy: [runtime-log-repair](../../../agents/skills/runtime-log-repair.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill runtime-log-repair --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill runtime-log-repair --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `8309c0984e3269a292e73187e46ea11ceeacfa14075b8d7ebe235a07790cbf33`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/runtime-log-repair.md`.
-1. Start from `$agent-log-analysis` dashboard artifacts:
-   `reports/agent-runtime-dashboard/agent-log-analysis-api.json` and
-   `reports/agent-runtime-dashboard/agent-log-analysis-compact.md`. If they are
-   missing or stale for the request, run `$agent-log-analysis` first.
-1. Do not read raw JSONL broadly for normal repair routing; raw event drilldown
-   stays with `$agent-log-analysis` tool development, schema debugging, or an
-   API-named drilldown path.
-1. Build a Runtime Log Repair Packet with `repair_class`,
-   `dashboard_evidence`, `owner_surface`, `repair_route`, `required_input`,
-   `non_goals`, and `closeout_gate` before editing or launching repair work.
-1. Route repairs to owners: eval gaps to `$agent-eval-accumulation`, durable
-   artifacts to `$result-artifact-writeout`, issue candidates to
-   `$issue-finding-report`, wave mechanics to `$subagent-bootstrap`,
-   prompt/config or selection repair to `$task-routing` plus the affected owner,
-   and recurrence learning to `$agent-learning`.
-1. Keep boundaries explicit: this skill does not own raw log analysis,
-   dashboard schema, eval producer loops, artifact placement, durable issue
-   writing, subagent launch mechanics, prompt/config review, hook
-   implementation details, or reference extraction internals.
-1. Verify closeout with the owner-selected gate. Rerun a full dashboard only
-   when the owner gate needs accumulated post-change evidence.
-1. If the owner-selected gate fails, add `failing_contract`,
-   `observation_level`, `cause_classification`, `intent_preservation`, and
-   `evidence` to the Runtime Log Repair Packet before changing repair
-   intent, simplifying to pass, reverting, deleting intended behavior/tests,
-   weakening an oracle, or downscoping validation. Preserve owner intent for
-   implementation bugs and route oracle/spec, fixture/environment/stale
-   artifact, unrelated, and approved-design/user-request conflicts to owner
-   repair, residual, or escalation.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

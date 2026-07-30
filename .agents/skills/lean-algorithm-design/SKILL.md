@@ -1,70 +1,45 @@
 ---
 name: lean-algorithm-design
-description: Use when an algorithm should be designed and checked in Lean before production implementation; models candidate algorithms independently of existing code paths, proves or refutes convergence, stopping, certificate, filter/restoration, and inner-solver contracts, then hands a checked design contract to implementation or implementation-derived proof workflows.
+description: "Use when an algorithm should be designed and checked in Lean before production implementation; models candidate algorithms independently of existing code paths, proves or refutes convergence, stopping, certificate, filter/restoration, and inner-solver contracts, then hands a checked design contract to implementation or implementation-derived proof workflows."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:lean-algorithm-design -->
+<!-- canonical: agents/skills/lean-algorithm-design.md sha256=982f62d5b1cc384c71b2dd3a75ce58b78442ebcb740b7f73631d60a333faeeaf -->
+<!-- route: agents/skills/catalog.yaml#skill:lean-algorithm-design.routing digest=5edb27b25833419ae869d230f09c139f295a28ea19d91a1460b6e607f8ac3f2f -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:lean-algorithm-design digest=bc6dd72981e8a98f4a593452ecf0e54ecba92c74b7a65ceb51ac776a9a944a72 -->
+<!-- commands: agents/skills/catalog.yaml#skill:lean-algorithm-design.tool_commands digest=5f6d285786edee318e075ef39b3ae369c10b4a4d3f6733381fa800a9ddf277ae -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Exposes Lean-first algorithm design to Codex/Copilot skill discovery.
-upstream design ../../../agents/skills/lean-algorithm-design.md canonical skill document
-upstream design ../../../agents/skills/formal-proof-workflow.md terminal checker-backed proof workflow
-upstream design ../../../agents/skills/algorithm-proof-exploration.md implementation-derived proof exploration
-upstream design ../../../agents/skills/computational-optimization.md numerical optimization contract
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/lean-algorithm-design.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
-# Lean Algorithm Design
+# lean-algorithm-design
 
-1. Read `agents/skills/lean-algorithm-design.md`.
-1. Use this skill when the algorithm should be designed in Lean before
-   production implementation, or when an implementation proof attempt needs a
-   clean mathematical algorithm model independent of current code.
-1. Pair with `$computational-optimization` for numerical optimization contracts,
-   `$formal-proof-workflow` for terminal proof adoption/refutation, and
-   `$algorithm-proof-exploration` only after a production entrypoint exists and
-   the checked Lean design is being mapped to code.
-1. Fix the design target before writing Lean: problem family, allowed
-   assumptions, state, transition map, stopping/certificate predicate, result
-   classification semantics, and inner-solver contract.
-1. Create or update a fresh Lean design namespace under `lean/<topic>/`. Do not
-   import generated implementation evidence unless the task explicitly asks to
-   compare the design with existing code.
-1. Encode candidate algorithms as Lean definitions: problem structure, state,
-   transition relation/function, acceptance/restoration predicates, inner-solver
-   contracts, and returned certificate predicates.
-1. State the target theorem over the Lean design API. For iterative algorithms,
-   consume the transition map and stopping scalar/certificate predicate; do not
-   start from production helper names.
-1. Use Mathlib, Aesop, theorem search, SMT/counterexample tools, and existing
-   local Lean libraries where they fit. Do not build a private proof framework
-   when standard Lean libraries cover the reasoning.
-1. If a design theorem fails, classify the checked reason as algorithm too weak,
-   assumptions too weak, theorem too strong, inner-solver contract insufficient,
-   or Lean model missing a required algorithm component. Iterate on the Lean
-   design before touching production code.
-1. Return to implementation only with an `implementation_handoff` that lists the
-   checked Lean definitions/theorems, `lake build` command, production API
-   fields required by the theorem, forbidden proof-only runtime fields, and the
-   later implementation-derived proof route.
+## Canonical Skill
+
+Canonical workflow and policy: [lean-algorithm-design](../../../agents/skills/lean-algorithm-design.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill lean-algorithm-design --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill lean-algorithm-design --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `5f6d285786edee318e075ef39b3ae369c10b4a4d3f6733381fa800a9ddf277ae`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-## Completion Gate
-
-- A design task is complete only when the Lean design target is checked,
-  checker-refuted, or restricted to a checked problem class.
-- A missing lemma, open frontier, or unchecked algorithm idea is not completion.
-- A production implementation may start only after the checked design handoff
-  exists.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

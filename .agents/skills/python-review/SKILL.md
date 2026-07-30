@@ -1,45 +1,45 @@
 ---
 name: python-review
-description: Python 差分を pyright、pytest、ruff、型境界、API 挙動、OOP 可読性根拠で厳密に確認する。
+description: "Python 差分を pyright、pytest、ruff、型境界、API 挙動、OOP 可読性根拠で厳密に確認する。"
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:python-review -->
+<!-- canonical: agents/skills/python-review.md sha256=ebdea2d7e5ec98def4575f493511371eb4f964beea1c948fd9ff1ac182a48d54 -->
+<!-- route: agents/skills/catalog.yaml#skill:python-review.routing digest=dec871082200bc4101743c885db4dd5ab7bc2b542dae384ed27de1e9d43163a3 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:python-review digest=c37e7ae69dfd399de98e56f124b5fec38636d08137a9334d869130ff86e80927 -->
+<!-- commands: agents/skills/catalog.yaml#skill:python-review.tool_commands digest=6e43fb40b59c525a46458a6801970ed9ecdcdef353861afb50699c680205a871 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Python Review for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/python-review.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
+# python-review
 
-# Python Review
+## Canonical Skill
+
+Canonical workflow and policy: [python-review](../../../agents/skills/python-review.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill python-review --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill python-review --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `6e43fb40b59c525a46458a6801970ed9ecdcdef353861afb50699c680205a871`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. `agents/skills/python-review.md` を読みます。
-1. 変更された Python ファイルと関連テストを直してから検証します。
-1. `pyright` を実行または確認します。
-1. `pytest tests/` を実行または確認します。
-1. `ruff check python tests --select D,E,F,I,UP --ignore E501` を実行または確認します。
-1. Python 差分が定義順、公開入口の配置、内部補助関数の配置を変える場合は、
-   `python3 tools/agent_tools/check_convention_compliance.py` を実行または確認し、
-   定義順契約が review evidence に見えていることを確認します。
-1. 変更された Python ファイルが、公開契約、公開入口、共有の内部補助関数、単一公開入口に従う内部補助関数の読者順序を保っていることを確認します。
-1. Python 差分が class、dataclass、`Protocol`、継承、公開 API、型境界、依存方向を持つ場合は、`$oop-readability-check` / `python3 tools/oop/python/readability.py` を下流根拠として実行または確認し、SOLID 原則シグナル数を確認します。
-   レポート内の Single responsibility、Open/closed、Liskov substitution、
-   Interface segregation、Dependency inversion のシグナルを review evidence として使います。
-1. 同じ変更パスに対して `python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths> --evidence <oop-readability-report>` を実行または確認し、レポートの `scanned_paths` が確認対象の SOLID 対象ファイルを覆っていることを確認します。
-1. API 挙動、型境界、文書とテストの追随を確認します。
-1. 要約より前に指摘を返します。
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

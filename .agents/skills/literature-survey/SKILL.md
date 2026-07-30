@@ -1,39 +1,45 @@
 ---
 name: literature-survey
-description: Use when a task needs paper search, prior-art mapping, contradictory-source hunting, or a reusable bibliography.
+description: "Use when a task needs paper search, prior-art mapping, contradictory-source hunting, or a reusable bibliography."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:literature-survey -->
+<!-- canonical: agents/skills/literature-survey.md sha256=4ea0bcfd04a7db46709cc7aafb5824601ae1c6f080e4f70e6b6b716d2c90c6a4 -->
+<!-- route: agents/skills/catalog.yaml#skill:literature-survey.routing digest=d4f4cf4a983780461a4267d1cbd74b267b0b2595afe2e206796f068577da7df3 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:literature-survey digest=fa83085b0c4dcab7ecbec02f8fc20fadb3a52c3e8858462177b53cbe99d5b90f -->
+<!-- commands: agents/skills/catalog.yaml#skill:literature-survey.tool_commands digest=d761bb4dee3c6bea232662130f7d3613733c1ed4b45d0f61b10e9f6e07f65d00 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Literature Survey for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
-upstream design ../../../agents/skills/prose-reasoning-graph.md defines claim/evidence graph handoffs
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/literature-survey.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
+# literature-survey
 
-# Literature Survey
+## Canonical Skill
+
+Canonical workflow and policy: [literature-survey](../../../agents/skills/literature-survey.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill literature-survey --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill literature-survey --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `d761bb4dee3c6bea232662130f7d3613733c1ed4b45d0f61b10e9f6e07f65d00`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/literature-survey.md`.
-1. Read `agents/workflows/workflow-references.md`.
-1. Fix the question, scope, and exclusion criteria before searching.
-1. Before web search, PDF download, or citation lookup, inspect existing `references/`, `notes/`, `documents/`, and topic reports for the same source or claim. Reuse or update the existing source note instead of creating a parallel truth surface.
-1. Prefer primary sources, surveys, benchmark comparison papers, and official docs over tertiary summaries.
-1. Record contrary or scope-limiting evidence, not only supporting sources.
-1. If a prose graph handoff is present, use unsupported-claim and citation/evidence-gap diagnostics to seed query terms, source adoption decisions, and source exclusion checks.
-1. If a source is used, downloaded, quoted, or cited in the answer/report, leave a durable tracked reference note or source packet with URL/DOI, access date, claim used, limitation, and artifact location; do not rely on transient browser context as the only record.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

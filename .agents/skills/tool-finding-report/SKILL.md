@@ -1,60 +1,45 @@
 ---
 name: tool-finding-report
-description: Use when running tools, checkers, hooks, static analysis, or structural analyzers to find problems, preserve raw and structured full finding artifacts, mechanically rank every finding, and produce a complete finding report for implementation or refactor planning; before/after impact is optional when explicitly requested.
+description: "Use when running tools, checkers, hooks, static analysis, or structural analyzers to find problems, preserve raw and structured full finding artifacts, mechanically rank every finding, and produce a complete finding report for implementation or refactor planning; before/after impact is optional when explicitly requested."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:tool-finding-report -->
+<!-- canonical: agents/skills/tool-finding-report.md sha256=d72485e69bc2af8f11ab3e9fef38fb1d72a125b7b9ff05ab709d6e87a97a4c20 -->
+<!-- route: agents/skills/catalog.yaml#skill:tool-finding-report.routing digest=c4efc1f6d5c496198e24285312873ccf59fee23f28859f6165573e2610b4de5c -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:tool-finding-report digest=73a0440bb18fb73e90cbe91c224e13749583a0c5427287daf292f3053ebe7c65 -->
+<!-- commands: agents/skills/catalog.yaml#skill:tool-finding-report.tool_commands digest=2ebcc7500ef166476ebf640526aa1d823c35e88ccd244c2e210a3aee76bf0052 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Tool Finding Report runtime skill for this repository.
-upstream design ../../../agents/skills/tool-finding-report.md documents the human-facing workflow
-upstream design ../../../agents/skills/result-artifact-writeout.md defines raw result artifact policy
-upstream design ../../../agents/skills/report-writing.md defines reader-facing report policy
-upstream design ../../../agents/skills/refactor-loop.md consumes finding packets for repair slices
-upstream implementation ../../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/tool-finding-report.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
-# Tool Finding Report
+# tool-finding-report
+
+## Canonical Skill
+
+Canonical workflow and policy: [tool-finding-report](../../../agents/skills/tool-finding-report.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill tool-finding-report --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill tool-finding-report --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `2ebcc7500ef166476ebf640526aa1d823c35e88ccd244c2e210a3aee76bf0052`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/tool-finding-report.md`.
-1. Default the target scope to the full repository before running tools. Fix exclude rules, dependency roots, and output directory. Use targeted, changed-only, or selected-path scope only when the user explicitly asks for it, the tool cannot run repo-wide, or it is an additional diagnostic beside the full-repository run; record `scope_exception=<reason>`, `requested_scope=<...>`, and `omitted_surfaces=<...>` in the finding packet. Fix a baseline ref only when before/after impact is explicitly requested.
-1. Preserve raw machine results first with `$result-artifact-writeout`; failed or partial runs are evidence, not noise.
-1. When failed validation/check output feeds implementation, include the
-   validation-failure-response packet fields (`failing_contract`,
-   `observation_level`, `cause_classification`, `intent_preservation`, and
-   `evidence`) in the finding packet.
-1. Build structured full-repository artifacts from the raw results before interpreting them. Do not truncate to top-N findings inside this skill. For Python structural findings, use `python-structure-hash` -> `python-structure-hash-report`, and use `python-structure-hash-impact` only when before / after comparison is requested.
-1. When the structured Python findings will feed implementation or refactor
-   planning, preserve the full report and call
-   `python-structure-hash-scope-plan` through `$dependency-analysis` after the
-   dependency review directory exists. The scope-plan JSON, not a chat
-   summary, is the mechanical source for `impact_blocks`, `scope_candidates`,
-   `selected_scope`, and `repair_batches`.
-1. Include the relevant checker family for the task: algorithm contract, module groups, OOP readability, dependency review, design-claim evidence, static analysis, hook logs, or workflow evals.
-1. If any tool, hook, checker, guardrail, or migration wrapper emits a warning, immediately register it as a closeout obligation in run-local `reports/agents/<run-id>/workflow_monitoring.md` with `workflow_monitor.py --tool-warning "warning_id=<stable-id> source_tool=<tool> severity=<warning|fix-now|s0|s1> status=open message=<short-no-spaces> repair_command=<command-or-doc>"`. The reusable template for that file is `templates/agents/workflow_monitoring.md`. After repair, append the same `warning_id` with `status=resolved evidence=<path-or-command>`. Normal warnings reach `tool_warning_exit_status` through `resolved`, `deferred_with_issue issue=<issue-or-pr>` with durable owner, or `accepted_with_reason` with `explicit_approval_evidence` and a durable rationale artifact; fix-now / S0 / S1 warnings must be resolved. If the run observed no warnings, run `workflow_monitor.py --tool-warning-status none` before closeout.
-1. Mechanically rank every finding. If the tool does not provide priority, derive a deterministic order from severity, public API or algorithm-contract impact, dependency fan-in/fan-out, duplicate/thin/single-caller signals, production vs test/experiment scope, and tool confidence. Record the ranking policy in the report.
-1. Write a finding packet with scope, scope exceptions if any, commands, raw artifacts, structured artifacts, full counts, full finding table or structured finding artifact reference, mechanical priority order, optional impact, and a handoff boundary. The caller or higher-level workflow chooses the repair slice and decides what to do next.
-1. Use `$report-writing` when the user needs a reader-facing narrative report; keep mechanical tool output and agent interpretation separated.
-   - This is mandatory when the user asks for a report, summary, interpretation, explanation of findings, or a Markdown reader artifact.
-   - Do not close with only a validation summary, command log, top-N excerpt, or raw JSON pointer. Produce a reader-facing finding report with the `$report-writing` required sections.
-   - For nontrivial finding packets, also apply `$structure-planning` before drafting so the report has a source packet, reader guide, metric/count contract, priority policy, limitations, and next actions.
-   - The report may reference the full structured artifact instead of embedding every row, but it must state that the full finding table is preserved there and must not truncate the underlying artifact.
-1. If findings drive behavior-preserving implementation or refactor, pass the full finding packet and mechanical priority order to `$refactor-loop` instead of editing from a chat-only summary.
-1. Classify each tool/reviewer/subagent feedback item as `implementation_bug`, `missing_test_or_design_evidence`, `handoff_prompt_gap`, `shared_skill_or_workflow_gap`, `tool_gap`, or `review_required`.
-   Use `missing_design_claim_evidence` when `check_design_doc_claims.py` reports an implementation-backed design claim without code, dependency-header, parent-doc, or assumption-ledger support.
-1. For `handoff_prompt_gap` or `shared_skill_or_workflow_gap`, repair the next subagent handoff or shared skill/workflow prompt before launching the next write-capable subagent, and record `workflow_monitor.py --runtime-feedback ... action=prompt_repair`.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

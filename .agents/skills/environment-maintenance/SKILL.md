@@ -1,50 +1,45 @@
 ---
 name: environment-maintenance
-description: Use when touching Docker, CI, dependencies, runtime compatibility, or repository-level development environment instructions.
+description: "Use when touching Docker, CI, dependencies, runtime compatibility, or repository-level development environment instructions."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:environment-maintenance -->
+<!-- canonical: agents/skills/environment-maintenance.md sha256=39f0eb31ff5bd05d93786e55a1700cfe5f4d218981cdd62ac3e30c6dcf89dc4f -->
+<!-- route: agents/skills/catalog.yaml#skill:environment-maintenance.routing digest=0f460d67c04f548911076ec4f526824f0a680be1083d2cb20116703055b87b5b -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:environment-maintenance digest=e81908361c85f153092adcecd138091721bedd3f3bd85127c71739767cb4ebda -->
+<!-- commands: agents/skills/catalog.yaml#skill:environment-maintenance.tool_commands digest=d01eed504dca9ddb23dbcc6765f7dccd8538c3f9519eb5c5bf24ade17d2578c0 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Environment Maintenance for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
-upstream design ../../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-upstream design ../../../documents/design/devcontainer/parent-dependency-manifest-followup.md dependency-design packet and parent follow-up contract
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/environment-maintenance.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
+# environment-maintenance
 
-# Environment Maintenance
+## Canonical Skill
+
+Canonical workflow and policy: [environment-maintenance](../../../agents/skills/environment-maintenance.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill environment-maintenance --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill environment-maintenance --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `d01eed504dca9ddb23dbcc6765f7dccd8538c3f9519eb5c5bf24ade17d2578c0`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Consume the passing `dependency-design` packet before changing dependency
-   manifests, bootstrap, install order, or related validators. Then treat
-   `CONTAINER_OPERATIONS.md` as the source of truth for Dockerfile, `docker/`,
-   `.devcontainer/`, validator, and Makefile target ownership. This skill is
-   only the routing checklist.
-1. Update `docker/packs/*.toml`, `docker/codex-container-profiles.toml`, and `docker/python-execution-rules.toml` when runtime selection behavior changes.
-1. When the main server host assumptions change, update `documents/contracts/server-host-contract.md` and the server layout templates in the same change.
-1. Start from `templates/agents/environment_change_proposal.md` when proposing a new repo-wide tool or dependency.
-1. Update dependency definitions and related docs in the same change.
-1. Check CI and local validation commands together.
-1. Use `CONTAINER_OPERATIONS.md`, `documents/conventions/coding-conventions-project.md`, `documents/contracts/github-first-module-and-devcontainer-policy.md`, `documents/tools/README.md`, `documents/contracts/server-host-contract.md`, and `docker/README.md`.
-1. Do not canonize host-global installs as the repository default.
-1. Follow `CONTAINER_OPERATIONS.md` when deciding whether a tool belongs in repo-local Dockerfile / `docker/` or AgentCanon-owned `.devcontainer/`.
-1. Update mechanical enforcement in `tools/docker_dependency_validator.sh` when the boundary changes.
-1. When environment or CI validation failure drives a repair, record the
-   validation-failure-response packet (`failing_contract`, `observation_level`,
-   `cause_classification`, `intent_preservation`, and `evidence`) before
-   downscoping validation or weakening an oracle.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

@@ -1,50 +1,45 @@
 ---
 name: document-canon-cleanup
-description: Use when organizing repository documents, finding non-canonical docs, separating source canon from generated reports, eval results, closed issues, duplicate headings, or stale document paths.
+description: "Use when organizing repository documents, finding non-canonical docs, separating source canon from generated reports, eval results, closed issues, duplicate headings, or stale document paths."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:document-canon-cleanup -->
+<!-- canonical: agents/skills/document-canon-cleanup.md sha256=da83b14f573de3b6fe946042f0d88d07a142b17217904387892ffcfd05279168 -->
+<!-- route: agents/skills/catalog.yaml#skill:document-canon-cleanup.routing digest=11a5decf86b437fd0be781e15800a78a4dbbff462a61b0e477ef08dcc7db5abe -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:document-canon-cleanup digest=0bde774c2d8bcc77e63b276624588393c4eaf7245055659ff4552ac27d319d8e -->
+<!-- commands: agents/skills/catalog.yaml#skill:document-canon-cleanup.tool_commands digest=5d9419d822d769e9777136685afd64d61d7305f3baf2eb73aa37b485250182af -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Document Canon Cleanup for this repository.
-upstream design ../../../agents/skills/document-canon-cleanup.md human-facing skill canon
-upstream implementation ../../../rust/agent-canon/src/structured_analysis.rs canonical document inventory implementation
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/document-canon-cleanup.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
+# document-canon-cleanup
 
-# Document Canon Cleanup
+## Canonical Skill
+
+Canonical workflow and policy: [document-canon-cleanup](../../../agents/skills/document-canon-cleanup.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill document-canon-cleanup --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill document-canon-cleanup --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `5d9419d822d769e9777136685afd64d61d7305f3baf2eb73aa37b485250182af`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/document-canon-cleanup.md`.
-1. Prefer the Rust structured-analysis command:
-
-```bash
-agent-canon structured-analysis document-inventory \
-  --root . \
-  --json-out reports/noncanonical-documents.json \
-  --markdown-out reports/noncanonical-documents.md
-```
-
-1. If an old document-inventory command is observed in a caller chain, migrate that caller to the Rust command before returning to the original task.
-1. Treat the report as triage, not deletion authority.
-1. Edit canonical sources, not generated evidence:
-   - `.agent-canon/log-archive/eval-results/*` -> edit eval definitions, workflow prompts, or generator logic.
-   - `reports/*` -> regenerate or cite as run evidence.
-   - `issues/closed/*` -> open/update a new issue for new scope.
-1. For missing dependency headers, either add the manifest or move the file out of source docs.
-1. For duplicate headings, merge, retitle, or document why both active docs remain distinct.
-1. Re-run the inventory and dependency review before closeout.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

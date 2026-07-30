@@ -1,0 +1,11 @@
+{
+  "scenario_id": "boundary-and-negative",
+  "packet_id": "shim-boundary-and-negative-v1",
+  "iteration_id": "fresh-generated-01",
+  "skill_id": "task-routing",
+  "variant": "generated",
+  "prompt": "Inspect the discovery adapter and preserve canonical and host boundaries.",
+  "input_tokens": 586,
+  "canonical_followup_input_tokens": 175,
+  "cache_fields_observed": {}
+}

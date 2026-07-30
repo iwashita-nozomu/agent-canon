@@ -1,65 +1,45 @@
 ---
 name: owner-bounded-routing
-description: Use for owner-bounded repository edits after routing evidence shows a bounded owner, replaceable unit, targeted validation route, and no public behavior/schema expansion; also use for typo/link/format-only edits and Owner-Bounded Change work where Codex should run existing tools directly, record owner/tool/validation evidence, keep validation targeted, and avoid escalating to broad workflow prose.
+description: "Use for owner-bounded repository edits after routing evidence shows a bounded owner, replaceable unit, targeted validation route, and no public behavior/schema expansion; also use for typo/link/format-only edits and Owner-Bounded Change work where Codex should run existing tools directly, record owner/tool/validation evidence, keep validation targeted, and avoid escalating to broad workflow prose."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:owner-bounded-routing -->
+<!-- canonical: agents/skills/owner-bounded-routing.md sha256=b91114a26c3137132d728630460fb861ef5772632c327d0ce0917f304db0653e -->
+<!-- route: agents/skills/catalog.yaml#skill:owner-bounded-routing.routing digest=f7a555da339b2fd491fcd1139f994324d489d9f17e2352d20efcd8cd0201f0b6 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:owner-bounded-routing digest=78734376c281b296991698dabce3c5ff736e7714e8024ed05981d8aa2fd90f27 -->
+<!-- commands: agents/skills/catalog.yaml#skill:owner-bounded-routing.tool_commands digest=35b4a5c022a081c53a5b25a644a6287a8d4f1d72eb6e9d5f6779af12f2b910c0 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Owner-Bounded Change Routing runtime skill for this repository.
-upstream design ../../../agents/skills/owner-bounded-routing.md documents the human-facing route
-upstream design ../../../agents/task_catalog.yaml owns Owner-Bounded Change workflow identity
-upstream design ../../../documents/runtime/runtime-profiles-and-check-matrix.md owns Routine docs and Focused code validation profiles
-downstream implementation ../../../tools/agent_tools/convention_compliance_contracts.toml declares owner-bounded marker contract
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/owner-bounded-routing.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
-# Owner-Bounded Change Routing
+# owner-bounded-routing
+
+## Canonical Skill
+
+Canonical workflow and policy: [owner-bounded-routing](../../../agents/skills/owner-bounded-routing.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill owner-bounded-routing --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill owner-bounded-routing --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `35b4a5c022a081c53a5b25a644a6287a8d4f1d72eb6e9d5f6779af12f2b910c0`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-1. Read `agents/skills/owner-bounded-routing.md`.
-1. Use this route after `$agent-orchestration` only when evidence already
-   fixes the owner boundary, replaceable unit, targeted validation route, and
-   public behavior / schema impact. Typo/link/format-only, Routine docs,
-   Focused code, and `Owner-Bounded Change` may use this route when those facts
-   are known. Do not select it from apparent file count alone.
-1. Do not make selected runtime `SKILL.md` reading a prerequisite for existing
-   tool execution or patching. Run the existing tool first when it owns the
-   check, then read only the owner surface or nearby lines needed to interpret
-   or repair its output.
-1. Record the owner boundary, existing tool route, and targeted validation
-   evidence. Add neighboring skills only when a concrete changed path, checker
-   finding, or routing packet names them.
-1. Run or cite `python3 tools/agent_tools/tool_rejection_preflight.py --root .
-   <planned-edit-paths>` before editing, and keep predicted repair commands in
-   the work log or handoff.
-   Record each `responsibility_scope` line with its owner scope and protecting tools
-   before choosing the implementation directory.
-1. For typo/link/format-only Markdown edits, route `$md-style-check`, record
-   `structure_contract=skipped` with the reason, and validate with
-   `tools/bin/agent-canon docs check <changed-docs>`.
-1. For bounded code edits, keep `targeted validation`: changed-file dependency
-   checks, relevant static checker, and directly related tests only when the
-   change adds observable behavior.
-1. If targeted validation fails, record `failing_contract`,
-   `observation_level`, `cause_classification`, `intent_preservation`, and
-   `evidence` before simplifying to pass, reverting, deleting intended
-   behavior/tests, weakening an oracle, or downscoping validation. Repair
-   implementation bugs while preserving approved intent; route oracle/spec,
-   fixture/environment/stale artifact, unrelated, and approved-design/user-
-   request conflicts to the owning repair, residual, or escalation path.
-1. Escalate to the broader workflow when public behavior, dependency direction,
-   section responsibility, claim grounding, schema, runtime profile, or multiple
-   writers enter scope.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

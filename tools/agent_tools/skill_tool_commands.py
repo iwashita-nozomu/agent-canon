@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Maintains explicit tool-command entry sections in runtime skills.
+# responsibility Produces read-only catalog-backed tool-command packets and checks their runtime projections.
 # upstream design ../../agents/canonical/skills.md skill canon registry
 # upstream design ../../agents/skills/task-routing.md deterministic skill routing contract
 # upstream design ../../agents/skills/agent-orchestration.md tool-first skill execution contract
@@ -9,9 +9,9 @@
 # upstream implementation ../../tools/agent_tools/route.py parses and validates the public skill catalog
 # downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md materialized runtime skill command entry example
 # downstream implementation ../../tools/agent_tools/check_convention_compliance.py verifies command section wiring
-# downstream implementation ../../tests/agent_tools/test_skill_tool_commands.py tests command extraction and sync
+# downstream implementation ../../tests/agent_tools/test_skill_tool_commands.py tests command extraction and read-only checks
 # @dependency-end
-"""Maintain explicit tool-command packets for AgentCanon runtime skills."""
+"""Produce read-only tool-command packets for AgentCanon runtime skills."""
 
 from __future__ import annotations
 
@@ -202,8 +202,6 @@ def build_parser() -> argparse.ArgumentParser:
     check = subparsers.add_parser("check", help="Check every runtime skill section.")
     check.add_argument("--format", choices=FORMAT_VALUES, default="text")
 
-    sync = subparsers.add_parser("sync", help="Synchronize every runtime skill section.")
-    sync.add_argument("--format", choices=FORMAT_VALUES, default="text")
     return parser
 
 
@@ -454,62 +452,8 @@ def check_issue_contract_rules(root: Path, skill: str) -> tuple[Finding, ...]:
     return tuple(findings)
 
 
-def expected_section(skill: str) -> str:
-    """Return the materialized Tool Commands section for one runtime skill."""
-    command = COMMAND_TEMPLATE.format(skill=skill)
-    return (
-        f"{SECTION_HEADING}\n\n"
-        f"{SECTION_START}\n"
-        "この skill の workflow を適用する前に、次の command packet を使用してください。\n\n"
-        "```bash\n"
-        f"{command}\n"
-        "```\n\n"
-        f"{COMMON_RESOLUTION_WORDING}\n\n"
-        "packet が出力した必須 command と、task に該当する conditional command を実行してください。\n"
-        f"{SECTION_END}\n"
-    )
-
-
-def replace_or_insert_section(text: str, section: str) -> str:
-    """Replace an existing Tool Commands section or insert one after the title."""
-    marked_pattern = re.compile(
-        rf"(?ms)^{re.escape(SECTION_HEADING)}\n\n"
-        rf"{re.escape(SECTION_START)}\n.*?{re.escape(SECTION_END)}\n"
-    )
-    if marked_pattern.search(text):
-        return marked_pattern.sub(section.rstrip() + "\n", text, count=1)
-    legacy_pattern = re.compile(
-        rf"(?ms)^{re.escape(SECTION_HEADING)}\n\n"
-        r"Use the command packet before applying this skill's workflow:\n\n"
-        r"```bash\n"
-        r"python3 tools/agent_tools/skill_tool_commands\.py show --skill [A-Za-z0-9_-]+ --format text\n"
-        r"```\n\n"
-        r"Execute the required and task-matching conditional commands that the packet prints\.\n\n?"
-    )
-    if legacy_pattern.search(text):
-        return legacy_pattern.sub(section.rstrip() + "\n\n", text, count=1)
-    match = re.search(r"(?m)^# .+\n", text)
-    if match:
-        insert_at = match.end()
-        return text[:insert_at] + "\n" + section + "\n" + text[insert_at:]
-    return section + "\n" + text
-
-
-def sync(root: Path) -> tuple[int, ...]:
-    """Synchronize every runtime skill and return changed file indexes."""
-    changed: list[int] = []
-    for index, path in enumerate(runtime_skill_paths(root)):
-        skill = skill_name_from_path(path)
-        current = path.read_text(encoding="utf-8")
-        updated = replace_or_insert_section(current, expected_section(skill))
-        if updated != current:
-            path.write_text(updated, encoding="utf-8")
-            changed.append(index)
-    return tuple(changed)
-
-
 def check(root: Path) -> tuple[Finding, ...]:
-    """Check every runtime skill for the materialized Tool Commands section."""
+    """Check every runtime skill for the materializer-owned packet projection."""
     findings: list[Finding] = []
     paths = runtime_skill_paths(root)
     if not paths:
@@ -518,16 +462,14 @@ def check(root: Path) -> tuple[Finding, ...]:
         skill = skill_name_from_path(path)
         relative = repo_relative(root, path)
         text = path.read_text(encoding="utf-8", errors="replace")
-        section = expected_section(skill)
         if SECTION_HEADING not in text:
             findings.append(Finding("skill_tool_commands", relative, "missing-tool-commands-section"))
-            continue
-        if SECTION_START not in text or SECTION_END not in text:
-            findings.append(Finding("skill_tool_commands", relative, "missing-section-markers"))
-        if COMMAND_TEMPLATE.format(skill=skill) not in text:
-            findings.append(Finding("skill_tool_commands", relative, "missing-command-packet-entry"))
-        if section not in text:
-            findings.append(Finding("skill_tool_commands", relative, "stale-tool-commands-section"))
+        else:
+            if SECTION_START not in text or SECTION_END not in text:
+                findings.append(Finding("skill_tool_commands", relative, "missing-section-markers"))
+            command = COMMAND_TEMPLATE.format(skill=skill)
+            if text.count(command) != 1:
+                findings.append(Finding("skill_tool_commands", relative, "missing-command-packet-entry"))
         findings.extend(check_issue_contract_rules(root, skill))
     return tuple(findings)
 
@@ -593,22 +535,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             print(render_packet_text(packet))
         return 0
-    if args.command == "sync":
-        changed = sync(root)
-        findings = check(root)
-        payload = {
-            "status": "pass" if not findings else "fail",
-            "changed_files": len(changed),
-            "findings": [asdict(finding) for finding in findings],
-        }
-        if args.format == "json":
-            print(json.dumps(payload, indent=2, sort_keys=True))
-        else:
-            print(f"SKILL_TOOL_COMMANDS_SYNC_CHANGED={len(changed)}")
-            for finding in findings:
-                print(finding.render())
-            print(f"SKILL_TOOL_COMMANDS_SYNC={'pass' if not findings else 'fail'}")
-        return 0 if not findings else 1
     findings = check(root)
     if args.format == "json":
         print(

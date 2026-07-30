@@ -1,0 +1,44 @@
+# @dependency-start
+# contract data
+# responsibility Defines answer-free fresh skill runtime shim evaluation packets.
+# upstream design ../../documents/design/skill-runtime-shim-materialization.md packet and measurement contract
+# downstream implementation ../../tools/agent_tools/skill_shim_evaluation.py packet producer
+# downstream implementation ../../tests/agent_tools/test_skill_shim_evaluation.py producer tests
+# @dependency-end
+
+catalog_kind = "agent_canon_skill_runtime_shim_eval"
+version = 1
+packet_class_order = ["full", "changed"]
+
+[[packet]]
+id = "shim-discovery-selection-v1"
+packet_class = "full"
+prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/full/shim-discovery-selection-v1.md"
+canonical_target_files = [".agents/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
+prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-dependencies.yaml", "documents/codex/prompt-skill-evaluation-checklist.md"]
+method = "one fresh read-only gpt-5.4-mini evaluator"
+requirements = ["discovery", "canonical-owner", "no-shim-route"]
+report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
+packet_digest = "e075539397201c30ffce289c81c6e955aaeec2c56be4aeadacb585ab236efbfa"
+
+[[packet]]
+id = "shim-boundary-and-negative-v1"
+packet_class = "full"
+prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/full/shim-boundary-and-negative-v1.md"
+canonical_target_files = [".agents/skills/task-routing/SKILL.md", "agents/skills/task-routing.md"]
+prompt_dependency_files = ["agents/skills/catalog.yaml", "documents/codex/prompt-skill-evaluation-checklist.md"]
+method = "one fresh read-only gpt-5.4-mini evaluator"
+requirements = ["no-false-activation", "host-delegation", "no-duplicate-policy"]
+report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
+packet_digest = "b895eaa3b6840ce5f60fc0cd6fbaa1c09d90474f99dbe3dacf1582c262ecf1d8"
+
+[[packet]]
+id = "shim-toolcall-route-v1"
+packet_class = "changed"
+prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/changed/shim-toolcall-route-v1.md"
+canonical_target_files = [".agents/skills/structure-planning/SKILL.md", "agents/skills/structure-planning.md"]
+prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-dependencies.yaml", "documents/design/skill-tool-invocation-graph.md"]
+method = "one fresh read-only gpt-5.4-mini evaluator"
+requirements = ["owner-command-packet", "typed-toolcall", "failure-semantics"]
+report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
+packet_digest = "aeee009e0669fe5d2b8c8aefcd95a49b7de880bb03e284e62a55830550a15142"

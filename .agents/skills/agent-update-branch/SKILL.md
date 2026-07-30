@@ -1,63 +1,45 @@
 ---
 name: agent-update-branch
-description: Use when Memory, eval results, AgentCanon pins, or other agent-runtime updates should be isolated on template-derived update branches and later integrated through a controlled branch workflow.
+description: "Use when Memory, eval results, AgentCanon pins, or other agent-runtime updates should be isolated on template-derived update branches and later integrated through a controlled branch workflow."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:agent-update-branch -->
+<!-- canonical: agents/skills/agent-update-branch.md sha256=a3a6696922e35315b2b2b64ea0104a0b106ce42988364d3649a1d61c505aa8c4 -->
+<!-- route: agents/skills/catalog.yaml#skill:agent-update-branch.routing digest=4548d2cbdafa14176e2b581c3b38cd0274b8725cc036cd0596d444fef9243293 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:agent-update-branch digest=63a8f40867793c99082c96ae8f6c56737223c1b65b2156de2df6419a774e992f -->
+<!-- commands: agents/skills/catalog.yaml#skill:agent-update-branch.tool_commands digest=78558eac85561771c228636232fa966edb4563c09e8f8dd5db6bcaca5cd0392f -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Agent Update Branch skill for this repository.
-upstream design ../../../agents/workflows/agent-update-branch-workflow.md defines branch lanes and integration gates
-upstream implementation ../../../tools/agent_tools/agent_update_branch.sh validates and pushes update branches
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/agent-update-branch.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
-# Agent Update Branch
+# agent-update-branch
+
+## Canonical Skill
+
+Canonical workflow and policy: [agent-update-branch](../../../agents/skills/agent-update-branch.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill agent-update-branch --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill agent-update-branch --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `78558eac85561771c228636232fa966edb4563c09e8f8dd5db6bcaca5cd0392f`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/workflows/agent-update-branch-workflow.md`.
-1. Classify the update lane:
-   - `memory-eval`: only `memory/`, `evidence/agent-evals/`, `.agents/skills/*/SKILL.md`, or run-local evaluation artifacts intended for feedback capture
-   - `canon-pin`: `.gitmodules`, `.agent-canon/update-state.toml`, `vendor/agent-canon`, and root AgentCanon symlink/copy surfaces
-   - `integration`: a branch that merges one or more `agent-updates/*` branches back toward `main`
-1. Use `$agent-canon-update` instead when the work is updating AgentCanon source,
-   merging AgentCanon main into a local `vendor/agent-canon` branch, opening an
-   AgentCanon PR, or deciding the parent latest route. This skill only owns the
-   parent-repo update branch lane after that route is known.
-1. Reuse the current parent branch / PR when it already owns the same update
-   lane. Do not create `agent-updates/*` just to start fresh, split a small
-   follow-up, avoid dirty state, or respond to a mid-task user instruction. A new
-   branch requires `branch_creation_reason=<reason>` in the run bundle, work
-   log, or PR body plus current-task explicit user approval. The creation
-   authority/reason and destructive authority/reason must all appear in the
-   same command segment; the recorded reason alone never authorizes creation.
-1. Use a template-derived branch name:
-   - `agent-updates/memory-eval/<slug>`
-   - `agent-updates/canon-pin/<slug>`
-   - `agent-updates/integration/<slug>`
-1. Before pushing, run the lane validator:
-
-```bash
-bash tools/agent_tools/agent_update_branch.sh validate <lane>
-```
-
-1. Push with:
-
-```bash
-bash tools/agent_tools/agent_update_branch.sh push <lane> <branch>
-```
-
-1. For integration, do not squash away evidence. Merge update branches on an integration branch, run dependency review and static analysis, then fast-forward or merge to `main` only after the integration gate passes.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

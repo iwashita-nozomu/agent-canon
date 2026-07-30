@@ -1,0 +1,11 @@
+{
+  "scenario_id": "discovery-selection",
+  "packet_id": "shim-discovery-selection-v1",
+  "iteration_id": "fresh-current-01",
+  "skill_id": "agent-orchestration",
+  "variant": "current",
+  "prompt": "Inspect the public skill discovery adapter and follow its canonical owner.",
+  "input_tokens": 612,
+  "canonical_followup_input_tokens": 188,
+  "cache_fields_observed": {"cache_read_input_tokens": 0}
+}

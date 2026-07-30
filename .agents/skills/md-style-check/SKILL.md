@@ -1,69 +1,45 @@
 ---
 name: md-style-check
-description: Use when Markdown files changed, docs formatter/fixer output must be checked, or `agent-canon docs` formatting, heading, math, Mermaid, and link checks are in scope.
+description: "Use when Markdown files changed, docs formatter/fixer output must be checked, or `agent-canon docs` formatting, heading, math, Mermaid, and link checks are in scope."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:md-style-check -->
+<!-- canonical: agents/skills/md-style-check.md sha256=d2c7e2118a6ee107eb96914fc692d6793cd2cf36ae287a734f71adfe1f6bdfc7 -->
+<!-- route: agents/skills/catalog.yaml#skill:md-style-check.routing digest=426e39d6eba9366369b3bd6b16d48d3ff8e4e37fec98ba679e79704e9a737c76 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:md-style-check digest=234e511e80ba3cc7a9dcd412ab4d182d04bd53fbadc416a79d946f0d123b49e7 -->
+<!-- commands: agents/skills/catalog.yaml#skill:md-style-check.tool_commands digest=4c15f64eb1db60c5ffcdd089e56ba0ebcc05a95569c6ac63524320b6f3c916a4 -->
+<!-- materializer: skill_shim_materializer.v1 -->
 
 <!--
 @dependency-start
-contract skill
-responsibility Documents Markdown Style Check for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
-upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
-downstream implementation ../../../tests/tools/test_fix_mermaid.py tests formatter and post-format coverage behavior.
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/md-style-check.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
-# Markdown Style Check
+# md-style-check
 
-## Visualization Formatter Gate
+## Canonical Skill
 
-For Mermaid artifacts, consume `$code-visualization`'s
-`VisualizationSourceUniverse`, canonical `ToolCall`, and
-`ProjectionCoverageManifest`; format the complete artifact and return
-post-format readback identities for the owner's final coverage status. This
-shim owns syntax only and cannot treat rewriting, substitution, aggregation,
-or deletion as an omission repair. A pre-format marker is not readback.
+Canonical workflow and policy: [md-style-check](../../../agents/skills/md-style-check.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill md-style-check --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill md-style-check --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `4c15f64eb1db60c5ffcdd089e56ba0ebcc05a95569c6ac63524320b6f3c916a4`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/md-style-check.md`.
-1. Check `documents/conventions/coding-conventions-project.md` and
-   `documents/conventions/common/05_docs.md`.
-1. Treat plain `md-style-check` or `$md-style-check` in a user request as an explicit skill invocation, not only a candidate signal.
-1. Select this skill when a repo-changing task edits Markdown files or routes docs lint, link, heading, Mermaid, markdown math, docs-check, formatter, or `agent-canon docs` failures.
-1. Treat this skill as the Markdown checker route for typo/link/format-only edits. Pair it with `$owner-bounded-routing` when the whole task is an owner-bounded repository edit. When a Markdown change alters section order, reader path, claim support, source map, canonical route, or document responsibility, add `$prose-reasoning-graph` and `$structure-planning` before prose edits; for the format-only route, record `structure_contract=skipped` with the reason.
-1. For typo/link/format-only edits, do not require runtime `SKILL.md` reading
-   before running the docs tool or patching. Keep owner, existing-tool route,
-   and targeted-validation evidence.
-1. Use the unified Rust entrypoint as the canonical tool: `tools/bin/agent-canon docs check <paths...>` for checks and `tools/bin/agent-canon docs format <paths...>` for formatter repairs.
-1. Use `tools/bin/agent-canon docs -h` for command options and examples before reading implementation files.
-1. Before formatting files with display math, normalize display math to standalone double-dollar delimiter lines with blank lines around the block. Do not nest Markdown display delimiters inside KaTeX / math fenced blocks.
-1. Inline math in prose must use `$...$` (for example, `$(式)$`). Do not put math in inline code backticks, and do not use double-dollar display delimiters inside a sentence. Reserve double-dollar delimiters for display math on standalone delimiter lines.
-1. Mathematical expressions must not be placed in fenced code blocks labeled `text`, `plaintext`, `txt`, `plain`, `math`, `latex`, or `tex`; these first info tokens are checked case-insensitively. Convert those to `$...$` for inline math or a standalone double-dollar block. The checker reports one finding at a declared math-like fence and payload-line findings for text-like syntax.
-1. For tool-covered Markdown style, link, heading, math, and Mermaid properties, run the Rust docs tool before reading whole documents or spawning reviewers. Trust `DOCS_CHECK=pass`, `DOCS_CHECK_FINDING=...`, and the `DOCS_CHECK_REPORT_BEGIN` structured report; open only the reported path and nearby lines when a repair needs prose context.
-1. After any docs formatter or fixer runs, treat the adjacent check as part of the same operation: run `tools/bin/agent-canon docs check <paths...>` or record why the command was unavailable.
-1. Use `tools/bin/agent-canon docs fix-math <paths...>` and `tools/bin/agent-canon docs fix-mermaid <paths...>` for mechanical math or Mermaid repairs.
-1. If the docs formatter or fixer escapes display delimiters or creates duplicate display delimiters, repair the block form and rerun `tools/bin/agent-canon docs check <paths...>`.
-1. Check heading hierarchy, command/path formatting, Mermaid fenced blocks, markdown math, and broken links together.
-1. Treat broken links and heading drift as real findings.
-1. Last, inspect formatter-sensitive inline math and inline code in tables. A table cell must not contain a raw `|` inside backticks or inline math; if the formatter escapes backticks or splits a cell, split the expression out of the table, replace the cell with a short name, or otherwise repair the rendered Markdown, then rerun `tools/bin/agent-canon docs check <paths...>`.
-1. If a docs formatter/fixer/checker failure drives repair, record the
-   validation-failure-response packet (`failing_contract`, `observation_level`,
-   `cause_classification`, `intent_preservation`, and `evidence`). Use
-   `intent_preservation` for the same-intent repair / owner-route repair /
-   residual classification / escalation route. Do not close a docs-check failure by
-   pass-only scope shrink, link/heading oracle weakening, or validation
-   downscope.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

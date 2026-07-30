@@ -1,54 +1,45 @@
 ---
 name: academic-writing
-description: Use when drafting a paper, thesis chapter, scholarly note, or other academic document that needs mandatory multi-agent review for notation, logic, and reader flow.
+description: "Use when drafting a paper, thesis chapter, scholarly note, or other academic document that needs mandatory multi-agent review for notation, logic, and reader flow."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:academic-writing -->
+<!-- canonical: agents/skills/academic-writing.md sha256=0b9d0e6901cc0a67bc3c2181c378ba1fb0f0a3430770fa19a1fa3e8c99cb2337 -->
+<!-- route: agents/skills/catalog.yaml#skill:academic-writing.routing digest=ca10bf6d75f42cd4327f5f00eb4a2d4bd60d989e5e15e07e1277226fff1a36cc -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:academic-writing digest=4cda45473cbe5fe4639378efbbac6b3b38a044c67ea77a6b9995a427c471c1a7 -->
+<!-- commands: agents/skills/catalog.yaml#skill:academic-writing.tool_commands digest=561590ebe2edf789760dc83d3d374325ea550408192cafc55d4f7022baabc102 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Academic Writing for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
-upstream design ../../../agents/skills/academic-writing.md Academic Writing skill contract
-upstream design ../../../agents/skills/structure-planning.md defines reusable document structure contracts
-upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose graph diagnostics and rewrite handoffs
-upstream environment ../../../CONTAINER_OPERATIONS.md TeX devcontainer tooling boundary
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/academic-writing.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
+# academic-writing
 
-# Academic Writing
+## Canonical Skill
+
+Canonical workflow and policy: [academic-writing](../../../agents/skills/academic-writing.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill academic-writing --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill academic-writing --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `561590ebe2edf789760dc83d3d374325ea550408192cafc55d4f7022baabc102`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/academic-writing.md`.
-1. Select this as the DSL-to-prose projection adapter when file/document responsibility is academic prose, scholarly note, thesis chapter, method note, or symbol-dense claim-heavy explanation; do not select it by length.
-1. Use `$structure-planning` before drafting when section order, figure/table placement, claim/evidence layout, first section, or invalid interpretations are nontrivial.
-1. When claim flow or discourse connectives matter, have `$structure-planning` use `agent-canon semantic-index discourse-relations --profile academic-argument`; keep TeX routing separate from discourse evidence.
-1. For nontrivial academic prose creation or revision, create or receive a `$prose-reasoning-graph` handoff before drafting; use unsupported-claim diagnostics, weak-bridge diagnostics, experiment completeness findings, and split/merge/reorder operations as advisory input to the evidence map, paragraph claim map, and logic-gap review.
-1. When the prose graph handoff includes `selected_ordering.ordered_anchors`, use that whole-document topological sentence order as the DSL-to-prose input sequence before drafting academic sections or paragraph transitions.
-1. Project academic responsibilities into positive prose contracts: state each claim, definition, warrant, evidence relation, limitation, and reviewer handoff directly. Use negative boundary wording only inside an explicit Boundary, Limitation, or Non-Goal slot, and replace `ad hoc` labels with a named responsibility, evidence gap, verification route, or prompt-defect classification.
-1. Before writing academic prose, close `fix-now` findings at the DSL/projection stage: revise the claim contract, evidence map, paragraph claim map, graph-backed rewrite packet, or graph-backed units, rerun graph diagnostics, and only draft prose after the selected profile has no active findings.
-1. After projecting DSL/projection state to academic prose, rerun the graph check. If new findings appear only after projection, record `dsl_to_prose_prompt_defect` against this skill's academic prose-generation prompt and repair it before continuing.
-1. In Codex, use `/plan` before planning when the runtime provides it, and use `/agent` to inspect available subagents when the runtime provides it.
-1. Fix a short `claim contract`: central contribution, gap, reader, and non-goal.
-1. Build an `evidence map`, `notation ledger`, and section contract before drafting prose.
-1. When the academic artifact needs PDF-ready output, dense math, or figures, create a TeX output plan and use the devcontainer TeX toolchain: `latexmk`, pdfLaTeX, XeLaTeX, `dvisvgm`, and `pdfcrop`.
-1. Bootstrap a run bundle and explicitly enable `notation_definition_reviewer` and `logic_gap_reviewer`.
-1. Draft in reader order and keep results, interpretation, and limitations separate.
-1. For TeX output, keep canonical `.tex` source and validate documents with `latexmk -pdf`; validate figure outputs with `latexmk -pdf` plus `dvisvgm` or `pdfcrop`.
-1. Take a reverse outline after drafting.
-1. Require `document_flow_reviewer`, a separate `notation_definition_reviewer`, a separate `logic_gap_reviewer`, and a separate reviewer using `docs-completeness-review`.
-1. Add `critical-review`, `report-review`, or `docs-consistency-review` when the document warrants them.
-1. Do not route general README, workflow, guide, migration, or ordinary report writing to TeX through this skill; TeX is default-wired only for Academic Writing.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

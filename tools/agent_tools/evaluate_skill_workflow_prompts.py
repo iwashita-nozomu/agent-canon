@@ -66,6 +66,7 @@ class PromptEval:
 
     eval_id: str
     target: Path
+    canonical_target: Path | None
     kind: str
     description: str
     checklist: tuple[ChecklistItem, ...]
@@ -387,6 +388,11 @@ def expand_eval_entry(
             PromptEval(
                 eval_id=eval_id,
                 target=resolve_target(root, str(entry["target"])),
+                canonical_target=(
+                    resolve_target(root, str(entry["canonical_target"]))
+                    if entry.get("canonical_target") is not None
+                    else None
+                ),
                 kind=kind,
                 description=description,
                 checklist=checklist,
@@ -412,6 +418,7 @@ def expand_eval_entry(
         PromptEval(
             eval_id=f"{eval_id}:{path.relative_to(root).as_posix()}",
             target=path,
+            canonical_target=None,
             kind=kind,
             description=description,
             checklist=checklist,
@@ -480,6 +487,21 @@ def evaluate_prompt(eval_def: PromptEval) -> tuple[ChecklistResult, ...]:
             for item in eval_def.checklist
         )
     text = eval_def.target.read_text(encoding="utf-8")
+    if eval_def.canonical_target is not None:
+        if not eval_def.canonical_target.is_file():
+            return tuple(
+                ChecklistResult(
+                    eval_id=eval_def.eval_id,
+                    item_id=item.item_id,
+                    critical=item.critical,
+                    passed=False,
+                    description=f"missing canonical target: {eval_def.canonical_target}",
+                    missing_required=("canonical-target-file",),
+                    matched_forbidden=(),
+                )
+                for item in eval_def.checklist
+            )
+        text += "\n" + eval_def.canonical_target.read_text(encoding="utf-8")
     return tuple(evaluate_item(item, eval_def, text) for item in eval_def.checklist)
 
 

@@ -1,57 +1,45 @@
 ---
 name: agent-orchestration
-description: Mandatory routing skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing.
+description: "Mandatory routing skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:agent-orchestration -->
+<!-- canonical: agents/skills/agent-orchestration.md sha256=cebe3b719aa1a04e4110e1f07893def08a46cddfe1d8bfa49b7251eb9878a5b6 -->
+<!-- route: agents/skills/catalog.yaml#skill:agent-orchestration.routing digest=3f8c23709a63eb8c7af65da6ba22becbfb9edb77c7320080d8b955bcf1c49b89 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:agent-orchestration digest=cb5ffbaa6b1fff3996a1c6e7c8320778a62a50162a4e53f4db6db1c855462075 -->
+<!-- commands: agents/skills/catalog.yaml#skill:agent-orchestration.tool_commands digest=adb5f208c3beab6a61a81da68764e04acf22840014be6a878c4411e61a606641 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Routes the runtime skill entry to the canonical Agent Orchestration policy without copying that policy.
-upstream design ../../../agents/skills/agent-orchestration.md owns orchestration and Decision Sufficiency policy.
-upstream design ../../../agents/canonical/skills.md owns the public skill registry.
-upstream design ../../../agents/skills/skill-dependencies.yaml owns typed skill prerequisites and invocation order.
-upstream implementation ../../../tools/agent_tools/agent_team.py materializes machine ToolCall route packets.
-upstream implementation ../../../tools/agent_tools/route.py derives the selected skill order from the dependency map.
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/agent-orchestration.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
-# Agent Orchestration
+# agent-orchestration
 
-## Reader Map
+## Canonical Skill
 
-- Canonical policy: `agents/skills/agent-orchestration.md`.
-- Execution-Time-Aware Work-Conservation Contract:
-  `agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`.
-- Parallel Fresh-Clone Workstreams:
-  `agents/skills/agent-orchestration.md#Parallel-Fresh-Clone-Workstreams`.
-- Executable scheduling fields: `dependency_dag`, `makespan_objective`,
-  `responsibility_completeness`, `correctness`, `critical_path`, `ready_set`,
-  `context_reuse`, `affected_evidence_invalidation`.
-- Decision Sufficiency owner:
-  `agents/skills/agent-orchestration.md#Decision Sufficiency Packet`.
-- Runtime packet producer: `tools/agent_tools/agent_team.py`.
-- Skill dependency source: `agents/skills/skill-dependencies.yaml`.
-- Boundary: this file is a discovery shim and does not restate routing, DSV,
-  ToolCall, subagent, or validation rules. The semantic sufficiency record is
-  owner, replaceable unit, implementation mechanism, validation route, and any
-  unresolved branch that can change them; durable packet transport is conditional.
+Canonical workflow and policy: [agent-orchestration](../../../agents/skills/agent-orchestration.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `adb5f208c3beab6a61a81da68764e04acf22840014be6a878c4411e61a606641`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-1. Read `agents/skills/agent-orchestration.md` as the sole policy owner.
-1. Consume the owner-produced semantic decision-sufficiency record referenced by
-   the active route packet. A structured handoff or tool result is sufficient;
-   use a durable packet reference only for coordination or resumption.
-1. Execute the route packet's machine-readable ToolCall tokens and return their
-   typed failure semantics without translating them into prose commands.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

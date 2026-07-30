@@ -1,53 +1,45 @@
 ---
 name: user-guided-debugging
-description: Use when the user explicitly asks to debug, repair, or refactor one issue at a time with visible problem statements before each edit and a next-issue prompt after each scoped fix.
+description: "Use when the user explicitly asks to debug, repair, or refactor one issue at a time with visible problem statements before each edit and a next-issue prompt after each scoped fix."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:user-guided-debugging -->
+<!-- canonical: agents/skills/user-guided-debugging.md sha256=b12afba097f856ef9d4547b63ad07df33d9804c6fc976834c1244da684c88598 -->
+<!-- route: agents/skills/catalog.yaml#skill:user-guided-debugging.routing digest=e4401791a52cd66e2c19c950ef56663020c18d63f17c40a74ab0b2ca4aed9e63 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:user-guided-debugging digest=75ae011666cdaf1ab2f3f9d866013454a8601e475098b2f396bc09f9c8b54dfd -->
+<!-- commands: agents/skills/catalog.yaml#skill:user-guided-debugging.tool_commands digest=4f6875918047d0f68b5b5a9002c91c854256eaca3ee0939ce09697c8c8b753be -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents User-Guided Debugging for this repository.
-upstream design ../../../agents/skills/user-guided-debugging.md human-facing skill canon
-upstream design ../../../agents/canonical/skills.md skill canon registry
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/user-guided-debugging.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
+# user-guided-debugging
 
-# User-Guided Debugging
+## Canonical Skill
+
+Canonical workflow and policy: [user-guided-debugging](../../../agents/skills/user-guided-debugging.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill user-guided-debugging --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill user-guided-debugging --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `4f6875918047d0f68b5b5a9002c91c854256eaca3ee0939ce09697c8c8b753be`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/user-guided-debugging.md`.
-1. Select exactly one next target issue.
-1. If implementation repair is in scope, prepare a fresh work-capable subagent worker for that target issue before handoff; use the task-appropriate implementation agent from `.codex/agents/*.toml`.
-   - `worker` is the default. Select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>` for an eligible bounded repair, and require the selection in stdout / manifest.
-   - If the selected candidate is blocked, record local/tool evidence with `selected_agent_type`, `write_capable_handoff_blocker`, `evidence`, `parent_packet_ref`, and `status=blocked`; changing candidates requires an explicit revised parent packet and wave.
-   - Pass the visible problem statement, scoped repair surface, forbidden drift, and validation route to that worker.
-1. Before editing, show the user:
-   - target object or path
-   - concrete problem
-   - evidence or failing code path
-   - intended repair surface
-1. Do not patch before that problem statement is visible in chat.
-1. Keep the patch scoped to the displayed target unless evidence moves the root cause; if it moves, show the new problem statement before editing.
-1. Do not run tests, smoke runs, lint, docs checks, benchmarks, or other validation commands in this cadence unless the user explicitly asks for that execution after the patch.
-1. If the user explicitly asks for validation after the patch and validation fails, show `failing_contract`, `observation_level`,
-   `cause_classification`, `intent_preservation`, and `evidence` before the
-   next edit. Use `intent_preservation` for the same-intent repair or
-   escalation route. Do not simplify to pass, revert, delete intended
-   behavior/tests, weaken an oracle, or downscope validation without that
-   five-field classification.
-1. Report the patch result, state that validation was not run when it was skipped, and present the next concrete issue.
-1. Use this skill only when the user explicitly asks for this cadence; do not make it an `agent-orchestration` default.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

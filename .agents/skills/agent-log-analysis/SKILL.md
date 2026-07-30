@@ -1,112 +1,45 @@
 ---
 name: agent-log-analysis
-description: Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, missed or late skill invocation, routing misses, weak skills, over-constrained related-skill coverage, or selection gaps; first convert raw logs into a structured dashboard summary with AgentCanon source generate_agent_runtime_dashboard.py before reading or interpreting evidence.
+description: "Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, missed or late skill invocation, routing misses, weak skills, over-constrained related-skill coverage, or selection gaps; first convert raw logs into a structured dashboard summary with AgentCanon source generate_agent_runtime_dashboard.py before reading or interpreting evidence."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:agent-log-analysis -->
+<!-- canonical: agents/skills/agent-log-analysis.md sha256=15c5b275768b3392413c4275577c81f41f6db8240bfa2ddd2bc54b05a06fb9d0 -->
+<!-- route: agents/skills/catalog.yaml#skill:agent-log-analysis.routing digest=209982eafc56e4192bcf5be5bbea7741de5cbe6681ef255974b92fe16c89af3d -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:agent-log-analysis digest=486745168c9797b58bfa8de909ac43bc81c349067f2a4fd6e10f889a214dacc9 -->
+<!-- commands: agents/skills/catalog.yaml#skill:agent-log-analysis.tool_commands digest=14d8d7b7dfd1e9d92a4eadfa8e2936e383a9ee4e8230d8b2a4e49e0fc9f9d632 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Agent Log Analysis for this repository.
-upstream design ../../../agents/skills/agent-log-analysis.md documents the human-facing skill
-upstream design ../../../agents/skills/agent-eval-accumulation.md repairs missing accumulated eval evidence
-downstream design ../../../agents/skills/issue-finding-report.md converts compact log findings into durable issues
-upstream design ../../../documents/runtime/runtime-log-archive.md defines the external log archive mount
-upstream implementation ../../../tools/agent_tools/generate_agent_runtime_dashboard.py owns structured dashboard API fields
-upstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/agent-log-analysis.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
+# agent-log-analysis
 
-# Agent Log Analysis
+## Canonical Skill
 
-## Reader Map
-
-- Purpose: runtime skill for compacting AgentCanon log evidence before
-  diagnosing routing misses, weak skills, or workflow drift.
-- Use When: accumulated skill, tool, workflow, hook, eval, or wave logs need
-  analysis.
-- Tool Commands: run this skill's command packet, then read the canonical
-  `agents/skills/agent-log-analysis.md` workflow.
-- Boundary: generate the structured dashboard first; do not start with broad raw
-  log reading. Interpret tool selections, spawn records, planned/actual waves,
-  packet materialization, and checker evidence together when diagnosing work
-  amplification.
+Canonical workflow and policy: [agent-log-analysis](../../../agents/skills/agent-log-analysis.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill agent-log-analysis --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill agent-log-analysis --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `14d8d7b7dfd1e9d92a4eadfa8e2936e383a9ee4e8230d8b2a4e49e0fc9f9d632`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/agent-log-analysis.md`.
-1. Use the structured dashboard API / Markdown summary as the normal analysis input.
-1. Select this skill when the observed problem is that a skill, tool, workflow, or related-skill candidate was missed, delayed, over-constrained, or routed to the wrong follow-up surface, even when the user describes the symptom without explicitly asking for logs.
-1. Resolve or mount the external log archive before dashboard generation:
-
-```bash
-python3 tools/agent_tools/runtime_log_archive_git.py ensure
-python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
-python3 tools/agent_tools/runtime_log_archive_git.py sync
-python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
-```
-
-1. Use this archive hygiene sequence: `sync`, `check-clean`, dashboard
-   generation, final `sync`. Preferred closed state is
-   `RUNTIME_LOG_ARCHIVE_CLEAN=yes`. When `check-clean` reports only
-   current-repo live hook files after the immediately preceding command, with
-   `RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no`, record those paths as
-   `live_hook_tail_dirty`, continue to dashboard generation, and close the task
-   after the final `sync` reports `RUNTIME_LOG_ARCHIVE_SYNC=pass`. Foreign dirty
-   keys remain archive hygiene repair targets before closeout.
-1. Call the AgentCanon source dashboard tool from the source repository root.
-   The tool resolves the AgentCanon root and the mounted log archive; keep
-   `<source-root>` as the repository being analyzed:
-
-```bash
-python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
-  --root <source-root> \
-  --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md \
-  --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
-```
-
-1. Read the API JSON or compact Markdown as the default analysis input. The
-   archive repo owns append-only evidence; the AgentCanon source dashboard owns
-   aggregation, moving averages, and routing evidence cells.
-1. Classify missing actual wave rows before proposing reconciliation as
-   `overplanning`, `logging_gap`, or `unresolved`. Do not backfill overplanning
-   or unresolved rows; only a supported logging gap routes to logging repair.
-   Group findings by owning replaceable responsibility and compatible context,
-   not one agent, packet, wave, or review per finding.
-1. Confirm the API JSON includes the normal analysis fields `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, and `oop_applicability`.
-1. When `generate_agent_runtime_dashboard.py` lacks a needed compact field,
-   record `dashboard_api_contract_gap`, route that finding to the dashboard API owner,
-   and rerun it after the source tool is repaired.
-1. For eval family gaps, run `python3 tools/agent_tools/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; if it reports missing, stale, or failing families, add `$agent-eval-accumulation` and use its producer/checker/archive loop.
-1. Event-file drilldown is for tool development, schema debugging, corruption audit, or an API-named drilldown path; record an explicit rationale before reading it.
-1. Answer token-use questions from the API token coverage/moving-average fields. If token status is missing, say token claims are unsupported.
-1. Report observations separately from interpretation, repair target, and unknowns.
-1. When the user asks to turn structured evidence into durable skill issues, hand
-   the structured API output, structured Markdown summary, and Finding Route Packet to
-   `$issue-finding-report`.
-1. If the analysis drives a prompt, skill, workflow, or tool change, write the `Finding Route Packet` from `agents/skills/agent-log-analysis.md` before editing or spawning the repair wave. A structured handoff message or tool result satisfies it; use a durable file only for coordination or resumption. The packet must include `finding_class`, `evidence_cells`, `route_target`, `instance_partition`, `required_packet`, and `closeout_gate`.
-1. Route by finding class:
-   wave execution findings to `$subagent-bootstrap`;
-   skill selection findings to the affected skill plus `prompt_config_reviewer`;
-   tool selection findings to `tools/catalog.yaml` plus the owning tool docs;
-   workflow selection findings to `agents/TASK_WORKFLOWS.md` plus the owning
-   workflow guide; workflow attribution or token coverage findings to
-   `$agent-learning` or the logging owner; eval gaps to
-   `$agent-eval-accumulation`; archive hygiene findings to
-   `$result-artifact-writeout` or the log archive owner; prompt/config drift to
-   `prompt_config_reviewer`; and structure-boundary findings to
-   `$structure-refactor`.
-1. When one structured summary contains independent findings, split same-role review instances by `repo_key`, `hook_family`, `skill_name`, `workflow_name`, `issue_id`, or path scope. Use an instance id shaped like `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>`.
-1. If the user asks for a durable report, pair this skill with `$result-artifact-writeout`.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

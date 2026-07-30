@@ -1,63 +1,45 @@
 ---
 name: save-experiment-results
-description: Save and publish experiment run results with branch-safe retention. Use when Codex needs to preserve experiments/<topic>/result/<run_name>, create or verify experiment result manifests, write experiment reader reports, publish to experiment-results/<topic>, prevent overwrites, or keep failed/partial experiment runs as durable evidence.
+description: "Save and publish experiment run results with branch-safe retention. Use when Codex needs to preserve experiments/<topic>/result/<run_name>, create or verify experiment result manifests, write experiment reader reports, publish to experiment-results/<topic>, prevent overwrites, or keep failed/partial experiment runs as durable evidence."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:save-experiment-results -->
+<!-- canonical: agents/skills/save-experiment-results.md sha256=9fe6211ab4e21a0580b372d3991927211f1aa343b4061c2d50a307ebd5dea1e4 -->
+<!-- route: agents/skills/catalog.yaml#skill:save-experiment-results.routing digest=e7e6280de33c4d5de334534d96aafeba109d07e8d74a991011280cd421cb98c5 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:save-experiment-results digest=539cd7169bf4ed079238078c3fa60d4cdde46f613832f05a11281d4b04febd40 -->
+<!-- commands: agents/skills/catalog.yaml#skill:save-experiment-results.tool_commands digest=82ead84c462ffbe69d203d7752820b2bce4a486d2539fd51b5b0e2a4c41bb633 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Save Experiment Results runtime skill for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
-upstream design ../../../agents/skills/save-experiment-results.md human-facing save-experiment-results skill
-upstream design ../../../agents/skills/experiment-lifecycle.md experiment lifecycle workflow
-upstream design ../../../agents/skills/result-artifact-writeout.md durable raw/result/report artifact writeout
-downstream implementation ../../../tools/experiments/publish_result_branch.py publishes formal result branches
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/save-experiment-results.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
-# Save Experiment Results
+# save-experiment-results
+
+## Canonical Skill
+
+Canonical workflow and policy: [save-experiment-results](../../../agents/skills/save-experiment-results.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill save-experiment-results --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill save-experiment-results --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `82ead84c462ffbe69d203d7752820b2bce4a486d2539fd51b5b0e2a4c41bb633`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-1. Read `agents/skills/save-experiment-results.md`.
-1. Start from an existing `experiments/<topic>/result/<run_name>/`. If it is
-   missing, return to `$experiment-lifecycle`; do not invent a saved result from
-   chat notes or report prose.
-1. Write a retention plan before touching a result branch: topic, run name,
-   result directory, source branch, source commit, source dirty state, result
-   branch, remote publish decision, overwrite policy, and report path.
-1. Preserve raw machine-readable run artifacts before deriving Markdown,
-   tables, or HTML. Missing standard artifacts become explicit limitations.
-1. Save failed, skipped, blocked, and partial runs with status, exit code,
-   blocker, partial artifact list, and next action. They are not disposable.
-1. Do not overwrite a detailed result directory. Use a new run name,
-   append-only manifest entry, or a recorded cleanup task with owner and reason.
-1. Keep source changes and result retention on separate branch lanes. Code,
-   config, protocol, skill, tool, workflow, or report-generator changes stay on
-   source branches/PRs; formal result artifacts go to
-   `experiment-results/<topic>` via `publish_result_branch.py`.
-1. Treat dirty-source runs as retainable but not formal success evidence. Record
-   affected paths and `experiment_formal_status=not_formal_dirty_source`; rerun
-   from a committed source branch or merged commit before marking the result
-   formal.
-1. Before creating or updating the result branch, record
-   `branch_creation_reason=<reason>` and `result_branch=<branch>` in the run
-   bundle, manifest, report, or PR body.
-1. Add `--push` only when the retention plan calls for remote storage.
-1. If a reader-facing report is requested, also use `$report-writing`; this
-   skill owns raw retention and branch-safe publication, not scientific
-   interpretation quality.
-1. Close out with `experiment_result_save=complete`, result paths, source commit,
-   dirty-state evidence, formal status, result branch, raw manifest, report
-   path, and overwrite policy.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

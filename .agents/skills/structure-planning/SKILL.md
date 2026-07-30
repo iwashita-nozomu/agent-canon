@@ -1,71 +1,45 @@
 ---
 name: structure-planning
-description: Use when a report, experiment plan, Eval output, presentation storyboard, PPT/deck plan, document, paper, HTML view, or refactor needs a structure contract before prose, rendering, interpretation, follow-up runs, or edits.
+description: "Use when a report, experiment plan, Eval output, presentation storyboard, PPT/deck plan, document, paper, HTML view, or refactor needs a structure contract before prose, rendering, interpretation, follow-up runs, or edits."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:structure-planning -->
+<!-- canonical: agents/skills/structure-planning.md sha256=e6dc1049dfabff9b68e07e20c658ca04dac51a2b067207fffaa76ecc4e1a532f -->
+<!-- route: agents/skills/catalog.yaml#skill:structure-planning.routing digest=a85e0ff9aec22048442d3faf8708dd83d8544eda291130e724f733a714b43ec8 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:structure-planning digest=63503ea8cdb8b6e9cdfa8223fca912882274bc6fdd63e93229706b9bf2ed2c09 -->
+<!-- commands: agents/skills/catalog.yaml#skill:structure-planning.tool_commands digest=1761fc61e0b6fc675ed6da769512e5c25e61661a3ddb21b33b4dfce59bda3256 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Structure Planning runtime skill for this repository.
-upstream design ../../../agents/skills/structure-planning.md documents the human-facing structure planning workflow
-upstream design ../../../documents/rule/README.md document rule canon
-upstream design ../../../documents/design/README.md design canon reader route
-upstream design ../../../agents/skills/result-artifact-writeout.md defines raw result and summary artifact placement
-upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose graph structure evidence handoffs
-upstream design ../../../agents/workflows/slide-production-workflow.md defines PPT template, slot, and layout review workflow
-upstream design ../../../agents/skills/code-visualization.md sole public visualization owner and typed projection contract.
-downstream implementation ../../../tests/agent_tools/test_check_dependency_headers.py validates this adapter dependency header.
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/structure-planning.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
-# Structure Planning
+# structure-planning
 
-## 文書正本
+## Canonical Skill
 
-文書の filename、配置、構成判断は
-[`documents/rule/README.md`](../../../documents/rule/README.md) を参照します。
-個別の target state と実装境界は
-[`documents/design/README.md`](../../../documents/design/README.md) を参照します。
-詳細規則はこの runtime shim に複製しません。
-
-## Visualization Adapter Boundary
-
-For every planned Mermaid, document, report, wiki, or browser graph, retain the
-structure contract as native planning evidence and call `$code-visualization`
-with the complete selected source set. Consume its
-`VisualizationSourceUniverse`, canonical `ToolCall`,
-`ProjectionCoverageManifest`, post-format readback, and final coverage status.
-This shim owns reader intent and layout only and does not duplicate universal
-omission or granularity rules.
+Canonical workflow and policy: [structure-planning](../../../agents/skills/structure-planning.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill structure-planning --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill structure-planning --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `1761fc61e0b6fc675ed6da769512e5c25e61661a3ddb21b33b4dfce59bda3256`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/structure-planning.md`.
-1. Use this before drafting prose, writing a renderer, interpreting experiment output, planning a presentation/deck, planning follow-up runs, or editing refactor surfaces when the work has a nontrivial structure.
-1. For document additions or revisions, use this before prose edits when section order, responsibility, claim/support, reader path, source map, or canonical route changes; for typo/link/format-only edits, record `structure_contract=skipped` with the reason and use `$md-style-check`.
-1. Create a structure contract with `structure_kind`, audience, decision context, first artifact, first artifact question, `visual_plan`, source-to-structure map, `document_unit`, `document_split_decision`, OOP structure contract when planning experiments, metric or delta contract, ordered structure, invalid interpretations, and validation gate; for deck/PPT work, include slide/storyboard order and source-to-slide mapping.
-1. For document structure changes, fill `document_unit` with owner, reader, source map, validation route, update cadence, canonical parent, and downstream consumers. Set `document_split_decision` to `keep`, `split`, `merge`, `inline`, `rename`, or `not_applicable:format-only` before prose edits.
-1. Choose `split` only for a new owner, reader, validation route, source map, update cadence, or downstream consumer. Choose `merge`, `inline`, or `keep` when the same owner, reader, source map, validation route, and update cadence remain shared. Treat length, token budget, chunking convenience, section count, nearby path, temporary work queue, and shared validation oracle as invalid split boundaries.
-1. For `experiment-plan` and `experiment-report`, structure from the OOP responsibility view before prose order: list reused modules/classes/functions/protocols, object creation/mutation/pass-through/artifact writes, the factory/function boundary where variants differ, and dependency direction across orchestration, domain logic, metrics, visualization, and artifact I/O.
-1. When paragraph/block order, connective choice, or logic-gap evidence is nontrivial, run or request `agent-canon semantic-index discourse-relations --profile <general|experiment-report|methods-protocol|academic-argument|refactor-design> --format jsonl` after the semantic index is built; use it as advisory structure evidence, not as prose or policy authority.
-1. If a prose graph DB or projection is present, use `prose_reasoning_graph.py explain` and `integrate` as advisory evidence for paragraph bridges, split/merge/reorder operations, and invalid interpretations.
-1. Choose the first artifact before implementation: figure, table, ponchi-e/concept diagram, slide, summary card, first section, experiment slice, or refactor slice.
-1. For reader-facing documents, reports, plans, workflow guides, and refactor maps, choose Mermaid as the default first visual when the structure includes nontrivial process flow, dependencies, ownership, routing, state transitions, review gates, or multi-step handoffs; choose `text-only` only when a diagram would duplicate a simple list and record that reason in `visual_plan`.
-1. Map every source artifact to the section, slide, visual, claim, experiment slice, or refactor slice it supports; do not let unsupported claims or edits appear later.
-1. Define metric denominator, directionality, baseline, and caveat for reports or experiments; define allowed structural delta and forbidden semantic delta for refactors.
-1. Put sections, slides/storyboards, visuals, experiment slices, or refactor slices in reader or execution order rather than raw tool-output order.
-1. Record invalid interpretations so the structure cannot be mistaken for policy, classification, merge, deletion, ownership, or behavior-change authority.
-1. Hand the completed structure contract to `$report-writing`, `$html-output`, `$html-experiment-report`, `$experiment-lifecycle`, slide-production workflow, `$long-form-writing`, `$academic-writing`, `$paper-writing`, or `$refactor-loop` as appropriate; this skill owns structure, not raw storage, experiment execution, report prose, document drafting, implementation, or domain authority.
-1. Record closeout tokens: `structure_planning=complete`, `structure_contract=<path-or-inline>`, `document_split_decision=<keep|split|merge|inline|rename|not_applicable:format-only>`, `structure_first_artifact=<name>`, `structure_visual_plan=<mermaid|table|text-only|html|image|slide|not-applicable>`, `structure_source_map=<path-or-inline>`, `structure_oop_contract=<path-or-inline|not_required>`, `discourse_relations=<path|not_required>`, and `structure_invalid_interpretations_recorded=yes`.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

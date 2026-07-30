@@ -2,7 +2,7 @@
 
 # @dependency-start
 # contract test
-# responsibility Tests skill tool-command packet sync and validation.
+# responsibility Tests skill tool-command packet production and read-only validation.
 # upstream implementation ../../tools/agent_tools/skill_tool_commands.py command packet tool
 # upstream design ../../agents/skills/task-routing.md deterministic skill routing contract
 # upstream design ../../agents/skills/catalog.yaml public skill identity and trigger catalog
@@ -131,23 +131,18 @@ class SkillToolCommandsTest(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def test_sync_adds_command_section_and_check_passes(self) -> None:
-        """Sync materializes the show command for every runtime skill."""
+    def test_sync_is_rejected_and_does_not_write(self) -> None:
+        """The removed sync surface is not a compatibility writer."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             skill = self.write_skill(root, "example-skill", "Use the canon.\n")
+            before = skill.read_bytes()
 
             sync = self.run_tool(root, "sync")
-            check = self.run_tool(root, "check")
 
-            self.assertEqual(sync.returncode, 0, sync.stdout + sync.stderr)
-            self.assertIn("SKILL_TOOL_COMMANDS_SYNC=pass", sync.stdout)
-            self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
-            self.assertIn(
-                "python3 tools/agent_tools/skill_tool_commands.py show "
-                "--skill example-skill --format text",
-                skill.read_text(encoding="utf-8"),
-            )
+            self.assertNotEqual(sync.returncode, 0)
+            self.assertIn("invalid choice", sync.stderr)
+            self.assertEqual(before, skill.read_bytes())
 
     def test_show_returns_discovered_commands(self) -> None:
         """Show prints commands discovered from the runtime and canon docs."""
@@ -486,25 +481,14 @@ class SkillToolCommandsTest(unittest.TestCase):
                 result.stdout + result.stderr,
             )
 
-    def test_common_entry_wording_is_synced(self) -> None:
-        """Canonical and generated skill entries state the source-root contract."""
-        source_root_wording = (
-            "論理コマンドは、実行前に AgentCanon source root を基準として解決します。"
-        )
-        generated_wording = (
-            "この skill の workflow を適用する前に、次の command packet を使用してください。",
-            source_root_wording,
-            "packet が出力した必須 command と、task に該当する conditional command を実行してください。",
-        )
-        canonical = (PROJECT_ROOT / "agents/skills/agent-orchestration.md").read_text(
-            encoding="utf-8"
-        )
+    def test_generated_entry_is_a_read_only_packet_projection(self) -> None:
+        """The materialized adapter exposes a read-only packet path."""
         runtime = (PROJECT_ROOT / ".agents/skills/agent-orchestration/SKILL.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn(source_root_wording, canonical)
-        for wording in generated_wording:
-            self.assertIn(wording, runtime)
+        self.assertIn("Canonical workflow and policy:", runtime)
+        self.assertIn("skill_tool_commands.py show --skill agent-orchestration --format text", runtime)
+        self.assertNotIn("skill_tool_commands.py sync", runtime)
 
     def test_resolve_source_root_fails_with_missing_catalog(self) -> None:
         """The command tool returns typed failure when no source root is detectable."""
@@ -737,11 +721,8 @@ class SkillToolCommandsTest(unittest.TestCase):
                 "result-artifact-writeout",
                 "Run `runtime_log_archive_git.py push` after archiving.\n",
             )
-            sync = self.run_tool(root, "sync")
-
             result = self.run_tool(root, "check")
 
-            self.assertIn("SKILL_TOOL_COMMANDS_SYNC_CHANGED=1", sync.stdout)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("bare-runtime-log-archive-push:present", result.stdout)
 
@@ -754,11 +735,8 @@ class SkillToolCommandsTest(unittest.TestCase):
                 "start-repository",
                 "Read `documents/agent-canon/agent-canon-github-remote.md`.\n",
             )
-            sync = self.run_tool(root, "sync")
-
             result = self.run_tool(root, "check")
 
-            self.assertIn("SKILL_TOOL_COMMANDS_SYNC_CHANGED=1", sync.stdout)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("remote-doc-template-path:missing", result.stdout)
 
@@ -774,12 +752,10 @@ class SkillToolCommandsTest(unittest.TestCase):
                     "using template `templates/agents/workflow_monitoring.md`.\n"
                 ),
             )
-            sync = self.run_tool(root, "sync")
-
             result = self.run_tool(root, "check")
 
-            self.assertEqual(sync.returncode, 0, sync.stdout + sync.stderr)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("workflow_monitoring.md:present", result.stdout)
 
 
 if __name__ == "__main__":

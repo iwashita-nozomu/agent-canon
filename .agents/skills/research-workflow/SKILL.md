@@ -1,38 +1,45 @@
 ---
 name: research-workflow
-description: Use when a task needs external research, comparison design, iterative implementation and runs, and explicit review decisions before claims are accepted.
+description: "Use when a task needs external research, comparison design, iterative implementation and runs, and explicit review decisions before claims are accepted."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:research-workflow -->
+<!-- canonical: agents/skills/research-workflow.md sha256=5f62bb10ed2a514ffa2b35c7f6e961b3fffbd6e6edbab51a7bf97248e6de15a2 -->
+<!-- route: agents/skills/catalog.yaml#skill:research-workflow.routing digest=18f8d33e3ae6a501fce57ae7b9cc9862538ee0dc0a06879d8c4456eecd135434 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:research-workflow digest=20b0cbfb5c92228a8528791bd30c17ffdf5fae7660146f6e17e3421d2979fb84 -->
+<!-- commands: agents/skills/catalog.yaml#skill:research-workflow.tool_commands digest=96f707eecc25738566e646d7258cdb6e174908726bd6cf36eb48b3dbc7238013 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Research Workflow for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/research-workflow.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
+# research-workflow
 
-# Research Workflow
+## Canonical Skill
+
+Canonical workflow and policy: [research-workflow](../../../agents/skills/research-workflow.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill research-workflow --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill research-workflow --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `96f707eecc25738566e646d7258cdb6e174908726bd6cf36eb48b3dbc7238013`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/research-workflow.md`.
-1. Read `agents/workflows/research-workflow.md`.
-1. Resolve AgentCanon document paths relative to the AgentCanon source root. From a template or derived repo root, read `vendor/agent-canon/documents/experiments/experiment-critical-review.md`; from standalone AgentCanon, read `documents/experiments/experiment-critical-review.md`.
-1. If the task includes paper search or prior-art mapping, also read `agents/skills/literature-survey.md`.
-1. Fix the question, comparison targets, and exit criteria before implementing.
-1. Before using external references, inspect existing repo reference notes and leave or update a durable source packet; claims based on browser/download context alone are not accepted.
-1. Keep one change per loop iteration.
-1. Do not close the loop while `report_rewrite_required`, `extra_validation_required`, or `rerun_required` remains.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

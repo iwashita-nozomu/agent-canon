@@ -1,0 +1,11 @@
+{
+  "scenario_id": "toolcall-route",
+  "packet_id": "shim-toolcall-route-v1",
+  "iteration_id": "fresh-generated-01",
+  "skill_id": "structure-planning",
+  "variant": "generated",
+  "prompt": "Read the structured planning command packet and preserve typed ToolCall boundaries.",
+  "input_tokens": 571,
+  "canonical_followup_input_tokens": 168,
+  "cache_fields_observed": {"cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
+}

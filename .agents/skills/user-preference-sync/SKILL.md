@@ -1,35 +1,45 @@
 ---
 name: user-preference-sync
-description: Use when memory/USER_PREFERENCES.md should be distilled into stable AGENTS.md preferences without carrying over task-local instructions.
+description: "Use when memory/USER_PREFERENCES.md should be distilled into stable AGENTS.md preferences without carrying over task-local instructions."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:user-preference-sync -->
+<!-- canonical: agents/skills/user-preference-sync.md sha256=037632daa77de3d214f4e936a407ef1139b1d671b059144a215899fe84808b5d -->
+<!-- route: agents/skills/catalog.yaml#skill:user-preference-sync.routing digest=3eb5cd69e76e742532b465c4c680c619cc9abc036c9b57bf2beefba9139dd659 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:user-preference-sync digest=5113f4858ea6e5f5908a72dd70dae33d5ad1b81206103eaec3a0ed1dcf763c4d -->
+<!-- commands: agents/skills/catalog.yaml#skill:user-preference-sync.tool_commands digest=d29ba274c3851d88b5a3cf7ffb09c58ece8987dfe32a14f3f4d0f738b250cd80 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents User Preference Sync for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/user-preference-sync.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
+# user-preference-sync
 
-# User Preference Sync
+## Canonical Skill
+
+Canonical workflow and policy: [user-preference-sync](../../../agents/skills/user-preference-sync.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill user-preference-sync --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill user-preference-sync --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `d29ba274c3851d88b5a3cf7ffb09c58ece8987dfe32a14f3f4d0f738b250cd80`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/user-preference-sync.md`.
-1. Read `AGENTS.md` and `memory/USER_PREFERENCES.md`.
-1. Separate durable repo-wide preferences from task-local instructions.
-1. Promote only repeated and stable items into `AGENTS.md`.
-1. Keep rationale, examples, and volatile observations in `memory/USER_PREFERENCES.md` unless they are project-specific notes that belong under repo-local `notes/themes/`.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

@@ -1,41 +1,45 @@
 ---
 name: comprehensive-development
-description: Use when a repo-wide task spans code, docs, tools, workflows, and runtime surfaces and needs explicit subagent routing.
+description: "Use when a repo-wide task spans code, docs, tools, workflows, and runtime surfaces and needs explicit subagent routing."
 ---
+<!-- generated: agent_canon.skill_runtime_shim.v1 -->
+<!-- source: agents/skills/catalog.yaml#skill:comprehensive-development -->
+<!-- canonical: agents/skills/comprehensive-development.md sha256=09f4caa99d3290b9311842592b168d78e4a9d3ba4e608a517bfc58d1d64ba91e -->
+<!-- route: agents/skills/catalog.yaml#skill:comprehensive-development.routing digest=c5a6312f47f5551dc5647765befe569ea80e28516cce821a2440eaab3bd83f55 -->
+<!-- dependencies: agents/skills/skill-dependencies.yaml#invocation:comprehensive-development digest=bd430951132f16013dc607063a8beb8b538bf17835b4a427b2f2d03eba973d50 -->
+<!-- commands: agents/skills/catalog.yaml#skill:comprehensive-development.tool_commands digest=d76fb141d0f4843ceac353f18f824b1ded4f3600d4a361a45cd481f5a0f2a5a0 -->
+<!-- materializer: skill_shim_materializer.v1 -->
+
 <!--
 @dependency-start
-contract skill
-responsibility Documents Comprehensive Development for this repository.
-upstream design ../../../agents/canonical/skills.md skill canon registry
-upstream design ../../../agents/task_catalog.yaml workflow family spawn budget and role topology owner
-upstream design ../../../agents/agents_config.json permanent team role ownership and write policy owner
-upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md Codex subagent inventory and activation contract
+contract reference
+responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
+upstream design ../../../agents/skills/catalog.yaml catalog-owner
+upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
+upstream implementation ../../../agents/skills/comprehensive-development.md canonical-owner
+downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
+downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
+downstream implementation ../../../tools/agent_tools/route.py route-owner
+downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
 @dependency-end
 -->
 
+# comprehensive-development
 
-# Comprehensive Development
+## Canonical Skill
+
+Canonical workflow and policy: [comprehensive-development](../../../agents/skills/comprehensive-development.md).
+Read that owner before applying the skill. This file is only the Codex discovery
+adapter; it does not restate the canonical skill prose.
 
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-この skill の workflow を適用する前に、次の command packet を使用してください。
-
-```bash
-python3 tools/agent_tools/skill_tool_commands.py show --skill comprehensive-development --format text
-```
-
-論理コマンドは、実行前に AgentCanon source root を基準として解決します。各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、fallback-only skill を含む script entry の script path は絶対 path にします。
-
-packet が出力した必須 command と、task に該当する conditional command を実行してください。
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill comprehensive-development --format text`.
+Packet schema: `skill_tool_commands.v2`; packet digest: `d76fb141d0f4843ceac353f18f824b1ded4f3600d4a361a45cd481f5a0f2a5a0`.
+The command packet is the complete catalog-backed packet, including every command
+phase and resolved command tuple; this line is its executable read path, not a second
+writer or an alternate write route.
 <!-- skill-tool-commands:end -->
 
-
-1. Read `agents/skills/comprehensive-development.md`.
-1. Set `workflow=Comprehensive Development` and declare `skills=<...>`, `review=<...>`.
-1. Read `agents/task_catalog.yaml` for the `comprehensive_development` family `spawn_budget`, `role_topology`, `roles`, and `subagent_prompt`.
-1. Read `agents/agents_config.json` for permanent team role ownership, required output, and write policy.
-1. Read `agents/canonical/CODEX_SUBAGENTS.md` for Codex inventory, activation, and runtime surface routing.
-1. Bootstrap the standard bundle, then mirror catalog / config ownership into `team_manifest.yaml`.
-1. Use `project_reviewer` as the repo-wide integration reviewer named by the catalog and config surfaces.
-1. Assign colliding writers to later waves in the current checkout when multiple writers are needed.
+1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
