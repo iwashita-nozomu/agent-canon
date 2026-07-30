@@ -169,3 +169,79 @@ Record:
   CleanupProof, G6, and terminal `CloseAgentToolCall`
 - remote readback before task-owned temp/cache deletion and evidence that
   unknown shared state is unchanged
+
+## Runtime Contract Clauses
+
+The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+
+Run `make agent-canon-update-plan` first. If it reports an update, request
+current-task user approval and rerun
+`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest`
+with all four inline Git authority/reason fields in the same command segment.
+
+Treat this as the mandatory `agentcanon_structure_followup` gate whenever
+   AgentCanon source, the parent submodule pin, `.gitmodules`, root runtime
+   views, shared root-copy surfaces, or parent root sync state changed. Record
+   `agentcanon_structure_followup=required` before the commands and
+   `agentcanon_structure_followup=pass` only after the sync check passes.
+   Template / derived parent roots must run this gate from the parent root after
+   AgentCanon source changes are integrated, or while preparing the parent
+   pin/root-view PR.
+
+```bash
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
+  bash tools/sync_agent_canon.sh link-root
+bash tools/sync_agent_canon.sh check
+```
+
+- Purpose: runtime skill for AgentCanon source updates, parent submodule pin
+  refreshes, root-view repair, and latest-state checklist work.
+- Use When: updating `vendor/agent-canon/`, applying AgentCanon update TODOs,
+  or routing local AgentCanon commits through source PRs before parent pins.
+- Tool Commands: run this skill's command packet, then read the canonical
+  update-route and parent latest-state documents.
+- Boundary: use `dependency-module-change` for source edits. Parent source編集は
+  原則 `vendor/agent-canon` の topic-named branch で行い、別 topic の dirty
+  親 vendor 状態がある場合のみ `workspace/<topic-slug>/agent-canon` の
+  standalone clone に fallback します。Parent pin/root projection は clean
+  `main` と staged index gitlink と worktree `HEAD` の一致が pass 条件です。
+  `main` は source edit owner ではなく topic 作成の起点です。
+  Parent state, requested topic identity, and dirty fallback next actions are
+  defined only by the [`AgentCanon parent state decision table`](../../../documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table).
+  `latest` の更新対象 branch 引数を topic slug に転用しません。
+  Under that decision table, a dirty vendor checkout is a refusal condition
+  when it is not the intended source working branch; do not preserve or resume
+  that state. For parent pin/root projection, only a clean vendor pin projection
+  is eligible, while a differing requested topic may use the managed workspace
+  clone only through the table's topic-identity rule.
+- Standalone local source-branch publication follows the canonical transport
+  contract in `documents/tools/github_publish.md`: verified remote identity/
+  permission, named branch, captured local identity, exact SHA ref push, remote
+  readback, and local invariance. It does not generate G1/G2/G3; packet-bound
+  push and PR operations retain the sealed publication requirements. CI
+  fresh-clone fixtures are not publication evidence.
+
+1. If `vendor/agent-canon/` contains local AgentCanon source commits or source
+   dirty state that is not the intended source working branch, stop. Do not invoke
+   `merge-main-into-current*`, stash, preserve, or resume that vendor state.
+   Run the generic dependency-module tool from the parent with owner evidence:
+   `prepare --topic <topic> --module vendor/agent-canon --branch <source-branch>`.
+   Make the source branch/PR in `workspace/<topic-slug>/agent-canon` only when the
+   parent vendor is occupied by another topic's dirty state and the requested
+   topic differs from the named current branch; otherwise follow the decision
+   table's typed stop or edit the parent vendor branch directly. Standalone
+   source clones retain the source-mode merge/publication route.
+
+1. Use `$agent-update-branch` only for parent-repo `canon-pin` update branches.
+   AgentCanon source edits use a standalone AgentCanon branch and PR. Reuse the
+   current parent branch if it already owns the same pin/update lane.
+1. Close out with update route, dirty-surface classification, submodule pin or
+   AgentCanon commit, PR URL if any, root-view check, TODO status, and selected
+   validation evidence.
+
+```bash
+python3 tools/agent_tools/agent_canon_update_todos.py status
+python3 tools/agent_tools/agent_canon_update_todos.py plan --write
+```
+
+1. Check and apply parent update TODOs before unrelated work:

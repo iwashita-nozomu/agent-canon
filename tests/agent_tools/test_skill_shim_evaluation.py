@@ -74,9 +74,9 @@ class SkillShimEvaluationTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(payload["schema"], "agent_canon.skill_runtime_shim.measurement")
-            self.assertEqual(payload["summary"]["scenario_row_count"], 6)
-            self.assertEqual(payload["summary"]["candidate_row_count"], 126)
-            self.assertIn(payload["summary"]["deterministic_reduction_status"], {"pass", "fail"})
+            self.assertEqual(payload["summary"]["scenario_row_count"], 12)
+            self.assertEqual(payload["summary"]["candidate_row_count"], 132)
+            self.assertEqual(payload["summary"]["deterministic_reduction_status"], "pass")
             self.assertEqual(
                 {row["variant"] for row in payload["candidate_rows"]},
                 {"current", "generated"},

@@ -97,6 +97,36 @@ class ReportQualityEvalTest(unittest.TestCase):
             self.assertIn("REPORT_QUALITY_EVAL_STATUS=fail", result.stdout)
             self.assertIn("REPORT_QUALITY_EVAL_CRITICAL_FAILED=1", result.stdout)
 
+    def test_canonical_target_supplies_generated_shim_policy(self) -> None:
+        """A thin runtime shim is evaluated with its canonical policy owner."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "shim.md").write_text("adapter\n", encoding="utf-8")
+            (root / "owner.md").write_text("required policy\n", encoding="utf-8")
+            manifest = root / "eval.toml"
+            manifest.write_text(
+                textwrap.dedent(
+                    """
+                    version = 1
+
+                    [[evals]]
+                    id = "canonical"
+                    target = "shim.md"
+                    canonical_target = "owner.md"
+
+                    [[evals.checklist]]
+                    id = "Q1"
+                    required_regex = ["required policy"]
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = run_eval("--root", str(root), "--manifest", str(manifest))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -19,9 +19,9 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 try:
     import tomllib
@@ -41,6 +41,15 @@ EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
 ROUTE_SCHEMA = "agent_canon.route.skill_route.v1"
 PACKET_CLASSES = ("full", "changed")
 VARIANTS = ("current", "generated")
+SCENARIO_CATEGORIES = (
+    "discovery-selection",
+    "boundary-and-negative",
+    "toolcall-route",
+    "dependent-skill-ordering",
+    "parent-subagent-instruction",
+    "failure-argparse-normalization",
+)
+HOST_OBSERVATION_SCHEMA = "agent_canon.skill_runtime_shim.host_observation"
 
 
 class ProducerError(ValueError):
@@ -219,11 +228,11 @@ def _packet_manifest(path: Path) -> tuple[dict[str, object], list[dict[str, obje
     if raw.get("packet_class_order") != list(PACKET_CLASSES):
         raise ProducerError("packet_class_order")
     packets = raw.get("packet")
-    if not isinstance(packets, list) or len(packets) != 3:
+    if not isinstance(packets, list) or len(packets) != len(SCENARIO_CATEGORIES):
         raise ProducerError("packet_count")
     required = {
         "id", "packet_class", "prompt_path", "canonical_target_files", "prompt_dependency_files",
-        "method", "requirements", "report_grammar", "packet_digest",
+        "scenario_id", "category", "method", "requirements", "report_grammar", "packet_digest",
     }
     rows: list[dict[str, object]] = []
     for item in packets:
@@ -241,9 +250,13 @@ def _packet_manifest(path: Path) -> tuple[dict[str, object], list[dict[str, obje
             raise ProducerError(f"packet_digest_mismatch:{row['id']}")
         if row["packet_class"] not in PACKET_CLASSES:
             raise ProducerError(f"packet_class:{row['id']}")
+        if row["scenario_id"] != row["category"] or row["category"] not in SCENARIO_CATEGORIES:
+            raise ProducerError(f"packet_category:{row['id']}")
         rows.append(
             {
                 "id": row["id"],
+                "scenario_id": row["scenario_id"],
+                "category": row["category"],
                 "packet_class": row["packet_class"],
                 "prompt_path": str(row["prompt_path"]),
                 "canonical_target_files": row["canonical_target_files"],
@@ -294,9 +307,19 @@ def _host_observation(path: Path) -> dict[str, object]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ProducerError(f"host_evaluation_not_object:{path.name}")
-    required = {"scenario_id", "packet_id", "iteration_id", "skill_id", "variant", "prompt", "input_tokens"}
-    if not required.issubset(raw):
+    required = {
+        "schema", "version", "scenario_id", "category", "packet_id", "iteration_id",
+        "skill_id", "variant", "prompt", "input_tokens", "model_id", "host_profile",
+        "method", "observation_status",
+    }
+    if set(raw) - {"schema", "version", "scenario_id", "category", "packet_id", "iteration_id", "skill_id", "variant", "prompt", "input_tokens", "canonical_followup_input_tokens", "cache_fields_observed", "model_id", "host_profile", "method", "observation_status"} or not required.issubset(raw):
         raise ProducerError(f"host_input_tokens_missing:{path.name}")
+    if raw["schema"] != HOST_OBSERVATION_SCHEMA or raw["version"] != 1:
+        raise ProducerError(f"host_schema:{path.name}")
+    if raw["category"] not in SCENARIO_CATEGORIES or raw["scenario_id"] != raw["category"]:
+        raise ProducerError(f"host_category:{path.name}")
+    if raw["model_id"] != MODEL_ID or raw["host_profile"] != HOST_PROFILE or raw["method"] != "fresh_read_only" or raw["observation_status"] != "pass":
+        raise ProducerError(f"host_metadata:{path.name}")
     if raw["variant"] not in VARIANTS:
         raise ProducerError(f"host_variant:{path.name}")
     if isinstance(raw["input_tokens"], bool) or not isinstance(raw["input_tokens"], int) or raw["input_tokens"] < 0:
@@ -318,6 +341,10 @@ def measurement(root: Path, model: str, profile: str, host_dir: Path, output: Pa
     observations = [_host_observation(path) for path in sorted(host_dir.glob("*.json"))]
     if not observations:
         raise ProducerError("host_evaluations_empty")
+    pairs = {(str(row["category"]), str(row["variant"])) for row in observations}
+    expected_pairs = {(category, variant) for category in SCENARIO_CATEGORIES for variant in VARIANTS}
+    if pairs != expected_pairs or len(observations) != len(expected_pairs):
+        raise ProducerError("host_observation_pair_coverage")
     host_envelopes: list[dict[str, object]] = []
     candidate_rows: list[dict[str, object]] = []
     scenario_rows: list[dict[str, object]] = []

@@ -24,7 +24,7 @@ import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 try:
     import tomllib
@@ -502,7 +502,6 @@ def render_shim(record: Mapping[str, object]) -> str:
     discovery = cast(Mapping[str, object], record["discovery"])
     owner = cast(Mapping[str, object], record["owner"])
     identity = cast(Mapping[str, object], record["identity"])
-    render = cast(Mapping[str, object], record["render"])
     provenance = cast(Mapping[str, object], record["provenance"])
     skill = cast(str, record["skill_id"])
     description = json.dumps(cast(str, discovery["description"]), ensure_ascii=False)
@@ -543,7 +542,7 @@ def render_shim(record: Mapping[str, object]) -> str:
         f"schema `skill_tool_commands.v2`, digest: `{identity['command_packet_identity_digest']}`.",
         "<!-- skill-tool-commands:end -->",
         "",
-        f"1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.",
+        "1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.",
         "",
     ]
     text = "\n".join(lines)

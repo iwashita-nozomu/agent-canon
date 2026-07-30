@@ -480,3 +480,14 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - Routine docs / Focused code でも implementation / patch / doc-edit work は、別 writer が必要な場合だけ write-capable handoff を選びます。parent-direct は risk class、check matrix、owner boundary、targeted validation、exception rationale が実装前に記録された場合だけ使います。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、identifier naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が必須になった場合のみ）、dependency-expanded handoff scope が揃った低リスク slice に対し、parent packet が `--select-agent-type implementer=spark_worker:<evidence>` を明示し、stdout / manifest が選択を記録した場合だけ使います。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は parent packet と wave の改訂を必須にします。
 - 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む slice は `worker` を使います。
 - `spark_worker` は詳細設計、review、final judgment には使いません。
+
+## Runtime Contract Clauses
+
+The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+
+1. Read `agents/skills/agent-orchestration.md` as the sole policy owner.
+1. Consume the owner-produced semantic decision-sufficiency record referenced by
+   the active route packet. A structured handoff or tool result is sufficient;
+   use a durable packet reference only for coordination or resumption.
+1. Execute the route packet's machine-readable ToolCall tokens and return their
+   typed failure semantics without translating them into prose commands.

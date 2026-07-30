@@ -121,3 +121,39 @@ experiment_raw_manifest=<path>
 experiment_report=<path-or-not_requested>
 experiment_overwrite_policy=<unique-run-name|append-only|cleanup-with-record>
 ```
+
+## Runtime Contract Clauses
+
+The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+
+1. Read `agents/skills/save-experiment-results.md`.
+1. Start from an existing `experiments/<topic>/result/<run_name>/`. If it is
+   missing, return to `$experiment-lifecycle`; do not invent a saved result from
+   chat notes or report prose.
+1. Write a retention plan before touching a result branch: topic, run name,
+   result directory, source branch, source commit, source dirty state, result
+   branch, remote publish decision, overwrite policy, and report path.
+1. Preserve raw machine-readable run artifacts before deriving Markdown,
+   tables, or HTML. Missing standard artifacts become explicit limitations.
+1. Save failed, skipped, blocked, and partial runs with status, exit code,
+   blocker, partial artifact list, and next action. They are not disposable.
+1. Do not overwrite a detailed result directory. Use a new run name,
+   append-only manifest entry, or a recorded cleanup task with owner and reason.
+1. Keep source changes and result retention on separate branch lanes. Code,
+   config, protocol, skill, tool, workflow, or report-generator changes stay on
+   source branches/PRs; formal result artifacts go to
+   `experiment-results/<topic>` via `publish_result_branch.py`.
+1. Treat dirty-source runs as retainable but not formal success evidence. Record
+   affected paths and `experiment_formal_status=not_formal_dirty_source`; rerun
+   from a committed source branch or merged commit before marking the result
+   formal.
+1. Before creating or updating the result branch, record
+   `branch_creation_reason=<reason>` and `result_branch=<branch>` in the run
+   bundle, manifest, report, or PR body.
+1. Add `--push` only when the retention plan calls for remote storage.
+1. If a reader-facing report is requested, also use `$report-writing`; this
+   skill owns raw retention and branch-safe publication, not scientific
+   interpretation quality.
+1. Close out with `experiment_result_save=complete`, result paths, source commit,
+   dirty-state evidence, formal status, result branch, raw manifest, report
+   path, and overwrite policy.

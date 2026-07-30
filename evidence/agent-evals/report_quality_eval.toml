@@ -14,6 +14,7 @@ version = 1
 [[evals]]
 id = "report-writing-runtime-skill"
 target = ".agents/skills/report-writing/SKILL.md"
+canonical_target = "agents/skills/report-writing.md"
 description = "The discoverable report-writing skill must route report authors through source packets, artifact separation, the report quality checklist, and review gates."
 
 [[evals.checklist]]

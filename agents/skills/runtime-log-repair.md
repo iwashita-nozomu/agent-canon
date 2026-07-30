@@ -109,3 +109,38 @@ evidence and does not duplicate those policy definitions.
 - Prompt/config review belongs to `$task-routing`, affected skill owners, and
   the prompt/config reviewer role.
 - Hook implementation details, workflow monitoring internals, and reference extraction internals stay with their owner surfaces.
+
+## Runtime Contract Clauses
+
+The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+
+1. Read `agents/skills/runtime-log-repair.md`.
+1. Start from `$agent-log-analysis` dashboard artifacts:
+   `reports/agent-runtime-dashboard/agent-log-analysis-api.json` and
+   `reports/agent-runtime-dashboard/agent-log-analysis-compact.md`. If they are
+   missing or stale for the request, run `$agent-log-analysis` first.
+1. Do not read raw JSONL broadly for normal repair routing; raw event drilldown
+   stays with `$agent-log-analysis` tool development, schema debugging, or an
+   API-named drilldown path.
+1. Build a Runtime Log Repair Packet with `repair_class`,
+   `dashboard_evidence`, `owner_surface`, `repair_route`, `required_input`,
+   `non_goals`, and `closeout_gate` before editing or launching repair work.
+1. Route repairs to owners: eval gaps to `$agent-eval-accumulation`, durable
+   artifacts to `$result-artifact-writeout`, issue candidates to
+   `$issue-finding-report`, wave mechanics to `$subagent-bootstrap`,
+   prompt/config or selection repair to `$task-routing` plus the affected owner,
+   and recurrence learning to `$agent-learning`.
+1. Keep boundaries explicit: this skill does not own raw log analysis,
+   dashboard schema, eval producer loops, artifact placement, durable issue
+   writing, subagent launch mechanics, prompt/config review, hook
+   implementation details, or reference extraction internals.
+1. Verify closeout with the owner-selected gate. Rerun a full dashboard only
+   when the owner gate needs accumulated post-change evidence.
+1. If the owner-selected gate fails, add `failing_contract`,
+   `observation_level`, `cause_classification`, `intent_preservation`, and
+   `evidence` to the Runtime Log Repair Packet before changing repair
+   intent, simplifying to pass, reverting, deleting intended behavior/tests,
+   weakening an oracle, or downscoping validation. Preserve owner intent for
+   implementation bugs and route oracle/spec, fixture/environment/stale
+   artifact, unrelated, and approved-design/user-request conflicts to owner
+   repair, residual, or escalation.

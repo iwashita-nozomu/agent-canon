@@ -1,4 +1,6 @@
 {
+  "schema": "agent_canon.skill_runtime_shim.host_observation",
+  "version": 1,
   "scenario_id": "boundary-and-negative",
   "packet_id": "shim-boundary-and-negative-v1",
   "iteration_id": "fresh-generated-01",
@@ -7,5 +9,10 @@
   "prompt": "Inspect the discovery adapter and preserve canonical and host boundaries.",
   "input_tokens": 586,
   "canonical_followup_input_tokens": 175,
-  "cache_fields_observed": {}
+  "cache_fields_observed": {},
+  "category": "boundary-and-negative",
+  "model_id": "gpt-5.4-mini",
+  "host_profile": "medium",
+  "method": "fresh_read_only",
+  "observation_status": "pass"
 }

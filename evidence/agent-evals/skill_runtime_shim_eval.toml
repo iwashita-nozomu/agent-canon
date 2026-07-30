@@ -13,6 +13,8 @@ packet_class_order = ["full", "changed"]
 [[packet]]
 id = "shim-discovery-selection-v1"
 packet_class = "full"
+scenario_id = "discovery-selection"
+category = "discovery-selection"
 prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/full/shim-discovery-selection-v1.md"
 canonical_target_files = [".agents/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-dependencies.yaml", "documents/codex/prompt-skill-evaluation-checklist.md"]
@@ -24,6 +26,8 @@ packet_digest = "e075539397201c30ffce289c81c6e955aaeec2c56be4aeadacb585ab236efbf
 [[packet]]
 id = "shim-boundary-and-negative-v1"
 packet_class = "full"
+scenario_id = "boundary-and-negative"
+category = "boundary-and-negative"
 prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/full/shim-boundary-and-negative-v1.md"
 canonical_target_files = [".agents/skills/task-routing/SKILL.md", "agents/skills/task-routing.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "documents/codex/prompt-skill-evaluation-checklist.md"]
@@ -35,6 +39,8 @@ packet_digest = "b895eaa3b6840ce5f60fc0cd6fbaa1c09d90474f99dbe3dacf1582c262ecf1d
 [[packet]]
 id = "shim-toolcall-route-v1"
 packet_class = "changed"
+scenario_id = "toolcall-route"
+category = "toolcall-route"
 prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/changed/shim-toolcall-route-v1.md"
 canonical_target_files = [".agents/skills/structure-planning/SKILL.md", "agents/skills/structure-planning.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-dependencies.yaml", "documents/design/skill-tool-invocation-graph.md"]
@@ -42,3 +48,42 @@ method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["owner-command-packet", "typed-toolcall", "failure-semantics"]
 report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
 packet_digest = "aeee009e0669fe5d2b8c8aefcd95a49b7de880bb03e284e62a55830550a15142"
+
+[[packet]]
+id = "shim-dependent-skill-ordering-v1"
+packet_class = "changed"
+scenario_id = "dependent-skill-ordering"
+category = "dependent-skill-ordering"
+prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/changed/shim-dependent-skill-ordering-v1.md"
+canonical_target_files = [".agents/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
+prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-dependencies.yaml"]
+method = "one fresh read-only gpt-5.4-mini evaluator"
+requirements = ["dependency-order", "canonical-owner", "no-shim-route"]
+report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
+packet_digest = "4e60620489c76b95847d3077eb4e21c351a119172189d854f2f34df1ad073389"
+
+[[packet]]
+id = "shim-parent-subagent-instruction-v1"
+packet_class = "full"
+scenario_id = "parent-subagent-instruction"
+category = "parent-subagent-instruction"
+prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/full/shim-parent-subagent-instruction-v1.md"
+canonical_target_files = [".agents/skills/subagent-bootstrap/SKILL.md", "agents/skills/subagent-bootstrap.md"]
+prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/canonical/CODEX_SUBAGENTS.md"]
+method = "one fresh read-only gpt-5.4-mini evaluator"
+requirements = ["parent-owner", "subagent-boundary", "canonical-instruction"]
+report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
+packet_digest = "ec51d4ad5e94d2fb42870310e9707a4a7765d1d80c50afb6ffcf36165aa630c2"
+
+[[packet]]
+id = "shim-failure-argparse-normalization-v1"
+packet_class = "changed"
+scenario_id = "failure-argparse-normalization"
+category = "failure-argparse-normalization"
+prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/changed/shim-failure-argparse-normalization-v1.md"
+canonical_target_files = [".agents/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
+prompt_dependency_files = ["tools/agent_tools/route.py", "tools/agent_tools/skill_shim_evaluation.py"]
+method = "one fresh read-only gpt-5.4-mini evaluator"
+requirements = ["argument-error", "failure-normalization", "no-invented-command"]
+report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
+packet_digest = "3fb087d0dbd888eab8608fe18196f8d5d8aef0913b512a6096794c25a8bb81cd"

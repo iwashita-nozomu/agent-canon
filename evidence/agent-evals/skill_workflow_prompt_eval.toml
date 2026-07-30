@@ -944,7 +944,7 @@ required_regex = ["Numerical Test Admission Gate", "numerical trigger", "non-num
 
 [[evals]]
 id = "test-design-validation-failure-response-shim"
-target_glob = ".agents/skills/test-design/SKILL.md"
+target_glob = "agents/skills/test-design.md"
 expected_count = 1
 kind = "skill"
 description = "The discoverable test-design skill must classify validation failures before simplification, deletion, revert, or oracle weakening, then route implementation bugs to owning repair."

@@ -143,3 +143,45 @@ html_output=complete
 html_server_mode=<reuse|started|not_requested|blocked>
 html_invalid_interpretations_recorded=yes
 ```
+
+## Runtime Contract Clauses
+
+The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+
+1. Read `agents/skills/html-experiment-report.md`.
+1. Use `$structure-planning` before renderer or experiment implementation to fix the first figure, source-to-structure map, metric contract, section order, and invalid interpretations.
+1. Use `$html-output` for polished HTML layout, optional `$imagegen` assets, existing preview-server reuse, `python3 -m http.server --bind 0.0.0.0` publication, `curl -fsS` validation, and local/external browser URLs.
+1. Survey existing assets first: relevant skills, tool catalog entries, workflow
+   docs, report helpers, previous run artifacts, and existing experiment
+   scripts.
+1. Write a responsibility analysis before implementation: raw evidence owner,
+   renderer owner, domain decision owner, generated artifact path, and the
+   invalid authority drift to avoid.
+1. Name the first figure through the structure contract before running the
+   experiment. Record its question, required data, metric denominator,
+   directionality, and invalid interpretations.
+1. Derive the experiment plan from that figure: evidence-producing command,
+   renderer command, HTML output path, blocked-provider behavior, and validation
+   gates.
+1. Reuse existing producers and helpers. Add a report-specific renderer or
+   adapter only when the HTML artifact needs one.
+1. Keep generated SQLite, JSON, and HTML artifacts under ignored run paths such
+   as `reports/agents/<run-id>/`; do not make generated HTML a policy truth.
+1. Put the primary figure first in the HTML, followed by source packet,
+   observations, interpretation, limitations, provenance, and next action.
+1. For semantic-index provider comparison, use the figure
+   `Provider Delta To Shared Candidate Logic` and state that LLM latent vectors
+   may change retrieval/ranking deltas but do not create labels, ownership, or
+   merge authority.
+1. Validate with targeted renderer tests, docs checks for changed Markdown, and
+   catalog/dependency checks for changed tool or skill wiring.
+1. Record closeout tokens:
+   `html_experiment_report=complete`,
+   `html_primary_figure=<figure-name>`,
+   `structure_contract=<path-or-inline>`,
+   `html_source_artifact=<path>`,
+   `html_report_artifact=<path>`,
+   `html_domain_authority=<tool-or-doc>`, and
+   `html_output=complete`,
+   `html_server_mode=<reuse|started|not_requested|blocked>`, and
+   `html_invalid_interpretations_recorded=yes`.

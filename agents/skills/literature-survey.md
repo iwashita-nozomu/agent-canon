@@ -98,3 +98,16 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 - 実験結果の批判的評価は critical review を使います
 - reader-facing な report の確認は report review を使います
 - repo-wide な workflow や review policy の外部根拠索引は `agents/workflows/workflow-references.md` に残します
+
+## Runtime Contract Clauses
+
+The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+
+1. Read `agents/skills/literature-survey.md`.
+1. Read `agents/workflows/workflow-references.md`.
+1. Fix the question, scope, and exclusion criteria before searching.
+1. Before web search, PDF download, or citation lookup, inspect existing `references/`, `notes/`, `documents/`, and topic reports for the same source or claim. Reuse or update the existing source note instead of creating a parallel truth surface.
+1. Prefer primary sources, surveys, benchmark comparison papers, and official docs over tertiary summaries.
+1. Record contrary or scope-limiting evidence, not only supporting sources.
+1. If a prose graph handoff is present, use unsupported-claim and citation/evidence-gap diagnostics to seed query terms, source adoption decisions, and source exclusion checks.
+1. If a source is used, downloaded, quoted, or cited in the answer/report, leave a durable tracked reference note or source packet with URL/DOI, access date, claim used, limitation, and artifact location; do not rely on transient browser context as the only record.

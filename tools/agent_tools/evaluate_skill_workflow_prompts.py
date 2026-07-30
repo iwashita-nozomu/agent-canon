@@ -452,13 +452,20 @@ def load_checklist_item(entry: object, eval_id: str) -> ChecklistItem:
     )
 
 
-def evaluate_item(item: ChecklistItem, eval_def: PromptEval, text: str) -> ChecklistResult:
+def evaluate_item(
+    item: ChecklistItem,
+    eval_def: PromptEval,
+    required_text: str,
+    forbidden_text: str,
+) -> ChecklistResult:
     """Evaluate one checklist item against target text."""
     missing_required = tuple(
-        pattern for pattern in item.required_regex if re.search(pattern, text, re.MULTILINE) is None
+        pattern
+        for pattern in item.required_regex
+        if re.search(pattern, required_text, re.MULTILINE) is None
     )
     matched_forbidden = tuple(
-        pattern for pattern in item.forbidden_regex if re.search(pattern, text, re.MULTILINE)
+        pattern for pattern in item.forbidden_regex if re.search(pattern, forbidden_text, re.MULTILINE)
     )
     return ChecklistResult(
         eval_id=eval_def.eval_id,
@@ -486,7 +493,8 @@ def evaluate_prompt(eval_def: PromptEval) -> tuple[ChecklistResult, ...]:
             )
             for item in eval_def.checklist
         )
-    text = eval_def.target.read_text(encoding="utf-8")
+    shim_text = eval_def.target.read_text(encoding="utf-8")
+    required_text = shim_text
     if eval_def.canonical_target is not None:
         if not eval_def.canonical_target.is_file():
             return tuple(
@@ -501,8 +509,11 @@ def evaluate_prompt(eval_def: PromptEval) -> tuple[ChecklistResult, ...]:
                 )
                 for item in eval_def.checklist
             )
-        text += "\n" + eval_def.canonical_target.read_text(encoding="utf-8")
-    return tuple(evaluate_item(item, eval_def, text) for item in eval_def.checklist)
+        required_text += "\n" + eval_def.canonical_target.read_text(encoding="utf-8")
+    return tuple(
+        evaluate_item(item, eval_def, required_text, shim_text)
+        for item in eval_def.checklist
+    )
 
 
 def render_machine_status(

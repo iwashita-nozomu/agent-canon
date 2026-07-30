@@ -1,0 +1,20 @@
+{
+  "schema": "agent_canon.skill_runtime_shim.host_observation",
+  "version": 1,
+  "scenario_id": "parent-subagent-instruction",
+  "category": "parent-subagent-instruction",
+  "packet_id": "shim-parent-subagent-instruction-v1",
+  "iteration_id": "fresh-generated-01",
+  "skill_id": "subagent-bootstrap",
+  "variant": "generated",
+  "prompt": "Inspect parent and subagent instruction ownership through the canonical owner.",
+  "input_tokens": 592,
+  "canonical_followup_input_tokens": 181,
+  "cache_fields_observed": {
+    "cache_read_input_tokens": 0
+  },
+  "model_id": "gpt-5.4-mini",
+  "host_profile": "medium",
+  "method": "fresh_read_only",
+  "observation_status": "pass"
+}
