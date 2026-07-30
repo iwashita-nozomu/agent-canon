@@ -52,6 +52,11 @@ packet が出力した必須 command と、task に該当する conditional comm
    `origin/main` clean checkout, re-apply intended topic commits only, and
    reopen a successor branch/PR if unmaterialized diff remains.
 1. Use `cleanup` as a dry-run first. Apply deletion only with the exact expected clone path and the required same-command authority environment; its remote reconstructibility gate is independent of PR/pin/root-sync state.
+   When PR merge/readback deleted the topic branch but local commits remain, pass
+   the typed `--integrated-commit <full-oid>` evidence from that merge/readback
+   (or leave it unset for the canonical `origin/main` discovery route). The
+   detailed equivalence and hold policy remains owned by
+   `documents/rule/dependency-module-changes.md`.
 1. If a parent update command proposes to preserve or merge dirty vendor source
    state, stop. Use the independent clone only through the typed workspace route
    or the decision table's dirty fallback; otherwise use the typed repair/rebuild
