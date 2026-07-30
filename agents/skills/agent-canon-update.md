@@ -207,7 +207,7 @@ python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh ch
   `main` と staged index gitlink と worktree `HEAD` の一致が pass 条件です。
   `main` は source edit owner ではなく topic 作成の起点です。
   Parent state, requested topic identity, and dirty fallback next actions are
-  defined only by the [`AgentCanon parent state decision table`](../../../documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table).
+  defined only by the [`AgentCanon parent state decision table`](../../documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table).
   `latest` の更新対象 branch 引数を topic slug に転用しません。
   Under that decision table, a dirty vendor checkout is a refusal condition
   when it is not the intended source working branch; do not preserve or resume
