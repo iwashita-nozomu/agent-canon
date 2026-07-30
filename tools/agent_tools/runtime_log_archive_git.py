@@ -5323,6 +5323,22 @@ def _legacy_import_index_path(context: ArchiveContext) -> Path:
     return context.archive_root / "legacy-import" / "import-index.jsonl"
 
 
+def _legacy_index_contains_inventory(path: Path, inventory_sha256: str) -> bool:
+    """Return whether an append-only legacy index already has this inventory."""
+    if not path.exists():
+        return False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(entry, dict) and entry.get("inventory_sha256") == inventory_sha256:
+            return True
+    return False
+
+
 def _legacy_import_plan(
     transaction: PreparedArchiveTransaction,
     *,
@@ -5399,7 +5415,7 @@ def _legacy_import_plan(
         "schema": "agent_canon.legacy_import.v1",
     }
     index_path = _legacy_import_index_path(context)
-    if records:
+    if records and not _legacy_index_contains_inventory(index_path, inventory_sha256):
         write_jsonl_once(index_path, index_entry, inventory_sha256)
         git(context.archive_root, ["add", "--", "legacy-import"])
     print_context(context)
@@ -5408,7 +5424,11 @@ def _legacy_import_plan(
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_FILES={sum(1 for record in records if record.destination)}")
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_NEW_FILES={imported}")
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EXISTING_FILES={existing}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS={len(records)}")
+    concrete_records = tuple(record for record in records if record.destination)
+    preserved_records = tuple(record for record in records if record.destination is None)
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS={len(concrete_records)}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_PRESERVED={len(preserved_records)}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_NOT_IMPORTED={len(preserved_records)}")
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_INVENTORY_SHA256={inventory_sha256}")
     copied_count = sum(1 for record in records if record.destination)
     if family == "hook-runs":
@@ -5423,7 +5443,9 @@ def _legacy_import_plan(
         print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES={copied_count}")
         print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_NEW_FILES={imported}")
         print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_EXISTING_FILES={existing}")
-        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={len(records)}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={len(concrete_records)}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED={len(preserved_records)}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED={len(preserved_records)}")
     return LegacyImportPlan(
         family=family,
         legacy_root=legacy_root,
@@ -5459,26 +5481,122 @@ def _finalize_legacy_import(
             print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=no")
         print(f"RUNTIME_LOG_ARCHIVE_IMPORT=publication_{receipt.status}")
         return 1
+    concrete_records = tuple(record for record in plan.records if record.destination)
+    preserved_records = tuple(record for record in plan.records if record.destination is None)
     required_paths = tuple(
         path
-        for path in (plan.index_path, *(transaction.context.archive_root / record.destination
-                                        for record in plan.records if record.destination))
+        for path in (
+            plan.index_path,
+            *(transaction.context.archive_root / record.destination
+              for record in concrete_records)
+        )
     )
     _verify_remote_archive_readback(transaction.context, receipt, required_paths)
-    for record in plan.records:
+    _verify_legacy_import_readback(
+        transaction.context,
+        receipt.archive_commit_oid,
+        plan,
+        concrete_records,
+    )
+    for record in concrete_records:
         try:
             payload = record.source.read_bytes()
         except FileNotFoundError as exc:
             raise ArchiveGitError("legacy_source_changed_before_finalize") from exc
         if len(payload) != record.byte_count or _hash_bytes(payload) != record.sha256:
             raise ArchiveGitError("legacy_source_changed_before_finalize")
-    for record in plan.records:
+    for record in concrete_records:
         delete_source_file(transaction.context, record.source)
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS={len(concrete_records)}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_PRESERVED={len(preserved_records)}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_NOT_IMPORTED={len(preserved_records)}")
     print("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=yes")
     if plan.family == "eval-results":
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={len(concrete_records)}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED={len(preserved_records)}")
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED={len(preserved_records)}")
         print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=yes")
     print("RUNTIME_LOG_ARCHIVE_IMPORT=pass")
     return 0
+
+
+def _legacy_import_record_payload(record: LegacyImportRecord) -> dict[str, object]:
+    """Return the canonical index representation for one import record."""
+    return {
+        "bytes": record.byte_count,
+        "destination": record.destination,
+        "sha256": record.sha256,
+        "source": record.source_relative,
+    }
+
+
+def _verify_legacy_import_readback(
+    context: ArchiveContext,
+    commit_oid: str,
+    plan: LegacyImportPlan,
+    concrete_records: tuple[LegacyImportRecord, ...],
+) -> None:
+    """Certify index membership and committed blobs before source deletion."""
+    try:
+        index_relative = plan.index_path.resolve().relative_to(
+            context.archive_root.resolve()
+        )
+    except ValueError as exc:
+        raise ArchiveGitError("legacy_readback_mismatch:index_path") from exc
+    index_bytes = _archive_blob_at(context, commit_oid, index_relative)
+    entries: list[dict[str, object]] = []
+    for line in index_bytes.splitlines():
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ArchiveGitError("legacy_readback_mismatch:index_json") from exc
+        if not isinstance(entry, dict):
+            raise ArchiveGitError("legacy_readback_mismatch:index_entry_type")
+        entries.append(cast(dict[str, object], entry))
+    matches = [
+        entry
+        for entry in entries
+        if entry.get("inventory_sha256") == plan.inventory_sha256
+    ]
+    if len(matches) != 1:
+        raise ArchiveGitError("legacy_readback_mismatch:index_entry")
+    entry = matches[0]
+    expected_records = [
+        _legacy_import_record_payload(record) for record in plan.records
+    ]
+    if (
+        entry.get("family") != plan.family
+        or entry.get("schema") != "agent_canon.legacy_import.v1"
+        or entry.get("file_count") != len(expected_records)
+        or entry.get("files") != expected_records
+    ):
+        raise ArchiveGitError("legacy_readback_mismatch:index_records")
+    inventory = {
+        "family": plan.family,
+        "files": expected_records,
+        "schema": "agent_canon.legacy_import.v1",
+    }
+    if _hash_bytes(_canonical_compact_json(inventory)) != plan.inventory_sha256:
+        raise ArchiveGitError("legacy_readback_mismatch:inventory_digest")
+
+    for record in concrete_records:
+        destination = Path(cast(str, record.destination))
+        tree_entry = git(
+            context.archive_root,
+            ["cat-file", "-t", f"{commit_oid}:{destination.as_posix()}"],
+            check=False,
+        )
+        if tree_entry.returncode != 0 or tree_entry.stdout.strip() != "blob":
+            raise ArchiveGitError(
+                f"legacy_readback_mismatch:tree_membership:{destination.as_posix()}"
+            )
+        remote = _archive_blob_at(context, commit_oid, destination)
+        if len(remote) != record.byte_count or _hash_bytes(remote) != record.sha256:
+            raise ArchiveGitError(
+                f"legacy_readback_mismatch:blob_digest:{destination.as_posix()}"
+            )
 
 
 def _import_legacy_prepared(

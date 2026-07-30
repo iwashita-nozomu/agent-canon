@@ -105,7 +105,10 @@ the source files and local archive evidence.
 The same migration imported the former accumulated eval result families for
 skill/workflow prompts, retired responsibility analysis, workflow selection,
 and report quality into `legacy-import/eval-results/`. AgentCanon source no
-longer keeps `agents/evals/results/`.
+longer keeps imported `agents/evals/results/` files. Plan records without a
+concrete destination, such as `hook-runs/README.md`, are preserved at the
+source and reported as preserved/not-imported; being listed in a plan is not
+deletion authority.
 
 `reports/broken_links.txt` is local docs-check output, not a runtime hook JSONL
 stream. It remains ignored local validation output and must not be copied into
