@@ -136,7 +136,7 @@ if [ "$RUN_PARALLEL" = true ]; then
     log_info "Running tools in parallel mode..."
     
     # Background jobs
-    "$PYTHON_BIN" "$SCRIPT_DIR/check_doc_test_triplet.py" > "$LOG_DIR/triplet_check.log" 2>&1 &
+    "$PYTHON_BIN" "$SCRIPT_DIR/validation/triplet_validator.py" > "$LOG_DIR/triplet_check.log" 2>&1 &
     PID_TRIPLET=$!
     
     "$PYTHON_BIN" "$SCRIPT_DIR/check_convention_consistency.py" > "$LOG_DIR/convention_check.log" 2>&1 &
@@ -177,7 +177,7 @@ else
     # Sequential execution
     log_info ""
     log_info "4/4️⃣ Doc-Test-Code Triplet Check..."
-    if "$PYTHON_BIN" "$SCRIPT_DIR/check_doc_test_triplet.py" > "$LOG_DIR/triplet_check.log" 2>&1; then
+    if "$PYTHON_BIN" "$SCRIPT_DIR/validation/triplet_validator.py" > "$LOG_DIR/triplet_check.log" 2>&1; then
         log_success "triplet check: OK"
     else
         log_error "triplet check: FAILED"

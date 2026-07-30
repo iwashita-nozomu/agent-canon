@@ -434,7 +434,7 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
 - `run_pytest_with_logs.sh`
 - `docker_dependency_validator.sh`
 - `ci/container_config.py`
-- `check_doc_test_triplet.py`
+- `validation/triplet_validator.py`
 - `agent_tools/waterfall_gate_check.py`
 - `agent_tools/evaluate_agent_run.py`
 - `agent_tools/compare_agent_run_paths.py`
