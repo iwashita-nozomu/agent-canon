@@ -13,14 +13,7 @@ description: "Use as the general explanatory-doc DSL-to-prose adapter for README
 <!--
 @dependency-start
 contract reference
-responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
-upstream design ../../../agents/skills/catalog.yaml catalog-owner
-upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
-upstream implementation ../../../agents/skills/long-form-writing.md canonical-owner
-downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
-downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
-downstream implementation ../../../tools/agent_tools/route.py route-owner
-downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
+upstream implementation ../../../agents/skills/long-form-writing.md
 @dependency-end
 -->
 
@@ -35,11 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill long-form-writing --format text`.
-Packet schema: `skill_tool_commands.v2`; packet digest: `5dff016c5ca24c413e9acd55ae62f87c036ab4a96d109e9d68524dd8e99f9802`.
-The command packet is the complete catalog-backed packet, including every command
-phase and resolved command tuple; this line is its executable read path, not a second
-writer or an alternate write route.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill long-form-writing --format text`; schema `skill_tool_commands.v2`, digest: `5dff016c5ca24c413e9acd55ae62f87c036ab4a96d109e9d68524dd8e99f9802`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

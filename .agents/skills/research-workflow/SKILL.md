@@ -13,14 +13,7 @@ description: "Use when a task needs external research, comparison design, iterat
 <!--
 @dependency-start
 contract reference
-responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
-upstream design ../../../agents/skills/catalog.yaml catalog-owner
-upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
-upstream implementation ../../../agents/skills/research-workflow.md canonical-owner
-downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
-downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
-downstream implementation ../../../tools/agent_tools/route.py route-owner
-downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
+upstream implementation ../../../agents/skills/research-workflow.md
 @dependency-end
 -->
 
@@ -35,11 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill research-workflow --format text`.
-Packet schema: `skill_tool_commands.v2`; packet digest: `96f707eecc25738566e646d7258cdb6e174908726bd6cf36eb48b3dbc7238013`.
-The command packet is the complete catalog-backed packet, including every command
-phase and resolved command tuple; this line is its executable read path, not a second
-writer or an alternate write route.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill research-workflow --format text`; schema `skill_tool_commands.v2`, digest: `96f707eecc25738566e646d7258cdb6e174908726bd6cf36eb48b3dbc7238013`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

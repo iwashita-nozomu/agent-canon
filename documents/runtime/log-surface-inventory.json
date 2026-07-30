@@ -15732,7 +15732,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "content_delta_count",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15740,7 +15740,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "content_delta_paths",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15748,7 +15748,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "projection_digests",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15756,7 +15756,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "record_digests",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15764,7 +15764,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15772,7 +15772,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_snapshot_digest",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15780,7 +15780,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15788,7 +15788,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "version",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15796,7 +15796,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "content_delta_count",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15804,7 +15804,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "content_delta_paths",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15812,7 +15812,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "projection_digests",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15820,7 +15820,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "record_digests",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15828,7 +15828,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "schema",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15836,7 +15836,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "source_snapshot_digest",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15844,7 +15844,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15852,7 +15852,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "version",
-      "line": 834,
+      "line": 823,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15860,7 +15860,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_DELTA",
-      "line": 843,
+      "line": 832,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15868,7 +15868,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_FAILURE",
-      "line": 856,
+      "line": 845,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15876,7 +15876,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_FAILURE",
-      "line": 859,
+      "line": 848,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15884,7 +15884,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_SCHEMA",
-      "line": 836,
+      "line": 825,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -15892,7 +15892,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_STATUS",
-      "line": 837,
+      "line": 826,
       "path": "tools/agent_tools/skill_shim_materializer.py",
       "surface": "tool"
     },

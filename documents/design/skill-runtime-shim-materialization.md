@@ -254,7 +254,12 @@ description: <discovery.description>
 <!-- commands: <owner.command_ref> digest=<identity.command_packet_identity_digest> -->
 <!-- materializer: <provenance.materializer_id> -->
 
-<!-- @dependency-start ... @dependency-end: generated owner links only -->
+<!--
+@dependency-start
+contract reference
+upstream implementation ../../../<owner.canonical_doc>
+@dependency-end
+-->
 
 # <skill_id>
 
@@ -267,11 +272,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text`.
-Packet schema: `skill_tool_commands.v2`; packet digest: `<command_packet_identity_digest>`.
-The command packet is the complete catalog-backed packet, including every command
-phase and resolved command tuple; this line is its executable read path, not a second
-writer or an alternate write route.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text`; schema `skill_tool_commands.v2`, digest: `<command_packet_identity_digest>`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

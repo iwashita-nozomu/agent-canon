@@ -13,14 +13,7 @@ description: "Mandatory routing skill for repository tasks. Use before selecting
 <!--
 @dependency-start
 contract reference
-responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
-upstream design ../../../agents/skills/catalog.yaml catalog-owner
-upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
-upstream implementation ../../../agents/skills/agent-orchestration.md canonical-owner
-downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
-downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
-downstream implementation ../../../tools/agent_tools/route.py route-owner
-downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
+upstream implementation ../../../agents/skills/agent-orchestration.md
 @dependency-end
 -->
 
@@ -35,11 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text`.
-Packet schema: `skill_tool_commands.v2`; packet digest: `adb5f208c3beab6a61a81da68764e04acf22840014be6a878c4411e61a606641`.
-The command packet is the complete catalog-backed packet, including every command
-phase and resolved command tuple; this line is its executable read path, not a second
-writer or an alternate write route.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text`; schema `skill_tool_commands.v2`, digest: `adb5f208c3beab6a61a81da68764e04acf22840014be6a878c4411e61a606641`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

@@ -13,14 +13,7 @@ description: "Python 差分を pyright、pytest、ruff、型境界、API 挙動�
 <!--
 @dependency-start
 contract reference
-responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
-upstream design ../../../agents/skills/catalog.yaml catalog-owner
-upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
-upstream implementation ../../../agents/skills/python-review.md canonical-owner
-downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
-downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
-downstream implementation ../../../tools/agent_tools/route.py route-owner
-downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
+upstream implementation ../../../agents/skills/python-review.md
 @dependency-end
 -->
 
@@ -35,11 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill python-review --format text`.
-Packet schema: `skill_tool_commands.v2`; packet digest: `6e43fb40b59c525a46458a6801970ed9ecdcdef353861afb50699c680205a871`.
-The command packet is the complete catalog-backed packet, including every command
-phase and resolved command tuple; this line is its executable read path, not a second
-writer or an alternate write route.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill python-review --format text`; schema `skill_tool_commands.v2`, digest: `6e43fb40b59c525a46458a6801970ed9ecdcdef353861afb50699c680205a871`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.

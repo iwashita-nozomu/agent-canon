@@ -13,14 +13,7 @@ description: "Use when touching Docker, CI, dependencies, runtime compatibility,
 <!--
 @dependency-start
 contract reference
-responsibility Exposes the catalog-owned Codex discovery adapter for this skill.
-upstream design ../../../agents/skills/catalog.yaml catalog-owner
-upstream design ../../../agents/skills/skill-dependencies.yaml dependency-owner
-upstream implementation ../../../agents/skills/environment-maintenance.md canonical-owner
-downstream implementation ../../../tools/agent_tools/skill_shim_materializer.py shim-writer
-downstream implementation ../../../tools/agent_tools/skill_tool_commands.py packet-reader
-downstream implementation ../../../tools/agent_tools/route.py route-owner
-downstream implementation ../../../tools/agent_tools/check_agent_runtime_alignment.py host-readback
+upstream implementation ../../../agents/skills/environment-maintenance.md
 @dependency-end
 -->
 
@@ -35,11 +28,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill environment-maintenance --format text`.
-Packet schema: `skill_tool_commands.v2`; packet digest: `d01eed504dca9ddb23dbcc6765f7dccd8538c3f9519eb5c5bf24ade17d2578c0`.
-The command packet is the complete catalog-backed packet, including every command
-phase and resolved command tuple; this line is its executable read path, not a second
-writer or an alternate write route.
+Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill environment-maintenance --format text`; schema `skill_tool_commands.v2`, digest: `d01eed504dca9ddb23dbcc6765f7dccd8538c3f9519eb5c5bf24ade17d2578c0`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
