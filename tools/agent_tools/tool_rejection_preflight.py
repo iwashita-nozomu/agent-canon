@@ -13,10 +13,10 @@
 # upstream design ../../tools/README.md documents tool entrypoints
 # upstream design ../../documents/tools/README.md documents user-facing tool routes
 # upstream implementation ./log_surface_inventory.py checks hook/tool/skill log-surface drift
-# upstream implementation ../../.codex/hooks/cause_investigation_guard.py blocks code edits without cause evidence
-# upstream implementation ../../.codex/hooks/oop_readability_guard.py blocks OOP readability failures
-# upstream implementation ../../.codex/hooks/library_implementation_guard.py blocks library implementation rewrites
-# upstream implementation ../../.codex/hooks/style_checker_guard.py blocks selected style checker failures
+# upstream implementation ./tool_rejection_preflight.py owns code-edit cause evidence.
+# upstream implementation ../../.agents/skills/oop-readability-check/SKILL.md owns OOP readability review routing
+# upstream implementation ./task_authority.py owns library implementation authority.
+# upstream implementation tools/bin/agent-canon owns selected style checks.
 # upstream implementation ./responsibility_scope.py validates responsibility owner scopes
 # downstream implementation ../../tools/agent_tools/agent_team.py injects preflight protocol into team manifests
 # downstream implementation ../../tests/agent_tools/test_tool_rejection_preflight.py validates predicted gate routing
@@ -187,7 +187,7 @@ CAUSE_INVESTIGATION_GATE_TEMPLATES = (
             "'{{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\","
             "\"tool_input\":{{\"patch\":\"*** Begin Patch\\n*** Update File: {path}\\n"
             "*** End Patch\\n\"}}}}' "
-            "| python3 .codex/hooks/cause_investigation_guard.py"
+            "| python3 tools/agent_tools/tool_rejection_preflight.py --gate cause_investigation"
         ),
         handoff=(
             "record Observation, Hypothesis or Root Cause, Expected Fix Surface "
@@ -216,7 +216,7 @@ PYTHON_GATE_TEMPLATES = (
         command_template=(
             "printf '%s' "
             "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
-            "| python3 .codex/hooks/module_boundary_guard.py"
+            "| python3 tools/agent_tools/import_responsibility.py"
         ),
         handoff=(
             "include module boundary evidence before changing Python module "
@@ -252,7 +252,7 @@ LIBRARY_GATE_TEMPLATES = (
         command_template=(
             "printf '%s' "
             "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
-            "| python3 .codex/hooks/library_implementation_guard.py"
+            "| import-only:tools.agent_tools.task_authority:first_party_library_authorized"
         ),
         handoff=(
             "do not rewrite vendored or installed library internals; use wrapper, "
@@ -275,7 +275,7 @@ STYLE_CHECK_GATE_TEMPLATES = (
         command_template=(
             "printf '%s' "
             "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
-            "| python3 .codex/hooks/style_checker_guard.py"
+            "| tools/bin/agent-canon docs check"
         ),
         handoff=(
             "include selected style checker families and unchecked changed-file "

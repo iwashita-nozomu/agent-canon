@@ -8,8 +8,7 @@ downstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves 
 downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages clone, branch, status, and push operations
 downstream design runtime-log-archive-migration.md documents in-tree hook JSONL migration into the archive
 downstream design ../../.codex/hooks/hook_dispatcher.py records the active fingerprint-only local spool contract
-downstream implementation ../../.codex/hooks/log_archive_mount_warning.py remains a standalone explicit mount check
-downstream implementation ../../.codex/hooks/runtime_log_auto_sync.py remains a standalone explicit archive checkpoint
+downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py owns explicit mount checks and archive checkpoints
 downstream implementation ../../.codex/hooks/hook_event_log.py writes atomic per-event files into the repository-owned spool
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates archive JSONL and eval reports when mounted
 downstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py reads mounted archive JSONL and eval reports

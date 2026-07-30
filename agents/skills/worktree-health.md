@@ -39,7 +39,7 @@ executor の選択と実行は各 owner route が行い、この skill は healt
 - `notes/guardrails/README.md`
 - `notes/failures/README.md`
 - `notes/worktrees/README.md`
-- `.codex/hooks/branch_worktree_guard.py`
+- `tools/agent_tools/hook_safety.py`
 - `tools/agent_tools/worktree_scope_lint.py`
 - `tools/docs/check_worktree_scopes.sh`
 - `tools/agent_tools/validate_role_write_scope.py`
@@ -60,7 +60,7 @@ executor の選択と実行は各 owner route が行い、この skill は healt
 - `python3 tools/agent_tools/worktree_scope_lint.py --current` が placeholder や stale kickoff field を出していない
 - `notes/guardrails/README.md` と `notes/failures/README.md` の relevant item が未対応のまま残っていない
 - `git worktree list --porcelain` で duplicate / stale worktree が無いか確認している
-- branch / worktree 作成 route は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と `branch_worktree_guard.py` に委譲し、この skill は診断 command と `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>` の存在だけを確認している
+- branch / worktree 作成 route は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と `tools/agent_tools/hook_safety.py` に委譲し、この skill は診断 command と `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>` の存在だけを確認している
 - carry-over すべき note、report、result の置き場が消える前提になっていない
 - dependency clone cleanup では、exact computed path、clean / untracked-zero
   state、remote integrated tree readback を health evidence として確認する。
@@ -90,5 +90,5 @@ executor の選択と実行は各 owner route が行い、この skill は healt
 ## Boundary
 
 - stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log の cleanup 診断には `worktree-start` を使います。新規作業の worktree 初期化には使いません。
-- branch/worktree 作成 route は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse `branch_worktree_guard.py` を正本にします。
+- branch/worktree 作成 route は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse safety owner `tools/agent_tools/hook_safety.py` を正本にします。
 - repo 全体レビューや再編は `comprehensive-development` を使います。

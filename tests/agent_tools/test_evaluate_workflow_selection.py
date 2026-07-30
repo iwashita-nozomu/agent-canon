@@ -274,8 +274,8 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
     def copy_runtime_fixture(self, root: Path) -> None:
         """Copy the classifier and manifest needed by the eval runner."""
         for relative in (
-            ".codex/hooks/skill_usage_logger.py",
-            ".codex/hooks/hook_event_log.py",
+            "tools/agent_tools/prompt_classifier.py",
+            "tools/agent_tools/skill_lane_detector.py",
             "evidence/agent-evals/workflow_selection_eval.toml",
         ):
             source = PROJECT_ROOT / relative

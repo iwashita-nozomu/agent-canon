@@ -75,7 +75,7 @@ if [ -d python ]; then
   fi
 else
   AGENT_CANON_W2_OWNER_PATHS=(
-    .codex/hooks/completion_review_guard.py \
+    "${CANON_TOOLS_ROOT}/agent_tools/review_dispatch.py" \
     "${CANON_TOOLS_ROOT}/agent_tools/artifact_identity.py" \
     "${CANON_TOOLS_ROOT}/agent_tools/external_artifact_binding.py" \
     "${CANON_TOOLS_ROOT}/agent_tools/publication_integrator.py" \

@@ -4,7 +4,7 @@
 # responsibility Exports bounded Codex runtime summaries from local Codex raw logs to the AgentCanon log archive.
 # upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and mount policy
 # upstream implementation ./runtime_log_paths.py resolves codex-runtime archive paths
-# downstream implementation ../../.codex/hooks/codex_runtime_summary_logger.py calls this exporter from Stop hooks
+# downstream implementation ./runtime_log_archive_git.py invokes this exporter from selected archive routes
 # downstream implementation ../../tests/agent_tools/test_export_codex_runtime_summary.py validates summary extraction
 # @dependency-end
 """Export bounded Codex runtime summaries into the AgentCanon log archive."""

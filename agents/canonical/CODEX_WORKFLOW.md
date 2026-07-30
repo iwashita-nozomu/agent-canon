@@ -95,7 +95,7 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 
 - 同じ checkout は複数 chat/session が同時に使う場合があります。unknown dirty/staged/untracked state と branch/worktree state は user または別 chat 所有として保存します。`git restore`、`git reset`、forced `git clean`、mutating `git stash`、checkout/switch、branch/worktree create/delete/move/rename/prune は protected Git mutation として扱います。proven exact task ownership は approval request に含める path を限定し、explicit destructive approval は引き続き必須です。
 - protected Git mutation の実行条件は、user の操作明示承認と、同じ command segment で Git または protected AgentCanon update wrapper の直前に置く `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` および非空の `AGENT_CANON_DESTRUCTIVE_GIT_REASON=<reason>` です。branch/worktree creation と `latest` / `apply` / merge update route は、同じ segment の `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` または `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow` と、非空の `AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>` も同時に要求します。ambient 変数や prior segment は authority になりません。
-- `branch_worktree_guard.py` は critical PreToolUse child です。session 開始時に dispatcher と child registration を load 済みの session では次の tool call から更新後 script が効きます。hook table 自体が未 load の既存 session は session restart 後に保護対象になります。
+- destructive Git safety は `tools/agent_tools/hook_safety.py` の pure owner を dispatcher が呼び出します。session 開始時に dispatcher registration を load 済みの session では次の tool call から更新後 script が効きます。hook table 自体が未 load の既存 session は session restart 後に保護対象になります。
 - 衝突時は current branch/worktree を維持し、status を保存して user の指示を待ちます。
 
 - 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。

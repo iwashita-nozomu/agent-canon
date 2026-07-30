@@ -314,10 +314,10 @@ python3 tools/agent_tools/vector_search.py --surface python --query "initialize 
   - 文書整理では `$document-canon-cleanup` と組み合わせ、候補 report を削除 authority ではなく triage evidence として扱います。
 - `tools/agent_tools/reference_materializer.py`
   - consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。
-  - `reference_capture_guard.py` の未登録 URL block を解消する canonical tool です。PDF の代わりに同等 HTML を参照した場合も、HTML source URL を Markdown reference に登録します。
-- `.codex/hooks/cause_investigation_guard.py`
-  - `PreToolUse` で `apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を要求します。
-  - `Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を含む run artifact、issue、または design note が無い code edit を block し、log に `cause_evidence_status` と `code_paths` を残します。
+- reference capture is selected through its owning materializer route. PDF の代わりに同等 HTML を参照した場合も、HTML source URL を Markdown reference に登録します。
+- `tools/agent_tools/tool_rejection_preflight.py`
+  - code edit 前の cause investigation evidence を canonical preflight route として検証します。
+  - `Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を含む run artifact、issue、または design note を typed preflight input として扱います。
 - `tools/agent_tools/helper_function_inventory.py`
   - Python helper 関数 / クラスを AST、呼び出し元、side effect、内部 call graph、domain 別の機能ベース rule から列挙し、`auto_helper`、`needs_user_judgment`、`redundant_helper` を分けて JSON / Markdown / text で出します。
   - `redundant_helper` は identity return、pass-through call wrapper、normalized body が重複する helper 実装を表し、`redundancy_rule` と `redundant_with` を出します。

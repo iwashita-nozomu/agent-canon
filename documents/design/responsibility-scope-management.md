@@ -11,8 +11,8 @@ downstream design ../../templates/documents/responsibility-scope.template.toml s
 upstream design ../../tools/catalog.yaml structured tool ownership
 downstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope coverage
 downstream implementation ../../tools/agent_tools/import_responsibility.py validates local import ownership
-downstream implementation ../../.codex/hooks/library_implementation_guard.py blocks protected external dependency rewrites
-downstream implementation ../../.codex/hooks/helper_first_guard.py blocks helper-first implementation drift
+downstream implementation ../../tools/agent_tools/task_authority.py owns protected external dependency authority
+downstream implementation ../../tools/agent_tools/responsibility_scope.py owns helper placement evidence
 downstream implementation ../../tools/agent_tools/tool_drift.py validates scope/tool trace links
 @dependency-end
 -->
@@ -93,11 +93,11 @@ python3 tools/agent_tools/import_responsibility.py --root . --changed
 
 Edit-time hooks use the same ownership model for two common failure modes:
 
-- `.codex/hooks/library_implementation_guard.py` blocks direct rewrites of
+- `tools/agent_tools/task_authority.py` owns direct rewrite authority for
   vendored or installed library implementation files. External code changes
   must be a wrapper / adapter, fork / upstream patch, or manifest-backed vendor
   import rather than an in-place patch to library internals.
-- `.codex/hooks/helper_first_guard.py` blocks helper-like function additions
+- `tools/agent_tools/responsibility_scope.py` validates helper-like function additions
   that do not carry ownership evidence such as a test, issue, docs, or
   responsibility-scope update. Its JSONL records include role, candidate rule,
   judgment rule, incoming count, and specialization so prompt and skill evals

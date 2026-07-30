@@ -4,7 +4,7 @@ contract design
 responsibility Defines the implementation-ready AgentCanon Wave 3 hook simplification target after the completed caller audit and reviewer-finding correction.
 upstream design ../../.codex/README.md owns the project-scoped hook design and reader route.
 upstream implementation ../../.codex/hooks/hook_dispatcher.py owns the active lifecycle dispatch contract.
-upstream implementation ../../.codex/hooks/hook_event_log.py owns append-only hook telemetry transport.
+upstream implementation ../../.codex/hooks/hook_event_log.py owns no-replace per-event spool transport for canonical hook telemetry.
 upstream design ../runtime/log-surface-inventory.json owns generated telemetry field inventory.
 upstream design ../../tools/catalog.yaml owns canonical tool registration.
 upstream design ../../responsibility-scope.toml owns top-level responsibility coverage.
@@ -20,10 +20,24 @@ downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates 
 ## Authority と設計境界
 
 - canonical design owner: `.codex/README.md` の Hook Context と `.codex/hooks/hook_dispatcher.py` の lifecycle contract
-- canonical non-hook owners: `tools/agent_tools/` の typed tool/checker modules、`tools/agent_tools/workflow_monitor.py` の behavior-event emitter
+- canonical non-hook owners: `tools/agent_tools/` の typed tool/checker modules、`tools/agent_tools/workflow_monitor.py` の monitor projection emitter
 - decision: 3 active dispatcher events、inactive `Stop`、permanent tombstones、retired executable file なし
 - no compatibility surface: 旧 executable、re-export、wrapper、shim、fallback CLI は作らない
 - source checkout: fresh design clone from current `main`; implementation wave は同じ source snapshot を再読込して開始する
+- first artifact（責務/呼び出し順）: 下表を起点に `active handler -> caller owner -> record assembly -> writer/projection` の順序を固定し、以降の契約はこのテーブルに従う
+
+| artifact owner | caller path | write/projection policy |
+| --- | --- | --- |
+| `.codex/hooks/hook_dispatcher.py` | finalized `UserPromptSubmit`/`PreToolUse`/`PostToolUse` path | one `record_hook_invocation` call; one `HookLogContext.append` for every active invocation; optional projection when append status is `spooled` and behavior record exists |
+| `tools/agent_tools/behavior_event_assembly.py` | direct import from dispatcher | returns `BehaviorEventRecord | None`; no I/O |
+| `.codex/hooks/hook_event_log.py` | direct import from dispatcher | no-replace per-event spool append (`<spool>/<namespace>/<hook_name>/<hook_run_id>.json`) with `spooled|duplicate|failed` result |
+| `tools/agent_tools/workflow_monitor.py` | direct import from dispatcher | emit projection only when append status is `spooled` AND behavior record exists |
+
+Invalid interpretations:
+
+- no transport relocation (`tools/agent_tools/hook_event_log.py` への新設は不可)
+- no compatibility wrapper / shim / fallback re-export
+- no count/path semantics changes (`RETIRED_CHILD_TOMBSTONES=23`, `MOVED_SOURCE_ABSENCES=1`, union `24`を維持)
 
 ## Reviewer-corrected caller and readback audit
 
@@ -53,7 +67,7 @@ Caller audit also has a typed artifact/read-only-consumer sidecar. It is part of
 ```text
 CALLER_AUDIT_ARTIFACTS = (
   "skill_usage.jsonl",          # historical read-only input
-  "behavior_events.jsonl",      # active target input
+  "behavior_events.jsonl",      # checkpoint/readback corpus from runtime_log_archive_git
   "workflow_monitoring.md",     # monitor projection
 )
 CALLER_AUDIT_CONSUMERS = (
@@ -127,11 +141,11 @@ The read-only consumers may not emit an independent B7/B9 decision, approval, or
 | `PreToolUse` | `Bash\|apply_patch\|python\|python3` | `hook_safety.first_block` then `branch_block_payload` | after the safety result is final, call `behavior_event_assembly.record_hook_invocation(parts)` exactly once | no output on pass; operation/hash-only block | unauthorized destructive Git block; malformed input and spool failure fail-open |
 | `PostToolUse` | current ten-tool matcher set | normalize six fields, then `execution_resource_projection.validate_projection_bytes` | after the projection result is final, call `behavior_event_assembly.record_hook_invocation(parts)` exactly once | validated successful Bash projection as official `additionalContext` | malformed input, non-Bash, unsuccessful response, invalid projection, spool failure fail-open |
 
-The active handler set is exactly `UserPromptSubmit.secret_safety`, `PreToolUse.destructive_git_safety`, `PostToolUse.execution_resource_projection`. The dispatcher is the sole caller of `record_hook_invocation`; `behavior_event_assembly.py` is the sole writer and orchestration owner for behavior-event persistence. The dispatcher imports the owner directly and calls it after, never before, the existing handler result is finalized. The call is exactly once per active handler invocation, including a finalized block/fail-open result; `Stop` is inactive and calls it zero times. The official output schema remains `agent-canon.posttooluse-stop.v1`; contract readback schema remains `agent-canon.hook-contract.v1` with `active_events` length 3 and `inactive_events=["Stop"]`.
+The active handler set is exactly `UserPromptSubmit.secret_safety`, `PreToolUse.destructive_git_safety`, `PostToolUse.execution_resource_projection`. The dispatcher is the sole caller of `record_hook_invocation`; `behavior_event_assembly.py` is the sole pure owner for eligibility, event-id, and snapshot assembly. The dispatcher imports the owner directly and calls it after, never before, the existing handler result is finalized. The call is exactly once per active handler invocation, including a finalized block/fail-open result; `Stop` is inactive and calls it zero times. The official output schema remains `agent-canon.posttooluse-stop.v1`; contract readback schema remains `agent-canon.hook-contract.v1` with `active_events` length 3 and `inactive_events=["Stop"]`.
 
 ### Dispatcher caller contract for `record_hook_invocation`
 
-The dispatcher imports `record_hook_invocation` directly from `tools/agent_tools/behavior_event_assembly.py` using the same source-root import bootstrap as the other non-hook owners. It does not dynamically load the retired logger, call a CLI, write JSONL, or invoke `workflow_monitor.py` itself. Each active handler constructs one immutable `HookInvocationParts` value only after its existing handler result is final:
+The dispatcher imports `record_hook_invocation` directly from `tools/agent_tools/behavior_event_assembly.py` using the same source-root import bootstrap as the other non-hook owners. Each active handler constructs one immutable `HookInvocationParts` value only after its existing handler result is final:
 
 ```text
 HookInvocationParts = frozen {
@@ -147,39 +161,46 @@ HookInvocationParts = frozen {
 }
 ```
 
-`handler_result` includes the finalized dispatcher status, output/block decision, and safe result fields; it never contains raw prompt, command, secret, stdout, or stderr material. `classifier_rules` is the already-frozen input described in the pure classifier contract. `tool_selection`, `subagent_selection`, and `workflow_context` are typed values or explicit empty values; the dispatcher does not recompute any of them. The caller contract is therefore one import, one parts value, one call, and no caller-side artifact write.
+`handler_result` includes the finalized dispatcher status, output/block decision, and safe result fields; it never contains raw prompt, command, secret, stdout, or stderr material. `classifier_rules` is the already-frozen input described in the pure classifier contract. `tool_selection`, `subagent_selection`, and `workflow_context` are typed values or explicit empty values; the dispatcher does not recompute any of them. The caller contract is therefore one direct import of `behavior_event_assembly`, one parts construction in parts-preparation, one call, and no caller-side artifact serialization/write during parts-preparation.
 
 The owner boundaries for admission are fixed:
 
 | decision | owner | true condition | false result |
 | --- | --- | --- | --- |
-| `eligible_hook_invocation(parts)` | `behavior_event_assembly.py` | active event name; finalized handler result; `payload_status="parsed"`; status is not `malformed_payload`, `blocked_secret`, `blocked_destructive_git`, or `invalid_projection`; and at least one safe behavior signal exists | `skipped`, with no JSONL write and no monitor projection |
-| `should_log(classifier_inputs)` | `prompt_classifier.py` | current pure classifier rule: prompt classification has a selected/candidate/feedback signal according to the injected immutable catalog and routing rules | `False`; no classifier-owned side effect |
-| final snapshot admission | `behavior_event_assembly.py` | `eligible_hook_invocation(parts)` and (`should_log(...)` or a nonempty tool-selection, subagent-selection, or workflow-context signal) | `skipped`; dispatcher handler result is unchanged |
+| `should_log(parts, signals)` | `behavior_event_assembly.py` | `parts` contains a configured prompt/classifier signal or workflow/workflow-context/subagent/tool selection signal | `False`; no classifier-owned side effects; dispatcher handler result is unchanged |
+| `eligible_hook_invocation(parts, signals)` | `behavior_event_assembly.py` | active event name; finalized handler result; `payload_status="parsed"`; status is not `invalid_projection`, `blocked_secret`, `blocked_destructive_git`, `malformed_payload`; and `should_log(parts, signals)` | `skipped`, with no behavior record candidate and no monitor projection |
 
-`Stop` never constructs parts. A finalized safety block is still passed once to the assembly caller, but is ineligible and cannot cause prompt/command material to be captured. A valid `PostToolUse` with an unsuccessful producer response may remain eligible for safe tool-selection evidence; an invalid projection is ineligible. The assembly owner, not the dispatcher, owns all three decisions and is the only place that may turn them into a behavior snapshot.
+`Stop` never constructs parts. A finalized safety block is still passed once to the assembly caller, but is ineligible and cannot cause prompt/command material to be captured. A valid `PostToolUse` with an unsuccessful producer response may remain eligible for safe tool-selection evidence; an invalid projection is ineligible. The assembly owner, not the dispatcher, owns `should_log` and `eligible` and is the only place that may turn an eligible invocation into a behavior snapshot.
 
-The call and write order is strict:
+Dispatcher must build a typed workflow context before assembly and pass it into parts:
 
-1. `hook_dispatcher.py` completes the existing event-specific safety or projection handler and stores its `FinalHandlerResult`.
-2. The dispatcher calls `record_hook_invocation(parts)` exactly once.
-3. `behavior_event_assembly.py` validates parts, invokes the pure classifier/selection/context owners, applies eligibility and `should_log`, assembles the one canonical snapshot, derives `event_id`, and writes `behavior_events.jsonl` through the canonical append transport.
-4. Only after a new JSONL record is successfully written does the assembly owner call `workflow_monitor.emit_behavior_projection(...)` with the same snapshot. A duplicate append does not emit a second monitor projection; a failed append never invokes the monitor.
-5. The dispatcher returns the already-finalized handler output. It ignores assembly status for safety/output purposes; assembly status is telemetry-only.
+1. `hook_dispatcher.py` executes `workflow_context.load_workflow_context(...)` before constructing parts; load failure is fail-open to a typed empty context.
+2. `hook_dispatcher.py` completes the event-specific safety or projection handler and stores its `FinalHandlerResult`.
+3. The dispatcher executes `subagent_selection.select_subagents(...)` and `tool_selection.select_tools(...)` in parts-preparation.
+4. If parts-preparation fails, typed input is normalized to explicit empties and the assembly call still happens exactly once.
+5. The dispatcher builds one immutable `HookInvocationParts` and calls `record_hook_invocation(parts)` exactly once.
+6. `behavior_event_assembly.py` validates parts, runs pure prompt capture + `prompt_classifier.prompt_intake_signals`, consumes precomputed typed tool/subagent/workflow-context values from `parts`, applies eligibility and `should_log`, assembles the one canonical snapshot, and derives `event_id`, returning `BehaviorEventRecord | None`.
+7. The dispatcher loads the base spool entry, merges behavior fields into that base when a record exists, and calls `HookLogContext.append(...)` exactly once for every active invocation after the handler result is finalized.
+8. The dispatcher calls `workflow_monitor.emit_behavior_projection(...)` once only when a behavior record exists and append status is `spooled`; duplicate/failed/blocked/malformed/ineligible statuses make zero emit calls, then returns the finalized handler output unchanged.
 
-`record_hook_invocation` is fail-open at the telemetry boundary: `skipped`, `duplicate`, JSONL append failure, monitor failure, malformed classifier inputs, and context load failure cannot change the finalized hook decision or create a new block. A successful JSONL write remains durable even if monitor projection fails. The assembly API returns a typed `RecordHookInvocationResult` and does not raise into the dispatcher. Exactly one eligible invocation produces exactly one `behavior-event.v1` snapshot; retries are deduplicated by the previously fixed `event_id` rule.
+`record_hook_invocation` is fail-open at the telemetry boundary: `skipped` and malformed inputs cannot change the finalized hook decision or create a new block. The assembly API returns a typed `BehaviorEventRecord | None` and does not raise into the dispatcher.
+
+Dispatcher parts-preparation remains I/O-free for artifact writes. Caller-side transport is exactly one `HookLogContext.append(...)` call for every active invocation (including blocked/malformed/ineligible), and exactly one `workflow_monitor.emit_behavior_projection(...)` call only when a behavior record exists and append status is `spooled`; otherwise 0.
 
 ### Transport hook name, semantic event kind, cardinality, and identity
 
 `hook_event_name` is transport metadata and is never used as the semantic event kind. It is exactly one of `UserPromptSubmit`, `PreToolUse`, or `PostToolUse` on an active invocation. `event_kind` is the behavior meaning and is independent of the transport name: `behavior_snapshot`, `prompt_intake`, `tool_selection`, `subagent_selection`, `workflow_attribution`, or `skill_lane`. The canonical replacement record uses `event_kind="behavior_snapshot"` and carries the other semantic dimensions as fields; the dimension names are not aliases for `hook_event_name`. The old ambiguous `event` field is removed from the target behavior schema and has no compatibility alias.
 
-Cardinality is fixed at both layers:
+Transport status is emitted only by `HookLogContext.append`, and telemetry cardinality is:
 
 | source | cardinality for one invocation | canonical identity |
 | --- | --- | --- |
-| active dispatcher spool | exactly one `hook_event_log` record for each active hook invocation; `Stop` produces zero | `hook_invocation_id`/current `hook_run_id` plus `hook_event_name` |
-| behavior-event artifact | zero when the invocation has no behavior signal; otherwise exactly one `behavior-event.v1` snapshot with `event_kind="behavior_snapshot"` | one `event_id` for the snapshot; no per-field or per-dimension duplicate rows |
-| monitor projection | zero or more human-readable monitoring lines derived from the one snapshot; these are projections, not canonical event records | projection lines never create a new `event_id` |
+| ineligible invocation | 0 behavior record candidate → 1 base append attempt (`HookLogContext.append`) with no behavior fields → 0 monitor projection | `hook_invocation_id`/current `hook_run_id` plus `hook_event_name` |
+| eligible behavior invocation | exactly 1 behavior record candidate; 1 merged base append with behavior fields; 1 projection when status is `spooled` | one `event_id` for the snapshot; no per-field or per-dimension duplicate rows |
+| blocked_secret | 0 behavior record candidate → 1 base append; 0 projection; telemetry fields include `safety_decision` only | same as invocation id + event name, with safety telemetry context |
+| blocked_destructive_git | 0 behavior record candidate → 1 base append; 0 projection; telemetry fields include `safety_decision`, `operation` | same as invocation id + event name, with safety telemetry context |
+| malformed_payload | 0 behavior record candidate → 1 base append; 0 projection; telemetry fields include base status/fingerprint only | same as invocation id + event name, with safety telemetry context |
+| append result (spooled/duplicate/failed) | one append already attempted above; spooled behavior exists: 1 projection; no behavior record or duplicate/failed: 0 projection | projection lines never create a new `event_id` |
 
 `hook_invocation_id` is the current `hook_run_id` supplied by the dispatcher context and is reused when the same invocation is retried. `event_id` is the lowercase SHA-256 of this exact UTF-8 preimage, with no newline:
 
@@ -208,14 +229,20 @@ The single safety owner is `tools/agent_tools/hook_safety.py`. It receives all p
 The implementation dispatcher import contract is exact: resolve `Path(__file__).resolve().parents[2]` as source root, prepend `<source-root>/tools/agent_tools` once to `sys.path` if absent, then use this direct-import list exactly once:
 
 ```text
-tools.agent_tools.hook_safety
-tools.agent_tools.execution_resource_projection
-tools.agent_tools.hook_event_log
-tools.agent_tools.hook_retirement
-tools.agent_tools.behavior_event_assembly:record_hook_invocation
+import hook_safety                              # canonical `tools.agent_tools.hook_safety`
+import execution_resource_projection             # canonical `tools.agent_tools.execution_resource_projection`
+import hook_retirement                          # canonical `tools.agent_tools.hook_retirement`
+from tool_selection import ToolSelection, select_tools
+from subagent_selection import SubagentSelection, select_subagents
+from workflow_context import WorkflowContext, load_workflow_context
+from hook_event_log import HookLogContext, utc_now
+from behavior_event_assembly import HookInvocationParts, record_hook_invocation
+from workflow_monitor import emit_behavior_projection
 ```
 
-After the source-root path insertion, the last entry is the ordinary direct Python import `from behavior_event_assembly import record_hook_invocation`; its canonical module identity is `tools.agent_tools.behavior_event_assembly` and its only imported symbol is `record_hook_invocation`. No `importlib`, dynamic path loading, CLI subprocess, or second assembly import is permitted. The dispatcher must not inspect cwd or Git, spawn a process, or access a network. It calls the new owner directly; `.codex/hooks/hook_safety.py` is deleted after the new owner and pure-owner tests pass. The old file is not a wrapper and is not importable in target state.
+After the source-root path insertion, imports are ordinary direct Python imports. The canonical identities for the new parts-prepared precomputed values are `tools.agent_tools.tool_selection`, `tools.agent_tools.subagent_selection`, and `tools.agent_tools.workflow_context`; behavior assembly is `tools.agent_tools.behavior_event_assembly` via `from behavior_event_assembly import HookInvocationParts, record_hook_invocation`; and `.codex/hooks/hook_event_log.py` is not imported as a tool module but as local hook module `from hook_event_log`. No `importlib`, dynamic path loading, CLI subprocess, or second assembly import is permitted. The dispatcher must not inspect cwd or Git, spawn a process, or access a network. It calls the new owner directly; `.codex/hooks/hook_safety.py` is deleted after the new owner and pure-owner tests pass. The old file is not a wrapper and is not importable in target state.
+
+Raw-to-spool mapping: for every active invocation, the handler result defines one base spool record; behavior-only fields are an optional enrichment layer merged into that base before append.
 
 ## Canonical tombstone manifest and guard
 
@@ -272,7 +299,7 @@ The canonical tuple rows are fixed as follows; no row may be inferred from a nea
 | `codex_runtime_summary_logger.py` | `tools/agent_tools/export_codex_runtime_summary.py` | `command-only:python3 tools/agent_tools/export_codex_runtime_summary.py` |
 | `runtime_log_auto_sync.py` | `tools/agent_tools/runtime_log_archive_git.py` | `command-only:python3 tools/agent_tools/runtime_log_archive_git.py sync` |
 | `execution_resource_plan_projection_guard.py` | `tools/agent_tools/execution_resource_projection.py` | `import-only:tools.agent_tools.execution_resource_projection:validate_projection_bytes` |
-| `skill_usage_logger.py` | `tools/agent_tools/behavior_event_assembly.py` | `import-only:tools.agent_tools.behavior_event_assembly:assemble_behavior_event` |
+| `skill_usage_logger.py` | `tools/agent_tools/behavior_event_assembly.py` | `import-only:tools.agent_tools.behavior_event_assembly:record_hook_invocation` |
 | `prompt_secret_guard.py` | `tools/agent_tools/hook_safety.py` | `import-only:tools.agent_tools.hook_safety:secret_block_payload` |
 | `branch_worktree_guard.py` | `tools/agent_tools/hook_safety.py` | `import-only:tools.agent_tools.hook_safety:first_block` |
 | `cause_investigation_guard.py` | `tools/agent_tools/tool_rejection_preflight.py` | `command-only:python3 tools/agent_tools/tool_rejection_preflight.py --gate cause_investigation` |
@@ -354,7 +381,7 @@ There is no trailing newline, filesystem metadata, absolute root, timestamp, sto
 
 The dispatcher `--contract` readback uses the same field names and counts: `retired_child_tombstones`, `moved_source_absences`, `counts.retired_child_tombstones=23`, `counts.moved_source_absences=1`, `counts.retired_filenames=24`, and `source_digest`. The old `retired_hook_routes` key is absent from target readback; there is no compatibility alias.
 
-The tombstone guard's artifact scan set is also fixed: `skill_usage.jsonl`, `behavior_events.jsonl`, and `workflow_monitoring.md`. `skill_usage.jsonl` may remain as an archived input and may be named by `historical_skill_usage_reader.py`, `generate_agent_improvement_guide.py`, or the historical dashboard readback only; it must not be an active producer, hook registration, catalog command, or inventory emitter. `behavior_events.jsonl` has exactly one active assembly owner, and `workflow_monitoring.md` has exactly one monitor owner. Any second writer or an executable route to the historical artifact fails closed.
+The tombstone guard's artifact scan set is also fixed: `skill_usage.jsonl`, `behavior_events.jsonl`, and `workflow_monitoring.md`. `skill_usage.jsonl` may remain as an archived input and may be named by `historical_skill_usage_reader.py`, `generate_agent_improvement_guide.py`, or the historical dashboard readback only; it must not be an active producer, hook registration, catalog command, or inventory emitter. `behavior_events.jsonl` is the checkpoint/readback corpus (not a hot-path write destination); its active per-event transport owner is `.codex/hooks/hook_event_log.py` via spool, and `workflow_monitoring.md` has exactly one monitor owner. Any second writer or an executable route to the historical artifact fails closed.
 
 ### Deterministic 24-basename caller audit
 
@@ -393,7 +420,7 @@ The following is copied from the current implementation and is the parity oracle
 | spool identity | `hook_run_id` | `hook-<compact timestamp>-<10 hex digest>-<10 hex nonce>`; path basename-safe; `fingerprint_json` helper returns 12 lowercase hex, while namespace disambiguation uses 8 lowercase hex | append-only no-replace; duplicate identical bytes is `duplicate`; conflict/I/O is failure | dispatcher catches all append failures and stays fail-open |
 | append result | `status`, `hook_run_id`, `spool_path`, `event_sha256`, `error_code` | status is `spooled|duplicate|failed`; path is `Path`; event hash is 64 lowercase hex on success; error code is empty or `event_identity_missing|event_schema_invalid|spool_unavailable|spool_io_failure|spool_conflict` | returned by `HookLogContext.append`; not copied into dispatcher safety status | transport owner preserves result domain |
 | telemetry | `safety_decision`, `operation` | optional non-empty strings; only block events emit them | UserPrompt block emits `safety_decision=block`; PreTool block additionally emits `operation`; no prompt, command, secret, stdout, stderr | field names and omission rules unchanged |
-| behavior JSONL | `event_id`, `hook_invocation_id`, `hook_event_name`, `event_kind`, timestamp, and the complete logger parity field union | required fields use the domains above; empty strings/lists/bools/counts are explicit; no JSON null for an absent parity field | current `skill_usage.jsonl` has no independent event-byte limit; target `behavior_events.jsonl` retains that absence, while prompt excerpt remains 600 characters and all canonical JSON is UTF-8/one-line | `behavior_event_assembly.py` owns assembly/write; parser owns readback |
+| behavior JSONL | `event_id`, `hook_invocation_id`, `hook_event_name`, `event_kind`, timestamp, and the complete logger parity field union | required fields use the domains above; empty strings/lists/bools/counts are explicit; no JSON null for an absent parity field | current `skill_usage.jsonl` has no independent event-byte limit; target `behavior_events.jsonl` retains that absence, while prompt excerpt remains 600 characters and all canonical JSON is UTF-8/one-line | no file write owner in this table; readback is owned by dashboard/parser layer |
 
 Dispatcher status domain is exactly `malformed_payload`, `pass`, `blocked_secret`, `blocked_destructive_git`, `projection_forwarded`, `unsuccessful_tool_response`, and `invalid_projection`; `Stop` emits none. `spooled`, `duplicate`, `failed`, and error codes belong to `HookAppendResult`, not dispatcher safety status. Spool failure never changes a safety decision.
 
@@ -407,21 +434,21 @@ The old hook module is not replaced by one broad helper. Its complete responsibi
 | --- | --- | --- | --- | --- |
 | prompt capture and redaction | `tools/agent_tools/prompt_capture.py` | `capture_prompt(payload, redaction_rules, excerpt_limit=600) -> PromptCapture` | none; immutable return containing status, redacted excerpt, original char count, fingerprint | `prompt_classifier.py`, behavior assembly |
 | prompt classification | `tools/agent_tools/prompt_classifier.py` | `prompt_intake_signals(inputs: PromptClassifierInputs) -> PromptIntakeSignals` | none; no subprocess, Git, network, environment mutation, or file I/O | workflow evaluator and behavior assembly |
-| feedback, candidate-reason, and related-skill normalization | `tools/agent_tools/prompt_classifier.py` | `feedback_targets(signals) -> tuple[str, ...]`; `should_log(signals) -> bool` | none; preserves current feedback labels/action/target and candidate-reason ordering | evaluator and behavior assembly consume the classifier result |
-| tool selection | `tools/agent_tools/tool_selection.py` | `select_tools(payload) -> ToolSelection` | none; tuple/list ordering is part of return contract | behavior assembly and dashboard parser fixtures |
-| subagent selection and attribution | `tools/agent_tools/subagent_selection.py` | `select_subagents(payload, workflow_context) -> SubagentSelection` | none; selection/workflow attribution is returned, not emitted directly | behavior assembly and workflow monitor |
-| workflow context store/load | `tools/agent_tools/workflow_context.py` | `load_workflow_context(path) -> WorkflowContext`; `store_workflow_context(path, context) -> StoreResult` | only the existing paired `skill_usage_context.json` path (resolved under the selected log/report directory); atomic write; load/store failure is fail-open to an empty context, never a second event | subagent selection and behavior assembly |
-| monitor emission | `tools/agent_tools/workflow_monitor.py` | existing `--behavior-event` and typed `emit_behavior_projection(report_dir, event)` | only report-dir `workflow_monitoring.md` and its existing monitor projection lines; never `skill_usage.jsonl` or `behavior_events.jsonl` | behavior assembly and closeout/readback consumers |
-| behavior JSONL assembly | `tools/agent_tools/behavior_event_assembly.py` | `record_hook_invocation(parts) -> RecordHookInvocationResult`; internal `assemble_behavior_event(parts) -> BehaviorEvent` and `append_behavior_event(root, event) -> AppendResult` | only canonical `behavior_events.jsonl`, one record per eligible invocation; uses `hook_event_log.py` as transport and does not write monitor Markdown | dispatcher is the sole caller; dashboard is a read-only parser |
+| feedback, candidate-reason, and related-skill normalization | `tools/agent_tools/prompt_classifier.py` | `feedback_targets(signals) -> tuple[str, ...]` | none; preserves current feedback labels/action/target and candidate-reason ordering | evaluator and behavior assembly consume the classifier result |
+| tool selection | `tools/agent_tools/tool_selection.py` | `select_tools(payload) -> ToolSelection` | none; tuple/list ordering is part of return contract | `hook_dispatcher.py` parts-preparation caller |
+| subagent selection and attribution | `tools/agent_tools/subagent_selection.py` | `select_subagents(payload, workflow_context) -> SubagentSelection` | none; selection/workflow attribution is returned, not emitted directly | `hook_dispatcher.py` parts-preparation caller |
+| workflow context store/load | `tools/agent_tools/workflow_context.py` | `load_workflow_context(path) -> WorkflowContext`; `store_workflow_context(path, context) -> StoreResult` | only the existing paired `skill_usage_context.json` path (resolved under the selected log/report directory); atomic write; load/store failure is fail-open to an empty context, never a second event | `hook_dispatcher.py` loads for parts; evaluator/workflow lifecycle owner stores |
+| monitor emission | `tools/agent_tools/workflow_monitor.py` | existing `--behavior-event` and typed `emit_behavior_projection(report_dir, event)` | only report-dir `workflow_monitoring.md` and its existing monitor projection lines; never `skill_usage.jsonl` or `behavior_events.jsonl` | dispatcher only (closeout/readback paths are read-only consumers) |
+| behavior record assembly | `tools/agent_tools/behavior_event_assembly.py` | `record_hook_invocation(parts) -> BehaviorEventRecord | None` | one record candidate per eligible invocation; returns `BehaviorEventRecord` only, no append/monitor/IO | dispatcher is the sole caller |
 | historical skill-usage readback | `tools/agent_tools/historical_skill_usage_reader.py` | `read_skill_usage_history(path) -> HistoricalReadback` | none; opens `skill_usage.jsonl` read-only, never imports/executes the old logger, never appends or rewrites it | improvement guide, historical dashboard migration, fixture tests |
 
-The ownership boundary is intentional: `workflow_monitor.py` owns monitor projection, while `behavior_event_assembly.py` owns the canonical JSONL bytes. Neither is a wrapper for the retired logger. `generate_agent_runtime_dashboard.py` and `generate_agent_improvement_guide.py` are read-only consumers; they do not become emitters. The target artifact is `behavior_events.jsonl`; `skill_usage.jsonl` remains a historical input only.
+The ownership boundary is intentional: `tools/agent_tools/workflow_monitor.py` owns monitor projection, while `.codex/hooks/hook_event_log.py` owns canonical per-event spool transport serialization/append. `tools/agent_tools/workflow_monitor.py` and `.codex/hooks/hook_event_log.py` are not wrappers for the retired logger. `generate_agent_runtime_dashboard.py` and `generate_agent_improvement_guide.py` are read-only consumers; they do not become emitters. The target artifact is `behavior_events.jsonl`; `skill_usage.jsonl` remains a historical input only.
 
 ### Pure classifier owner
 
-`tools/agent_tools/prompt_classifier.py` owns the current `PromptIntakeSignals` fields exactly: `skills`, `selected_workflows`, `candidate_skills`, `candidate_skill_reasons`, `candidate_workflows`, `candidate_tools`, `feedback_labels`, `feedback_action`, all as tuples of strings except `feedback_action: str`. `should_log()` and `feedback_targets()` remain pure. `prompt_intake_signals(inputs)` preserves current keyword, catalog, structural-lane, validation-repair, feedback, and related-skill ordering.
+`tools/agent_tools/prompt_classifier.py` owns the current `PromptIntakeSignals` fields exactly: `skills`, `selected_workflows`, `candidate_skills`, `candidate_skill_reasons`, `candidate_workflows`, `candidate_tools`, `feedback_labels`, `feedback_action`, all as tuples of strings except `feedback_action: str`. `feedback_targets()` remains pure. `prompt_intake_signals(inputs)` preserves current keyword, catalog, structural-lane, validation-repair, feedback, and related-skill ordering. `behavior_event_assembly.py` consumes the returned signals and owns `should_log`.
 
-The classifier receives all repository-dependent knowledge as immutable input; it does not discover it. The exact input contract is:
+The classifier receives all repository-dependent knowledge as immutable input to return dimensions consumed by assembly; it does not discover it. The exact input contract is:
 
 ```text
 PromptClassifierInputs = frozen {
@@ -453,7 +480,7 @@ SkillLaneEvidence {
 }
 ```
 
-The detector returns no record for an unmatched lane; it never writes logs. `tools/agent_tools/behavior_event_assembly.py` is the sole emitter for canonical durable behavior events, and `tools/agent_tools/workflow_monitor.py` is the sole emitter for durable monitor projections. The existing `--behavior-event` route accepts one assembled canonical object and emits a monitor projection line; it does not append `behavior_events.jsonl`. The event envelope is the fixed `agent-canon.behavior-event.v1` schema:
+The detector returns no record for an unmatched lane; it never writes logs. `tools/agent_tools/behavior_event_assembly.py` is the sole pure assembler (`record_hook_invocation(parts) -> BehaviorEventRecord | None`) and does not perform transport I/O. Canonical durable behavior events are serialized by `.codex/hooks/hook_event_log.py` into per-event no-replace spool files with result `spooled|duplicate|failed`; `tools/agent_tools/workflow_monitor.py` is the monitor owner and the existing `--behavior-event` route accepts one assembled canonical object to emit a monitor projection line; it does not participate in spool file writes. The event envelope is the fixed `agent-canon.behavior-event.v1` schema:
 
 ```text
 {
@@ -508,7 +535,7 @@ The fields above preserve the current logger's types and empty-value nullability
 
 The exact behavior-event field set is the union of the envelope fields and the parity fields in the table below; no implementation may silently drop a current logger field because a dashboard row does not display it.
 
-The classifier emits the existing behavior dimensions into this one event: selected/candidate skills and workflows, `candidate_skill_reasons`, feedback labels/action/targets, prompt capture, tool selection, subagent selection, workflow attribution/context, and structural lane evidence. This keeps one execution route and one event identity for dashboard aggregation. The assembly owner writes `behavior_events.jsonl`; the monitor owner writes the existing workflow monitoring artifact. Neither writes `skill_usage.jsonl`.
+The classifier returns the existing behavior dimensions consumed by assembly: selected/candidate skills and workflows, `candidate_skill_reasons`, feedback labels/action/targets, prompt capture, tool selection, subagent selection, workflow attribution/context, and structural lane evidence. This keeps one execution route and one event identity for dashboard aggregation. `.codex/hooks/hook_event_log.py` performs per-event no-replace spool append; `tools/agent_tools/runtime_log_archive_git.py` emits checkpoint `behavior_events` lines after explicit checkpointing from per-event spools, and `tools/agent_tools/workflow_monitor.py` emits monitor projection only after a spooled append result. `hook_event_log` never writes shared `behavior_events.jsonl`; it only spools per-event bytes. `runtime_log_archive_git` writes checkpoint JSONL only after invocation and outside the hot-path. `workflow_monitor.py` emits monitor projection only and never writes `skill_usage.jsonl`.
 
 The remaining current logger fields are carried without semantic loss as follows; these are part of the behavior-event schema even when a dashboard view does not display them:
 
@@ -533,7 +560,7 @@ The parser boundary is fixed:
 
 | input artifact | parser owner | accepted purpose | forbidden behavior |
 | --- | --- | --- | --- |
-| `behavior_events.jsonl` and `behavior_event_json=` monitor lines | `behavior_event_assembly.py` schema/parser consumed by dashboard | active target behavior readback and dashboard oracle | no legacy-field guessing; no fallback to `skill_usage.jsonl` |
+| `behavior_events.jsonl` and `behavior_event_json=` monitor lines | `generate_agent_runtime_dashboard.py` parser for behavior readback | active target behavior readback and dashboard oracle | no legacy-field guessing; no fallback to `skill_usage.jsonl` |
 | historical `skill_usage.jsonl` | `historical_skill_usage_reader.py` | read-only migration/improvement-guide evidence, preserving old field names and nullability | no hook import, subprocess, execution, append, rewrite, or conversion into an active event |
 
 Fixtures are exact: `tests/fixtures/behavior_events/accepted.jsonl`, `duplicate.jsonl`, `malformed.jsonl`, `out_of_order.jsonl`, `escaping.jsonl`, `oracle.json`, plus `tests/fixtures/skill_usage_history/historical.jsonl`, `malformed.jsonl`, and `oracle.json`. The historical fixtures prove that old records remain readable as evidence while the behavior fixtures prove that the active parser never accepts them as target records.
@@ -586,7 +613,7 @@ The parser aggregates malformed records without aborting the batch: `malformed_b
 
 - `.codex/hooks/skill_usage_logger.py` is absent from both `scanned_files` and `records`;
 - `tools/agent_tools/prompt_capture.py`, `tools/agent_tools/prompt_classifier.py`, `tools/agent_tools/tool_selection.py`, `tools/agent_tools/subagent_selection.py`, `tools/agent_tools/workflow_context.py`, `tools/agent_tools/behavior_event_assembly.py`, `tools/agent_tools/skill_lane_detector.py`, `tools/agent_tools/workflow_monitor.py`, `tools/agent_tools/generate_agent_runtime_dashboard.py`, and `tools/agent_tools/generate_agent_improvement_guide.py` are present with their new static/dynamic fields or read-only consumer surfaces;
-- `behavior_events.jsonl` is the active target artifact; `skill_usage.jsonl` is classified as historical read-only evidence and is not an active emitter path;
+- `behavior_events.jsonl` is the checkpoint/readback corpus for `runtime_log_archive_git` (`<hook-name>-<agent-canon-commit>.jsonl` emitted; readback and verification consume `behavior_events.jsonl`); `skill_usage.jsonl` is classified as historical read-only evidence and is not an active emitter path;
 - `behavior_event_json`, `agent-canon.behavior-event.v1`, `prompt_capture_status`, `prompt_excerpt_redacted`, `prompt_char_count`, `tool_name`, `tool_command_verb`, `selected_tools`, `feedback_labels`, `candidate_skill_reasons`, every `subagent_*` and `workflow_*` attribution field, and `skill_lane` are read back from the new emitter where statically discoverable;
 - old hook child names are absent from executable inventory paths, while their names may occur only in the manifest/design metadata allowlist;
 - `check_hook_retirement.py` verifies this generated readback and rejects an old path in either `scanned_files` or a record `path`; the dashboard parser verifies the behavior-event schema and oracle separately. The inventory gate also records the post-PR-471 baseline selector and refuses a comparison that cannot prove that provenance.
@@ -595,12 +622,12 @@ The parser aggregates malformed records without aborting the batch: `malformed_b
 
 | target | import/CLI contract | caller migration |
 | --- | --- | --- |
-| `tools/agent_tools/prompt_capture.py` | import-only: `PromptCapture`, `capture_prompt`; no CLI | classifier and behavior assembly direct import; no write |
-| `tools/agent_tools/prompt_classifier.py` | import-only: `PromptClassifierInputs`, `PromptIntakeSignals`, `prompt_intake_signals`; no hook CLI | evaluator injects frozen repo root/catalog/routing rules; behavior assembly direct import |
-| `tools/agent_tools/tool_selection.py` | import-only: `ToolSelection`, `select_tools`; no CLI | behavior assembly direct import; no write |
-| `tools/agent_tools/subagent_selection.py` | import-only: `SubagentSelection`, `select_subagents`; no CLI | behavior assembly direct import; no write |
-| `tools/agent_tools/workflow_context.py` | import-only: `WorkflowContext`, `load_workflow_context`, `store_workflow_context`; no hook CLI | selected report-directory context JSON only |
-| `tools/agent_tools/behavior_event_assembly.py` | import-only: `HookInvocationParts`, `RecordHookInvocationResult`, `record_hook_invocation`, `BehaviorEvent`, `assemble_behavior_event`, `append_behavior_event`, `parse_behavior_events`; no hook CLI | dispatcher is the sole caller; sole writer of `behavior_events.jsonl`; calls monitor only after a new append |
+| `tools/agent_tools/prompt_capture.py` | import-only: `PromptCapture`, `capture_prompt`; no CLI | `tools/agent_tools/behavior_event_assembly.py` direct import; no write |
+| `tools/agent_tools/prompt_classifier.py` | import-only: `PromptClassifierInputs`, `PromptIntakeSignals`, `prompt_intake_signals`; no hook CLI | evaluator and `tools/agent_tools/behavior_event_assembly.py` direct import; no write |
+| `tools/agent_tools/tool_selection.py` | import-only: `ToolSelection`, `select_tools`; no CLI | `hook_dispatcher.py` parts-preparation direct import; `behavior_event_assembly.py` consumes precomputed typed value only |
+| `tools/agent_tools/subagent_selection.py` | import-only: `SubagentSelection`, `select_subagents`; no CLI | `hook_dispatcher.py` parts-preparation direct import; `behavior_event_assembly.py` consumes precomputed typed value only |
+| `tools/agent_tools/workflow_context.py` | import-only: `WorkflowContext`, `load_workflow_context`, `store_workflow_context`; no hook CLI | `hook_dispatcher.py` parts-preparation direct load import; `behavior_event_assembly.py` consumes precomputed typed value only; evaluator/context lifecycle owner for store |
+| `tools/agent_tools/behavior_event_assembly.py` | import-only: `HookInvocationParts`, `BehaviorEventRecord`, `record_hook_invocation`; no `append_behavior_event`, `parse_behavior_events` | dispatcher is the sole caller; sole pure owner for `should_log` / eligibility / `event_id` / record assembly; returns `BehaviorEventRecord | None`; no file I/O |
 | `tools/agent_tools/historical_skill_usage_reader.py` | import-only: `HistoricalReadback`, `read_skill_usage_history`; no CLI and no import of retired logger | read-only `skill_usage.jsonl` input |
 | `tools/agent_tools/execution_resource_projection.py` | import-only: `validate_normalized_input`, `validate_projection_bytes`, `projection_context_payload`; no guard CLI | dispatcher and pure projection tests direct import |
 | `tools/agent_tools/hook_safety.py` | import-only pure API listed above; no standalone safety CLI | dispatcher direct import; old hook safety path deleted |
@@ -613,8 +640,8 @@ The parser aggregates malformed records without aborting the batch: `malformed_b
 | `tools/agent_tools/report_artifact_checks.py` | existing validation readback API; no B9 decision | consumes typed B9 state read-only |
 | `tools/agent_tools/task_close.py` | existing closeout API; no B9 decision | consumes typed B9 state read-only |
 | `tools/ci/run_python_quality_checks.sh` | existing shell quality route; no B9 decision | invokes validation consumers only |
-| `.codex/hooks/hook_dispatcher.py` | direct import-only caller: `record_hook_invocation(parts)`; exactly once after each of the three finalized handler results; no JSONL/monitor write | sole active-hook caller; returns the finalized handler output unchanged |
-| `workflow_monitor.py` | import-only `emit_behavior_projection(report_dir, event) -> MonitorProjectionResult`; existing `--behavior-event` CLI is the equivalent explicit projection route | consumes the assembled record and writes only `behavior_event_json=<JSON>` projection lines/monitor Markdown; it does not assemble or append canonical JSONL |
+| `.codex/hooks/hook_dispatcher.py` | direct import-only caller: `record_hook_invocation(parts)`; exactly once after each of the three finalized handler results; one `HookLogContext.append` for every active invocation | sole active-hook caller; returns the finalized handler output unchanged; monitor emission is conditional on existing behavior record + append status `spooled` |
+| `tools/agent_tools/workflow_monitor.py` | import-only `emit_behavior_projection(report_dir, event) -> MonitorProjectionResult`; existing `--behavior-event` CLI is the equivalent explicit projection route | consumes the assembled record and writes only `behavior_event_json=<JSON>` projection lines/monitor Markdown; it does not assemble or append canonical JSONL |
 | `generate_agent_runtime_dashboard.py` | existing read-only dashboard CLI; `agent-canon.behavior-readback.v1` oracle and parser aggregation | reads active behavior events and monitor projections; retains prompt/tool/feedback/subagent/workflow/lane metrics |
 | `generate_agent_improvement_guide.py` | existing read-only guide CLI | consumes `historical_skill_usage_reader.py` for archived `skill_usage.jsonl` and active dashboard evidence; no active emission |
 | `log_surface_inventory.py` | existing `--check --baseline --baseline-ref current-main-after-pr-471` and generated JSON | emits updated inventory once after all path migrations, using the post-PR-471 current-main baseline |
@@ -633,7 +660,7 @@ This is the exact future implementation write set `W`; this design wave does not
 
 **runtime artifact write set:**
 
-`behavior_events.jsonl` is written only by `tools/agent_tools/behavior_event_assembly.py`; `workflow_monitoring.md` and its projection lines are written only by `tools/agent_tools/workflow_monitor.py` after a new behavior JSONL append. `.codex/hooks/hook_dispatcher.py` writes neither artifact and `skill_usage.jsonl` has no active writer. A runtime append failure or monitor failure is telemetry-only and leaves the finalized handler output unchanged.
+`behavior_events` checkpoint lines (`<hook-name>-<agent-canon-commit>.jsonl`) are written only by `tools/agent_tools/runtime_log_archive_git.py`; per-invocation transport spooling is performed only by `.codex/hooks/hook_event_log.py` into no-replace `<spool>/<namespace>/<hook_name>/<hook_run_id>.json` with `spooled|duplicate|failed` result. The dispatcher performs exactly one base append per active invocation and merges behavior fields into that same entry when a behavior record exists; no second append is allowed. `workflow_monitoring.md` and its projection lines are written only by `tools/agent_tools/workflow_monitor.py` after a successful spooled append of a behavior record. `.codex/hooks/hook_dispatcher.py` and `tools/agent_tools/behavior_event_assembly.py` write no files. `skill_usage.jsonl` has no active writer. A runtime append or monitor failure is telemetry-only and leaves the finalized handler output unchanged.
 
 **deleted files, only after caller migration:**
 
@@ -650,9 +677,9 @@ The exact tombstone scan includes every deleted path above, every path in the ex
 5. Retire the 9 blocking files in dependency order: `execution_resource_plan_projection_guard.py`, `skill_usage_logger.py`, `prompt_secret_guard.py`, `branch_worktree_guard.py`, `cause_investigation_guard.py`, `module_boundary_guard.py`, `library_implementation_guard.py`, `style_checker_guard.py`, `completion_review_guard.py`.
 6. Run `check_hook_retirement.py`, dispatcher contract readback, dashboard/skill-lane readback, generated inventory readback, catalog, responsibility, convention, dependency, and pure-owner tests from one source snapshot; assert each active dispatcher handler calls `record_hook_invocation` exactly once after its finalized result and `Stop` calls it zero times.
 
-Forward trace: each active registration in `hooks.json` invokes `hook_dispatcher.py`; the dispatcher finalizes `hook_safety.py` or `execution_resource_projection.py`, constructs `HookInvocationParts`, and calls `behavior_event_assembly.record_hook_invocation(parts)` exactly once; assembly applies `eligible_hook_invocation`/classifier `should_log`, writes one new `behavior_events.jsonl` snapshot, then calls `workflow_monitor.py --behavior-event` for projection; dashboard reads the active event/projection; archived `skill_usage.jsonl` → `historical_skill_usage_reader.py` → `generate_agent_improvement_guide.py` (read-only only); reviewer/closeout input → `review_dispatch.py` → `report_artifact_checks.py`/`task_close.py`; all retired names → `hook_retirement.py` → `check_hook_retirement.py`.
+Forward trace: each active registration in `hooks.json` invokes `hook_dispatcher.py`; the dispatcher finalizes `hook_safety.py` or `execution_resource_projection.py`, constructs `HookInvocationParts`, calls `behavior_event_assembly.record_hook_invocation(parts)` exactly once, then calls `HookLogContext.append` exactly once for one base entry (`<spool>/<namespace>/<hook_name>/<hook_run_id>.json`) per active invocation. Behavior fields are merged into that same entry only when a behavior record exists. `workflow_monitor.emit_behavior_projection` is called exactly once only when `spooled` and a behavior record exists; duplicate/failed/blocked/malformed/ineligible invocations emit zero projection. `runtime_log_archive_git` emits checkpoint `<hook-name>-<agent-canon-commit>.jsonl` after invocation from checkpointed per-event spools. Dashboard reads projection plus checkpointed readback corpus; archived `behavior_events.jsonl` remains outside hot-path transport. archived `skill_usage.jsonl` → `historical_skill_usage_reader.py` → `generate_agent_improvement_guide.py` (read-only only); reviewer/closeout input → `review_dispatch.py` → `report_artifact_checks.py`/`task_close.py`; all retired names → `hook_retirement.py` → `check_hook_retirement.py`.
 
-Reverse trace: every deleted filename maps to exactly one tombstone owner and one import/CLI/skill representation; the guard proves filesystem absence, zero executable references, updated inventory paths, and dispatcher readback count. The dispatcher test proves one post-result caller edge for each active event, assembly tests prove one eligible invocation → one JSONL snapshot → at most one new monitor projection, and fail-open tests prove assembly failure cannot alter handler output. A failed reverse edge blocks deletion and cannot be repaired with a wrapper.
+Reverse trace: every deleted filename maps to exactly one tombstone owner and one import/CLI/skill representation; the guard proves filesystem absence, zero executable references, updated inventory paths, and dispatcher readback count. The dispatcher test proves one post-result caller edge for each active event, plus one append attempt per invocation; assembly tests prove behavior record 1 or 0 candidates by eligibility. `workflow_monitor.emit_behavior_projection` is proven to happen exactly once only on `spooled` with an existing record; archive checkpoint lines are only emitted by `runtime_log_archive_git` after invocation flow, outside hook path; fail-open tests prove assembly/write/monitor failure cannot alter handler output. A failed reverse edge blocks deletion and cannot be repaired with a wrapper.
 
 ## Fail-open/fail-closed parity
 
@@ -674,10 +701,11 @@ Exact fixture and test corpus:
 - safety: four secret classes, benign/malformed prompt, protected/read-only/authorized Git, same-segment creation AND gate, shell wrapper/backtick/opaque cases, exact redaction and hash;
 - projection: raw six-key normalization, exact nine-key projection, nested nullable admission/error, duplicate/extra/nonfinite/schema/path/byte/LF/unsuccessful matrices;
 - skill replacement: frozen workflow manifest, immutable injected `repo_root`/catalog/routing-rules classifier inputs, all eight `PromptIntakeSignals` fields, prompt capture/tool/feedback/candidate-reason/subagent/workflow-attribution fields with current empty-string/list/bool/int domains, structural lane observed/candidate/unmatched, one-snapshot-per-invocation cardinality, exact event-id preimage, canonical behavior-event JSON parse, duplicate/order/timestamp/escaping/malformed aggregation, historical `skill_usage.jsonl` read-only parsing, and missing/malformed dashboard readback against `oracle.json`;
-- dispatcher-to-assembly: three event-specific parts fixtures, finalized pass/block/projection/unsuccessful results, eligible and `should_log` truth table, exactly-once post-result call assertions, JSONL-write-before-monitor ordering, duplicate/no-monitor retry, append/monitor fail-open, and `record_hook_invocation_oracle.json`;
+- dispatcher-to-assembly: three event-specific parts fixtures, finalized pass/block/projection/unsuccessful results, explicit cardinality oracle (`blocked_secret=1 append/0 projection`, `blocked_destructive_git=1 append/0 projection`, `malformed_payload=1 append/0 projection`, `eligible behavior=1 merged append/spooled=>1 projection`, `ineligible normal=1 append/0 projection`, `duplicate/failed=1 append attempt/0 projection`), eligible and `should_log` truth table, exactly-once post-result call assertions, merged-append policy with one transport write, and `record_hook_invocation_oracle.json`;
 - inventory: old logger and 24 old executable paths absent, new emitter paths and fields present, sorted generated schema and no stale `scanned_files`/record path;
 - manifest: `retired_child_tombstones=23`, `moved_source_absences=1`, `retired_filenames=24`, reproducible `source_digest`, and caller audit containing all 24 generated basenames;
 - conventions/readback: `check_convention_compliance.py`, `convention_compliance_contracts.toml`, `check_agent_runtime_alignment.py`, `run_python_quality_checks.sh`, `report_artifact_checks.py`, `agents/skills/worktree-health.md`, and `documents/experiments/gpu-admission-r5-source-packet.md` contain canonical owner paths only;
+- transport/readback separation: no direct shared `behavior_events.jsonl` append path is asserted in hot-path; `HookLogContext.append` to no-replace per-event spool and `runtime_log_archive_git` checkpointing to `behavior_events` JSONL are tested separately in the same run;
 - pure-owner tests: `test_prompt_capture.py`, `test_prompt_classifier.py`, `test_tool_selection.py`, `test_subagent_selection.py`, `test_workflow_context.py`, `test_behavior_event_assembly.py`, `test_historical_skill_usage_reader.py`, `test_hook_safety.py`, `test_execution_resource_projection.py`, and `test_hook_retirement.py` prove import side-effect absence, immutable-input/no-subprocess behavior, domain/nullability, parity, event identity/cardinality, historical parser separation, and tombstone guard behavior; `test_codex_hooks.py` proves the dispatcher caller contract and ordering.
 
 Target validation commands are `python3 tools/agent_tools/check_hook_retirement.py --root . --check`, `python3 tools/agent_tools/check_agent_runtime_alignment.py`, `python3 tools/agent_tools/check_convention_compliance.py`, `python3 tools/agent_tools/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json --baseline-ref current-main-after-pr-471`, `tools/bin/agent-canon docs check` on changed Markdown, the focused pytest corpus above, `python3 tools/agent_tools/responsibility_scope.py --root .`, and the repository dependency review selected by the implementation profile. The inventory command must resolve the baseline from current `main` after PR #471 and record its exact commit; a vendored or pre-471 baseline is invalid.
@@ -698,4 +726,4 @@ No code implementation, compatibility wrapper, parent pin update, root-view sync
 | E8 | requested convention, quality, report, worktree, GPU, catalog, responsibility, test, and fixture paths are caller/readback surfaces | exact path set above | exact write-set/tombstone scan |
 | E9 | current skill logger emits prompt capture, tool selection, feedback, candidate reasons, subagent, and workflow-context fields consumed by dashboard readers | `skill_usage_logger.py` dataclasses/emitter and dashboard accumulators | canonical behavior-event schema and fixed dashboard oracle |
 | E10 | manifest digest and behavior parser require independent deterministic serialization/order rules | typed manifest projection and dashboard readback design | source digest preimage and parser corpus |
-| E11 | active dispatcher handlers have one finalized result before behavior telemetry can be assembled | dispatcher event handlers and behavior assembly caller contract | exactly-once `record_hook_invocation` call, eligible snapshot cardinality, JSONL-before-monitor order, and fail-open caller tests |
+| E11 | active dispatcher handlers have one finalized result before telemetry append can occur | dispatcher event handlers and behavior assembly caller contract | exactly-once `record_hook_invocation` call, one base append per active invocation, merged-write policy, and fail-open caller tests |
