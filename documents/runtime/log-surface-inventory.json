@@ -20233,7 +20233,6 @@
     "tools/audit/audit_log_schema.py",
     "tools/audit/audit_logger.py",
     "tools/check_convention_consistency.py",
-    "tools/check_doc_test_triplet.py",
     "tools/ci/check_agent_canon_latest.sh",
     "tools/ci/check_agent_canon_pr.sh",
     "tools/ci/check_docker_build.sh",
