@@ -29,7 +29,7 @@ AgentCanon の source of truth は GitHub remote です。
 - `scripts/init_from_template.sh`
 - AgentCanon document `documents/runtime/runtime-profiles-and-check-matrix.md`; from a template or derived repo root, resolve it as `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md`
 - AgentCanon document `documents/agent-canon/agent-canon-github-remote.md`; from a template or derived repo root, resolve it as `vendor/agent-canon/documents/agent-canon/agent-canon-github-remote.md`
-- `tools/sync_agent_canon.sh`
+- `bash "$(PYTHONPATH=vendor/agent-canon/tools:tools python3 -c "from pathlib import Path; from agent_tools.agent_canon_source_root import resolve_agent_canon_source_root; print((resolve_agent_canon_source_root(Path(\".\")).source_root / \"tools/sync_agent_canon.sh\").as_posix())")"`
 
 ## Default Sequence
 

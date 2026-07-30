@@ -57,7 +57,7 @@ TODO state up to date.
 - `agents/skills/structure-refactor.md#Pre-Task Structure Repair Contract`
 - `agents/skills/refactor-loop.md#共有構造 refactor の実行順`
 - `tools/update_agent_canon.sh`
-- `tools/sync_agent_canon.sh`
+- `bash "$(PYTHONPATH=vendor/agent-canon/tools:tools python3 -c "from pathlib import Path; from agent_tools.agent_canon_source_root import resolve_agent_canon_source_root; print((resolve_agent_canon_source_root(Path(\".\")).source_root / \"tools/sync_agent_canon.sh\").as_posix())")"`
 - `agents/skills/agent-update-branch.md`
 
 ## Route
