@@ -24,6 +24,19 @@ import re
 import subprocess
 from pathlib import Path
 
+try:
+    from .log_repository_identity import (
+        SourceRepositoryIdentityError,
+        stable_source_id,
+        stable_source_id_from_runtime_env,
+    )
+except ImportError:
+    from log_repository_identity import (
+        SourceRepositoryIdentityError,
+        stable_source_id,
+        stable_source_id_from_runtime_env,
+    )
+
 HOOK_ARCHIVE_DIR_ENV = "AGENT_CANON_HOOK_ARCHIVE_DIR"
 HOOK_EVENT_SPOOL_DIR_ENV = "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
 LOG_ENV_ENV = "AGENT_CANON_LOG_ENV"
@@ -51,15 +64,18 @@ def safe_slug(value: str) -> str:
 
 
 def short_hash(value: str) -> str:
-    """Return a stable short hash for path-derived keys."""
+    """Return a stable short hash for non-identity local namespace details."""
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:NAMESPACE_HASH_LENGTH]
 
 
 def repo_log_key(root: Path) -> str:
-    """Return the source-repository key used inside the shared hook archive."""
-    canonical = root.resolve()
-    name = safe_slug(canonical.name or "repo")
-    return f"{name}-{short_hash(str(canonical))}"
+    """Return the source-repository key from the normalized Git remote identity."""
+    try:
+        return stable_source_id_from_runtime_env(root)
+    except SourceRepositoryIdentityError:
+        # Hook spooling remains local and non-blocking when a checkout is not a
+        # Git clone; write routes fail with the typed identity error instead.
+        return "unidentified-source"
 
 
 def hook_event_spool_root(active_root: Path) -> Path:
@@ -99,9 +115,9 @@ def _log_environment_key(root: Path) -> str:
     for env_name in ("DEVCONTAINER_PROJECT_NAME", "COMPOSE_PROJECT_NAME", "CODESPACE_NAME", "HOSTNAME"):
         value = os.environ.get(env_name, "").strip()
         if value:
-            return f"{safe_slug(value)}-{short_hash(str(root.resolve()))}"
+            return safe_slug(value)
     canonical = root.resolve()
-    return f"{safe_slug(canonical.name or 'agent-canon')}-{short_hash(str(canonical))}"
+    return safe_slug(canonical.name or "agent-canon")
 
 
 def log_environment_key(root: Path) -> str:
@@ -119,7 +135,7 @@ def codex_trace_key() -> str:
 
 
 def log_chat_key(source_root: Path) -> str:
-    """Return the chat key segment used by runtime log archive branches."""
+    """Return the chat metadata key; it is never used for branch identity."""
     trace_key = codex_trace_key()
     if trace_key:
         return safe_slug(trace_key)
@@ -127,8 +143,8 @@ def log_chat_key(source_root: Path) -> str:
 
 
 def log_branch_key(source_root: Path, canon_root: Path) -> str:
-    """Return the environment-plus-chat key used for runtime log archive branches."""
-    return f"{log_environment_key(canon_root)}-{log_chat_key(source_root)}"
+    """Return the stable source identity key used by agent-canon-log."""
+    return stable_source_id(source_root)
 
 
 def source_git_head(source_root: Path) -> str:

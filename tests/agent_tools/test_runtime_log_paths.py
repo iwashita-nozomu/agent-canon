@@ -31,6 +31,18 @@ from tools.agent_tools.runtime_log_paths import (
 class RuntimeLogPathsTest(unittest.TestCase):
     """Exercise runtime log archive path ordering."""
 
+    def setUp(self) -> None:
+        """Set the stable source remote used by path fixtures."""
+        self._old_source_remote = os.environ.get("AGENT_CANON_SOURCE_REPOSITORY_REMOTE")
+        os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = "https://github.com/test/source.git"
+
+    def tearDown(self) -> None:
+        """Restore the caller's source remote environment."""
+        if self._old_source_remote is None:
+            os.environ.pop("AGENT_CANON_SOURCE_REPOSITORY_REMOTE", None)
+        else:
+            os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = self._old_source_remote
+
     def make_git_commit(self, root: Path) -> str:
         """Create one commit in root and return its HEAD SHA."""
         subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
@@ -107,8 +119,8 @@ class RuntimeLogPathsTest(unittest.TestCase):
         self.assertEqual(summary_path, runtime_root / "chats" / "thread-1" / "summary-no-git-head.jsonl")
         self.assertEqual(index_path, runtime_root / "index.jsonl")
 
-    def test_log_branch_key_uses_environment_and_chat(self) -> None:
-        """Archive branch keys should be environment plus Codex chat UUID."""
+    def test_log_branch_key_uses_stable_source_identity(self) -> None:
+        """Archive branch keys should ignore environment and Codex chat UUID."""
         with tempfile.TemporaryDirectory() as temp_dir:
             parent = Path(temp_dir) / "project"
             canon_root = Path(temp_dir) / "agent-canon"
@@ -125,10 +137,10 @@ class RuntimeLogPathsTest(unittest.TestCase):
             ):
                 branch_key = log_branch_key(parent, canon_root)
 
-        self.assertEqual(branch_key, "dev-env-chat-uuid-1")
+        self.assertEqual(branch_key, repo_log_key(parent))
 
-    def test_log_branch_key_uses_explicit_no_chat_fallback(self) -> None:
-        """Non-Codex tools should use an explicit no-chat branch segment."""
+    def test_log_branch_key_uses_same_identity_without_chat(self) -> None:
+        """Non-Codex tools should use the same stable source branch."""
         with tempfile.TemporaryDirectory() as temp_dir:
             parent = Path(temp_dir) / "project"
             canon_root = Path(temp_dir) / "agent-canon"
@@ -145,7 +157,7 @@ class RuntimeLogPathsTest(unittest.TestCase):
             ):
                 branch_key = log_branch_key(parent, canon_root)
 
-        self.assertEqual(branch_key, f"dev-env-no-chat-{repo_log_key(parent)}")
+        self.assertEqual(branch_key, repo_log_key(parent))
 
     def test_log_filenames_use_agent_canon_commit_key(self) -> None:
         """Hook and Codex summary files should carry the AgentCanon commit key."""

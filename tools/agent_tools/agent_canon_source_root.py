@@ -9,11 +9,15 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
 LAYOUT_STANDALONE = "standalone"
 LAYOUT_VENDORED = "vendored"
+LAYOUT_OVERRIDE = "override"
+SOURCE_ROOT_OVERRIDE_ENV = "AGENT_CANON_SOURCE_ROOT"
+CANON_ROOT_OVERRIDE_ENV = "AGENT_CANON_ROOT"
 
 VENDOR_OUTSIDE_REPOSITORY = "agent_canon_source_root_vendor_outside_repository"
 ROOT_VIEW_OUTSIDE_REPOSITORY = "agent_canon_source_root_root_view_outside_repository"
@@ -34,6 +38,7 @@ class RootResolution:
     current_repository_root: Path
     source_root: Path
     layout: str
+    canon_root: Path
 
 
 def _find_current_repository_root(raw_root: Path) -> Path:
@@ -76,8 +81,62 @@ def _same_canonical_entity(left: Path, right: Path) -> bool:
         return left.resolve() == right.resolve()
 
 
-def resolve_agent_canon_source_root(raw_root: Path) -> RootResolution:
+def _explicit_resolution(raw_root: Path, source: Path, canon: Path) -> RootResolution:
+    """Resolve explicit source and canon roots without collapsing their identities."""
+    if not _has_catalog(source):
+        raise SourceRootFailure(
+            "agent_canon_source_root_override_missing",
+            f"Override source root has no AgentCanon catalog: {source}",
+        )
+    if not _has_catalog(canon):
+        raise SourceRootFailure(
+            "agent_canon_canon_root_override_missing",
+            f"Override canon root has no AgentCanon catalog: {canon}",
+        )
+    return RootResolution(
+        current_repository_root=_find_current_repository_root(raw_root),
+        source_root=source,
+        layout=LAYOUT_OVERRIDE,
+        canon_root=canon,
+    )
+
+
+def _explicit_override(raw_root: Path) -> RootResolution | None:
+    source_override = os.environ.get(SOURCE_ROOT_OVERRIDE_ENV, "").strip()
+    canon_override = os.environ.get(CANON_ROOT_OVERRIDE_ENV, "").strip()
+    if not source_override and not canon_override:
+        return None
+    if not source_override or not canon_override:
+        raise SourceRootFailure(
+            "agent_canon_source_root_override_incomplete",
+            "AGENT_CANON_SOURCE_ROOT and AGENT_CANON_ROOT must be supplied together",
+        )
+    source_root = Path(source_override).expanduser().resolve()
+    canon_root = Path(canon_override).expanduser().resolve()
+    return _explicit_resolution(raw_root, source_root, canon_root)
+
+
+def resolve_agent_canon_source_root(
+    raw_root: Path,
+    *,
+    source_root: Path | None = None,
+    canon_root: Path | None = None,
+) -> RootResolution:
     """Resolve a deterministic AgentCanon source root from an entry directory."""
+    if source_root is not None or canon_root is not None:
+        if source_root is None or canon_root is None:
+            raise SourceRootFailure(
+                "agent_canon_source_root_override_incomplete",
+                "source_root and canon_root must be supplied together",
+            )
+        source = source_root.expanduser().resolve()
+        canon = canon_root.expanduser().resolve()
+        return _explicit_resolution(raw_root, source, canon)
+
+    explicit = _explicit_override(raw_root)
+    if explicit is not None:
+        return explicit
+
     current_repository_root = _find_current_repository_root(raw_root)
     vendor_root = current_repository_root / "vendor" / "agent-canon"
     vendor_source_root = _resolve_path(
@@ -112,6 +171,7 @@ def resolve_agent_canon_source_root(raw_root: Path) -> RootResolution:
                 current_repository_root=current_repository_root,
                 source_root=vendor_source_root,
                 layout=LAYOUT_VENDORED,
+                canon_root=vendor_source_root,
             )
         candidate_labels = (
             f"{LAYOUT_STANDALONE}:{current_repository_root}",
@@ -128,4 +188,5 @@ def resolve_agent_canon_source_root(raw_root: Path) -> RootResolution:
         current_repository_root=current_repository_root,
         source_root=source_root,
         layout=layout,
+        canon_root=source_root,
     )

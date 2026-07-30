@@ -30,8 +30,9 @@ agent report の置き場を決めます。まず `置き場ルール` と `Task
 - run-local の artifact:
   - `reports/agents/<run-id>/`
 - cross-run に蓄積する agent report:
-  - `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/`
-  - log archive branch は `logs/<repo-key>`
+  - `.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/<run-id>/<snapshot-id>/`
+  - branch and stable-source identity are owned by the `agent-canon-log`
+    repository policy; this document only owns placement.
   - 具体値は `python3 tools/agent_tools/runtime_log_archive_git.py status` の
     `RUNTIME_LOG_ARCHIVE_REPORTS_*` 行を見る
 - 一時的な runtime output:
@@ -75,11 +76,11 @@ agent report の置き場を決めます。まず `置き場ルール` と `Task
 - artifact-only role は許可された artifact だけを更新します。
 - run 固有の追補は既存 artifact の節追加で吸収します。
 - cross-run で残す必要がある agent report は、agent が手で別 report を作らず
-  通常は `python3 tools/agent_tools/runtime_log_archive_git.py sync` で
-  `reports/agents/` 全体を `.agent-canon/log-archive/agent-reports/<repo-key>/`
-  へ機械的に同期します。特定 run の immutable snapshot が必要なときだけ
-  `archive-agent-report --report-dir reports/agents/<run-id>` を使い、push は同じ
-  helper の `push` command が担当します。
+  `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report
+  --report-dir reports/agents/<run-id>` で immutable snapshot にします。snapshot
+  の append-only index と push/readback は同じ helper が担当します。広い
+  `sync` は hook JSONL や Codex runtime summary など、明示的に選んだ累積
+  runtime family の checkpoint に限ります。
 - closeout 前に、`task_close.py` が report artifact placement を確認します。
   tracked durable report は repo canon として許可します。untracked または
   ignored な report file は current run の `reports/agents/<run-id>/` の下だけを

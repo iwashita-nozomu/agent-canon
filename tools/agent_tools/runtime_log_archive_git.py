@@ -73,7 +73,8 @@ AGENT_REPORT_EXCLUDED_FILES = frozenset({".active_run", ".mcp_inventory_cache.js
 DEFAULT_AGENT_REPORT_MAX_FILE_BYTES = 10 * 1024 * 1024
 GIT_PORCELAIN_STATUS_PATH_START = 3
 GIT_PORCELAIN_STATUS_MIN_LINE_LENGTH = GIT_PORCELAIN_STATUS_PATH_START
-REPORT_SNAPSHOT_DIGEST_CHARS = 16
+REPORT_SNAPSHOT_DIGEST_CHARS = 64
+PUBLICATION_RETRY_LIMIT = 3
 REPO_KEYED_ARCHIVE_FAMILIES = frozenset({"agent-reports", "codex-runtime", "hook-runs"})
 MANAGED_GLOBAL_ARCHIVE_FAMILIES = frozenset({"eval-results", "legacy-import"})
 BRANCH_SWITCH_COMMIT_MESSAGE = "Preserve managed runtime logs before branch switch"
@@ -303,6 +304,7 @@ class ArchivePublicationReceipt:
     archive_tree_oid: str
     dedup_index_sha256: str
     cursor_sha256: str
+    push_status: str = ""
 
 
 @dataclass
@@ -702,7 +704,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ensure = subparsers.add_parser(
         "ensure",
-        help="Clone/fetch the archive and switch to logs/<environment-key>-<chat-key>.",
+        help="Clone/fetch the archive and select logs/<stable-source-repository-id>.",
     )
     ensure.add_argument("--no-fetch", action="store_true", help="Do not fetch origin before selecting the branch.")
 
@@ -721,7 +723,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     agent_reports = subparsers.add_parser(
         "archive-agent-reports",
-        help="Copy reports/agents run bundles into the current runtime archive branch.",
+        help="Snapshot reports/agents run bundles into the current runtime archive branch.",
     )
     agent_reports.add_argument(
         "--report-root",
@@ -795,14 +797,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     push = subparsers.add_parser("push", help="Commit and push append-only logs for this source repository.")
-    push.add_argument("--message", help="Commit message. Defaults to 'Append <repo-key> runtime logs'.")
+    push.add_argument("--message", help="Commit message. Defaults to 'Append <stable-source-repository-id> runtime logs'.")
     push.add_argument("--no-pull", action="store_true", help="Do not pull --rebase before pushing.")
 
     sync = subparsers.add_parser(
         "sync",
-        help="Ensure the archive, copy current agent reports, commit, and push log artifacts.",
+        help="Ensure the archive, snapshot current agent reports, commit, and push log artifacts.",
     )
-    sync.add_argument("--message", help="Commit message. Defaults to 'Append <repo-key> runtime logs'.")
+    sync.add_argument("--message", help="Commit message. Defaults to 'Append <stable-source-repository-id> runtime logs'.")
     sync.add_argument("--no-pull", action="store_true", help="Do not pull --rebase before pushing.")
     sync.add_argument("--no-push", action="store_true", help="Copy artifacts into the archive without pushing.")
     sync.add_argument("--no-agent-reports", action="store_true", help="Do not copy reports/agents artifacts.")
@@ -906,9 +908,12 @@ def build_context(args: argparse.Namespace) -> ArchiveContext:
         if args.archive_root
         else mounted_log_archive_root(canon_root).resolve()
     )
-    key = repo_log_key(source_root)
+    try:
+        key = repo_log_key(source_root)
+        branch_key = log_branch_key(source_root, canon_root)
+    except ValueError as exc:
+        raise ArchiveGitError(f"source_identity_unavailable:{exc}") from exc
     env_key = log_environment_key(canon_root)
-    branch_key = log_branch_key(source_root, canon_root)
     return ArchiveContext(
         source_root=source_root,
         canon_root=canon_root,
@@ -4477,11 +4482,18 @@ def switch_to_archive_branch(context: ArchiveContext, branch: str) -> None:
     git(context.archive_root, ["switch", "-c", branch])
 
 
-def ensure_archive(context: ArchiveContext, *, fetch: bool = True) -> None:
+def ensure_archive(
+    context: ArchiveContext,
+    *,
+    fetch: bool = True,
+    allow_branch_switch: bool = True,
+) -> None:
     """Ensure the ignored clone exists and is on the runtime log branch."""
+    created = False
     if not context.archive_root.exists():
         context.archive_root.parent.mkdir(parents=True, exist_ok=True)
         run(["git", "clone", context.remote, str(context.archive_root)])
+        created = True
     if not is_archive_clone(context.archive_root):
         raise ArchiveGitError(f"archive path is not a Git clone: {context.archive_root}")
 
@@ -4493,6 +4505,13 @@ def ensure_archive(context: ArchiveContext, *, fetch: bool = True) -> None:
     current = current_branch(context)
     if current == branch:
         return
+    if created and not allow_branch_switch:
+        switch_to_archive_branch(context, branch)
+        return
+    if not allow_branch_switch:
+        raise ArchiveGitError(
+            f"archive_branch_mismatch:current={current}:expected={branch}"
+        )
     summary = archive_status_summary(context)
     if summary.dirty:
         preserve_managed_dirty_paths(context, current)
@@ -4520,6 +4539,8 @@ def _require_prepared(transaction: PreparedArchiveTransaction) -> ArchiveContext
 def prepare_archive_transaction(
     context: ArchiveContext,
     fetch: bool,
+    *,
+    allow_branch_switch: bool = False,
 ) -> PreparedArchiveTransaction:
     """Acquire the source lock, ensure once, and return one prepared boundary."""
     lock_path = (context.source_root / HOOK_SPOOL_LOCK_RELATIVE).resolve()
@@ -4536,7 +4557,11 @@ def prepare_archive_transaction(
         raise
     _ACTIVE_ARCHIVE_LOCKS.add(lock_path)
     try:
-        ensure_archive(context, fetch=fetch)
+        ensure_archive(
+            context,
+            fetch=fetch,
+            allow_branch_switch=allow_branch_switch,
+        )
         ensured_branch = current_branch(context)
         if ensured_branch != context.branch:
             raise ArchiveGitError(
@@ -5211,7 +5236,11 @@ def command_repo_key(context: ArchiveContext) -> int:
 
 def command_ensure(context: ArchiveContext, args: argparse.Namespace) -> int:
     """Ensure archive clone and branch."""
-    with prepare_archive_transaction(context, fetch=not args.no_fetch) as transaction:
+    with prepare_archive_transaction(
+        context,
+        fetch=not args.no_fetch,
+        allow_branch_switch=True,
+    ) as transaction:
         print_context(transaction.context)
         print(f"RUNTIME_LOG_ARCHIVE_CURRENT_BRANCH={transaction.ensured_branch}")
         print("RUNTIME_LOG_ARCHIVE_ENSURE=pass")
@@ -5234,6 +5263,10 @@ def command_status(context: ArchiveContext, args: argparse.Namespace) -> int:
     if args.porcelain:
         for line in status.splitlines():
             print(f"RUNTIME_LOG_ARCHIVE_PORCELAIN={line}")
+    if not summary.branch_matches:
+        print("RUNTIME_LOG_ARCHIVE_ERROR_CODE=archive_branch_mismatch")
+        print("RUNTIME_LOG_ARCHIVE_STATUS=branch_mismatch")
+        return 1
     print("RUNTIME_LOG_ARCHIVE_STATUS=pass")
     return 0
 
@@ -5465,6 +5498,15 @@ def _archive_agent_report_prepared(
 
     run_id = safe_run_id(report_dir.name)
     files = iter_report_files(report_dir)
+    max_file_bytes = getattr(args, "max_file_bytes", None)
+    if max_file_bytes is not None:
+        files = [
+            path
+            for path in files
+            if not should_skip_agent_report(
+                path.relative_to(report_dir), path, max_file_bytes
+            )
+        ]
     if not files:
         raise ArchiveGitError(f"report directory has no files to archive: {report_dir}")
     snapshot_id = report_snapshot_digest(report_dir, files)
@@ -5600,40 +5642,49 @@ def copy_agent_reports_prepared(
     destination_prefix: Path,
     max_file_bytes: int,
 ) -> AgentReportArchiveSummary:
-    """Copy run-local reports/agents artifacts to the archive branch."""
+    """Snapshot each run bundle; never overwrite a mutable full-tree projection."""
     context = _require_prepared(transaction)
+    if destination_prefix != DEFAULT_AGENT_REPORT_DESTINATION:
+        raise ArchiveGitError(
+            "agent report destination is policy-owned: "
+            f"expected {DEFAULT_AGENT_REPORT_DESTINATION}"
+        )
     root = report_root_for_context(context, report_root)
     default_destination = agent_report_archive_dir(context.source_root, context.canon_root)
-    destination = (
-        default_destination
-        if destination_prefix == DEFAULT_AGENT_REPORT_DESTINATION
-        else context.archive_root / destination_prefix / context.repo_key
-    )
     if context.archive_root.resolve() == root or context.archive_root.resolve() in root.parents:
         raise ArchiveGitError("agent report root cannot be inside the archive clone")
     if not root.exists():
-        return AgentReportArchiveSummary(root, destination, 0, 0, 0, 0, 0)
+        return AgentReportArchiveSummary(root, default_destination, 0, 0, 0, 0, 0)
 
-    files = copied = updated = existing = skipped = 0
-    for source in sorted(path for path in root.rglob("*") if path.is_file()):
-        relative = source.relative_to(root)
-        if should_skip_agent_report(relative, source, max_file_bytes):
-            skipped += 1
+    files = copied = existing = skipped = 0
+    run_directories = sorted(path for path in root.iterdir() if path.is_dir())
+    for run_dir in run_directories:
+        run_files = iter_report_files(run_dir)
+        eligible = [
+            path
+            for path in run_files
+            if not should_skip_agent_report(path.relative_to(run_dir), path, max_file_bytes)
+        ]
+        skipped += len(run_files) - len(eligible)
+        if not eligible:
             continue
-        files += 1
-        target = destination / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.exists():
-            if target.read_bytes() == source.read_bytes():
-                existing += 1
-                continue
-            shutil.copy2(source, target)
-            updated += 1
-            continue
-        shutil.copy2(source, target)
-        copied += 1
+        run_id = safe_run_id(run_dir.name)
+        snapshot_id = report_snapshot_digest(run_dir, eligible)
+        destination = default_destination / run_id / snapshot_id
+        before = {
+            source.relative_to(run_dir).as_posix(): (destination / source.relative_to(run_dir)).read_bytes()
+            for source in eligible
+            if (destination / source.relative_to(run_dir)).is_file()
+        }
+        _archive_agent_report_prepared(
+            transaction,
+            argparse.Namespace(report_dir=run_dir, max_file_bytes=max_file_bytes),
+        )
+        files += len(eligible)
+        existing += len(before)
+        copied += len(eligible) - len(before)
 
-    return AgentReportArchiveSummary(root, destination, files, copied, updated, existing, skipped)
+    return AgentReportArchiveSummary(root, default_destination, files, copied, 0, existing, skipped)
 
 
 def print_agent_report_archive_summary(summary: AgentReportArchiveSummary) -> None:
@@ -5696,6 +5747,120 @@ def _publication_metadata_hashes(
     )
 
 
+def _remote_ref_oid(context: ArchiveContext) -> str:
+    """Read the exact remote branch head without trusting a stale tracking ref."""
+    result = git(
+        context.archive_root,
+        ["ls-remote", "origin", f"refs/heads/{context.branch}"],
+        check=False,
+    )
+    if result.returncode != 0:
+        return ""
+    line = result.stdout.strip().splitlines()
+    return line[0].split("\t", 1)[0] if line else ""
+
+
+def _rebase_to_remote(context: ArchiveContext) -> tuple[bool, str]:
+    """Rebase local append-only commits onto the fetched remote head."""
+    fetched = git(
+        context.archive_root,
+        ["fetch", "origin", context.branch],
+        check=False,
+    )
+    if fetched.returncode != 0 and _remote_ref_oid(context):
+        return False, "fetch_failed"
+    remote = _archive_oid(context, f"origin/{context.branch}")
+    local = _archive_oid(context, "HEAD")
+    if not remote or remote == local:
+        return True, "no_rebase_needed"
+    rebased = git(
+        context.archive_root,
+        ["rebase", f"origin/{context.branch}"],
+        check=False,
+    )
+    if rebased.returncode == 0:
+        return True, "rebased"
+    conflicted = git(
+        context.archive_root,
+        ["diff", "--name-only", "--diff-filter=U"],
+        check=False,
+    ).stdout.splitlines()
+    if conflicted and all(path.endswith(".jsonl") for path in conflicted):
+        for path in conflicted:
+            ours = git(context.archive_root, ["show", f":2:{path}"]).stdout
+            theirs = git(context.archive_root, ["show", f":3:{path}"]).stdout
+            merged = ours.splitlines(keepends=True)
+            seen = set(merged)
+            for line in theirs.splitlines(keepends=True):
+                if line not in seen:
+                    merged.append(line)
+                    seen.add(line)
+            Path(context.archive_root / path).write_text("".join(merged), encoding="utf-8")
+            git(context.archive_root, ["add", "--", path])
+        continued = run(
+            [
+                "env",
+                "GIT_EDITOR=true",
+                "git",
+                "-C",
+                str(context.archive_root),
+                "rebase",
+                "--continue",
+            ],
+            check=False,
+        )
+        if continued.returncode == 0:
+            return True, "rebased_jsonl_union"
+    git(context.archive_root, ["rebase", "--abort"], check=False)
+    detail = rebased.stderr.strip() or rebased.stdout.strip() or "rebase_failed"
+    return False, detail.replace("\n", " ")[:240]
+
+
+def _compare_and_push(
+    transaction: PreparedArchiveTransaction,
+    *,
+    no_pull: bool,
+) -> tuple[bool, bool, str]:
+    """Push without force, retrying only after expected-head comparison and rebase."""
+    context = _require_prepared(transaction)
+    expected = transaction.archive_head_before
+    for attempt in range(PUBLICATION_RETRY_LIMIT):
+        if attempt:
+            rebased, detail = _rebase_to_remote(context)
+            if not rebased:
+                return False, False, f"conflict:{detail}"
+            expected = _remote_ref_oid(context)
+        else:
+            fetched = git(context.archive_root, ["fetch", "origin", context.branch], check=False)
+            if fetched.returncode != 0 and _remote_ref_oid(context):
+                return False, False, "fetch_failed"
+            observed = _remote_ref_oid(context)
+            if observed != expected:
+                if no_pull:
+                    return False, False, "expected_remote_head_changed"
+                rebased, detail = _rebase_to_remote(context)
+                if not rebased:
+                    return False, False, f"conflict:{detail}"
+                expected = _remote_ref_oid(context)
+        local = _archive_oid(context, "HEAD")
+        if not local:
+            return False, False, "local_head_missing"
+        pushed = git(
+            context.archive_root,
+            ["push", "-u", "origin", f"HEAD:refs/heads/{context.branch}"],
+            check=False,
+        )
+        if pushed.returncode == 0:
+            readback = _remote_ref_oid(context)
+            if readback == local:
+                return True, True, "committed"
+            return False, False, "remote_readback_mismatch"
+        if attempt + 1 < PUBLICATION_RETRY_LIMIT and not no_pull:
+            continue
+        return False, False, "compare_and_push_conflict"
+    return False, False, "retry_limit"
+
+
 def publish_prepared_archive(
     transaction: PreparedArchiveTransaction,
     args: argparse.Namespace,
@@ -5749,8 +5914,6 @@ def publish_prepared_archive(
         if commit_created:
             ensure_commit_identity(context)
             git(context.archive_root, ["commit", "-m", message])
-        if not no_pull and remote_branch_exists(context, context.branch):
-            git(context.archive_root, ["pull", "--rebase", "--autostash", "origin", context.branch])
     except ArchiveGitError:
         commit_oid = _archive_oid(context, "HEAD")
         tree_oid = _archive_oid(context, f"{commit_oid}^{{tree}}") if commit_oid else ""
@@ -5769,11 +5932,6 @@ def publish_prepared_archive(
             cursor_sha256=cursor_sha256,
         )
 
-    push_result = git(
-        context.archive_root,
-        ["push", "-u", "origin", context.branch],
-        check=False,
-    )
     commit_oid = _archive_oid(context, "HEAD")
     tree_oid = _archive_oid(context, f"{commit_oid}^{{tree}}") if commit_oid else ""
     index_sha256, cursor_sha256 = _publication_metadata_hashes(
@@ -5781,17 +5939,24 @@ def publish_prepared_archive(
         commit_oid,
         committed_tree=True,
     )
-    status = "committed" if push_result.returncode == 0 else "uncertain"
+    pushed, push_succeeded, _push_status = _compare_and_push(
+        transaction,
+        no_pull=no_pull,
+    )
+    status = "committed" if pushed and push_succeeded else "uncertain"
+    commit_oid = _archive_oid(context, "HEAD")
+    tree_oid = _archive_oid(context, f"{commit_oid}^{{tree}}") if commit_oid else ""
     if status == "committed" and (not commit_oid or not tree_oid):
         status = "uncertain"
     return ArchivePublicationReceipt(
         status=status,
         commit_created=commit_created,
-        pushed=push_result.returncode == 0,
-        archive_commit_oid=commit_oid,
+        pushed=push_succeeded,
+        archive_commit_oid=_archive_oid(context, "HEAD"),
         archive_tree_oid=tree_oid,
         dedup_index_sha256=index_sha256,
         cursor_sha256=cursor_sha256,
+        push_status=_push_status,
     )
 
 
@@ -5802,6 +5967,7 @@ def command_push(context: ArchiveContext, args: argparse.Namespace) -> int:
         print_context(context)
         print(f"RUNTIME_LOG_ARCHIVE_COMMITTED={'yes' if receipt.commit_created else 'no'}")
         print(f"RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS={receipt.status}")
+        print(f"RUNTIME_LOG_ARCHIVE_PUSH_STATUS={receipt.push_status}")
         print(
             "RUNTIME_LOG_ARCHIVE_PUSH=pass"
             if receipt.status == "committed"
@@ -5830,7 +5996,9 @@ def command_sync(context: ArchiveContext, args: argparse.Namespace) -> int:
         receipt = publish_prepared_archive(transaction, args)
         removed = finalize_hook_spool_readback(transaction, receipt, ingest_result)
         print(f"RUNTIME_LOG_ARCHIVE_SPOOL_FINALIZED={removed}")
+        print(f"RUNTIME_LOG_ARCHIVE_COMMITTED={'yes' if receipt.commit_created else 'no'}")
         print(f"RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS={receipt.status}")
+        print(f"RUNTIME_LOG_ARCHIVE_PUSH_STATUS={receipt.push_status}")
         if receipt.status == "partial_retained":
             print("RUNTIME_LOG_ARCHIVE_SYNC_PUSH=skipped")
             print("RUNTIME_LOG_ARCHIVE_SYNC=partial_retained")

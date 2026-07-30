@@ -102,6 +102,16 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
+    def test_external_provenance_stays_outside_dependency_manifest(self) -> None:
+        """External provenance links remain prose metadata, not graph targets."""
+        path = PROJECT_ROOT / "agents" / "skills" / "agent-log-analysis.md"
+        text = path.read_text(encoding="utf-8")
+        manifest = text.split("@dependency-start", 1)[1].split("@dependency-end", 1)[0]
+        provenance = "https://github.com/iwashita-nozomu/agent-canon-log/pull/4"
+
+        self.assertNotIn(provenance, manifest)
+        self.assertIn(provenance, text.split("@dependency-end", 1)[1])
+
     def test_visualization_completion_queue_has_canonical_contract_edges(self) -> None:
         """Every queue surface declares its canonical visualization dependency."""
         for relative_path in VISUALIZATION_QUEUE_PATHS:
