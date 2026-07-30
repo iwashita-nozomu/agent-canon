@@ -1,3 +1,8 @@
+# @dependency-start
+# contract test
+# responsibility Tests pure prompt routing classification.
+# upstream implementation ../../tools/agent_tools/prompt_classifier.py owns prompt classification.
+# @dependency-end
 """Focused tests for injected prompt classification."""
 from __future__ import annotations
 

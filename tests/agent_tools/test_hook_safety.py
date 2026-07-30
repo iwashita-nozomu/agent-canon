@@ -1,3 +1,8 @@
+# @dependency-start
+# contract test
+# responsibility Tests the sole pure hook-safety owner.
+# upstream implementation ../../tools/agent_tools/hook_safety.py owns hook safety decisions.
+# @dependency-end
 """Focused tests for the sole pure hook safety owner."""
 from __future__ import annotations
 

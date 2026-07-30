@@ -1,3 +1,8 @@
+# @dependency-start
+# contract test
+# responsibility Tests exact execution-resource projection validation.
+# upstream implementation ../../tools/agent_tools/execution_resource_projection.py owns projection validation.
+# @dependency-end
 """Focused tests for projection byte validation."""
 from __future__ import annotations
 

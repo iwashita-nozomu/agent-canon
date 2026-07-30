@@ -1,3 +1,8 @@
+# @dependency-start
+# contract test
+# responsibility Tests canonical behavior-event readback parsing.
+# upstream implementation ../../tools/agent_tools/behavior_event_assembly.py owns behavior-event parsing.
+# @dependency-end
 """Readback tests for canonical behavior event parsing."""
 from __future__ import annotations
 

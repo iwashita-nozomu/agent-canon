@@ -1,1 +1,6 @@
+# @dependency-start
+# contract test
+# responsibility Provides a retired catalog violation fixture.
+# upstream implementation ../../../agent_tools/test_hook_retirement.py validates this fixture.
+# @dependency-end
 tools: [branch_worktree_guard.py]

@@ -1,3 +1,8 @@
+# @dependency-start
+# contract test
+# responsibility Tests normalized subagent-selection evidence.
+# upstream implementation ../../tools/agent_tools/subagent_selection.py owns subagent selection.
+# @dependency-end
 """Focused tests for pure subagent selection."""
 from __future__ import annotations
 

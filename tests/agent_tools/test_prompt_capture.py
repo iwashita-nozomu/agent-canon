@@ -1,3 +1,8 @@
+# @dependency-start
+# contract test
+# responsibility Tests bounded and redacted prompt capture.
+# upstream implementation ../../tools/agent_tools/prompt_capture.py owns prompt capture.
+# @dependency-end
 """Focused tests for pure, redacted prompt capture."""
 from __future__ import annotations
 

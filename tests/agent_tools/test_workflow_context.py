@@ -1,3 +1,8 @@
+# @dependency-start
+# contract test
+# responsibility Tests workflow-context storage and fail-open readback.
+# upstream implementation ../../tools/agent_tools/workflow_context.py owns workflow context.
+# @dependency-end
 """Focused tests for workflow context fail-open storage."""
 from __future__ import annotations
 

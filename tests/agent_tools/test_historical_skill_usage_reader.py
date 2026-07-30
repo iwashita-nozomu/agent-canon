@@ -1,3 +1,8 @@
+# @dependency-start
+# contract test
+# responsibility Tests historical-only skill-usage readback.
+# upstream implementation ../../tools/agent_tools/historical_skill_usage_reader.py owns historical parsing.
+# @dependency-end
 """Focused tests for historical-only skill usage parsing."""
 from __future__ import annotations
 

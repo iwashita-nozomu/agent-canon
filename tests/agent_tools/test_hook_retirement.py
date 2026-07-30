@@ -1,3 +1,9 @@
+# @dependency-start
+# contract test
+# responsibility Tests the typed hook-retirement manifest and checker.
+# upstream implementation ../../tools/agent_tools/check_hook_retirement.py validates retirement closure.
+# upstream implementation ../../tools/agent_tools/hook_retirement.py owns typed retirement records.
+# @dependency-end
 """Focused tests for the typed retirement guard."""
 from __future__ import annotations
 

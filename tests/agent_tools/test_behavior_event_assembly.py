@@ -1,3 +1,8 @@
+# @dependency-start
+# contract test
+# responsibility Tests canonical behavior-event assembly and cardinality.
+# upstream implementation ../../tools/agent_tools/behavior_event_assembly.py owns behavior-event assembly.
+# @dependency-end
 """Focused tests for pure behavior-record assembly."""
 from __future__ import annotations
 

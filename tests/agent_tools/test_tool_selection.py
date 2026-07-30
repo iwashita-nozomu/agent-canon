@@ -1,3 +1,8 @@
+# @dependency-start
+# contract test
+# responsibility Tests normalized tool-selection evidence.
+# upstream implementation ../../tools/agent_tools/tool_selection.py owns tool selection.
+# @dependency-end
 """Focused tests for pure tool selection."""
 from __future__ import annotations
 
