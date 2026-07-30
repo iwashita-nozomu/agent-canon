@@ -112,9 +112,9 @@ Docstring の意味契約へ混ぜません。
 - helper / local function の名前は、推定 role に対応する action token を含めます。
   `python3 tools/agent_tools/helper_function_inventory.py --changed --baseline-ref HEAD --only-name-gaps`
   は、責務検索で再利用候補として見つけやすい名前へ寄せる review 対象を出します。
-- `.codex/hooks/library_implementation_guard.py` と
-  `.codex/hooks/helper_first_guard.py` はこの規約の edit-time gate です。
-- `.codex/hooks/cause_investigation_guard.py` は code edit 前の cause evidence
+- `tools/agent_tools/task_authority.py` と
+  `tools/agent_tools/responsibility_scope.py` はこの規約の edit-time owner です。
+- `tools/agent_tools/tool_rejection_preflight.py` は code edit 前の cause evidence
   gate です。
 
 ## SOLID 設計契約

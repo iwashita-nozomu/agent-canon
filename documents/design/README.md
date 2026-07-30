@@ -33,6 +33,8 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
   - `experiment_runner` の契約と実行モデル
 - [python-structure-hash.md](python-structure-hash.md)
   - Python の structural duplicate analysis と module-group dependency priority
+- [agentcanon-hook-simplification-wave3.md](agentcanon-hook-simplification-wave3.md)
+  - Wave 3 の3 active event、`hook_dispatcher.py`→`behavior_event_assembly.py` の exactly-once caller contract、`behavior_event_assembly.record_hook_invocation(parts)` の純アセンブリ公開 API、`.codex/hooks/hook_event_log.py` が no-replace per-event spool transport の serialization/append writer、活性ハンドラ毎に1 base append、行動レコード存在時のみ monitor projection、`RETIRED_CHILD_TOMBSTONES=23` / `MOVED_SOURCE_ABSENCES=1` / retired basenames `24`、分離した semantic event / hook event、skill logger 単独 owner 化、`skill_usage.jsonl` 履歴 read-only 取扱い、PR #471後 current-main inventory gate、検証コーパス
 - [skill-tool-invocation-graph.md](skill-tool-invocation-graph.md)
   - skill / capability / phase / tool / edge の identity、参照、coverage、readback
 - [runtime-log-repository-lifecycle.md](runtime-log-repository-lifecycle.md)

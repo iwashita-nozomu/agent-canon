@@ -7,7 +7,7 @@
 # upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves archive paths
 # downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py checkpoints immutable per-event spool files
 # downstream implementation ./hook_dispatcher.py creates one bounded context per active event
-# downstream design ./hook_safety.py keeps prompt/command values out of spool telemetry
+# downstream implementation ../../tools/agent_tools/hook_safety.py keeps prompt/command values out of spool telemetry
 # downstream design ../../documents/runtime/runtime-log-archive.md assigns archive work to explicit checkpoints
 # @dependency-end
 

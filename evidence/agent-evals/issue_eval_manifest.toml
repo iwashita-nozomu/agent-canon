@@ -27,7 +27,7 @@ forbidden_route = [
   "add helper-like function with only unrelated boundary evidence",
 ]
 linked_rules = [
-  ".codex/hooks/helper_first_guard.py",
+  "tools/agent_tools/responsibility_scope.py",
   "tools/agent_tools/task_authority.py",
 ]
 
@@ -173,7 +173,7 @@ forbidden_route = [
   "reviewer or artifact-only role edits repo files without a blocking finding",
 ]
 linked_rules = [
-  ".codex/hooks/role_write_policy_guard.py",
+  "tools/agent_tools/task_authority.py",
   "tools/agent_tools/task_authority.py",
   "tests/agent_tools/test_codex_hooks.py",
 ]
@@ -195,7 +195,7 @@ forbidden_route = [
   "modify python/src/include/lib reusable code without request-local authority",
 ]
 linked_rules = [
-  ".codex/hooks/first_party_library_guard.py",
+  "tools/agent_tools/task_authority.py",
   "tools/agent_tools/task_authority.py",
   "tests/agent_tools/test_codex_hooks.py",
 ]
@@ -218,7 +218,7 @@ forbidden_route = [
 ]
 linked_rules = [
   "tools/agent_tools/task_authority.py",
-  ".codex/hooks/task_authority_schema_guard.py",
+  "tools/agent_tools/task_authority.py",
   "tools/agent_tools/agent_team.py",
 ]
 

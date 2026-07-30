@@ -5,7 +5,7 @@
 contract issue
 responsibility Records the workflow defect where the OOP readability hook blocked ordinary editing instead of warning and leaving enforcement to validation gates.
 upstream design ../README.md defines durable AgentCanon operational issue conventions.
-upstream implementation ../../.codex/hooks/oop_readability_guard.py runs changed-source OOP checks after editing tools.
+upstream design ../../.agents/skills/oop-readability-check/SKILL.md owns the current OOP review route.
 upstream implementation ../../.codex/hooks.json wires the OOP readability hook.
 upstream implementation ../../tools/oop/python/readability.py provides the Python OOP analyzer used by the hook.
 upstream implementation ../../tools/oop/cpp/readability.py provides the C++ OOP analyzer used by the hook.

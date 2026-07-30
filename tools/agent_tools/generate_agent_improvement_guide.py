@@ -5,6 +5,7 @@
 # upstream design ../../evidence/agent-evals/README.md eval evidence contract
 # upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
 # upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
+# upstream implementation ./historical_skill_usage_reader.py reads archived skill_usage.jsonl read-only
 # upstream design ../../issues/README.md durable operational issue storage
 # downstream implementation ../../.github/workflows/agent-improvement-guide.yml runs this on PR and push
 # downstream implementation ../../tests/agent_tools/test_generate_agent_improvement_guide.py tests guide generation
@@ -32,6 +33,7 @@ from runtime_log_paths import (  # noqa: E402
     eval_result_search_dirs,
     hook_result_search_dirs,
 )
+from historical_skill_usage_reader import read_skill_usage_history  # noqa: E402
 
 COMMIT_TIME_FORMAT = "%ct"
 GIT_LOG_TIMEOUT_SECONDS = 5
@@ -557,6 +559,11 @@ class AgentImprovementGuide:
         """Return hook counters."""
         counter = HookEvidenceCounter(known_skill_ids(self.root), root=self.root)
         for path in self.hook_result_paths():
+            if path.name == "skill_usage.jsonl":
+                history = read_skill_usage_history(path)
+                for entry in history.records:
+                    counter.add_entry(path, entry)
+                continue
             for raw_line in path.read_text(encoding="utf-8").splitlines():
                 counter.add_line(path, raw_line)
         return counter.counts()

@@ -2,7 +2,7 @@
 # contract test
 # responsibility Tests log surface inventory, Rust CLI field extraction, and baseline drift detection.
 # upstream implementation ../../tools/agent_tools/log_surface_inventory.py inventories emitted machine-readable fields
-# downstream implementation ../../.codex/hooks/log_surface_inventory_guard.py consumes inventory checks
+# downstream implementation ../../tools/agent_tools/check_hook_retirement.py consumes inventory checks
 # @dependency-end
 """Tests for log-surface field inventory."""
 

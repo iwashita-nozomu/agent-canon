@@ -4,7 +4,7 @@
 # responsibility Evaluates deterministic workflow selection routing cases.
 # upstream design ../../evidence/agent-evals/README.md eval usage contract
 # upstream design ../../evidence/agent-evals/workflow_selection_eval.toml workflow selection eval manifest
-# upstream implementation ../../.codex/hooks/skill_usage_logger.py owns prompt-to-workflow classification
+# upstream implementation ./prompt_classifier.py owns prompt-to-workflow classification
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_workflow_selection.py tests workflow selection eval behavior
 # @dependency-end
@@ -14,15 +14,19 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.util
-import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 UTC = timezone.utc
 from pathlib import Path
-from typing import Protocol, cast
+from typing import cast
+
+from prompt_classifier import PromptClassifierInputs, SkillLaneEvidence, prompt_intake_signals
+from skill_lane_detector import (
+    structural_skill_lane_concept_matches,
+    validation_failure_repair_concept_matches,
+)
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -49,24 +53,6 @@ class WorkflowSelectionCase:
     forbidden_workflows: tuple[str, ...]
     expected_skills: tuple[str, ...]
     expected_tools: tuple[str, ...]
-
-
-class PromptIntakeSignalsProtocol(Protocol):
-    """Typed subset returned by the prompt-intake classifier."""
-
-    skills: tuple[str, ...]
-    selected_workflows: tuple[str, ...]
-    candidate_skills: tuple[str, ...]
-    candidate_workflows: tuple[str, ...]
-    candidate_tools: tuple[str, ...]
-
-
-class SkillUsageLoggerProtocol(Protocol):
-    """Typed subset of the hook-owned skill usage logger."""
-
-    def prompt_intake_signals(self, payload: dict[str, object]) -> PromptIntakeSignalsProtocol:
-        """Classify one hook payload into routing signals."""
-        ...
 
 
 @dataclass(frozen=True)
@@ -342,23 +328,28 @@ def load_cases(path: Path) -> tuple[WorkflowSelectionCase, ...]:
     return load_manifest(path).cases
 
 
-def load_skill_usage_logger(root: Path) -> SkillUsageLoggerProtocol:
-    """Load the skill usage logger module that owns prompt routing keywords."""
-    path = root / ".codex" / "hooks" / "skill_usage_logger.py"
-    sys.path.insert(0, str(path.parent))
-    spec = importlib.util.spec_from_file_location("agent_canon_skill_usage_logger", path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load {path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return cast(SkillUsageLoggerProtocol, module)
-
-
-def evaluate_case(logger: SkillUsageLoggerProtocol, case: WorkflowSelectionCase) -> WorkflowSelectionResult:
-    """Evaluate one case through the hook-owned routing classifier."""
-    signals = logger.prompt_intake_signals(
-        {"hookEventName": "UserPromptSubmit", "prompt": case.prompt}
+def evaluate_case(root: Path, case: WorkflowSelectionCase) -> WorkflowSelectionResult:
+    """Evaluate one case through the pure injected routing classifier."""
+    lane_evidence = tuple(
+        SkillLaneEvidence(
+            schema="agent-canon.skill-lane.v1",
+            lane=match.concept.name,
+            route_skills=match.concept.route_skills,
+            evidence_categories=match.observed_evidence_categories,
+            status="observed",
+        )
+        for match in structural_skill_lane_concept_matches(case.prompt)
+    )
+    validation_evidence = tuple(match.reason() for match in validation_failure_repair_concept_matches(case.prompt))
+    signals = prompt_intake_signals(
+        PromptClassifierInputs(
+            prompt=case.prompt,
+            repo_root=root.resolve(),
+            catalog={},
+            routing_rules={},
+            structural_lane_evidence=lane_evidence,
+            validation_repair_evidence=validation_evidence,
+        )
     )
     observed_workflows = tuple(
         dict.fromkeys(tuple(signals.selected_workflows) + tuple(signals.candidate_workflows))
@@ -410,9 +401,8 @@ def evaluate(root: Path, manifest: Path, requested_run_id: str = "") -> Workflow
     """Evaluate one workflow selection manifest."""
     resolved_root = root.resolve()
     resolved_manifest = resolve_eval_manifest(resolved_root, manifest).resolve()
-    logger = load_skill_usage_logger(resolved_root)
     manifest_data = load_manifest(resolved_manifest)
-    results = tuple(evaluate_case(logger, case) for case in manifest_data.cases)
+    results = tuple(evaluate_case(resolved_root, case) for case in manifest_data.cases)
     status = "pass" if all(result.passed for result in results) and not manifest_data.count_failures else "fail"
     return WorkflowSelectionBundle(
         run_id=run_id_for(resolved_manifest, results, requested_run_id),

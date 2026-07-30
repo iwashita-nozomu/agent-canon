@@ -107,7 +107,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
         self.assertIn("documents/runtime/runtime-log-archive-migration.md", paths)
         self.assertIn("tools/agent_tools/runtime_log_paths.py", paths)
         self.assertIn("tools/agent_tools/runtime_log_archive_git.py", paths)
-        self.assertIn(".codex/hooks/log_archive_mount_warning.py", paths)
+        self.assertIn("tools/agent_tools/runtime_log_archive_git.py", paths)
         self.assertNotIn("evidence/agent-evals/**", scopes["runtime-entrypoints"]["exclude_paths"])
         self.assertIn(
             "tools/agent_tools/runtime_log_paths.py",

@@ -3,9 +3,10 @@
 # contract agent-runtime
 # responsibility Dispatches the bounded active hook contract in-process without child processes, Git, or network access.
 # upstream implementation ../hooks.json invokes this dispatcher once per active event.
-# upstream implementation ./hook_safety.py owns pure secret and destructive Git safety leaves.
-# upstream implementation ./execution_resource_plan_projection_guard.py validates producer projection bytes.
+# upstream implementation ../../tools/agent_tools/hook_safety.py owns pure secret and destructive Git safety leaves.
+# upstream implementation ../../tools/agent_tools/execution_resource_projection.py validates producer projection bytes.
 # upstream implementation ./hook_event_log.py provides one bounded local spool context per event.
+# downstream implementation ../../tools/agent_tools/behavior_event_assembly.py records one behavior snapshot.
 # downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates the active/inactive contract.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates dispatch, redaction, malformed input, and no-subprocess behavior.
 # @dependency-end
@@ -19,15 +20,14 @@ import hashlib
 import json
 import os
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
-from execution_resource_plan_projection_guard import (  # noqa: E402
-    ProjectionError,
-    validate_normalized_input,
-    validate_projection_bytes,
-)
-from hook_event_log import HookLogContext, utc_now  # noqa: E402
+SOURCE_ROOT = Path(__file__).resolve().parents[2]
+TOOLS_ROOT = SOURCE_ROOT / "tools" / "agent_tools"
+if str(TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ROOT))
+
 from hook_safety import (  # noqa: E402
     SHELL_TOOL_NAMES,
     branch_block_payload,
@@ -38,6 +38,27 @@ from hook_safety import (  # noqa: E402
     secret_block_payload,
     secret_kind,
 )
+from execution_resource_projection import (  # noqa: E402
+    ProjectionError,
+    validate_normalized_input,
+    validate_projection_bytes,
+)
+from hook_event_log import HookLogContext, utc_now  # noqa: E402
+from hook_retirement import (  # noqa: E402
+    MOVED_SOURCE_ABSENCES,
+    RETIRED_CHILD_TOMBSTONES,
+    source_digest,
+)
+from behavior_event_assembly import (  # noqa: E402
+    FinalHandlerResult,
+    HookInvocationParts,
+    record_hook_invocation,
+)
+from prompt_classifier import PromptClassifierInputs, freeze  # noqa: E402
+from subagent_selection import select_subagents  # noqa: E402
+from tool_selection import select_tools  # noqa: E402
+from workflow_context import WorkflowContext, load_workflow_context  # noqa: E402
+from workflow_monitor import emit_behavior_projection  # noqa: E402
 
 OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
 HOOK_CONTRACT_SCHEMA = "agent-canon.hook-contract.v1"
@@ -90,77 +111,6 @@ ACTIVE_HOOK_HANDLERS = frozenset(
         "PostToolUse.execution_resource_projection",
     }
 )
-
-FORMER_ACTIVE_HOOK_CHILDREN = frozenset(
-    {
-        "log_archive_mount_warning.py",
-        "prompt_secret_guard.py",
-        "skill_usage_logger.py",
-        "reference_capture_guard.py",
-        "branch_worktree_guard.py",
-        "direct_rg_context_guard.py",
-        "cause_investigation_guard.py",
-        "task_authority_schema_guard.py",
-        "execution_resource_plan_projection_guard.py",
-        "role_write_policy_guard.py",
-        "oop_readability_guard.py",
-        "module_boundary_guard.py",
-        "library_implementation_guard.py",
-        "first_party_library_guard.py",
-        "helper_inventory_guard.py",
-        "helper_first_guard.py",
-        "style_checker_guard.py",
-        "log_surface_inventory_guard.py",
-        "notebook_quality_guard.py",
-        "completion_review_guard.py",
-        "goal_completion_guard.py",
-        "codex_runtime_summary_logger.py",
-        "runtime_log_auto_sync.py",
-    }
-)
-
-
-@dataclass(frozen=True)
-class RetiredHookRoute:
-    """Explicit owner and migration route for one former child hook."""
-
-    owner: str
-    command_or_skill: str
-    profile_trigger: str
-    decision_semantics: str
-    artifact: str
-
-
-RETIRED_HOOK_ROUTES: dict[str, RetiredHookRoute] = {
-    "log_archive_mount_warning.py": RetiredHookRoute("runtime-log-archive owner", "python3 tools/agent_tools/runtime_log_archive_git.py ensure", "explicit archive checkpoint", "fail-open mount preparation warning", "runtime log archive checkpoint evidence"),
-    "prompt_secret_guard.py": RetiredHookRoute("hook_safety.py", "python3 .codex/hooks/prompt_secret_guard.py", "UserPromptSubmit compatibility invocation", "standalone wrapper delegates pure secret block", "hook safety decision"),
-    "skill_usage_logger.py": RetiredHookRoute("workflow_monitor.py", "python3 tools/agent_tools/workflow_monitor.py --behavior-event", "explicit workflow monitoring", "route observation, not hook blocking", "behavior-event record"),
-    "reference_capture_guard.py": RetiredHookRoute("reference_materializer.py", "python3 tools/agent_tools/reference_materializer.py", "literature-survey or reference capture", "reference registration belongs to source materialization", "references/ materialized artifact"),
-    "branch_worktree_guard.py": RetiredHookRoute("hook_safety.py", "python3 .codex/hooks/branch_worktree_guard.py", "PreToolUse compatibility invocation", "standalone wrapper delegates pure destructive Git block", "redacted safety payload"),
-    "direct_rg_context_guard.py": RetiredHookRoute("task-routing", "$task-routing", "pre-edit repository investigation", "warning is owned by context construction", "Pre-Edit Repository Investigation Packet"),
-    "cause_investigation_guard.py": RetiredHookRoute("dependency-analysis", "$dependency-analysis", "hypothesis-validation workflow", "cause evidence is implementation intake, not a hook stop", "cause investigation note"),
-    "task_authority_schema_guard.py": RetiredHookRoute("task_authority.py", "python3 tools/agent_tools/task_authority.py", "implementation handoff", "authority schema is validated at the write route", "task authority packet"),
-    "execution_resource_plan_projection_guard.py": RetiredHookRoute("hook_dispatcher.py", "python3 .codex/hooks/execution_resource_plan_projection_guard.py", "explicit projection validation", "standalone wrapper validates bytes; active dispatch calls it in-process", "validated execution-resource projection"),
-    "role_write_policy_guard.py": RetiredHookRoute("agent_team.py", "python3 tools/agent_tools/agent_team.py", "write-capable handoff", "write scope is enforced at handoff and closeout", "write-scope manifest"),
-    "oop_readability_guard.py": RetiredHookRoute("oop-readability-check", "python3 tools/oop/python/readability.py", "explicit OOP review", "review signal is non-blocking evidence", "OOP readability report"),
-    "module_boundary_guard.py": RetiredHookRoute("import_responsibility.py", "python3 tools/agent_tools/import_responsibility.py", "dependency boundary review", "import ownership is checked by the owner tool", "import responsibility report"),
-    "library_implementation_guard.py": RetiredHookRoute("dependency-module-change", "$dependency-module-change", "dependency source change", "library edits use the dependency source route", "dependency source packet"),
-    "first_party_library_guard.py": RetiredHookRoute("task_authority.py", "python3 tools/agent_tools/task_authority.py", "first-party surface change", "public reusable surface authority is explicit", "authority evidence"),
-    "helper_inventory_guard.py": RetiredHookRoute("helper inventory tool", "python3 tools/agent_tools/helper_function_inventory.py", "helper inventory review", "inventory findings are review evidence", "helper inventory report"),
-    "helper_first_guard.py": RetiredHookRoute("owner-bounded-routing", "python3 tools/agent_tools/responsibility_scope.py --root .", "owner boundary selection", "helper placement follows responsibility evidence", "responsibility-scope evidence"),
-    "style_checker_guard.py": RetiredHookRoute("md-style-check", "tools/bin/agent-canon docs check", "changed Markdown or docs", "style is a targeted validation result", "docs check result"),
-    "log_surface_inventory_guard.py": RetiredHookRoute("log-surface inventory", "python3 tools/agent_tools/log_surface_inventory.py", "log field contract change", "telemetry fields are reviewed at the surface owner", "log-surface inventory"),
-    "notebook_quality_guard.py": RetiredHookRoute("experiment-review", "python3 tools/validation/notebook_quality.py", "experiment notebook review", "notebook quality is explicit experiment evidence", "notebook quality report"),
-    "completion_review_guard.py": RetiredHookRoute("change-review", "python3 tools/agent_tools/review_dispatch.py", "review gate", "review approval is a closeout gate, not an active hook", "change review packet"),
-    "goal_completion_guard.py": RetiredHookRoute("codex-goals-workflow", "python3 tools/agent_tools/goal_loop.py status", "goal-driven task", "goal continuation is workflow state", "goal.md / goal-loop status"),
-    "codex_runtime_summary_logger.py": RetiredHookRoute("runtime summary exporter", "python3 tools/agent_tools/export_codex_runtime_summary.py", "explicit runtime summary export", "summary is bounded derived evidence", "Codex runtime summary"),
-    "runtime_log_auto_sync.py": RetiredHookRoute("runtime-log-archive owner", "python3 tools/agent_tools/runtime_log_archive_git.py sync", "explicit log archive checkpoint", "archive sync is administrative and fail-open outside hooks", "hook archive checkpoint"),
-}
-
-if set(RETIRED_HOOK_ROUTES) != FORMER_ACTIVE_HOOK_CHILDREN:
-    raise RuntimeError("retired hook route table must cover each former child exactly once")
-if set(RETIRED_HOOK_ROUTES).intersection(ACTIVE_HOOK_HANDLERS):
-    raise RuntimeError("active and retired hook route sets must be disjoint")
 
 EVENT_ALIASES = {event.casefold(): event for event in HOOK_EVENT_CONTRACTS} | {
     "user-prompt-submit": "UserPromptSubmit",
@@ -258,11 +208,11 @@ def projection_payload(stdout: str) -> dict[str, object]:
 
 def root_for_spool() -> Path:
     override = os.environ.get(DISPATCHER_SOURCE_ROOT_ENV, "").strip()
-    return Path(override).resolve() if override else Path.cwd().resolve()
+    return Path(override).resolve() if override else SOURCE_ROOT
 
 
-def spool_event(event: str, raw_payload: bytes, status: str, **telemetry: str) -> None:
-    """Write one bounded fingerprint-only event; telemetry never changes safety."""
+def spool_event(event: str, raw_payload: bytes, status: str, **telemetry: str) -> tuple[dict[str, object], HookLogContext]:
+    """Build one base transport entry; the caller appends it exactly once."""
     timestamp = utc_now()
     payload_fingerprint = hashlib.sha256(raw_payload).hexdigest()
     context = HookLogContext(root_for_spool(), event)
@@ -274,11 +224,57 @@ def spool_event(event: str, raw_payload: bytes, status: str, **telemetry: str) -
         "hook_event_name": event,
     }
     entry.update({key: value for key, value in telemetry.items() if value})
+    return entry, context
+
+
+def prepare_parts(
+    event: str,
+    payload: dict[str, object] | None,
+    status: str,
+    output: dict[str, object] | None,
+    entry: dict[str, object],
+    root: Path,
+) -> HookInvocationParts:
+    """Construct typed assembly inputs without writing an artifact."""
+    parsed = payload is not None
+    safe_payload = payload if parsed else None
+    payload_data = payload or {}
     try:
-        context.append(entry)
+        context = load_workflow_context(root / "skill_usage_context.json")
     except Exception:
-        # Local spool transport is deliberately fail-open and cannot alter the decision.
-        return
+        context = WorkflowContext()
+    try:
+        tools = select_tools(payload_data)
+        subagents = select_subagents(payload_data, context)
+        rules = PromptClassifierInputs(
+            prompt=payload_data.get("prompt", "") if isinstance(payload_data.get("prompt"), str) else "",
+            repo_root=root,
+            catalog=freeze({}),
+            routing_rules=freeze({}),
+        )
+    except Exception:
+        tools = None
+        subagents = None
+        rules = None
+    return HookInvocationParts(
+        hook_event_name=event,
+        hook_invocation_id=str(entry["hook_run_id"]),
+        hook_payload=safe_payload,
+        payload_status="parsed" if parsed else "malformed_payload",
+        handler_result=FinalHandlerResult(
+            status=status,
+            output_kind="block" if output else "additional_context" if status == "projection_forwarded" else "",
+            safe_fields={"safety_decision": "block"} if status.startswith("blocked_") else {},
+        ),
+        classifier_rules=rules,
+        tool_selection=tools,
+        subagent_selection=subagents,
+        workflow_context=context,
+        payload_fingerprint=str(entry["payload_fingerprint"]),
+        timestamp=str(entry["timestamp"]),
+        root=root,
+        report_dir=root,
+    )
 
 
 def dispatch_event(event: str, raw_payload: bytes) -> int:
@@ -322,7 +318,20 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
                         status = "unsuccessful_tool_response"
             except (ProjectionError, TypeError, ValueError, AssertionError):
                 status = "invalid_projection"
-    spool_event(event, raw_payload, status, **telemetry)
+    root = root_for_spool()
+    spool_entry, context = spool_event(event, raw_payload, status, **telemetry)
+    behavior = record_hook_invocation(prepare_parts(event, payload, status, output, spool_entry, root))
+    if behavior is not None:
+        spool_entry.update(behavior.as_dict())
+    try:
+        append_result = context.append(spool_entry)
+    except Exception:
+        append_result = None
+    if behavior is not None and append_result is not None and getattr(append_result, "status", "") == "spooled":
+        try:
+            emit_behavior_projection(root, behavior.as_dict())
+        except Exception:
+            pass
     if output is not None:
         json.dump(output, sys.stdout, sort_keys=True)
         sys.stdout.write("\n")
@@ -353,9 +362,33 @@ def contract_payload(event: str | None = None) -> dict[str, object]:
         "active_events": [name for name in names if HOOK_EVENT_CONTRACTS[name].active],
         "inactive_events": [name for name in names if not HOOK_EVENT_CONTRACTS[name].active],
         "active_handlers": sorted(ACTIVE_HOOK_HANDLERS),
-        "retired_hook_routes": {
-            name: asdict(route) for name, route in sorted(RETIRED_HOOK_ROUTES.items())
+        "retired_child_tombstones": [
+            {
+                "filename": row.filename,
+                "owner": row.owner,
+                "command_or_skill": row.command_or_skill,
+                "profile_trigger": row.profile_trigger,
+                "decision_semantics": row.decision_semantics,
+                "artifact": row.artifact,
+            }
+            for row in RETIRED_CHILD_TOMBSTONES
+        ],
+        "moved_source_absences": [
+            {
+                "filename": row.filename,
+                "moved_to": row.moved_to,
+                "import_contract": row.import_contract,
+                "reason": row.reason,
+                "artifact": row.artifact,
+            }
+            for row in MOVED_SOURCE_ABSENCES
+        ],
+        "counts": {
+            "retired_child_tombstones": len(RETIRED_CHILD_TOMBSTONES),
+            "moved_source_absences": len(MOVED_SOURCE_ABSENCES),
+            "retired_filenames": len(RETIRED_CHILD_TOMBSTONES) + len(MOVED_SOURCE_ABSENCES),
         },
+        "source_digest": source_digest(),
     }
 
 

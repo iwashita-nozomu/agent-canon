@@ -3855,7 +3855,7 @@ ReleaseTransactionFailure {
 
 BranchGuardReadback {
   readback_version: uint64
-  guard_path: ".codex/hooks/branch_worktree_guard.py"
+  guard_path: "tools/agent_tools/hook_safety.py"
   guard_sha256: Sha256
   payload_ref: Ref
   exact_command_sha256: Sha256
@@ -3896,7 +3896,7 @@ payload whose `tool_input.cmd` is byte-identical to the four-assignment command
 above, then runs:
 
 ```text
-python3 .codex/hooks/branch_worktree_guard.py < "$BRANCH_GUARD_PAYLOAD"
+python3 .codex/hooks/hook_dispatcher.py PreToolUse < "$BRANCH_GUARD_PAYLOAD"
 ```
 
 The exact-command oracle requires empty stdout, the guard and payload hashes,

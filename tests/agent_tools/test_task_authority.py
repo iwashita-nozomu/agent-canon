@@ -4,9 +4,7 @@
 # contract test
 # responsibility Tests request-local task authority lookup behavior.
 # upstream implementation ../../tools/agent_tools/task_authority.py locates active task authority files.
-# downstream implementation ../../.codex/hooks/task_authority_schema_guard.py consumes active task authority.
-# downstream implementation ../../.codex/hooks/role_write_policy_guard.py consumes active task authority.
-# downstream implementation ../../.codex/hooks/first_party_library_guard.py consumes active task authority.
+# downstream implementation ../../tools/agent_tools/task_authority.py owns active task authority.
 # @dependency-end
 
 from __future__ import annotations

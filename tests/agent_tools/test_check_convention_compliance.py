@@ -685,20 +685,15 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/sync_agent_canon.sh": "surface_manifest.py build_regular_specs regular_path\n",
     "agents/skills/environment-maintenance.md": "container_config.py\n",
     ".codex/README.md": (
-        "active events active/inactive legacy `Stop` fail-open RETIRED_HOOK_ROUTES bounded redacted\n"
+        "active events active/inactive legacy `Stop` fail-open retired child tombstones bounded redacted\n"
     ),
     ".codex/hooks/hook_dispatcher.py": (
         "HOOK_EVENT_CONTRACTS HookEventContract ACTIVE_HOOK_HANDLERS "
-        "UserPromptSubmit PreToolUse PostToolUse Stop hook_safety.py "
-        "validate_projection_bytes execution_resource_plan_projection_guard.py "
-        "FORMER_ACTIVE_HOOK_CHILDREN RETIRED_HOOK_ROUTES branch_worktree_guard.py "
-        "if set(RETIRED_HOOK_ROUTES) != FORMER_ACTIVE_HOOK_CHILDREN: "
-        "if set(RETIRED_HOOK_ROUTES).intersection(ACTIVE_HOOK_HANDLERS):\n"
+        "UserPromptSubmit PreToolUse PostToolUse Stop hook_safety "
+        "validate_projection_bytes record_hook_invocation HookLogContext "
+        "RETIRED_CHILD_TOMBSTONES MOVED_SOURCE_ABSENCES\n"
     ),
-    ".codex/hooks/branch_worktree_guard.py": (
-        "standalone wrapper for destructive Git safety\n"
-    ),
-    ".codex/hooks/hook_safety.py": (
+    "tools/agent_tools/hook_safety.py": (
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
         "AGENT_CANON_BRANCH_WORKTREE_REASON AGENT_CANON_DESTRUCTIVE_GIT_REASON "
         "explicit_user_approval user_request agent_canon_workflow same-segment "
@@ -958,7 +953,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / ".codex" / "hooks" / "hook_safety.py").write_text(
+            (root / "tools" / "agent_tools" / "hook_safety.py").write_text(
                 "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
                 "explicit_user_approval\n",
                 encoding="utf-8",
@@ -967,7 +962,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("hook_guardrail_policy:.codex/hooks/hook_safety.py", result.stdout)
+            self.assertIn("hook_guardrail_policy:tools/agent_tools/hook_safety.py", result.stdout)
             self.assertIn("missing-marker:operation", result.stdout)
 
     def test_parent_repo_can_keep_shared_docs_only_in_vendor_canon(self) -> None:
@@ -1505,10 +1500,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            dispatcher = root / ".codex" / "hooks" / "hook_dispatcher.py"
-            dispatcher.write_text(
-                dispatcher.read_text(encoding="utf-8").replace(
-                    "branch_worktree_guard.py",
+            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "tools/agent_tools/hook_safety.py",
                     "",
                 ),
                 encoding="utf-8",
@@ -1518,7 +1513,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("branch_worktree_creation_guard", result.stdout)
-            self.assertIn("missing-marker:branch_worktree_guard.py", result.stdout)
+            self.assertIn("missing-marker:tools/agent_tools/hook_safety.py", result.stdout)
 
     def test_minimal_fixture_covers_branch_worktree_guard_surfaces(self) -> None:
         """The minimal test fixture includes every branch/worktree guard surface."""
