@@ -4998,8 +4998,11 @@ def ingest_hook_event_spool(
             projection_bytes[projection_path] = existing
             projection_original_bytes[projection_path] = existing if projection_exists else None
         projected_sha = projection_entries.get(event_id)
-        if projected_sha is not None and projected_sha != event_sha256:
-            raise ArchiveGitError("spool_conflict")
+        if projected_sha is not None:
+            if projected_sha != event_sha256:
+                raise ArchiveGitError("spool_conflict")
+        else:
+            projection_bytes[projection_path] += canonical
         accepted.append(
             (
                 snapshot_event,
@@ -5012,7 +5015,6 @@ def ingest_hook_event_spool(
         )
         pending_identities[event_id] = (event_sha256, runtime_namespace, hook_name)
         projection_entries[event_id] = event_sha256
-        projection_bytes[projection_path] += canonical
 
     source_set_sha256 = _hash_bytes(_canonical_compact_json(source_rows))
     prior_cursor_sha256 = _hash_bytes(cursor_before) if cursor_before else HOOK_SPOOL_ZERO_SHA256

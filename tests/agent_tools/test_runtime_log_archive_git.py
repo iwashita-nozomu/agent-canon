@@ -2632,8 +2632,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(client.query(all_nodes=True).status, "fresh")
             self.assertEqual(client.context("documents/design/example.md").status, "stale")
 
-    def test_ingest_hook_event_spool_materializes_projection_once(self) -> None:
-        """Ingest should read and parse one shared projection once for all events."""
+    def test_ingest_indexes_identical_projection_event_without_duplicate(self) -> None:
+        """Ingest should index an identical unindexed event without appending it."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "project"
@@ -2663,7 +2663,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             events: list[runtime_log_archive_git.HookSpoolEvent] = []
             event_bytes: list[bytes] = []
-            for event_id in ("hook-20260718-linear-a", "hook-20260718-linear-b"):
+            event_ids = ("hook-20260718-linear-a", "hook-20260718-linear-b")
+            for event_id in event_ids:
                 event = {
                     "hook_log_namespace": "test-runtime",
                     "hook_run_id": event_id,
@@ -2686,15 +2687,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 event_bytes.append(payload)
 
             projection_path = archive / "hook-runs" / key / "test-runtime" / "posttooluse-no-git-head.jsonl"
-            existing_event = {
-                "hook_log_namespace": "test-runtime",
-                "hook_run_id": "hook-20260718-linear-existing",
-                "payload_fingerprint": "existing",
-                "source_repo_key": key,
-                "status": "pass",
-                "timestamp": "2026-07-18T00:00:00Z",
-            }
-            existing_bytes = runtime_log_archive_git._canonical_compact_json(existing_event) + b"\n"
+            existing_bytes = event_bytes[0]
             projection_path.parent.mkdir(parents=True, exist_ok=True)
             projection_path.write_bytes(existing_bytes)
             transaction = runtime_log_archive_git.PreparedArchiveTransaction(
@@ -2725,7 +2718,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
             self.assertEqual(len(result.accepted_events), 2)
             self.assertEqual(projection_reads, [projection_path])
-            self.assertEqual(projection_path.read_bytes(), existing_bytes + b"".join(event_bytes))
+            self.assertEqual(projection_path.read_bytes(), existing_bytes + event_bytes[1])
+            index_entries = runtime_log_archive_git._parse_spool_index_bytes(
+                result.dedup_index_path.read_bytes()
+            )
+            self.assertEqual(index_entries[event_ids[0]][0], events[0].bytes_sha256)
 
     def test_finalize_hook_spool_readback_loads_each_projection_once(self) -> None:
         """Readback should load each indexed projection once across covered events."""
