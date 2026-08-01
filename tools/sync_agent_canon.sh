@@ -11,6 +11,7 @@ set -euo pipefail
 export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_DIR}/lib/git_authority.sh"
 SUPERPROJECT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
 if [ -n "$SUPERPROJECT_DIR" ]; then
   ROOT_DIR="$SUPERPROJECT_DIR"
@@ -60,15 +61,7 @@ die() {
 
 require_protected_git_authority() {
   local mode="$1"
-  local branch_authority="${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-}"
-  local branch_reason="${AGENT_CANON_BRANCH_WORKTREE_REASON:-}"
-  local destructive_authority="${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY:-}"
-  local destructive_reason="${AGENT_CANON_DESTRUCTIVE_GIT_REASON:-}"
-
-  if { [ "$branch_authority" = "user_request" ] || [ "$branch_authority" = "agent_canon_workflow" ]; } \
-    && [ -n "$branch_reason" ] \
-    && [ "$destructive_authority" = "explicit_user_approval" ] \
-    && [ -n "$destructive_reason" ]; then
+  if git_authority_check_protected_git_authority "$mode"; then
     return 0
   fi
 
@@ -81,9 +74,7 @@ require_protected_git_authority() {
 
 require_commit_request_evidence() {
   local mode="$1"
-  local evidence="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE:-}"
-
-  if [[ "$evidence" =~ ^evidence:[0-9a-f]{64}$ ]]; then
+  if git_authority_check_commit_request_evidence; then
     return 0
   fi
 
@@ -95,8 +86,22 @@ require_commit_request_evidence() {
 
 require_commit_provenance() {
   local mode="$1"
-  require_protected_git_authority "$mode"
-  require_commit_request_evidence "$mode"
+  if git_authority_check_commit_provenance "$mode"; then
+    return 0
+  fi
+
+  if ! git_authority_check_protected_git_authority "$mode"; then
+    echo "DESTRUCTIVE_GIT_GUARD=block"
+    echo "BRANCH_WORKTREE_CREATION_GUARD=block"
+    echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
+    echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
+    die "protected AgentCanon update requires inherited branch/worktree and explicit destructive approval authority"
+  fi
+
+  echo "COMMIT_PROVENANCE_GUARD=block"
+  echo "AGENT_CANON_COMMIT_PROVENANCE_SUBCOMMAND=$mode"
+  echo "NEXT_ACTION=$COMMIT_PROVENANCE_NEXT_ACTION"
+  die "auto-commit requires AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>"
 }
 
 resolve_remote_branch_sha() {
@@ -357,6 +362,7 @@ ensure_repo_local_goal() {
     repo_local_goal_template >"$path"
     echo "goal_md=created_repo_local_placeholder"
   fi
+  return 0
 }
 
 goal_is_shared_symlink() {
@@ -520,7 +526,7 @@ regular_path() {
 
 prune_parent_devcontainer_artifacts() {
   local abs_path="$ROOT_DIR/.devcontainer"
-  [ -d "$abs_path" ] || return
+  [ -d "$abs_path" ] || return 0
   rm -f \
     "$abs_path/bootstrap-shared-runtime.sh" \
     "$abs_path/finalize-shared-runtime.sh" \

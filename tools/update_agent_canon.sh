@@ -17,13 +17,15 @@ export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_DIR}/lib/repo_paths.sh"
+source "${SCRIPT_DIR}/lib/git_authority.sh"
 ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_tools_root "$ROOT_DIR")"
+PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 SUPERPROJECT_DIR=""
-if [ "$ROOT_DIR" != "$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)" ]; then
+if [ "$(git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.path" 2>/dev/null || true)" = "$PREFIX" ] \
+  || [ "$ROOT_DIR" != "$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)" ]; then
   SUPERPROJECT_DIR="$ROOT_DIR"
 fi
-PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
 COMMIT_AUTOMATION_AUTHOR_NAME="AgentCanon Sync Automation"
@@ -191,15 +193,7 @@ classify_parent_vendor_source() {
 
 require_protected_git_authority() {
   local mode="$1"
-  local branch_authority="${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-}"
-  local branch_reason="${AGENT_CANON_BRANCH_WORKTREE_REASON:-}"
-  local destructive_authority="${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY:-}"
-  local destructive_reason="${AGENT_CANON_DESTRUCTIVE_GIT_REASON:-}"
-
-  if { [ "$branch_authority" = "user_request" ] || [ "$branch_authority" = "agent_canon_workflow" ]; } \
-    && [ -n "$branch_reason" ] \
-    && [ "$destructive_authority" = "explicit_user_approval" ] \
-    && [ -n "$destructive_reason" ]; then
+  if git_authority_check_protected_git_authority "$mode"; then
     return 0
   fi
 
@@ -212,9 +206,7 @@ require_protected_git_authority() {
 
 require_commit_request_evidence() {
   local mode="$1"
-  local evidence="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE:-}"
-
-  if [[ "$evidence" =~ ^evidence:[0-9a-f]{64}$ ]]; then
+  if git_authority_check_commit_request_evidence; then
     return 0
   fi
 
@@ -226,8 +218,22 @@ require_commit_request_evidence() {
 
 require_commit_provenance() {
   local mode="$1"
-  require_protected_git_authority "$mode"
-  require_commit_request_evidence "$mode"
+  if git_authority_check_commit_provenance "$mode"; then
+    return 0
+  fi
+
+  if ! git_authority_check_protected_git_authority "$mode"; then
+    echo "DESTRUCTIVE_GIT_GUARD=block"
+    echo "BRANCH_WORKTREE_CREATION_GUARD=block"
+    echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
+    echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
+    die "protected AgentCanon update requires same-command branch/worktree and explicit destructive approval authority"
+  fi
+
+  echo "COMMIT_PROVENANCE_GUARD=block"
+  echo "AGENT_CANON_COMMIT_PROVENANCE_SUBCOMMAND=$mode"
+  echo "NEXT_ACTION=$COMMIT_PROVENANCE_NEXT_ACTION"
+  die "auto-commit requires AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>"
 }
 
 resolve_remote_branch_sha() {
@@ -1153,42 +1159,6 @@ cmd_latest() {
     cmd_merge_main_into_current_preserve_dirty "$branch"
     return
   fi
-  if [ "$AGENT_CANON_SOURCE_MODE" = "parent_projection" ]; then
-    local latest_state_rc=0
-    local latest_state=""
-    classify_parent_vendor_source || {
-      latest_state_rc="$?"
-      if [ "$latest_state_rc" -eq 1 ]; then
-        latest_state="parent_vendor_on_default_branch"
-        echo "AGENT_CANON_LATEST_ROUTE_STATE=$latest_state"
-        echo "NEXT_ACTION=checkout_or_create_topic_branch_from_$DEFAULT_BRANCH"
-        return "$latest_state_rc"
-      elif [ "$latest_state_rc" -eq 2 ]; then
-        latest_state="parent_vendor_worktree_dirty_or_pin_mismatch"
-        echo "AGENT_CANON_LATEST_ROUTE_STATE=$latest_state"
-        return "$latest_state_rc"
-      elif [ "$latest_state_rc" -eq 3 ]; then
-        latest_state="parent_vendor_detached_head"
-        echo "AGENT_CANON_LATEST_ROUTE_STATE=$latest_state"
-        return "$latest_state_rc"
-      elif [ "$latest_state_rc" -eq 4 ]; then
-        latest_state="parent_vendor_not_on_default_branch"
-        echo "AGENT_CANON_LATEST_ROUTE_STATE=$latest_state"
-        echo "AGENT_CANON_LATEST_TOOL_ROUTE=$route"
-        echo "NEXT_ACTION=checkout_or_create_topic_branch_from_$DEFAULT_BRANCH"
-        return "$latest_state_rc"
-      else
-        latest_state="parent_vendor_unready"
-        echo "AGENT_CANON_LATEST_ROUTE_STATE=$latest_state"
-        return "$latest_state_rc"
-      fi
-    }
-    echo "AGENT_CANON_LATEST_ROUTE_STATE=parent_vendor_clean_source_owner"
-    echo "AGENT_CANON_LATEST_TOOL_ROUTE=merge-main-into-current"
-    cmd_merge_main_into_current "$branch"
-    return "$?"
-  fi
-
   require_accepted_dependency_frontier
 
   park_eval_log_dirty_state_if_safe || park_rc=$?

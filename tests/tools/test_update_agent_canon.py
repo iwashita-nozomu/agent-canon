@@ -21,8 +21,20 @@ from pathlib import Path
 
 def resolve_repo_root() -> Path:
     """Return the repository root for both vendored and mirrored test paths."""
+    cwd_root = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=Path.cwd(),
+        check=False,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if cwd_root:
+        candidate = Path(cwd_root)
+        if (candidate / "vendor" / "agent-canon").exists():
+            return candidate
+
     git_root = None
-    for candidate in Path(__file__).resolve().parents:
+    for candidate in Path(__file__).absolute().parents:
         if (candidate / ".git").exists():
             git_root = candidate
             if (candidate / "vendor" / "agent-canon").exists():
@@ -55,8 +67,13 @@ AGENT_CANON_IS_SUBMODULE = bool(
     ).stdout.strip()
 )
 AGENT_CANON_IS_STANDALONE = not (REPO_ROOT / "vendor" / "agent-canon").exists()
-sys.path.insert(0, str(REPO_ROOT / "tools" / "agent_tools"))
-sys.path.insert(0, str(REPO_ROOT / "tools" / "ci"))
+AGENT_CANON_SOURCE_ROOT = (
+    REPO_ROOT / "vendor" / "agent-canon"
+    if AGENT_CANON_IS_SUBMODULE
+    else REPO_ROOT
+)
+sys.path.insert(0, str(AGENT_CANON_SOURCE_ROOT / "tools" / "agent_tools"))
+sys.path.insert(0, str(AGENT_CANON_SOURCE_ROOT / "tools" / "ci"))
 
 from check_agent_canon_pr import (  # noqa: E402
     GENERATED_COMPLETENESS_CHECK_IDS,
@@ -64,11 +81,15 @@ from check_agent_canon_pr import (  # noqa: E402
 )
 from github_publish import materialize_pr_identity_gate  # noqa: E402
 from update_lifecycle_contract import (  # noqa: E402
+    SourceMainReadbackIdentity,
+    materialize_dependency_frontier,
     materialize_gate_verdict,
     materialize_publication_readback_receipt,
+    materialize_queue_receipt,
     materialize_source_main_rebind_receipt,
     materialize_source_projection_packet,
     pull_request_branch_table,
+    validate_dependency_frontier_transition,
 )
 OVERLAY_EXCLUDED_NAMES = {".git", ".pytest_cache", ".ruff_cache", "reports"}
 SUBMODULE_GITFILE = Path("vendor") / "agent-canon" / ".git"
@@ -95,7 +116,7 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
 
     def test_fresh_clone_route_sets_commit_request_evidence(self) -> None:
         """Fresh-clone update calls must pass the canonical workflow digest."""
-        script = (REPO_ROOT / "tools" / "ci" / "check_fresh_clone.sh").read_text(
+        script = (AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_fresh_clone.sh").read_text(
             encoding="utf-8"
         )
         self.assertIn(
@@ -110,7 +131,7 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
             script.index('attach_submodule_main_to_staged_pin "vendor/agent-canon"'),
             script.index('bash "${CLONE_TOOLS_ROOT}/sync_agent_canon.sh" check'),
         )
-        sync_script = (REPO_ROOT / "tools" / "sync_agent_canon.sh").read_text(
+        sync_script = (AGENT_CANON_SOURCE_ROOT / "tools" / "sync_agent_canon.sh").read_text(
             encoding="utf-8"
         )
         start = sync_script.index("cmd_ensure_latest() {")
@@ -851,7 +872,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         (work_dir / "ROOT_AGENTS.md").write_text("# Root agents\n", encoding="utf-8")
         (work_dir / "tools" / "agent_tools").mkdir(parents=True)
         shutil.copy2(
-            REPO_ROOT / "tools" / "agent_tools" / "surface_manifest.py",
+            AGENT_CANON_SOURCE_ROOT / "tools" / "agent_tools" / "surface_manifest.py",
             work_dir / "tools" / "agent_tools" / "surface_manifest.py",
         )
         github_template_paths = sorted(
@@ -960,7 +981,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             "# Derived Documents Seed\n",
             encoding="utf-8",
         )
-        (work_dir / "documents" / "SHARED_RUNTIME_SURFACES.md").write_text(
+        (work_dir / "documents" / "runtime" / "SHARED_RUNTIME_SURFACES.md").write_text(
             "\n".join(
                 [
                     "# Standalone Surface Policy",
@@ -1042,11 +1063,19 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         )
         (repo / "tools").mkdir()
         shutil.copy2(
-            REPO_ROOT / "tools" / "sync_agent_canon.sh",
+            AGENT_CANON_SOURCE_ROOT / "tools" / "sync_agent_canon.sh",
             repo / "tools",
         )
-        shutil.copy2(REPO_ROOT / "tools" / "update_agent_canon.sh", repo / "tools")
-        shutil.copy2(REPO_ROOT / "tools" / "rebuild_agent_tools.sh", repo / "tools")
+        shutil.copy2(AGENT_CANON_SOURCE_ROOT / "tools" / "update_agent_canon.sh", repo / "tools")
+        shutil.copy2(AGENT_CANON_SOURCE_ROOT / "tools" / "rebuild_agent_tools.sh", repo / "tools")
+        shutil.copytree(AGENT_CANON_SOURCE_ROOT / "tools" / "lib", repo / "tools" / "lib")
+        fixture_agent_tools = repo / "tools" / "agent_tools"
+        fixture_agent_tools.mkdir()
+        for name in ("artifact_identity.py", "update_lifecycle_contract.py"):
+            shutil.copy2(
+                AGENT_CANON_SOURCE_ROOT / "tools" / "agent_tools" / name,
+                fixture_agent_tools / name,
+            )
         if public_submodule_add:
             subprocess.run(["git", "add", "tools"], cwd=repo, check=True)
             subprocess.run(["git", "commit", "-m", "initial parent"], cwd=repo, check=True)
@@ -1108,6 +1137,96 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             ).stdout
             for command, cwd in commands
         )
+
+    def materialize_parent_projection_frontier(
+        self,
+        repo: Path,
+        source: Path,
+    ) -> None:
+        """Materialize accepted lifecycle evidence for one parent projection fixture."""
+        lifecycle = StandaloneUpdateLifecycleTest()
+        binding, rebind = lifecycle.binding_and_rebind(source)
+        packet = lifecycle.source_projection_packet(binding, rebind)
+        readback_ref = "evidence:" + "9" * 64
+        queue = materialize_queue_receipt(
+            binding=binding,
+            source_namespace=str(source.resolve()),
+            source_main_rebind_receipt_id=str(rebind["rebind_receipt_id"]),
+            source_main_readback_evidence_ref=readback_ref,
+            publication_readback_receipt=packet["publication_readback_receipt"],
+            state="accepted",
+        )
+        predecessors = [
+            {
+                "queue_number": 388,
+                "source_pr": "#388",
+                "publication_evidence_id": "evidence:" + "5" * 64,
+            },
+            {
+                "queue_number": 389,
+                "source_pr": "#389",
+                "source_pr_sha": "6" * 40,
+                "publication_evidence_id": "evidence:" + "7" * 64,
+            },
+        ]
+        pending = materialize_dependency_frontier(
+            binding=binding,
+            queue_receipt=queue,
+            rebind_receipt=rebind,
+            source_main_readback_evidence_ref=readback_ref,
+            ordered_predecessor_evidence=predecessors,
+        )
+        accepted = json.loads(json.dumps(pending))
+        accepted["frontier_state"] = "accepted"
+        accepted["preceding_frontier_evidence_id"] = binding["evidence_ref"]
+        accepted["acceptance_evidence_ref"] = packet["acceptance_evidence_ref"]
+        accepted = validate_dependency_frontier_transition(
+            pending,
+            accepted,
+            queue_receipt=queue,
+            rebind_receipt=rebind,
+            origin_main_readback=SourceMainReadbackIdentity(
+                commit_sha=str(binding["candidate_sha"]),
+                tree_sha=str(binding["tree_sha"]),
+            ),
+            ordered_oracle=(
+                "source_pr:#388",
+                "source_pr:#389",
+                f"transaction:{binding['transaction_id']}",
+            ),
+        )
+        g4 = materialize_gate_verdict(
+            binding=accepted["binding"],
+            gate_id="G4",
+            ordered_input_evidence_refs=(
+                packet["source_gate_verdicts"][2]["binding"]["evidence_ref"],
+                queue["binding"]["evidence_ref"],
+                accepted["acceptance_evidence_ref"],
+            ),
+            invariant="parent_projection_integrity",
+            output_digest="sha256:" + "a" * 64,
+            owner=str(repo.resolve())
+            + "/tools/update_agent_canon.sh#accept_dependency_frontier",
+            verdict="pass",
+        )
+        namespace = repo / ".agent-canon" / "update-lifecycle"
+        records = {
+            namespace / "projection-queue" / "queue.accepted.json": queue,
+            namespace / "projection-queue" / "frontier.accepted.json": accepted,
+            namespace / "evidence" / "g4.parent-projection-integrity.json": g4,
+            namespace / "state" / "current-transaction": {
+                "schema": "agent-canon.update-lifecycle-current-transaction.v1",
+                "transaction_id": binding["transaction_id"],
+                "queue_receipt_id": queue["queue_receipt_id"],
+                "frontier_id": accepted["frontier_id"],
+            },
+        }
+        for path, record in records.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps(record, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
 
     def test_update_modes_require_all_inline_git_authority_before_side_effects(self) -> None:
         """Missing, wrong, or empty authority blocks every mutating update mode."""
@@ -1241,6 +1360,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
             subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
             subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            self.materialize_parent_projection_frontier(repo, work_dir)
 
             result = subprocess.run(
                 ["bash", "tools/update_agent_canon.sh", "apply"],
@@ -1258,7 +1378,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 },
             )
 
-            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             committed_paths = subprocess.run(
                 ["git", "show", "--pretty=format:", "--name-only", "HEAD"],
                 cwd=repo,
@@ -1327,10 +1447,10 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         """TODO acknowledgement commits only its state path and preserves staged dirt."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            bare_repo, _work_dir = self.make_agent_canon_remote(root)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
             repo = self.make_superproject(root, bare_repo)
             todo_dir = repo / "tools" / "agent_tools"
-            todo_dir.mkdir()
+            todo_dir.mkdir(exist_ok=True)
             state_dir = repo / ".agent-canon"
             state_dir.mkdir()
             state_path = state_dir / "update-state.toml"
@@ -1359,6 +1479,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             sentinel = repo / "other-chat-todo-sentinel.txt"
             sentinel.write_text("owned elsewhere\n", encoding="utf-8")
             subprocess.run(["git", "add", sentinel.name], cwd=repo, check=True)
+            self.materialize_parent_projection_frontier(repo, work_dir)
 
             result = subprocess.run(
                 ["bash", "tools/update_agent_canon.sh", "latest"],
@@ -1369,7 +1490,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 env=authorized_test_env(),
             )
 
-            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             committed_paths = subprocess.run(
                 ["git", "show", "--pretty=format:", "--name-only", "HEAD"],
                 cwd=repo,
@@ -2220,7 +2341,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             repo = self.make_superproject(root, bare_repo)
             (repo / "tools" / "ci").mkdir()
             shutil.copy2(
-                REPO_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
+                AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
                 repo / "tools" / "ci" / "check_agent_canon_latest.sh",
             )
             (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
@@ -2273,7 +2394,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             repo = self.make_superproject(root, bare_repo)
             (repo / "tools" / "ci").mkdir()
             shutil.copy2(
-                REPO_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
+                AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
                 repo / "tools" / "ci" / "check_agent_canon_latest.sh",
             )
             submodule = repo / "vendor" / "agent-canon"
@@ -2321,7 +2442,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             repo = self.make_superproject(root, bare_repo)
             (repo / "tools" / "ci").mkdir()
             shutil.copy2(
-                REPO_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
+                AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
                 repo / "tools" / "ci" / "check_agent_canon_latest.sh",
             )
             submodule = repo / "vendor" / "agent-canon"
@@ -2446,7 +2567,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             repo = self.make_superproject(root, bare_repo)
             (repo / "tools" / "ci").mkdir()
             shutil.copy2(
-                REPO_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
+                AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
                 repo / "tools" / "ci" / "check_agent_canon_latest.sh",
             )
             submodule = repo / "vendor" / "agent-canon"
@@ -3060,10 +3181,10 @@ class StandaloneUpdateLifecycleTest(unittest.TestCase):
         tool_dir.mkdir(parents=True)
         repo_lib_dir = source / "tools" / "lib"
         repo_lib_dir.mkdir(parents=True)
-        shutil.copy2(REPO_ROOT / "tools" / "update_agent_canon.sh", source / "tools")
+        shutil.copy2(AGENT_CANON_SOURCE_ROOT / "tools" / "update_agent_canon.sh", source / "tools")
         for name in ("artifact_identity.py", "update_lifecycle_contract.py"):
-            shutil.copy2(REPO_ROOT / "tools" / "agent_tools" / name, tool_dir / name)
-        shutil.copy2(REPO_ROOT / "tools" / "lib" / "repo_paths.sh", repo_lib_dir / "repo_paths.sh")
+            shutil.copy2(AGENT_CANON_SOURCE_ROOT / "tools" / "agent_tools" / name, tool_dir / name)
+        shutil.copy2(AGENT_CANON_SOURCE_ROOT / "tools" / "lib" / "repo_paths.sh", repo_lib_dir / "repo_paths.sh")
         (source / "ROOT_AGENTS.md").write_text("# fixture\n", encoding="utf-8")
         subprocess.run(["git", "add", "-A"], cwd=source, check=True)
         subprocess.run(["git", "commit", "-m", "fixture source"], cwd=source, check=True)
@@ -3232,7 +3353,7 @@ class StandaloneUpdateLifecycleTest(unittest.TestCase):
             ordered_input_evidence_refs=[str(binding["evidence_ref"])],
             invariant="source_correctness",
             output_digest="sha256:" + "2" * 64,
-            owner=str(REPO_ROOT / "tools" / "agent_tools" / "publication_integrator.py")
+            owner=str(AGENT_CANON_SOURCE_ROOT / "tools" / "agent_tools" / "publication_integrator.py")
             + "#resolve_publication_eligibility",
             verdict="pass",
         )
