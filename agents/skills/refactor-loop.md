@@ -8,6 +8,7 @@ upstream design structure-planning.md reusable refactor structure contract
 upstream design dependency-analysis.md unified change-impact and repair-planning packet
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback loop
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner contract
+upstream design ./agent-orchestration.md write-capable handoff validation trust boundary and work-conservation owner
 upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings for refactor plans
 upstream design ../internal-routines/design-implementation-correspondence.md design read, clause fingerprint, and drift-block route
 @dependency-end
@@ -35,6 +36,14 @@ routine に委譲します。
 ## Purpose
 
 大きめの refactor を、feature 追加ではなく挙動保存つきの再編として扱います。
+
+## Validation route
+
+validation command の正本は
+`agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` です。
+refactor-loop は親 packet または変更後 responsibility graph が明示した exact command
+だけを消費します。global/full rescan が未指定なら実行せず、`unexpected-action` または
+`unresolved-risk` として親へ返します。
 
 ## 共有構造 refactor の実行順
 
@@ -175,7 +184,7 @@ the design trace before accepting a path or dependency-direction change.
 1. 外部 repo や bare snapshot の OOP survey では、元 repo を編集せず、commit SHA、解析 path、`--exclude vendor --exclude reports` などの除外条件、Markdown / JSON report を run bundle に残します。
 1. `test_designer` は owning mechanism の確立または修復後に、既存 owner と targeted
    validation では閉じない test-owned runtime risk が残った場合だけ使います。baseline
-   capture、full scan / rescan は、選択された validation route が必要とする場合に使います。
+   capture、full scan / rescan は、`Validation route` が選択した exact command の場合だけ使います。
    prompt / docs / static-contract refactor では、owner が選んだ static
    validation と targeted validation で閉じます。
 1. closeout 前に `python3 tools/ci/check_merge_structure.py ...` の要否を確認します。
@@ -200,15 +209,13 @@ Stopping、logging、runtime tolerance、preconditioner など、複数 algorith
 1. `Forbidden Semantic Delta:` には、停止条件、tolerance 解決、ログ項目、数値
    residual の定義を変えないことを明記します。意味を変える必要がある場合は
    refactor pass ではなく design / algorithm pass に分離します。
-1. canonical surface を直したら、dependency scan、call-site scan、algorithm
-   contract check、OOP/readability scan を再実行し、利用側の `repair_slice`
-   を作ります。
+1. canonical surface を直したら、親 packet または変更後 responsibility graph が
+   明示した exact validation command だけを実行し、利用側の `repair_slice` を作ります。
 1. 利用側は、最も依存の深い algorithm から順に、primitive helper 直接呼び出しを
    canonical object 呼び出しへ置き換えます。専用 wrapper を caller ごとに増やす
    ことを既定解にしてはいけません。
-1. 利用側 wave を直したら、対象 property に応じて global rescan、targeted
-   rescan、または owner-selected static validation を実行し、残り finding が
-   正本 abstraction へ収束しているか確認します。
+1. 利用側 wave を直したら、前記 `Validation route` が選択した exact command を実行し、
+   残り finding が正本 abstraction へ収束しているか確認します。
 
 ## Dependency-Guided Repair Slice Loop
 
@@ -257,9 +264,10 @@ validation surface を共有する mechanically safe な target は、同じ bat
    nearest valid ancestor を選びます。canonical home、nearest valid ancestor、
    batchable downstream repair のすべてが behavior-preserving に成立しない場合
    だけ、current-state/no-op を evidence-backed blocker として report に残します。
-1. 1 dependency-ordered wave を修正したら、選択した validation surface に応じて
-   tool-owned global rescan、targeted rescan、または owner-selected static
-   validation を実行します。差分 finding だけで次の wave を判断してはいけません。
+1. 1 dependency-ordered wave を修正したら、親 packet または変更後 responsibility
+   graph が明示した exact validation command を実行します。global/full rescan が
+   未指定なら実行せず、`unexpected-action` または `unresolved-risk` として親へ返します。
+   差分 finding だけで次の wave を判断してはいけません。
 1. 再走査前後の判断材料として、finding packet がある場合は latest `git diff`
    をその packet に join し、ない場合は owner-selected static / targeted
    validation artifact と target trace に join した
@@ -293,7 +301,11 @@ validation を使います。
    含めます。
 1. write-capable subagent への handoff は token-bounded にします。必ず exact
    target traces、allowed files、target-by-target repair intent、
-   forbidden semantic delta、test commands、final response format を指定します。
+   forbidden semantic delta、親が選択した exact validation commands、final response
+   format を指定します。validation commands は
+   `agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` の閉じた
+   trust boundary であり、full suite / full scan は owner packet または変更後の
+   responsibility graph が選んだ exact command の場合だけ含めます。
    repair intent では、各 target trace ごとに current problem、intended
    structural change、behavior が変わらない理由、non-goals、validation signal を
    親 agent が言語化します。final response は changed paths、validation
@@ -378,11 +390,11 @@ validation を使います。
    - `parallel_safe`: yes/no と理由
 1. parent はこの plan から subagent prompt を生成します。subagent は機械的に出た
    finding だけで判断せず、親が指定した修正方針、non-goals、validation に従います。
-1. wave ごとに、tool-owned global property では global rescan、局所 refactor では
-   targeted rescan、prompt / docs / static-contract refactor では owner-selected
-   static validation を実行し、次 wave の plan を更新します。最初に作った
-   parallel plan を、root 修正後の validation signal を見ずに最後まで使い回しては
-   いけません。
+1. wave ごとに、親 packet または変更後 responsibility graph が明示した exact
+   validation command を実行し、次 wave の plan を更新します。global/full rescan が
+   未指定なら実行せず、`unexpected-action` または `unresolved-risk` として親へ返します。
+   最初に作った parallel plan を、root 修正後の validation signal を見ずに最後まで
+   使い回してはいけません。
 1. refactor validation が fail した場合は、behavior-preserving intent の変更、
    pass 目的の単純化、revert、intended behavior / test 削除、oracle weakening、
    validation downscope へ進む前に `failing_contract`、`observation_level`、

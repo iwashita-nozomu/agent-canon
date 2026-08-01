@@ -79,7 +79,7 @@ EXPECTED_CONSUMERS = {
     "runtime-shim": {
         "path": ".agents/skills/agent-orchestration/SKILL.md",
         "kind": "runtime_reference",
-        "reference_mode": "text",
+        "reference_mode": "reference",
     },
 }
 

@@ -130,8 +130,8 @@ required_markers = [
 id = "runtime-shim"
 path = ".agents/skills/agent-orchestration/SKILL.md"
 kind = "runtime_reference"
-reference_mode = "text"
+reference_mode = "reference"
 required_markers = [
-  "Execution-Time-Aware Work-Conservation Contract",
-  "Executable scheduling fields",
+  "Canonical Skill",
+  "../../../agents/skills/agent-orchestration.md",
 ]

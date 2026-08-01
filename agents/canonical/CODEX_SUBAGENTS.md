@@ -4,6 +4,7 @@ contract agent-runtime
 responsibility Documents Codex Subagents for this repository.
 upstream design ../task_catalog.yaml task routing catalog
 upstream design ../agents_config.json permanent team role ownership and artifact policy
+upstream design ../skills/agent-orchestration.md canonical validation trust boundary owner
 upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md empirical evaluation packet and report contract
 upstream design ../../documents/design/request-intent-and-update-relation.md compact reuse, parallel handoff, and cleanup projection
 downstream design CODEX_WORKFLOW.md workflow consumes subagent routing contract
@@ -629,7 +630,7 @@ Activation Conditions:
 - `reviewer`
   - 読み取り専用で diff と risk を findings-led で洗う
 - `python_reviewer`
-  - Python diff を型、pytest、ruff 前提で洗う
+  - Python diff の型、API境界、親 packet が選択した validation evidence を review する。validation scope は `../skills/python-review.md#Validation route` と `../skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` を参照し、reviewer が追加の full suite を選択しない
 - `cpp_reviewer`
   - C / C++ diff を build、header、ownership、native test 前提で洗う
 - `oop_readability_reviewer`
