@@ -72,7 +72,7 @@ required_regex = ["oop-type-design", "@dependency-start", "@dependency-end", "^1
 [[evals.checklist]]
 id = "OOP-TYPE-RUNTIME-2"
 critical = true
-required_regex = ["Protocol|interface", "value object", "aggregate", "constructor", "state transition", "composition", "dependency direction", "responsibility", "cohesive|cohesion"]
+required_regex = ["Protocol|interface", "value object", "aggregate", "constructor", "state transition", "composition", "dependency direction", "responsibility", "semantic responsibility contract|semantic grouping"]
 
 [[evals.checklist]]
 id = "OOP-TYPE-RUNTIME-3"
@@ -94,13 +94,13 @@ required_regex = ["Abstract Design Frame|Responsibility model", "Implementation 
 [[evals.checklist]]
 id = "OOP-TYPE-HUMAN-2"
 critical = true
-required_regex = ["API", "serialization", "external input", "constructor invariant", "legal state transition", "Protocol|interface", "independent invariant", "change reason", "external effect", "substitutability", "dependency graph", "indivisible edge|shared transaction|consistency boundary", "coordination[_ ]cost", "connected-components"]
+required_regex = ["API", "serialization", "external input", "constructor invariant", "legal state transition", "Protocol|interface", "invariant", "change reason", "external effect", "substitutability", "dependency direction", "atomic_transition|transaction|consistency|lifecycle", "semantic grouping", "one or more obligations"]
 
 [[evals.checklist]]
 id = "OOP-TYPE-HUMAN-3"
 critical = true
-required_regex = ["check_static_any.py", "pyright", "ruff", "oop-readability-check", "gpt-5.4-mini", "T14", "responsibility accumulation|oversized responsibility", "line/function count|function count", "composition root"]
-forbidden_regex = ["test-first", "keyword routing", "split.*line count|split.*function count"]
+required_regex = ["check_static_any.py", "pyright", "ruff", "oop-readability-check", "gpt-5.4-mini", "T14", "primary verification owner|obligations", "hard-edge", "test_designer", "composition root"]
+forbidden_regex = ["keyword routing", "keyword trigger", "coordination[_ ]cost", "connected-components", "line/function count|function count", "exhaustive partition|threshold", "compatibility"]
 
 [[evals]]
 id = "all-internal-routine-docs"
