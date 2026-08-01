@@ -569,7 +569,7 @@ full staged route でも、`scheduler`、`schedule_reviewer`、`designer`、`des
 active gate の場合の `document_flow_reviewer` は候補です。owner-critical decision または
 distinct unresolved claim/risk が選択した stage だけを materialize し、W2 の completion
 gate は approved typed contract evidence と active owner route で確定します。
-owner-bounded route は `external public API/behavior/schema unchanged` の場合だけ維持します。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更、reader-facing docs、新用語、cross-surface risk がある場合は `scoped_change` または broader route へ進み、`dependency/consumer/migration/docs closure` を scope 形成します。
+owner-bounded route は `external public API/behavior/schema unchanged` の場合だけ維持します。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更がある場合は `scoped_change` または broader route へ進み、`dependency/consumer/migration/docs closure` を scope 形成します。reader-facing docs、新用語、cross-surface risk がある場合も従来どおり broader route へ進みますが、その理由だけで同 closure を無条件要求しません。
 Codex subagent では、候補 role を workflow family に応じて宣言しますが、owner-critical
 decision、distinct unresolved claim/risk、または selected validation route が要求した
 role だけを materialize します。W2 の completion predicate は approved typed contract
