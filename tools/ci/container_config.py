@@ -5,6 +5,7 @@
 # upstream design ../../documents/conventions/coding-conventions-project.md environment configuration policy
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
 # upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell boundary
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact runtime identity validation contract
 # upstream design ../../documents/design/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
@@ -60,6 +61,7 @@ REQUIRED_REQUIREMENTS = (
 PARENT_ENVIRONMENT_SCRIPT = ".devcontainer/parent-environment.sh"
 PARENT_ENVIRONMENT_MANIFEST = ".devcontainer/parent-environment.toml"
 ENVIRONMENT_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+RUNTIME_SHELL_RE = re.compile(r"/[A-Za-z0-9._/-]+\Z")
 
 
 @dataclass(frozen=True)
@@ -226,8 +228,14 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
     workdir = runtime.get("workdir", "/workspace")
     workspace_mount = runtime.get("workspace_mount", "/workspace")
     shell = runtime.get("shell", "/bin/bash")
-    if not isinstance(shell, str) or not shell:
-        findings.append(Finding("invalid_manifest", source, "runtime.shell-must-be-string"))
+    if not isinstance(shell, str) or RUNTIME_SHELL_RE.fullmatch(shell) is None:
+        findings.append(
+            Finding(
+                "invalid_manifest",
+                source,
+                "runtime.shell-must-be-absolute-executable-path",
+            )
+        )
         shell = "/bin/bash"
     if not isinstance(workdir, str):
         findings.append(Finding("invalid_manifest", source, "runtime.workdir-must-be-string"))
@@ -576,6 +584,15 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         if source_path(source) == root or target == repo_target:
             findings.append(Finding("dependency_contract_violation", relative, "repository-double-mount"))
     parent_layout = (root / "vendor" / "agent-canon").is_dir()
+    expected_shell = pack.shell if pack is not None else "/bin/bash"
+    if service.get("command") != f'{expected_shell} -lc "sleep infinity"':
+        findings.append(
+            Finding(
+                "inconsistency",
+                relative,
+                f"runtime-shell-command:{expected_shell}",
+            )
+        )
     if parent_layout:
         required_mounts = (
             "/etc/project-template/parent-environment.sh",
@@ -603,31 +620,24 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                         f"parent-environment-mount-read-only:{target}",
                     )
                 )
-        tmpfs = as_sequence(service.get("tmpfs"))
-        tmpfs_targets = set()
-        if tmpfs is not None:
-            for item in tmpfs:
-                if isinstance(item, str):
-                    tmpfs_targets.add(item.split(":", 1)[0])
-                else:
-                    item_mapping = as_mapping(item)
-                    if item_mapping is not None and isinstance(item_mapping.get("target"), str):
-                        tmpfs_targets.add(item_mapping["target"])
-        if "/tmp/project-template-home" not in tmpfs_targets:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    relative,
-                    "mapped-uid-home-tmpfs-required",
-                )
-            )
-        expected_shell = pack.shell if pack is not None else "/bin/bash"
-        if service.get("command") != f'{expected_shell} -lc "sleep infinity"':
+        if service.get("user") != "${LOCAL_UID}:${LOCAL_GID}":
             findings.append(
                 Finding(
                     "inconsistency",
                     relative,
-                    f"runtime-shell-command:{expected_shell}",
+                    "user-mapping-must-be-${LOCAL_UID}:${LOCAL_GID}",
+                )
+            )
+        tmpfs = as_sequence(service.get("tmpfs"))
+        expected_tmpfs = (
+            "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700"
+        )
+        if tmpfs is None or expected_tmpfs not in tmpfs:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "mapped-uid-home-tmpfs-must-be-exact",
                 )
             )
     required_environment = {

@@ -81,6 +81,8 @@ zsh とその descendants は zsh startup を通じて parent variables を受�
 Compose が parent variables の値を再定義することはなく、関連する Compose-owned
 environment は `HOME`、`ZDOTDIR`、`SHELL` だけです。mapped UID/GID の `HOME` は
 zsh startup より前に generator が用意する tmpfs（または同等の直接機構）です。
+standalone AgentCanon source layout では host `~/.zshrc`、parent environment mount、
+`HOME`、`ZDOTDIR`、tmpfs を要求せず、pack-derived command だけを生成します。
 
 Compose の生成先は親レポの `.agent-canon/docker-compose.generated.yml` とする。
 `.agent-canon/` は親レポの実行状態用であり、生成 Compose を追跡対象にしない。

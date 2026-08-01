@@ -56,6 +56,8 @@ generator は shell script を実行して値を抽出せず、Compose に paren
 generator は既存の `pack.runtime.shell` を interactive process として使います。
 親の default pack は `/bin/zsh` を選び、bash を明示した pack と smoke shell は
 `/bin/bash` を使います。別の shell 設定機構は追加しません。
+standalone AgentCanon source layout では pack-derived command だけを生成し、host
+`~/.zshrc`、parent environment mount、`HOME`、`ZDOTDIR`、tmpfs は要求しません。
 
 Compose がこの境界で直接所有する environment は次の三つです。
 

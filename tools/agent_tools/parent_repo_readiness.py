@@ -476,54 +476,6 @@ class ContainerConfigChecker:
         return module
 
 
-class ParentEnvironmentChecker:
-    """Runs the static parent-environment contract without shell execution."""
-
-    def __init__(self, root: Path, prefix: str) -> None:
-        """Store the parent root and AgentCanon source prefix."""
-        self.root = root
-        self.prefix = prefix
-
-    def run(self) -> tuple[tuple[Finding, ...], tuple[str, ...]]:
-        """Return static parent-environment findings and checked tokens."""
-        if not (self.root / self.prefix).is_dir():
-            return (), ("parent_environment:skipped",)
-        module_path = self.root / self.prefix / "tools" / "ci" / "container_config.py"
-        if not module_path.is_file():
-            return (
-                (
-                    Finding(
-                        ERROR,
-                        "parent_environment",
-                        f"{self.prefix}/tools/ci/container_config.py",
-                        "missing-validator",
-                    ),
-                ),
-                ("parent_environment:missing",),
-            )
-        module = ContainerConfigChecker.load_module(module_path)
-        validate_object: object = getattr(module, "validate_parent_environment", None)
-        if not callable(validate_object):
-            return (
-                (
-                    Finding(
-                        ERROR,
-                        "parent_environment",
-                        str(module_path),
-                        "validate-not-callable",
-                    ),
-                ),
-                ("parent_environment:invalid",),
-            )
-        validate = cast(Callable[[Path], Sequence[ContainerFinding]], validate_object)
-        raw_findings = validate(self.root)
-        findings = tuple(
-            Finding(ERROR, "parent_environment", item.path, f"{item.kind}:{item.detail}")
-            for item in raw_findings
-        )
-        return findings, ("parent_environment:checked",)
-
-
 class TreeDisplayChecker:
     """Checks availability of the canonical parent structure display command."""
 
@@ -613,13 +565,6 @@ class ParentRepoReadinessChecker:
         expected_paths = (*PARENT_CONTRACT_PATHS, *ENVIRONMENT_PATHS)
         findings.extend(ExpectedPathChecker(self.root, expected_paths).run())
         findings.extend(ContentMarkerChecker(self.root, CONTENT_MARKERS).run())
-        if self.skip_container_config:
-            parent_environment_findings, parent_environment_checked = ParentEnvironmentChecker(
-                self.root,
-                self.prefix,
-            ).run()
-            findings.extend(parent_environment_findings)
-            checked.extend(parent_environment_checked)
         container_findings, container_checked = ContainerConfigChecker(
             self.root,
             self.prefix,
@@ -659,7 +604,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--skip-container-config",
         action="store_true",
-        help="Skip deep Docker/devcontainer validation; path existence is still checked.",
+        help="Skip all container semantic validation; path existence is still checked.",
     )
     parser.add_argument(
         "--skip-submodule-check",

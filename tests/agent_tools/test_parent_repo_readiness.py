@@ -6,6 +6,7 @@
 # upstream implementation ../../tools/agent_tools/parent_repo_readiness.py checks parent repo surfaces
 # upstream implementation ../../tools/agent_tools/surface_manifest.py parses shared surface manifest
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared runtime surface manifest
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent readiness boundary
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md runtime identity receipt and shared-surface test contract
 # @dependency-end
 
@@ -70,58 +71,21 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.assertIn("PARENT_REPO_READINESS=pass", result.stdout)
             self.assertFalse((root / ".codex" / "project-skills").exists())
 
-    def test_parent_environment_names_are_ordered_and_static(self) -> None:
-        """Readiness compares export names without executing the parent script."""
+    def test_skip_container_config_skips_parent_environment_semantics(self) -> None:
+        """Readiness skip mode leaves parent-environment semantics to container_config."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
             self.write_file(
                 root,
                 ".devcontainer/parent-environment.sh",
-                'export PROJECT_REGION="tokyo"\nexport PROJECT_TOKEN=value\n',
-            )
-            self.write_file(
-                root,
-                ".devcontainer/parent-environment.toml",
-                'variables = ["PROJECT_REGION", "PROJECT_TOKEN"]\n',
+                "touch should-not-be-validated\n",
             )
 
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-            marker = root / "executed"
-            self.write_file(
-                root,
-                ".devcontainer/parent-environment.sh",
-                f"touch {marker}\n",
-            )
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("invalid-export-line", result.stdout)
-            self.assertFalse(marker.exists())
-
-    def test_parent_environment_order_mismatch_fails(self) -> None:
-        """The ordered TOML names must exactly match export order."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_parent_fixture(root)
-            self.write_file(
-                root,
-                ".devcontainer/parent-environment.sh",
-                "export PROJECT_REGION=tokyo\nexport PROJECT_TOKEN=value\n",
-            )
-            self.write_file(
-                root,
-                ".devcontainer/parent-environment.toml",
-                'variables = ["PROJECT_TOKEN", "PROJECT_REGION"]\n',
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("ordered-variable-names-mismatch", result.stdout)
+            self.assertIn("container_config:skipped", result.stdout)
 
     def test_shared_surface_receipt(self) -> None:
         """The shared devcontainer surface carries both exact identity receipt owners."""
