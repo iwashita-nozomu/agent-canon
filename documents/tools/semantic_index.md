@@ -4,7 +4,7 @@ contract reference
 responsibility Documents the semantic-index candidate-generation tool and Eval harness.
 upstream design search-coordination.md coordinated search provider boundary
 upstream design ../design/rust-agent-tool-migration.md Rust CLI migration policy
-downstream implementation ../../rust/agent-canon/src/semantic_index.rs implements the Rust semantic-index CLI
+downstream implementation ../../rust/agent-canon/src/semantic_index/mod.rs implements the Rust semantic-index CLI
 downstream implementation ../../rust/agent-canon/src/main.rs routes the semantic-index command
 downstream design ../../tools/README.md documents operator-facing tool entrypoints
 downstream design ../../tools/README.md documents reader-facing tool entrypoints
@@ -35,7 +35,7 @@ generation boundaries so search output is not mistaken for edit authority.
 ## Evidence And Assumption Ledger
 
 - Evidence sources: `search-coordination.md`,
-  `../../rust/agent-canon/src/semantic_index.rs`, and
+  `../../rust/agent-canon/src/semantic_index/mod.rs`, and
   `../../tools/catalog.yaml`.
 - Assumption:
   implementation surface routing uses semantic-index output as bounded

@@ -19,7 +19,7 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
 downstream design dependency-tools-and-licenses.md documents dependency tool purposes and license evidence
 downstream design ../../tools/user/README.md defines stable user-facing tool entrypoint migration target
 downstream design ../../tools/internal/README.md defines skill, workflow, and compatibility helper migration targets
-downstream implementation ../../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
+downstream implementation ../../rust/agent-canon/src/semantic_index/mod.rs runs semantic vector index commands
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
 downstream implementation ../../rust/agent-canon/src/test_design.rs runs test design resilience diagnostics
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals

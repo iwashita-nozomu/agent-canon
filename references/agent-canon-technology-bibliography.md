@@ -10,7 +10,7 @@ upstream design ../documents/design/dependency-manifest-design.md dependency hea
 downstream design ../documents/tools/README.md documents operator-facing tool entrypoints.
 downstream design ../documents/tools/lean_capability_matrix.md records Lean feature routing adopted from bibliography sources.
 downstream design ../tools/README.md documents root tool inventory.
-downstream implementation ../rust/agent-canon/src/semantic_index.rs implements the semantic vector cache.
+downstream implementation ../rust/agent-canon/src/semantic_index/mod.rs implements the semantic vector cache.
 downstream implementation ../tools/agent_tools/reference_materializer.py materializes consulted external sources.
 @dependency-end
 -->
