@@ -145,6 +145,27 @@ that decision.
 - `forbidden_presence`: 削除済みラッパー、旧経路、禁止されたroot copy、またはownerが明示した不許可surfaceが存在しないこと。存在はfailureですが、無いことだけでは他の要件を証明しません。
 - `sufficient_behavior`: 実装の意味、公開契約、状態遷移、数理特性、またはreader-facing成果が成立すること。これはownerが明示した場合だけ、必要な観測・静的解析・証明・テストで閉じます。
 
+### Write-Capable Handoff Validation Trust Boundary
+
+write-capable handoff の `validation_route` は、親が選んだ閉じた信頼境界です。
+worker はその route に明示された validation command を実行し、変更 mechanism に
+必要な read-only/static confirmation だけを追加できます。repository の既定 test
+command、tool の利用可能性、または worker 自身の不安から、未選択の test、full
+suite、full scan、global rescan を追加してはいけません。full suite / full scan /
+global rescan は owner packet または変更後の responsibility graph が明示的に選んだ
+場合だけ route に含めます。
+
+すでに実行中の長時間 check は観測対象として扱い、強制停止も同一 check の再実行も
+しません。handoff にない check を worker が起動した場合は、完了条件へ昇格させず
+`unexpected action` として親へ返します。repository contract の欠落が原因なら、親は
+この owner の修正 finding として扱い、worker 側に新しい checker、test、時間閾値を
+追加させません。
+
+この境界は `test-design` の起動条件や oracle 契約を変更しません。既存 mechanism が
+確立または修復された後、既存 checker と targeted validation で閉じない具体的な
+test-owned risk が残る場合だけ `test_designer` を起動し、起動後もその risk を必要
+十分に覆う oracle と production mechanism の修復を優先します。
+
 readiness、構造確認、移行漏れ確認は原則として `necessary_presence` と
 `forbidden_presence` に留めます。例示tree、manifestの列挙、コピーの存在、
 format成功を、完成形の十分条件や全責務の証明へ自動昇格させません。
@@ -182,6 +203,9 @@ The machine-readable contract is
 checker is `tools/agent_tools/check_execution_time_aware_orchestration.py`.
 The selected-skill command catalog owns the required checker invocation; this
 owner and its runtime shim do not duplicate that command.
+Validation command scope is governed by the preceding write-capable handoff
+trust boundary; work-conservation scheduling does not authorize a worker to
+expand a selected validation route.
 
 Model the complete requested work as a dependency DAG. Each node is a full
 replaceable responsibility unit, not a file-sized chunk, timed slice, or review

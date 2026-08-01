@@ -32,7 +32,7 @@ specialist dispatch、統合、再レビューを [`responsibility-cleanup`](../
 ## Route
 
 1. `tree -a -J --noreport` と既存 structure/scope checker で観測を作る。
-2. 近接性や analyzer finding ではなく owner、dependency、公開契約、validation、rollback で unit を閉じる。
+2. 近接性や analyzer finding ではなく owner、dependency、公開契約、validation、rollback で unit を閉じる。write-capable handoff の validation command 境界は `agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` を参照する。
 3. environment は `environment-cleanup`、code は `code-cleanup`、skill は `skill-cleanup` に渡す。
 4. 文書、worktree、log は既存の `document-canon-cleanup`、`worktree-health`、`agent-log-analysis`、`runtime-log-repair`、`result-artifact-writeout` を再利用する。
 5. `agent-orchestration` と `task-routing` の order を保ち、統合後に `change-review` と owner readback を行う。
