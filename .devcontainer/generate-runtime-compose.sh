@@ -4,6 +4,7 @@
 # responsibility Renders shared devcontainer compose from repo-local Docker pack.
 # upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer boundary
 # upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract
+# upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell boundary
 # upstream implementation ../tools/agent_tools/dependency_module_change.py topic clone lifecycle tool
 # upstream design ../documents/experiments/gpu-admission-r5-source-packet.md exact Compose runtime identity wiring
 # upstream environment devcontainer.json initializeCommand entrypoint
@@ -58,12 +59,13 @@ PY
 compose_project_name="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"
 
 if [ -f "$pack" ]; then
-  mapfile -t pack_values < <(
+  pack_values_raw="$(
     python3 - "$pack" <<'PY'
 from __future__ import annotations
 
 import sys
 import json
+import re
 try:
     import tomllib
 except ModuleNotFoundError:
@@ -73,7 +75,11 @@ with open(sys.argv[1], "rb") as handle:
     data = tomllib.load(handle)
 pack = data["pack"]
 runtime = data.get("runtime", {})
+runtime_shell = runtime.get("shell", "/bin/bash")
+if not isinstance(runtime_shell, str) or re.fullmatch(r"/[A-Za-z0-9._/-]+", runtime_shell) is None:
+    raise SystemExit("runtime.shell must be one absolute executable path")
 print(f"dockerfile={pack['dockerfile']}")
+print(f"runtime_shell={runtime_shell}")
 print(f"workdir={runtime.get('workdir', '/workspace')}")
 print(f"workspace_mount={runtime.get('workspace_mount', '/workspace')}")
 for mount in runtime.get("mounts", []):
@@ -83,10 +89,12 @@ for item in runtime.get("env", []):
     if separator:
         print(f"ENV:{name}: {json.dumps(value)}")
 PY
-  )
+  )"
+  mapfile -t pack_values <<< "$pack_values_raw"
 
   compose_mode="repo-docker-pack"
   dockerfile=""
+  runtime_shell="/bin/bash"
   workdir="/workspace"
   workspace_mount="/workspace"
   pack_mounts=()
@@ -94,6 +102,7 @@ PY
   for pack_value in "${pack_values[@]}"; do
     case "$pack_value" in
       dockerfile=*) dockerfile="${pack_value#dockerfile=}" ;;
+      runtime_shell=*) runtime_shell="${pack_value#runtime_shell=}" ;;
       workdir=*) workdir="${pack_value#workdir=}" ;;
       workspace_mount=*) workspace_mount="${pack_value#workspace_mount=}" ;;
       mount=*) pack_mounts+=("${pack_value#mount=}") ;;
@@ -103,10 +112,31 @@ PY
 else
   compose_mode="agent-canon-source-only"
   dockerfile=""
+  runtime_shell="/bin/bash"
   workdir="/workspace"
   workspace_mount="/workspace"
   pack_mounts=()
   pack_environment_lines=()
+fi
+
+parent_layout=false
+parent_environment_source="${repo_root}/.devcontainer/parent-environment.sh"
+if [ -d "${repo_root}/vendor/agent-canon" ]; then
+  parent_layout=true
+  if [ ! -f "$parent_environment_source" ] || [ -L "$parent_environment_source" ]; then
+    printf 'devcontainer parent environment source must be a regular file: %s\n' "$parent_environment_source" >&2
+    exit 1
+  fi
+  host_zshrc="${HOME}/.zshrc"
+  if [ ! -f "$host_zshrc" ] || [ -L "$host_zshrc" ]; then
+    printf 'devcontainer requires a regular host zshrc source: %s\n' "$host_zshrc" >&2
+    exit 1
+  fi
+fi
+
+if [[ "$runtime_shell" != /* || "$runtime_shell" == *[!A-Za-z0-9._/-]* ]]; then
+  printf 'devcontainer runtime.shell must be one absolute executable path: %s\n' "$runtime_shell" >&2
+  exit 1
 fi
 
 workspace_root_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$workspace_root")"
@@ -120,6 +150,22 @@ volume_lines+=(
   "        source: /var/lib/agent-canon/runtime"
   "        target: /var/lib/agent-canon/runtime"
 )
+if [ "$parent_layout" = true ]; then
+  host_zshrc_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$host_zshrc")"
+  volume_lines+=(
+    "      - type: bind"
+    "        source: ${host_zshrc_yaml}"
+    '        target: "/etc/project-template/zsh/.zshrc"'
+    "        read_only: true"
+  )
+  parent_environment_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$parent_environment_source")"
+  volume_lines+=(
+    "      - type: bind"
+    "        source: ${parent_environment_source_yaml}"
+    '        target: "/etc/project-template/parent-environment.sh"'
+    "        read_only: true"
+  )
+fi
 for pack_mount in "${pack_mounts[@]}"; do
   case "$pack_mount" in
     *:/workspace|*:/workspace:*)
@@ -237,6 +283,14 @@ environment_lines=(
   '      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"'
   "${pack_environment_lines[@]}"
 )
+if [ "$parent_layout" = true ]; then
+  environment_lines=(
+    '      HOME: "/tmp/project-template-home"'
+    '      ZDOTDIR: "/etc/project-template/zsh"'
+    "      SHELL: \"${runtime_shell}\""
+    "${environment_lines[@]}"
+  )
+fi
 if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
   environment_lines+=('      SSH_AUTH_SOCK: "/ssh-agent"')
 fi
@@ -262,9 +316,13 @@ fi
     printf '    image: mcr.microsoft.com/devcontainers/base:ubuntu-22.04\n'
   fi
   printf '    working_dir: %s\n' "$container_repo_root"
+  if [ "$parent_layout" = true ]; then
+    printf '    tmpfs:\n'
+    printf '      - /tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700\n'
+  fi
   printf '    volumes:\n'
   printf '%s\n' "${volume_lines[@]}"
-  printf '    command: /bin/bash -lc "sleep infinity"\n'
+  printf '    command: %s -lc "sleep infinity"\n' "$runtime_shell"
   printf '    tty: true\n'
   printf '    init: true\n'
   if [ "$gpu_mode" = "enabled" ]; then

@@ -63,6 +63,7 @@ class ExpectedPath:
     kind: str
     severity: str = ERROR
     executable: bool = False
+    regular: bool = False
 
 
 @dataclass(frozen=True)
@@ -115,6 +116,18 @@ ENVIRONMENT_PATHS = (
         "file",
         executable=True,
     ),
+    ExpectedPath(
+        ".devcontainer/parent-environment.sh",
+        "devcontainer_environment",
+        "file",
+        regular=True,
+    ),
+    ExpectedPath(
+        ".devcontainer/parent-environment.toml",
+        "devcontainer_environment",
+        "file",
+        regular=True,
+    ),
 )
 
 CONTENT_MARKERS = (
@@ -153,6 +166,15 @@ class ExpectedPathChecker:
                         expected.category,
                         expected.path,
                         "not-executable",
+                    )
+                )
+            if expected.regular and path.is_symlink():
+                findings.append(
+                    Finding(
+                        expected.severity,
+                        expected.category,
+                        expected.path,
+                        "must-be-regular-file",
                     )
                 )
         return tuple(findings)
@@ -582,7 +604,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--skip-container-config",
         action="store_true",
-        help="Skip deep Docker/devcontainer validation; path existence is still checked.",
+        help="Skip all container semantic validation; path existence is still checked.",
     )
     parser.add_argument(
         "--skip-submodule-check",

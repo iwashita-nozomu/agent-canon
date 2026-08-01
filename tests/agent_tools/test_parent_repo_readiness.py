@@ -6,6 +6,7 @@
 # upstream implementation ../../tools/agent_tools/parent_repo_readiness.py checks parent repo surfaces
 # upstream implementation ../../tools/agent_tools/surface_manifest.py parses shared surface manifest
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared runtime surface manifest
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent readiness boundary
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md runtime identity receipt and shared-surface test contract
 # @dependency-end
 
@@ -69,6 +70,22 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("PARENT_REPO_READINESS=pass", result.stdout)
             self.assertFalse((root / ".codex" / "project-skills").exists())
+
+    def test_skip_container_config_skips_parent_environment_semantics(self) -> None:
+        """Readiness skip mode leaves parent-environment semantics to container_config."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_parent_fixture(root)
+            self.write_file(
+                root,
+                ".devcontainer/parent-environment.sh",
+                "touch should-not-be-validated\n",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("container_config:skipped", result.stdout)
 
     def test_shared_surface_receipt(self) -> None:
         """The shared devcontainer surface carries both exact identity receipt owners."""
@@ -339,6 +356,8 @@ class ParentRepoReadinessTest(unittest.TestCase):
             )
             + "\n",
             ".devcontainer/post-create-parent.sh": "#!/usr/bin/env bash\nset -euo pipefail\n",
+            ".devcontainer/parent-environment.sh": "",
+            ".devcontainer/parent-environment.toml": "variables = []\n",
         }
         for path, text in files.items():
             self.write_file(root, path, text)
