@@ -547,6 +547,18 @@ class DependencyModelTests(unittest.TestCase):
                 (ManifestSource(vendor, ManifestRole.CANONICAL),),
             )
 
+    def test_canonical_manifest_owns_pinned_pyyaml_independently(self) -> None:
+        """AgentCanon's mounted validators receive their own exact PyYAML record."""
+        plan = load_plan(ROOT, ROOT)
+        pyyaml = next(item for item in plan.records if item.id == "pyyaml")
+
+        self.assertEqual(pyyaml.package, "pyyaml")
+        self.assertEqual(pyyaml.method.value, "pip-user")
+        self.assertEqual(pyyaml.version, "6.0.2")
+        self.assertEqual(pyyaml.deps, ("python3-pip",))
+        self.assertEqual(pyyaml.verification.executable, "python3")
+        self.assertTrue(any("yaml.__version__" in arg for arg in pyyaml.verification.args))
+
     def test_empty_parent_overlay_merges_with_nonempty_vendor_manifest(self) -> None:
         """Allow an empty parent overlay when the canonical vendor is non-empty."""
         with tempfile.TemporaryDirectory() as temporary:
