@@ -564,6 +564,13 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
             return raw_volume.rsplit(":", 1)[-1] == "ro"
         return False
 
+    def volume_type(raw_volume: object) -> str | None:
+        volume = as_mapping(raw_volume)
+        if volume is None:
+            return None
+        value = volume.get("type")
+        return value if isinstance(value, str) else None
+
     def source_path(source: str | None) -> Path | None:
         if not source:
             return None
@@ -620,6 +627,25 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                         f"parent-environment-mount-read-only:{target}",
                     )
                 )
+            if target == "/etc/project-template/zsh/.zshrc" and len(matches) == 1:
+                host_zshrc = matches[0]
+                if volume_type(host_zshrc) != "bind":
+                    findings.append(
+                        Finding(
+                            "dependency_contract_violation",
+                            relative,
+                            "host-zshrc-mount-type-must-be-bind",
+                        )
+                    )
+                source, _ = volume_fields(host_zshrc)
+                if source != "${HOME}/.zshrc":
+                    findings.append(
+                        Finding(
+                            "dependency_contract_violation",
+                            relative,
+                            "host-zshrc-source-must-be-${HOME}/.zshrc",
+                        )
+                    )
         if service.get("user") != "${LOCAL_UID}:${LOCAL_GID}":
             findings.append(
                 Finding(

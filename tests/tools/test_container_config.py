@@ -519,36 +519,54 @@ def test_generator_rejects_runtime_shell_arguments(tmp_path: Path) -> None:
     )
 
 
-def test_parent_generator_requires_regular_host_zshrc(tmp_path: Path) -> None:
-    """The generator fails when the explicit host zshrc premise is absent or non-regular."""
+def test_parent_generator_uses_host_zshrc_expression_without_host_probe(
+    tmp_path: Path,
+) -> None:
+    """Fresh-clone generation checks the host mount contract, not host state."""
     repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
     home = tmp_path / "home"
     home.mkdir()
 
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
-        env={**os.environ, "HOME": str(home)},
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
         check=False,
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 1
-    assert "regular host zshrc source" in result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose_path = repo / ".agent-canon/docker-compose.generated.yml"
+    compose = compose_path.read_text(encoding="utf-8")
+    assert 'source: "${HOME}/.zshrc"' in compose
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack_findings == []
+    assert pack is not None
+    assert module.validate_generated_compose(repo, pack) == []
 
-    target = tmp_path / "real-zshrc"
-    target.write_text("# target\n", encoding="utf-8")
-    (home / ".zshrc").symlink_to(target)
-    result = subprocess.run(
-        ["bash", ".devcontainer/generate-runtime-compose.sh"],
-        cwd=repo,
-        env={**os.environ, "HOME": str(home)},
-        check=False,
-        capture_output=True,
-        text=True,
+    malformed = compose.replace(
+        '      - type: bind\n'
+        '        source: "${HOME}/.zshrc"\n'
+        '        target: "/etc/project-template/zsh/.zshrc"\n'
+        "        read_only: true",
+        '      - type: volume\n'
+        '        source: "/tmp/guessed-zshrc"\n'
+        '        target: "/etc/project-template/zsh/.zshrc"\n'
+        "        read_only: false",
     )
-    assert result.returncode == 1
-    assert "regular host zshrc source" in result.stderr
+    compose_path.write_text(malformed, encoding="utf-8")
+    details = {
+        finding.detail for finding in module.validate_generated_compose(repo, pack)
+    }
+    assert "host-zshrc-mount-type-must-be-bind" in details
+    assert "host-zshrc-source-must-be-${HOME}/.zshrc" in details
+    assert "parent-environment-mount-read-only:/etc/project-template/zsh/.zshrc" in details
 
 
 def test_parent_environment_validator_is_static_and_ordered(tmp_path: Path) -> None:
