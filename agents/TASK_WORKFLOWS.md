@@ -39,6 +39,7 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | skill selection | `agents/skills/catalog.yaml`; `.agents/skills/*/SKILL.md`; `python3 tools/agent_tools/route.py --prompt` |
 | implementation stage gate | `agents/workflows/implementation-waterfall-workflow.md` |
 | active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; `agents/agents_config.json#artifacts.active_design_packet` |
+| semantic responsibility allocation | `documents/design/semantic-responsibility-contract.md`; run-local instance via active-packet `source_refs` |
 | closeout authority | `task_close.py`; `report_artifact_checks.py` |
 | validation failure response taxonomy | `documents/runtime/runtime-profiles-and-check-matrix.json`; generated reader projection: `documents/runtime/runtime-profiles-and-check-matrix.md` |
 | validation failure response workflow projections | `agents/canonical/CODEX_WORKFLOW.md`; `agents/canonical/CODEX_SUBAGENTS.md`; `documents/conventions/REVIEW_PROCESS.md` |
@@ -93,6 +94,12 @@ delegator: it resolves the packet, validates all references, renders every
 projection, and atomically publishes the complete bundle for task-start,
 bootstrap, and document-start producers. One responsibility unit remains one
 implementation handoff even when its internal work is dependency ordered.
+
+When a design contains semantic deltas, the implementation source packet also
+references `artifact:semantic_responsibility_contract.toml`. The populated
+instance is created from the reusable template in the current run bundle,
+allocates obligations before implementation, and is not copied into the
+repository-wide template or policy.
 
 ## Implementation Flow Graph
 

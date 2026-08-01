@@ -9,6 +9,7 @@ upstream design ../../issues/README.md durable AgentCanon operational finding st
 downstream design ../workflows/token-efficient-codex-workflow.md token-aware runtime mode overlay
 downstream design ../../templates/agents/closeout_gate.md closeout gate contract
 upstream design ../../documents/design/dependency-manifest-design.md dependency manifest design
+upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner contract
 upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md runtime profile and risk-based validation routing
 upstream design ../../documents/operations/BRANCH_SCOPE.md commit correctness and push contract
 upstream design ../skills/tool-finding-report.md tool finding packet and prompt feedback workflow
@@ -102,7 +103,7 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
 - branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に creation authority/reason と destructive authority/reason の全 4 値を置いた場合だけ実行できます。
 - AgentCanon source 変更は `dependency-module-change` で exact topic workspace clone を prepare/reuse し、その standalone source branch / AgentCanon PR を継続します。parent repo の `canon-pin` branch は source publication 後の clean parent pin projection だけを担います。
-- vendor-first は非並列 single-stream の既定です。parent packet が十分な replaceable responsibility unit、disjoint write scope、依存/merge order、validation route、reviewer ownership を固定した独立 stream を含む場合は、vendor が clean でも `dependency_module_change.py prepare --placement workspace` を明示選択できます。parent は ready な全 stream を launch し、全 descendant を monitor し、互換な worker context を再利用します。細粒度の fresh-agent fan-out は独立 stream とみなしません。
+- vendor-first は非並列 single-stream の既定です。parent packet が十分な replaceable responsibility unit、disjoint write scope、依存/merge order、validation route、reviewer ownership を固定した独立 stream を含む場合は、vendor が clean でも `dependency_module_change.py prepare --placement workspace` を明示選択できます。parent は ready な全 stream を launch し、全 descendant を monitor し、同一責任・同一 worker context を再利用します。細粒度の fresh-agent fan-out は独立 stream とみなしません。
 - `--placement workspace` で作成する fresh source branch は local/remote の既存 branch を拒否し、最新 `origin/main` から作成します。既存 branch の継続は `--placement workspace-continuation` で明示します。各 source branch は candidate review / PR 前に最新 `origin/main` を merge し、parent は packet の明示 merge order を保持します。`origin/main` の read/CAS だけでは merge 済みの代替になりません。
 
 ### Runtime Profile And Risk Selection
@@ -158,7 +159,6 @@ bounded route では、existing tool の実行と patching を tool-owned eviden
 ```bash
 git grep -l "topic keywords" -- <responsibility-scoped dirs> \
   | sed -n '1,200p' > reports/search_hits.txt
-wc -l reports/search_hits.txt > reports/search_hits.count
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt
@@ -245,6 +245,10 @@ run `--active-design-packet` input、workflow-specific record、standard
 run manifest に永続化し、以後その manifest が persisted authority になります。
 gate は persisted manifest の `run.active_design_packet` を唯一の runtime input として
 読み、manifest-declared path だけを active artifact route として消費します。
+active packet の source reference には、同じ run bundle にある
+`semantic_responsibility_contract.toml` を `artifact:` reference として含めます。
+この instance は実装前に semantic delta、implementation action、obligation、一次検証
+owner、supporting property/role、hard-edge closure を割り当てるために使います。
 missing / unknown field / unknown schema / invalid field / outside-bundle path は typed blocker として
 design owner に戻します。implementation handoff は、manifest-declared design artifact、
 両 review の一致する `Design artifact path:`、最終 `decision=approve`、および required
@@ -253,7 +257,7 @@ design owner に戻します。implementation handoff は、manifest-declared de
 API shape、責務境界、path layout、命名、アルゴリズム、test oracle、依存方向、
 runtime contract、config surface の判断が未確定なら、実装吸収ではなく
 `design_issue_blocker=<issue>` と evidence を残して Gate 5-6 へ戻ります。local
-fallback、wrapper、helper、branch、compatibility route、test relaxation、docs
+fallback、wrapper、helper、branch、alternate route、test relaxation、docs
 overwrite、implementation shortcut は Design Integrity Gate の外側です。
 
 ### Codex Goals Feature Preflight
@@ -480,7 +484,7 @@ checked and cited.
   - `cpp-review`
 - test design:
   - `test-design`
-- owning implementation mechanism の確立または修復後は `test-design` / `test_designer` を積極的に起動し、Activation Decision と boundary classification を先に返す。起動後は未解決oracleを必要十分に覆う最小ケースだけを設計し、checker-owned property、重複契約、no-crash、内部形状固定をtestへ追加しない
+- owning implementation mechanism の確立または修復後に、semantic responsibility contract の owner と targeted validation で閉じない test-owned runtime risk が残る場合だけ `test-design` / `test_designer` を起動し、Activation Decision と boundary classification を先に返す。起動後は未解決oracleを必要十分に覆うケースだけを設計し、checker-owned property、重複契約、no-crash、内部形状固定をtestへ追加しない
 - paper writing:
   - `paper-writing`
 - general explanatory docs:
@@ -707,8 +711,8 @@ cost を無視して review coverage を優先する run では、research-drive
 - worker は docs、workflow、prompt/config、validation output、dependency manifest、user-facing surface へ波及する変更を `Design Side-Effect Map` の item として扱い、implementation summary に owner stage と review gate を残す
 - `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、選択された場合の承認済み `design_review.md`、design gate check、および design と現行 repo docs / code / dependency surface の整合が揃った時点で実装へ進む。design review が未選択なら semantic decision sufficiency と owner validation evidence を使い、欠けた場合だけ Gate 5-6 へ戻る
 - 実装中に design issue が見つかった場合は、`design_issue_blocker=<issue>`、evidence、候補 option を artifact に残し、Gate 5-6 へ戻す。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾は設計側で解決します。run bundle が無い parent-direct task では編集を止めて user に設計判断を返す
-- `design_issue_blocker` は local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きではなく、Gate 5-6 の設計更新で閉じる。承認済み design と局所 precedent から一意に導ける typo、format、import、狭い機械的追従だけが同じ implementation pass で修正できる
-- compatibility-preservation drift と duplicate implementation は implementation GuardRail finding として扱い、旧 route、旧 wrapper、旧 helper、config mirror は caller migration で canonical owner へ統合する
+- `design_issue_blocker` は local fallback、wrapper、helper、分岐、別経路、test 緩和、docs 上書きではなく、Gate 5-6 の設計更新で閉じる。承認済み design と局所 precedent から一意に導ける typo、format、import、狭い機械的追従だけが同じ implementation pass で修正できる
+- legacy-route drift と duplicate implementation は implementation GuardRail finding として扱い、旧 route、旧 wrapper、旧 helper、config mirror は caller migration で canonical owner へ統合する
 - implementation は current tree head の canonical path だけを更新対象にし、`*_old`、`*_copy`、dated clone、parallel module、duplicate directory のような別 truth surface を作らない
 - `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、repo-changing implementation / patch / doc-edit work は write-capable handoff first で進める。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ）、dependency-expanded handoff scope に加え、`--select-agent-type implementer=spark_worker:<evidence>` が stdout / manifest に記録された場合だけ使います。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は parent packet と wave の改訂を必須にします。parent-direct は explicit approval、spawn authorization blocker、または tool-gate blocker を記録した exception route です
 - 新規または rename する file、function、class、theorem、artifact、CLI flag、
@@ -725,7 +729,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - repo-changing task では selected durable coordination/resumption route がある場合だけ current checkout の run bundle `work_log.md` を継続更新し、それ以外は structured handoff/tool-result evidence を使う
 - 新規作業は current checkout で kickoff します。`WORKTREE_SCOPE.md` と `worktree_scope_lint.py` は legacy cleanup / drift diagnosis 専用です
 - stale な `WORKTREE_SCOPE.md`、別 branch、別 path の action log を見つけた場合は、current checkout の `work_log.md` に観測事実と扱いを残す
-- selected review の instance reuse / separation と implementation 着手条件は、semantic owner route と `.codex/agents/*.toml` の runtime projection に従う。compatible な同一責務 review は再利用し、distinct unresolved claim/risk の場合だけ分ける
+- selected review の instance reuse / separation と implementation 着手条件は、semantic owner route と `.codex/agents/*.toml` の runtime projection に従う。同一責務・同一 context の review は再利用し、distinct unresolved claim/risk の場合だけ分ける
 - 包括的開発では `project_reviewer` を intake と closeout に追加し、repo-wide な integration risk を確認する
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認する
 - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書で reader-facing 構成を変える場合は `long-form-writing` を DSL-to-prose adapter として読み、docs-impact がある distinct unresolved reader-path claim を owning gate が判定できない場合だけ `docs-completeness-review` を追加する

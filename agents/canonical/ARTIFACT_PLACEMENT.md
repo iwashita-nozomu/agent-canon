@@ -62,6 +62,8 @@ agent report の置き場を決めます。まず `置き場ルール` と `Task
 - `decision_log.md`
 - `design_brief.md`
 - `design_review.md`
+- `semantic_responsibility_contract.toml` (the run-local semantic delta
+  allocation instance referenced by the active design packet)
 - `change_review.md`
 - `final_review.md`
 - `experiment_change_loop.md`
@@ -86,6 +88,11 @@ agent report の置き場を決めます。まず `置き場ルール` と `Task
   ignored な report file は current run の `reports/agents/<run-id>/` の下だけを
   許可します。古い run bundle は archive / closeout の対象であり、current run
   へ手でコピーして残しません。
+- `semantic_responsibility_contract.toml` は template から作る空の task
+  instance shape を run-local に populated したものだけを許可します。
+  policy と empty template はそれぞれ `documents/design/` と
+  `templates/documents/` に置き、populated instance を repo-wide canon や
+  template に戻しません。
 - 機械的に再生成できる report root は残しません。
   `reports/agent-eval-runs/`、`reports/dependency-review/`,
   `reports/agent-runtime-dashboard/`, `reports/agent-improvement-guide/`,

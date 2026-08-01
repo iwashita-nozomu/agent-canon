@@ -863,6 +863,10 @@ def classify_legacy(context: BuildContext, skill: str, expected: str) -> dict[st
         }
     legacy_candidates = (
         (
+            "generated_previous_materialization_record",
+            expected,
+        ),
+        (
             "generated_legacy_schema",
             _legacy_generated_schema_shim(context, skill, expected),
         ),

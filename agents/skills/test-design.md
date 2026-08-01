@@ -4,6 +4,7 @@
 contract skill
 responsibility Documents test-design for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../../documents/design/semantic-responsibility-contract.md semantic obligation and verification-owner contract
 @dependency-end
 -->
 
@@ -31,6 +32,20 @@ path、state transition、return projection）を同じ調査記録に結び付�
 候補 case は、`Design Clause -> Reachable Implementation Mechanism -> Concrete
 Breaking Input/State Sequence -> Observable Outcome -> Decidable Oracle` の trace
 を持ち、tests だけから contract や oracle を推測しません。
+
+## Semantic responsibility integration
+
+The active design packet references one run-local semantic responsibility contract.
+That contract allocates every obligation and its primary verification owner before
+implementation. `test-design` does not replace those allocations. It returns an
+`Activation Decision` only after the owning mechanism is established or repaired and
+only when a concrete test-owned runtime risk remains outside the declared static,
+design, existing-test, and targeted-validation owners.
+
+When `activation=required`, every proposed case is attached to one obligation and
+records the design clause, reachable mechanism, observable outcome, and decidable
+oracle. When the risk is already owned by an obligation's primary owner, return
+`activation=not_needed` and reuse that evidence.
 
 ## Activation Decision
 
@@ -87,7 +102,7 @@ Breaking Input/State Sequence -> Observable Outcome -> Decidable Oracle` の tra
 - 関連 tests がある場合、既存の test-design checker を必要な範囲で実行し、finding を behavior contract と照合する。activation が false の場合は実行しない
 - contract source、behavior contract、observation level、observable outcome、oracle、input space、adequacy evidence、Do Not Freeze を分ける
 - malformed input、boundary value、empty / null-ish input、error path、state transition、再発しやすい regression を、安定した観測レベルで列挙する
-- 各 nasty / regression case は、設計条項から到達可能な実装機構を経て、具体的な breaking input / state sequence が observable outcome と decidable oracle に至る一つの trace として固定する。テスト件数や coverage を増やすこと自体を adequacy としない
+- 各 nasty / regression case は、設計条項から到達可能な実装機構を経て、具体的な breaking input / state sequence が observable outcome と decidable oracle に至る一つの trace として固定する。ケース追加や coverage を目的そのものにしない
 - 各候補 case の null hypothesis と、その根拠である契約・型制約・checker を記録し、公開入力または公開 state sequence の reachability witness が null hypothesis を反証することを確認する。反証できない case は test-design の候補から外し、所有する checker / static validation / design route に返す
 - parser / formatter / graph / router / mapping では property または metamorphic relation を検討するが、checker-owned property は test oracle に昇格させない
 - numerical、randomized、tolerance、solver、convergence、residual、benchmark、experiment-style test は、`documents/conventions/coding-conventions-testing.md` の Numerical Test Admission Gate を owner とし、`activation=required` かつ数値 trigger、non-numerical alternative、oracle、budget が approved route にある場合だけ提案する
@@ -163,5 +178,5 @@ The runtime discovery adapter delegates these required operating clauses to this
    fallback for numerical validation.
 1. Prefer behavior examples for concrete regressions, property tests for broad input spaces, metamorphic tests when exact expected output is hard, and mutation testing when oracle strength is doubtful.
 1. Record nasty edge cases and regression cases in `test_plan.md` only when `activation=required`.
-1. Keep cases concrete at the stable observation level: `Design Clause`, `Reachable Implementation Mechanism`, `Breaking Input/State Sequence`, `Observation Level`, `Observable Outcome`, `Decidable Oracle`, `Input Space`, `Adequacy Evidence`, `Do Not Freeze`, and why the case is nasty. Do not add tests merely to increase test count or coverage without this trace.
+1. Keep cases concrete at the stable observation level: `Design Clause`, `Reachable Implementation Mechanism`, `Breaking Input/State Sequence`, `Observation Level`, `Observable Outcome`, `Decidable Oracle`, `Input Space`, `Adequacy Evidence`, `Do Not Freeze`, and why the case is nasty. Do not add tests merely to broaden coverage without this trace.
 1. Mirror existing test style, fixture layout, and naming before suggesting anything new.

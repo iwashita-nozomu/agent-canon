@@ -38,6 +38,7 @@ downstream implementation ../../tools/experiments/create_experiment_topic.py pla
 | surface | canonical path | natural format | role |
 | --- | --- | --- | --- |
 | design document | `design-document.template.md` | Markdown | authority、責務、型境界、依存、effects、options、review、reconstruction、acceptance |
+| semantic responsibility contract | `semantic-responsibility-contract.template.toml` | TOML | run-local semantic delta、obligation、一次検証 owner、hard-edge closure |
 | README | `README.template.md` | Markdown | purpose、structure、owner、entrypoint、reproduce、canonical/non-canonical boundary |
 | experiment plan | `experiment/` | directory + Markdown/TOML | plan、resource/GPU、run/result provenance、accepted failure、reproducibility |
 | GitHub Issue | `github/issue/*.yml` | GitHub Issue Form YAML | observed facts、reproduction、owner、impact、options、acceptance、non-goal |

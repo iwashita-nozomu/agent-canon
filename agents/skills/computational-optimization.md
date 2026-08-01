@@ -7,6 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design research-workflow.md research-backed change boundary
 upstream design experiment-lifecycle.md experiment execution and rerun boundary
 upstream design test-design.md adversarial test design boundary
+upstream design ../../documents/design/semantic-responsibility-contract.md semantic obligation and verification-owner contract
 downstream implementation ../../.agents/skills/computational-optimization/SKILL.md Codex discovery shim
 @dependency-end
 -->
@@ -47,6 +48,13 @@ downstream implementation ../../.agents/skills/computational-optimization/SKILL.
 - この skill は数値最適化の数学契約と検証契約を固定する責務を持ち、汎用 research workflow や実験 runner の代替ではありません。
 
 ## Optimization Contract
+
+The active design packet also references the run-local semantic responsibility
+contract. Allocate the optimization delta's implementation action and obligations
+before implementation. Assign exactly one primary verification owner to each
+invariant, transition, effect, consistency, or substitutability obligation; keep
+distinct supporting evidence with its distinct property or role. Numerical oracles
+remain owned by the declared experiment, test, compiler, static, or proof route.
 
 実装、実験、review の前に次を固定します。
 

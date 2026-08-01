@@ -39,6 +39,11 @@ only to the current artifact recorded below.
 - Source packet reviewed:
 - Reviewer separation:
 - Review validity:
+- Semantic responsibility contract:
+  - Run-local instance:
+  - Policy reference:
+  - Delta actions and obligation owners read back:
+  - Hard-edge grouping read back:
 
 ## Document Completeness Review
 
@@ -79,6 +84,12 @@ only to the current artifact recorded below.
 ## Implementation Source Packet Review
 
 <!-- Check whether the design names every selected read-before-edit artifact: request contract, schedule, design, design review when active, document flow review when active, test plan only when post-implementation test design is active, repo docs, code paths, tests, and external references. Return revise if the worker would need chat context or unstated assumptions. -->
+
+The review includes the run-local semantic responsibility contract whenever
+the design contains semantic deltas. It confirms one action per delta, one
+primary verification owner per obligation, and distinct supporting properties.
+Hard-edge closure is read back as semantic grouping evidence only and does not
+mandate a class, module, or file shape.
 
 ## Design Side-Effect Map Review
 

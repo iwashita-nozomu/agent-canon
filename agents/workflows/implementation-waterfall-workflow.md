@@ -4,6 +4,7 @@ contract workflow
 responsibility Documents 実装ウォーターフォールワークフロー for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md defines canonical Codex task gates
 upstream design ../../documents/design/dependency-manifest-design.md defines dependency manifest gates
+upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner allocation
 downstream design ../../templates/agents/closeout_gate.md records closeout evidence required by this workflow
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py verifies design-doc evidence claims
 upstream design ../skills/code-visualization.md sole public visualization owner and canonical projection gate
@@ -142,6 +143,9 @@ manifest record が run authority になります。
 
 gate は manifest-declared path だけを active artifact route として消費します。
 active packet set は historical artifact、sibling run、undeclared basename を除外します。
+active packet の source reference には、その run bundle 内の
+`semantic_responsibility_contract.toml` を `artifact:` reference として含めます。
+値を埋めた instance は run-local に限り、template source は active artifact になりません。
 path acceptance は lexical component の non-symlink、run bundle containment、regular
 file の三条件を要求します。schema、unknown field、必須 field、outside-bundle path、missing artifact
 は typed design-owner blocker です。technical review と required な document-flow review
@@ -245,7 +249,7 @@ decision が `approve` の場合に approval evidence になります。
 - active runtime が explicit user request なしの subagent spawn を禁止する場合は、actual spawn の代わりに `SUBAGENT_AUTHORIZATION=required`、role、input packet、expected output、review gate を structured handoff message/tool result に固定します。coordination/resumption が既に durable bundle を選択している場合だけ、その bundle を使います。許可が出るまでその specialist review を完了扱いにしません
 - selected review claims が同じ owner、responsibility、context、write authority、validation route を共有する場合は active instance を再利用します。独立 review、disjoint authority、incompatible context、または owning gate で判定できない distinct unresolved claim/risk の場合だけ別 instance にします
 - 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します
-- 包括的開発では、same directory / same public API surface の parallel write を許可しません。独立した source workstream は、substantial replaceable responsibility unit、computed workspace clone、disjoint write scope、dependency/merge order、validation route、reviewer ownership を持つ場合だけ `--placement workspace` で分離できます。fresh route は既存 local/remote branch を拒否し、継続は `--placement workspace-continuation` に分けます。vendor-first は非並列 single-stream の既定であり、ready な全 stream を launch した parent は descendants を monitor し、互換 context を再利用します。
+- 包括的開発では、same directory / same public API surface の parallel write を許可しません。独立した source workstream は、substantial replaceable responsibility unit、computed workspace clone、disjoint write scope、dependency/merge order、validation route、reviewer ownership を持つ場合だけ `--placement workspace` で分離できます。fresh route は既存 local/remote branch を拒否し、継続は `--placement workspace-continuation` に分けます。vendor-first は非並列 single-stream の既定であり、ready な全 stream を launch した parent は descendants を monitor し、同一責任・同一 context を再利用します。
 - 独立 workstream が複数ある場合は、同じ parent wave に全 role を詰めず、stage owner ごとの vertical dynamic wave として schedule / workflow monitoring に記録します
 
 ### Gate 1. 要件整理
@@ -449,6 +453,7 @@ exit 条件:
 - `Abstract Design Frame` には、実装対象 file や直近 finding へ絞る前の抽象責務、概念 graph または layer model、非対象、将来拡張 layer、評価軸、既存正本との関係を列挙します。`File-By-File Design`、`Design-To-Implementation Trace`、validation はこの frame から導きます
 - `Installed Libraries And Existing Implementation Survey` には、designer が見た dependency surface、導入済みライブラリ候補、既存実装候補、reuse / extend / replace / add-new の判断、既存では足りない理由を列挙します
 - `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、selected の場合の `design_review.md`、active な場合の `document_flow_review.md`、repo docs、dependency surface、code path、test path、外部 reference を列挙します。`test_plan.md` は Gate 8.5 が active になった後の review packet にだけ加えます
+- `Semantic Responsibility Contract` には、run-local instance の path、各 semantic delta の action、obligation、一次検証 owner、supporting property/role、hard-edge closure を列挙します。これは実装前に allocation し、Gate 8.5 の `test_designer` はこの owner で閉じない unresolved test-owned runtime risk に限ります。
 - `Design Side-Effect Map` には、主要設計判断ごとに影響する implementation、document、workflow、prompt/config、validation、dependency manifest、user-facing surface を列挙し、各 item を `Abstract Design Frame`、request clause ID、reuse precedent、owner stage、review gate、canonical validation evidence に接続します。test-design route が active な場合だけ test-plan item も接続します
 - `Dependency Manifest Plan` には、編集対象 file ごとに追加・維持する `upstream` / `downstream` edge、kind、相対 path、reason、編集前に読む upstream context、編集後に確認する downstream context を列挙します
 - 新規・変更する human-authored text file では旧 `Dependency Files:` block を使わず、`documents/design/dependency-manifest-design.md` の `@dependency-start` / `@dependency-end` 形式に統一します
@@ -469,7 +474,7 @@ exit 条件:
 - refactor pass では semantic delta を feature 追加として混ぜません
 - refactor pass では path mapping と remove list を実装前に固定します
 - structure refactor では recursive directory README graph と dependency / responsibility-scope evidence から path mapping を作り、README 更新だけで構造矛盾を隠しません
-- 包括 refactor では、必要に応じて `tools/agent_tools/analyze_refactor_surface.py` または task 固有解析 tool の score を design gate に入れます。score pass は behavior evidence の代替ではなく、責務境界の補助 evidence として扱います
+- 包括 refactor では、必要に応じて `tools/agent_tools/analyze_refactor_surface.py` または task 固有解析 tool の structured finding を design gate に入れます。tool finding は behavior evidence の代替ではなく、責務境界の補助 evidence として扱います
 - Gate 6 または Gate 7 の accepted finding が design / reader-facing decision を
   変える場合だけ Gate 5 へ戻ります。rejected finding は `reason_code` と
   `evidence_ref` を残し、wave / rollback を起こしません
@@ -626,7 +631,7 @@ exit 条件:
 - tests は concrete behavior regression oracle が承認された場合だけ変更し、docs と同じ pass での更新を既定にしません
 - 途中で scope を広げません
 - 設計を変えたくなったら Gate 5-6 を開き直します
-- 実装中に設計上の問題を見つけた場合は、勝手に実装で吸収せず `design_issue_blocker` と evidence を残して Gate 5-6 へ戻します。対象は API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾です。local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで解決した扱いにしてはいけません
+- 実装中に設計上の問題を見つけた場合は、勝手に実装で吸収せず `design_issue_blocker` と evidence を残して Gate 5-6 へ戻します。対象は API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾です。local fallback、wrapper、helper、分岐、別経路、test 緩和、docs 上書きで解決した扱いにしてはいけません
 - 同じ implementation pass で直せるのは、承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従だけです。判断が必要なら設計問題として扱います
 - validation の test / check failure を見た場合は、implementation intent の変更、behavior / test の削除、revert、oracle weakening、pass 目的の単純化へ進む前に、`failing_contract`、`observation_level`、`cause_classification`、`intent_preservation`、`evidence` を記録します。`cause_classification` と `intent_preservation` の slug set と route semantics は `documents/runtime/runtime-profiles-and-check-matrix.json` を canonical taxonomy owner として cite し、`documents/runtime/runtime-profiles-and-check-matrix.md` を generated reader projection として扱います。workflow、subagent、review surface は required evidence と same-intent repair / escalation result だけを記録します。`cause_classification=implementation_bug` で contract と oracle が安定している場合は、approved intent を保ち、追加 test planning で止めずに owning code / config / docs / workflow repair へ進めます
 - design section、request clause ID に trace できない変更は実装しません。test-design route が activate された場合だけ、その evidence を test-plan item に trace します

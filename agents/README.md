@@ -30,6 +30,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 | handoff / review の契約を見る | [COMMUNICATION_PROTOCOL.md](COMMUNICATION_PROTOCOL.md), [canonical/CODEX_SUBAGENTS.md](canonical/CODEX_SUBAGENTS.md) | subagent input packet、review separation、lifecycle を決める |
 | Codex task の実行順を見る | [canonical/CODEX_WORKFLOW.md](canonical/CODEX_WORKFLOW.md), [canonical/CLI_ENTRYPOINTS.md](canonical/CLI_ENTRYPOINTS.md) | bootstrap、plan、implementation、closeout の順序を確認する |
 | AgentCanon update transaction を進める | [../documents/agent-canon/agent-canon-update-route.md](../documents/agent-canon/agent-canon-update-route.md) | source transaction と projection frontier の唯一の入口を選ぶ |
+| semantic responsibility を設計する | [../documents/design/semantic-responsibility-contract.md](../documents/design/semantic-responsibility-contract.md) | semantic delta、obligation、一次検証 owner、hard-edge closure を固定する |
 | run artifact の置き場を確認する | [canonical/ARTIFACT_PLACEMENT.md](canonical/ARTIFACT_PLACEMENT.md) | reports、issues、notes、experiments の責務を分ける |
 | skill を選ぶ | [skills/README.md](skills/README.md), [skills/catalog.yaml](skills/catalog.yaml) | 個別 skill 文書へ進む前に family と trigger を決める |
 | internal routine を確認する | [internal-routines/README.md](internal-routines/README.md) | workflow が呼ぶ review / validation / compatibility routine を見る |
@@ -71,9 +72,10 @@ Target-State-First と Decision Sufficiency は
 - `designer` は常に `implementer` より前に走ります。
 - review の直後は、直前の execution role が feedback を反映してから次段へ進みます。
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は必ず別 instance にします。
-- behavior-changing、regression-prone、または high-risk code 変更では
-  `test_designer` を実装前に立て、最も意地の悪い case を `test_plan.md` に固定します。
-  contract-only wrapper では checker-owned validation と static contract evidence を使います。
+- obligation と一次検証 owner は semantic responsibility contract に実装前に割り当てます。
+  `test_designer` は owning mechanism の確立または修復後に、checker と targeted validation
+  では閉じない test-owned runtime risk が残った場合だけ起動します。contract-only wrapper
+  では checker-owned validation と static contract evidence を使います。
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` もそれぞれ別 instance にします。
 - repo file edit は parent-managed write scope で割り当て、同一 path / ownership / public API surface を複数 writer に割り当てません。
 - `manager`、reviewer 群、`researcher`、`scheduler`、`infra_steward`、`verifier`、`auditor` は artifact-only です。
