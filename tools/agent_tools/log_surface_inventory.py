@@ -49,7 +49,10 @@ TOOL_PATTERNS = (
     "tools/**/*.sh",
     "tools/**/*.bash",
 )
-RUST_TOOL_PATTERNS = ("rust/agent-canon/src/*.rs",)
+RUST_TOOL_PATTERNS = (
+    "rust/agent-canon/src/*.rs",
+    "rust/agent-canon/src/**/*.rs",
+)
 RUST_PRINT_PATTERN = re.compile(r'^\s*(?:e?println)\s*!\s*\(\s*"(?P<value>[^"]*)')
 MAX_DIFF_RECORDS = 20
 OUTPUT_LINE_VARIABLES = {"lines", "output_lines", "report_lines"}

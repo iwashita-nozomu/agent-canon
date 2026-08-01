@@ -19,15 +19,12 @@ use super::embedding::{
     bound_remote_embedding_text, dot, embed_text, parse_openai_embeddings_response,
 };
 use super::eval::{compare_providers, eval_output, run_eval};
-use super::model::{
-    merge_candidate_bucket, responsibility_scope_bucket, run_id, IndexedNode,
-    MERGE_CANDIDATE_MIN_LINES,
-};
+use super::model::{responsibility_scope_bucket, run_id, IndexedNode};
 use super::pipeline::{build_index, embed_existing_nodes};
 use super::query::{context_pack, responsibility_tree, search_index};
 use super::relations::{
-    classify_natural_relation, directed_kind_of_score, discourse_relations, natural_relations,
-    relation_terms, similar_pairs, thin_docs,
+    classify_natural_relation, directed_kind_of_score, discourse_relations, merge_candidate_bucket,
+    natural_relations, relation_terms, similar_pairs, thin_docs, MERGE_CANDIDATE_MIN_LINES,
 };
 use super::report::{pair_json, responsibility_tree_report_json, write_pretty_report};
 use super::source::segment_text;
@@ -965,7 +962,7 @@ fn responsibility_scope_bucket_tracks_manifest_surfaces() {
         "shared-policy-documents"
     );
     assert_eq!(
-        responsibility_scope_bucket("rust/agent-canon/src/semantic_index.rs"),
+        responsibility_scope_bucket("rust/agent-canon/src/semantic_index/mod.rs"),
         "shared-tooling"
     );
     assert_eq!(

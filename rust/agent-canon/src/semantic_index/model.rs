@@ -12,17 +12,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub(super) const OPENAI_COMPATIBLE_EMBEDDING_PROVIDER: &str = "openai-compatible-embedding";
-pub(super) const MERGE_CANDIDATE_MIN_LINES: i64 = 4;
-
-pub(super) fn validate_discourse_profile(profile: &str) -> Result<(), String> {
-    match profile {
-        "general" | "experiment-report" | "methods-protocol" | "academic-argument"
-        | "refactor-design" => Ok(()),
-        unknown => Err(format!("unknown discourse profile {unknown}")),
-    }
-}
-
 pub(super) struct TextNode {
     pub(super) kind: String,
     pub(super) line_start: usize,
@@ -47,115 +36,6 @@ pub(super) struct ScoredNode {
     pub(super) node: IndexedNode,
     pub(super) score: f32,
     pub(super) rank: usize,
-}
-
-pub(super) fn is_merge_candidate_node(node: &IndexedNode) -> bool {
-    if node.kind != "document" && node.kind != "section" {
-        return false;
-    }
-    let line_count = node.line_end.saturating_sub(node.line_start) + 1;
-    line_count >= MERGE_CANDIDATE_MIN_LINES
-}
-
-pub(super) fn merge_candidate_bucket(node: &IndexedNode) -> Option<String> {
-    let path = node.path.replace('\\', "/");
-    if is_alignment_or_log_surface(&path) {
-        return None;
-    }
-    let surface = merge_candidate_surface_kind(&path)?;
-    let responsibility = responsibility_scope_bucket(&path);
-    let topic = match surface {
-        "docs" => document_responsibility_bucket(&path).to_string(),
-        _ => Path::new(&path)
-            .extension()
-            .and_then(|part| part.to_str())
-            .unwrap_or("none")
-            .to_ascii_lowercase(),
-    };
-    Some(format!("{surface}:{responsibility}:{topic}"))
-}
-
-pub(super) fn merge_candidate_surface_kind(path: &str) -> Option<&'static str> {
-    let extension = Path::new(&path)
-        .extension()
-        .and_then(|part| part.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    match extension.as_str() {
-        "md" | "markdown" | "txt" | "rst" => Some("docs"),
-        "rs" | "py" | "sh" | "sql" => Some("code"),
-        "toml" | "yaml" | "yml" | "json" | "jsonl" => Some("config"),
-        _ => None,
-    }
-}
-
-pub(super) fn is_alignment_or_log_surface(path: &str) -> bool {
-    path.starts_with("agents/evals/results/")
-        || path.starts_with("reports/")
-        || path.starts_with(".agent-canon/")
-        || path.starts_with(".agents/skills/")
-        || path.starts_with("templates/agents/_partials/")
-        || path.starts_with("codex-cli-guide/source/")
-        || path.starts_with("codex-cli-guide/sections/")
-}
-
-pub(super) fn is_document_text_path(path: &str) -> bool {
-    let extension = Path::new(path)
-        .extension()
-        .and_then(|part| part.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    matches!(extension.as_str(), "md" | "markdown" | "txt" | "rst")
-}
-
-pub(super) fn is_thin_doc_protected_surface(path: &str) -> bool {
-    path == "README.md"
-        || path == "AGENTS.md"
-        || path == "ROOT_AGENTS.md"
-        || path.ends_with("/README.md")
-        || path.starts_with(".github/")
-        || path.starts_with(".codex/")
-}
-
-pub(super) fn is_thin_doc_non_candidate_surface(path: &str) -> bool {
-    path.starts_with("templates/agents/") || path.starts_with("tests/fixtures/")
-}
-
-pub(super) fn document_responsibility_bucket(path: &str) -> &'static str {
-    if path == "README.md" || path.ends_with("/README.md") {
-        return "readme";
-    }
-    if path.starts_with("agents/skills/") {
-        return "skill";
-    }
-    if path.starts_with("agents/workflows/") {
-        return "workflow";
-    }
-    if path.starts_with("documents/tools/") {
-        return "tool-doc";
-    }
-    if path.starts_with("documents/") {
-        return "document";
-    }
-    if path.starts_with("issues/") {
-        return "issue";
-    }
-    if path.starts_with("memory/") {
-        return "memory";
-    }
-    if path.starts_with("notes/") {
-        return "note";
-    }
-    if path.starts_with("references/") {
-        return "reference";
-    }
-    if path.starts_with("tests/fixtures/") {
-        return "fixture";
-    }
-    if path.starts_with(".github/") {
-        return "github";
-    }
-    "general"
 }
 
 pub(super) fn responsibility_scope_bucket(path: &str) -> &'static str {

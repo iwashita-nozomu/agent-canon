@@ -11,15 +11,14 @@ use super::args::{
     ContextPackArgs, DiscourseRelationsArgs, NaturalRelationsArgs, OutputFormat,
     ResponsibilityTreeArgs, SearchArgs, SimilarArgs, SimilarKind, ThinDocsArgs,
 };
-use super::model::{
-    merge_candidate_bucket, merge_candidate_surface_kind, responsibility_scope_bucket, ScoredNode,
-};
+use super::model::{responsibility_scope_bucket, ScoredNode};
 use super::query::{
     ContextCell, DirectoryCoverage, DirectoryResponsibilityNode, ResponsibilityTreeReport,
     SearchResults,
 };
 use super::relations::{
-    DiscourseRelation, NaturalRelation, SimilarPair, ThinDocCandidate, ThinDocMetrics,
+    merge_candidate_bucket, merge_candidate_surface_kind, DiscourseRelation, NaturalRelation,
+    SimilarPair, ThinDocCandidate, ThinDocMetrics,
 };
 use serde_json::{json, Value};
 use std::fs;

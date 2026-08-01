@@ -7,7 +7,7 @@
 // downstream implementation ../../../../tools/agent_tools/review_backlog_scan.sh process-level semantic-index behavior oracle
 // @dependency-end
 
-use super::model::{run_id, validate_discourse_profile, OPENAI_COMPATIBLE_EMBEDDING_PROVIDER};
+use super::model::run_id;
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
@@ -15,6 +15,7 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 pub(super) const DEFAULT_PROVIDER: &str = "deterministic-dense-v1";
+pub(super) const OPENAI_COMPATIBLE_EMBEDDING_PROVIDER: &str = "openai-compatible-embedding";
 pub(super) const DEFAULT_MODEL: &str = "hash-token-char-v1";
 pub(super) const DEFAULT_DIM: usize = 128;
 pub(super) const DEFAULT_TOP_K: usize = 10;
@@ -1297,6 +1298,14 @@ pub(super) fn validate_dim(dim: usize) -> Result<(), String> {
         return Err("--dim must be greater than zero".to_string());
     }
     Ok(())
+}
+
+pub(super) fn validate_discourse_profile(profile: &str) -> Result<(), String> {
+    match profile {
+        "general" | "experiment-report" | "methods-protocol" | "academic-argument"
+        | "refactor-design" => Ok(()),
+        unknown => Err(format!("unknown discourse profile {unknown}")),
+    }
 }
 
 fn validate_positive(value: usize, flag: &str) -> Result<(), String> {

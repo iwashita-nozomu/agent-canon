@@ -450,12 +450,22 @@ def check_tool_docs_manifest(
             findings.append(Finding("tool_docs", tool, "missing-tool"))
         if not doc_path.is_file():
             findings.append(Finding("tool_docs", doc, "missing-doc"))
-        if Path(tool).stem != Path(doc).stem:
+        if not tool_doc_name_matches(tool, doc):
             findings.append(Finding("tool_docs", doc, "tool-doc-name-mismatch"))
         docs = string_list(catalog_entry.get("docs"))
         if doc not in docs:
             findings.append(Finding("tool_docs", tool, f"catalog-doc-missing:{doc}"))
     return findings
+
+
+def tool_doc_name_matches(tool: str, doc: str) -> bool:
+    """Return whether a tool path and reader doc share their canonical identity."""
+    tool_path = Path(tool)
+    doc_stem = Path(doc).stem
+    if tool_path.name == "mod.rs":
+        owner_stem = tool_path.parent.name
+        return doc_stem in {owner_stem, owner_stem.replace("_", "-")}
+    return tool_path.stem == doc_stem
 
 
 def check_visualization_contract_entry(

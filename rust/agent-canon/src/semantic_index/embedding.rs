@@ -7,8 +7,7 @@
 // downstream implementation ../../../../tools/agent_tools/review_backlog_scan.sh process-level semantic-index behavior oracle
 // @dependency-end
 
-use super::args::{validate_dim, DEFAULT_DIM};
-use super::model::OPENAI_COMPATIBLE_EMBEDDING_PROVIDER;
+use super::args::{validate_dim, DEFAULT_DIM, OPENAI_COMPATIBLE_EMBEDDING_PROVIDER};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
