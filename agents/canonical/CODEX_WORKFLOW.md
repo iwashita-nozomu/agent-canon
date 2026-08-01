@@ -153,7 +153,7 @@ user の durable preference を見落とさないため、`memory/USER_PREFERENC
 agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
 
 raw text search の hit だけで編集対象を決めません。
-検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を直接 materialize する handoff を作ります。空の unresolved-decision set は即時に one-pass materialization へ遷移し、owner gate は完了後だけです。parent repository edits は `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` かつ `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を記録した場合だけ許可します。
+検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を直接 materialize する handoff を作ります。空の unresolved-decision set は即時に one-pass materialization へ遷移し、owner gate は完了後だけです。parent repository edits は `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` かつ `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を記録した場合だけ許可します。
 bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。runtime `SKILL.md` 読了は、対象 property を正本として持つ existing tool の実行後に必要な場合だけ使う follow-up context です。結果の解釈や修正に必要な owner surface だけを開きます。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
 
 ```bash
@@ -569,7 +569,7 @@ full staged route でも、`scheduler`、`schedule_reviewer`、`designer`、`des
 active gate の場合の `document_flow_reviewer` は候補です。owner-critical decision または
 distinct unresolved claim/risk が選択した stage だけを materialize し、W2 の completion
 gate は approved typed contract evidence と active owner route で確定します。
-owner-bounded route では、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ full staged route へ昇格します。
+owner-bounded route は `external public API/behavior/schema unchanged` の場合だけ維持します。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更、reader-facing docs、新用語、cross-surface risk がある場合は `scoped_change` または broader route へ進み、`dependency/consumer/migration/docs closure` を scope 形成します。
 Codex subagent では、候補 role を workflow family に応じて宣言しますが、owner-critical
 decision、distinct unresolved claim/risk、または selected validation route が要求した
 role だけを materialize します。W2 の completion predicate は approved typed contract

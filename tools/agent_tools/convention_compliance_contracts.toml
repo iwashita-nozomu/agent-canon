@@ -83,19 +83,19 @@ markers = ["$literature-survey", "$research-workflow", "research_driven_change",
 
 [[contracts]]
 id = "owner_bounded_tool_route"
-description = "Owner-bounded repository edits run existing tools without a pre-use reading gate and keep owner/tool/validation routing visible."
+description = "Owner-bounded repository edits require external public API, behavior, and schema invariance, run existing tools without a pre-use reading gate, and route every public-surface delta to scoped_change with dependency, consumer, migration, and docs closure."
 
 [[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"
-markers = ["existing-tool route", "targeted validation", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing"]
+markers = ["existing-tool route", "targeted validation", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
 
 [[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
-markers = ["existing-tool route", "targeted validation", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing"]
+markers = ["existing-tool route", "targeted validation", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
 
 [[contracts.surfaces]]
 path = "agents/skills/owner-bounded-routing.md"
-markers = ["existing tool", "owner boundary", "Owner-Bounded Change", "targeted validation", "tool_rejection_preflight.py", "structure_contract=skipped"]
+markers = ["existing tool", "owner boundary", "Owner-Bounded Change", "targeted validation", "tool_rejection_preflight.py", "structure_contract=skipped", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
 
 [[contracts.surfaces]]
 path = "agents/skills/md-style-check.md"
@@ -107,19 +107,27 @@ markers = ["existing-tool route", "targeted validation", "typo", "format-only"]
 
 [[contracts.surfaces]]
 path = "agents/skills/README.md"
-markers = ["owner-bounded-routing", "existing tool", "targeted validation", ".codex/config.toml"]
+markers = ["owner-bounded-routing", "existing tool", "targeted validation", ".codex/config.toml", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
 
 [[contracts.surfaces]]
 path = "agents/skills/catalog.yaml"
-markers = ["owner-bounded-routing", "owner-bounded", "targeted validation", "Owner-Bounded Change"]
+markers = ["owner-bounded-routing", "owner-bounded", "targeted validation", "Owner-Bounded Change", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
+
+[[contracts.surfaces]]
+path = "agents/task_catalog.yaml"
+markers = ["owner_bounded_change", "public interface unchanged", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
 
 [[contracts.surfaces]]
 path = "agents/canonical/CODEX_WORKFLOW.md"
-markers = ["existing tool", "bounded route", "follow-up context"]
+markers = ["existing tool", "bounded route", "follow-up context", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
 
 [[contracts.surfaces]]
 path = "agents/USER_GUIDE_JA.md"
-markers = ["existing tool", "読了 gate なし", "targeted validation"]
+markers = ["existing tool", "読了 gate なし", "targeted validation", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
+
+[[contracts.surfaces]]
+path = "agents/COMMUNICATION_PROTOCOL.md"
+markers = ["Parent-Direct Context Note", "external public API/behavior/schema unchanged"]
 
 [[contracts]]
 id = "responsibility_preflight_gate"

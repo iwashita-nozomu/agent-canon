@@ -315,7 +315,8 @@ guessing an edit path.
 ## Parent-Direct Context Note
 
 For an approved parent-direct exception whose owner boundary, replaceable unit,
-validation route, and public impact boundary are already evidenced, the full
+validation route, and `external public API/behavior/schema unchanged` readback
+are already evidenced, the full
 Pre-Edit Repository Investigation Packet can be replaced by a short
 Parent-Direct Context Note. Routine docs, Focused code, typo/link/format-only,
 or other bounded work still needs the exception rationale when the work is

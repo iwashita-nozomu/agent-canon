@@ -14,20 +14,27 @@ downstream implementation ../../.agents/skills/owner-bounded-routing/SKILL.md ex
 
 ## Purpose
 
-owner boundary、差し替え可能な単位、targeted validation route、public behavior /
-schema impact が evidence で閉じている repo-changing 修正で、広い workflow prose を
-読み足さずに、既存 tool の直接利用、軽量 preflight、targeted validation、
-closeout evidence を固定します。
+owner boundary、差し替え可能な単位、targeted validation route に加え、
+`external public API/behavior/schema unchanged` が evidence で閉じている
+repo-changing 修正で、広い workflow prose を読み足さずに、既存 tool の直接利用、
+軽量 preflight、targeted validation、closeout evidence を固定します。
+
+`public impact boundary closed` は、public surface の変化を把握済みという意味ではなく、
+external public API、behavior、schema が不変であるという readback です。追加、縮小、
+削除、rename、restriction、deprecation、意味変更のいずれかがある場合は
+`scoped_change` または broader route へ進み、`dependency/consumer/migration/docs closure`
+を scope に含めます。file 数や近接 owner だけでこの closure を縮めません。
 
 この skill は `Owner-Bounded Change`、Routine docs、Focused code、
 typo / link / format-only の薄い実行面を担当します。workflow family、
 spawn budget、risk profile は `agents/task_catalog.yaml` と
 `documents/runtime/runtime-profiles-and-check-matrix.md` に委譲します。
+これらの label も public-surface invariance gate を迂回しません。
 
 ## Use When
 
-- owner boundary、差し替え可能な単位、targeted validation route、public impact
-  boundary が evidence で閉じている局所修正を行う
+- owner boundary、差し替え可能な単位、targeted validation route と
+  `external public API/behavior/schema unchanged` が evidence で閉じている局所修正を行う
 - typo / link / format-only の Markdown 修正を行う
 - owner-bounded route で既存 tool を読了 gate なしに先に使う
 - user request が bounded route または `Owner-Bounded Change` を示す
@@ -58,9 +65,11 @@ spawn budget、risk profile は `agents/task_catalog.yaml` と
    implementation bug は同じ owner-bounded slice で修復し、oracle / spec、
    fixture / environment / stale artifact、unrelated failure、approved-design /
    user-request conflict はそれぞれ owner route、residual、または escalation に分けます。
-1. public behavior、dependency direction、document responsibility、claim grounding、
-   schema、runtime profile、複数 writer が入った場合は、`codex-task-workflow` の
-   broader route に戻します。
+1. external public API、behavior、schema の追加、縮小、削除、rename、restriction、
+   deprecation、意味変更がある場合は `scoped_change` または `codex-task-workflow` の
+   broader route に戻し、`dependency/consumer/migration/docs closure` を scope 形成します。
+   dependency direction、document responsibility、claim grounding、runtime profile、
+   複数 writer の変更も同じ broader route で扱います。
 
 ## Evidence
 
@@ -68,5 +77,6 @@ spawn budget、risk profile は `agents/task_catalog.yaml` と
 - existing tool or command packet used first
 - nearby owner context opened only when needed to interpret or repair tool output
 - route: `Owner-Bounded Change` / Routine docs / Focused code / format-only
+- `external public API/behavior/schema unchanged` readback
 - targeted validation commands and results
 - escalation reason when broader route is selected
