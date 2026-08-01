@@ -1793,7 +1793,7 @@ def manifest_prompt_contract_lines(
         )
         lines.append(
             "      assignment_prompt_source: "
-            "'tools/agent_tools/implementation_dispatch.py#dispatch_fixed_implementation->model_profile_registry.materialize_prompt_capsule'"
+            "'tools/agent_tools/agent_team.py#dispatch_fixed_implementation->model_profile_registry.materialize_prompt_capsule'"
         )
     else:
         lines.append(
@@ -1802,7 +1802,7 @@ def manifest_prompt_contract_lines(
         )
         lines.append(
             "      assignment_prompt_source: "
-            "'tools/agent_tools/manifest_rendering.py#role_prompt_contract'"
+            "'tools/agent_tools/agent_team.py#role_prompt_contract'"
         )
     if role.id == "skill_evaluator":
         lines.append("      common_prompt_must_include_ref: 'not_applicable'")

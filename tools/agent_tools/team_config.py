@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, cast
 
 import yaml
 
@@ -23,6 +23,12 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 from route import implementation_handoff_required, load_skill_route_rules
+
+if TYPE_CHECKING:
+    if __package__:
+        from .packets import ActiveDesignPacketConfig
+    else:
+        from packets import ActiveDesignPacketConfig
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -153,7 +159,7 @@ class RunBundleSpec:
     parent_lineage_id: str = ""
     decision_sufficiency_packet: dict[str, object] | None = None
     decision_sufficiency_packet_ref: str = ""
-    active_design_packet: Any | None = None
+    active_design_packet: ActiveDesignPacketConfig | None = None
 
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:

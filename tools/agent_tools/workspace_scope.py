@@ -18,12 +18,18 @@ import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 if __package__:
     from .team_config import ROOT, Role, TeamConfig, resolve_role
 else:
     from team_config import ROOT, Role, TeamConfig, resolve_role
+
+if TYPE_CHECKING:
+    if __package__:
+        from .packets import ActiveDesignPacketConfig
+    else:
+        from packets import ActiveDesignPacketConfig
 
 GIT_STATUS_SHORT_MIN_LINE_LENGTH = 4
 
@@ -161,7 +167,7 @@ def resolve_role_write_scope(
     role: Role,
     report_dir: Path,
     workspace_root: Path,
-    active_design_packet: Any | None = None,
+    active_design_packet: ActiveDesignPacketConfig | None = None,
 ) -> RoleWriteScope:
     """Resolve concrete write paths for one role."""
     allowed_files = role_allowed_artifact_files(
@@ -188,7 +194,7 @@ def role_allowed_artifact_files(
     config: TeamConfig,
     role: Role,
     report_dir: Path,
-    active_design_packet: Any | None = None,
+    active_design_packet: ActiveDesignPacketConfig | None = None,
 ) -> tuple[Path, ...]:
     """Resolve generated artifact files one role may write."""
     if __package__:
