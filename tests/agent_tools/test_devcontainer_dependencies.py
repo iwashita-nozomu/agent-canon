@@ -157,6 +157,70 @@ def write_manifest(path: Path, records: list[dict[str, Any]]) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
+def hash_requirement(
+    name: str,
+    version: str,
+    hashes: Sequence[str],
+    *,
+    marker: str | None = None,
+) -> str:
+    """Build one pip-compile requirement record for boundary fixtures."""
+    backslash = chr(92)
+    marker_text = f"; {marker}" if marker is not None else ""
+    lines = [f"{name}=={version}{marker_text} {backslash}"]
+    for index, digest in enumerate(hashes):
+        continuation = f" {backslash}" if index < len(hashes) - 1 else ""
+        lines.append(f"    --hash=sha256:{digest}{continuation}")
+    return "\n".join(lines) + "\n"
+
+
+def write_boundary_fixture(
+    root: Path,
+    requirements: str,
+) -> tuple[EnvironmentBoundaryModel, Path]:
+    """Build a valid parent boundary fixture with supplied requirements."""
+    vendor_root = root / "vendor" / "agent-canon"
+    vendor_root.parent.mkdir(parents=True, exist_ok=True)
+    vendor_root.symlink_to(ROOT, target_is_directory=True)
+
+    def write_file(relative: str, content: str, *, executable: bool = False) -> Path:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        if executable:
+            path.chmod(0o755)
+        return path
+
+    write_file("README.md", "# fixture\n")
+    write_file("docker/README.md", "# fixture\n")
+    write_file(
+        "docker/Dockerfile",
+        "FROM python:3.11\n"
+        "RUN apt-get install -y rsync openssh-client graphviz python3.11-venv\n",
+    )
+    requirements_path = write_file("docker/requirements.txt", requirements)
+    write_file(
+        "docker/install_python_dependencies.sh",
+        "python3 -m pip install -r docker/requirements.txt\n",
+        executable=True,
+    )
+    write_file("pyproject.toml", "[build-system]\n")
+    write_file(".dockerignore", "vendor/agent-canon\n.git\n.state\n")
+    write_file(".gitignore", ".venv/\nvenv/\n")
+    write_file(
+        ".devcontainer/devcontainer.json",
+        '{"postCreateCommand": "vendor/agent-canon/.devcontainer/post-create.sh '
+        'post-create-parent.sh"}\n',
+    )
+    write_file(".devcontainer/post-create-parent.sh", "#!/bin/sh\n", executable=True)
+    write_file(
+        ".devcontainer/dependencies.toml",
+        'schema = "agent-canon.devcontainer-dependencies"\n'
+        "schema_version = 2\nrecords = []\n",
+    )
+    return EnvironmentBoundaryModel(root, vendor_root), requirements_path
+
+
 def loaded_manifest(
     path: Path,
     records: tuple[Any, ...],
@@ -675,6 +739,68 @@ class DependencyModelTests(unittest.TestCase):
                 ),
                 source,
             )
+
+    def test_requirements_accept_hash_lock_records_and_preserve_markers(self) -> None:
+        """Accept hash records through the public boundary findings route."""
+        with tempfile.TemporaryDirectory() as temporary:
+            requirements = (
+                "# generated lock\n"
+                + hash_requirement(
+                    "jupyterlab",
+                    "1.2.3",
+                    ("a" * 64, "b" * 64),
+                    marker="python_version >= '3.0'",
+                )
+                + "    # via project\n"
+                + hash_requirement("notebook", "1.0.0", ("c" * 64,))
+                + hash_requirement("ipykernel", "1.0.0", ("d" * 64,))
+                + hash_requirement("pydeps", "1.0.0", ("e" * 64,))
+                + hash_requirement("snakeviz", "1.0.0", ("f" * 64,))
+                + hash_requirement("pyyaml", "1.0.0", ("0" * 64,))
+            )
+            model, path = write_boundary_fixture(Path(temporary), requirements)
+
+            report = model.validate()
+
+        self.assertEqual(report.status, "pass")
+        self.assertFalse(
+            [finding for finding in report.findings if finding.path == str(path)]
+        )
+
+    def test_requirements_reject_malformed_hash_records_and_options(self) -> None:
+        """Reject invalid lock records through public boundary findings."""
+        backslash = chr(92)
+        cases = {
+            "malformed continuation": (
+                f"package==1.0 {backslash}\n    not-a-hash\n",
+                "malformed requirement continuation",
+            ),
+            "orphan hash": (
+                f"--hash=sha256:{'a' * 64}\n",
+                "orphan requirement hash",
+            ),
+            "malformed hash": (
+                f"package==1.0 {backslash}\n    --hash=sha256:short\n",
+                "malformed requirement hash",
+            ),
+            "requirement option": (
+                "--index-url https://pypi.org/simple\n",
+                "requirement option without requirement",
+            ),
+        }
+
+        for name, (contents, message) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                model, path = write_boundary_fixture(Path(temporary), contents)
+                report = model.validate()
+
+                findings = [
+                    finding for finding in report.findings if finding.path == str(path)
+                ]
+                self.assertTrue(
+                    any(message in finding.detail for finding in findings),
+                    report.findings,
+                )
 
     def test_canonical_manifest_owns_pinned_pyyaml_independently(self) -> None:
         """AgentCanon's mounted validators receive their own exact PyYAML record."""
