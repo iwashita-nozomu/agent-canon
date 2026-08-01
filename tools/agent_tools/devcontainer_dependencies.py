@@ -1017,7 +1017,7 @@ def load_manifest(source: ManifestSource) -> LoadedManifest:
 def _require_file_candidate_agreement(
     candidates: Sequence[Path], *, description: str
 ) -> None:
-    """Reject active file candidates that do not identify equal content."""
+    """Reject active file candidates that are not the same filesystem entity."""
     if len(candidates) < 2:
         return
     reference = candidates[0]
@@ -1025,15 +1025,13 @@ def _require_file_candidate_agreement(
         try:
             if reference.samefile(candidate):
                 continue
-            matches = reference.read_bytes() == candidate.read_bytes()
         except OSError as exc:
             raise DependencyError(
                 f"cannot compare {description}: {reference} and {candidate}: {exc}"
             ) from exc
-        if not matches:
-            raise DependencyError(
-                f"ambiguous {description}: {reference} and {candidate} differ"
-            )
+        raise DependencyError(
+            f"ambiguous {description}: {reference} and {candidate} are distinct files"
+        )
 
 
 def manifest_sources(

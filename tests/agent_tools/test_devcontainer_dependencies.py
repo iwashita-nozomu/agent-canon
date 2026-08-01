@@ -581,7 +581,7 @@ class DependencyModelTests(unittest.TestCase):
             )
 
     def test_manifest_sources_rejects_stale_tools_agent_canon_duplicate(self) -> None:
-        """Never merge a stale projection manifest with canonical AgentCanon."""
+        """Reject an identical copied manifest that is not the canonical entity."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             vendor = (
@@ -591,16 +591,10 @@ class DependencyModelTests(unittest.TestCase):
                 root / "tools" / "agent-canon" / ".devcontainer" / "dependencies.toml"
             )
             write_manifest(vendor, [record("vendor")])
-            write_manifest(tools, [record("tools")])
+            write_manifest(tools, [record("vendor")])
 
             with self.assertRaisesRegex(DependencyError, "ambiguous canonical"):
                 manifest_sources(root, root / "vendor" / "agent-canon")
-
-            write_manifest(tools, [record("vendor")])
-            self.assertEqual(
-                manifest_sources(root, root / "vendor" / "agent-canon"),
-                (ManifestSource(vendor, ManifestRole.CANONICAL),),
-            )
 
     def test_manifest_sources_never_uses_tools_projection_manifest(self) -> None:
         """A tools projection cannot become the canonical dependency manifest."""
@@ -650,7 +644,7 @@ class DependencyModelTests(unittest.TestCase):
     def test_boundary_tool_resolution_rejects_stale_projection_ambiguity(
         self,
     ) -> None:
-        """Reject differing active roots and ignore parent compatibility wrappers."""
+        """Reject identical copied roots and ignore parent compatibility wrappers."""
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary)
             vendor_root = workspace / "vendor" / "agent-canon"
@@ -661,7 +655,7 @@ class DependencyModelTests(unittest.TestCase):
             wrapper = workspace / "tools" / "requirement_sync_validator.py"
             for path, content in (
                 (source, "source\n"),
-                (projection, "stale\n"),
+                (projection, "source\n"),
                 (wrapper, "wrapper\n"),
             ):
                 path.parent.mkdir(parents=True, exist_ok=True)
