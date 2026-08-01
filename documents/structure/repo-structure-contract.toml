@@ -357,6 +357,16 @@ kind = "any"
 category = "shared_runtime_view"
 
 [[profile.required]]
+path = ".devcontainer/parent-environment.sh"
+kind = "file"
+category = "parent_environment"
+
+[[profile.required]]
+path = ".devcontainer/parent-environment.toml"
+kind = "file"
+category = "parent_environment"
+
+[[profile.required]]
 path = ".vscode"
 kind = "any"
 category = "shared_runtime_view"

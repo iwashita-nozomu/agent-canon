@@ -35,8 +35,9 @@ runtime surface and end with the practical change checklist and stability notes.
 - Do not duplicate `$openai-docs` bundled alternate route references here. When current
   Codex behavior or model guidance matters, run `$openai-docs` and record the
   resulting run artifact or decision, not a copied official URL list.
-- Local evidence: `codex --help`, `codex exec --help`, `codex review --help`,
-  `codex mcp --help`, `codex features list`, and `.codex/config.toml`.
+- Local evidence: `codex --version`, `codex --help`, `codex exec --help`,
+  `codex review --help`, `codex mcp --help`, `codex features list`, and
+  `.codex/config.toml`.
 
 ## Configuration Surfaces
 
@@ -58,7 +59,7 @@ Codex combines settings from persistent config, project config, profiles, custom
 
 - Put durable repo policy in `.codex/config.toml`.
 - Put human-readable task and coding rules in `AGENTS.md`, not in model/provider settings.
-- Use user-level `profiles` for reusable modes such as safe review, full-access container runs, or OSS/local model usage.
+- Use user-level `profiles` for reusable modes such as safe review, full-access container runs, or other machine-specific defaults.
 - Use CLI `-c` for temporary one-off changes; do not commit temporary operator overrides.
 - Treat `experimental_*` and realtime websocket overrides as unstable unless a task explicitly targets those features.
 
@@ -133,7 +134,10 @@ Operational interpretation:
 The current repo intentionally configures the shared runtime keys and registries
 that require repository-wide agreement.
 The lists below are not recommendations to enable every key.
-They are an explicit inventory of settings that Codex can accept but this template does not currently put in `.codex/config.toml`.
+They are an AgentCanon/template-relevant subset of settings that Codex can
+accept but this template does not currently put in `.codex/config.toml`; they
+are not a complete official schema inventory. Upstream-only API facts are
+listed in [上流限定の Codex CLI API 事実](#上流限定の-codex-cli-api-事実).
 
 ### Currently Configured Top-Level Keys
 
@@ -153,7 +157,7 @@ They are an explicit inventory of settings that Codex can accept but this templa
 
 | Category | Absent Keys |
 | -------- | ----------- |
-| Additional model and provider selection | `model_provider`, `model_providers`, `openai_base_url`, `chatgpt_base_url`, `oss_provider`, `service_tier`, `model_reasoning_summary`, `model_supports_reasoning_summaries`, `model_auto_compact_token_limit`, `model_catalog_json`, `model_instructions_file` |
+| Additional model and provider selection | `model_provider`, `model_providers`, `openai_base_url`, `chatgpt_base_url`, `service_tier`, `model_reasoning_summary`, `model_supports_reasoning_summaries`, `model_auto_compact_token_limit`, `model_catalog_json`, `model_instructions_file` |
 | Approval, permissions, and sandbox detail | `approvals_reviewer`, `default_permissions`, `permissions`, `sandbox_workspace_write`, `shell_environment_policy`, `allow_login_shell` |
 | Project docs and injected context | `instructions`, `developer_instructions`, `include_apps_instructions`, `include_environment_context`, `include_permissions_instructions`, `project_doc_fallback_filenames`, `project_doc_max_bytes`, `project_root_markers`, `projects` |
 | Hooks, tools, and integrations | `hooks`, `tools`, `tool_suggest`, `web_search`, `apps`, `plugins`, `marketplaces` |
@@ -172,6 +176,38 @@ Interpretation for this template:
 - Registered `skills.config` entries expose repo-owned `.agents/skills/`
   packages; selecting a skill still precedes reading its `SKILL.md`.
 - Absent experimental keys should stay absent unless a task explicitly owns the risk and rollback path.
+
+### 上流限定の Codex CLI API 事実
+
+この節は、上流 Codex CLI の API 事実を参照用に保存する境界です。
+AgentCanon / template はこの機能を提供せず、推奨せず、設定の既定値として
+所有せず、alias・wrapper・fallback・compatibility route として公開せず、
+runtime/config/routing surface として経路化しません。`codex-cli-guide/` に
+残る上流例も、template の設定 guidance ではありません。
+
+根拠は次の三つの evidence route に固定します。
+
+- Primary-source route: この文書の [Primary Sources](#primary-sources) にある
+  `$openai-docs` route、公式 CLI / Configuration Reference / schema の案内、
+  および `codex --version`、`codex --help`、`codex exec --help`、
+  `codex features list` の reviewed local evidence。
+- Official Codex source/help evidence: upstream `openai/codex` の
+  [`codex-rs/exec/src/lib.rs`](https://github.com/openai/codex/blob/main/codex-rs/exec/src/lib.rs)
+  にある OSS provider resolution と、公式 CLI reference の
+  `--local-provider` / `--oss` の定義。既存 guide の
+  `codex-cli-guide/source/codex_cli_guide_config_deepdive.full.md` も、
+  `--oss`（source line 459）と `oss_provider`（source line 626）を記録する
+  upstream-only reference です。
+- Reviewed version evidence: `codex-cli-guide/README.md` の Runtime
+  compatibility note が記録する `codex-cli 0.130.0` と、上記 version/help
+  route の組合せ。この version evidence は AgentCanon の runtime version
+  pin や local-provider support claim ではありません。
+
+| API | 上流 API の事実 |
+| --- | --- |
+| `--oss` | 上流 Codex CLI の OSS provider mode を選択する。 |
+| `--local-provider` | `--oss` と組み合わせる上流の provider 選択 flag である。 |
+| `oss_provider` | `--oss` 実行時の上流 provider 選択設定キーである。 |
 
 ### Feature Flags Not Currently Enabled Here
 
@@ -302,12 +338,15 @@ Common root and `exec` flags:
 | `--add-dir <DIR>` | Adds writable directories beside the main workspace. |
 | `--search` | Enables live web search for the run. |
 | `-i, --image <FILE>` | Attaches initial images. |
-| `--oss` / `--local-provider` | Use local open-source provider selection. |
 | `--no-alt-screen` | TUI display behavior; equivalent to inline terminal mode. |
 
-## Top-Level `config.toml` Inventory
+## AgentCanon/template-relevant `config.toml` subset
 
-The official schema currently exposes the following top-level keys. Some are normal operator controls; others are machine-local state, UI state, or experimental surfaces.
+The table below is an AgentCanon/template-relevant subset for configuration
+ownership and review. It is not a complete transcription of the official
+Codex schema. The upstream-only `--oss`, `--local-provider`, and
+`oss_provider` API facts are recorded in [上流限定の Codex CLI API 事実](#上流限定の-codex-cli-api-事実)
+and are not AgentCanon configuration surfaces.
 
 | Key | Type | Purpose |
 | --- | ---- | ------- |
@@ -374,7 +413,6 @@ The official schema currently exposes the following top-level keys. Some are nor
 | `notice` | object | Local acknowledgement state for product notices. |
 | `notify` | array | External notification command. |
 | `openai_base_url` | string | Built-in OpenAI provider base URL override. |
-| `oss_provider` | string | Preferred local OSS provider, such as LM Studio or Ollama. |
 | `otel` | object | OpenTelemetry logs, metrics, and trace export settings. |
 | `permissions` | object | Named granular permission profiles. |
 | `personality` | enum | Model personality setting, such as `none`, `friendly`, `pragmatic`. |
@@ -417,7 +455,6 @@ The official schema currently exposes the following top-level keys. Some are nor
 | `model_provider` | Points to `model_providers.<id>`. |
 | `openai_base_url` | Override only the built-in OpenAI provider URL. |
 | `chatgpt_base_url` | Override ChatGPT-specific requests separately from API provider requests. |
-| `oss_provider` | Select a local provider when `--oss` is used. |
 | `service_tier` | Set only after the selected model advertises the requested tier; otherwise leave it absent. |
 
 `[model_providers.<id>]` supports:
@@ -790,7 +827,7 @@ Before changing Codex config in this repo:
 ## Field Stability Notes
 
 - Normal operator keys: `model`, `approval_policy`, `sandbox_mode`, `model_providers`, `mcp_servers`, `tools`, `web_search`, `agents`, `skills`, `hooks`.
-- User-level operator keys: `profiles`, UI preferences, local model/provider experiments, and other machine-specific defaults.
+- User-level operator keys: `profiles`, UI preferences, and other machine-specific defaults.
 - Repo-policy keys: project doc discovery, hooks, MCP, subagent limits, skill instructions, shared defaults.
 - Machine-local keys: audio, TUI, credentials stores, notifications, logs, SQLite home, notices, Windows onboarding state.
 - Experimental keys: names beginning with `experimental_`, realtime websocket overrides, app-server/thread endpoints, and other fields documented as experimental.
