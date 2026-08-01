@@ -68,6 +68,7 @@ METHODS = frozenset(
 FAILURE_POLICIES = frozenset({"fail", "warn"})
 HEX_RE = re.compile(r"^[0-9a-fA-F]+$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+HASH_OPTION_PREFIX = "--hash=sha256:"
 COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
@@ -186,6 +187,72 @@ class PythonRequirementSpec:
         if self.marker is None:
             return True
         return Marker(self.marker).evaluate()
+
+
+def _requirement_records(
+    path: Path,
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Fold one requirements file into strict logical requirement records.
+
+    A continued record starts with one PEP 508 requirement and may contain one
+    or more ``--hash=sha256:<hex>`` continuation lines.  Comments and blank
+    lines retain the existing requirements-file behavior; every other line is
+    either part of a record or rejected.
+    """
+    records: list[tuple[str, tuple[str, ...]]] = []
+    pending_requirement: str | None = None
+    pending_hashes: list[str] = []
+
+    for line_number, raw_line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        line = re.split(r"\s+#", raw_line, maxsplit=1)[0].strip()
+        if not line or line.startswith("#"):
+            if pending_requirement is not None:
+                raise DependencyError(
+                    f"{path}:{line_number}: malformed requirement continuation"
+                )
+            continue
+
+        continued = line.endswith("\\")
+        value = line[:-1].rstrip() if continued else line
+        if not value:
+            raise DependencyError(
+                f"{path}:{line_number}: malformed requirement continuation"
+            )
+
+        if pending_requirement is None:
+            if value.startswith("--hash"):
+                raise DependencyError(f"{path}:{line_number}: orphan requirement hash")
+            if value.startswith("-"):
+                raise DependencyError(
+                    f"{path}:{line_number}: requirement option without requirement"
+                )
+            if continued:
+                pending_requirement = value
+                pending_hashes = []
+            else:
+                records.append((value, ()))
+            continue
+
+        if not value.startswith("--hash"):
+            raise DependencyError(
+                f"{path}:{line_number}: malformed requirement continuation"
+            )
+        if not value.startswith(HASH_OPTION_PREFIX) or not SHA256_RE.fullmatch(
+            value[len(HASH_OPTION_PREFIX) :]
+        ):
+            raise DependencyError(f"{path}:{line_number}: malformed requirement hash")
+
+        pending_hashes.append(value)
+        if not continued:
+            records.append((pending_requirement, tuple(pending_hashes)))
+            pending_requirement = None
+            pending_hashes = []
+
+    if pending_requirement is not None:
+        raise DependencyError(f"{path}: unterminated requirement continuation")
+    return tuple(records)
 
 
 @dataclass(frozen=True)
@@ -1359,10 +1426,7 @@ class EnvironmentBoundaryModel:
     def _requirements(path: Path) -> tuple[PythonRequirementSpec, ...]:
         """Parse and preserve active PEP 508 requirements for ownership checks."""
         requirements: list[PythonRequirementSpec] = []
-        for raw_line in path.read_text(encoding="utf-8").splitlines():
-            line = re.split(r"\s+#", raw_line, maxsplit=1)[0].strip()
-            if not line or line.startswith("#"):
-                continue
+        for line, _hashes in _requirement_records(path):
             requirement = PythonRequirementSpec.parse(line)
             if requirement.is_active():
                 requirements.append(requirement)

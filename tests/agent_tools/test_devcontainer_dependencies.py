@@ -676,6 +676,60 @@ class DependencyModelTests(unittest.TestCase):
                 source,
             )
 
+    def test_requirements_accept_hash_lock_records_and_preserve_markers(self) -> None:
+        """Fold pip-compile hashes while retaining active-marker behavior."""
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "requirements.txt"
+            backslash = chr(92)
+            path.write_text(
+                "# generated lock\n"
+                f"active-package==1.2.3; python_version >= '3.0' {backslash}\n"
+                f"    --hash=sha256:{'a' * 64} {backslash}\n"
+                f"    --hash=sha256:{'b' * 64}\n"
+                "    # via project\n"
+                f"inactive-package==9.0; python_version < '0' {backslash}\n"
+                f"    --hash=sha256:{'c' * 64}\n"
+                "plain-package==2.0\n",
+                encoding="utf-8",
+            )
+
+            requirements = EnvironmentBoundaryModel._requirements(path)
+
+        self.assertEqual(
+            tuple(requirement.normalized_name for requirement in requirements),
+            ("active-package", "plain-package"),
+        )
+
+    def test_requirements_reject_malformed_hash_records_and_options(self) -> None:
+        """Reject each invalid lock-record shape instead of skipping it."""
+        backslash = chr(92)
+        cases = {
+            "malformed continuation": (
+                f"package==1.0 {backslash}\n    not-a-hash\n",
+                "malformed requirement continuation",
+            ),
+            "orphan hash": (
+                f"--hash=sha256:{'a' * 64}\n",
+                "orphan requirement hash",
+            ),
+            "malformed hash": (
+                f"package==1.0 {backslash}\n    --hash=sha256:short\n",
+                "malformed requirement hash",
+            ),
+            "requirement option": (
+                "--index-url https://pypi.org/simple\n",
+                "requirement option without requirement",
+            ),
+        }
+
+        for name, (contents, message) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                path = Path(temporary) / "requirements.txt"
+                path.write_text(contents, encoding="utf-8")
+
+                with self.assertRaisesRegex(DependencyError, message):
+                    EnvironmentBoundaryModel._requirements(path)
+
     def test_canonical_manifest_owns_pinned_pyyaml_independently(self) -> None:
         """AgentCanon's mounted validators receive their own exact PyYAML record."""
         plan = load_plan(ROOT, ROOT)
