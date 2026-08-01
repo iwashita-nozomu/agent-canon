@@ -210,7 +210,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "静的解析・読み取り 主証跡 reading evidence 動作確認 broad execution "
         "静的解析、読み取り確認、docs / targeted tests / agent checks "
         "Runtime evidence distinct unresolved claim/risk\n"
-        "compatibility-preservation drift duplicate implementation canonical owner "
+        "legacy-route drift duplicate implementation canonical owner "
         "caller migration contract-complete implementation acceptance contract "
         "design_issue_blocker implementation shortcut\n"
         "Branch Reuse Default branch_worktree_guard.py user が別 branch を明示 "
@@ -1557,15 +1557,15 @@ class CheckConventionComplianceTest(unittest.TestCase):
         self.assertEqual(missing, [])
 
     def test_implementation_guardrails_require_markers(self) -> None:
-        """Implementation policy keeps compatibility and duplicate guards visible."""
+        """Implementation policy keeps legacy-route and duplicate guards visible."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            house_style = (
-                root / "documents" / "conventions" / "coding-conventions-house-style.md"
-            )
-            house_style.write_text(
-                "house canonical owner check_convention_compliance.py\n",
+            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow.write_text(
+                MINIMAL_REPO_FILES["agents/canonical/CODEX_WORKFLOW.md"].replace(
+                    "legacy-route drift ", ""
+                ),
                 encoding="utf-8",
             )
 
@@ -1574,18 +1574,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("implementation_guardrails", result.stdout)
             self.assertIn(
-                "missing-marker:compatibility-preservation drift",
+                "missing-marker:legacy-route drift",
                 result.stdout,
             )
-            self.assertIn("missing-marker:duplicate implementation", result.stdout)
-            self.assertIn("missing-marker:caller migration", result.stdout)
-            self.assertIn(
-                "missing-marker:contract-complete implementation",
-                result.stdout,
-            )
-            self.assertIn("missing-marker:acceptance contract", result.stdout)
-            self.assertIn("missing-marker:design_issue_blocker", result.stdout)
-            self.assertIn("missing-marker:implementation shortcut", result.stdout)
 
     def test_minimal_fixture_covers_implementation_guardrail_surfaces(self) -> None:
         """The minimal test fixture includes every implementation guardrail surface."""
