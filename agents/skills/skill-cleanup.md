@@ -44,7 +44,7 @@ graph/readback を一つの source-to-generated cleanup unit として既存 own
    entry set、source order、path、enabled を readback する。
 3. 既存 materializer は `.agents/skills/<skill>/SKILL.md` だけを生成する。
 4. `skill_dependency_map.py graph` で graph JSON/Mermaid を生成し、既存 checker で source/readback equality を確認する。
-5. 文書は `document-canon-cleanup`、worktree は `worktree-health`、log は `agent-log-analysis`/`runtime-log-repair`、結果は `result-artifact-writeout` を再利用する。
+5. validation command の実行範囲は `agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` を参照し、skill-cleanup 側で別の test/full-scan policy を作らない。文書は `document-canon-cleanup`、worktree は `worktree-health`、log は `agent-log-analysis`/`runtime-log-repair`、結果は `result-artifact-writeout` を再利用する。
 
 ## Tool Commands
 

@@ -468,7 +468,8 @@ skill_dependencies:
     - algorithm-proof-exploration
   refactor-loop:
     responsibility_group: design
-    required_prerequisites: []
+    required_prerequisites:
+    - agent-orchestration
     routing_candidates:
     - dependency-analysis
     - structure-refactor
@@ -838,6 +839,7 @@ skill_dependencies:
     responsibility_group: cleanup
     required_prerequisites:
     - responsibility-cleanup
+    - agent-orchestration
     routing_candidates:
     - agent-orchestration
     - task-routing
