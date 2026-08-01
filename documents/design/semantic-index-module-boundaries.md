@@ -6,9 +6,17 @@ upstream design README.md design index and evidence-ledger policy
 upstream design dependency-manifest-design.md dependency graph and claim-evidence contract
 upstream design rust-agent-tool-migration.md Rust CLI ownership and migration order
 upstream design ../tools/semantic_index.md semantic-index command and generated-cache contract
-upstream implementation ../../rust/agent-canon/src/semantic_index.rs current monolithic Rust implementation and schema source
-upstream implementation ../../rust/agent-canon/src/main.rs canonical Rust CLI dispatch caller
-upstream implementation ../../tools/catalog.yaml command catalog and public command source
+downstream implementation ../../rust/agent-canon/src/semantic_index/mod.rs crate-facing semantic-index entrypoint
+downstream implementation ../../rust/agent-canon/src/semantic_index/cli.rs CLI parse/dispatch/output/exit owner
+downstream implementation ../../rust/agent-canon/src/semantic_index/args.rs argument DTO/default/validation owner
+downstream implementation ../../rust/agent-canon/src/semantic_index/storage.rs SQLite schema/transaction/atomic publish owner
+downstream implementation ../../rust/agent-canon/src/semantic_index/pipeline.rs build/embed orchestration owner
+downstream implementation ../../rust/agent-canon/src/semantic_index/query.rs read-side result owner
+downstream implementation ../../rust/agent-canon/src/semantic_index/relations.rs relation analysis owner
+downstream implementation ../../rust/agent-canon/src/semantic_index/report.rs JSON/JSONL/text/report-write owner
+downstream implementation ../../rust/agent-canon/src/semantic_index/eval.rs Eval semantics owner
+downstream implementation ../../rust/agent-canon/src/main.rs canonical Rust CLI dispatch caller
+downstream implementation ../../tools/catalog.yaml command catalog and public command source
 downstream implementation ../../tools/agent_tools/review_backlog_scan.sh semantic-index command runner
 downstream implementation ../../tests/agent_tools/test_review_backlog_scan.py command/report behavior oracle
 downstream implementation ../../tests/agent_tools/test_tool_catalog.py command catalog oracle
