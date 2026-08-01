@@ -8,6 +8,7 @@ upstream design structure-planning.md reusable refactor structure contract
 upstream design dependency-analysis.md unified change-impact and repair-planning packet
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback loop
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner contract
+upstream design ./agent-orchestration.md write-capable handoff validation trust boundary and work-conservation owner
 upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings for refactor plans
 upstream design ../internal-routines/design-implementation-correspondence.md design read, clause fingerprint, and drift-block route
 @dependency-end
@@ -293,7 +294,11 @@ validation を使います。
    含めます。
 1. write-capable subagent への handoff は token-bounded にします。必ず exact
    target traces、allowed files、target-by-target repair intent、
-   forbidden semantic delta、test commands、final response format を指定します。
+   forbidden semantic delta、親が選択した exact validation commands、final response
+   format を指定します。validation commands は
+   `agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` の閉じた
+   trust boundary であり、full suite / full scan は owner packet または変更後の
+   responsibility graph が選んだ場合だけ含めます。
    repair intent では、各 target trace ごとに current problem、intended
    structural change、behavior が変わらない理由、non-goals、validation signal を
    親 agent が言語化します。final response は changed paths、validation

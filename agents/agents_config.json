@@ -2853,7 +2853,7 @@
       "approval_policy": "never",
       "model": "gpt-5.3-codex-spark",
       "model_reasoning_effort": "low",
-      "developer_instructions": "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.",
+      "developer_instructions": "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.",
       "logical_role_id": "implementer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/6",
       "profile_id": "spark_implementation_low",
@@ -2877,7 +2877,7 @@
       "return_schema_id": "spark_implementation_result_v1",
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
-      "projection_digest": "2ac6c4a88bc4ae5b18e1319c20120137f26f85b9221d3d495ffa506f84986e29"
+      "projection_digest": "59a128eed6867f3d30a2216ddd5839f7754fa0a82838480f8e29e1ba5750e89f"
     },
     "test_designer": {
       "name": "test_designer",
@@ -2923,7 +2923,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "xhigh",
-      "developer_instructions": "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.",
+      "developer_instructions": "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.",
       "logical_role_id": "implementer+experimenter+infra_steward",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/6+agents/agents_config.json#/specialist_roles/2+agents/agents_config.json#/specialist_roles/9",
       "profile_id": "luna_implementation_xhigh",
@@ -2946,7 +2946,7 @@
       "return_schema_id": "implementation_feedback_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "4148ef03f24e9e7916383342e2d197a1494b62169946840420543fb212f2b654"
+      "projection_digest": "67ec57507fc9d419e25f8daf2cf2ed2c420b2bff1e6d2b2e8ebd22480bcefdeb"
     }
   },
   "roles": [
@@ -3685,7 +3685,7 @@
       "return_schema_id": "spark_implementation_result_v1",
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
-      "projection_digest": "2ac6c4a88bc4ae5b18e1319c20120137f26f85b9221d3d495ffa506f84986e29"
+      "projection_digest": "59a128eed6867f3d30a2216ddd5839f7754fa0a82838480f8e29e1ba5750e89f"
     },
     {
       "id": "test_designer",
@@ -3732,7 +3732,7 @@
       "return_schema_id": "implementation_feedback_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "4148ef03f24e9e7916383342e2d197a1494b62169946840420543fb212f2b654"
+      "projection_digest": "67ec57507fc9d419e25f8daf2cf2ed2c420b2bff1e6d2b2e8ebd22480bcefdeb"
     }
   ],
   "generated_profile_projection": {
@@ -3740,6 +3740,6 @@
     "materializer": "tools/agent_tools/model_profile_registry.py",
     "registry_ref": "agents/model_profiles.toml",
     "role_count": 34,
-    "projection_digest": "87936bf581a121d93b8c7858b81226e2e501971275873f3c87e25587b8e6c0eb"
+    "projection_digest": "df7c396997d45830970d5fd191a6356a82ca13c5a3b1c08871194534532a566b"
   }
 }
