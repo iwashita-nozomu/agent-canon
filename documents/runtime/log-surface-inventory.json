@@ -16284,7 +16284,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "catalog",
-      "line": 909,
+      "line": 919,
       "path": "tools/agent_tools/tool_catalog.py",
       "surface": "tool"
     },
@@ -16292,7 +16292,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 909,
+      "line": 919,
       "path": "tools/agent_tools/tool_catalog.py",
       "surface": "tool"
     },
@@ -16308,7 +16308,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOOL_CATALOG",
-      "line": 990,
+      "line": 1000,
       "path": "tools/agent_tools/tool_catalog.py",
       "surface": "tool"
     },
@@ -16316,7 +16316,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOOL_CATALOG_FINDINGS",
-      "line": 989,
+      "line": 999,
       "path": "tools/agent_tools/tool_catalog.py",
       "surface": "tool"
     },

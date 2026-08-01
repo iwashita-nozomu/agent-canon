@@ -10,15 +10,14 @@
 use super::args::{
     DiscourseRelationsArgs, NaturalRelationsArgs, SimilarArgs, SimilarKind, ThinDocsArgs,
 };
-use super::model::{
-    blob_to_vector, hex_hash, run_id, unix_millis, vector_to_blob, IndexedNode, TextNode,
-};
+use super::model::{blob_to_vector, hex_hash, vector_to_blob, IndexedNode, TextNode};
 use rusqlite::{params, Connection};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub(super) struct SimilarPairRow {
     pub(super) left_node_id: i64,
@@ -69,6 +68,21 @@ pub(super) struct DiscourseRelationRow {
     pub(super) ambiguity: String,
     pub(super) gap_flags: Vec<String>,
     pub(super) rank: usize,
+}
+
+pub(super) fn temporary_db_identity() -> String {
+    run_id()
+}
+
+fn unix_millis() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+}
+
+fn run_id() -> String {
+    unix_millis().to_string()
 }
 
 pub(super) fn persist_pairs(args: &SimilarArgs, pairs: &[SimilarPairRow]) -> Result<(), String> {

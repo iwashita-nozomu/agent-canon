@@ -10,7 +10,6 @@
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub(super) struct TextNode {
     pub(super) kind: String,
@@ -193,15 +192,4 @@ pub(super) fn hex_hash(text: &str) -> String {
 pub(super) fn bytes_hex_hash(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
-pub(super) fn unix_millis() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
-}
-
-pub(super) fn run_id() -> String {
-    format!("{}", unix_millis())
 }

@@ -20,12 +20,12 @@ use super::report::{
 };
 use super::storage::{
     persist_discourse_relations, persist_natural_relations, persist_pairs, persist_thin_docs,
-    DiscourseRelationRow, NaturalRelationRow, SimilarPairRow, ThinDocRow,
+    temporary_db_identity, DiscourseRelationRow, NaturalRelationRow, SimilarPairRow, ThinDocRow,
 };
 use serde_json::Value;
 
 pub(super) fn run(args: &[String]) -> i32 {
-    match parse_args(args) {
+    match parse_args(args, temporary_db_identity) {
         Ok(ParsedArgs::Command(SemanticCommand::Help)) => {
             print_usage();
             0

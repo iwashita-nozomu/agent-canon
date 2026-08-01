@@ -19,7 +19,7 @@ use super::embedding::{
     bound_remote_embedding_text, dot, embed_text, parse_openai_embeddings_response,
 };
 use super::eval::{compare_providers, eval_output, run_eval};
-use super::model::{responsibility_scope_bucket, run_id, IndexedNode};
+use super::model::{responsibility_scope_bucket, IndexedNode};
 use super::pipeline::{build_index, embed_existing_nodes};
 use super::query::{context_pack, responsibility_tree, search_index};
 use super::relations::{
@@ -30,7 +30,8 @@ use super::report::{pair_json, responsibility_tree_report_json, write_pretty_rep
 use super::source::segment_text;
 use super::storage::{
     insert_embedding, load_nodes, open_cache_connection, persist_discourse_relations,
-    persist_natural_relations, provider_dimensions, DiscourseRelationRow, NaturalRelationRow,
+    persist_natural_relations, provider_dimensions, temporary_db_identity, DiscourseRelationRow,
+    NaturalRelationRow,
 };
 use serde_json::Value;
 use std::env;
@@ -750,7 +751,7 @@ fn parse_search_requires_query() {
         "--format".to_string(),
         "json".to_string(),
     ];
-    let error = parse_args(&args).unwrap_err();
+    let error = parse_args(&args, temporary_db_identity).unwrap_err();
     assert!(error.contains("--query, --query-file, or --query-stdin is required"));
 }
 
@@ -1285,7 +1286,7 @@ fn parse_similar_rejects_non_positive_min_score() {
         "--min-score".to_string(),
         "0".to_string(),
     ];
-    let error = parse_args(&args).unwrap_err();
+    let error = parse_args(&args, temporary_db_identity).unwrap_err();
     assert!(error.contains("--min-score must be greater than zero"));
 }
 
@@ -1305,7 +1306,7 @@ fn parse_search_accepts_query_file_and_jsonl_for_long_text() {
         "--format".to_string(),
         "jsonl".to_string(),
     ];
-    let ParsedArgs::Search(parsed) = parse_args(&args).unwrap() else {
+    let ParsedArgs::Search(parsed) = parse_args(&args, temporary_db_identity).unwrap() else {
         panic!("expected search args");
     };
     assert!(parsed.query.contains("natural-language task"));
@@ -1580,7 +1581,11 @@ fn absolute_include_outside_root_is_rejected() {
 }
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
-    let path = env::temp_dir().join(format!("{prefix}-{}-{}", std::process::id(), run_id()));
+    let path = env::temp_dir().join(format!(
+        "{prefix}-{}-{}",
+        std::process::id(),
+        temporary_db_identity()
+    ));
     fs::create_dir_all(&path).unwrap();
     path
 }

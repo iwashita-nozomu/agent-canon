@@ -7,7 +7,6 @@
 // downstream implementation ../../../../tools/agent_tools/review_backlog_scan.sh process-level semantic-index behavior oracle
 // @dependency-end
 
-use super::model::run_id;
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
@@ -238,7 +237,10 @@ pub(super) enum ParsedArgs {
     EvalOutput(EvalOutputArgs),
 }
 
-pub(super) fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
+pub(super) fn parse_args(
+    args: &[String],
+    temporary_db_identity: fn() -> String,
+) -> Result<ParsedArgs, String> {
     let Some(raw_command) = args.first() else {
         return Ok(ParsedArgs::Command(SemanticCommand::Help));
     };
@@ -272,7 +274,10 @@ pub(super) fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
         "discourse-relations" | "discourse-edges" => Ok(ParsedArgs::DiscourseRelations(
             parse_discourse_relations_args(&args[1..])?,
         )),
-        "eval" => Ok(ParsedArgs::Eval(parse_eval_args(&args[1..])?)),
+        "eval" => Ok(ParsedArgs::Eval(parse_eval_args(
+            &args[1..],
+            temporary_db_identity,
+        )?)),
         "compare-providers" => Ok(ParsedArgs::CompareProviders(parse_compare_providers_args(
             &args[1..],
         )?)),
@@ -960,13 +965,16 @@ fn parse_discourse_relations_args(args: &[String]) -> Result<DiscourseRelationsA
     Ok(parsed)
 }
 
-fn parse_eval_args(args: &[String]) -> Result<EvalArgs, String> {
+fn parse_eval_args(
+    args: &[String],
+    temporary_db_identity: fn() -> String,
+) -> Result<EvalArgs, String> {
     let mut fixture: Option<PathBuf> = None;
     let mut parsed = EvalArgs {
         fixture: PathBuf::new(),
         db: env::temp_dir().join(format!(
             "agent-canon-semantic-index-eval-{}.sqlite",
-            run_id()
+            temporary_db_identity()
         )),
         report: None,
         provider: DEFAULT_PROVIDER.to_string(),

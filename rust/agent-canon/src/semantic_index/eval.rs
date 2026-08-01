@@ -12,7 +12,6 @@ use super::args::{
     SearchArgs, SimilarKind, DEFAULT_EMBEDDING_BATCH, DEFAULT_MAX_FILE_BYTES, DEFAULT_MIN_SCORE,
 };
 use super::embedding::{cosine_score, embed_one_for_provider};
-use super::model::unix_millis;
 use super::model::{sorted_difference, sorted_intersection, IndexedNode, ScoredNode};
 use super::pipeline::build_index;
 use super::query::{score_nodes, search_index};
@@ -23,6 +22,7 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub(super) fn max_path_pair_score(
     nodes: &[IndexedNode],
@@ -156,9 +156,16 @@ pub(super) fn run_eval(args: &EvalArgs) -> Result<Value, String> {
         embedding_batch: DEFAULT_EMBEDDING_BATCH,
         max_file_bytes: DEFAULT_MAX_FILE_BYTES,
     };
-    let started = unix_millis();
+    let started = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
     let stats = build_index(&build_args)?;
-    let build_ms = unix_millis().saturating_sub(started);
+    let build_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .saturating_sub(started);
     let queries = eval_queries(args, &expected)?;
     let pairs = eval_pairs(args, &expected, false)?;
     let must_not = eval_pairs(args, &expected, true)?;
