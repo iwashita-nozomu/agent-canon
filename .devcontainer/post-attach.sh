@@ -75,9 +75,9 @@ if [ -S /var/run/docker.sock ]; then
   docker_socket_status="mounted"
 fi
 
-codex_home_status="container-local (host mount forbidden)"
+codex_state_status="container-local"
 if grep -F '/root/.codex' /proc/self/mountinfo >/dev/null 2>&1; then
-  codex_home_status="forbidden-host-mount-detected"
+  codex_state_status="forbidden-host-mount-detected"
 fi
 
 codex_login_status="unauthenticated"
@@ -151,7 +151,7 @@ echo "gpu-notice: ${DEVCONTAINER_GPU_NOTICE:-<unset>}"
 echo "/mnt/git: ${mnt_git_status}"
 echo "secret-mount: ${secret_mount_status} (${secret_mount_target}, mode=${AGENT_CANON_SECRET_DIR_MODE:-ro})"
 echo "docker-socket: ${docker_socket_status}"
-echo "host-codex-home: ${codex_home_status}"
+echo "codex-state: ${codex_state_status}"
 echo "runtime-root: ${runtime_root} ($(if [ -d "$runtime_root" ]; then echo available; else echo missing; fi))"
 echo "runtime-readback: ${readback_receipt} ($(if [ -f "$readback_receipt" ]; then echo published; else echo missing; fi))"
 echo "source-projection: ${source_projection_root} ($(if [ -f "$runtime_root/tool-availability.json" ]; then echo cataloged-tools-readback; else echo missing; fi))"
