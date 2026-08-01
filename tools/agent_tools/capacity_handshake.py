@@ -4,7 +4,7 @@
 # responsibility Owns typed capacity derivation, spawn reservations, saturation queues, and descendant lifecycle CAS.
 # upstream implementation ../../agents/capacity_policy.toml declares topology and projection policy
 # upstream implementation ../../.codex/config.toml provides configured capacity loader readback
-# downstream implementation ./agent_team.py consumes capacity and records successful spawns
+# downstream implementation ./implementation_dispatch.py consumes capacity and records successful spawns
 # downstream implementation ./implementation_route.py consumes availability for Spark routing
 # downstream implementation ./task_close.py validates postorder close tokens and release state
 # downstream implementation ../../tests/agent_tools/test_capacity_handshake.py tests capacity and lifecycle behavior

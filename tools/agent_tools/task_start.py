@@ -18,59 +18,138 @@ UTC = timezone.utc
 from pathlib import Path
 
 from agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
-from agent_team import (
-    ACTIVE_DESIGN_PACKET_SCHEMA,
-    ActiveDesignPacketConfig,
-    AgentTypeSelection,
-    Role,
-    RunBundleSpec,
-    TaskCatalog,
-    TeamConfig,
-    language_review_candidates,
-    capacity_start_output_lines,
-    codex_agent_model_matrix_for_roles,
-    codex_runtime_max_depth,
-    codex_runtime_max_threads,
-    contract_complete_implementation_policy_output_lines,
-    create_run_bundle,
-    current_stage_skills,
-    default_quality_check_policy_output_lines,
-    default_review_pack_ids_for_task,
-    default_specialists_for_task,
-    deferred_stage_skills,
-    enable_choices,
-    expand_enabled_specialists,
-    format_agent_type_selections,
-    format_subagent_role_instance_wave_chunks,
-    format_subagent_wave,
-    format_subagent_wave_chunks,
-    load_task_catalog,
-    load_team_config,
-    make_run_id,
-    parse_active_design_packet_input,
-    parse_agent_type_selections,
-    pre_handoff_gate_status_output_lines,
-    pre_handoff_scope_policy_output_lines,
-    recommended_dynamic_expansion_wave_slots,
-    recommended_dynamic_expansion_waves,
-    recommended_initial_subagent_wave,
-    repo_tool_routing_policy_output_lines,
-    resolve_cross_cutting_document_packet,
-    resolve_report_root,
-    resolve_role_document_packet,
-    resolve_task_spec,
-    resolve_workflow_family,
-    run_active_design_packet,
-    same_role_subagent_policy_output_lines,
-    select_roles,
-    standard_agent_wave_sequence_output_lines,
-    subagent_wave_record_command,
-    suggested_public_skills,
-    task_ids,
-    user_facing_language_policy_output_lines,
-    validate_agent_type_selections,
-    workflow_spawn_budget,
-)
+
+if __package__:
+    from .packets import (
+        ACTIVE_DESIGN_PACKET_SCHEMA,
+        ActiveDesignPacketConfig,
+        parse_active_design_packet_input,
+        resolve_cross_cutting_document_packet,
+        resolve_role_document_packet,
+    )
+else:
+    from packets import (
+        ACTIVE_DESIGN_PACKET_SCHEMA,
+        ActiveDesignPacketConfig,
+        parse_active_design_packet_input,
+        resolve_cross_cutting_document_packet,
+        resolve_role_document_packet,
+    )
+
+if __package__:
+    from .team_config import (
+        AgentTypeSelection,
+        Role,
+        RunBundleSpec,
+        TaskCatalog,
+        TeamConfig,
+        codex_agent_model_matrix_for_roles,
+        current_stage_skills,
+        default_review_pack_ids_for_task,
+        default_specialists_for_task,
+        deferred_stage_skills,
+        enable_choices,
+        expand_enabled_specialists,
+        load_task_catalog,
+        load_team_config,
+        resolve_task_spec,
+        resolve_workflow_family,
+        select_roles,
+        task_ids,
+    )
+else:
+    from team_config import (
+        AgentTypeSelection,
+        Role,
+        RunBundleSpec,
+        TaskCatalog,
+        TeamConfig,
+        codex_agent_model_matrix_for_roles,
+        current_stage_skills,
+        default_review_pack_ids_for_task,
+        default_specialists_for_task,
+        deferred_stage_skills,
+        enable_choices,
+        expand_enabled_specialists,
+        load_task_catalog,
+        load_team_config,
+        resolve_task_spec,
+        resolve_workflow_family,
+        select_roles,
+        task_ids,
+    )
+
+if __package__:
+    from .manifest_rendering import (
+        contract_complete_implementation_policy_output_lines,
+        default_quality_check_policy_output_lines,
+        format_subagent_role_instance_wave_chunks,
+        format_subagent_wave,
+        format_subagent_wave_chunks,
+        language_review_candidates,
+        pre_handoff_gate_status_output_lines,
+        pre_handoff_scope_policy_output_lines,
+        repo_tool_routing_policy_output_lines,
+        same_role_subagent_policy_output_lines,
+        standard_agent_wave_sequence_output_lines,
+        subagent_wave_record_command,
+        suggested_public_skills,
+        user_facing_language_policy_output_lines,
+    )
+else:
+    from manifest_rendering import (
+        contract_complete_implementation_policy_output_lines,
+        default_quality_check_policy_output_lines,
+        format_subagent_role_instance_wave_chunks,
+        format_subagent_wave,
+        format_subagent_wave_chunks,
+        language_review_candidates,
+        pre_handoff_gate_status_output_lines,
+        pre_handoff_scope_policy_output_lines,
+        repo_tool_routing_policy_output_lines,
+        same_role_subagent_policy_output_lines,
+        standard_agent_wave_sequence_output_lines,
+        subagent_wave_record_command,
+        suggested_public_skills,
+        user_facing_language_policy_output_lines,
+    )
+
+if __package__:
+    from .implementation_dispatch import (
+        capacity_start_output_lines,
+        codex_runtime_max_depth,
+        codex_runtime_max_threads,
+        format_agent_type_selections,
+        parse_agent_type_selections,
+        recommended_dynamic_expansion_wave_slots,
+        recommended_dynamic_expansion_waves,
+        recommended_initial_subagent_wave,
+        validate_agent_type_selections,
+        workflow_spawn_budget,
+    )
+else:
+    from implementation_dispatch import (
+        capacity_start_output_lines,
+        codex_runtime_max_depth,
+        codex_runtime_max_threads,
+        format_agent_type_selections,
+        parse_agent_type_selections,
+        recommended_dynamic_expansion_wave_slots,
+        recommended_dynamic_expansion_waves,
+        recommended_initial_subagent_wave,
+        validate_agent_type_selections,
+        workflow_spawn_budget,
+    )
+
+if __package__:
+    from .agent_team import create_run_bundle, run_active_design_packet
+else:
+    from agent_team import create_run_bundle, run_active_design_packet
+
+if __package__:
+    from .workspace_scope import make_run_id, resolve_report_root
+else:
+    from workspace_scope import make_run_id, resolve_report_root
 from task_authority import write_task_authority_baselines
 from workflow_monitor import append_monitoring
 

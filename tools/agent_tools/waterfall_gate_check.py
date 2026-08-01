@@ -4,7 +4,8 @@
 # responsibility Provides waterfall gate check agent workflow automation.
 # upstream design ../README.md shared automation index
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md active design packet schema contract
-# upstream implementation ./agent_team.py owns active design packet schema constants and path resolution
+# upstream implementation ./packets.py owns active design packet schema constants and normalization
+# upstream implementation ./workspace_scope.py owns report path resolution
 # @dependency-end
 
 """Check intermediate waterfall gate readiness for one agent run bundle."""
@@ -20,16 +21,36 @@ from pathlib import Path
 from typing import TypeGuard, cast
 
 import yaml
-from agent_team import (
-    ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS,
-    ACTIVE_DESIGN_PACKET_FIELDS,
-    ACTIVE_DESIGN_PACKET_SCHEMA,
-    ReportBundleArtifactPathError,
-    active_design_packet_mapping,
-    normalize_active_design_packet_config,
-    resolve_report_bundle_artifact_path,
-    resolve_report_root,
-)
+
+if __package__:
+    from .packets import (
+        ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS,
+        ACTIVE_DESIGN_PACKET_FIELDS,
+        ACTIVE_DESIGN_PACKET_SCHEMA,
+        active_design_packet_mapping,
+        normalize_active_design_packet_config,
+    )
+else:
+    from packets import (
+        ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS,
+        ACTIVE_DESIGN_PACKET_FIELDS,
+        ACTIVE_DESIGN_PACKET_SCHEMA,
+        active_design_packet_mapping,
+        normalize_active_design_packet_config,
+    )
+
+if __package__:
+    from .workspace_scope import (
+        ReportBundleArtifactPathError,
+        resolve_report_bundle_artifact_path,
+        resolve_report_root,
+    )
+else:
+    from workspace_scope import (
+        ReportBundleArtifactPathError,
+        resolve_report_bundle_artifact_path,
+        resolve_report_root,
+    )
 from report_artifact_checks import (
     check_schedule_artifact,
     check_work_log_artifact,

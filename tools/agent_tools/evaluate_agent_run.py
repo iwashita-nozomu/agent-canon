@@ -25,7 +25,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from agent_team import resolve_report_root
+if __package__:
+    from .workspace_scope import resolve_report_root
+else:
+    from workspace_scope import resolve_report_root
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
 from report_artifact_checks import (
     check_final_review_artifact,

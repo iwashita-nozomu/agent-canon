@@ -2,7 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Provides task close agent workflow automation.
-# upstream implementation ./agent_team.py resolves report root defaults
+# upstream implementation ./workspace_scope.py resolves report root defaults and write scope
+# upstream implementation ./tool_calls.py materializes close-agent ToolCalls
 # upstream implementation ./capacity_handshake.py owns lifecycle state, reservations, and postorder release
 # upstream implementation ./report_artifact_checks.py validates schedule and work log artifacts
 # upstream implementation ./update_lifecycle_contract.py owns gate, cleanup, handback, and terminal ToolCall identities.
@@ -27,11 +28,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import capacity_handshake
-from agent_team import (
-    CloseAgentLifecycleEvidence,
-    materialize_close_agent_tool_call,
-    resolve_report_root,
-)
+
+if __package__:
+    from .tool_calls import (
+        CloseAgentLifecycleEvidence,
+        materialize_close_agent_tool_call,
+    )
+else:
+    from tool_calls import (
+        CloseAgentLifecycleEvidence,
+        materialize_close_agent_tool_call,
+    )
+
+if __package__:
+    from .workspace_scope import resolve_report_root
+else:
+    from workspace_scope import resolve_report_root
 from report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
     COMPLETION_COVERAGE_TAXONOMY_REFS,
@@ -68,8 +80,6 @@ COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
 
 def _resolve_report_root(report_root: str | None, workspace_root: Path) -> Path:
     """Load the team CLI helper only for the CLI/report path."""
-    from agent_team import resolve_report_root
-
     return resolve_report_root(report_root, workspace_root)
 
 

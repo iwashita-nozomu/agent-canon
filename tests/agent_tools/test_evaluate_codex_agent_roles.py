@@ -23,13 +23,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_codex_agent_roles.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from agent_team import (  # noqa: E402
-    load_task_catalog,
-    load_team_config,
+from implementation_dispatch import (  # noqa: E402
     recommended_dynamic_expansion_wave_slots,
     recommended_initial_subagent_wave,
-    select_roles,
 )
+from team_config import load_task_catalog, load_team_config, select_roles  # noqa: E402
 
 FIRST_RUNTIME_TOKENS = 100
 FIRST_RUNTIME_LATENCY_MS = 25

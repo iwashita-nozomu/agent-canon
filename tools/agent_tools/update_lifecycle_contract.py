@@ -8,7 +8,7 @@
 # upstream implementation ./artifact_identity.py provides canonical JSON serialization.
 # upstream implementation ../../tools/ci/check_agent_canon_pr.py provides the authoritative G2 owner API consumed through SourceProjectionGateOwnerApis.
 # upstream implementation ./github_publish.py provides the authoritative G3 owner API consumed through SourceProjectionGateOwnerApis.
-# downstream implementation ./agent_team.py materializes lifecycle-bound subagent and close ToolCall packets.
+# downstream implementation ./tool_calls.py materializes lifecycle-bound subagent and close ToolCall packets.
 # downstream implementation ./github_publish.py consumes immutable pull-request lifecycle and gate evidence.
 # downstream implementation ./publication_integrator.py consumes candidate CAS and publication receipts.
 # downstream implementation ./task_close.py consumes closeout coverage without revalidating upstream gates.
@@ -206,7 +206,7 @@ GATE_CONTRACTS: dict[str, dict[str, object]] = {
     "G6": {
         "invariant": "nested_lifecycle_cleanup",
         "owners": (
-            "tools/agent_tools/agent_team.py#materialize_close_agent_tool_call",
+            "tools/agent_tools/tool_calls.py#materialize_close_agent_tool_call",
         ),
     },
 }

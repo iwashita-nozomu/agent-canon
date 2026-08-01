@@ -3,6 +3,10 @@
 # responsibility Tests test task start and close behavior.
 # upstream design ../../tools/README.md validated automation surface
 # upstream implementation ../../tools/agent_tools/agent_canon_preflight.py preflight routing under test
+# upstream implementation ../../tools/agent_tools/packets.py owns packet normalization under test
+# upstream implementation ../../tools/agent_tools/tool_calls.py owns typed lifecycle tool calls under test
+# upstream implementation ../../tools/agent_tools/team_config.py owns team configuration under test
+# upstream implementation ../../tools/agent_tools/implementation_dispatch.py owns dispatch under test
 # @dependency-end
 
 """Tests for machine-driven task start and close commands."""
@@ -27,18 +31,34 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "ci"))
 
-import agent_team  # noqa: E402
-from agent_team import (  # noqa: E402
-    AgentTypeSelection,
-    load_team_config,
-    validate_agent_type_selections,
-)
-from task_authority import hash_baseline_bytes  # noqa: E402
-from report_artifact_checks import write_completion_coverage_artifact  # noqa: E402
-from task_close import update_lifecycle_closeout_consumer  # noqa: E402
 from check_agent_canon_pr import (  # noqa: E402
     GENERATED_COMPLETENESS_CHECK_IDS,
     materialize_generated_completeness_receipt,
+)
+from implementation_dispatch import (  # noqa: E402
+    default_quality_check_agent_types,
+    recommended_dynamic_expansion_wave_slots,
+    recommended_initial_subagent_wave,
+    unique_codex_agents_for_roles,
+    validate_agent_type_selections,
+    workflow_spawn_budget,
+)
+from packets import (  # noqa: E402
+    active_design_packet_mapping,
+    resolve_active_design_packet_config,
+)
+from report_artifact_checks import write_completion_coverage_artifact  # noqa: E402
+from task_authority import hash_baseline_bytes  # noqa: E402
+from task_close import update_lifecycle_closeout_consumer  # noqa: E402
+from team_config import (  # noqa: E402
+    AgentTypeSelection,
+    load_task_catalog,
+    load_team_config,
+    select_roles,
+)
+from tool_calls import (  # noqa: E402
+    CloseAgentLifecycleEvidence,
+    materialize_close_agent_tool_call,
 )
 from update_lifecycle_contract import (  # noqa: E402
     materialize_descendant_close_receipt,
@@ -85,9 +105,7 @@ def selected_active_design_packet(prefix: str) -> dict[str, object]:
     """Build a current closed packet while rebinding every selected output."""
     config = load_team_config()
     packet = deepcopy(
-        agent_team.active_design_packet_mapping(
-            agent_team.resolve_active_design_packet_config(config)
-        )
+        active_design_packet_mapping(resolve_active_design_packet_config(config))
     )
     selected = {
         "design_artifact": f"{prefix}_design_brief.md",
@@ -239,10 +257,10 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
             evidence_ref="evidence:" + "0" * 64,
         )
     ]
-    closeout = agent_team.materialize_close_agent_tool_call(
+    closeout = materialize_close_agent_tool_call(
         run_id="run-update-lifecycle",
         agent_id="agent:owner",
-        evidence=agent_team.CloseAgentLifecycleEvidence(
+        evidence=CloseAgentLifecycleEvidence(
             gate_verdicts=gates,
             cleanup_proof=cleanup,
             durable_handback=handback,
@@ -2330,34 +2348,34 @@ class TaskStartAndCloseTest(unittest.TestCase):
     def test_empty_registry_does_not_materialize_configured_candidates(self) -> None:
         """Configured codex_agents are candidate order, not executable availability."""
         config = load_team_config()
-        catalog = agent_team.load_task_catalog(config)
-        roles = agent_team.select_roles(
+        catalog = load_task_catalog(config)
+        roles = select_roles(
             config,
             ["implementer", "change_reviewer", "docs_workflow_steward"],
             full_team=False,
             catalog=catalog,
             workflow_family_id="comprehensive_development",
         )
-        active_subagents, _max_write_subagents = agent_team.workflow_spawn_budget(
+        active_subagents, _max_write_subagents = workflow_spawn_budget(
             catalog,
             "comprehensive_development",
         )
 
-        self.assertIn("worker", agent_team.unique_codex_agents_for_roles(roles))
+        self.assertIn("worker", unique_codex_agents_for_roles(roles))
 
-        with patch("agent_team.registered_codex_agent_types", return_value=set()):
-            initial_wave = agent_team.recommended_initial_subagent_wave(
+        with patch("implementation_dispatch.registered_codex_agent_types", return_value=set()):
+            initial_wave = recommended_initial_subagent_wave(
                 roles,
                 active_subagents,
                 catalog,
             )
-            dynamic_waves = agent_team.recommended_dynamic_expansion_wave_slots(
+            dynamic_waves = recommended_dynamic_expansion_wave_slots(
                 roles,
                 active_subagents,
                 initial_wave,
                 catalog,
             )
-            quality_agent_types = agent_team.default_quality_check_agent_types(roles)
+            quality_agent_types = default_quality_check_agent_types(roles)
 
         self.assertEqual(initial_wave, ())
         self.assertEqual(dynamic_waves, ())

@@ -2,7 +2,8 @@
 # contract test
 # responsibility Tests test waterfall gate check behavior.
 # upstream design ../../tools/README.md validated automation surface
-# upstream implementation ../../tools/agent_tools/agent_team.py owns canonical active-packet projection loading
+# upstream implementation ../../tools/agent_tools/packets.py owns canonical active-packet projection loading
+# upstream implementation ../../tools/agent_tools/workspace_scope.py owns report path resolution
 # @dependency-end
 
 """Tests for intermediate waterfall gate checks."""
@@ -23,15 +24,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from agent_team import (  # noqa: E402
+from packets import (  # noqa: E402
     ACTIVE_DESIGN_PACKET_SCHEMA,
-    RunBundleSpec,
     active_design_packet_mapping,
     active_design_packet_reference_projection,
-    load_team_config,
     normalize_active_design_packet_config,
     resolve_active_design_packet_config,
 )
+from team_config import RunBundleSpec, load_team_config  # noqa: E402
 
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 GATE_CHECK_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "waterfall_gate_check.py"

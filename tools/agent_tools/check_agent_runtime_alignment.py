@@ -11,7 +11,8 @@
 # upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
 # upstream implementation ./model_profile_registry.py owns canonical model/profile projections
 # upstream implementation ./capacity_handshake.py owns typed capacity readback
-# upstream implementation ./agent_team.py owns active design packet normalization and materialization
+# upstream implementation ./packets.py owns active design packet normalization and materialization
+# upstream implementation ./team_config.py owns team and role configuration resolution
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""
@@ -20,50 +21,98 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 import tempfile
-import shutil
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
+import sys
 from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
-import yaml
 import model_profile_registry
-from agent_team import (
-    ROOT,
-    Role,
-    RunBundleSpec,
-    TaskCatalog,
-    TeamConfig,
-    codex_runtime_max_depth,
-    codex_runtime_max_threads,
-    declared_team_capacity_derivation,
-    create_run_bundle,
-    default_specialists_for_task,
-    load_task_catalog,
-    load_team_config,
-    recommended_dynamic_expansion_wave_slots,
-    recommended_initial_subagent_wave,
-    required_output_templates_missing,
-    resolve_active_design_packet_config,
-    resolve_cross_cutting_document_packet,
-    resolve_role,
-    resolve_role_document_packet,
-    select_roles,
-    task_ids,
-    workflow_spawn_budget,
-    workflow_topology_policy_violations,
-)
+import yaml
+
+if __package__:
+    from .team_config import (
+        ROOT,
+        Role,
+        RunBundleSpec,
+        TaskCatalog,
+        TeamConfig,
+        default_specialists_for_task,
+        load_task_catalog,
+        load_team_config,
+        resolve_role,
+        select_roles,
+        task_ids,
+    )
+else:
+    from team_config import (
+        ROOT,
+        Role,
+        RunBundleSpec,
+        TaskCatalog,
+        TeamConfig,
+        default_specialists_for_task,
+        load_task_catalog,
+        load_team_config,
+        resolve_role,
+        select_roles,
+        task_ids,
+    )
+
+if __package__:
+    from .implementation_dispatch import (
+        codex_runtime_max_depth,
+        codex_runtime_max_threads,
+        declared_team_capacity_derivation,
+        recommended_dynamic_expansion_wave_slots,
+        recommended_initial_subagent_wave,
+        workflow_spawn_budget,
+        workflow_topology_policy_violations,
+    )
+else:
+    from implementation_dispatch import (
+        codex_runtime_max_depth,
+        codex_runtime_max_threads,
+        declared_team_capacity_derivation,
+        recommended_dynamic_expansion_wave_slots,
+        recommended_initial_subagent_wave,
+        workflow_spawn_budget,
+        workflow_topology_policy_violations,
+    )
+
+if __package__:
+    from .agent_team import create_run_bundle
+else:
+    from agent_team import create_run_bundle
+
+if __package__:
+    from .manifest_rendering import required_output_templates_missing
+else:
+    from manifest_rendering import required_output_templates_missing
+
+if __package__:
+    from .packets import (
+        resolve_active_design_packet_config,
+        resolve_cross_cutting_document_packet,
+        resolve_role_document_packet,
+    )
+else:
+    from packets import (
+        resolve_active_design_packet_config,
+        resolve_cross_cutting_document_packet,
+        resolve_role_document_packet,
+    )
 from skill_route_catalog import load_skill_route_rules
 from vendor_skill_adapters import VendorSkillValidator
 

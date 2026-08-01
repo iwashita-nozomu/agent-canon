@@ -5,7 +5,7 @@
 # upstream implementation ../../agents/model_profiles.toml declares canonical profiles and explicit role bindings
 # upstream implementation ../../.codex/config.toml declares registered role descriptions
 # downstream implementation ./implementation_route.py selects the fixed Spark profile
-# downstream implementation ./agent_team.py materializes implementation prompts and close tokens
+# downstream implementation ./implementation_dispatch.py materializes implementation prompts and close tokens
 # downstream implementation ./check_agent_runtime_alignment.py validates generated projections
 # downstream implementation ../../tests/agent_tools/test_model_profile_registry.py tests closed registry behavior
 # @dependency-end

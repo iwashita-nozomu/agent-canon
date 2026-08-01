@@ -9,7 +9,8 @@
 # upstream design ../../agents/skills/subagent-bootstrap.md owns review launch and resume mechanics.
 # upstream design ../../agents/skills/change-review.md owns findings-first candidate review decisions.
 # upstream design ../../agents/skills/pr-processing.md owns PR-head review handling.
-# upstream implementation ./agent_team.py resolves task, role, agent type, and resume routing.
+# upstream implementation ./team_config.py resolves task, role, and resume routing.
+# upstream implementation ./implementation_dispatch.py resolves agent type and dispatch routing.
 # upstream implementation ./workflow_monitor.py produces write-result triggers and records review waves.
 # upstream implementation ./github_publish.py produces verified PR-head update triggers.
 # upstream implementation ./artifact_identity.py materializes review artifact byte identities.

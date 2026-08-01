@@ -7,6 +7,7 @@
 # upstream implementation ./skill_route_catalog.py owns typed route and dependency projections
 # upstream implementation ./skill_dependency_map.py owns graph/tool identity projections
 # upstream implementation ./skill_tool_commands.py owns read-only command packets
+# upstream implementation ./tool_calls.py owns skill ToolCall token materialization
 # downstream implementation ../../tests/agent_tools/test_skill_shim_materializer.py validates migration, readback, and fixed point
 # @dependency-end
 """Materialize the canonical thin runtime shims for all public skills."""
@@ -33,7 +34,11 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility.
 
 import yaml
 from agent_canon_source_root import resolve_agent_canon_source_root
-from agent_team import materialize_skill_tool_call_token
+
+if __package__:
+    from .tool_calls import materialize_skill_tool_call_token
+else:
+    from tool_calls import materialize_skill_tool_call_token
 from skill_dependency_map import build_graph
 from skill_route_catalog import (
     SkillDependencyRule,
@@ -50,9 +55,7 @@ FIXED_POINT_SCHEMA = "agent_canon.skill_runtime_shim.fixed_point"
 MATERIALIZER_ID = "skill_shim_materializer.v1"
 TEMPLATE_ID = "skill-runtime-shim-md-v1"
 COMMAND_PACKET_TEMPLATE_ID = "skill-tool-command-packet-v2"
-MATERIALIZATION_RECORD_SCHEMA = (
-    "agent_canon.skill_runtime_shim.materialization_record"
-)
+MATERIALIZATION_RECORD_SCHEMA = "agent_canon.skill_runtime_shim.materialization_record"
 MATERIALIZATION_RECORD_VERSION = 1
 MIGRATION_BASELINE_PATH = Path(
     "tests/fixtures/skill-runtime-shim/migration-baseline/expected.json"
@@ -70,6 +73,8 @@ SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 ABSOLUTE_LOCATOR_RE = re.compile(
     r"(?<![A-Za-z0-9._~/<>-])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+"
 )
+
+
 class MaterializerError(RuntimeError):
     """One stable fail-closed materializer error."""
 
@@ -192,7 +197,9 @@ def canonical_json_bytes(value: object) -> bytes:
 
 def domain_digest(domain: str, value: object) -> str:
     """Hash one canonical value in a named digest domain."""
-    return hashlib.sha256(domain.encode("utf-8") + b"\0" + canonical_json_bytes(value)).hexdigest()
+    return hashlib.sha256(
+        domain.encode("utf-8") + b"\0" + canonical_json_bytes(value)
+    ).hexdigest()
 
 
 def file_digest(path: Path) -> str:
@@ -225,9 +232,13 @@ def _load_migration_baseline(
         raise MaterializerError("migration_baseline_invalid_rows", "host_config_rows")
     payload_map = cast(Mapping[str, object], payload)
     if payload_map.get("schema") != MIGRATION_BASELINE_SCHEMA:
-        raise MaterializerError("migration_baseline_invalid_schema", str(payload_map.get("schema")))
+        raise MaterializerError(
+            "migration_baseline_invalid_schema", str(payload_map.get("schema"))
+        )
     if payload_map.get("version") != VERSION:
-        raise MaterializerError("migration_baseline_invalid_version", str(payload_map.get("version")))
+        raise MaterializerError(
+            "migration_baseline_invalid_version", str(payload_map.get("version"))
+        )
     raw_rows = payload_map.get("host_config_rows")
     if not isinstance(raw_rows, list):
         raise MaterializerError("migration_baseline_invalid_rows", "host_config_rows")
@@ -245,15 +256,9 @@ def _load_migration_baseline(
         rows[skill_id] = {
             "skill_id": skill_id,
             "path": path,
-            "index": _int(
-                row.get("index"), f"host_config_rows[{index}].index"
-            ),
-            "order": _int(
-                row.get("order"), f"host_config_rows[{index}].order"
-            ),
-            "enabled": _bool(
-                row.get("enabled"), f"host_config_rows[{index}].enabled"
-            ),
+            "index": _int(row.get("index"), f"host_config_rows[{index}].index"),
+            "order": _int(row.get("order"), f"host_config_rows[{index}].order"),
+            "enabled": _bool(row.get("enabled"), f"host_config_rows[{index}].enabled"),
             "host_config_entry_digest": _string(
                 row.get("host_config_entry_digest"),
                 f"host_config_rows[{index}].host_config_entry_digest",
@@ -267,7 +272,10 @@ def _load_migration_baseline(
     if set(rows) != set(skill_ids):
         raise MaterializerError(
             "migration_baseline_skill_set_mismatch",
-            json.dumps({"expected": sorted(skill_ids), "actual": sorted(rows)}, ensure_ascii=False),
+            json.dumps(
+                {"expected": sorted(skill_ids), "actual": sorted(rows)},
+                ensure_ascii=False,
+            ),
         )
     if len(rows) != len(skill_ids):
         raise MaterializerError("migration_baseline_count_mismatch", str(len(rows)))
@@ -285,19 +293,34 @@ def _assert_migration_baseline(
     for skill, live in sorted(hosts.items()):
         expected = baseline[skill]
         if live.path != expected["path"]:
-            mismatches.append({"skill_id": skill, "field": "path", "expected": expected["path"], "actual": live.path})
+            mismatches.append(
+                {
+                    "skill_id": skill,
+                    "field": "path",
+                    "expected": expected["path"],
+                    "actual": live.path,
+                }
+            )
         if live.index != expected["index"] or live.order != expected["order"]:
             mismatches.append(
                 {
                     "skill_id": skill,
                     "field": "index_order",
-                    "expected": {"index": expected["index"], "order": expected["order"]},
+                    "expected": {
+                        "index": expected["index"],
+                        "order": expected["order"],
+                    },
                     "actual": {"index": live.index, "order": live.order},
                 }
             )
         if live.enabled != expected["enabled"]:
             mismatches.append(
-                {"skill_id": skill, "field": "enabled", "expected": expected["enabled"], "actual": live.enabled}
+                {
+                    "skill_id": skill,
+                    "field": "enabled",
+                    "expected": expected["enabled"],
+                    "actual": live.enabled,
+                }
             )
         if live.digest != expected["host_config_entry_digest"]:
             mismatches.append(
@@ -327,7 +350,9 @@ def _bool(value: object, field: str) -> bool:
     return value
 
 
-def _catalog_entries(root: Path) -> tuple[tuple[str, ...], dict[str, Mapping[str, object]]]:
+def _catalog_entries(
+    root: Path,
+) -> tuple[tuple[str, ...], dict[str, Mapping[str, object]]]:
     """Load the complete public catalog and its discovery source."""
     data = load_skill_catalog(root)
     families = data.get("skill_families")
@@ -437,16 +462,25 @@ def _packet_payload(packet: SkillCommandPacket, root: Path) -> dict[str, object]
                 ],
                 value,
             )
-            for logical, _source_root, _execution_cwd, root_bindings, argv in resolved_commands:
+            for (
+                logical,
+                _source_root,
+                _execution_cwd,
+                root_bindings,
+                argv,
+            ) in resolved_commands:
                 resolved_argv: list[str] = []
                 for token in argv:
                     token_path = Path(token)
                     normalized_token = token
                     if token_path.is_absolute():
                         try:
-                            normalized_token = "@root/" + token_path.resolve().relative_to(
-                                root.resolve()
-                            ).as_posix()
+                            normalized_token = (
+                                "@root/"
+                                + token_path.resolve()
+                                .relative_to(root.resolve())
+                                .as_posix()
+                            )
                         except ValueError:
                             normalized_token = "@absolute"
                     resolved_argv.append(normalized_token)
@@ -455,13 +489,18 @@ def _packet_payload(packet: SkillCommandPacket, root: Path) -> dict[str, object]
                     binding_path = Path(binding)
                     if binding_path.is_absolute():
                         try:
-                            binding = "@root/" + binding_path.resolve().relative_to(
-                                root.resolve()
-                            ).as_posix()
+                            binding = (
+                                "@root/"
+                                + binding_path.resolve()
+                                .relative_to(root.resolve())
+                                .as_posix()
+                            )
                         except ValueError:
                             binding = "@absolute"
                     normalized_bindings.append([binding_key, binding])
-                rows.append([logical, "@root", "@root", normalized_bindings, resolved_argv])
+                rows.append(
+                    [logical, "@root", "@root", normalized_bindings, resolved_argv]
+                )
             result[field] = rows
         elif isinstance(value, tuple):
             result[field] = list(cast(tuple[object, ...], value))
@@ -491,10 +530,14 @@ def _tool_call_refs(packet: SkillCommandPacket) -> tuple[list[dict[str, object]]
     if not refs:
         raise MaterializerError("tool_call_phase_missing", packet.skill)
     payload = {"skill": packet.skill, "phase_refs": refs}
-    return refs, domain_digest("agent-canon.skill-runtime-shim.owner.tool-surface.v2", payload)
+    return refs, domain_digest(
+        "agent-canon.skill-runtime-shim.owner.tool-surface.v2", payload
+    )
 
 
-def _source_snapshot_digest(root: Path, graph: Mapping[str, object], skill_ids: Sequence[str]) -> str:
+def _source_snapshot_digest(
+    root: Path, graph: Mapping[str, object], skill_ids: Sequence[str]
+) -> str:
     """Hash only immutable sources so runtime target replacement cannot perturb fixed point."""
     files = {
         "catalog": file_digest(root / CATALOG_PATH),
@@ -505,7 +548,10 @@ def _source_snapshot_digest(root: Path, graph: Mapping[str, object], skill_ids: 
     }
     files["canonical_docs"] = domain_digest(
         "agent-canon.skill-runtime-shim.canonical-docs.v1",
-        {skill: file_digest(root / "agents/skills" / f"{skill}.md") for skill in skill_ids},
+        {
+            skill: file_digest(root / "agents/skills" / f"{skill}.md")
+            for skill in skill_ids
+        },
     )
     return domain_digest("agent-canon.skill-runtime-shim.source-snapshot.v1", files)
 
@@ -641,9 +687,7 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
     }
     if not tool_call_refs:
         raise MaterializerError("argument_schema_missing", skill)
-    record_digest = domain_digest(
-        "agent-canon.skill-runtime-shim.record.v1", record
-    )
+    record_digest = domain_digest("agent-canon.skill-runtime-shim.record.v1", record)
     cast(dict[str, object], record["provenance"])["record_digest"] = record_digest
     return record
 
@@ -689,9 +733,7 @@ def _legacy_metadata_lines(record: Mapping[str, object]) -> list[str]:
     ]
 
 
-def _dependency_manifest_lines(
-    record: Mapping[str, object], variant: str
-) -> list[str]:
+def _dependency_manifest_lines(record: Mapping[str, object], variant: str) -> list[str]:
     """Render one exact current or bounded legacy dependency manifest."""
     skill = cast(str, record["skill_id"])
     owner = cast(Mapping[str, object], record["owner"])
@@ -826,7 +868,9 @@ def _legacy_generated_schema_matches(candidate: str, expected: str) -> bool:
     return re.fullmatch(pattern, candidate) is not None
 
 
-def classify_legacy(context: BuildContext, skill: str, expected: str) -> dict[str, object]:
+def classify_legacy(
+    context: BuildContext, skill: str, expected: str
+) -> dict[str, object]:
     """Classify one existing target using only exact generated sections."""
     path = _runtime_path(context, skill)
     if not path.is_file():
@@ -939,11 +983,17 @@ def _markdown_body(text: str) -> str:
 def _projection_digest(skill: str, record: Mapping[str, object], content: bytes) -> str:
     return domain_digest(
         "agent-canon.skill-runtime-shim.projection.v1",
-        {"skill_id": skill, "record_digest": _record_digest(record), "content_sha256": hashlib.sha256(content).hexdigest()},
+        {
+            "skill_id": skill,
+            "record_digest": _record_digest(record),
+            "content_sha256": hashlib.sha256(content).hexdigest(),
+        },
     )
 
 
-def build_rows(context: BuildContext) -> tuple[dict[str, object], dict[str, str], dict[str, str]]:
+def build_rows(
+    context: BuildContext,
+) -> tuple[dict[str, object], dict[str, str], dict[str, str]]:
     """Build all records and staged projections in catalog order."""
     records: dict[str, object] = {}
     rendered: dict[str, str] = {}
@@ -1023,7 +1073,9 @@ def materialize(root: Path, *, all_skills: bool = False) -> dict[str, object]:
         raise MaterializerError("all_required")
     context = build_context(root)
     records, rendered, projections = build_rows(context)
-    legacy = [classify_legacy(context, skill, rendered[skill]) for skill in context.skill_ids]
+    legacy = [
+        classify_legacy(context, skill, rendered[skill]) for skill in context.skill_ids
+    ]
     if any(cast(Sequence[object], row["unmatched_blocks"]) for row in legacy):
         raise LegacyMigrationError(legacy)
     _staged_readback(context, rendered)
@@ -1039,7 +1091,11 @@ def materialize(root: Path, *, all_skills: bool = False) -> dict[str, object]:
         temporary: str | None = None
         try:
             with tempfile.NamedTemporaryFile(
-                mode="wb", dir=path.parent, prefix=".SKILL.md.", suffix=".tmp", delete=False
+                mode="wb",
+                dir=path.parent,
+                prefix=".SKILL.md.",
+                suffix=".tmp",
+                delete=False,
             ) as handle:
                 temporary = handle.name
                 handle.write(data)
@@ -1055,14 +1111,23 @@ def materialize(root: Path, *, all_skills: bool = False) -> dict[str, object]:
                     os.unlink(temporary)
                 except OSError:
                     pass
-            raise PartialStopError(path.relative_to(context.root).as_posix(), replaced) from exc
-    readback = readback_digest(context, cast(Mapping[str, object], records), projections)
+            raise PartialStopError(
+                path.relative_to(context.root).as_posix(), replaced
+            ) from exc
+    readback = readback_digest(
+        context, cast(Mapping[str, object], records), projections
+    )
     return {
         "schema": "agent_canon.skill_runtime_shim.materialize",
         "version": VERSION,
         "source_snapshot_digest": context.source_snapshot_digest,
-        "record_digests": {skill: _record_digest(cast(Mapping[str, object], records[skill])) for skill in sorted(context.skill_ids)},
-        "projection_digests": {skill: projections[skill] for skill in sorted(context.skill_ids)},
+        "record_digests": {
+            skill: _record_digest(cast(Mapping[str, object], records[skill]))
+            for skill in sorted(context.skill_ids)
+        },
+        "projection_digests": {
+            skill: projections[skill] for skill in sorted(context.skill_ids)
+        },
         "readback_digest": readback,
         "content_delta_count": len(delta_paths),
         "content_delta_paths": sorted(delta_paths),
@@ -1085,8 +1150,13 @@ def readback(root: Path, *, all_skills: bool = False) -> dict[str, object]:
         "schema": "agent_canon.skill_runtime_shim.readback",
         "version": VERSION,
         "source_snapshot_digest": context.source_snapshot_digest,
-        "record_digests": {skill: _record_digest(cast(Mapping[str, object], records[skill])) for skill in sorted(context.skill_ids)},
-        "projection_digests": {skill: projections[skill] for skill in sorted(context.skill_ids)},
+        "record_digests": {
+            skill: _record_digest(cast(Mapping[str, object], records[skill]))
+            for skill in sorted(context.skill_ids)
+        },
+        "projection_digests": {
+            skill: projections[skill] for skill in sorted(context.skill_ids)
+        },
         "readback_digest": digest,
         "readback_count": len(context.skill_ids),
         "status": "pass",
@@ -1109,8 +1179,13 @@ def check(root: Path, *, all_skills: bool = False) -> dict[str, object]:
         "schema": "agent_canon.skill_runtime_shim.check",
         "version": VERSION,
         "source_snapshot_digest": context.source_snapshot_digest,
-        "record_digests": {skill: _record_digest(cast(Mapping[str, object], records[skill])) for skill in sorted(context.skill_ids)},
-        "projection_digests": {skill: projections[skill] for skill in sorted(context.skill_ids)},
+        "record_digests": {
+            skill: _record_digest(cast(Mapping[str, object], records[skill]))
+            for skill in sorted(context.skill_ids)
+        },
+        "projection_digests": {
+            skill: projections[skill] for skill in sorted(context.skill_ids)
+        },
         "content_delta_count": len(drift),
         "content_delta_paths": sorted(drift),
         "status": "pass" if not drift else "fail",

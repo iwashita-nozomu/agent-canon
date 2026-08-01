@@ -12,13 +12,25 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from agent_team import (
-    load_directory_snapshot,
-    load_team_config,
-    validate_role_write_scope,
-    write_directory_snapshot,
-    write_workspace_change_snapshot,
-)
+if __package__:
+    from .workspace_scope import (
+        load_directory_snapshot,
+        validate_role_write_scope,
+        write_directory_snapshot,
+        write_workspace_change_snapshot,
+    )
+else:
+    from workspace_scope import (
+        load_directory_snapshot,
+        validate_role_write_scope,
+        write_directory_snapshot,
+        write_workspace_change_snapshot,
+    )
+
+if __package__:
+    from .team_config import load_team_config
+else:
+    from team_config import load_team_config
 
 
 def build_parser() -> argparse.ArgumentParser:

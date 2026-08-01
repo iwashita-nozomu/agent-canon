@@ -25,7 +25,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from agent_team import resolve_report_root
+if __package__:
+    from .workspace_scope import resolve_report_root
+else:
+    from workspace_scope import resolve_report_root
 from task_authority import ACTIVE_RUN_POINTER
 
 LEDGER_SEMANTIC_KINDS = (

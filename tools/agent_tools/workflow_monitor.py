@@ -24,7 +24,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import TextIO, cast
 
-from agent_team import resolve_report_root, schedule_wave_row
+if __package__:
+    from .workspace_scope import resolve_report_root, schedule_wave_row
+else:
+    from workspace_scope import resolve_report_root, schedule_wave_row
 from mid_task_user_input_policy import (
     MID_TASK_CLASSIFICATION_ACTIONS,
     MID_TASK_CLASSIFICATION_SCOPE_STATUS,
