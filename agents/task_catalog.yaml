@@ -186,19 +186,19 @@ workflow_families:
   - id: owner_bounded_change
     name: Owner-Bounded Change
     subagent_prompt:
-      purpose: Prompt packet for owner-bounded fixes whose replaceable unit, public-impact boundary, and local validation route are already evidenced.
+      purpose: Prompt packet for owner-bounded fixes whose replaceable unit, local validation route, and external public API/behavior/schema unchanged readback are already evidenced.
       prompt_preamble:
-        - Treat this as an owner-bounded fix; route to `scoped_change` when public API, dependency, workflow, or specification interpretation is involved.
+        - Treat this as an owner-bounded fix only while `external public API/behavior/schema unchanged`; route every public-surface addition, contraction, removal, rename, restriction, deprecation, or semantic change to `scoped_change` or a broader route and form `dependency/consumer/migration/docs closure`.
         - Start from the structured handoff; use user_request_contract.md, schedule.md, and team_manifest.yaml only when the selected coordination or resumption route materializes them.
         - Include request_clause_ids, expected artifact path, parent-assigned write scope, validation command, and next review gate in every handoff.
       workflow_focus:
         - Treat catalog intake roles, `worker`, `explorer`, language-specific reviewers, and review packs as candidates. For semantic deltas, reference the run-local semantic_responsibility_contract.toml from the active design packet and allocate one action plus obligation owners before implementation. Activate only the owner-critical implementation route or a distinct unresolved claim/risk. Add `test_designer` only after the owning mechanism is established or repaired and an unresolved oracle/specification/regression/failure-mode risk remains outside static analysis, checkers, and targeted validation; select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>` recorded in stdout and the manifest.
-        - Keep this route only when the run's abstract responsibility frame derives a bounded implementation slice with public interface unchanged, no dependency change, no specification interpretation, and local validation. File count is not enough to select or keep this route.
+        - Keep this route only when the run's abstract responsibility frame derives a bounded implementation slice with public interface unchanged, meaning `external public API/behavior/schema unchanged`, no dependency change, no specification interpretation, and local validation. File count and nearby ownership are not enough to select or keep this route.
         - Activate design, document-flow, and broad review only when an unresolved owner/design/reader-facing claim requires it. A produced design artifact does not by itself create a separate review wave; one owning review gate may cover the responsibility.
-        - Escalate to `scoped_change` when the owner boundary is non-obvious, validation is cross-module, or the diff-triage reviewer returns escalate.
+        - Escalate to `scoped_change` when any external public API, behavior, or schema delta exists, the owner boundary is non-obvious, validation is cross-module, or the diff-triage reviewer returns escalate; public deltas carry `dependency/consumer/migration/docs closure` into scope.
       reviewer_prompt:
         - Prefer language-specific and diff-triage findings before broad review.
-        - Block completion if validation is missing, request clauses are not mapped, or write scope expanded beyond the owner-bounded route.
+        - Block completion if public-surface invariance is missing, validation is missing, request clauses are not mapped, or write scope expanded beyond the owner-bounded route.
     capacity_request:
       schema_id: task_catalog_capacity_request_v1
       policy_id: topology_derived_v1

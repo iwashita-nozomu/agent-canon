@@ -47,7 +47,7 @@ workflow family、role behavior、validation gate の正本はリンク先の ow
   と run-local instance template を先に読みます。
 - 文書構造、reader path、claim support、source map、canonical route、document responsibility が変わる Markdown 差分では、`structure-planning` と `prose-reasoning-graph` を先に使い、closeout の `Document Structure Evidence` に構造解析 evidence を残します。
 - typo / link / format-only の Markdown 差分では、`md-style-check` と `structure_contract=skipped:<reason>` を evidence に残します。
-- owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じた repo-changing 差分では `owner-bounded-routing` を使い、existing tool を読了 gate なしに先に実行し、owner boundary、existing-tool route、targeted validation を evidence に残します。
+- owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じた repo-changing 差分では `owner-bounded-routing` を使い、existing tool を読了 gate なしに先に実行し、owner boundary、existing-tool route、targeted validation を evidence に残します。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更は `scoped_change` または broader route へ進みます。
 - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書では、`long-form-writing` を DSL-to-prose adapter として使います。長さだけでは選びません。
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を使います。
 - 投稿論文や thesis chapter の draft では `paper-writing` を使います。
@@ -67,7 +67,7 @@ workflow family、role behavior、validation gate の正本はリンク先の ow
 - 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
 - `skills=<...>` には `$skill-name` で指定した skill をそのまま並べます。
 - 例: `skills=$research-workflow,$literature-survey,$paper-writing`
-- 既定の流れは workflow family で変わります。owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている修正は `Owner-Bounded Change`、それ以外の repo-changing task は `要件整理 -> 調査 -> 実行計画立案 -> 計画レビュー -> 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー -> 実装` を基準にします。
+- 既定の流れは workflow family で変わります。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じている修正は `Owner-Bounded Change` です。public surface に変化がある場合は `scoped_change` または broader route で `dependency/consumer/migration/docs closure` を scope 形成し、それ以外の repo-changing task は `要件整理 -> 調査 -> 実行計画立案 -> 計画レビュー -> 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー -> 実装` を基準にします。
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 subagent で行います。
 - `詳細設計レビュー` を通す前に実装へ進みません。
 - `test_designer` は owning mechanism の確立または修復後に、semantic responsibility

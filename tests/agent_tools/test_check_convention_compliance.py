@@ -192,7 +192,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/COMMUNICATION_PROTOCOL.md": (
         "responsibility_scope responsibility-scope.toml owner class protecting tools "
-        "planned path\n"
+        "planned path Parent-Direct Context Note "
+        "external public API/behavior/schema unchanged\n"
     ),
     "agents/canonical/CODEX_WORKFLOW.md": (
         "Completion Readiness\n"
@@ -205,6 +206,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "repo_wide_dependency_tools_complete\n"
         "run_repo_dependency_review.sh\n"
         "bounded route existing tool targeted validation follow-up context\n"
+        "external public API/behavior/schema unchanged scoped_change "
+        "dependency/consumer/migration/docs closure\n"
         "contract-only wrapper static contract validation canonical command evidence "
         "validation tool\n"
         "静的解析・読み取り 主証跡 reading evidence 動作確認 broad execution "
@@ -254,7 +257,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "write-capable handoff prose-reasoning-graph structure-planning "
         "md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted validation Owner-Bounded Change "
-        "parent-direct SKILL.md "
+        "parent-direct SKILL.md external public API/behavior/schema unchanged "
+        "scoped_change dependency/consumer/migration/docs closure "
         "selected_agent_type write_capable_handoff_blocker evidence "
         "parent_packet_ref status=blocked explicit_approval_evidence "
         "router_unavailable_blocker "
@@ -272,6 +276,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted validation Owner-Bounded Change "
         "parent-direct $owner-bounded-routing SKILL.md "
+        "external public API/behavior/schema unchanged scoped_change "
+        "dependency/consumer/migration/docs closure "
         "tool_rejection_preflight.py "
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut "
@@ -319,7 +325,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "existing tool owner boundary targeted validation Owner-Bounded Change "
         "targeted validation tool_rejection_preflight.py "
         "structure_contract=skipped responsibility_scope owner scope protecting tools "
-        "実装ディレクトリ SKILL.md\n"
+        "実装ディレクトリ SKILL.md external public API/behavior/schema unchanged "
+        "scoped_change dependency/consumer/migration/docs closure\n"
     ),
     "agents/skills/test-design.md": (
         "contract-only wrapper static contract validation canonical command evidence "
@@ -378,7 +385,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/skills/README.md": (
         "owner-bounded-routing existing tool targeted validation .codex/config.toml "
         "prose-reasoning-graph structure-planning md-style-check "
-        "structure_contract=skipped\n"
+        "structure_contract=skipped external public API/behavior/schema unchanged "
+        "scoped_change dependency/consumer/migration/docs closure\n"
     ),
     "agents/skills/catalog.yaml": (
         "skill catalog routing entry skill format-only docs work "
@@ -386,7 +394,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "prose-reasoning-graph structure-planning SOLID SRP OCP LSP ISP DIP "
         "Single responsibility Open/closed Liskov Interface segregation "
         "Dependency inversion Protocol コードファイル 順序 定義順 関数 class\n"
-        "owner-bounded-routing owner-bounded targeted validation Owner-Bounded Change\n"
+        "owner-bounded-routing owner-bounded targeted validation Owner-Bounded Change "
+        "external public API/behavior/schema unchanged scoped_change "
+        "dependency/consumer/migration/docs closure\n"
         '- ["SOLID"]\n'
         '- ["SRP"]\n'
         '- ["Dependency inversion"]\n'
@@ -396,7 +406,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/task_catalog.yaml": (
         "literature-survey research-workflow source packet adoption/exclusion "
-        "Research-Driven Change\n"
+        "Research-Driven Change owner_bounded_change public interface unchanged "
+        "external public API/behavior/schema unchanged scoped_change "
+        "dependency/consumer/migration/docs closure\n"
     ),
     "tools/agent_tools/agent_team.py": (
         "$literature-survey $research-workflow research_driven_change selected.append\n"
@@ -454,7 +466,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "agents/USER_GUIDE_JA.md": (
         "structure-planning prose-reasoning-graph md-style-check "
         "Document Structure Evidence structure_contract=skipped "
-        "existing tool targeted validation 読了 gate なし\n"
+        "existing tool targeted validation 読了 gate なし "
+        "external public API/behavior/schema unchanged scoped_change "
+        "dependency/consumer/migration/docs closure\n"
     ),
     "templates/agents/closeout_gate.md": (
         "evaluate_agent_run.py run_repo_dependency_review.sh\n"
@@ -1145,6 +1159,30 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("owner_bounded_tool_route", result.stdout)
             self.assertIn("missing-marker:existing-tool route", result.stdout)
+
+    def test_owner_bounded_tool_route_requires_public_surface_invariance(self) -> None:
+        """Owner-bounded routing requires external public-surface invariance."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill_doc = root / "agents" / "skills" / "owner-bounded-routing.md"
+            skill_doc.write_text(
+                skill_doc.read_text(encoding="utf-8").replace(
+                    "external public API/behavior/schema unchanged",
+                    "public impact known",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("owner_bounded_tool_route", result.stdout)
+            self.assertIn(
+                "agents/skills/owner-bounded-routing.md:missing-marker:"
+                "external public API/behavior/schema unchanged",
+                result.stdout,
+            )
 
     def test_minimal_fixture_covers_owner_bounded_tool_route_surfaces(self) -> None:
         """The fixture includes every owner-bounded tool route surface."""

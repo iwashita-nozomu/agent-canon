@@ -2,7 +2,7 @@
 name: html-experiment-report
 description: "Use when producing a browser-readable HTML experiment or Eval report; first decide the primary figure, then plan and run an evidence-backed report renderer while keeping domain authority in the original tool."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"b0214a2ad8dfc8cdaf7dc837d4b6018869def6a9ff75bd8a7307a7dbc60ce05c"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"def14583849d091243414f43ee2359feb084e9c9c22a19425491fbd91ddb9ebd"} -->
 
 <!--
 @dependency-start
