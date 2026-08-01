@@ -2,7 +2,7 @@
 name: experiment-lifecycle
 description: "Use this skill when preparing, running, or validating experiments."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"efb8925f5fe4c466e709a155e6e77044f540f2f309ad3f747a4194113e262f68"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"f188406fdd1f7ff3fcf963a7db00e7a10c3c9b1a9a41d29e4f237772206919cd"} -->
 
 <!--
 @dependency-start

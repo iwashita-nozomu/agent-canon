@@ -347,16 +347,6 @@ is_jsonl_eval_result_path() {
   esac
 }
 
-restore_original_submodule_ref() {
-  local original_branch="$1"
-  local original_head="$2"
-  if [ -n "$original_branch" ]; then
-    git -C "$AGENT_CANON_DIR" switch "$original_branch" >/dev/null
-    return
-  fi
-  git -C "$AGENT_CANON_DIR" checkout --detach "$original_head" >/dev/null
-}
-
 stash_ref_for_sha() {
   local stash_sha="$1"
   git -C "$AGENT_CANON_DIR" stash list --format='%gd %H' \

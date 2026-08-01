@@ -86,7 +86,7 @@ dev container は `.devcontainer/` を使います。起動時に generated comp
 
 - GPU があれば `gpus: all`
 - GPU がなければ CPU-only
-- `~/.codex`、`~/.config/gh`、`~/.ssh` があれば bind mount
+- `~/.config/gh`、`~/.ssh` があれば bind mount
 - `SSH_AUTH_SOCK` が有効なら agent socket を forward
 - `AGENT_CANON_SECRET_DIR` が既存 directory を指すときだけ、既定では
   `/mnt/agent-canon-secrets` へ read-only mount
@@ -110,6 +110,8 @@ GPU が無いこと自体を failure 条件にしません。
 
 - `codex` は host に入っていることを推奨します
 - container 内の Codex CLI は AgentCanon-owned `vendor/agent-canon/.devcontainer/post-create.sh` が必要時に導入します
+- container 内の Codex state は container-local です。認証に使う
+  `OPENAI_API_KEY` と `OPENAI_BASE_URL` は runner の明示的な環境 forward で渡します。
 - `gh` は host に入っていることを推奨します。container 内の GitHub CLI も AgentCanon-owned `vendor/agent-canon/.devcontainer/post-create.sh` が必要時に導入します
 - 初回 `gh auth login` は host 側で行い、container は mounted `~/.config/gh` を使います
 - `~/.ssh` は read-only mount 前提なので、key 追加や GitHub host key 登録は host 側で行います

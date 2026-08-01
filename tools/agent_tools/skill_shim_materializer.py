@@ -63,7 +63,6 @@ CATALOG_PATH = Path("agents/skills/catalog.yaml")
 DEPENDENCY_PATH = Path("agents/skills/skill-dependencies.yaml")
 CONFIG_PATH = Path(".codex/config.toml")
 GRAPH_PATH = Path("documents/runtime/skill-dependency-graph.json")
-SKILL_COUNT = 60
 HOST_CONFIG_PATH_RE = re.compile(
     r"^\.\./\.agents/skills/[a-z0-9]+(?:-[a-z0-9]+)*/SKILL\.md$"
 )
@@ -270,7 +269,7 @@ def _load_migration_baseline(
             "migration_baseline_skill_set_mismatch",
             json.dumps({"expected": sorted(skill_ids), "actual": sorted(rows)}, ensure_ascii=False),
         )
-    if len(rows) != SKILL_COUNT:
+    if len(rows) != len(skill_ids):
         raise MaterializerError("migration_baseline_count_mismatch", str(len(rows)))
     return rows
 
@@ -329,7 +328,7 @@ def _bool(value: object, field: str) -> bool:
 
 
 def _catalog_entries(root: Path) -> tuple[tuple[str, ...], dict[str, Mapping[str, object]]]:
-    """Load the public catalog and require the complete 60-row discovery source."""
+    """Load the complete public catalog and its discovery source."""
     data = load_skill_catalog(root)
     families = data.get("skill_families")
     if not isinstance(families, list):
@@ -349,8 +348,6 @@ def _catalog_entries(root: Path) -> tuple[tuple[str, ...], dict[str, Mapping[str
             raise MaterializerError("discovery_name_mismatch", skill)
         ids.append(skill)
         entries[skill] = entry
-    if len(ids) != SKILL_COUNT:
-        raise MaterializerError("catalog_count_mismatch", str(len(ids)))
     return tuple(ids), entries
 
 
@@ -391,7 +388,7 @@ def _host_entries(root: Path, skill_ids: Sequence[str]) -> dict[str, HostEntry]:
         observed[skill] = HostEntry(path, enabled, index, order, entry_digest)
     if set(observed) != set(skill_ids):
         raise MaterializerError("host_config_skill_set_mismatch")
-    if set(observed) != set(skill_ids) or len(observed) != SKILL_COUNT:
+    if set(observed) != set(skill_ids) or len(observed) != len(skill_ids):
         raise MaterializerError("host_config_count_mismatch", str(len(observed)))
     return observed
 
@@ -533,7 +530,7 @@ def build_context(root: Path) -> BuildContext:
         packets = {skill: packet_for_skill(resolution, skill) for skill in skill_ids}
     except (OSError, ValueError) as exc:
         raise MaterializerError("command_packet_invalid", str(exc)) from exc
-    if len(packets) != SKILL_COUNT:
+    if len(packets) != len(skill_ids):
         raise MaterializerError("command_packet_count_mismatch", str(len(packets)))
     return BuildContext(
         root,
@@ -863,6 +860,10 @@ def classify_legacy(context: BuildContext, skill: str, expected: str) -> dict[st
         }
     legacy_candidates = (
         (
+            "generated_current_schema",
+            expected,
+        ),
+        (
             "generated_legacy_schema",
             _legacy_generated_schema_shim(context, skill, expected),
         ),
@@ -970,7 +971,7 @@ def readback_digest(
     records: Mapping[str, object],
     projections: Mapping[str, str],
 ) -> str:
-    """Hash the 60-row actual target readback manifest."""
+    """Hash the catalog-sized actual target readback manifest."""
     rows: list[dict[str, str]] = []
     for skill in sorted(context.skill_ids):
         path = _runtime_path(context, skill)
@@ -994,7 +995,7 @@ def readback_digest(
                 "projection_digest": projections[skill],
             }
         )
-    if len(rows) != SKILL_COUNT:
+    if len(rows) != len(context.skill_ids):
         raise MaterializerError("readback_count_mismatch", str(len(rows)))
     return domain_digest("agent-canon.skill-runtime-shim.readback.v1", rows)
 
@@ -1087,7 +1088,7 @@ def readback(root: Path, *, all_skills: bool = False) -> dict[str, object]:
         "record_digests": {skill: _record_digest(cast(Mapping[str, object], records[skill])) for skill in sorted(context.skill_ids)},
         "projection_digests": {skill: projections[skill] for skill in sorted(context.skill_ids)},
         "readback_digest": digest,
-        "readback_count": SKILL_COUNT,
+        "readback_count": len(context.skill_ids),
         "status": "pass",
     }
 

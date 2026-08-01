@@ -52,10 +52,6 @@ def latest_result_dir(result_root: Path) -> Path:
     return max(candidates, key=_result_timestamp)
 
 
-def _latest_result_dir(result_root: Path) -> Path:
-    return latest_result_dir(result_root)
-
-
 def _latest_payload(result_root: Path, result_dir: Path) -> dict[str, object]:
     manifest_path = _manifest_path(result_dir)
     summary_path = result_dir / "summary.json"

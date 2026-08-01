@@ -301,13 +301,6 @@ submodule_deferred_branch_pr_ref() {
   submodule_pushed_branch_ref "$commit"
 }
 
-ensure_submodule_checkout() {
-  if submodule_checkout_initialized; then
-    return
-  fi
-  git -C "$ROOT_DIR" submodule update --init --recursive "$PREFIX" >/dev/null
-}
-
 build_link_specs() {
   python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
     --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" link-specs
@@ -383,11 +376,6 @@ goal_is_shared_symlink() {
       ;;
   esac
   return 1
-}
-
-build_removed_legacy_paths() {
-  python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
-    --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" removed-legacy-paths
 }
 
 build_root_absent_paths() {
@@ -921,49 +909,6 @@ find_commit_by_tree() {
   done < <(git -C "$ROOT_DIR" rev-list "$history_head")
 
   return 1
-}
-
-find_submodule_commit_by_tree() {
-  local tree_sha="$1"
-  local history_head="$2"
-  local commit=""
-
-  while IFS= read -r commit; do
-    if [ "$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$commit^{tree}")" = "$tree_sha" ]; then
-      echo "$commit"
-      return
-    fi
-  done < <(git -C "$ROOT_DIR/$PREFIX" rev-list "$history_head")
-
-  return 1
-}
-
-submodule_cherry_equivalent_to_remote() {
-  local remote_sha="$1"
-  local worktree_head="$2"
-  local cherry_output=""
-
-  cherry_output="$(git -C "$ROOT_DIR/$PREFIX" cherry "$remote_sha" "$worktree_head" 2>/dev/null || true)"
-  if [ -z "$cherry_output" ]; then
-    echo "yes"
-    return
-  fi
-  if printf '%s\n' "$cherry_output" | grep -q '^+'; then
-    echo "no"
-    return
-  fi
-  echo "yes"
-}
-
-submodule_merge_conflicts() {
-  local local_head="$1"
-  local remote_sha="$2"
-
-  if git -C "$ROOT_DIR/$PREFIX" merge-tree --write-tree "$local_head" "$remote_sha" >/dev/null 2>&1; then
-    echo "no"
-    return
-  fi
-  echo "yes"
 }
 
 materialize_cached_snapshot_diff() {
