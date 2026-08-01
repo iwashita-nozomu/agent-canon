@@ -29,6 +29,10 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
 - [devcontainer/parent-devcontainer-policy.md](devcontainer/parent-devcontainer-policy.md)
   - 親root と AgentCanon source の devcontainer 境界、wrapper 順序、compose 出力、
     親 hook 契約を定義します。
+  - `tools/agent_tools/requirements_lock.py` が `docker/requirements.txt` の
+    PEP 508 logical record、hash、marker、continuation、typed error の唯一の
+    parser owner であり、`devcontainer_dependencies.py` と `container_config.py`
+    は同じ result を findings に projection します。
 - [experiment_runner.md](experiment_runner.md)
   - `experiment_runner` の契約と実行モデル
 - [python-structure-hash.md](python-structure-hash.md)

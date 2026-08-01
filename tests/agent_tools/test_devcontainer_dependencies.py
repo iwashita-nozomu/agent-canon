@@ -5,6 +5,7 @@
 # responsibility Verifies schema, merge, order, security, and receipt semantics for devcontainer dependencies.
 # upstream design ../../documents/design/devcontainer/parent-dependency-manifest-followup.md dependency model contract
 # upstream implementation ../../tools/agent_tools/devcontainer_dependencies.py typed dependency engine
+# upstream implementation ../../tools/agent_tools/requirements_lock.py canonical requirements lock parser and result/error model
 # downstream implementation ../../.devcontainer/dependencies.toml canonical manifest inventory
 # @dependency-end
 
@@ -155,23 +156,6 @@ def write_manifest(path: Path, records: list[dict[str, Any]]) -> None:
         lines.append("records = []")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
-
-
-def hash_requirement(
-    name: str,
-    version: str,
-    hashes: Sequence[str],
-    *,
-    marker: str | None = None,
-) -> str:
-    """Build one pip-compile requirement record for boundary fixtures."""
-    backslash = chr(92)
-    marker_text = f"; {marker}" if marker is not None else ""
-    lines = [f"{name}=={version}{marker_text} {backslash}"]
-    for index, digest in enumerate(hashes):
-        continuation = f" {backslash}" if index < len(hashes) - 1 else ""
-        lines.append(f"    --hash=sha256:{digest}{continuation}")
-    return "\n".join(lines) + "\n"
 
 
 def write_boundary_fixture(
@@ -740,67 +724,18 @@ class DependencyModelTests(unittest.TestCase):
                 source,
             )
 
-    def test_requirements_accept_hash_lock_records_and_preserve_markers(self) -> None:
-        """Accept hash records through the public boundary findings route."""
+    def test_requirements_parse_errors_project_to_boundary_findings(self) -> None:
+        """Project canonical parser errors without reimplementing parsing."""
         with tempfile.TemporaryDirectory() as temporary:
-            requirements = (
-                "# generated lock\n"
-                + hash_requirement(
-                    "jupyterlab",
-                    "1.2.3",
-                    ("a" * 64, "b" * 64),
-                    marker="python_version >= '3.0'",
-                )
-                + "    # via project\n"
-                + hash_requirement("notebook", "1.0.0", ("c" * 64,))
-                + hash_requirement("ipykernel", "1.0.0", ("d" * 64,))
-                + hash_requirement("pydeps", "1.0.0", ("e" * 64,))
-                + hash_requirement("snakeviz", "1.0.0", ("f" * 64,))
-                + hash_requirement("pyyaml", "1.0.0", ("0" * 64,))
+            model, path = write_boundary_fixture(
+                Path(temporary), "--index-url https://pypi.org/simple\n"
             )
-            model, path = write_boundary_fixture(Path(temporary), requirements)
 
             report = model.validate()
 
-        self.assertEqual(report.status, "pass")
-        self.assertFalse(
-            [finding for finding in report.findings if finding.path == str(path)]
-        )
-
-    def test_requirements_reject_malformed_hash_records_and_options(self) -> None:
-        """Reject invalid lock records through public boundary findings."""
-        backslash = chr(92)
-        cases = {
-            "malformed continuation": (
-                f"package==1.0 {backslash}\n    not-a-hash\n",
-                "malformed requirement continuation",
-            ),
-            "orphan hash": (
-                f"--hash=sha256:{'a' * 64}\n",
-                "orphan requirement hash",
-            ),
-            "malformed hash": (
-                f"package==1.0 {backslash}\n    --hash=sha256:short\n",
-                "malformed requirement hash",
-            ),
-            "requirement option": (
-                "--index-url https://pypi.org/simple\n",
-                "requirement option without requirement",
-            ),
-        }
-
-        for name, (contents, message) in cases.items():
-            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
-                model, path = write_boundary_fixture(Path(temporary), contents)
-                report = model.validate()
-
-                findings = [
-                    finding for finding in report.findings if finding.path == str(path)
-                ]
-                self.assertTrue(
-                    any(message in finding.detail for finding in findings),
-                    report.findings,
-                )
+        findings = [finding for finding in report.findings if finding.path == str(path)]
+        self.assertEqual(len(findings), 1)
+        self.assertIn("requirement option without requirement", findings[0].detail)
 
     def test_canonical_manifest_owns_pinned_pyyaml_independently(self) -> None:
         """AgentCanon's mounted validators receive their own exact PyYAML record."""

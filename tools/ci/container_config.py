@@ -12,6 +12,7 @@
 # upstream design ../../documents/tools/lean_proof_env.md Lean proof environment toolchain boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
 # upstream implementation ../agent_tools/surface_manifest.py parses shared runtime surface manifests
+# upstream implementation ../agent_tools/requirements_lock.py canonical requirements lock parser and result/error model
 # upstream implementation ../docker_dependency_validator.sh validates Docker dependency contents
 # upstream implementation ./container_runtime.py loads runtime pack contracts
 # upstream implementation ./run_container_pack.py builds and smokes runtime packs
@@ -41,12 +42,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
 
-from packaging.requirements import InvalidRequirement, Requirement
-
 AGENT_TOOLS_DIR = Path(__file__).resolve().parents[1] / "agent_tools"
 if str(AGENT_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_DIR))
 
+from requirements_lock import (  # noqa: E402,I001  # pyright: ignore[reportMissingTypeStubs]
+    RequirementErrorCode,
+    parse_requirements,
+)
 from surface_manifest import (
     SurfaceEntry,
     SurfaceManifest,
@@ -291,15 +294,6 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
     )
 
 
-def trim_requirement_line(line: str) -> str:
-    """Strip comments while preserving URL fragments in one requirement line."""
-    line = line.strip()
-    for index, character in enumerate(line):
-        if character == "#" and (index == 0 or line[index - 1].isspace()):
-            return line[:index].rstrip()
-    return line
-
-
 def validate_requirements(root: Path) -> list[Finding]:
     """Validate docker/requirements.txt."""
     path = root / "docker" / "requirements.txt"
@@ -307,32 +301,27 @@ def validate_requirements(root: Path) -> list[Finding]:
     if not path.is_file():
         return [Finding("missing_file", relative, "missing")]
     findings: list[Finding] = []
-    requirements: set[str] = set()
-    for line_number, raw_line in enumerate(
-        path.read_text(encoding="utf-8").splitlines(), start=1
-    ):
-        line = trim_requirement_line(raw_line)
-        if not line:
-            continue
-        try:
-            requirement = Requirement(line)
-        except InvalidRequirement:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    relative,
-                    f"invalid-line:{line_number}",
+    parsed = parse_requirements(path)
+    for error in parsed.errors:
+        detail = (
+            f"invalid-line:{error.line_number}"
+            if error.code is RequirementErrorCode.INVALID_REQUIREMENT
+            else error.detail
+        )
+        findings.append(Finding("dependency_contract_violation", relative, detail))
+    if parsed.valid:
+        requirements = {
+            record.normalized_name for record in parsed.records if record.is_active()
+        }
+        for requirement in REQUIRED_REQUIREMENTS:
+            if requirement not in requirements:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"missing:{requirement}",
+                    )
                 )
-            )
-            continue
-        requirements.add(requirement.name.lower())
-    for requirement in REQUIRED_REQUIREMENTS:
-        if requirement not in requirements:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation", relative, f"missing:{requirement}"
-                )
-            )
     return findings
 
 
