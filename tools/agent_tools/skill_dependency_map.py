@@ -700,7 +700,7 @@ def _source_snapshot(
 
 
 def _validate_reader_parity(root: Path) -> None:
-    """Check skills.md as a link-only reader index, never as a 60-row canon."""
+    """Check skills.md as a link-only reader index, never as a skill-count canon."""
     text = (root / "agents/canonical/skills.md").read_text(encoding="utf-8")
     required_links = (
         "../skills/README.md",
@@ -754,8 +754,8 @@ def build_graph(root: Path) -> dict[str, object]:
         cast(str, cast(Mapping[str, object], entry)["id"])
         for entry in cast(list[object], catalog["skill_families"])
     )
-    if len(skill_ids) != 60:
-        raise ValueError(f"skill_tool_invocation_graph_skill_count:{len(skill_ids)}")
+    if not skill_ids:
+        raise ValueError("skill_tool_invocation_graph_skill_count:0")
     rules = dict(load_skill_dependency_map(root, skill_ids))
     route_rules = load_skill_route_rules(root)
     route_by_skill = {rule.skill: rule for rule in route_rules}
@@ -1818,15 +1818,7 @@ def _validate_loaded_graph(machine: Mapping[str, object]) -> None:
     if machine.get("schema") != GRAPH_SCHEMA or machine.get("version") != 2:
         raise ValueError("skill_tool_invocation_graph_schema_mismatch")
     skills = cast(Sequence[Mapping[str, object]], machine.get("skills", []))
-    if machine.get("skill_count") != 60 or "dependency-design" not in {
-        cast(
-            str,
-            cast(
-                Mapping[str, object], cast(Mapping[str, object], skill["ref"])["id"]
-            ).removeprefix("skill:"),
-        )
-        for skill in skills
-    }:
+    if machine.get("skill_count") != len(skills) or not skills:
         raise ValueError("dependency-design:omission")
     if machine.get("json_digest") != _json_digest_from_graph(machine):
         raise ValueError("json_digest:mismatch")

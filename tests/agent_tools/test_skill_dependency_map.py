@@ -52,10 +52,9 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         """All skills, phases, resolved commands, tools, and edge kinds are present."""
         graph = build_graph(PROJECT_ROOT)
         self.assertEqual(graph["schema"], "agent_canon.skill_tool_invocation_graph.v2")
-        self.assertEqual(graph["skill_count"], 60)
-        self.assertEqual(len(graph["skills"]), 60)
-        self.assertEqual(len(graph["phases"]), 180)
-        self.assertEqual(len(graph["commands"]), 387)
+        self.assertEqual(graph["skill_count"], len(graph["skills"]))
+        self.assertEqual(len(graph["phases"]), graph["skill_count"] * 3)
+        self.assertGreater(len(graph["commands"]), graph["skill_count"])
         self.assertGreater(len(graph["tools"]), 0)
         correspondence = graph["design_correspondence"]
         self.assertEqual(len(correspondence["clause_ids"]), 15)
@@ -113,8 +112,8 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         graph = build_graph(PROJECT_ROOT)
         records = {record["id"]: record for record in graph["identity_records"]}
         command_projections = graph["commands"]
-        self.assertEqual(len(command_projections), 387)
         resolution = resolve_agent_canon_source_root(PROJECT_ROOT)
+        expected_command_count = 0
         for skill in (item["display_label"] for item in graph["skills"]):
             packet = packet_for_skill(resolution, skill)
             for phase, rows in (
@@ -122,6 +121,7 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                 ("conditional", packet.resolved_conditional_commands),
                 ("maintenance", packet.resolved_maintenance_commands),
             ):
+                expected_command_count += len(rows)
                 for index, row in enumerate(rows):
                     projection = next(
                         item
@@ -136,6 +136,7 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                     self.assertEqual(
                         records[projection["ref"]["id"]]["kind"], "command"
                     )
+        self.assertEqual(len(command_projections), expected_command_count)
 
     def test_invocation_order_is_derived_and_command_order_is_immutable(self) -> None:
         """Ordinals follow the existing order function and #461 report order."""

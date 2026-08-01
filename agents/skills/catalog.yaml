@@ -2047,3 +2047,129 @@ skill_families:
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: responsibility-cleanup
+    purpose: Route responsibility-unit cleanup from tree observation through owner dispatch, integration, and re-review.
+    canonical_doc: agents/skills/responsibility-cleanup.md
+    shim: .agents/skills/responsibility-cleanup/SKILL.md
+    discovery:
+      name: responsibility-cleanup
+      description: "Use when cleanup requires tree observation, source/view/generated/project/personal boundary classification, dependency closure, responsibility-unit dispatch, integration, or re-review."
+    tool_commands:
+      required:
+      - tree -a -J --noreport
+      conditional:
+      - python3 tools/agent_tools/repo_structure_contract.py --root . --contract documents/structure/repo-structure-contract.toml
+      - python3 tools/agent_tools/responsibility_scope.py --root .
+      - python3 tools/agent_tools/skill_dependency_map.py check --root .
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      - python3 tools/agent_tools/check_convention_compliance.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: responsibility-unit cleanup, ownership boundary, dependency closure, or specialist dispatch is in scope
+      triggers:
+        - [責務, cleanup]
+        - [責務, 整理]
+        - [責務単位]
+        - [構造, cleanup]
+        - [ownership, cleanup]
+        - [responsibility, cleanup]
+        - [responsibility, unit]
+        - [dependency, closure, cleanup]
+        - [source, view, generated]
+        - [specialist, dispatch]
+        - [integration, re-review]
+  - id: environment-cleanup
+    purpose: Route environment dependency and runtime-capability cleanup through dependency design and environment maintenance.
+    canonical_doc: agents/skills/environment-cleanup.md
+    shim: .agents/skills/environment-cleanup/SKILL.md
+    discovery:
+      name: environment-cleanup
+      description: "Use when environment dependencies or runtime capabilities need cleanup through dependency-design and environment-maintenance with version, scope, security, and rollback evidence."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/devcontainer_dependencies.py validate --workspace . --format text
+      - python3 tools/agent_tools/devcontainer_dependencies.py dry-run --workspace . --vendor-root . --format json
+      - bash tools/docker_dependency_validator.sh
+      - python3 tools/agent_tools/check_convention_compliance.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: environment dependency or runtime-capability cleanup is in scope
+      triggers:
+        - [environment, cleanup]
+        - [environment, refactor]
+        - [runtime, capability, cleanup]
+        - [dependency, cleanup]
+        - [dependency, runtime]
+        - [環境, cleanup]
+        - [環境, 整理]
+        - [runtime, compatibility]
+  - id: code-cleanup
+    purpose: Route public and module code cleanup by responsibility and reachability through dependency analysis, refactor loop, and change review.
+    canonical_doc: agents/skills/code-cleanup.md
+    shim: .agents/skills/code-cleanup/SKILL.md
+    discovery:
+      name: code-cleanup
+      description: "Use when public or module code cleanup must be bounded by responsibility and reachability, then passed through dependency-analysis, refactor-loop, and change-review."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/check_dependency_headers.py --changed
+      - bash tools/agent_tools/scan_code_dependencies.sh --changed
+      - bash tools/agent_tools/run_repo_dependency_review.sh
+      - python3 tools/agent_tools/check_convention_compliance.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: public/module responsibility, reachability, or behavior-preserving code cleanup is in scope
+      triggers:
+        - [code, cleanup]
+        - [code, refactor]
+        - [module, cleanup]
+        - [module, responsibility]
+        - [public, API, cleanup]
+        - [reachability, cleanup]
+        - [コード, cleanup]
+        - [コード, 整理]
+        - [module, reachability]
+  - id: skill-cleanup
+    purpose: Route canonical skill and generated runtime cleanup as one source-to-readback unit.
+    canonical_doc: agents/skills/skill-cleanup.md
+    shim: .agents/skills/skill-cleanup/SKILL.md
+    discovery:
+      name: skill-cleanup
+      description: "Use when canonical skill docs, catalog, dependency DAG, routes, tool commands, generated shims, host config, graph, or readback must be cleaned as one unit."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/check_agent_runtime_alignment.py
+      - python3 tools/agent_tools/skill_shim_materializer.py materialize --root . --all
+      - python3 tools/agent_tools/skill_shim_materializer.py readback --root . --all
+      - python3 tools/agent_tools/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md
+      - python3 tools/agent_tools/check_skill_tool_invocation_graph.py --root .
+      - python3 tools/agent_tools/check_convention_compliance.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: canonical skill, catalog, route, generated shim, host config, graph, or readback cleanup is in scope
+      triggers:
+        - [skill, cleanup]
+        - [skill, refactor]
+        - [skill, catalog]
+        - [skill, dependency, graph]
+        - [skill, shim]
+        - [skill, route]
+        - [generated, skill]
+        - [canonical, skill]
+        - [スキル, cleanup]
+        - [スキル, 整理]
