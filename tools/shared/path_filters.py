@@ -2,8 +2,13 @@
 # @dependency-start
 # contract tool
 # responsibility Provides shared path-filter helpers for AgentCanon tooling.
-# upstream design tools/README.md shared tooling ownership
-# downstream implementation tools/agent_tools/* consumes shared path filters
+# upstream design ../README.md shared tooling ownership
+# downstream implementation ../agent_tools/analyze_refactor_surface.py consumes shared path filters
+# downstream implementation ../agent_tools/check_algorithm_config_partition.py consumes shared path filters
+# downstream implementation ../agent_tools/check_log_helper_names.py consumes shared path filters
+# downstream implementation ../agent_tools/check_run_log_contract.py consumes shared path filters
+# downstream implementation ../agent_tools/check_static_any.py consumes shared path filters
+# downstream implementation ../oop/shared/readability_core.py consumes shared path filters
 # @dependency-end
 
 """Shared path-filter helpers for checker-style tooling."""
