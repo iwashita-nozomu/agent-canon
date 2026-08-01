@@ -58,7 +58,7 @@ Codex combines settings from persistent config, project config, profiles, custom
 
 - Put durable repo policy in `.codex/config.toml`.
 - Put human-readable task and coding rules in `AGENTS.md`, not in model/provider settings.
-- Use user-level `profiles` for reusable modes such as safe review, full-access container runs, or OSS/local model usage.
+- Use user-level `profiles` for reusable modes such as safe review, full-access container runs, or other machine-specific defaults.
 - Use CLI `-c` for temporary one-off changes; do not commit temporary operator overrides.
 - Treat `experimental_*` and realtime websocket overrides as unstable unless a task explicitly targets those features.
 
@@ -153,7 +153,7 @@ They are an explicit inventory of settings that Codex can accept but this templa
 
 | Category | Absent Keys |
 | -------- | ----------- |
-| Additional model and provider selection | `model_provider`, `model_providers`, `openai_base_url`, `chatgpt_base_url`, `oss_provider`, `service_tier`, `model_reasoning_summary`, `model_supports_reasoning_summaries`, `model_auto_compact_token_limit`, `model_catalog_json`, `model_instructions_file` |
+| Additional model and provider selection | `model_provider`, `model_providers`, `openai_base_url`, `chatgpt_base_url`, `service_tier`, `model_reasoning_summary`, `model_supports_reasoning_summaries`, `model_auto_compact_token_limit`, `model_catalog_json`, `model_instructions_file` |
 | Approval, permissions, and sandbox detail | `approvals_reviewer`, `default_permissions`, `permissions`, `sandbox_workspace_write`, `shell_environment_policy`, `allow_login_shell` |
 | Project docs and injected context | `instructions`, `developer_instructions`, `include_apps_instructions`, `include_environment_context`, `include_permissions_instructions`, `project_doc_fallback_filenames`, `project_doc_max_bytes`, `project_root_markers`, `projects` |
 | Hooks, tools, and integrations | `hooks`, `tools`, `tool_suggest`, `web_search`, `apps`, `plugins`, `marketplaces` |
@@ -172,6 +172,20 @@ Interpretation for this template:
 - Registered `skills.config` entries expose repo-owned `.agents/skills/`
   packages; selecting a skill still precedes reading its `SKILL.md`.
 - Absent experimental keys should stay absent unless a task explicitly owns the risk and rollback path.
+
+### Upstream-only Codex CLI API facts
+
+The entries below preserve factual upstream Codex CLI API surface for reference.
+They are not AgentCanon-owned runtime or configuration routes, defaults,
+recommendations, provider installations, aliases, wrappers, or compatibility
+surfaces. Upstream examples remain in `codex-cli-guide/` and are not template
+configuration guidance.
+
+| API | Upstream fact |
+| --- | --- |
+| `--oss` | Selects the upstream Codex CLI open-source provider mode. |
+| `--local-provider` | Selects the upstream Codex CLI local provider mode. |
+| `oss_provider` | Names the upstream Codex CLI configuration field for selecting an OSS provider. |
 
 ### Feature Flags Not Currently Enabled Here
 
@@ -302,7 +316,6 @@ Common root and `exec` flags:
 | `--add-dir <DIR>` | Adds writable directories beside the main workspace. |
 | `--search` | Enables live web search for the run. |
 | `-i, --image <FILE>` | Attaches initial images. |
-| `--oss` / `--local-provider` | Use local open-source provider selection. |
 | `--no-alt-screen` | TUI display behavior; equivalent to inline terminal mode. |
 
 ## Top-Level `config.toml` Inventory
@@ -374,7 +387,6 @@ The official schema currently exposes the following top-level keys. Some are nor
 | `notice` | object | Local acknowledgement state for product notices. |
 | `notify` | array | External notification command. |
 | `openai_base_url` | string | Built-in OpenAI provider base URL override. |
-| `oss_provider` | string | Preferred local OSS provider, such as LM Studio or Ollama. |
 | `otel` | object | OpenTelemetry logs, metrics, and trace export settings. |
 | `permissions` | object | Named granular permission profiles. |
 | `personality` | enum | Model personality setting, such as `none`, `friendly`, `pragmatic`. |
@@ -417,7 +429,6 @@ The official schema currently exposes the following top-level keys. Some are nor
 | `model_provider` | Points to `model_providers.<id>`. |
 | `openai_base_url` | Override only the built-in OpenAI provider URL. |
 | `chatgpt_base_url` | Override ChatGPT-specific requests separately from API provider requests. |
-| `oss_provider` | Select a local provider when `--oss` is used. |
 | `service_tier` | Set only after the selected model advertises the requested tier; otherwise leave it absent. |
 
 `[model_providers.<id>]` supports:
@@ -790,7 +801,7 @@ Before changing Codex config in this repo:
 ## Field Stability Notes
 
 - Normal operator keys: `model`, `approval_policy`, `sandbox_mode`, `model_providers`, `mcp_servers`, `tools`, `web_search`, `agents`, `skills`, `hooks`.
-- User-level operator keys: `profiles`, UI preferences, local model/provider experiments, and other machine-specific defaults.
+- User-level operator keys: `profiles`, UI preferences, and other machine-specific defaults.
 - Repo-policy keys: project doc discovery, hooks, MCP, subagent limits, skill instructions, shared defaults.
 - Machine-local keys: audio, TUI, credentials stores, notifications, logs, SQLite home, notices, Windows onboarding state.
 - Experimental keys: names beginning with `experimental_`, realtime websocket overrides, app-server/thread endpoints, and other fields documented as experimental.

@@ -562,7 +562,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
     def test_invalid_tool_selection_label_does_not_abort_dashboard(self) -> None:
         """Regex-like tool labels stay aggregate evidence without a reset path."""
-        invalid_tool = "pattern='AGENT_CANON_LLAMA_CPP|...'"
+        invalid_tool = "pattern='INVALID_TOOL_LABEL|...'"
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
@@ -607,7 +607,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(
-            "| `tool` | `pattern='AGENT_CANON_LLAMA_CPP|...'` | `0` | `1` | `1` |",
+            "| `tool` | `pattern='INVALID_TOOL_LABEL|...'` | `0` | `1` | `1` |",
             dashboard,
         )
 
