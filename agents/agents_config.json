@@ -3,7 +3,7 @@
     "@dependency-start",
     "contract reference",
     "responsibility Defines the canonical runtime agent team configuration.",
-    "upstream design agents/skills/python-review.md canonical Python validation route",
+    "upstream design skills/python-review.md canonical Python validation route",
     "upstream implementation ../tools/agent_tools/agent_team.py loads this runtime team configuration",
     "downstream implementation ../tests/agent_tools/test_task_start_and_close.py validates generated run artifacts",
     "@dependency-end"
