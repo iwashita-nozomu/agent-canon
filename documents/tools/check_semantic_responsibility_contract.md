@@ -13,7 +13,8 @@ downstream implementation ../../tests/agent_tools/test_check_semantic_responsibi
 この checker は、semantic responsibility contract の schema、identity、参照先を
 fail-closed で検証します。template の shape と run-local task instance の必須値、
 delta action、obligation の一次 owner、supporting property/role、existing-test の
-contract から removal witness までの chain、hard-edge closure を確認します。
+contract から removal witness までの chain、hard-edge の宣言、および structural
+mandates が空であることを確認します。
 
 checker は schema/identity/reference validator に限定されます。責務の分割を数値評価せず、
 class、module、file の形を要求せず、数値的な調整値、件数、境界条件を算出しません。
@@ -41,5 +42,6 @@ template fixture と task fixture を同時に確認する場合は `--template`
   instance shape です。
 - populated instance は current run bundle にだけ置き、active design packet の
   `source_refs` から参照します。
-- property の妥当性、設計上の grouping、実装が obligation を満たすかの判断はこの
-  checker の出力ではなく、primary owner の evidence と review gate が行います。
+- hard-edge の意味上の closure と semantic grouping、property の妥当性、実装が
+  obligation を満たすかの判断はこの checker の出力ではなく、primary owner の
+  evidence と design review gate が行います。

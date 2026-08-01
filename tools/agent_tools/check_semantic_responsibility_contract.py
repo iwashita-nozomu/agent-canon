@@ -292,8 +292,8 @@ def _check_delta(
             artifact_root=artifact_root,
         )
     obligations = _require_list(raw.get("obligation"), f"{field}.obligation")
-    if len(obligations) < 2:
-        raise ContractError(f"{field}.obligation:requires_multiple")
+    if not obligations:
+        raise ContractError(f"{field}.obligation:empty")
     obligation_ids: set[str] = set()
     for index, obligation in enumerate(obligations):
         obligation_field = f"{field}.obligation[{index}]"

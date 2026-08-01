@@ -1,9 +1,0 @@
-# @dependency-start
-# contract fixture
-# responsibility Provides the active design packet reference target for semantic contract fixture validation.
-# upstream design ../../../agents/COMMUNICATION_PROTOCOL.md active design packet source reference
-# @dependency-end
-
-run:
-  active_design_packet:
-    schema: waterfall.design_packet.v1

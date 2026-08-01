@@ -47,7 +47,7 @@ implementation action を持ちます。
 | `replace` | 既存 mechanism を新しい mechanism に置き換える |
 | `introduce` | 新しい mechanism を契約に追加する |
 
-delta は複数の obligation を持ちます。obligation は「何を満たすか」を表す
+delta は一つ以上の obligation を持ちます。obligation は「何を満たすか」を表す
 claim と、一次検証 owner、一次検証の reference を持ちます。一次検証 owner は
 obligation ごとに一つだけです。supporting evidence は一次 owner の代替ではなく、
 別の property または別の role を検証するときだけ記録します。同じ property/role を

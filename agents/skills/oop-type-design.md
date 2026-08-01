@@ -92,7 +92,7 @@ Produce exactly one packet in this order:
 
 Before naming a class, aggregate, module, or file, create or reuse the run-local
 semantic responsibility contract referenced by the active design packet. A delta has
-one action from `reuse|extend|replace|introduce` and multiple obligations. Each
+one action from `reuse|extend|replace|introduce` and one or more obligations. Each
 obligation has exactly one primary verification owner from the contract's owner kinds.
 Supporting evidence is recorded only for a distinct property or role.
 

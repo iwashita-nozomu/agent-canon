@@ -43,7 +43,7 @@ downstream implementation ../../.agents/skills/computational-optimization/SKILL.
 - 外部調査や method 比較は `$research-workflow` を外側に置きます。
 - 1 つの protocol の run、rerun、result artifact は `$experiment-lifecycle` と `$result-artifact-writeout` を使います。
 - 実験結果を見ながら継続的に改善する場合は `$adaptive-improvement-loop` を使います。
-- 実装前の edge case 設計は `$test-design` を使います。
+- 実装前は semantic responsibility contract に数値検証の obligation と一次 owner を割り当てます。`$test-design` は実装 mechanism 確立後の未解決 test-owned runtime risk に限ります。
 - Python / C++ 差分 review は `$python-review` / `$cpp-review` を併用します。
 - この skill は数値最適化の数学契約と検証契約を固定する責務を持ち、汎用 research workflow や実験 runner の代替ではありません。
 
@@ -55,6 +55,13 @@ before implementation. Assign exactly one primary verification owner to each
 invariant, transition, effect, consistency, or substitutability obligation; keep
 distinct supporting evidence with its distinct property or role. Numerical oracles
 remain owned by the declared experiment, test, compiler, static, or proof route.
+
+実装前の output は、optimization delta の action、semantic verification
+obligations、各 obligation の一次 owner、supporting property/role、hard-edge
+declaration です。`$test-design` の output は常時生成しません。owning mechanism
+が確立または修復された後にも、既存 checker、static validation、design review、
+既存 test、targeted validation で閉じない具体的な test-owned runtime risk が残る
+場合だけ、`Activation Decision` と最小の test plan を出力します。
 
 実装、実験、review の前に次を固定します。
 
@@ -135,7 +142,7 @@ surfaces when the route packet makes them part of the product contract.
 1. Select the algorithmic repair route before editing tests: initializer,
    update rule, line search, inner-solver policy, regularization, feasibility
    restoration, scaling, or status semantics.
-1. Create the adversarial numeric validation plan after the contract and repair
+1. Create the targeted numeric validation plan after the contract and repair
    route are fixed: exact small case, ill-conditioned case,
    constraint-boundary case, non-finite guard, not-converged status, derivative
    check, and device / dtype case when relevant.
@@ -171,7 +178,10 @@ surfaces when the route packet makes them part of the product contract.
 ## Outputs
 
 - `optimization_contract.md` or an equivalent section in `design_brief.md`
-- numeric edge-case list in `test_plan.md`
+- pre-implementation semantic responsibility allocation with action, obligations,
+  primary owners, and hard-edge declarations
+- numeric edge-case list in `test_plan.md` only when post-mechanism unresolved
+  test-owned runtime risk activates `$test-design`
 - validation commands and result paths
 - convergence / failure interpretation with observed state, first bad point, inferred cause, and unconfirmed hypotheses separated
 
@@ -219,10 +229,13 @@ The runtime discovery adapter delegates these required operating clauses to this
    `documents/conventions/python/15_jax_rules.md` as the detailed code-writing
    rule.
 1. If the task includes external method comparison or claims, also use `$research-workflow`; if it includes a concrete run protocol or rerun decision, also use `$experiment-lifecycle`.
-1. If code changes are needed, use `$test-design` after the optimization
-   contract and algorithmic repair route are fixed, and include exact small
-   cases, ill-conditioned cases, constraint-boundary cases, derivative checks,
-   non-finite guards, and not-converged status handling when relevant.
+1. If the owning mechanism is established or repaired and a concrete
+   test-owned runtime risk remains outside existing validation, activate
+   `$test-design` and emit its `Activation Decision`; otherwise keep the
+   pre-implementation obligation allocation as the test-design output and do
+   not emit a test plan. When activated, include exact small cases,
+   ill-conditioned cases, constraint-boundary cases, derivative checks,
+   non-finite guards, and not-converged status handling only when relevant.
 1. Do not green numerical tests by relaxing tolerances, deleting assertions,
    skipping cases, changing expected values to match current output, or running
    computational tests on CPU; using CPU as substitute evidence is a validation
