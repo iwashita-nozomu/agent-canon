@@ -814,7 +814,7 @@ entries:
 
   - id: semantic-index
     summary: Builds ignored SQLite semantic-vector indexes, adds provider-scoped embeddings, and reports search, bounded context-pack, directory responsibility-tree coverage, merge, natural-relation, discourse-relation, thin-doc, provider-comparison, and Eval results.
-    path: rust/agent-canon/src/semantic_index.rs
+    path: rust/agent-canon/src/semantic_index/mod.rs
     family: root
     role: inventory
     status: canonical
@@ -830,7 +830,7 @@ entries:
       - documents/tools/semantic_index.md
       - .gitignore
     tests:
-      - rust/agent-canon/src/semantic_index.rs
+      - rust/agent-canon/src/semantic_index/tests.rs
 
   - id: semantic-provider-html-report
     summary: Renders semantic-index compare-providers JSON into a self-contained HTML projection report with the provider-delta-to-shared-candidate-logic figure.
