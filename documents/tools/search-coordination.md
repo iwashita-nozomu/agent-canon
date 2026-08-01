@@ -6,7 +6,7 @@ upstream design ../../tools/README.md shared tool command surface
 upstream design ../../tools/README.md operator-facing tool guide
 downstream implementation ../../tools/agent_tools/search.py coordinates search providers from one purpose string
 downstream implementation ../../tools/agent_tools/search_index.py builds repo-local semantic search cards
-downstream implementation ../../rust/agent-canon/src/semantic_index.rs builds SQLite-backed semantic vector candidate indexes
+downstream implementation ../../rust/agent-canon/src/semantic_index/mod.rs builds SQLite-backed semantic vector candidate indexes
 downstream implementation ../../tests/agent_tools/test_search.py validates provider coordination
 @dependency-end
 -->
@@ -27,7 +27,7 @@ AgentCanon coordinated search has six provider classes:
 
 - Evidence sources: `../../tools/agent_tools/search.py`,
   `../../tools/agent_tools/search_index.py`, and
-  `../../rust/agent-canon/src/semantic_index.rs`.
+  `../../rust/agent-canon/src/semantic_index/mod.rs`.
 - Assumption:
   implementation surface routing is a bounded candidate-selection step. Search
   providers can nominate tool, document, code, or dependency-header surfaces,

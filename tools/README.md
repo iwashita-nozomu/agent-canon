@@ -16,7 +16,7 @@ downstream implementation agent_tools/eval_accumulation_check.py validates eval 
 downstream implementation agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
 downstream implementation agent_tools/generated_artifact_guard.py rejects regenerated report outputs left in source tree
 downstream implementation agent_tools/check_design_doc_claims.py validates design-document evidence claims
-downstream implementation ../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
+downstream implementation ../rust/agent-canon/src/semantic_index/mod.rs runs semantic vector index commands
 downstream implementation ../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
 downstream implementation ../rust/agent-canon/src/python_algorithm_contract.rs runs the canonical Python algorithm contract checker
 downstream implementation agent_tools/search.py coordinates purpose-based search providers
