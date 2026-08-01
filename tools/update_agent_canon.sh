@@ -224,41 +224,6 @@ require_commit_request_evidence() {
   die "auto-commit requires AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>"
 }
 
-require_protected_git_authority() {
-  local mode="$1"
-  local branch_authority="${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-}"
-  local branch_reason="${AGENT_CANON_BRANCH_WORKTREE_REASON:-}"
-  local destructive_authority="${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY:-}"
-  local destructive_reason="${AGENT_CANON_DESTRUCTIVE_GIT_REASON:-}"
-
-  if { [ "$branch_authority" = "user_request" ] || [ "$branch_authority" = "agent_canon_workflow" ]; } \
-    && [ -n "$branch_reason" ] \
-    && [ "$destructive_authority" = "explicit_user_approval" ] \
-    && [ -n "$destructive_reason" ]; then
-    return 0
-  fi
-
-  echo "DESTRUCTIVE_GIT_GUARD=block"
-  echo "BRANCH_WORKTREE_CREATION_GUARD=block"
-  echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
-  echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
-  die "protected AgentCanon update requires same-command branch/worktree and explicit destructive approval authority"
-}
-
-require_commit_request_evidence() {
-  local mode="$1"
-  local evidence="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE:-}"
-
-  if [[ "$evidence" =~ ^evidence:[0-9a-f]{64}$ ]]; then
-    return 0
-  fi
-
-  echo "COMMIT_PROVENANCE_GUARD=block"
-  echo "AGENT_CANON_COMMIT_PROVENANCE_SUBCOMMAND=$mode"
-  echo "NEXT_ACTION=$COMMIT_PROVENANCE_NEXT_ACTION"
-  die "auto-commit requires AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>"
-}
-
 require_commit_provenance() {
   local mode="$1"
   require_protected_git_authority "$mode"
@@ -374,16 +339,6 @@ is_jsonl_eval_result_path() {
       return 1
       ;;
   esac
-}
-
-restore_original_submodule_ref() {
-  local original_branch="$1"
-  local original_head="$2"
-  if [ -n "$original_branch" ]; then
-    git -C "$AGENT_CANON_DIR" switch "$original_branch" >/dev/null
-    return
-  fi
-  git -C "$AGENT_CANON_DIR" checkout --detach "$original_head" >/dev/null
 }
 
 stash_ref_for_sha() {
