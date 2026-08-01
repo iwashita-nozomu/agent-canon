@@ -38,7 +38,6 @@ def detect_workspace_root() -> Path:
 # Preserve the template or derived checkout root when this module is imported
 # through a symlinked runtime surface from vendor/agent-canon.
 WORKSPACE_ROOT = detect_workspace_root()
-HOST_CODEX_HOME = Path.home() / ".codex"
 HOST_GH_CONFIG = Path.home() / ".config" / "gh"
 HOST_SSH_DIR = Path.home() / ".ssh"
 BUILDER_INFO_TIMEOUT_SECONDS = 15
@@ -93,7 +92,6 @@ class HostRuntimeFeatures:
     """Describe host-dependent runtime features shared across container entrypoints."""
 
     has_gpu: bool
-    has_host_codex_home: bool
     has_host_gh_config: bool
     has_host_ssh_dir: bool
     ssh_auth_sock: str | None
@@ -102,7 +100,6 @@ class HostRuntimeFeatures:
 def detect_host_runtime_features() -> HostRuntimeFeatures:
     """Detect host-dependent runtime features once."""
     has_gpu = Path("/dev/nvidiactl").exists() or shutil.which("nvidia-smi") is not None
-    has_host_codex_home = HOST_CODEX_HOME.is_dir()
     has_host_gh_config = HOST_GH_CONFIG.is_dir()
     has_host_ssh_dir = HOST_SSH_DIR.is_dir()
     ssh_auth_sock = os.environ.get("SSH_AUTH_SOCK")
@@ -110,7 +107,6 @@ def detect_host_runtime_features() -> HostRuntimeFeatures:
         ssh_auth_sock = None
     return HostRuntimeFeatures(
         has_gpu=has_gpu,
-        has_host_codex_home=has_host_codex_home,
         has_host_gh_config=has_host_gh_config,
         has_host_ssh_dir=has_host_ssh_dir,
         ssh_auth_sock=ssh_auth_sock,
@@ -119,7 +115,6 @@ def detect_host_runtime_features() -> HostRuntimeFeatures:
 
 def default_host_mounts(
     *,
-    auto_mount_host_codex_home: bool = True,
     auto_mount_host_gh_config: bool = False,
     auto_mount_host_ssh_dir: bool = False,
     auto_forward_ssh_auth_sock: bool = False,
@@ -127,8 +122,6 @@ def default_host_mounts(
     """Return host mounts that should appear in canonical container entrypoints."""
     mounts: list[str] = []
     features = detect_host_runtime_features()
-    if auto_mount_host_codex_home and features.has_host_codex_home:
-        mounts.append(f"{HOST_CODEX_HOME}:/root/.codex")
     if auto_mount_host_gh_config and features.has_host_gh_config:
         mounts.append(f"{HOST_GH_CONFIG}:/root/.config/gh")
     if auto_mount_host_ssh_dir and features.has_host_ssh_dir:
@@ -392,7 +385,6 @@ def build_run_command(
     gpus: str | None = None,
     user: str | None = None,
     tty: bool = False,
-    auto_mount_host_codex_home: bool = True,
 ) -> list[str]:
     """Build one container run command."""
     resolved_workspace = workspace_root.resolve()
@@ -412,9 +404,7 @@ def build_run_command(
         run_command.extend(["--gpus", resolved_gpus])
 
     run_command.extend(["-v", f"{resolved_workspace}:{resolved_mount}"])
-    auto_mounts = default_host_mounts(
-        auto_mount_host_codex_home=auto_mount_host_codex_home
-    )
+    auto_mounts = default_host_mounts()
     for mount in (*auto_mounts, *combined_mounts):
         run_command.extend(["-v", mount])
     for port in ports:

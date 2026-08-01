@@ -2,7 +2,7 @@
 name: dependency-design
 description: "Define and validate the typed declarative devcontainer dependency design packet before changing mounted developer or agent tools, manifests, bootstrap, or dependency installation order."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"a0adfa17a502cf946d6b5568a8cadcbaf87b586b31d20ab31b40d72881db654c"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"92618acbe608c3becd1e1752c2c95cf0aa8819f9f68a0ee64e977827601d4140"} -->
 
 <!--
 @dependency-start

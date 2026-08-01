@@ -38,8 +38,6 @@ class ProfileDefaults:
     container_home_root: str
     use_host_user: bool
     tty: bool
-    share_host_codex_home: bool
-    seed_host_codex: bool
     mount_host_gitconfig: bool
     mount_host_git_credentials: bool
     mount_host_ssh_dir: bool
@@ -60,7 +58,9 @@ def parse_bool(data: dict[str, object], key: str, default: bool) -> bool:
     """Extract a boolean option with a default."""
     value = data.get(key, default)
     if not isinstance(value, bool):
-        raise ValueError(f"docker/codex-container-profiles.toml: {key} must be a boolean")
+        raise ValueError(
+            f"docker/codex-container-profiles.toml: {key} must be a boolean"
+        )
     return value
 
 
@@ -68,7 +68,9 @@ def parse_string(data: dict[str, object], key: str, default: str) -> str:
     """Extract a string option with a default."""
     value = data.get(key, default)
     if not isinstance(value, str):
-        raise ValueError(f"docker/codex-container-profiles.toml: {key} must be a string")
+        raise ValueError(
+            f"docker/codex-container-profiles.toml: {key} must be a string"
+        )
     return value
 
 
@@ -76,7 +78,9 @@ def parse_string_list(data: dict[str, object], key: str) -> tuple[str, ...]:
     """Extract a list of strings."""
     value = data.get(key, [])
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        raise ValueError(f"docker/codex-container-profiles.toml: {key} must be a list of strings")
+        raise ValueError(
+            f"docker/codex-container-profiles.toml: {key} must be a list of strings"
+        )
     return tuple(value)
 
 
@@ -85,16 +89,20 @@ def load_profiles(path_like: str) -> tuple[ProfileDefaults, list[CodexProfile]]:
     data = load_toml(path_like)
     defaults_data = data.get("defaults", {})
     if not isinstance(defaults_data, dict):
-        raise ValueError("docker/codex-container-profiles.toml: [defaults] must be a table")
+        raise ValueError(
+            "docker/codex-container-profiles.toml: [defaults] must be a table"
+        )
 
     defaults = ProfileDefaults(
-        container_home_root=parse_string(defaults_data, "container_home_root", "/workspace/.state/nested-codex"),
+        container_home_root=parse_string(
+            defaults_data, "container_home_root", "/workspace/.state/nested-codex"
+        ),
         use_host_user=parse_bool(defaults_data, "use_host_user", True),
         tty=parse_bool(defaults_data, "tty", True),
-        share_host_codex_home=parse_bool(defaults_data, "share_host_codex_home", False),
-        seed_host_codex=parse_bool(defaults_data, "seed_host_codex", True),
         mount_host_gitconfig=parse_bool(defaults_data, "mount_host_gitconfig", True),
-        mount_host_git_credentials=parse_bool(defaults_data, "mount_host_git_credentials", True),
+        mount_host_git_credentials=parse_bool(
+            defaults_data, "mount_host_git_credentials", True
+        ),
         mount_host_ssh_dir=parse_bool(defaults_data, "mount_host_ssh_dir", False),
         forward_ssh_auth_sock=parse_bool(defaults_data, "forward_ssh_auth_sock", True),
         forward_env=parse_string_list(defaults_data, "forward_env"),
@@ -102,49 +110,61 @@ def load_profiles(path_like: str) -> tuple[ProfileDefaults, list[CodexProfile]]:
 
     raw_profiles = data.get("profile", [])
     if not isinstance(raw_profiles, list):
-        raise ValueError("docker/codex-container-profiles.toml: [[profile]] must be a list")
+        raise ValueError(
+            "docker/codex-container-profiles.toml: [[profile]] must be a list"
+        )
 
     profiles: list[CodexProfile] = []
     for raw_profile in raw_profiles:
         if not isinstance(raw_profile, dict):
-            raise ValueError("docker/codex-container-profiles.toml: each profile must be a table")
+            raise ValueError(
+                "docker/codex-container-profiles.toml: each profile must be a table"
+            )
         name = raw_profile.get("name")
         pack = raw_profile.get("pack")
         description = raw_profile.get("description", "")
-        if not isinstance(name, str) or not isinstance(pack, str) or not isinstance(description, str):
-            raise ValueError("docker/codex-container-profiles.toml: invalid profile entry")
+        if (
+            not isinstance(name, str)
+            or not isinstance(pack, str)
+            or not isinstance(description, str)
+        ):
+            raise ValueError(
+                "docker/codex-container-profiles.toml: invalid profile entry"
+            )
         profiles.append(CodexProfile(name=name, pack=pack, description=description))
     return defaults, profiles
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
-    parser = argparse.ArgumentParser(description="Run Codex inside the repo-defined container runtime.")
+    parser = argparse.ArgumentParser(
+        description="Run Codex inside the repo-defined container runtime."
+    )
     parser.add_argument(
         "--profiles",
         default="docker/codex-container-profiles.toml",
         help="Profile TOML file. Default: docker/codex-container-profiles.toml",
     )
-    parser.add_argument("--profile", default="default", help="Profile name. Default: default")
-    parser.add_argument("--list-profiles", action="store_true", help="List available profiles and exit.")
+    parser.add_argument(
+        "--profile", default="default", help="Profile name. Default: default"
+    )
+    parser.add_argument(
+        "--list-profiles", action="store_true", help="List available profiles and exit."
+    )
     parser.add_argument(
         "--builder",
         default="auto",
         choices=("auto", "docker", "podman"),
         help="Container builder to use. Default: auto",
     )
-    parser.add_argument("--skip-build", action="store_true", help="Skip the build step.")
-    parser.add_argument("--keep-image", action="store_true", help="Keep the built image.")
-    parser.add_argument("--print-only", action="store_true", help="Print commands without executing.")
     parser.add_argument(
-        "--share-host-codex-home",
-        action="store_true",
-        help="Bind mount host ~/.codex directly into the container HOME.",
+        "--skip-build", action="store_true", help="Skip the build step."
     )
     parser.add_argument(
-        "--no-seed-host-codex",
-        action="store_true",
-        help="Do not seed auth/config from host ~/.codex.",
+        "--keep-image", action="store_true", help="Keep the built image."
+    )
+    parser.add_argument(
+        "--print-only", action="store_true", help="Print commands without executing."
     )
     parser.add_argument(
         "--mount-host-ssh-dir",
@@ -163,7 +183,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="NAME",
         help="Additional host environment variable to forward. Repeatable.",
     )
-    parser.add_argument("--workspace-root", default=".", help="Workspace root to mount. Default: repo root")
+    parser.add_argument(
+        "--workspace-root",
+        default=".",
+        help="Workspace root to mount. Default: repo root",
+    )
     parser.add_argument(
         "command",
         nargs=argparse.REMAINDER,
@@ -174,7 +198,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def cleanup_image(builder: str, image_tag: str) -> None:
     """Remove one image quietly."""
-    subprocess.run([builder, "image", "rm", "-f", image_tag], check=False, capture_output=True)
+    subprocess.run(
+        [builder, "image", "rm", "-f", image_tag], check=False, capture_output=True
+    )
 
 
 def find_profile(profiles: list[CodexProfile], name: str) -> CodexProfile:
@@ -186,12 +212,16 @@ def find_profile(profiles: list[CodexProfile], name: str) -> CodexProfile:
     raise SystemExit(f"Unknown profile `{name}`. Known profiles: {known}")
 
 
-def host_to_container_home(defaults: ProfileDefaults, profile: CodexProfile, workspace_root: Path) -> tuple[Path, str]:
+def host_to_container_home(
+    defaults: ProfileDefaults, profile: CodexProfile, workspace_root: Path
+) -> tuple[Path, str]:
     """Return the host path and container path for nested Codex HOME."""
     container_home = f"{defaults.container_home_root.rstrip('/')}/{profile.name}"
     container_workspace = "/workspace"
     if not container_home.startswith(container_workspace.rstrip("/") + "/"):
-        raise SystemExit("container_home_root must live under /workspace for this template")
+        raise SystemExit(
+            "container_home_root must live under /workspace for this template"
+        )
     relative_home = container_home.removeprefix(container_workspace).lstrip("/")
     host_home = (workspace_root / relative_home).resolve()
     host_home.mkdir(parents=True, exist_ok=True)
@@ -211,7 +241,6 @@ def normalize_command(command: list[str]) -> list[str]:
 def build_nested_codex_script(
     command: list[str],
     *,
-    seed_host_codex: bool,
     mount_host_ssh_dir: bool,
     workspace: str,
     run_uid: int | None,
@@ -227,18 +256,6 @@ def build_nested_codex_script(
         'mkdir -p "$HOME"',
         'mkdir -p "$HOME/.codex"',
     ]
-    if seed_host_codex:
-        lines.extend(
-            [
-                'if [ -d /tmp/host-codex-home ]; then',
-                '  for name in auth.json config.toml; do',
-                '    if [ -f "/tmp/host-codex-home/$name" ] && [ ! -e "$HOME/.codex/$name" ]; then',
-                '      cp "/tmp/host-codex-home/$name" "$HOME/.codex/$name"',
-                "    fi",
-                "  done",
-                "fi",
-            ]
-        )
     lines.extend(
         [
             'if [ -f /tmp/host-gitconfig ] && [ ! -e "$HOME/.gitconfig" ]; then cp /tmp/host-gitconfig "$HOME/.gitconfig"; fi',
@@ -246,7 +263,9 @@ def build_nested_codex_script(
         ]
     )
     if mount_host_ssh_dir:
-        lines.append('if [ -d /tmp/host-ssh-dir ] && [ ! -e "$HOME/.ssh" ]; then ln -s /tmp/host-ssh-dir "$HOME/.ssh"; fi')
+        lines.append(
+            'if [ -d /tmp/host-ssh-dir ] && [ ! -e "$HOME/.ssh" ]; then ln -s /tmp/host-ssh-dir "$HOME/.ssh"; fi'
+        )
     lines.extend(
         [
             f"if [ -f {post_create} ]; then",
@@ -290,22 +309,16 @@ def main() -> int:
         pack = apply_pack_overrides(load_or_default_pack(profile.pack))
         builder = resolve_builder(args.builder, print_only=args.print_only)
 
-        share_host_codex_home = defaults.share_host_codex_home or args.share_host_codex_home
-        seed_host_codex = defaults.seed_host_codex and not args.no_seed_host_codex and not share_host_codex_home
         mount_host_ssh_dir = defaults.mount_host_ssh_dir or args.mount_host_ssh_dir
-        forward_ssh_auth_sock = defaults.forward_ssh_auth_sock and not args.no_forward_ssh_auth_sock
+        forward_ssh_auth_sock = (
+            defaults.forward_ssh_auth_sock and not args.no_forward_ssh_auth_sock
+        )
         forward_env = tuple(dict.fromkeys((*defaults.forward_env, *args.forward_env)))
         use_host_user = defaults.use_host_user
         tty = defaults.tty
 
         mounts: list[str] = []
         envs: list[str] = [f"HOME={container_home}"]
-
-        host_codex_home = Path.home() / ".codex"
-        if share_host_codex_home and host_codex_home.is_dir():
-            mounts.append(f"{host_codex_home}:{container_home}/.codex:ro")
-        elif seed_host_codex and host_codex_home.is_dir():
-            mounts.append(f"{host_codex_home}:/tmp/host-codex-home:ro")
 
         host_gitconfig = Path.home() / ".gitconfig"
         if defaults.mount_host_gitconfig and host_gitconfig.is_file():
@@ -331,7 +344,6 @@ def main() -> int:
 
         shell_script = build_nested_codex_script(
             normalize_command(args.command),
-            seed_host_codex=seed_host_codex,
             mount_host_ssh_dir=mount_host_ssh_dir,
             workspace=pack.runtime.workspace_mount,
             run_uid=os.getuid() if use_host_user else None,
@@ -346,7 +358,6 @@ def main() -> int:
             env=tuple(envs),
             mounts=tuple(mounts),
             tty=tty,
-            auto_mount_host_codex_home=False,
         )
 
         print_label_and_command("build", build_command)

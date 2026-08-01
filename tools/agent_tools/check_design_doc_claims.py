@@ -728,9 +728,15 @@ def token_is_path_in_repo(root: Path, claim_path: str, token: str) -> bool:
             if any(path_is_under_root(root, path) for path in base.glob(candidate)):
                 return True
             continue
-        path = resolve_claim_token_path(root, claim_path, candidate)
-        if path_is_under_root(root, path) and path.exists():
-            return True
+        try:
+            path = resolve_claim_token_path(root, claim_path, candidate)
+            if path_is_under_root(root, path) and path.exists():
+                return True
+        except (OSError, ValueError):
+            # Formula/code tokens can look path-like while being invalid filesystem
+            # names (for example a literal NUL escape). They are not repository
+            # path evidence, but they must not abort claim evaluation.
+            continue
     return False
 
 
