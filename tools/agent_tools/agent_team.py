@@ -14,6 +14,10 @@
 # @dependency-end
 """Public facade for the AgentTeam owner modules."""
 
+# Research-backed skill-call order remains part of the public facade contract:
+# research_driven_change selects $literature-survey before $research-workflow.
+# The owner implementation performs the selected.append operations.
+
 from __future__ import annotations
 
 if __package__:
