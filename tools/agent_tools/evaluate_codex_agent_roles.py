@@ -4,7 +4,8 @@
 # responsibility Evaluates Codex subagent role configuration, routing, model settings, and runtime metrics.
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
 # upstream design ../../evidence/agent-evals/README.md eval directory contract
-# upstream implementation ./agent_team.py loads team and task routing metadata
+# upstream implementation ./team_config.py loads team and task routing metadata
+# upstream implementation ./implementation_dispatch.py owns capacity and wave routing
 # upstream implementation ./model_profile_registry.py owns canonical model/profile expectations
 # upstream implementation ./capacity_handshake.py owns typed capacity provenance
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
@@ -39,18 +40,39 @@ from typing import cast
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from agent_team import (  # noqa: E402
-    Role,
-    default_specialists_for_task,
-    declared_team_capacity_derivation,
-    load_task_catalog,
-    load_team_config,
-    recommended_dynamic_expansion_wave_slots,
-    recommended_initial_subagent_wave,
-    select_roles,
-    workflow_spawn_budget,
-    workflow_topology_policy_violations,
-)
+if __package__:
+    from .team_config import (
+        Role,
+        default_specialists_for_task,
+        load_task_catalog,
+        load_team_config,
+        select_roles,
+    )
+else:
+    from team_config import (
+        Role,
+        default_specialists_for_task,
+        load_task_catalog,
+        load_team_config,
+        select_roles,
+    )
+
+if __package__:
+    from .implementation_dispatch import (
+        declared_team_capacity_derivation,
+        recommended_dynamic_expansion_wave_slots,
+        recommended_initial_subagent_wave,
+        workflow_spawn_budget,
+        workflow_topology_policy_violations,
+    )
+else:
+    from implementation_dispatch import (
+        declared_team_capacity_derivation,
+        recommended_dynamic_expansion_wave_slots,
+        recommended_initial_subagent_wave,
+        workflow_spawn_budget,
+        workflow_topology_policy_violations,
+    )
 from runtime_log_paths import eval_results_dir  # noqa: E402
 
 COMPACT_FINDING_SAMPLE_LIMIT = 25

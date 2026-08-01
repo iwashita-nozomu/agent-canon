@@ -7,6 +7,7 @@
 # upstream implementation ./skill_route_catalog.py owns typed route and dependency projections
 # upstream implementation ./skill_dependency_map.py owns graph/tool identity projections
 # upstream implementation ./skill_tool_commands.py owns read-only command packets
+# upstream implementation ./tool_calls.py owns skill ToolCall token materialization
 # downstream implementation ../../tests/agent_tools/test_skill_shim_materializer.py validates migration, readback, and fixed point
 # @dependency-end
 """Materialize the canonical thin runtime shims for all public skills."""
@@ -33,7 +34,11 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility.
 
 import yaml
 from agent_canon_source_root import resolve_agent_canon_source_root
-from agent_team import materialize_skill_tool_call_token
+
+if __package__:
+    from .tool_calls import materialize_skill_tool_call_token
+else:
+    from tool_calls import materialize_skill_tool_call_token
 from skill_dependency_map import build_graph
 from skill_route_catalog import (
     SkillDependencyRule,
@@ -616,7 +621,7 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
             "dependency_ref": f"{DEPENDENCY_PATH.as_posix()}#invocation:{skill}",
             "route_ref": f"{CATALOG_PATH.as_posix()}#skill:{skill}.routing",
             "command_ref": f"{CATALOG_PATH.as_posix()}#skill:{skill}.tool_commands",
-            "tool_surface_ref": "tools/agent_tools/agent_team.py#materialize_skill_tool_call_token",
+            "tool_surface_ref": "tools/agent_tools/tool_calls.py#materialize_skill_tool_call_token",
             "graph_ref": f"{GRAPH_PATH.as_posix()}#skill:{skill}",
         },
         "identity": {

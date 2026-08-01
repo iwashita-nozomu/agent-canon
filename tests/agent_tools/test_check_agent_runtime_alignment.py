@@ -25,18 +25,18 @@ SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "check_agent_runtime_alig
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 import check_agent_runtime_alignment as runtime_alignment  # noqa: E402
-from agent_team import (  # noqa: E402
-    TaskCatalog,
+from check_agent_runtime_alignment import validate_permanent_team_mapping  # noqa: E402
+from implementation_dispatch import (  # noqa: E402
     codex_runtime_max_depth,
-    load_team_config,
+    workflow_topology_policy_violations,
+)
+from packets import (  # noqa: E402
     resolve_active_design_packet_config,
     resolve_cross_cutting_document_packet,
     resolve_document_section_locators,
-    resolve_role,
     resolve_role_document_packet,
-    workflow_topology_policy_violations,
 )
-from check_agent_runtime_alignment import validate_permanent_team_mapping  # noqa: E402
+from team_config import TaskCatalog, load_team_config, resolve_role  # noqa: E402
 
 
 def task_catalog_from_raw(raw: dict[str, object]) -> TaskCatalog:
@@ -368,14 +368,11 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         owner = (
             PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
         ).read_text(encoding="utf-8")
-        agent_team = (
-            PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
+        manifest_rendering = (
+            PROJECT_ROOT / "tools" / "agent_tools" / "manifest_rendering.py"
         ).read_text(encoding="utf-8")
         lifecycle_contract = (
-            PROJECT_ROOT
-            / "tools"
-            / "agent_tools"
-            / "update_lifecycle_contract.py"
+            PROJECT_ROOT / "tools" / "agent_tools" / "update_lifecycle_contract.py"
         ).read_text(encoding="utf-8")
         subagents = (
             PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
@@ -389,15 +386,15 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
         self.assertEqual(owner.count("## Decision Sufficiency Packet"), 1)
         self.assertIn("唯一の意味論 owner", owner)
-        self.assertNotIn("def validate_decision_sufficiency_packet", agent_team)
+        self.assertNotIn("def validate_decision_sufficiency_packet", manifest_rendering)
         self.assertNotIn("def validate_decision_sufficiency_packet", lifecycle_contract)
         self.assertIn(
             'DECISION_SUFFICIENCY_OWNER = "agents/skills/agent-orchestration.md#Decision Sufficiency Packet"',
-            agent_team,
+            manifest_rendering,
         )
-        self.assertIn("import_decision_sufficiency_verdict", agent_team)
+        self.assertIn("import_decision_sufficiency_verdict", manifest_rendering)
         self.assertIn("selected owner gate", subagents)
-        self.assertIn("decision_sufficiency_packet_ref", agent_team)
+        self.assertIn("decision_sufficiency_packet_ref", manifest_rendering)
         for path in consumer_docs:
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")

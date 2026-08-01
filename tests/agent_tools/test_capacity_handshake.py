@@ -3,7 +3,7 @@
 # responsibility Tests typed capacity derivation, successful-spawn reservations, queue retention, and lifecycle CAS.
 # upstream implementation ../../agents/capacity_policy.toml declares capacity policy
 # upstream implementation ../../tools/agent_tools/capacity_handshake.py implements the provider contract
-# downstream implementation ../../tools/agent_tools/agent_team.py consumes spawn reservation behavior
+# downstream implementation ../../tools/agent_tools/implementation_dispatch.py consumes spawn reservation behavior
 # @dependency-end
 
 from __future__ import annotations

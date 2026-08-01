@@ -2,6 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Provides smoke test research perspective pack agent workflow automation.
+# upstream implementation ./packets.py owns active design packet types.
+# upstream implementation ./team_config.py owns team and role configuration.
+# upstream implementation ./agent_team.py owns run bundle orchestration.
+# upstream implementation ./workspace_scope.py owns role write scope.
 # @dependency-end
 
 """Smoke test the research perspective review pack runtime surfaces."""
@@ -17,16 +21,36 @@ UTC = timezone.utc
 from pathlib import Path
 
 import yaml
-from agent_team import (
-    ActiveDesignPacketConfig,
-    RunBundleSpec,
-    create_run_bundle,
-    load_task_catalog,
-    load_team_config,
-    resolve_role,
-    resolve_role_write_scope,
-    run_active_design_packet,
-)
+
+if __package__:
+    from .packets import ActiveDesignPacketConfig
+else:
+    from packets import ActiveDesignPacketConfig
+
+if __package__:
+    from .team_config import (
+        RunBundleSpec,
+        load_task_catalog,
+        load_team_config,
+        resolve_role,
+    )
+else:
+    from team_config import (
+        RunBundleSpec,
+        load_task_catalog,
+        load_team_config,
+        resolve_role,
+    )
+
+if __package__:
+    from .agent_team import create_run_bundle, run_active_design_packet
+else:
+    from agent_team import create_run_bundle, run_active_design_packet
+
+if __package__:
+    from .workspace_scope import resolve_role_write_scope
+else:
+    from workspace_scope import resolve_role_write_scope
 
 ROOT = Path(__file__).resolve().parents[2]
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"

@@ -16,16 +16,32 @@ from datetime import datetime, timezone
 UTC = timezone.utc
 from pathlib import Path
 
-from agent_team import (
-    RunBundleSpec,
-    create_run_bundle,
-    load_task_catalog,
-    load_team_config,
-    make_run_id,
-    resolve_report_root,
-    select_roles,
-    specialist_role_ids,
-)
+if __package__:
+    from .team_config import (
+        RunBundleSpec,
+        load_task_catalog,
+        load_team_config,
+        select_roles,
+        specialist_role_ids,
+    )
+else:
+    from team_config import (
+        RunBundleSpec,
+        load_task_catalog,
+        load_team_config,
+        select_roles,
+        specialist_role_ids,
+    )
+
+if __package__:
+    from .agent_team import create_run_bundle
+else:
+    from agent_team import create_run_bundle
+
+if __package__:
+    from .workspace_scope import make_run_id, resolve_report_root
+else:
+    from workspace_scope import make_run_id, resolve_report_root
 
 DOC_KIND_MAP = {
     "long-form": {

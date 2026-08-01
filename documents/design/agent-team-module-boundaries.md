@@ -7,7 +7,13 @@ upstream design dependency-manifest-design.md dependency graph and claim-evidenc
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface ownership
 upstream design ../../agents/COMMUNICATION_PROTOCOL.md active-design packet and caller readback contract
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow and repository-changing gate
-upstream implementation ../../tools/agent_tools/agent_team.py current Python implementation and public-surface source
+downstream implementation ../../tools/agent_tools/agent_team.py facade and public-surface source
+downstream implementation ../../tools/agent_tools/team_config.py owner source identity
+downstream implementation ../../tools/agent_tools/packets.py owner source identity
+downstream implementation ../../tools/agent_tools/tool_calls.py owner source identity
+downstream implementation ../../tools/agent_tools/implementation_dispatch.py owner source identity
+downstream implementation ../../tools/agent_tools/manifest_rendering.py owner source identity
+downstream implementation ../../tools/agent_tools/workspace_scope.py owner source identity
 upstream implementation ../../tools/agent_tools/helper_function_inventory.py function/class inventory producer
 upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh static import-edge producer
 downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py run-bundle caller
@@ -29,7 +35,7 @@ downstream design README.md AgentCanon design reader index
 evidence から再現するための design contract です。最初に tree と exact
 inventory を読み、次に current/target map と DAG を `tools/agent_tools/agent_team.py` から読みます。その後に import
 mode と side effect、migration wave、validation oracle、rollback を読みます。
-この文書が決めるのは module boundary と公開 API 契約 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` と future owner `tools/agent_tools/agent_team.py` であり、実装コードの移動そのもの
+この文書が決めるのは module boundary と公開 API 契約 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` と target owner set（`team_config.py`、`packets.py`、`tool_calls.py`、`implementation_dispatch.py`、`manifest_rendering.py`、`workspace_scope.py`、`agent_team.py` facade）であり、実装コードの移動そのもの
 ではありません。
 
 最初の図は、現在の一枚岩から target owner `tools/agent_tools/agent_team.py` への責務移動 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` と、最後に残る facade の
@@ -488,7 +494,7 @@ smoke/test、manifest bytes、JSON snapshot、capacity receipt、stdout/stderr/e
 
 `RC-01` から `RC-08` はこの design pass の request clauses です。実装者は各 wave
 の commit message と review packet で該当 clause を再掲し、future module path を
-実装後の graph source identity `tools/agent_tools/agent_team.py` に接続します `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
+実装後の graph source identities（`tools/agent_tools/agent_team.py` facade と六つの owner module）に接続します `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
 
 ## 11. Rollback と旧内部 surface の削除条件
 
@@ -500,7 +506,7 @@ wildcard import、allowlist 外 public binding、`globals()` への注入は残�
 
 rollback は wave の最後の成功 commit に戻す設計で、target module の一部だけを残す
 中間状態を採用しません。rollback 後も source inventory と checker evidence を更新し、
-未検証の target claim `tools/agent_tools/agent_team.py` を settled behavior として記述しません `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
+実装後は target claim を owner source identities（`team_config.py`、`packets.py`、`tool_calls.py`、`implementation_dispatch.py`、`manifest_rendering.py`、`workspace_scope.py`、`agent_team.py` facade）へ readback して settled behavior として記述します `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
 
 ## 12. 確定した設計判断
 
@@ -521,4 +527,4 @@ rollback は wave の最後の成功 commit に戻す設計で、target module �
 
 これらは approved target-state contract
 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`
-の確定判断であり、owner `tools/agent_tools/agent_team.py`、implementation mechanism、validation route に未解決分岐はありません `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
+の確定判断であり、owner source identities（六つの owner module と `tools/agent_tools/agent_team.py` facade）、implementation mechanism、validation route に未解決分岐はありません `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
