@@ -319,7 +319,9 @@ class SubprocessRunner:
             raise DependencyError("command argv must contain non-empty strings")
         if privileged and os.geteuid() != 0:
             if shutil.which("sudo") is None:
-                raise DependencyError("privileged dependency action requires root or sudo")
+                raise DependencyError(
+                    "privileged dependency action requires root or sudo"
+                )
             command.insert(0, "sudo")
         process_environment = None
         if env is not None:
@@ -424,7 +426,9 @@ def _checksums(value: object) -> tuple[tuple[str, str], ...]:
         arch_name = _string(arch, "checksum architecture")
         checksum_value = _string(checksum, f"checksum[{arch_name}]")
         if SHA256_RE.fullmatch(checksum_value) is None:
-            raise DependencyError(f"checksum[{arch_name}] must be a 64-character SHA256")
+            raise DependencyError(
+                f"checksum[{arch_name}] must be a 64-character SHA256"
+            )
         result.append((arch_name, checksum_value.lower()))
     return tuple(sorted(result))
 
@@ -442,9 +446,13 @@ def _string_map(value: object, field: str) -> tuple[tuple[str, str], ...]:
 
 def _validate_url(value: str, field: str) -> None:
     parsed = urllib.parse.urlparse(value)
-    if parsed.scheme not in {"https", "file"} or (
-        not parsed.netloc and parsed.scheme == "https"
-    ) or parsed.query or parsed.fragment or TRAVERSAL_RE.search(parsed.path):
+    if (
+        parsed.scheme not in {"https", "file"}
+        or (not parsed.netloc and parsed.scheme == "https")
+        or parsed.query
+        or parsed.fragment
+        or TRAVERSAL_RE.search(parsed.path)
+    ):
         raise DependencyError(f"{field} must be an https or file URL")
 
 
@@ -529,7 +537,11 @@ def _parse_verification(
         VerificationKind.RUST_TOOLCHAIN: set(),
         VerificationKind.LEAN_TOOLCHAIN: set(),
         VerificationKind.CARGO_BINARY: {"path", "args", "output_contains"},
-        VerificationKind.BROWSER_EXECUTABLE: {"args", "output_contains", "executable_globs"},
+        VerificationKind.BROWSER_EXECUTABLE: {
+            "args",
+            "output_contains",
+            "executable_globs",
+        },
     }
     if "kind" not in value:
         raise DependencyError(f"{record_id}.verification missing fields: kind")
@@ -629,9 +641,7 @@ def _parse_verification(
                 f"{record_id}.verification requires executable_globs, args, and output_contains"
             )
         for glob in executable_globs:
-            _validate_safe_glob(
-                glob, f"{record_id}.verification.executable_globs"
-            )
+            _validate_safe_glob(glob, f"{record_id}.verification.executable_globs")
     elif (
         executable is not None
         or path is not None
@@ -657,9 +667,13 @@ def _validate_package(record: DependencyRecord) -> None:
         if APT_PACKAGE_RE.fullmatch(record.package) is None:
             raise DependencyError(f"{record.id}.package is not an apt package name")
     elif record.method in {Method.NPM_GLOBAL, Method.PIP_USER}:
-        pattern = NPM_PACKAGE_RE if record.method is Method.NPM_GLOBAL else APT_PACKAGE_RE
+        pattern = (
+            NPM_PACKAGE_RE if record.method is Method.NPM_GLOBAL else APT_PACKAGE_RE
+        )
         if pattern.fullmatch(record.package) is None:
-            raise DependencyError(f"{record.id}.package has an unsupported registry name")
+            raise DependencyError(
+                f"{record.id}.package has an unsupported registry name"
+            )
     elif record.method is Method.BROWSER_INSTALL:
         if record.package not in {"chromium", "firefox", "webkit"}:
             raise DependencyError(f"{record.id}.package has an unsupported browser")
@@ -667,10 +681,19 @@ def _validate_package(record: DependencyRecord) -> None:
         raise DependencyError(f"{record.id}.package has an unsupported value")
 
 
-def _validate_method_fields(record: DependencyRecord, raw: Mapping[str, object]) -> None:
+def _validate_method_fields(
+    record: DependencyRecord, raw: Mapping[str, object]
+) -> None:
     common = {
-        "id", "package", "method", "version", "source", "verification",
-        "deps", "provides", "failure_policy",
+        "id",
+        "package",
+        "method",
+        "version",
+        "source",
+        "verification",
+        "deps",
+        "provides",
+        "failure_policy",
     }
     method_fields = {
         Method.APT_PACKAGE: set(),
@@ -678,8 +701,13 @@ def _validate_method_fields(record: DependencyRecord, raw: Mapping[str, object])
         Method.NPM_GLOBAL: set(),
         Method.PIP_USER: set(),
         Method.RELEASE_ASSET: {
-            "checksum", "checksums", "asset", "assets", "archive_format",
-            "extract", "destination",
+            "checksum",
+            "checksums",
+            "asset",
+            "assets",
+            "archive_format",
+            "extract",
+            "destination",
         },
         Method.RUST_TOOLCHAIN: {"components"},
         Method.LEAN_TOOLCHAIN: set(),
@@ -702,7 +730,9 @@ def _validate_method_values(record: DependencyRecord) -> None:
             raise DependencyError(f"{record.id}.version has an unsupported apt value")
         if record.method is Method.APT_REPOSITORY:
             _validate_https_url(record.source, f"{record.id}.source")
-        elif VERSION_TOKEN_RE.fullmatch(record.source) is None and not record.source.startswith("https://"):
+        elif VERSION_TOKEN_RE.fullmatch(
+            record.source
+        ) is None and not record.source.startswith("https://"):
             raise DependencyError(f"{record.id}.source has an unsupported apt value")
     elif record.method in {Method.NPM_GLOBAL, Method.PIP_USER}:
         if SEMVER_RE.fullmatch(record.version) is None:
@@ -710,14 +740,18 @@ def _validate_method_values(record: DependencyRecord) -> None:
         _validate_https_url(record.source, f"{record.id}.source")
     elif record.method is Method.RELEASE_ASSET:
         if VERSION_TOKEN_RE.fullmatch(record.version) is None:
-            raise DependencyError(f"{record.id}.version has an unsupported release value")
+            raise DependencyError(
+                f"{record.id}.version has an unsupported release value"
+            )
         _validate_https_url(record.source, f"{record.id}.source")
         for asset in (record.asset, *[value for _, value in record.assets]):
             if asset is not None:
                 _validate_safe_asset_path(asset, f"{record.id}.asset")
         for arch, _ in record.assets:
             if arch not in {"x86_64", "aarch64"}:
-                raise DependencyError(f"{record.id}.assets has an unsupported architecture")
+                raise DependencyError(
+                    f"{record.id}.assets has an unsupported architecture"
+                )
         assert record.archive_format is not None
         if record.archive_format not in {"binary", "tar.gz", "tar.xz", "tar"}:
             raise DependencyError(f"{record.id}.archive_format is unsupported")
@@ -728,16 +762,28 @@ def _validate_method_values(record: DependencyRecord) -> None:
                 f"{record.id}: binary release assets require extract=none"
             )
         assert record.destination is not None
-        _validate_absolute_path(record.destination, f"{record.id}.destination", prefix="/usr/local/bin")
+        _validate_absolute_path(
+            record.destination, f"{record.id}.destination", prefix="/usr/local/bin"
+        )
     elif record.method is Method.RUST_TOOLCHAIN:
         if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", record.version) is None:
             raise DependencyError(f"{record.id}.version must be an exact Rust version")
         _validate_https_url(record.source, f"{record.id}.source")
-        if any(component not in {"rustfmt", "clippy", "rust-analyzer"} for component in record.components):
-            raise DependencyError(f"{record.id}.components contains an unsupported component")
+        if any(
+            component not in {"rustfmt", "clippy", "rust-analyzer"}
+            for component in record.components
+        ):
+            raise DependencyError(
+                f"{record.id}.components contains an unsupported component"
+            )
     elif record.method is Method.LEAN_TOOLCHAIN:
-        if re.fullmatch(r"leanprover/lean4:v[0-9]+\.[0-9]+\.[0-9]+", record.version) is None:
-            raise DependencyError(f"{record.id}.version must be an exact Lean toolchain")
+        if (
+            re.fullmatch(r"leanprover/lean4:v[0-9]+\.[0-9]+\.[0-9]+", record.version)
+            is None
+        ):
+            raise DependencyError(
+                f"{record.id}.version must be an exact Lean toolchain"
+            )
         _validate_https_url(record.source, f"{record.id}.source")
     elif record.method is Method.CARGO_SOURCE_BUILD:
         if record.source.startswith("/") or TRAVERSAL_RE.search(record.source):
@@ -745,7 +791,9 @@ def _validate_method_values(record: DependencyRecord) -> None:
         if PurePosixPath(record.source).is_absolute() or any(
             part in {"", "."} for part in PurePosixPath(record.source).parts
         ):
-            raise DependencyError(f"{record.id}.source must be a normalized relative path")
+            raise DependencyError(
+                f"{record.id}.source must be a normalized relative path"
+            )
         assert record.repo is not None
         _validate_https_url(record.repo, f"{record.id}.repo")
         assert record.commit is not None
@@ -755,7 +803,9 @@ def _validate_method_values(record: DependencyRecord) -> None:
         if record.browser not in {"chromium", "firefox", "webkit"}:
             raise DependencyError(f"{record.id}.browser is unsupported")
         if SEMVER_RE.fullmatch(record.version) is None:
-            raise DependencyError(f"{record.id}.version must be an exact Playwright version")
+            raise DependencyError(
+                f"{record.id}.version must be an exact Playwright version"
+            )
         _validate_https_url(record.source, f"{record.id}.source")
         assert record.browser_cache_path is not None
         _validate_absolute_path(
@@ -861,7 +911,9 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         checksum=_optional_string(raw.get("checksum"), f"{record_id}.checksum"),
         checksums=_checksums(raw["checksums"]) if "checksums" in raw else (),
         asset=_optional_string(raw.get("asset"), f"{record_id}.asset"),
-        assets=_string_map(raw["assets"], f"{record_id}.assets") if "assets" in raw else (),
+        assets=_string_map(raw["assets"], f"{record_id}.assets")
+        if "assets" in raw
+        else (),
         archive_format=_optional_string(
             raw.get("archive_format"), f"{record_id}.archive_format"
         ),
@@ -876,9 +928,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         browser_cache_path=_optional_string(
             raw.get("browser_cache_path"), f"{record_id}.browser_cache_path"
         ),
-        components=_string_list(
-            raw.get("components", []), f"{record_id}.components"
-        ),
+        components=_string_list(raw.get("components", []), f"{record_id}.components"),
     )
     if record.locked is not None:
         _bool(record.locked, f"{record.id}.locked")
@@ -945,9 +995,7 @@ def load_manifest(source: ManifestSource) -> LoadedManifest:
             if isinstance(raw, dict)
             else []
         )
-        raise DependencyError(
-            f"{path}: unknown top-level fields: {', '.join(unknown)}"
-        )
+        raise DependencyError(f"{path}: unknown top-level fields: {', '.join(unknown)}")
     if raw.get("schema") != SCHEMA or raw.get("schema_version") != SCHEMA_VERSION:
         raise DependencyError(
             f"{path}: schema must be {SCHEMA!r} version {SCHEMA_VERSION}"
@@ -958,8 +1006,7 @@ def load_manifest(source: ManifestSource) -> LoadedManifest:
     if not records and source.role is not ManifestRole.PARENT_OVERLAY:
         raise DependencyError(f"{path}: records must be a non-empty array of tables")
     parsed = tuple(
-        parse_record(item, path=path, index=index)
-        for index, item in enumerate(records)
+        parse_record(item, path=path, index=index) for index, item in enumerate(records)
     )
     ids = [record.id for record in parsed]
     if len(set(ids)) != len(ids):
@@ -975,6 +1022,10 @@ def manifest_sources(
     vendor = (vendor_root or workspace / "vendor" / "agent-canon").resolve()
     parent_path = workspace / ".devcontainer" / "dependencies.toml"
     vendor_path = vendor / ".devcontainer" / "dependencies.toml"
+    tools_agent_canon_root = workspace / "tools" / "agent-canon"
+    tools_agent_canon_path = (
+        tools_agent_canon_root / ".devcontainer" / "dependencies.toml"
+    )
     if vendor == workspace and parent_path == vendor_path:
         return (
             (ManifestSource(vendor_path, ManifestRole.CANONICAL),)
@@ -988,6 +1039,11 @@ def manifest_sources(
         source.path for source in sources
     }:
         sources.append(ManifestSource(vendor_path, ManifestRole.CANONICAL))
+    if tools_agent_canon_path.is_file() and tools_agent_canon_path.resolve() not in {
+        source.path for source in sources
+    }:
+        # Parent projections may contain a legacy tools/agent-canon alias to AgentCanon.
+        sources.append(ManifestSource(tools_agent_canon_path, ManifestRole.CANONICAL))
     return tuple(sources)
 
 
@@ -1118,9 +1174,7 @@ def build_plan(
                     )
                 provider = candidates[0]
             if provider == record.id:
-                raise DependencyError(
-                    f"dependency cycle: {record.id} -> {provider}"
-                )
+                raise DependencyError(f"dependency cycle: {record.id} -> {provider}")
             if provider not in dependency_providers[record.id]:
                 dependency_providers[record.id].append(provider)
             if record.id not in graph[provider]:
@@ -1137,9 +1191,7 @@ def build_plan(
             if indegree[dependent] == 0:
                 ready.append(dependent)
     if len(ordered) != len(records):
-        remaining = sorted(
-            set(by_id) - set(ordered), key=order_index.__getitem__
-        )
+        remaining = sorted(set(by_id) - set(ordered), key=order_index.__getitem__)
         raise DependencyError(f"dependency cycle: {', '.join(remaining)}")
     sources = tuple(manifest.path for manifest in manifests)
     payload = {
@@ -1182,7 +1234,9 @@ class BoundaryFinding:
 
     def render(self) -> str:
         """Render one stable machine-readable finding."""
-        return f"DEVCONTAINER_BOUNDARY_FINDING={self.category}:{self.path}:{self.detail}"
+        return (
+            f"DEVCONTAINER_BOUNDARY_FINDING={self.category}:{self.path}:{self.detail}"
+        )
 
 
 @dataclass(frozen=True)
@@ -1250,7 +1304,9 @@ class EnvironmentBoundaryModel:
             try:
                 tokens = tuple(shlex.split(arguments, comments=True, posix=True))
             except ValueError as exc:
-                raise DependencyError(f"{path}: malformed Dockerfile instruction: {exc}") from exc
+                raise DependencyError(
+                    f"{path}: malformed Dockerfile instruction: {exc}"
+                ) from exc
             result.append((keyword.upper(), tokens))
         return tuple(result)
 
@@ -1290,6 +1346,17 @@ class EnvironmentBoundaryModel:
                 requirements.append(requirement)
         return tuple(requirements)
 
+    def _resolve_agent_canon_root_path(self, relative: str) -> Path:
+        """Return the first existing AgentCanon path for a shared tool path."""
+        candidates = (
+            self.vendor_root / relative,
+            self.workspace / "tools" / "agent-canon" / relative,
+        )
+        for candidate in candidates:
+            if candidate.is_file():
+                return candidate
+        return self.vendor_root / relative
+
     def _check_parent_container(
         self, findings: list[BoundaryFinding], checked: list[str]
     ) -> None:
@@ -1307,10 +1374,14 @@ class EnvironmentBoundaryModel:
             executable=True,
         )
         self._require(findings, checked, "pyproject.toml", "python")
-        self._require(
-            findings, checked, "tools/requirement_sync_validator.py", "python"
-        )
-        self._require(findings, checked, "tools/ci/python_env_policy.py", "python")
+        for required_tool in (
+            "tools/requirement_sync_validator.py",
+            "tools/ci/python_env_policy.py",
+        ):
+            path = self._resolve_agent_canon_root_path(required_tool)
+            checked.append(str(path.relative_to(self.workspace)))
+            if not path.is_file():
+                findings.append(BoundaryFinding("python", str(path), "missing-file"))
         dockerignore = self._require(findings, checked, ".dockerignore", "docker")
         gitignore = self._require(findings, checked, ".gitignore", "python")
         if requirements is not None:
@@ -1320,11 +1391,17 @@ class EnvironmentBoundaryModel:
                 findings.append(BoundaryFinding("python", str(requirements), str(exc)))
             else:
                 declared = frozenset(
-                    requirement.normalized_name
-                    for requirement in declared_requirements
+                    requirement.normalized_name for requirement in declared_requirements
                 )
                 required = frozenset(
-                    {"jupyterlab", "notebook", "ipykernel", "pydeps", "snakeviz", "pyyaml"}
+                    {
+                        "jupyterlab",
+                        "notebook",
+                        "ipykernel",
+                        "pydeps",
+                        "snakeviz",
+                        "pyyaml",
+                    }
                 )
                 for name in sorted(required - declared):
                     findings.append(
@@ -1351,14 +1428,18 @@ class EnvironmentBoundaryModel:
             for entry in ("vendor/agent-canon", ".git", ".state"):
                 if entry not in ignored:
                     findings.append(
-                        BoundaryFinding("docker", str(dockerignore), f"missing-ignore:{entry}")
+                        BoundaryFinding(
+                            "docker", str(dockerignore), f"missing-ignore:{entry}"
+                        )
                     )
         if gitignore is not None:
             ignored = gitignore.read_text(encoding="utf-8")
             for entry in (".venv/", "venv/"):
                 if entry not in ignored:
                     findings.append(
-                        BoundaryFinding("python", str(gitignore), f"missing-ignore:{entry}")
+                        BoundaryFinding(
+                            "python", str(gitignore), f"missing-ignore:{entry}"
+                        )
                     )
         if dockerfile is not None:
             try:
@@ -1367,28 +1448,49 @@ class EnvironmentBoundaryModel:
                 findings.append(BoundaryFinding("docker", str(dockerfile), str(exc)))
             else:
                 packages = self._installed_apt_packages(instructions)
-                for package in ("rsync", "openssh-client", "graphviz", "python3.11-venv"):
+                for package in (
+                    "rsync",
+                    "openssh-client",
+                    "graphviz",
+                    "python3.11-venv",
+                ):
                     if package not in packages:
                         findings.append(
-                            BoundaryFinding("docker", str(dockerfile), f"missing-runtime-package:{package}")
+                            BoundaryFinding(
+                                "docker",
+                                str(dockerfile),
+                                f"missing-runtime-package:{package}",
+                            )
                         )
                 for keyword, tokens in instructions:
                     if keyword != "RUN":
                         continue
                     if "pip" in tokens and "-r" in tokens:
                         findings.append(
-                            BoundaryFinding("docker", str(dockerfile), "must-not-install-workspace-requirements")
+                            BoundaryFinding(
+                                "docker",
+                                str(dockerfile),
+                                "must-not-install-workspace-requirements",
+                            )
                         )
                 for keyword, tokens in instructions:
-                    if keyword == "COPY" and any("docker/requirements.txt" in token for token in tokens):
+                    if keyword == "COPY" and any(
+                        "docker/requirements.txt" in token for token in tokens
+                    ):
                         findings.append(
-                            BoundaryFinding("docker", str(dockerfile), "must-not-copy-workspace-requirements")
+                            BoundaryFinding(
+                                "docker",
+                                str(dockerfile),
+                                "must-not-copy-workspace-requirements",
+                            )
                         )
 
     def _check_parent_devcontainer(
         self, findings: list[BoundaryFinding], checked: list[str]
     ) -> None:
-        config = self._require(findings, checked, ".devcontainer/devcontainer.json", "parent")
+        config = self._require(
+            findings, checked, ".devcontainer/devcontainer.json", "parent"
+        )
         self._require(
             findings,
             checked,
@@ -1402,37 +1504,82 @@ class EnvironmentBoundaryModel:
         try:
             payload = json.loads(config.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            findings.append(BoundaryFinding("parent", str(config), f"invalid-json:{exc}"))
+            findings.append(
+                BoundaryFinding("parent", str(config), f"invalid-json:{exc}")
+            )
             return
         if not isinstance(payload, dict):
-            findings.append(BoundaryFinding("parent", str(config), "json-root-must-be-object"))
+            findings.append(
+                BoundaryFinding("parent", str(config), "json-root-must-be-object")
+            )
             return
         post_create = payload.get("postCreateCommand")
         if not isinstance(post_create, (str, list, dict)):
-            findings.append(BoundaryFinding("parent", str(config), "missing-post-create-command"))
+            findings.append(
+                BoundaryFinding("parent", str(config), "missing-post-create-command")
+            )
         else:
             command_text = json.dumps(post_create, sort_keys=True)
-            for required in ("vendor/agent-canon/.devcontainer/post-create.sh", "post-create-parent.sh"):
+            for required in (
+                "vendor/agent-canon/.devcontainer/post-create.sh",
+                "post-create-parent.sh",
+            ):
                 if required not in command_text:
-                    findings.append(BoundaryFinding("parent", str(config), f"missing-command:{required}"))
+                    findings.append(
+                        BoundaryFinding(
+                            "parent", str(config), f"missing-command:{required}"
+                        )
+                    )
 
     def validate(self) -> EnvironmentBoundaryReport:
         """Validate typed ownership coverage without running project commands."""
         findings: list[BoundaryFinding] = []
         checked: list[str] = []
-        vendor_prefix = self.vendor_root.relative_to(self.workspace).as_posix() if not self.standalone else "."
+        vendor_prefix = (
+            self.vendor_root.relative_to(self.workspace).as_posix()
+            if not self.standalone
+            else "."
+        )
         for relative in (
-            f"{vendor_prefix}/.devcontainer/bootstrap-dependencies.sh" if not self.standalone else ".devcontainer/bootstrap-dependencies.sh",
-            f"{vendor_prefix}/.devcontainer/dependencies.toml" if not self.standalone else ".devcontainer/dependencies.toml",
-            f"{vendor_prefix}/.devcontainer/post-create.sh" if not self.standalone else ".devcontainer/post-create.sh",
-            f"{vendor_prefix}/tools/agent_tools/devcontainer_dependencies.py" if not self.standalone else "tools/agent_tools/devcontainer_dependencies.py",
-            f"{vendor_prefix}/CONTAINER_OPERATIONS.md" if not self.standalone else "CONTAINER_OPERATIONS.md",
+            f"{vendor_prefix}/.devcontainer/bootstrap-dependencies.sh"
+            if not self.standalone
+            else ".devcontainer/bootstrap-dependencies.sh",
+            f"{vendor_prefix}/.devcontainer/dependencies.toml"
+            if not self.standalone
+            else ".devcontainer/dependencies.toml",
+            f"{vendor_prefix}/.devcontainer/post-create.sh"
+            if not self.standalone
+            else ".devcontainer/post-create.sh",
+            f"{vendor_prefix}/tools/agent_tools/devcontainer_dependencies.py"
+            if not self.standalone
+            else "tools/agent_tools/devcontainer_dependencies.py",
+            f"{vendor_prefix}/CONTAINER_OPERATIONS.md"
+            if not self.standalone
+            else "CONTAINER_OPERATIONS.md",
         ):
-            category = "environment" if relative.endswith("CONTAINER_OPERATIONS.md") else "shared-post-create"
-            self._require(findings, checked, relative, category, executable=relative.endswith(".sh"))
+            category = (
+                "environment"
+                if relative.endswith("CONTAINER_OPERATIONS.md")
+                else "shared-post-create"
+            )
+            self._require(
+                findings,
+                checked,
+                relative,
+                category,
+                executable=relative.endswith(".sh"),
+            )
         rulebook = self.vendor_root / "CONTAINER_OPERATIONS.md"
-        if rulebook.is_file() and "Product Image And Mounted Tool Boundary" not in rulebook.read_text(encoding="utf-8"):
-            findings.append(BoundaryFinding("environment", str(rulebook), "missing-product-mounted-boundary"))
+        if (
+            rulebook.is_file()
+            and "Product Image And Mounted Tool Boundary"
+            not in rulebook.read_text(encoding="utf-8")
+        ):
+            findings.append(
+                BoundaryFinding(
+                    "environment", str(rulebook), "missing-product-mounted-boundary"
+                )
+            )
         if not self.standalone:
             self._check_parent_devcontainer(findings, checked)
             self._check_parent_container(findings, checked)
@@ -1463,8 +1610,10 @@ def safe_extract_tar(archive: Path, destination: Path) -> None:
         members = stream.getmembers()
         for member in members:
             _safe_member_path(destination, member.name)
-            if member.issym() or member.islnk() or not (
-                member.isdir() or member.isfile()
+            if (
+                member.issym()
+                or member.islnk()
+                or not (member.isdir() or member.isfile())
             ):
                 raise DependencyError(f"unsafe archive member: {member.name}")
         for member in members:
@@ -1539,7 +1688,9 @@ class Installer:
                 receipt.unlink(missing_ok=True)
                 unavailable.add(record.id)
                 if record.failure_policy == "warn":
-                    print(f"DEPENDENCY_RECORD_WARN={record.id}:{error}", file=sys.stderr)
+                    print(
+                        f"DEPENDENCY_RECORD_WARN={record.id}:{error}", file=sys.stderr
+                    )
                     continue
                 raise error
             receipt_matches = self._receipt_matches(receipt, plan, record)
@@ -1652,12 +1803,8 @@ class Installer:
         merged["ELAN_HOME"] = elan_home
         merged.pop("RUSTUP_TOOLCHAIN", None)
         merged.pop("ELAN_TOOLCHAIN", None)
-        missing_tool_paths = [
-            item for item in tool_paths if item not in path_entries
-        ]
-        merged["PATH"] = os.pathsep.join(
-            [*missing_tool_paths, *path_entries]
-        )
+        missing_tool_paths = [item for item in tool_paths if item not in path_entries]
+        merged["PATH"] = os.pathsep.join([*missing_tool_paths, *path_entries])
         return merged
 
     def install_record(
@@ -1852,9 +1999,7 @@ class Installer:
                     str(source / "Cargo.toml"),
                 ],
                 workspace=workspace,
-                env=self._with_tool_paths(
-                    {"CARGO_TARGET_DIR": str(source / "target")}
-                ),
+                env=self._with_tool_paths({"CARGO_TARGET_DIR": str(source / "target")}),
             )
         elif method is Method.BROWSER_INSTALL:
             assert record.browser is not None
@@ -1899,7 +2044,9 @@ class Installer:
         }
         verifier = verifiers.get(record.verification.kind)
         if verifier is None:  # pragma: no cover - VerificationKind is closed.
-            raise DependencyError(f"unsupported verification kind: {record.verification.kind}")
+            raise DependencyError(
+                f"unsupported verification kind: {record.verification.kind}"
+            )
         verifier(record, workspace=workspace)
 
     def _capture(
@@ -1944,7 +2091,9 @@ class Installer:
         )
         fields = result.stdout.strip().split("\t")
         if fields != ["install ok installed", record.version, record.package]:
-            raise DependencyError(f"{record.id}: dpkg package/version/owned state mismatch")
+            raise DependencyError(
+                f"{record.id}: dpkg package/version/owned state mismatch"
+            )
         executable = record.verification.executable
         if executable is not None:
             assert record.verification.output_contains is not None
@@ -2002,7 +2151,9 @@ class Installer:
             payload = json.loads(result.stdout)
             observed = payload["dependencies"][record.package]["version"]
         except (KeyError, TypeError, json.JSONDecodeError) as exc:
-            raise DependencyError(f"{record.id}: npm global JSON is missing package") from exc
+            raise DependencyError(
+                f"{record.id}: npm global JSON is missing package"
+            ) from exc
         if observed != record.version:
             raise DependencyError(
                 f"{record.id}: npm version mismatch {observed!r}!={record.version!r}"
@@ -2029,7 +2180,10 @@ class Installer:
                 observed_name = canonicalize_name(value.strip())
             elif separator and key == "Version":
                 observed_version = value.strip()
-        if observed_name != canonicalize_name(record.package) or observed_version != record.version:
+        if (
+            observed_name != canonicalize_name(record.package)
+            or observed_version != record.version
+        ):
             raise DependencyError(f"{record.id}: Python distribution/version mismatch")
         spec = record.verification
         assert spec.executable is not None and spec.output_contains is not None
@@ -2046,12 +2200,18 @@ class Installer:
         assert spec.path is not None and spec.output_contains is not None
         path = Path(spec.path)
         if not path.is_file() or not os.access(path, os.X_OK):
-            raise DependencyError(f"{record.id}: executable is missing or not executable: {path}")
+            raise DependencyError(
+                f"{record.id}: executable is missing or not executable: {path}"
+            )
         result = self._capture([str(path), *spec.args], workspace=workspace)
         self._require_output(result, spec.output_contains, record.id)
 
-    def _verify_rust_toolchain(self, record: DependencyRecord, *, workspace: Path) -> None:
-        active = self._capture(["rustup", "show", "active-toolchain"], workspace=workspace)
+    def _verify_rust_toolchain(
+        self, record: DependencyRecord, *, workspace: Path
+    ) -> None:
+        active = self._capture(
+            ["rustup", "show", "active-toolchain"], workspace=workspace
+        )
         if not active.stdout.strip().startswith(record.version):
             raise DependencyError(f"{record.id}: Rust default toolchain is stale")
         installed = self._capture(["rustup", "toolchain", "list"], workspace=workspace)
@@ -2070,7 +2230,9 @@ class Installer:
                 line.startswith(component) and "(installed)" in line
                 for line in components.splitlines()
             ):
-                raise DependencyError(f"{record.id}: Rust component is stale: {component}")
+                raise DependencyError(
+                    f"{record.id}: Rust component is stale: {component}"
+                )
         component_tools = {
             "rustfmt": "rustfmt",
             "clippy": "clippy-driver",
@@ -2093,7 +2255,9 @@ class Installer:
         installed = line.split()[0]
         return installed == version or installed.startswith(f"{version}-")
 
-    def _verify_lean_toolchain(self, record: DependencyRecord, *, workspace: Path) -> None:
+    def _verify_lean_toolchain(
+        self, record: DependencyRecord, *, workspace: Path
+    ) -> None:
         active = self._capture(["elan", "default"], workspace=workspace)
         installed = self._capture(["elan", "toolchain", "list"], workspace=workspace)
         if record.version not in active.stdout or not any(
@@ -2112,13 +2276,17 @@ class Installer:
         source = (workspace / record.source).resolve()
         if not source.is_dir():
             source = (workspace / "vendor" / "agent-canon" / record.source).resolve()
-        if os.path.commonpath((str(workspace.resolve()), str(source))) != str(workspace.resolve()):
+        if os.path.commonpath((str(workspace.resolve()), str(source))) != str(
+            workspace.resolve()
+        ):
             raise DependencyError(f"{record.id}: cargo source escapes workspace")
         if not source.is_dir():
             raise DependencyError(f"{record.id}: cargo source is missing: {source}")
         return source
 
-    def _verify_cargo_binary(self, record: DependencyRecord, *, workspace: Path) -> None:
+    def _verify_cargo_binary(
+        self, record: DependencyRecord, *, workspace: Path
+    ) -> None:
         spec = record.verification
         assert spec.path is not None and spec.output_contains is not None
         source = self._cargo_source(record, workspace)
@@ -2163,7 +2331,9 @@ class Installer:
                 ):
                     matches.append(candidate)
         if not matches:
-            raise DependencyError(f"{record.id}: browser executable is missing from cache")
+            raise DependencyError(
+                f"{record.id}: browser executable is missing from cache"
+            )
         result = self._capture(
             [str(matches[0]), *spec.args],
             workspace=workspace,
@@ -2176,7 +2346,9 @@ class Installer:
     ) -> None:
         assert record.key_url is not None
         assert record.key_fingerprint is not None
-        with tempfile.TemporaryDirectory(prefix=f"agent-canon-{record.id}-") as temporary:
+        with tempfile.TemporaryDirectory(
+            prefix=f"agent-canon-{record.id}-"
+        ) as temporary:
             root = Path(temporary)
             raw_key = root / "key.raw"
             keyring = root / f"{record.id}.gpg"
@@ -2247,7 +2419,9 @@ class Installer:
             if not record.source.endswith(asset)
             else record.source
         )
-        with tempfile.TemporaryDirectory(prefix=f"agent-canon-{record.id}-") as temporary:
+        with tempfile.TemporaryDirectory(
+            prefix=f"agent-canon-{record.id}-"
+        ) as temporary:
             root = Path(temporary)
             archive = root / asset
             archive.parent.mkdir(parents=True, exist_ok=True)
@@ -2279,7 +2453,9 @@ class Installer:
                     else []
                 )
                 if len(matches) != 1:
-                    raise DependencyError(f"{record.id}: extracted destination not found")
+                    raise DependencyError(
+                        f"{record.id}: extracted destination not found"
+                    )
                 candidate = matches[0]
             self._run_install_file(candidate, Path(record.destination))
 
@@ -2305,7 +2481,9 @@ def _cli_plan(args: argparse.Namespace) -> DependencyPlan:
 def build_parser() -> argparse.ArgumentParser:
     """Build the dependency model CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("validate", "dry-run", "install", "boundary"))
+    parser.add_argument(
+        "command", choices=("validate", "dry-run", "install", "boundary")
+    )
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--vendor-root")
     parser.add_argument("--receipts")
@@ -2330,7 +2508,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload = {
                 "status": report.status,
                 "checked": list(report.checked),
-                "findings": [dataclasses.asdict(finding) for finding in report.findings],
+                "findings": [
+                    dataclasses.asdict(finding) for finding in report.findings
+                ],
             }
             exit_status = 0 if not report.findings else 1
         else:
@@ -2383,10 +2563,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if "order" in payload:
             print("DEVCONTAINER_DEPENDENCY_ORDER=" + ",".join(payload["order"]))
         if "completed" in payload:
-            print(
-                "DEVCONTAINER_DEPENDENCY_COMPLETED="
-                + ",".join(payload["completed"])
-            )
+            print("DEVCONTAINER_DEPENDENCY_COMPLETED=" + ",".join(payload["completed"]))
     return exit_status
 
 

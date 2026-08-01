@@ -47,7 +47,12 @@ AGENT_TOOLS_DIR = Path(__file__).resolve().parents[1] / "agent_tools"
 if str(AGENT_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_DIR))
 
-from surface_manifest import SurfaceEntry, SurfaceManifest, load_manifest, target_for_entry  # noqa: E402,I001
+from surface_manifest import (
+    SurfaceEntry,
+    SurfaceManifest,
+    load_manifest,
+    target_for_entry,
+)  # noqa: E402,I001
 
 REQUIRED_REQUIREMENTS = (
     "jupyterlab",
@@ -90,6 +95,7 @@ class PackConfig:
     shell: str
     workdir: str
     workspace_mount: str
+    platform: str | None
 
 
 @dataclass(frozen=True)
@@ -154,7 +160,9 @@ def require_string_list(
         return (), None
     sequence = as_sequence(value)
     if sequence is None or not all(isinstance(item, str) for item in sequence):
-        return (), Finding("invalid_manifest", source, f"{section}.{key}-must-be-string-list")
+        return (), Finding(
+            "invalid_manifest", source, f"{section}.{key}-must-be-string-list"
+        )
     return tuple(cast(Sequence[str], sequence)), None
 
 
@@ -175,7 +183,9 @@ def validate_repo_path(
     if not value:
         return
     if not is_safe_repo_relative(value):
-        findings.append(Finding("invalid_manifest", source, f"{field}-escapes-repo:{value}"))
+        findings.append(
+            Finding("invalid_manifest", source, f"{field}-escapes-repo:{value}")
+        )
         return
     if not (root / value).exists():
         findings.append(Finding("missing_file", source, f"{field}-missing:{value}"))
@@ -195,7 +205,9 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
     smoke = as_mapping(data.get("smoke"))
     runtime = as_mapping(data.get("runtime"))
     if pack is None or smoke is None or runtime is None:
-        return None, [Finding("invalid_manifest", source, "pack-smoke-runtime-required")]
+        return None, [
+            Finding("invalid_manifest", source, "pack-smoke-runtime-required")
+        ]
 
     required_pack_fields = {
         "name": "",
@@ -215,7 +227,15 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
     target_value = pack.get("target")
     target = target_value if isinstance(target_value, str) else None
     if target_value is not None and target is None:
-        findings.append(Finding("invalid_manifest", source, "pack.target-must-be-string"))
+        findings.append(
+            Finding("invalid_manifest", source, "pack.target-must-be-string")
+        )
+    platform_value = pack.get("platform")
+    platform = platform_value if isinstance(platform_value, str) else None
+    if platform_value is not None and platform is None:
+        findings.append(
+            Finding("invalid_manifest", source, "pack.platform-must-be-string")
+        )
 
     for table, key, section in (
         (smoke, "commands", "smoke"),
@@ -238,11 +258,15 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
         )
         shell = "/bin/bash"
     if not isinstance(workdir, str):
-        findings.append(Finding("invalid_manifest", source, "runtime.workdir-must-be-string"))
+        findings.append(
+            Finding("invalid_manifest", source, "runtime.workdir-must-be-string")
+        )
         workdir = ""
     if not isinstance(workspace_mount, str):
         findings.append(
-            Finding("invalid_manifest", source, "runtime.workspace_mount-must-be-string")
+            Finding(
+                "invalid_manifest", source, "runtime.workspace_mount-must-be-string"
+            )
         )
         workspace_mount = ""
 
@@ -261,6 +285,7 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             shell=shell,
             workdir=workdir,
             workspace_mount=workspace_mount,
+            platform=platform,
         ),
         [],
     )
@@ -283,7 +308,9 @@ def validate_requirements(root: Path) -> list[Finding]:
         return [Finding("missing_file", relative, "missing")]
     findings: list[Finding] = []
     requirements: set[str] = set()
-    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for line_number, raw_line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
         line = trim_requirement_line(raw_line)
         if not line:
             continue
@@ -291,14 +318,20 @@ def validate_requirements(root: Path) -> list[Finding]:
             requirement = Requirement(line)
         except InvalidRequirement:
             findings.append(
-                Finding("dependency_contract_violation", relative, f"invalid-line:{line_number}")
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    f"invalid-line:{line_number}",
+                )
             )
             continue
         requirements.add(requirement.name.lower())
     for requirement in REQUIRED_REQUIREMENTS:
         if requirement not in requirements:
             findings.append(
-                Finding("dependency_contract_violation", relative, f"missing:{requirement}")
+                Finding(
+                    "dependency_contract_violation", relative, f"missing:{requirement}"
+                )
             )
     return findings
 
@@ -323,7 +356,11 @@ def validate_dockerignore(root: Path) -> list[Finding]:
     for ignored_path in (".git", ".state", "vendor/agent-canon"):
         if not re.search(rf"(^|\n){re.escape(ignored_path)}(\n|$)", text):
             findings.append(
-                Finding("dependency_contract_violation", relative, f"missing-ignore:{ignored_path}")
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    f"missing-ignore:{ignored_path}",
+                )
             )
     return findings
 
@@ -354,7 +391,9 @@ def validate_python_dependency_installer(root: Path) -> list[Finding]:
     return []
 
 
-def load_devcontainer_json(path: Path) -> tuple[Mapping[str, object] | None, list[Finding]]:
+def load_devcontainer_json(
+    path: Path,
+) -> tuple[Mapping[str, object] | None, list[Finding]]:
     """Load .devcontainer/devcontainer.json."""
     relative = ".devcontainer/devcontainer.json"
     try:
@@ -382,12 +421,18 @@ def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
     for key, expected in expected_json.items():
         if config.get(key) != expected:
             findings.append(
-                Finding("inconsistency", ".devcontainer/devcontainer.json", f"{key}-expected:{expected}")
+                Finding(
+                    "inconsistency",
+                    ".devcontainer/devcontainer.json",
+                    f"{key}-expected:{expected}",
+                )
             )
     return findings
 
 
-def validate_devcontainer_workspace(config: Mapping[str, object], pack: PackConfig | None) -> list[Finding]:
+def validate_devcontainer_workspace(
+    config: Mapping[str, object], pack: PackConfig | None
+) -> list[Finding]:
     """Validate the selected repository folder below the topic mount."""
     del pack
     if config.get("workspaceFolder") == "/workspace/${localWorkspaceFolderBasename}":
@@ -413,7 +458,9 @@ def parse_parent_environment_exports(path: Path) -> tuple[tuple[str, ...], list[
     """Parse allowed parent-environment export lines without executing shell."""
     names: list[str] = []
     findings: list[str] = []
-    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for line_number, raw_line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), 1
+    ):
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
@@ -530,17 +577,32 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
     findings: list[Finding] = []
     if topic_root.parent.name != "workspace":
         if topic_root.name.startswith("workspace-"):
-            findings.append(Finding("dependency_contract_violation", relative, "legacy-topic-root-name"))
+            findings.append(
+                Finding(
+                    "dependency_contract_violation", relative, "legacy-topic-root-name"
+                )
+            )
         else:
-            findings.append(Finding("dependency_contract_violation", relative, "topic-root-parent"))
+            findings.append(
+                Finding("dependency_contract_violation", relative, "topic-root-parent")
+            )
     if service.get("working_dir") != repo_target:
-        findings.append(Finding("inconsistency", relative, f"working-dir:{service.get('working_dir')}"))
+        findings.append(
+            Finding(
+                "inconsistency", relative, f"working-dir:{service.get('working_dir')}"
+            )
+        )
     build = as_mapping(service.get("build"))
     if build is not None and build.get("context") != "..":
-        findings.append(Finding("inconsistency", relative, f"build-context:{build.get('context')}"))
+        findings.append(
+            Finding("inconsistency", relative, f"build-context:{build.get('context')}")
+        )
     volumes = as_sequence(service.get("volumes"))
     if volumes is None:
-        return [*findings, Finding("invalid_manifest", relative, "workspace-volumes-required")]
+        return [
+            *findings,
+            Finding("invalid_manifest", relative, "workspace-volumes-required"),
+        ]
 
     def volume_fields(raw_volume: object) -> tuple[str | None, str | None]:
         volume = as_mapping(raw_volume)
@@ -583,13 +645,25 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         if target == "/workspace":
             workspace_mounts.append((source, target))
     if len(workspace_mounts) != 1:
-        findings.append(Finding("dependency_contract_violation", relative, f"workspace-mount-count:{len(workspace_mounts)}"))
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                f"workspace-mount-count:{len(workspace_mounts)}",
+            )
+        )
     elif source_path(workspace_mounts[0][0]) != topic_root:
-        findings.append(Finding("dependency_contract_violation", relative, "workspace-source"))
+        findings.append(
+            Finding("dependency_contract_violation", relative, "workspace-source")
+        )
     for raw_volume in volumes:
         source, target = volume_fields(raw_volume)
         if source_path(source) == root or target == repo_target:
-            findings.append(Finding("dependency_contract_violation", relative, "repository-double-mount"))
+            findings.append(
+                Finding(
+                    "dependency_contract_violation", relative, "repository-double-mount"
+                )
+            )
     parent_layout = (root / "vendor" / "agent-canon").is_dir()
     expected_shell = pack.shell if pack is not None else "/bin/bash"
     if service.get("command") != f'{expected_shell} -lc "sleep infinity"':
@@ -699,7 +773,9 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                     )
                 )
             elif environment.get(name) != expected:
-                findings.append(Finding("inconsistency", relative, f"{name.lower()}-env"))
+                findings.append(
+                    Finding("inconsistency", relative, f"{name.lower()}-env")
+                )
         if parent_layout:
             manifest_names, manifest_findings = parse_parent_environment_manifest(
                 root / PARENT_ENVIRONMENT_MANIFEST
@@ -757,7 +833,9 @@ def shared_agent_tools_dir(root: Path) -> Path:
     return root / "tools" / "agent-canon" / "agent_tools"
 
 
-def validate_devcontainer_pack_alignment(root: Path, pack: PackConfig | None) -> list[Finding]:
+def validate_devcontainer_pack_alignment(
+    root: Path, pack: PackConfig | None
+) -> list[Finding]:
     """Validate devcontainer paths that depend on the repo-local runtime pack."""
     devcontainer_dir = root / ".devcontainer"
     json_path = devcontainer_dir / "devcontainer.json"
@@ -776,7 +854,9 @@ def validate_devcontainer_pack_alignment(root: Path, pack: PackConfig | None) ->
 def has_vscode_contract(root: Path) -> bool:
     """Return whether this root declares an AgentCanon VS Code surface."""
     vscode_dir = root / ".vscode"
-    vendor_manifest = root / "vendor" / "agent-canon" / "documents" / "shared-runtime-surfaces.toml"
+    vendor_manifest = (
+        root / "vendor" / "agent-canon" / "documents" / "shared-runtime-surfaces.toml"
+    )
     return (
         (root / "documents" / "shared-runtime-surfaces.toml").is_file()
         or vendor_manifest.is_file()
@@ -785,10 +865,14 @@ def has_vscode_contract(root: Path) -> bool:
     )
 
 
-def load_shared_surface_manifest(root: Path) -> tuple[SurfaceManifest | None, list[Finding]]:
+def load_shared_surface_manifest(
+    root: Path,
+) -> tuple[SurfaceManifest | None, list[Finding]]:
     """Load the shared runtime surface manifest through its canonical parser."""
     try:
-        return load_manifest(root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml"), []
+        return load_manifest(
+            root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml"
+        ), []
     except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
         return None, [
             Finding(
@@ -799,12 +883,17 @@ def load_shared_surface_manifest(root: Path) -> tuple[SurfaceManifest | None, li
         ]
 
 
-def load_vscode_surface(root: Path) -> tuple[SurfaceEntry | None, SurfaceManifest | None, list[Finding]]:
+def load_vscode_surface(
+    root: Path,
+) -> tuple[SurfaceEntry | None, SurfaceManifest | None, list[Finding]]:
     """Load the .vscode entry from the shared runtime surface manifest."""
     manifest, findings = load_shared_surface_manifest(root)
     if manifest is None:
         return None, None, findings
-    entry = next((candidate for candidate in manifest.entries if candidate.path == ".vscode"), None)
+    entry = next(
+        (candidate for candidate in manifest.entries if candidate.path == ".vscode"),
+        None,
+    )
     if entry is None:
         return (
             None,
@@ -828,7 +917,9 @@ VSCODE_SHARED_FILES = (
 )
 
 
-def validate_vscode_manifest(entry: SurfaceEntry, manifest: SurfaceManifest) -> list[Finding]:
+def validate_vscode_manifest(
+    entry: SurfaceEntry, manifest: SurfaceManifest
+) -> list[Finding]:
     """Validate the real .vscode container and exact shared-file coverage."""
     findings: list[Finding] = []
     expected = {
@@ -915,30 +1006,47 @@ def validate_vscode(root: Path) -> list[Finding]:
         path = f".vscode/{name}"
         source_file = source_dir / name
         if not source_file.is_file():
-            findings.append(Finding("missing_file", f"{source_relative}/{name}", "missing"))
+            findings.append(
+                Finding("missing_file", f"{source_relative}/{name}", "missing")
+            )
         root_file = root / path
         if source_checkout:
             if source_file.is_symlink():
-                findings.append(Finding("inconsistency", path, "source-file-must-be-regular"))
+                findings.append(
+                    Finding("inconsistency", path, "source-file-must-be-regular")
+                )
         elif path in shared:
             if not root_file.is_symlink():
-                findings.append(Finding("inconsistency", path, "expected-individual-symlink"))
+                findings.append(
+                    Finding("inconsistency", path, "expected-individual-symlink")
+                )
                 continue
             expected_target = target_for_entry(root, manifest.prefix, shared[path])
             target = root_file.readlink()
             target_path = target if target.is_absolute() else root_file.parent / target
             try:
-                matches = target_path.resolve(strict=True) == source_file.resolve(strict=True)
+                matches = target_path.resolve(strict=True) == source_file.resolve(
+                    strict=True
+                )
             except FileNotFoundError:
                 matches = False
             if target.as_posix() != expected_target and not matches:
-                findings.append(Finding("inconsistency", path, "unexpected-individual-symlink-target"))
+                findings.append(
+                    Finding(
+                        "inconsistency", path, "unexpected-individual-symlink-target"
+                    )
+                )
     if not source_checkout:
         allowed = set(VSCODE_SHARED_FILES)
         for child in (root / ".vscode").iterdir():
             if child.name not in allowed:
-                findings.append(Finding("inconsistency", str(child.relative_to(root)), "unexpected-file"))
+                findings.append(
+                    Finding(
+                        "inconsistency", str(child.relative_to(root)), "unexpected-file"
+                    )
+                )
     return findings
+
 
 def validate(root: Path) -> ValidationReport:
     """Run all container configuration checks."""
@@ -946,14 +1054,25 @@ def validate(root: Path) -> ValidationReport:
     docker_dir = root / "docker"
     devcontainer_dir = root / ".devcontainer"
     vscode_configured = has_vscode_contract(root)
-    if not docker_dir.exists() and not devcontainer_dir.exists() and not vscode_configured:
+    if (
+        not docker_dir.exists()
+        and not devcontainer_dir.exists()
+        and not vscode_configured
+    ):
         return ValidationReport("skip", (), (), ())
 
     findings: list[Finding] = []
     checked: list[str] = []
     packs: list[PackConfig] = []
     if docker_dir.exists():
-        checked.extend((".dockerignore", "docker/Dockerfile", "docker/requirements.txt", "docker/packs"))
+        checked.extend(
+            (
+                ".dockerignore",
+                "docker/Dockerfile",
+                "docker/requirements.txt",
+                "docker/packs",
+            )
+        )
         findings.extend(validate_dockerignore(root))
         findings.extend(validate_dockerfile(root))
         findings.extend(validate_python_dependency_installer(root))
@@ -964,14 +1083,18 @@ def validate(root: Path) -> ValidationReport:
         else:
             pack_paths = sorted(packs_dir.glob("*.toml"))
             if not pack_paths:
-                findings.append(Finding("missing_file", "docker/packs", "no-pack-files"))
+                findings.append(
+                    Finding("missing_file", "docker/packs", "no-pack-files")
+                )
             for pack_path in pack_paths:
                 pack, pack_findings = load_pack(root, pack_path)
                 findings.extend(pack_findings)
                 if pack is not None:
                     packs.append(pack)
 
-    default_pack = next((pack for pack in packs if pack.path == "docker/packs/default.toml"), None)
+    default_pack = next(
+        (pack for pack in packs if pack.path == "docker/packs/default.toml"), None
+    )
     if devcontainer_dir.exists():
         checked.append(".devcontainer")
         findings.extend(validate_devcontainer(root))
@@ -981,7 +1104,9 @@ def validate(root: Path) -> ValidationReport:
         findings.extend(validate_vscode(root))
 
     sorted_findings = tuple(
-        sorted(findings, key=lambda finding: (finding.kind, finding.path, finding.detail))
+        sorted(
+            findings, key=lambda finding: (finding.kind, finding.path, finding.detail)
+        )
     )
     return ValidationReport(
         "fail" if sorted_findings else "pass",
@@ -1014,9 +1139,11 @@ def render_text(report: ValidationReport) -> None:
             "CONTAINER_CONFIG_PACK="
             f"{pack.name}\tpath={pack.path}\tdockerfile={pack.dockerfile}\t"
             f"context={pack.context}\tworkdir={pack.workdir}\t"
-            f"workspace_mount={pack.workspace_mount}"
+            f"workspace_mount={pack.workspace_mount}\tplatform={pack.platform}"
         )
-    print(f"CONTAINER_CONFIG_CHECKED={','.join(report.checked) if report.checked else 'none'}")
+    print(
+        f"CONTAINER_CONFIG_CHECKED={','.join(report.checked) if report.checked else 'none'}"
+    )
     print(f"CONTAINER_CONFIG_FINDINGS={len(report.findings)}")
     print(f"CONTAINER_CONFIG={report.status}")
 

@@ -374,7 +374,11 @@ def write_parent_generator_fixture(
 ) -> Path:
     """Create a parent-shaped generator fixture with the zsh contract inputs."""
     repo = tmp_path / "workspace" / "topic" / "parent"
-    write_file(repo, ".devcontainer/generate-runtime-compose.sh", GENERATOR.read_text(encoding="utf-8"))
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
     (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
     write_file(repo, ".devcontainer/parent-environment.sh", environment_script)
     variables = ", ".join(json.dumps(item) for item in environment_variables)
@@ -409,6 +413,48 @@ def write_parent_generator_fixture(
     )
     write_file(repo, "docker/Dockerfile", "FROM scratch\n")
     return repo
+
+
+def test_load_pack_reads_optional_platform_when_present_or_omitted(
+    tmp_path: Path,
+) -> None:
+    """Runtime pack can explicitly set platform or omit it."""
+    repo = write_parent_generator_fixture(tmp_path)
+    module = load_container_config_module()
+    implicit, implicit_findings = module.load_pack(
+        repo, repo / "docker/packs/default.toml"
+    )
+    assert implicit_findings == []
+    assert implicit is not None
+    assert implicit.platform is None
+
+    explicit_pack = repo / "docker/packs/explicit-platform.toml"
+    explicit_pack.write_text(
+        "\n".join(
+            [
+                "[pack]",
+                'name = "explicit"',
+                'dockerfile = "docker/Dockerfile"',
+                'context = "."',
+                'image_tag = "explicit:fixture"',
+                'platform = "linux/amd64"',
+                "",
+                "[smoke]",
+                "commands = []",
+                "",
+                "[runtime]",
+                'shell = "/bin/bash"',
+                'workdir = "/workspace"',
+                'workspace_mount = "/workspace"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    explicit, explicit_findings = module.load_pack(repo, explicit_pack)
+    assert explicit_findings == []
+    assert explicit is not None
+    assert explicit.platform == "linux/amd64"
 
 
 def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> None:
@@ -446,12 +492,13 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     assert 'ZDOTDIR: "/etc/project-template/zsh"' in compose
     assert 'SHELL: "/bin/zsh"' in compose
     assert 'user: "${LOCAL_UID}:${LOCAL_GID}"' in compose
-    assert "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700" in compose
+    assert (
+        "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700"
+        in compose
+    )
     assert 'command: /bin/zsh -lc "sleep infinity"' in compose
     module = load_container_config_module()
-    pack, pack_findings = module.load_pack(
-        repo, repo / "docker/packs/default.toml"
-    )
+    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
     assert pack_findings == []
     assert pack is not None
     assert module.validate_generated_compose(repo, pack) == []
@@ -477,20 +524,22 @@ def test_parent_compose_rejects_malformed_user_and_home_tmpfs(tmp_path: Path) ->
     )
     assert result.returncode == 0, result.stdout + result.stderr
     compose_path = repo / ".agent-canon/docker-compose.generated.yml"
-    malformed = compose_path.read_text(encoding="utf-8").replace(
-        'user: "${LOCAL_UID}:${LOCAL_GID}"', 'user: "1000:1000"'
-    ).replace(
-        "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700",
-        "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=755",
+    malformed = (
+        compose_path.read_text(encoding="utf-8")
+        .replace('user: "${LOCAL_UID}:${LOCAL_GID}"', 'user: "1000:1000"')
+        .replace(
+            "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700",
+            "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=755",
+        )
     )
     compose_path.write_text(malformed, encoding="utf-8")
     module = load_container_config_module()
-    pack, pack_findings = module.load_pack(
-        repo, repo / "docker/packs/default.toml"
-    )
+    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
     assert pack_findings == []
     assert pack is not None
-    details = {finding.detail for finding in module.validate_generated_compose(repo, pack)}
+    details = {
+        finding.detail for finding in module.validate_generated_compose(repo, pack)
+    }
     assert "user-mapping-must-be-${LOCAL_UID}:${LOCAL_GID}" in details
     assert "mapped-uid-home-tmpfs-must-be-exact" in details
 
@@ -551,11 +600,11 @@ def test_parent_generator_uses_host_zshrc_expression_without_host_probe(
     assert module.validate_generated_compose(repo, pack) == []
 
     malformed = compose.replace(
-        '      - type: bind\n'
+        "      - type: bind\n"
         '        source: "${HOME}/.zshrc"\n'
         '        target: "/etc/project-template/zsh/.zshrc"\n'
         "        read_only: true",
-        '      - type: volume\n'
+        "      - type: volume\n"
         '        source: "/tmp/guessed-zshrc"\n'
         '        target: "/etc/project-template/zsh/.zshrc"\n'
         "        read_only: false",
@@ -566,7 +615,9 @@ def test_parent_generator_uses_host_zshrc_expression_without_host_probe(
     }
     assert "host-zshrc-mount-type-must-be-bind" in details
     assert "host-zshrc-source-must-be-${HOME}/.zshrc" in details
-    assert "parent-environment-mount-read-only:/etc/project-template/zsh/.zshrc" in details
+    assert (
+        "parent-environment-mount-read-only:/etc/project-template/zsh/.zshrc" in details
+    )
 
 
 def test_parent_environment_validator_is_static_and_ordered(tmp_path: Path) -> None:

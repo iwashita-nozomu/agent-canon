@@ -35,7 +35,10 @@ def test_print_only_runs_shared_post_create_before_codex() -> None:
     result = run_cli("--print-only")
 
     assert result.returncode == 0, result.stderr
-    assert "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace" in result.stdout
+    assert (
+        "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
+        in result.stdout
+    )
     assert "setpriv --reuid" in result.stdout
     assert "--user" not in result.stdout
     assert "exec codex" in result.stdout
@@ -52,6 +55,7 @@ def test_runtime_identity(tmp_path: Path) -> None:
                 'dockerfile = "docker/Dockerfile"',
                 'context = "."',
                 'image_tag = "agent-canon-runtime-identity:test"',
+                'platform = "linux/amd64"',
                 "",
                 "[smoke]",
                 "commands = []",
@@ -113,9 +117,12 @@ def test_runtime_identity(tmp_path: Path) -> None:
     ).read_text(encoding="utf-8")
 
     assert result.returncode == 0, result.stderr
-    assert "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace" in result.stdout
+    assert (
+        "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
+        in result.stdout
+    )
     assert "umask 0007" in post_create
-    assert '"${devcontainer_dir}/finalize-shared-runtime.sh"' in post_create
+    assert "$devcontainer_dir/finalize-shared-runtime.sh" in post_create
     assert '"schema_version": "shared-runtime-readback/v1"' in finalize
     assert 'readback_receipt="${runtime_root}/shared-runtime-readback.json"' in finalize
     assert (
@@ -142,3 +149,4 @@ def test_runtime_identity(tmp_path: Path) -> None:
         (bootstrap, finalize, compose, environment_manifest, managed_runner)
     )
     assert "exec codex" in result.stdout
+    assert "--platform linux/amd64" in result.stdout
