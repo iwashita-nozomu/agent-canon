@@ -3,6 +3,7 @@
     "@dependency-start",
     "contract reference",
     "responsibility Defines the canonical runtime agent team configuration.",
+    "upstream design agents/skills/python-review.md canonical Python validation route",
     "upstream implementation ../tools/agent_tools/agent_team.py loads this runtime team configuration",
     "downstream implementation ../tests/agent_tools/test_task_start_and_close.py validates generated run artifacts",
     "@dependency-end"
@@ -237,7 +238,7 @@
         "allowed_artifacts": [
           "change_review"
         ],
-        "notes": "The implementation reviewer checks each coding chunk, verifies request-clause and Design Side-Effect Map coverage for that chunk, records fix-now findings, and may only update review artifacts. Python chunks that touch class, dataclass, Protocol, inheritance, public API, type-boundary, or dependency-direction surfaces require python_reviewer plus OOP readability report, SOLID principle signal, and check_solid_evidence.py path-coverage evidence."
+        "notes": "The implementation reviewer checks each coding chunk, verifies request-clause and Design Side-Effect Map coverage for that chunk, records fix-now findings, and may only update review artifacts. Python-specific validation follows agents/skills/python-review.md#Validation route; OOP/SOLID evidence and check_solid_evidence.py path-coverage are added only when that canonical route requires them."
       }
     },
     {
@@ -2582,7 +2583,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not select an additional full suite. Require a path-covered OOP readability report and check_solid_evidence.py evidence; return revise when SOLID principle signal counts or Single responsibility, Open/closed, Liskov substitution, Interface segregation, and Dependency inversion evidence is missing.",
+      "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not add validation outside that route. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route.",
       "logical_role_id": "change_reviewer+python_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/20",
       "profile_id": "luna_reasoning_high",
@@ -2604,7 +2605,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "2f8503bb3cefc535eba79857a24b71902304d421dbd543ff5a7faa5ac7feed70"
+      "projection_digest": "095599b7a2cc0157f43a54b08446fbcf21c138fa1656054a4f209ad756022e33"
     },
     "report_reviewer": {
       "name": "report_reviewer",
@@ -3500,7 +3501,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "2f8503bb3cefc535eba79857a24b71902304d421dbd543ff5a7faa5ac7feed70"
+      "projection_digest": "095599b7a2cc0157f43a54b08446fbcf21c138fa1656054a4f209ad756022e33"
     },
     {
       "id": "report_reviewer",
@@ -3740,6 +3741,6 @@
     "materializer": "tools/agent_tools/model_profile_registry.py",
     "registry_ref": "agents/model_profiles.toml",
     "role_count": 34,
-    "projection_digest": "35f5934bcdabe1703a38d79a8c2d15aabb57b462a4c85838211fc5340831e013"
+    "projection_digest": "01685d8f72c2aabbb5a8fefd7f108fe20e62316f4ef0f2bcee017c51139c80ca"
   }
 }

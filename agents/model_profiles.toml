@@ -93,7 +93,7 @@ priority = 100
 
 [[role_instruction_templates.python_reviewer]]
 id = "python_solid_boundary"
-text = "Review Python diffs findings-first for behavior, types, tests, and public boundaries. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not select an additional full suite. Require a path-covered OOP readability report and check_solid_evidence.py evidence; return revise when SOLID principle signal counts or Single responsibility, Open/closed, Liskov substitution, Interface segregation, and Dependency inversion evidence is missing."
+text = "Review Python diffs findings-first for behavior, types, tests, and public boundaries. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not add validation outside that route. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route."
 priority = 100
 
 [[role_instruction_templates.reviewer]]
