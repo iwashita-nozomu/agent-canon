@@ -3,6 +3,7 @@
 # contract implementation
 # responsibility Owns the typed declarative devcontainer dependency model, merge, plan, and receipt installer.
 # upstream design ../../documents/design/devcontainer/parent-dependency-manifest-followup.md parent-first merge and lifecycle order
+# upstream implementation ./requirements_lock.py canonical requirements lock parser and result/error model
 # upstream design ../../CONTAINER_OPERATIONS.md image versus mounted tool boundary
 # downstream environment ../../.devcontainer/dependencies.toml AgentCanon shared developer/agent records
 # downstream implementation ../../.devcontainer/post-create.sh shared lifecycle orchestration
@@ -40,9 +41,15 @@ from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
-from packaging.markers import Marker
-from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
+
+try:
+    from .requirements_lock import RequirementErrorCode, parse_requirements
+except ImportError:  # pragma: no cover - direct script execution path.
+    from requirements_lock import (  # type: ignore[no-redef]
+        RequirementErrorCode,
+        parse_requirements,
+    )
 
 try:  # pragma: no cover - the branch depends on the interpreter image.
     import tomllib
@@ -68,7 +75,6 @@ METHODS = frozenset(
 FAILURE_POLICIES = frozenset({"fail", "warn"})
 HEX_RE = re.compile(r"^[0-9a-fA-F]+$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
-HASH_OPTION_PREFIX = "--hash=sha256:"
 COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
@@ -153,106 +159,6 @@ class VerificationKind(str, Enum):
     LEAN_TOOLCHAIN = "lean-toolchain"
     CARGO_BINARY = "cargo-binary"
     BROWSER_EXECUTABLE = "browser-executable"
-
-
-@dataclass(frozen=True)
-class PythonRequirementSpec:
-    """Normalized PEP 508 requirement identity used by ownership checks."""
-
-    raw: str
-    normalized_name: str
-    extras: tuple[str, ...]
-    specifier: str
-    marker: str | None
-    url: str | None
-
-    @classmethod
-    def parse(cls, value: str) -> PythonRequirementSpec:
-        """Parse a PEP 508 requirement without rejecting extras or URLs."""
-        try:
-            requirement = Requirement(value)
-        except InvalidRequirement as exc:
-            raise DependencyError(f"unsupported requirement syntax: {value}") from exc
-        return cls(
-            raw=value,
-            normalized_name=canonicalize_name(requirement.name),
-            extras=tuple(sorted(requirement.extras)),
-            specifier=str(requirement.specifier),
-            marker=str(requirement.marker) if requirement.marker is not None else None,
-            url=requirement.url,
-        )
-
-    def is_active(self) -> bool:
-        """Return whether a marker applies to the current Python environment."""
-        if self.marker is None:
-            return True
-        return Marker(self.marker).evaluate()
-
-
-def _requirement_records(
-    path: Path,
-) -> tuple[tuple[str, tuple[str, ...]], ...]:
-    """Fold one requirements file into strict logical requirement records.
-
-    A continued record starts with one PEP 508 requirement and may contain one
-    or more ``--hash=sha256:<hex>`` continuation lines.  Comments and blank
-    lines retain the existing requirements-file behavior; every other line is
-    either part of a record or rejected.
-    """
-    records: list[tuple[str, tuple[str, ...]]] = []
-    pending_requirement: str | None = None
-    pending_hashes: list[str] = []
-
-    for line_number, raw_line in enumerate(
-        path.read_text(encoding="utf-8").splitlines(), start=1
-    ):
-        line = re.split(r"\s+#", raw_line, maxsplit=1)[0].strip()
-        if not line or line.startswith("#"):
-            if pending_requirement is not None:
-                raise DependencyError(
-                    f"{path}:{line_number}: malformed requirement continuation"
-                )
-            continue
-
-        continued = line.endswith("\\")
-        value = line[:-1].rstrip() if continued else line
-        if not value:
-            raise DependencyError(
-                f"{path}:{line_number}: malformed requirement continuation"
-            )
-
-        if pending_requirement is None:
-            if value.startswith("--hash"):
-                raise DependencyError(f"{path}:{line_number}: orphan requirement hash")
-            if value.startswith("-"):
-                raise DependencyError(
-                    f"{path}:{line_number}: requirement option without requirement"
-                )
-            if continued:
-                pending_requirement = value
-                pending_hashes = []
-            else:
-                records.append((value, ()))
-            continue
-
-        if not value.startswith("--hash"):
-            raise DependencyError(
-                f"{path}:{line_number}: malformed requirement continuation"
-            )
-        if not value.startswith(HASH_OPTION_PREFIX) or not SHA256_RE.fullmatch(
-            value[len(HASH_OPTION_PREFIX) :]
-        ):
-            raise DependencyError(f"{path}:{line_number}: malformed requirement hash")
-
-        pending_hashes.append(value)
-        if not continued:
-            records.append((pending_requirement, tuple(pending_hashes)))
-            pending_requirement = None
-            pending_hashes = []
-
-    if pending_requirement is not None:
-        raise DependencyError(f"{path}: unterminated requirement continuation")
-    return tuple(records)
 
 
 @dataclass(frozen=True)
@@ -1422,16 +1328,6 @@ class EnvironmentBoundaryModel:
                 break
         return frozenset(packages)
 
-    @staticmethod
-    def _requirements(path: Path) -> tuple[PythonRequirementSpec, ...]:
-        """Parse and preserve active PEP 508 requirements for ownership checks."""
-        requirements: list[PythonRequirementSpec] = []
-        for line, _hashes in _requirement_records(path):
-            requirement = PythonRequirementSpec.parse(line)
-            if requirement.is_active():
-                requirements.append(requirement)
-        return tuple(requirements)
-
     def _resolve_agent_canon_root_path(self, relative: str) -> Path:
         """Resolve one source-relative path across active AgentCanon tool roots."""
         relative_path = PurePosixPath(relative)
@@ -1489,11 +1385,21 @@ class EnvironmentBoundaryModel:
         dockerignore = self._require(findings, checked, ".dockerignore", "docker")
         gitignore = self._require(findings, checked, ".gitignore", "python")
         if requirements is not None:
-            try:
-                declared_requirements = self._requirements(requirements)
-            except DependencyError as exc:
-                findings.append(BoundaryFinding("python", str(requirements), str(exc)))
-            else:
+            parsed_requirements = parse_requirements(requirements)
+            for error in parsed_requirements.errors:
+                if error.code is RequirementErrorCode.INVALID_REQUIREMENT:
+                    detail = error.detail
+                elif error.code is RequirementErrorCode.UNTERMINATED_CONTINUATION:
+                    detail = f"{requirements}: {error.detail}"
+                else:
+                    detail = error.render()
+                findings.append(BoundaryFinding("python", str(requirements), detail))
+            if parsed_requirements.valid:
+                declared_requirements = tuple(
+                    record
+                    for record in parsed_requirements.records
+                    if record.is_active()
+                )
                 declared = frozenset(
                     requirement.normalized_name for requirement in declared_requirements
                 )
