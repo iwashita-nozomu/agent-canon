@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# @dependency-start
+# contract tool
+# responsibility Provides shared path-filter helpers for AgentCanon tooling.
+# upstream design tools/README.md shared tooling ownership
+# downstream implementation tools/agent_tools/* consumes shared path filters
+# @dependency-end
+
 """Shared path-filter helpers for checker-style tooling."""
 
 from __future__ import annotations
