@@ -1557,7 +1557,38 @@ class CheckConventionComplianceTest(unittest.TestCase):
         self.assertEqual(missing, [])
 
     def test_implementation_guardrails_require_markers(self) -> None:
-        """Implementation policy keeps legacy-route and duplicate guards visible."""
+        """Implementation policy keeps compatibility and duplicate guards visible."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            house_style = (
+                root / "documents" / "conventions" / "coding-conventions-house-style.md"
+            )
+            house_style.write_text(
+                "house canonical owner check_convention_compliance.py\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("implementation_guardrails", result.stdout)
+            self.assertIn(
+                "missing-marker:compatibility-preservation drift",
+                result.stdout,
+            )
+            self.assertIn("missing-marker:duplicate implementation", result.stdout)
+            self.assertIn("missing-marker:caller migration", result.stdout)
+            self.assertIn(
+                "missing-marker:contract-complete implementation",
+                result.stdout,
+            )
+            self.assertIn("missing-marker:acceptance contract", result.stdout)
+            self.assertIn("missing-marker:design_issue_blocker", result.stdout)
+            self.assertIn("missing-marker:implementation shortcut", result.stdout)
+
+    def test_workflow_guardrails_require_legacy_route_marker(self) -> None:
+        """The workflow owner uses the semantic legacy-route marker."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
@@ -1572,9 +1603,14 @@ class CheckConventionComplianceTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("implementation_guardrails", result.stdout)
             self.assertIn(
+                "implementation_guardrails:agents/canonical/CODEX_WORKFLOW.md:"
                 "missing-marker:legacy-route drift",
+                result.stdout,
+            )
+            self.assertNotIn(
+                "implementation_guardrails:agents/canonical/CODEX_WORKFLOW.md:"
+                "missing-marker:compatibility-preservation drift",
                 result.stdout,
             )
 

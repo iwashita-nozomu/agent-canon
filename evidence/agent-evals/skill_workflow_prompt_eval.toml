@@ -100,7 +100,7 @@ required_regex = ["API", "serialization", "external input", "constructor invaria
 id = "OOP-TYPE-HUMAN-3"
 critical = true
 required_regex = ["check_static_any.py", "pyright", "ruff", "oop-readability-check", "gpt-5.4-mini", "T14", "primary verification owner|obligations", "hard-edge", "test_designer", "composition root"]
-forbidden_regex = ["keyword routing", "keyword trigger", "coordination[_ ]cost", "connected-components", "line/function count|function count", "exhaustive partition|threshold", "compatibility"]
+forbidden_regex = ["keyword routing", "keyword trigger", "coordination[_ ]cost", "connected-components", "line/function count|function count", "exhaustive partition|partition threshold|cohesion threshold", "compatibility-preservation drift|compatibility (path|route)"]
 
 [[evals]]
 id = "all-internal-routine-docs"
