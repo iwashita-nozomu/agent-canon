@@ -58,6 +58,10 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
   - 質問回答、明示 write clause、sparse update、既存 cleanup route の compact flow
 - [semantic-responsibility-contract.md](semantic-responsibility-contract.md)
   - semantic delta、obligation、一次検証 owner、hard-edge closure、run-local instance の契約
+- [agent-team-module-boundaries.md](agent-team-module-boundaries.md)
+  - AgentTeam runtime orchestration の Python module boundary、公開 facade、migration wave、検証責任
+- [semantic-index-module-boundaries.md](semantic-index-module-boundaries.md)
+  - semantic-index CLI/cache/report pipeline の Rust module boundary、schema、atomic publish、検証責任
 - [../remote-execution-repo-contract.md](../contracts/remote-execution-repo-contract.md)
   - remote execution を受ける repo の最小契約
 
