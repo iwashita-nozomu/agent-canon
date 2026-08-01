@@ -12,10 +12,21 @@ from __future__ import annotations
 
 import argparse
 import ast
-import fnmatch
 import json
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+try:
+    from tools.shared.path_filters import is_hidden, path_is_excluded
+except ModuleNotFoundError:
+    for parent in Path(__file__).resolve().parents:
+        if parent.name == "tools":
+            repo_root = parent.parent
+            if str(repo_root) not in sys.path:
+                sys.path.append(str(repo_root))
+            break
+    from tools.shared.path_filters import is_hidden, path_is_excluded
 
 DEFAULT_EXCLUDES = (
     ".git",
@@ -144,31 +155,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def path_is_excluded(relative: Path, exclude_patterns: list[str]) -> bool:
-    """Return true when a root-relative path matches one exclude pattern."""
-    relative_posix = relative.as_posix()
-    for raw_pattern in exclude_patterns:
-        pattern = raw_pattern.strip().strip("/")
-        if not pattern:
-            continue
-        if any(char in pattern for char in "*?[]"):
-            if fnmatch.fnmatch(relative_posix, pattern):
-                return True
-            continue
-        if (
-            relative_posix == pattern
-            or relative_posix.startswith(f"{pattern}/")
-            or pattern in relative.parts
-        ):
-            return True
-    return False
-
-
-def is_hidden(path: Path) -> bool:
-    """Return true when any path part is hidden."""
-    return any(part.startswith(".") for part in path.parts)
-
-
 def iter_python_files(
     root: Path,
     raw_paths: list[str],
@@ -213,7 +199,9 @@ def base_name(node: ast.AST) -> str:
     if isinstance(node, ast.Subscript):
         return base_name(node.value)
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        return "|".join(part for part in (base_name(node.left), base_name(node.right)) if part)
+        return "|".join(
+            part for part in (base_name(node.left), base_name(node.right)) if part
+        )
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value
     return ""
@@ -294,7 +282,9 @@ def class_base_names(node: ast.ClassDef) -> tuple[str, ...]:
 
 def config_class_kinds(tree: ast.Module) -> dict[str, str]:
     """Resolve config class ownership from AST inheritance only."""
-    protocol_module_aliases, protocol_class_aliases = algorithm_protocol_import_aliases(tree)
+    protocol_module_aliases, protocol_class_aliases = algorithm_protocol_import_aliases(
+        tree
+    )
     by_name: dict[str, ast.ClassDef] = {}
 
     def collect_classes(body: list[ast.stmt], prefix: tuple[str, ...] = ()) -> None:
@@ -364,7 +354,9 @@ def primary_module_name(root: Path, path: Path) -> str:
     return names[0] if names else ""
 
 
-def resolve_import_from_module(current_module: str, level: int, module: str | None) -> str:
+def resolve_import_from_module(
+    current_module: str, level: int, module: str | None
+) -> str:
     """Resolve an ImportFrom module string relative to the current file module."""
     if level <= 0:
         return module or ""
@@ -423,7 +415,9 @@ def import_context(
             if alias.name == "*":
                 continue
             alias_name = alias.asname or alias.name
-            imported_module = f"{module_name}.{alias.name}" if module_name else alias.name
+            imported_module = (
+                f"{module_name}.{alias.name}" if module_name else alias.name
+            )
             if imported_module in module_index:
                 module_aliases[alias_name] = imported_module
                 continue
@@ -572,11 +566,7 @@ def is_literalish_default(
         name = dotted_name(node.func)
         if name in {"dict", "list", "set", "tuple"}:
             return True
-        if (
-            local_config_kinds is None
-            or imports is None
-            or module_index is None
-        ):
+        if local_config_kinds is None or imports is None or module_index is None:
             return False
         return (
             config_kind_for_expr(
@@ -638,8 +628,12 @@ def is_module_constant_assignment(node: ast.AST) -> bool:
     if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
         names.append(node.target.id)
     if isinstance(node, ast.Assign):
-        names.extend(target.id for target in node.targets if isinstance(target, ast.Name))
-    return bool(names) and all(name.isupper() or name.startswith("__") for name in names)
+        names.extend(
+            target.id for target in node.targets if isinstance(target, ast.Name)
+        )
+    return bool(names) and all(
+        name.isupper() or name.startswith("__") for name in names
+    )
 
 
 def function_default_findings(
@@ -806,7 +800,8 @@ class ConfigDefaultVisitor(ast.NodeVisitor):
                         scope=enclosing_scope(node),
                         kind="or-implicit-default",
                         name="<or>",
-                        owner=enclosing_config_owner(node, self.config_kinds) or "runtime",
+                        owner=enclosing_config_owner(node, self.config_kinds)
+                        or "runtime",
                         severity="error",
                         reason="boolean or supplies an implicit value outside config ownership",
                         guidance=(
@@ -867,7 +862,9 @@ def class_fields(
         if kind is None:
             continue
         for item in node.body:
-            if not isinstance(item, ast.AnnAssign) or not isinstance(item.target, ast.Name):
+            if not isinstance(item, ast.AnnAssign) or not isinstance(
+                item.target, ast.Name
+            ):
                 continue
             fields.append(
                 ConfigField(
