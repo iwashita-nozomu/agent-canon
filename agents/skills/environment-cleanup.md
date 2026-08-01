@@ -39,7 +39,6 @@ evidence/rollback は [`responsibility-cleanup`](../../documents/design/responsi
 ```bash
 python3 tools/agent_tools/devcontainer_dependencies.py validate --workspace . --format text
 python3 tools/agent_tools/devcontainer_dependencies.py dry-run --workspace . --vendor-root . --format json
-python3 tools/agent_tools/check_convention_compliance.py
 ```
 
 ## Boundary

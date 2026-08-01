@@ -73,9 +73,10 @@ commit を行わない。
 .agents/skills/<skill>/SKILL.md
 ~~~
 
-host の path は現在どおり ../.agents/skills/<skill>/SKILL.md とし、
-.codex/config.toml の catalog-derived な [[skills.config]] 集合を materializer が生成し直す
-ことはしません。config は host wiring の既存 owner であり、readback の対象です。
+host の path は現在どおり ../.agents/skills/<skill>/SKILL.md とします。
+`.codex/config.toml` は host-wiring の source/input であり、materializer の生成 target
+ではありません。materializer は `.agents/skills/<skill>/SKILL.md` だけを生成し、config
+entry の catalog-derived set、source order、path、enabled を readback します。
 
 ### Non-Goals
 
@@ -479,17 +480,10 @@ catalog-derived row readback は各 row で次を検査します。
 
 ## Graph and Route Golden Preservation
 
-現 snapshot の checker evidence は次です。
-
-~~~text
-skill_count=<catalog-derived count>
-command_count=387
-tool_count=52
-edge_count=1153
-graph_digest=de94948ed6f9c0aac20b2df1ae912e79a9ff038961704c6c26f6ea84663544ef
-json_digest=8bcf8e05709996307fd0869a41c285c474e5365bc7d0e79350b6a34d5aab5894
-mermaid_digest=5046999110b79e5858f6c5ac10735277254661383ec28f1fa0e748050d30e531
-~~~
+現 snapshot の skill/command/tool/edge 件数と graph/JSON/Mermaid digest は、この設計へ
+埋め込みません。`documents/runtime/skill-dependency-graph.json` の catalog-derived
+projection と `tools/agent_tools/check_skill_tool_invocation_graph.py` の readback が
+current value の owner です。
 
 shim の body は graph source ではないため、shim materialization だけでは graph の
 skill/command/edge/order membership を変更しません。implementation で catalog に
@@ -932,7 +926,7 @@ python3 tools/agent_tools/skill_shim_evaluation.py tokens \
 | SHIM-002 catalog-owned discovery metadata | catalog reader | agents/skills/catalog.yaml / skill_families[].discovery | catalog-sized frontmatter pairs equal migration baseline |
 | SHIM-003 canonical prose stays out of runtime adapter | human skill canon | agents/skills/<skill>.md and generated template | adapter contains link/digest only; duplicate-policy scan=0 |
 | SHIM-004 owner/dependency/route identity | route/dependency readers | skill_route_catalog.py, route.py, skill_dependency_map.py | catalog-derived route/dependency digests and semantic edge golden |
-| SHIM-005 command packet preservation | command packet owner | skill_tool_commands.py / SkillCommandPacket (read-only) | complete packet JSON/digest, all phases/resolved fields, command count 387 equal |
+| SHIM-005 command packet preservation | command packet owner | skill_tool_commands.py / SkillCommandPacket (read-only) | complete packet JSON/digest, all phases/resolved fields, catalog-derived command count equals generated graph/readback |
 | SHIM-005b typed ToolID/ToolCall preservation | graph/tool-packet owner | agent_team.py, skill-tool-invocation-graph.md | ToolID/ToolCall/argument-schema Ref and digest equal; no payload in shim |
 | SHIM-006 host discovery preservation | runtime alignment | .codex/config.toml, check_agent_runtime_alignment.py | catalog-sized config-to-shim paths, frontmatter pass |
 | SHIM-007 single writer | shim materializer | skill_shim_materializer.py; skill_tool_commands.py has no sync/write surface | writer inventory identifies exactly one SKILL.md writer; sync symbol absent |

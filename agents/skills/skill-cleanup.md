@@ -40,9 +40,11 @@ graph/readback を一つの source-to-generated cleanup unit として既存 own
 ## Route
 
 1. canonical skill doc と catalog/dependency/route/tool command の source owner を固定する。
-2. `.codex/config.toml` と `.agents/skills/<skill>/SKILL.md` を既存 materializer で生成する。
-3. `skill_dependency_map.py graph` で graph JSON/Mermaid を生成し、既存 checker で source/readback equality を確認する。
-4. 文書は `document-canon-cleanup`、worktree は `worktree-health`、log は `agent-log-analysis`/`runtime-log-repair`、結果は `result-artifact-writeout` を再利用する。
+2. `.codex/config.toml` を host-wiring の source/input として読み、catalog skill id に対する
+   entry set、source order、path、enabled を readback する。
+3. 既存 materializer は `.agents/skills/<skill>/SKILL.md` だけを生成する。
+4. `skill_dependency_map.py graph` で graph JSON/Mermaid を生成し、既存 checker で source/readback equality を確認する。
+5. 文書は `document-canon-cleanup`、worktree は `worktree-health`、log は `agent-log-analysis`/`runtime-log-repair`、結果は `result-artifact-writeout` を再利用する。
 
 ## Tool Commands
 
@@ -57,4 +59,6 @@ python3 tools/agent_tools/check_skill_tool_invocation_graph.py --root .
 ## Boundary
 
 generated shim と graph は source owner から生成し、手書き projection を authority にしません。
+`.codex/config.toml` は materializer の生成 target ではなく、host-wiring の source/input と
+set/order readback owner です。
 個別の document/worktree/log policy は既存 skill を読み、この skill では新しい代替 skill を作りません。

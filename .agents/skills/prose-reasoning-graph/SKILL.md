@@ -2,7 +2,7 @@
 name: prose-reasoning-graph
 description: "Use when existing prose should be converted into a SQLite-backed structure graph, diagnosed for discourse/argument/evidence/experiment gaps, explained in natural language, and handed off to writing or review skills with split/merge/bridge/reorder rewrite packets."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"df86648829a7f788f60a34183969c5281828d86e63eaf11a58a40564720d4ee2"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"bc6a9fe1e04f4393148ddb840a8a6e9143afdc731e52ad4e36d5f7f2e56f7196"} -->
 
 <!--
 @dependency-start

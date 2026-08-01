@@ -2,7 +2,7 @@
 name: agent-log-analysis
 description: "Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, missed or late skill invocation, routing misses, weak skills, over-constrained related-skill coverage, or selection gaps; first convert raw logs into a structured dashboard summary with AgentCanon source generate_agent_runtime_dashboard.py before reading or interpreting evidence."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"7173d8494f339ce3dfeee6bdf0799d4d00f793f5e6954cf90e263d0c5ce076e8"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"9da23c917b548cda5954b815e6aeebd4efc035dac3ba3e81a80c534ea56ef1ca"} -->
 
 <!--
 @dependency-start

@@ -49,13 +49,18 @@ responsibility と一つの一次 owner を持ち、必要な specialist dispatc
 | responsibility | `responsibility-cleanup` | tree 観測、境界分類、dependency closure、replaceable unit 化、specialist dispatch、統合と再レビューを束ねる | unit record と owner/review readback |
 | environment | `environment-cleanup` | environment dependency/runtime capability unit を `dependency-design` で確定し、`environment-maintenance` へ渡す | design packet、maintenance handoff、environment validation |
 | code | `code-cleanup` | public/module responsibility と到達性を `dependency-analysis` で閉じ、`refactor-loop`、`change-review` へ渡す | impact packet、refactor review、targeted validation |
-| skill | `skill-cleanup` | canonical doc/catalog/DAG/route/tool command/generated shim/host config/graph/readback を一つの unit として既存 owner へ渡す | source-to-generated readback と graph/shim checker |
+| skill | `skill-cleanup` | canonical doc/catalog/DAG/route/tool command/generated shim/host config/graph/readback を一つの unit として既存 owner へ渡す | shim/graph generation と host config set/order input readback |
 | documents/worktree/log | existing owners | `document-canon-cleanup`、`worktree-health`、`agent-log-analysis`、`runtime-log-repair`、`result-artifact-writeout` を再利用する | 既存 owner の receipt |
 
-`structure-refactor`（`agents/skills/structure-refactor.md`）は構造と責任境界の修復 owner、`refactor-loop` は意味を保つ
-refactor の実行 owner、`agent-orchestration` と `task-routing` は dispatch/order の
-（`agents/skills/refactor-loop.md`）
-routing owner です。cleanup skill はこれらの policy を再定義せず、route と evidence を
+4 cleanup skill の選択は、explicit public skill ID、host discovery、
+`agents/skills/skill-dependencies.yaml` の typed DAG で閉じます。
+`agents/skills/catalog.yaml` の4 entryには `routing.triggers`、alias、prompt matcherを
+持たせず、近接語やnarrowing keywordを代替authorityにしません。
+
+`structure-refactor`（`agents/skills/structure-refactor.md`）は構造と責任境界の修復 owner、
+`refactor-loop`（`agents/skills/refactor-loop.md`）は意味を保つ refactor の実行 owner、
+`agent-orchestration` と `task-routing`（`agents/skills/task-routing.md`）は dispatch/order の
+routing owner です（`agents/skills/agent-orchestration.md`）。cleanup skill はこれらの policy を再定義せず、route と evidence を
 接続します（`agents/skills/agent-orchestration.md`、`agents/skills/task-routing.md`）。
 
 ## Responsibility-Unit Schema
@@ -120,9 +125,14 @@ identity を保った候補だけを再レビューへ進めます。
 
 validation は変更面の既存 checker（`tools/agent_tools/skill_shim_materializer.py`）を使い、necessary presence、forbidden presence、
 sufficient behavior を owner の契約に従って分類します（`tools/agent_tools/skill_shim_materializer.py`）。公開 skill surface では catalog、
-dependency map、materialized shim、host config、generated graph（`documents/runtime/skill-dependency-graph.md`）、graph readback を同じ
+dependency map、materialized shim、host-wiring source/input の `.codex/config.toml`、generated graph（`documents/runtime/skill-dependency-graph.md`）、graph readback を同じ
 source snapshot から検証します（`documents/runtime/skill-dependency-graph.md`）。失敗は実装原因を分類して同じ owner route を修正し、
 checker の条件を弱めずに再実行します（`tools/agent_tools/check_skill_tool_invocation_graph.py`）。
+
+`tools/agent_tools/skill_shim_materializer.py` の生成 target は
+`.agents/skills/<skill>/SKILL.md` だけです。`.codex/config.toml` は materializer の
+出力ではなく、`.codex/config.toml` の catalog skill id に対する entry set、source order、
+path、enabled の readback input とします。
 
 rollback は `rollback` field に対象 tree/commit、保持する source identity、復元する
 generated projection、再検証 command を記録します（`documents/design/responsibility-cleanup.md`）。統合前に candidate の source identity
@@ -137,7 +147,7 @@ generated projection、再検証 command を記録します（`documents/design/
 | RC-02 dependency closure and unit schema | `responsibility-cleanup` / `dependency-analysis` | `documents/design/responsibility-cleanup.md` unit schema, dependency graph | unit fields、closure、handoff readback |
 | RC-03 environment route | `environment-cleanup` | `agents/skills/dependency-design.md`, `agents/skills/environment-maintenance.md` | dependency design と maintenance validation |
 | RC-04 code route | `code-cleanup` | `agents/skills/dependency-analysis.md`, `agents/skills/refactor-loop.md`, `agents/skills/change-review.md` | impact、refactor、review の連続 evidence |
-| RC-05 skill route | `skill-cleanup` | `agents/skills/catalog.yaml`, `agents/skills/skill-dependencies.yaml`, `tools/agent_tools/skill_shim_materializer.py`, `tools/agent_tools/skill_dependency_map.py` | source/catalog/DAGからshim・host config・graphへの readback |
+| RC-05 skill route | `skill-cleanup` | `agents/skills/catalog.yaml`, `.codex/config.toml`, `agents/skills/skill-dependencies.yaml`, `tools/agent_tools/skill_shim_materializer.py`, `tools/agent_tools/skill_dependency_map.py` | source/catalog/DAGからshim・graphを生成し、host config set/order inputをreadback |
 | RC-06 existing-owner reuse | `responsibility-cleanup` | `agents/skills/document-canon-cleanup.md`, `agents/skills/worktree-health.md`, `agents/skills/agent-log-analysis.md`, `agents/skills/runtime-log-repair.md`, `agents/skills/result-artifact-writeout.md` | reuse route と既存 receipt |
 | RC-07 external evidence and rollback | owner-selected specialist | unit `external_tools`, `rollback`、`handoff` | primary source/version/license/security と rollback readback |
 | RC-08 integration and re-review | `agent-orchestration` / `change-review` | generated projections、tree/commit readback、review packet | final owner/review/validation readback |
@@ -146,7 +156,7 @@ generated projection、再検証 command を記録します（`documents/design/
 
 | kind | statement | evidence / owner | status |
 | --- | --- | --- | --- |
-| current state | public skill identity、dependency relation、runtime shim、host config、graph はそれぞれ既存の catalog/materializer/checker owner が持つ | `agents/skills/catalog.yaml`, `agents/skills/skill-dependencies.yaml`, `tools/agent_tools/skill_shim_materializer.py`, `tools/agent_tools/skill_dependency_map.py` | checked |
+| current state | public skill identity、dependency relation、runtime shim、host-wiring input、graph はそれぞれ既存の catalog/config/materializer/checker owner が持つ | `agents/skills/catalog.yaml`, `.codex/config.toml`, `agents/skills/skill-dependencies.yaml`, `tools/agent_tools/skill_shim_materializer.py`, `tools/agent_tools/skill_dependency_map.py` | checked |
 | target state | 4 cleanup skill は同じ public registry、dependency DAG、host config、generated readback へ接続する | `agents/skills/README.md`, `agents/canonical/skills.md`, `.codex/config.toml` | implementation readback |
 | assumption | tree は構造観測であり、責務 authority は owner/dependency/contract evidence から閉じる | `RC-01`, `RC-02`, `agents/skills/structure-refactor.md` | explicit |
 | assumption | analyzer は candidate producer であり、採用 disposition と削除 oracle は owner route が決める | `RC-02`, `RC-07`, `agents/skills/dependency-analysis.md` | explicit |

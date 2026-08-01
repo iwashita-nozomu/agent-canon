@@ -2,7 +2,7 @@
 name: formal-proof-workflow
 description: "Use when natural-language mathematical claims, JIT-canonical implementation claims, proof sketches, or theory assumptions should be converted into formal-proof obligations, generated Lean evidence, theorem-graph targets, and checker-gated evidence."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"067a65f35f247d8af90b101f3e879c45a348f2b052f868d1f375d77e2b3241a0"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"512e68fe8b82ed4bb6c23a4ae4aff300304c3b1753f51d2678a81ee3c9cecb98"} -->
 
 <!--
 @dependency-start

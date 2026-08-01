@@ -33,6 +33,7 @@ from skill_dependency_map import (  # noqa: E402
     _json_digest_from_graph,
     _normalize_identifier,
     _resolve_tool_id,
+    _validate_loaded_graph,
     build_graph,
     check_artifacts,
     readback_mermaid,
@@ -337,10 +338,8 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         changed["artifact_id"] = "edited"
         self.assertNotEqual(_json_digest_from_graph(changed), baseline)
 
-    def test_checker_rejects_stale_json_mermaid_and_dependency_design_omission(
-        self,
-    ) -> None:
-        """Edited machine or Mermaid artifacts and an omitted dependency skill fail closed."""
+    def test_checker_rejects_stale_mermaid(self) -> None:
+        """Edited Mermaid artifacts fail closed."""
         check_artifacts(PROJECT_ROOT)
         markdown_path = PROJECT_ROOT / "documents/runtime/skill-dependency-graph.md"
         json_path = PROJECT_ROOT / "documents/runtime/skill-dependency-graph.json"
@@ -353,22 +352,22 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "stale_artifact"):
                 check_artifacts(PROJECT_ROOT)
-            markdown_path.write_text(original_markdown, encoding="utf-8")
-            machine = json.loads(original_json)
-            machine["skills"] = [
-                item
-                for item in machine["skills"]
-                if item["ref"]["id"] != "skill:dependency-design"
-            ]
-            json_path.write_text(
-                json.dumps(machine, ensure_ascii=False, separators=(",", ":")),
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(ValueError, "dependency-design:omission"):
-                check_artifacts(PROJECT_ROOT)
         finally:
             markdown_path.write_text(original_markdown, encoding="utf-8")
             json_path.write_text(original_json, encoding="utf-8")
+
+    def test_matching_count_rejects_dependency_design_omission(self) -> None:
+        """A count-matching machine graph still requires dependency-design identity."""
+        machine = copy.deepcopy(build_graph(PROJECT_ROOT))
+        machine["skills"] = [
+            item
+            for item in machine["skills"]
+            if item["ref"]["id"] != "skill:dependency-design"
+        ]
+        machine["skill_count"] = len(machine["skills"])
+        machine["json_digest"] = _json_digest_from_graph(machine)
+        with self.assertRaisesRegex(ValueError, "dependency-design:omission"):
+            _validate_loaded_graph(machine)
 
 
 if __name__ == "__main__":

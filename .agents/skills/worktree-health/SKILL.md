@@ -2,7 +2,7 @@
 name: worktree-health
 description: "Use this skill to review current checkout authority, run-bundle drift, legacy worktree cleanup evidence, and cleanup readiness."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"f3634a980dc0a5b25f7d851296fdabbfccafcec4bf41402aed53a43a660bea98"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"39807b6dddf0536877bab2f419902bed7b2388619e8a73a232eb941e440e1816"} -->
 
 <!--
 @dependency-start

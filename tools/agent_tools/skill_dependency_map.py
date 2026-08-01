@@ -1818,7 +1818,16 @@ def _validate_loaded_graph(machine: Mapping[str, object]) -> None:
     if machine.get("schema") != GRAPH_SCHEMA or machine.get("version") != 2:
         raise ValueError("skill_tool_invocation_graph_schema_mismatch")
     skills = cast(Sequence[Mapping[str, object]], machine.get("skills", []))
-    if machine.get("skill_count") != len(skills) or not skills:
+    if not skills:
+        raise ValueError("skill_tool_invocation_graph_skill_count:0")
+    if machine.get("skill_count") != len(skills):
+        raise ValueError("skill_tool_invocation_graph_skill_count_parity")
+    skill_ref_ids = {
+        reference.get("id")
+        for skill in skills
+        if isinstance((reference := skill.get("ref")), Mapping)
+    }
+    if "skill:dependency-design" not in skill_ref_ids:
         raise ValueError("dependency-design:omission")
     if machine.get("json_digest") != _json_digest_from_graph(machine):
         raise ValueError("json_digest:mismatch")
