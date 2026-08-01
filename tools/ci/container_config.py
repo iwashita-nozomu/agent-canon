@@ -49,12 +49,12 @@ if str(AGENT_TOOLS_DIR) not in sys.path:
 from requirements_lock import (  # noqa: E402,I001  # pyright: ignore[reportMissingTypeStubs]
     parse_requirements,
 )
-from surface_manifest import (
+from surface_manifest import (  # noqa: E402,I001
     SurfaceEntry,
     SurfaceManifest,
     load_manifest,
     target_for_entry,
-)  # noqa: E402,I001
+)
 
 REQUIRED_REQUIREMENTS = (
     "jupyterlab",
