@@ -559,11 +559,6 @@ def _source_counts(source_inventory: Sequence[Mapping[str, object]]) -> dict[str
     return counts
 
 
-def _ref_key(reference: Mapping[str, object]) -> tuple[str, str]:
-    """Return a stable comparison key for a Ref."""
-    return cast(str, reference["id"]), cast(str, reference["digest"])
-
-
 def _projection_entry(
     reference: Mapping[str, str], label: str, order: int | None = None
 ) -> dict[str, object]:

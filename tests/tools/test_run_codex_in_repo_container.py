@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -19,7 +20,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_codex_in_repo_container.py"
 
 
-def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
+def run_cli(
+    *args: str, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     """Run the nested Codex runner and capture output."""
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
@@ -27,6 +30,7 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
         check=False,
         capture_output=True,
         text=True,
+        env={**os.environ, **(env or {})},
     )
 
 
@@ -35,9 +39,14 @@ def test_print_only_runs_shared_post_create_before_codex() -> None:
     result = run_cli("--print-only")
 
     assert result.returncode == 0, result.stderr
-    assert "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace" in result.stdout
+    assert (
+        "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
+        in result.stdout
+    )
     assert "setpriv --reuid" in result.stdout
     assert "--user" not in result.stdout
+    assert "/root/.codex" not in result.stdout
+    assert "codex-state" not in result.stdout
     assert "exec codex" in result.stdout
 
 
@@ -75,13 +84,11 @@ def test_runtime_identity(tmp_path: Path) -> None:
                 'container_home_root = "/workspace/.state/nested-codex"',
                 "use_host_user = false",
                 "tty = false",
-                "share_host_codex_home = false",
-                "seed_host_codex = false",
                 "mount_host_gitconfig = false",
                 "mount_host_git_credentials = false",
                 "mount_host_ssh_dir = false",
                 "forward_ssh_auth_sock = false",
-                "forward_env = []",
+                'forward_env = ["OPENAI_API_KEY", "OPENAI_BASE_URL"]',
                 "",
                 "[[profile]]",
                 'name = "default"',
@@ -92,13 +99,24 @@ def test_runtime_identity(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    result = run_cli("--print-only", "--profiles", str(profiles))
+    result = run_cli(
+        "--print-only",
+        "--profiles",
+        str(profiles),
+        env={
+            "OPENAI_API_KEY": "test-api-key",
+            "OPENAI_BASE_URL": "https://api.example.test/v1",
+        },
+    )
     post_create = (PROJECT_ROOT / ".devcontainer" / "post-create.sh").read_text(
         encoding="utf-8"
     )
     finalize = (
         PROJECT_ROOT / ".devcontainer" / "finalize-shared-runtime.sh"
     ).read_text(encoding="utf-8")
+    post_attach = (PROJECT_ROOT / ".devcontainer" / "post-attach.sh").read_text(
+        encoding="utf-8"
+    )
     bootstrap = (
         PROJECT_ROOT / ".devcontainer" / "bootstrap-shared-runtime.sh"
     ).read_text(encoding="utf-8")
@@ -113,9 +131,16 @@ def test_runtime_identity(tmp_path: Path) -> None:
     ).read_text(encoding="utf-8")
 
     assert result.returncode == 0, result.stderr
-    assert "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace" in result.stdout
+    assert (
+        "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
+        in result.stdout
+    )
+    assert "-e OPENAI_API_KEY=test-api-key" in result.stdout
+    assert "-e OPENAI_BASE_URL=https://api.example.test/v1" in result.stdout
+    assert "/root/.codex" not in result.stdout
     assert "umask 0007" in post_create
-    assert '"${devcontainer_dir}/finalize-shared-runtime.sh"' in post_create
+    assert '"$devcontainer_dir/finalize-shared-runtime.sh"' in post_create
+    assert 'echo "codex-state: ${codex_state_status}"' in post_attach
     assert '"schema_version": "shared-runtime-readback/v1"' in finalize
     assert 'readback_receipt="${runtime_root}/shared-runtime-readback.json"' in finalize
     assert (

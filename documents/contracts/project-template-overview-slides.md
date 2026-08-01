@@ -92,7 +92,7 @@ downstream design ./README.md document index links this slide deck
 - Docker is the canonical runtime, not a place to hardcode machine-local remote paths.
 - `docker/packs/default.toml` defines build and smoke checks.
 - Devcontainer compose is generated from the runtime pack.
-- Host `~/.codex`, `~/.config/gh`, `~/.ssh`, and `SSH_AUTH_SOCK` are reused when available.
+- Host `~/.config/gh`, `~/.ssh`, and `SSH_AUTH_SOCK` are reused when available; Codex state remains container-local and API auth may use explicitly forwarded `OPENAI_API_KEY` and `OPENAI_BASE_URL`.
 
 ## 11. Jupyter And Results
 

@@ -245,6 +245,9 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   Host `~/.codex` is never mounted. Successful post-create tool availability is
   recorded and later certified by `EnvironmentCertificate`, not by a second
   environment policy surface.
+- Nested Codex uses container-local state under the selected workspace runtime
+  home. The runner may forward `OPENAI_API_KEY` and `OPENAI_BASE_URL` explicitly;
+  it never mounts or seeds host Codex state.
 - GPU admission runtime identity uses exactly
   `/var/lib/agent-canon/runtime/shared-runtime-provision.json` and
   `/var/lib/agent-canon/runtime/shared-runtime-readback.json`. Bootstrap runs
