@@ -1657,6 +1657,43 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("## SOLID Principle Signals", markdown.stdout)
             self.assertIn("- `liskov substitution`: 0", markdown.stdout)
 
+    def test_exclude_accepts_wildcard_patterns(self) -> None:
+        """External scans can exclude paths matched by a wildcard pattern."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            product = root / "python"
+            reports = root / "reports"
+            product.mkdir()
+            reports.mkdir()
+            (product / "model.py").write_text(
+                "\n".join(
+                    [
+                        "from dataclasses import dataclass",
+                        "",
+                        "@dataclass(frozen=True)",
+                        "class Product:",
+                        "    value: int",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (reports / "helpers.py").write_text(
+                "class DataHelper:\n    pass\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(
+                root,
+                "--exclude",
+                "reports/*.py",
+                ".",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("OOP_READABILITY_FILES=1", result.stdout)
+            self.assertNotIn("DataHelper", result.stdout)
+
     def test_markdown_report_and_review_prompt_are_generated(self) -> None:
         """Markdown reports and reviewer prompts are generated."""
         with tempfile.TemporaryDirectory() as tmp_dir:
