@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 import sys
 
 try:
@@ -56,6 +57,10 @@ REQUIRED_REQUIREMENTS = (
     "pyyaml",
 )
 
+PARENT_ENVIRONMENT_SCRIPT = ".devcontainer/parent-environment.sh"
+PARENT_ENVIRONMENT_MANIFEST = ".devcontainer/parent-environment.toml"
+ENVIRONMENT_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -80,6 +85,7 @@ class PackConfig:
     context: str
     image_tag: str
     target: str | None
+    shell: str
     workdir: str
     workspace_mount: str
 
@@ -219,6 +225,10 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             findings.append(finding)
     workdir = runtime.get("workdir", "/workspace")
     workspace_mount = runtime.get("workspace_mount", "/workspace")
+    shell = runtime.get("shell", "/bin/bash")
+    if not isinstance(shell, str) or not shell:
+        findings.append(Finding("invalid_manifest", source, "runtime.shell-must-be-string"))
+        shell = "/bin/bash"
     if not isinstance(workdir, str):
         findings.append(Finding("invalid_manifest", source, "runtime.workdir-must-be-string"))
         workdir = ""
@@ -240,6 +250,7 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             context=context,
             image_tag=image_tag,
             target=target,
+            shell=shell,
             workdir=workdir,
             workspace_mount=workspace_mount,
         ),
@@ -390,9 +401,100 @@ def validate_generate_runtime_compose_script(root: Path) -> list[Finding]:
     return []
 
 
+def parse_parent_environment_exports(path: Path) -> tuple[tuple[str, ...], list[str]]:
+    """Parse allowed parent-environment export lines without executing shell."""
+    names: list[str] = []
+    findings: list[str] = []
+    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            tokens = shlex.split(line, comments=True, posix=True)
+        except ValueError:
+            findings.append(f"invalid-export-line:{line_number}")
+            continue
+        if len(tokens) != 2 or tokens[0] != "export":
+            findings.append(f"invalid-export-line:{line_number}")
+            continue
+        name, separator, _value = tokens[1].partition("=")
+        if not separator or ENVIRONMENT_NAME_RE.fullmatch(name) is None:
+            findings.append(f"invalid-export-line:{line_number}")
+            continue
+        if name in names:
+            findings.append(f"duplicate-export:{name}")
+            continue
+        names.append(name)
+    return tuple(names), findings
+
+
+def parse_parent_environment_manifest(path: Path) -> tuple[tuple[str, ...], list[str]]:
+    """Read the ordered parent-environment variable-name manifest."""
+    try:
+        with path.open("rb") as handle:
+            data = tomllib.load(handle)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        return (), [f"toml-decode:{exc}"]
+    if set(data) != {"variables"}:
+        return (), ["toml-keys-must-be-variables-only"]
+    variables = data.get("variables")
+    if not isinstance(variables, list) or not all(
+        isinstance(item, str) for item in variables
+    ):
+        return (), ["variables-must-be-string-list"]
+    names = cast(list[str], variables)
+    findings: list[str] = []
+    seen: set[str] = set()
+    for name in names:
+        if ENVIRONMENT_NAME_RE.fullmatch(name) is None:
+            findings.append(f"invalid-variable-name:{name}")
+        elif name in seen:
+            findings.append(f"duplicate-variable:{name}")
+        seen.add(name)
+    return tuple(names), findings
+
+
+def validate_parent_environment(root: Path) -> list[Finding]:
+    """Validate parent environment sources and their ordered-name agreement."""
+    if not (root / "vendor" / "agent-canon").is_dir():
+        return []
+    findings: list[Finding] = []
+    script_path = root / PARENT_ENVIRONMENT_SCRIPT
+    manifest_path = root / PARENT_ENVIRONMENT_MANIFEST
+    for path, relative in (
+        (script_path, PARENT_ENVIRONMENT_SCRIPT),
+        (manifest_path, PARENT_ENVIRONMENT_MANIFEST),
+    ):
+        if not path.is_file():
+            findings.append(Finding("missing_file", relative, "missing"))
+        elif path.is_symlink():
+            findings.append(Finding("inconsistency", relative, "must-be-regular-file"))
+    if findings:
+        return findings
+
+    export_names, export_findings = parse_parent_environment_exports(script_path)
+    findings.extend(
+        Finding("invalid_manifest", PARENT_ENVIRONMENT_SCRIPT, detail)
+        for detail in export_findings
+    )
+    manifest_names, manifest_findings = parse_parent_environment_manifest(manifest_path)
+    findings.extend(
+        Finding("invalid_manifest", PARENT_ENVIRONMENT_MANIFEST, detail)
+        for detail in manifest_findings
+    )
+    if not export_findings and not manifest_findings and export_names != manifest_names:
+        findings.append(
+            Finding(
+                "inconsistency",
+                PARENT_ENVIRONMENT_MANIFEST,
+                f"ordered-variable-names-mismatch:manifest={list(manifest_names)}:exports={list(export_names)}",
+            )
+        )
+    return findings
+
+
 def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Finding]:
     """Validate generated Compose meaning rather than generator implementation text."""
-    del pack
     if (root / "vendor" / "agent-canon").is_dir():
         compose_path = root / ".agent-canon" / "docker-compose.generated.yml"
         relative = ".agent-canon/docker-compose.generated.yml"
@@ -446,6 +548,14 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
             return source, target
         return None, None
 
+    def volume_is_read_only(raw_volume: object) -> bool:
+        volume = as_mapping(raw_volume)
+        if volume is not None:
+            return volume.get("read_only") is True
+        if isinstance(raw_volume, str):
+            return raw_volume.rsplit(":", 1)[-1] == "ro"
+        return False
+
     def source_path(source: str | None) -> Path | None:
         if not source:
             return None
@@ -465,10 +575,73 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         source, target = volume_fields(raw_volume)
         if source_path(source) == root or target == repo_target:
             findings.append(Finding("dependency_contract_violation", relative, "repository-double-mount"))
+    parent_layout = (root / "vendor" / "agent-canon").is_dir()
+    if parent_layout:
+        required_mounts = (
+            "/etc/project-template/parent-environment.sh",
+            "/etc/project-template/zsh/.zshrc",
+        )
+        for target in required_mounts:
+            matches = [
+                raw_volume
+                for raw_volume in volumes
+                if volume_fields(raw_volume)[1] == target
+            ]
+            if len(matches) != 1:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"parent-environment-mount-required:{target}",
+                    )
+                )
+            elif not volume_is_read_only(matches[0]):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"parent-environment-mount-read-only:{target}",
+                    )
+                )
+        tmpfs = as_sequence(service.get("tmpfs"))
+        tmpfs_targets = set()
+        if tmpfs is not None:
+            for item in tmpfs:
+                if isinstance(item, str):
+                    tmpfs_targets.add(item.split(":", 1)[0])
+                else:
+                    item_mapping = as_mapping(item)
+                    if item_mapping is not None and isinstance(item_mapping.get("target"), str):
+                        tmpfs_targets.add(item_mapping["target"])
+        if "/tmp/project-template-home" not in tmpfs_targets:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "mapped-uid-home-tmpfs-required",
+                )
+            )
+        expected_shell = pack.shell if pack is not None else "/bin/bash"
+        if service.get("command") != f'{expected_shell} -lc "sleep infinity"':
+            findings.append(
+                Finding(
+                    "inconsistency",
+                    relative,
+                    f"runtime-shell-command:{expected_shell}",
+                )
+            )
     required_environment = {
         "AGENT_CANON_WORKSPACE_ROOT": "/workspace",
         "AGENT_CANON_REPOSITORY_ROOT": repo_target,
     }
+    if parent_layout:
+        required_environment.update(
+            {
+                "HOME": "/tmp/project-template-home",
+                "ZDOTDIR": "/etc/project-template/zsh",
+                "SHELL": pack.shell if pack is not None else "/bin/bash",
+            }
+        )
     environment = as_mapping(service.get("environment"))
     if environment is None:
         for name in required_environment:
@@ -491,6 +664,20 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 )
             elif environment.get(name) != expected:
                 findings.append(Finding("inconsistency", relative, f"{name.lower()}-env"))
+        if parent_layout:
+            manifest_names, manifest_findings = parse_parent_environment_manifest(
+                root / PARENT_ENVIRONMENT_MANIFEST
+            )
+            if not manifest_findings:
+                for name in manifest_names:
+                    if name in environment:
+                        findings.append(
+                            Finding(
+                                "dependency_contract_violation",
+                                relative,
+                                f"parent-variable-in-compose:{name}",
+                            )
+                        )
     return findings
 
 
@@ -500,6 +687,7 @@ def validate_devcontainer(root: Path) -> list[Finding]:
     if not devcontainer_dir.exists():
         return []
     findings: list[Finding] = []
+    findings.extend(validate_parent_environment(root))
     json_path = devcontainer_dir / "devcontainer.json"
     if not json_path.is_file():
         return [Finding("missing_file", ".devcontainer/devcontainer.json", "missing")]

@@ -41,6 +41,12 @@ def write_file(root: Path, relative: str, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def write_host_zshrc(home: Path, content: str = "# fixture zshrc\n") -> None:
+    """Write the explicit host zshrc premise used by generator tests."""
+    home.mkdir(parents=True, exist_ok=True)
+    (home / ".zshrc").write_text(content, encoding="utf-8")
+
+
 def write_devcontainer(root: Path) -> None:
     """Write only the observable devcontainer entrypoint surface."""
     write_file(
@@ -249,7 +255,7 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     )
     (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
     home = tmp_path / "home"
-    home.mkdir()
+    write_host_zshrc(home)
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
@@ -280,7 +286,7 @@ def test_generator_accepts_explicit_output_path(tmp_path: Path) -> None:
     (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
     home = tmp_path / "home"
     output_path = repo / ".devcontainer/custom-compose.generated.yml"
-    home.mkdir()
+    write_host_zshrc(home)
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
@@ -337,7 +343,7 @@ def test_generator_rejects_legacy_topic_root(tmp_path: Path) -> None:
     )
     (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
     home = tmp_path / "home"
-    home.mkdir()
+    write_host_zshrc(home)
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
@@ -349,6 +355,156 @@ def test_generator_rejects_legacy_topic_root(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "legacy workspace-<topic-slug> root" in result.stderr
+
+
+def write_parent_generator_fixture(
+    tmp_path: Path,
+    *,
+    runtime_shell: str = "/bin/zsh",
+    environment_script: str = "",
+    environment_variables: tuple[str, ...] = (),
+) -> Path:
+    """Create a parent-shaped generator fixture with the zsh contract inputs."""
+    repo = tmp_path / "workspace" / "topic" / "parent"
+    write_file(repo, ".devcontainer/generate-runtime-compose.sh", GENERATOR.read_text(encoding="utf-8"))
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    write_file(repo, ".devcontainer/parent-environment.sh", environment_script)
+    variables = ", ".join(json.dumps(item) for item in environment_variables)
+    write_file(
+        repo,
+        ".devcontainer/parent-environment.toml",
+        f"variables = [{variables}]\n",
+    )
+    write_file(repo, "vendor/agent-canon/.keep", "\n")
+    write_file(
+        repo,
+        "docker/packs/default.toml",
+        "\n".join(
+            [
+                "[pack]",
+                'name = "parent"',
+                'dockerfile = "docker/Dockerfile"',
+                'context = "."',
+                'image_tag = "parent:fixture"',
+                "",
+                "[smoke]",
+                'shell = "/bin/bash"',
+                "commands = []",
+                "",
+                "[runtime]",
+                f'shell = "{runtime_shell}"',
+                'workdir = "/workspace"',
+                'workspace_mount = "/workspace"',
+                "",
+            ]
+        ),
+    )
+    write_file(repo, "docker/Dockerfile", "FROM scratch\n")
+    return repo
+
+
+def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> None:
+    """Parent generation uses pack shell, read-only sources, and mapped HOME tmpfs."""
+    repo = write_parent_generator_fixture(
+        tmp_path,
+        environment_script='export PROJECT_REGION="tokyo"\n',
+        environment_variables=("PROJECT_REGION",),
+    )
+    (repo / ".agent-canon").mkdir()
+    home = tmp_path / "home"
+    write_host_zshrc(home)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".agent-canon/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert 'target: "/etc/project-template/parent-environment.sh"' in compose
+    assert 'target: "/etc/project-template/zsh/.zshrc"' in compose
+    assert compose.count("read_only: true") >= 2
+    assert 'HOME: "/tmp/project-template-home"' in compose
+    assert 'ZDOTDIR: "/etc/project-template/zsh"' in compose
+    assert 'SHELL: "/bin/zsh"' in compose
+    assert "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700" in compose
+    assert 'command: /bin/zsh -lc "sleep infinity"' in compose
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(
+        repo, repo / "docker/packs/default.toml"
+    )
+    assert pack_findings == []
+    assert pack is not None
+    assert module.validate_generated_compose(repo, pack) == []
+
+
+def test_parent_generator_requires_regular_host_zshrc(tmp_path: Path) -> None:
+    """The generator fails when the explicit host zshrc premise is absent or non-regular."""
+    repo = write_parent_generator_fixture(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "HOME": str(home)},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "regular host zshrc source" in result.stderr
+
+    target = tmp_path / "real-zshrc"
+    target.write_text("# target\n", encoding="utf-8")
+    (home / ".zshrc").symlink_to(target)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "HOME": str(home)},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "regular host zshrc source" in result.stderr
+
+
+def test_parent_environment_validator_is_static_and_ordered(tmp_path: Path) -> None:
+    """Parent environment validation never executes shell lines and preserves order."""
+    module = load_container_config_module()
+    (tmp_path / "vendor" / "agent-canon").mkdir(parents=True)
+    write_file(
+        tmp_path,
+        ".devcontainer/parent-environment.sh",
+        'export PROJECT_REGION="tokyo"\nexport PROJECT_TOKEN=value\n',
+    )
+    write_file(
+        tmp_path,
+        ".devcontainer/parent-environment.toml",
+        'variables = ["PROJECT_REGION", "PROJECT_TOKEN"]\n',
+    )
+    assert module.validate_parent_environment(tmp_path) == []
+
+    marker = tmp_path / "executed"
+    write_file(
+        tmp_path,
+        ".devcontainer/parent-environment.sh",
+        f"touch {marker}\n",
+    )
+    findings = module.validate_parent_environment(tmp_path)
+    assert not marker.exists()
+    assert any("invalid-export-line" in finding.detail for finding in findings)
 
 
 def test_source_vscode_surface_and_shared_files_pass(tmp_path: Path) -> None:

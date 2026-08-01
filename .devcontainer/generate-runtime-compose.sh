@@ -74,6 +74,7 @@ with open(sys.argv[1], "rb") as handle:
 pack = data["pack"]
 runtime = data.get("runtime", {})
 print(f"dockerfile={pack['dockerfile']}")
+print(f"runtime_shell={runtime.get('shell', '/bin/bash')}")
 print(f"workdir={runtime.get('workdir', '/workspace')}")
 print(f"workspace_mount={runtime.get('workspace_mount', '/workspace')}")
 for mount in runtime.get("mounts", []):
@@ -87,6 +88,7 @@ PY
 
   compose_mode="repo-docker-pack"
   dockerfile=""
+  runtime_shell="/bin/bash"
   workdir="/workspace"
   workspace_mount="/workspace"
   pack_mounts=()
@@ -94,6 +96,7 @@ PY
   for pack_value in "${pack_values[@]}"; do
     case "$pack_value" in
       dockerfile=*) dockerfile="${pack_value#dockerfile=}" ;;
+      runtime_shell=*) runtime_shell="${pack_value#runtime_shell=}" ;;
       workdir=*) workdir="${pack_value#workdir=}" ;;
       workspace_mount=*) workspace_mount="${pack_value#workspace_mount=}" ;;
       mount=*) pack_mounts+=("${pack_value#mount=}") ;;
@@ -103,10 +106,25 @@ PY
 else
   compose_mode="agent-canon-source-only"
   dockerfile=""
+  runtime_shell="/bin/bash"
   workdir="/workspace"
   workspace_mount="/workspace"
   pack_mounts=()
   pack_environment_lines=()
+fi
+
+parent_environment_source="${repo_root}/.devcontainer/parent-environment.sh"
+if [ -d "${repo_root}/vendor/agent-canon" ]; then
+  if [ ! -f "$parent_environment_source" ] || [ -L "$parent_environment_source" ]; then
+    printf 'devcontainer parent environment source must be a regular file: %s\n' "$parent_environment_source" >&2
+    exit 1
+  fi
+fi
+
+host_zshrc="${HOME}/.zshrc"
+if [ ! -f "$host_zshrc" ] || [ -L "$host_zshrc" ]; then
+  printf 'devcontainer requires a regular host zshrc source: %s\n' "$host_zshrc" >&2
+  exit 1
 fi
 
 workspace_root_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$workspace_root")"
@@ -120,6 +138,22 @@ volume_lines+=(
   "        source: /var/lib/agent-canon/runtime"
   "        target: /var/lib/agent-canon/runtime"
 )
+host_zshrc_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$host_zshrc")"
+volume_lines+=(
+  "      - type: bind"
+  "        source: ${host_zshrc_yaml}"
+  '        target: "/etc/project-template/zsh/.zshrc"'
+  "        read_only: true"
+)
+if [ -f "$parent_environment_source" ]; then
+  parent_environment_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$parent_environment_source")"
+  volume_lines+=(
+    "      - type: bind"
+    "        source: ${parent_environment_source_yaml}"
+    '        target: "/etc/project-template/parent-environment.sh"'
+    "        read_only: true"
+  )
+fi
 for pack_mount in "${pack_mounts[@]}"; do
   case "$pack_mount" in
     *:/workspace|*:/workspace:*)
@@ -224,6 +258,9 @@ if [ "$gpu_mode" = "unavailable" ]; then
 fi
 
 environment_lines=(
+  '      HOME: "/tmp/project-template-home"'
+  '      ZDOTDIR: "/etc/project-template/zsh"'
+  "      SHELL: \"${runtime_shell}\""
   "      DEVCONTAINER_RUNTIME_MODE: \"${compose_mode}\""
   "      DEVCONTAINER_GPU_MODE: \"${gpu_mode}\""
   "      DEVCONTAINER_GPU_NOTICE: \"${gpu_notice}\""
@@ -262,9 +299,11 @@ fi
     printf '    image: mcr.microsoft.com/devcontainers/base:ubuntu-22.04\n'
   fi
   printf '    working_dir: %s\n' "$container_repo_root"
+  printf '    tmpfs:\n'
+  printf '      - /tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700\n'
   printf '    volumes:\n'
   printf '%s\n' "${volume_lines[@]}"
-  printf '    command: /bin/bash -lc "sleep infinity"\n'
+  printf '    command: %s -lc "sleep infinity"\n' "$runtime_shell"
   printf '    tty: true\n'
   printf '    init: true\n'
   if [ "$gpu_mode" = "enabled" ]; then

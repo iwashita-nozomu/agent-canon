@@ -26,6 +26,8 @@ downstream design ../../README.md AgentCanon source reader route
 - `../repo-structure-contract.toml`: checker が読む path と mode の正本。
 - 各 directory の `README.md` または owner document: その directory 内の子構造と
   個別責務の正本。この README に子構造の説明を複製しない。
+- `CONTAINER_OPERATIONS.md`: 親レポの image、mounted tool、zsh startup、Compose
+  environment の操作正本。
 - 親レポ root の `documents/README.md`: 親レポ固有文書の索引。AgentCanon の
   shared document は `vendor/agent-canon/documents/` を読む。
 
@@ -37,6 +39,8 @@ downstream design ../../README.md AgentCanon source reader route
 ├── README.md                         # parent-owned regular file
 ├── .devcontainer/                    # parent-owned regular directory
 │   ├── devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json
+│   ├── parent-environment.sh         # parent environment value source; initially empty
+│   ├── parent-environment.toml       # ordered variable-name manifest
 │   └── post-create-parent.sh         # parent-specific source
 ├── .gitmodules                       # AgentCanon submodule declaration
 ├── documents/README.md                # parent document index
@@ -86,6 +90,11 @@ Regular surface は親レポが ownership を持ち、親固有の責務や stat
 - `python/`、`src/`、`include/`、`lib/`: 親レポの production implementation。
 - `goal.md`: 親レポ固有の current task state。AgentCanon view に戻さない。
 
+`.devcontainer/parent-environment.sh` は親環境の値の唯一の source、
+`.devcontainer/parent-environment.toml` は ordered variable names のみを持つ
+regular file です。validator は shell を実行せず、許可された export line と TOML
+の順序付き name を完全一致させます。
+
 ## Directory owner document
 
 この README は root の境界だけを定義します。各 directory の子構造、役割、更新
@@ -94,6 +103,7 @@ Regular surface は親レポが ownership を持ち、親固有の責務や stat
 - `AGENTS.md`、`.agents/`、`.codex/`、`agents/`: `AGENTS.md`、
   `agents/README.md`、`agents/canonical/README.md`。
 - `.devcontainer/`: `../design/devcontainer/parent-devcontainer-policy.md`。
+- `documents/parent-repository/`: `CONTAINER_OPERATIONS.md`。
 - `.github/`、`.vscode/`、`tools/`、`vendor/`: `../SHARED_RUNTIME_SURFACES.md`
   と各 directory の README。
 - `documents/`: `../README.md` と `../rule/README.md`。
@@ -123,6 +133,10 @@ AgentCanon の実体パスを直接呼び出します。
   `vendor/agent-canon/.devcontainer/` を直接呼ぶ。
 - `post-create-parent.sh` は shared post-create の成功後に呼ぶ親固有 source とする。
 - Compose の生成物は親の `.agent-canon/docker-compose.generated.yml` に置く。
+- 親の default pack が zsh を選ぶ場合、generator は pack の `runtime.shell` を
+  process boundary とし、host `~/.zshrc` と parent environment script を read-only
+  mount する。host `~/.zshrc` は regular file の明示 premise であり、代替 path は
+  探索しない。
 
 この分離により、shared runtime の更新と親プロジェクトの hook / build 設定を
 別々に review でき、親固有の変更が AgentCanon source の pin を汚染しません。
@@ -157,3 +171,7 @@ python3 vendor/agent-canon/tools/agent_tools/parent_repo_readiness.py \
 path / mode の判定は `repo_structure_contract.py` と surface manifest checker に
 委譲します。README の tree と checker の結果が異なる場合は、まず ownership と
 manifest を確認し、Symlink を実体に置き換えて合わせません。
+
+parent environment の構造 path は必要条件です。readiness や structure checker の
+pass は、Compose の runtime behavior、image-owned zsh startup、または parent value
+の意味が成立したことを単独では証明しません。

@@ -252,6 +252,17 @@ provides = ["trufflehog"]
 failure_policy = "fail"
 
 [[records]]
+id = "pyyaml"
+package = "pyyaml"
+method = "pip-user"
+version = "6.0.2"
+source = "https://pypi.org/project/PyYAML/6.0.2/"
+verification = { kind = "python-distribution", executable = "python3", args = ["-c", "import yaml; print(yaml.__version__)"], output_contains = "6.0.2" }
+deps = ["python3-pip"]
+provides = ["pyyaml"]
+failure_policy = "fail"
+
+[[records]]
 id = "detect-secrets"
 package = "detect-secrets"
 method = "pip-user"

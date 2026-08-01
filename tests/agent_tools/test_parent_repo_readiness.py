@@ -70,6 +70,59 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.assertIn("PARENT_REPO_READINESS=pass", result.stdout)
             self.assertFalse((root / ".codex" / "project-skills").exists())
 
+    def test_parent_environment_names_are_ordered_and_static(self) -> None:
+        """Readiness compares export names without executing the parent script."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_parent_fixture(root)
+            self.write_file(
+                root,
+                ".devcontainer/parent-environment.sh",
+                'export PROJECT_REGION="tokyo"\nexport PROJECT_TOKEN=value\n',
+            )
+            self.write_file(
+                root,
+                ".devcontainer/parent-environment.toml",
+                'variables = ["PROJECT_REGION", "PROJECT_TOKEN"]\n',
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            marker = root / "executed"
+            self.write_file(
+                root,
+                ".devcontainer/parent-environment.sh",
+                f"touch {marker}\n",
+            )
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("invalid-export-line", result.stdout)
+            self.assertFalse(marker.exists())
+
+    def test_parent_environment_order_mismatch_fails(self) -> None:
+        """The ordered TOML names must exactly match export order."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_parent_fixture(root)
+            self.write_file(
+                root,
+                ".devcontainer/parent-environment.sh",
+                "export PROJECT_REGION=tokyo\nexport PROJECT_TOKEN=value\n",
+            )
+            self.write_file(
+                root,
+                ".devcontainer/parent-environment.toml",
+                'variables = ["PROJECT_TOKEN", "PROJECT_REGION"]\n',
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("ordered-variable-names-mismatch", result.stdout)
+
     def test_shared_surface_receipt(self) -> None:
         """The shared devcontainer surface carries both exact identity receipt owners."""
         manifest = load_manifest(
@@ -339,6 +392,8 @@ class ParentRepoReadinessTest(unittest.TestCase):
             )
             + "\n",
             ".devcontainer/post-create-parent.sh": "#!/usr/bin/env bash\nset -euo pipefail\n",
+            ".devcontainer/parent-environment.sh": "",
+            ".devcontainer/parent-environment.toml": "variables = []\n",
         }
         for path, text in files.items():
             self.write_file(root, path, text)
