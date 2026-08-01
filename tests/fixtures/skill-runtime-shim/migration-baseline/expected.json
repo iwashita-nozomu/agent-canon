@@ -481,6 +481,38 @@
       "order": 59,
       "enabled": true,
       "host_config_entry_digest": "71c574ba3e80788dfd5df899f1722608b7ba9306939ddce50ae93f37732f76b7"
+    },
+    {
+      "skill_id": "responsibility-cleanup",
+      "path": "../.agents/skills/responsibility-cleanup/SKILL.md",
+      "index": 60,
+      "order": 60,
+      "enabled": true,
+      "host_config_entry_digest": "491a6e61b2f48de29ca7772b4395f6391534affa3c19bcbf4955e677c66bda16"
+    },
+    {
+      "skill_id": "environment-cleanup",
+      "path": "../.agents/skills/environment-cleanup/SKILL.md",
+      "index": 61,
+      "order": 61,
+      "enabled": true,
+      "host_config_entry_digest": "92079abce1d7ce280c6b6a578324b0f4b886598efc8165382e99be03afba13e9"
+    },
+    {
+      "skill_id": "code-cleanup",
+      "path": "../.agents/skills/code-cleanup/SKILL.md",
+      "index": 62,
+      "order": 62,
+      "enabled": true,
+      "host_config_entry_digest": "965694a921d7f51724efb938d6e228af0ce8fc540d60e04dac3bfedfc250e8fc"
+    },
+    {
+      "skill_id": "skill-cleanup",
+      "path": "../.agents/skills/skill-cleanup/SKILL.md",
+      "index": 63,
+      "order": 63,
+      "enabled": true,
+      "host_config_entry_digest": "d58afb7f316511f560de5f666d7423d0aacaf786e3da422b829e77d04f027654"
     }
   ]
 }

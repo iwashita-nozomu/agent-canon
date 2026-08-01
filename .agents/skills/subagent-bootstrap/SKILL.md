@@ -2,7 +2,7 @@
 name: subagent-bootstrap
 description: "Use when a task needs specialist delegation, run-bundle bootstrap, explicit stage subagents, or Codex implementation routing."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"e03c7daff99431e50b41b701048390daeab361809dea81ec690592b5a612aa15"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"09aa0d34d0466b09ee676243d33bf95d14e407fc38d56b9be6e88b38a6be19aa"} -->
 
 <!--
 @dependency-start

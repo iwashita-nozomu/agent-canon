@@ -133,7 +133,6 @@ skill_dependencies:
     - pr-processing
     - report-writing
     - test-design
-    - refactor-loop
     - comprehensive-development
   python-review:
     responsibility_group: review
@@ -474,13 +473,12 @@ skill_dependencies:
     - dependency-analysis
     - structure-refactor
     - change-review
-    successors: []
+    successors:
+    - change-review
     order_constraints: []
     parallel_independent:
-    - change-review
     - structure-planning
     - structure-refactor
-    - dependency-analysis
     - comprehensive-development
   structure-refactor:
     responsibility_group: analysis
@@ -586,7 +584,6 @@ skill_dependencies:
     parallel_independent:
     - tool-finding-report
     - dependency-module-change
-    - refactor-loop
     - structure-refactor
     - comprehensive-development
   worktree-start:
@@ -785,6 +782,75 @@ skill_dependencies:
     order_constraints: []
     parallel_independent:
     - gpu-execution
+  responsibility-cleanup:
+    responsibility_group: cleanup
+    required_prerequisites:
+    - agent-orchestration
+    - task-routing
+    routing_candidates:
+    - structure-refactor
+    - environment-cleanup
+    - code-cleanup
+    - skill-cleanup
+    - document-canon-cleanup
+    - worktree-health
+    - agent-log-analysis
+    - runtime-log-repair
+    - result-artifact-writeout
+    successors:
+    - structure-refactor
+    - environment-cleanup
+    - code-cleanup
+    - skill-cleanup
+    order_constraints: []
+    parallel_independent: []
+  environment-cleanup:
+    responsibility_group: cleanup
+    required_prerequisites:
+    - responsibility-cleanup
+    - dependency-design
+    routing_candidates:
+    - dependency-design
+    - environment-maintenance
+    successors:
+    - environment-maintenance
+    order_constraints: []
+    parallel_independent:
+    - code-cleanup
+    - skill-cleanup
+  code-cleanup:
+    responsibility_group: cleanup
+    required_prerequisites:
+    - responsibility-cleanup
+    - dependency-analysis
+    routing_candidates:
+    - dependency-analysis
+    - structure-refactor
+    - refactor-loop
+    - change-review
+    successors:
+    - refactor-loop
+    order_constraints: []
+    parallel_independent:
+    - environment-cleanup
+    - skill-cleanup
+  skill-cleanup:
+    responsibility_group: cleanup
+    required_prerequisites:
+    - responsibility-cleanup
+    routing_candidates:
+    - agent-orchestration
+    - task-routing
+    - document-canon-cleanup
+    - worktree-health
+    - agent-log-analysis
+    - runtime-log-repair
+    - result-artifact-writeout
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - environment-cleanup
+    - code-cleanup
   user-preference-sync:
     responsibility_group: runtime
     required_prerequisites: []

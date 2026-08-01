@@ -267,6 +267,22 @@ enabled = true
 path = "../.agents/skills/worktree-start/SKILL.md"
 enabled = true
 
+[[skills.config]]
+path = "../.agents/skills/responsibility-cleanup/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/environment-cleanup/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/code-cleanup/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/skill-cleanup/SKILL.md"
+enabled = true
+
 [agents]
 max_threads = 26
 max_depth = 2
