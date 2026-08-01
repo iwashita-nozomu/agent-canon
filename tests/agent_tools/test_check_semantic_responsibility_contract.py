@@ -71,7 +71,7 @@ def materialize_task_instance(
             'changed_mechanism_ref = ""': 'changed_mechanism_ref = "repo:tools/agent_tools/check_semantic_responsibility_contract.py#symbol:validate_document"',
             'observable_assertion = ""': 'observable_assertion = "valid task instance passes"',
             'decidable_oracle = ""': 'decidable_oracle = "pytest return code"',
-            'removal_witness = ""': 'removal_witness = "repo:tests/agent_tools/test_check_semantic_responsibility_contract.py#symbol:test_rejects_invalid_reference"',
+            'removal_witness = ""': 'removal_witness = "repo:tests/agent_tools/test_check_semantic_responsibility_contract.py#symbol:test_rejects_existing_test_without_removal_witness"',
         }
         for before, after in existing_replacements.items():
             if before not in text:
@@ -128,7 +128,7 @@ def test_rejects_existing_test_without_removal_witness(tmp_path: Path) -> None:
     invalid = tmp_path / "invalid.toml"
     invalid.write_text(
         instance.read_text(encoding="utf-8").replace(
-            'removal_witness = "repo:tests/agent_tools/test_check_semantic_responsibility_contract.py#symbol:test_rejects_invalid_reference"',
+            'removal_witness = "repo:tests/agent_tools/test_check_semantic_responsibility_contract.py#symbol:test_rejects_existing_test_without_removal_witness"',
             'removal_witness = ""',
             1,
         ),
