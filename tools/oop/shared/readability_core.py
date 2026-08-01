@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import fnmatch
 import importlib.util
 import json
 import os
@@ -35,9 +34,27 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
 
+try:
+    from tools.shared.path_filters import is_hidden, path_is_excluded
+except ModuleNotFoundError:
+    for parent in Path(__file__).resolve().parents:
+        if parent.name == "tools":
+            repo_root = parent.parent
+            if str(repo_root) not in sys.path:
+                sys.path.append(str(repo_root))
+            break
+    from tools.shared.path_filters import is_hidden, path_is_excluded
+
 BAD_CLASS_NAME_PARTS = ("Manager", "Helper", "Util", "Thing")
 BAD_SYMBOL_NAME_PARTS = ("helper", "util", "misc", "tmp")
-PRESENTATION_FUNCTION_PARTS = ("format", "render", "stringify", "to_string", "display", "label")
+PRESENTATION_FUNCTION_PARTS = (
+    "format",
+    "render",
+    "stringify",
+    "to_string",
+    "display",
+    "label",
+)
 CPP_LOCAL_MUTATION_METHODS = {
     "append",
     "assign",
@@ -167,9 +184,7 @@ CPP_AGGREGATE_VALUE_OBJECT_NAMES = (
     "two_float",
 )
 CPP_DOMAIN_IDENTITY_FUNCTION_NAMES = {"apply_compile_bindings"}
-CPP_SCALAR_OPERATOR_VALUE_OBJECT_RE = re.compile(
-    r"^(?:bfloat|float|int|uint)\d+x\d+$"
-)
+CPP_SCALAR_OPERATOR_VALUE_OBJECT_RE = re.compile(r"^(?:bfloat|float|int|uint)\d+x\d+$")
 CPP_ABI_FUNCTION_PREFIXES = ("__nad_",)
 CPP_ABI_MARKER_MACROS = (
     "NATIVE_AD_AUGMENT",
@@ -621,7 +636,9 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
     return parser
 
 
-def add_target_arguments(parser: argparse.ArgumentParser, default_language: str) -> None:
+def add_target_arguments(
+    parser: argparse.ArgumentParser, default_language: str
+) -> None:
     """Add source selection and boundary-observation arguments."""
     parser.add_argument("paths", nargs="*", help="Files or directories to analyze.")
     parser.add_argument("--root", default=".", help="Repository root. Defaults to cwd.")
@@ -632,9 +649,12 @@ def add_target_arguments(parser: argparse.ArgumentParser, default_language: str)
         help="Source language to analyze. Language-specific wrappers set this.",
     )
 
+
 def add_report_arguments(parser: argparse.ArgumentParser) -> None:
     """Add output formatting arguments."""
-    parser.add_argument("--format", choices=("text", "json", "markdown"), default="text")
+    parser.add_argument(
+        "--format", choices=("text", "json", "markdown"), default="text"
+    )
     parser.add_argument(
         "--include-snippets",
         action="store_true",
@@ -703,7 +723,9 @@ def add_dependency_context_arguments(parser: argparse.ArgumentParser) -> None:
 
 def add_threshold_arguments(parser: argparse.ArgumentParser) -> None:
     """Add analyzer threshold arguments."""
-    parser.add_argument("--max-public-methods", type=int, default=DEFAULT_MAX_PUBLIC_METHODS)
+    parser.add_argument(
+        "--max-public-methods", type=int, default=DEFAULT_MAX_PUBLIC_METHODS
+    )
     parser.add_argument(
         "--max-instance-attributes",
         type=int,
@@ -715,34 +737,15 @@ def add_threshold_arguments(parser: argparse.ArgumentParser) -> None:
         type=int,
         default=DEFAULT_MAX_COGNITIVE_COMPLEXITY,
     )
-    parser.add_argument("--max-public-fields", type=int, default=DEFAULT_MAX_PUBLIC_FIELDS)
-    parser.add_argument("--max-base-classes", type=int, default=DEFAULT_MAX_BASE_CLASSES)
-    parser.add_argument("--max-module-helpers", type=int, default=DEFAULT_MAX_MODULE_HELPERS)
-
-
-def is_hidden(path: Path) -> bool:
-    """Return true when any path part is hidden."""
-    return any(part.startswith(".") for part in path.parts)
-
-
-def path_is_excluded(relative: Path, exclude_patterns: list[str]) -> bool:
-    """Return true when a root-relative path matches an exclude pattern."""
-    relative_posix = relative.as_posix()
-    for raw_pattern in exclude_patterns:
-        pattern = raw_pattern.strip().strip("/")
-        if not pattern:
-            continue
-        if any(char in pattern for char in "*?[]"):
-            if fnmatch.fnmatch(relative_posix, pattern):
-                return True
-            continue
-        if (
-            relative_posix == pattern
-            or relative_posix.startswith(f"{pattern}/")
-            or pattern in relative.parts
-        ):
-            return True
-    return False
+    parser.add_argument(
+        "--max-public-fields", type=int, default=DEFAULT_MAX_PUBLIC_FIELDS
+    )
+    parser.add_argument(
+        "--max-base-classes", type=int, default=DEFAULT_MAX_BASE_CLASSES
+    )
+    parser.add_argument(
+        "--max-module-helpers", type=int, default=DEFAULT_MAX_MODULE_HELPERS
+    )
 
 
 def is_excluded_path(root: Path, path: Path, exclude_patterns: list[str]) -> bool:
@@ -757,7 +760,9 @@ def is_excluded_path(root: Path, path: Path, exclude_patterns: list[str]) -> boo
         candidates.append(resolved.relative_to(root))
     except ValueError:
         candidates.append(resolved)
-    return any(path_is_excluded(candidate, exclude_patterns) for candidate in candidates)
+    return any(
+        path_is_excluded(candidate, exclude_patterns) for candidate in candidates
+    )
 
 
 def source_targets(root: Path, raw_paths: list[str]) -> list[Path]:
@@ -817,7 +822,9 @@ def iter_source_files(
             files.append(target.resolve())
             continue
         if target.is_dir():
-            files.extend(iter_directory_sources(root, target, exclude_patterns, language))
+            files.extend(
+                iter_directory_sources(root, target, exclude_patterns, language)
+            )
     return sorted(set(files))
 
 
@@ -850,7 +857,9 @@ def python_cognitive_complexity(node: ast.AST) -> int:
     return visit(node, 0)
 
 
-def public_method_nodes(node: ast.ClassDef) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+def public_method_nodes(
+    node: ast.ClassDef,
+) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
     """Return directly declared public Python methods."""
     if is_python_ast_visitor_class(node):
         return [
@@ -915,7 +924,9 @@ def python_parameter_count(node: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
 
 def annotation_missing(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     """Return true when public boundary annotations are incomplete."""
-    args = list(node.args.posonlyargs) + list(node.args.args) + list(node.args.kwonlyargs)
+    args = (
+        list(node.args.posonlyargs) + list(node.args.args) + list(node.args.kwonlyargs)
+    )
     for index, arg in enumerate(args):
         if index == 0 and arg.arg in {"self", "cls"}:
             continue
@@ -941,7 +952,9 @@ def collect_local_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str
     return names
 
 
-def python_all_parameter_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+def python_all_parameter_names(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> set[str]:
     """Return every source-level parameter name including variadic names."""
     parameters = {
         arg.arg
@@ -954,7 +967,9 @@ def python_all_parameter_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> 
     return parameters
 
 
-def collect_target_names(target: ast.AST, parameters: set[str], names: set[str]) -> None:
+def collect_target_names(
+    target: ast.AST, parameters: set[str], names: set[str]
+) -> None:
     """Add names introduced by one assignment target."""
     if isinstance(target, ast.Name) and target.id not in parameters:
         names.add(target.id)
@@ -963,7 +978,9 @@ def collect_target_names(target: ast.AST, parameters: set[str], names: set[str])
             collect_target_names(element, parameters, names)
 
 
-def iter_assignment_targets(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ast.AST]:
+def iter_assignment_targets(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> list[ast.AST]:
     """Return assignment targets that create function-local names."""
     targets: list[ast.AST] = []
     for child in ast.walk(node):
@@ -981,9 +998,7 @@ def assignment_targets_from_node(node: ast.AST) -> list[ast.AST]:
         return [node.target]
     if isinstance(node, (ast.With, ast.AsyncWith)):
         return [
-            item.optional_vars
-            for item in node.items
-            if item.optional_vars is not None
+            item.optional_vars for item in node.items if item.optional_vars is not None
         ]
     return []
 
@@ -1056,14 +1071,19 @@ def none_runtime_checks(node: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
     for child in ast.walk(node):
         if isinstance(child, ast.Compare):
             values = [child.left, *child.comparators]
-            if any(isinstance(value, ast.Constant) and value.value is None for value in values):
+            if any(
+                isinstance(value, ast.Constant) and value.value is None
+                for value in values
+            ):
                 count += 1
     return count
 
 
 def optional_boundary_annotations(node: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
     """Count parameters annotated as Optional or union-with-None."""
-    args = list(node.args.posonlyargs) + list(node.args.args) + list(node.args.kwonlyargs)
+    args = (
+        list(node.args.posonlyargs) + list(node.args.args) + list(node.args.kwonlyargs)
+    )
 
     def is_optional(annotation: ast.AST | None) -> bool:
         if annotation is None:
@@ -1141,12 +1161,17 @@ def is_algorithm_contract_class(node: ast.ClassDef) -> bool:
 
 def is_protocol_class(node: ast.ClassDef) -> bool:
     """Return true for classes whose primary responsibility is a typing Protocol."""
-    return any(base_class_name(base) in {"Protocol", "typing.Protocol"} for base in node.bases)
+    return any(
+        base_class_name(base) in {"Protocol", "typing.Protocol"} for base in node.bases
+    )
 
 
 def is_python_ast_visitor_class(node: ast.ClassDef) -> bool:
     """Return true for Python AST visitor hook classes."""
-    return any(base_class_name(base) in {"NodeVisitor", "ast.NodeVisitor"} for base in node.bases)
+    return any(
+        base_class_name(base) in {"NodeVisitor", "ast.NodeVisitor"}
+        for base in node.bases
+    )
 
 
 def is_test_case_class(path: Path, node: ast.ClassDef) -> bool:
@@ -1212,7 +1237,9 @@ def is_algorithm_contract_factory_method(
     return parent is not None and is_algorithm_contract_class(parent)
 
 
-def python_boundary_parameter_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
+def python_boundary_parameter_names(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> list[str]:
     """Return source-level parameter names, excluding self and cls."""
     args = [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]
     names = [arg.arg for arg in args]
@@ -1223,7 +1250,11 @@ def python_boundary_parameter_names(node: ast.FunctionDef | ast.AsyncFunctionDef
 
 def only_statement(node: ast.FunctionDef | ast.AsyncFunctionDef) -> ast.stmt | None:
     """Return the single meaningful body statement when exactly one exists."""
-    body = [item for item in node.body if not isinstance(item, ast.Expr) or not is_docstring(item)]
+    body = [
+        item
+        for item in node.body
+        if not isinstance(item, ast.Expr) or not is_docstring(item)
+    ]
     if len(body) != 1:
         return None
     return body[0]
@@ -1243,7 +1274,9 @@ def returned_identity_parameter(
 ) -> str | None:
     """Return parameter name when the function only returns that parameter unchanged."""
     statement = only_statement(node)
-    if not isinstance(statement, ast.Return) or not isinstance(statement.value, ast.Name):
+    if not isinstance(statement, ast.Return) or not isinstance(
+        statement.value, ast.Name
+    ):
         return None
     name = statement.value.id
     return name if name in python_boundary_parameter_names(node) else None
@@ -1267,11 +1300,15 @@ def is_passthrough_call(
     if not parameter_names:
         return None
     statement = only_statement(node)
-    if not isinstance(statement, ast.Return) or not isinstance(statement.value, ast.Call):
+    if not isinstance(statement, ast.Return) or not isinstance(
+        statement.value, ast.Call
+    ):
         return None
     call = statement.value
     positional_names = [
-        arg.id for arg in call.args if isinstance(arg, ast.Name) and arg.id in parameter_names
+        arg.id
+        for arg in call.args
+        if isinstance(arg, ast.Name) and arg.id in parameter_names
     ]
     keyword_names = [
         keyword.value.id
@@ -1284,9 +1321,13 @@ def is_passthrough_call(
     return python_call_name(call), len(forwarded)
 
 
-def expression_uses_only_parameters(expression: ast.AST, parameter_names: set[str]) -> bool:
+def expression_uses_only_parameters(
+    expression: ast.AST, parameter_names: set[str]
+) -> bool:
     """Return true when an expression references only function parameters."""
-    seen_names = [node.id for node in ast.walk(expression) if isinstance(node, ast.Name)]
+    seen_names = [
+        node.id for node in ast.walk(expression) if isinstance(node, ast.Name)
+    ]
     return bool(seen_names) and all(name in parameter_names for name in seen_names)
 
 
@@ -1352,7 +1393,9 @@ def analyze_python_file(
 ) -> list[Finding]:
     """Analyze one Python source file."""
     findings: list[Finding] = []
-    context = SourceContext(root=root, path=path, language="python", thresholds=thresholds)
+    context = SourceContext(
+        root=root, path=path, language="python", thresholds=thresholds
+    )
     tree = parse_python_source(context, findings)
     if tree is None:
         return findings
@@ -1363,12 +1406,16 @@ def analyze_python_file(
             analyze_python_class(context, node, findings, usage_index)
             continue
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            module_bucket_count += analyze_python_function(context, node, parents, findings)
+            module_bucket_count += analyze_python_function(
+                context, node, parents, findings
+            )
     add_python_module_bucket_finding(context, module_bucket_count, findings)
     return findings
 
 
-def parse_python_source(context: SourceContext, findings: list[Finding]) -> ast.Module | None:
+def parse_python_source(
+    context: SourceContext, findings: list[Finding]
+) -> ast.Module | None:
     """Parse one Python source file and record syntax errors as findings."""
     text = context.path.read_text(encoding="utf-8")
     try:
@@ -1445,7 +1492,9 @@ def build_python_usage_index(
             if not isinstance(node, ast.ClassDef):
                 continue
             key = f"{module}.{node.name}"
-            class_defs[key] = PythonClassDef(key=key, module=module, name=node.name, path=resolved)
+            class_defs[key] = PythonClassDef(
+                key=key, module=module, name=node.name, path=resolved
+            )
             simple_to_keys.setdefault(node.name, []).append(key)
     unique_name_to_key = {
         name: keys[0] for name, keys in simple_to_keys.items() if len(keys) == 1
@@ -1481,7 +1530,9 @@ def python_usage_source_files(
 ) -> PythonUsageSourceSet:
     """Return Python files used to resolve dependency-source class usage."""
     source_roots: set[Path] = {root.resolve()}
-    selected_python_files = [path.resolve() for path in selected_files if path.suffix in PYTHON_SUFFIXES]
+    selected_python_files = [
+        path.resolve() for path in selected_files if path.suffix in PYTHON_SUFFIXES
+    ]
     root_python_files = iter_directory_sources(
         root,
         root,
@@ -1514,13 +1565,17 @@ def dependency_root_source_set(
         usage_root = root / usage_root
     resolved = usage_root.resolve()
     if resolved.is_file():
-        if not visible_source_path(resolved.parent, resolved, list(exclude_patterns), "python"):
+        if not visible_source_path(
+            resolved.parent, resolved, list(exclude_patterns), "python"
+        ):
             return PythonUsageSourceSet(files=[], source_roots=())
         return PythonUsageSourceSet(files=[resolved], source_roots=(resolved.parent,))
     if not resolved.is_dir():
         return PythonUsageSourceSet(files=[], source_roots=())
     return PythonUsageSourceSet(
-        files=iter_directory_sources(resolved, resolved, list(exclude_patterns), "python"),
+        files=iter_directory_sources(
+            resolved, resolved, list(exclude_patterns), "python"
+        ),
         source_roots=(resolved,),
     )
 
@@ -1534,12 +1589,18 @@ def dependency_module_source_set(
     if spec is None:
         return PythonUsageSourceSet(files=[], source_roots=())
     if spec.submodule_search_locations:
-        package_dirs = [Path(location).resolve() for location in spec.submodule_search_locations]
+        package_dirs = [
+            Path(location).resolve() for location in spec.submodule_search_locations
+        ]
         files: set[Path] = set()
         source_roots: set[Path] = set()
         for package_dir in package_dirs:
             source_roots.add(dependency_package_source_root(package_dir, module_name))
-            files.update(iter_directory_sources(package_dir, package_dir, list(exclude_patterns), "python"))
+            files.update(
+                iter_directory_sources(
+                    package_dir, package_dir, list(exclude_patterns), "python"
+                )
+            )
         return PythonUsageSourceSet(
             files=sorted(files),
             source_roots=tuple(sorted(source_roots, key=str)),
@@ -1550,7 +1611,9 @@ def dependency_module_source_set(
     if module_path.suffix not in PYTHON_SUFFIXES or not module_path.is_file():
         return PythonUsageSourceSet(files=[], source_roots=())
     source_root = dependency_module_source_root(module_path, module_name)
-    if not visible_source_path(source_root, module_path, list(exclude_patterns), "python"):
+    if not visible_source_path(
+        source_root, module_path, list(exclude_patterns), "python"
+    ):
         return PythonUsageSourceSet(files=[], source_roots=())
     return PythonUsageSourceSet(files=[module_path], source_roots=(source_root,))
 
@@ -1636,7 +1699,9 @@ def cpp_usage_source_files(
     usage_roots: Sequence[str] = (),
 ) -> CppUsageSourceSet:
     """Return C++ files used to resolve dependency-source class usage."""
-    selected_cpp_files = [path.resolve() for path in selected_files if path.suffix in CPP_SUFFIXES]
+    selected_cpp_files = [
+        path.resolve() for path in selected_files if path.suffix in CPP_SUFFIXES
+    ]
     root_cpp_files = iter_directory_sources(
         root,
         root,
@@ -1645,7 +1710,9 @@ def cpp_usage_source_files(
     )
     usage_files: set[Path] = set(selected_cpp_files) | set(root_cpp_files)
     for usage_root in usage_roots:
-        usage_files.update(cpp_dependency_root_source_files(root, usage_root, exclude_patterns))
+        usage_files.update(
+            cpp_dependency_root_source_files(root, usage_root, exclude_patterns)
+        )
     return CppUsageSourceSet(files=sorted(usage_files))
 
 
@@ -1660,7 +1727,9 @@ def cpp_dependency_root_source_files(
         usage_root = root / usage_root
     resolved = usage_root.resolve()
     if resolved.is_file():
-        if not visible_source_path(resolved.parent, resolved, list(exclude_patterns), "cpp"):
+        if not visible_source_path(
+            resolved.parent, resolved, list(exclude_patterns), "cpp"
+        ):
             return []
         return [resolved]
     if not resolved.is_dir():
@@ -1834,7 +1903,9 @@ def cpp_constructor_usage_count(analysis_text: str, class_name: str) -> int:
     )
     for match in expression_pattern.finditer(analysis_text):
         prefix = analysis_text[
-            max(0, match.start() - CPP_CONSTRUCTOR_PREFIX_LOOKBACK_CHARS) : match.start()
+            max(
+                0, match.start() - CPP_CONSTRUCTOR_PREFIX_LOOKBACK_CHARS
+            ) : match.start()
         ]
         if re.search(r"(?:class|struct)\s+$", prefix):
             continue
@@ -1999,9 +2070,7 @@ def collect_python_function_class_usage(
         collect_python_annotation_refs(build_context, node.returns, resolver)
     for child in ast.walk(node):
         if isinstance(child, (ast.Assign, ast.AnnAssign)):
-            collect_python_assignment_class_usage(
-                child, resolver, variable_classes
-            )
+            collect_python_assignment_class_usage(child, resolver, variable_classes)
             continue
         if isinstance(child, ast.Call):
             collect_python_call_class_usage(
@@ -2073,7 +2142,9 @@ def collect_python_annotation_refs(
         record_python_class_ref(build_context, key, "annotation_refs")
 
 
-def class_refs_in_annotation(annotation: ast.AST, resolver: PythonClassResolver) -> set[str]:
+def class_refs_in_annotation(
+    annotation: ast.AST, resolver: PythonClassResolver
+) -> set[str]:
     """Return known project class references contained in an annotation-like expression."""
     refs: set[str] = set()
     resolved = resolver.resolve_expr(annotation)
@@ -2097,7 +2168,9 @@ def record_python_class_ref(
     usage.mark_source(build_context.root, build_context.path)
 
 
-def static_method_nodes(node: ast.ClassDef) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+def static_method_nodes(
+    node: ast.ClassDef,
+) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
     """Return direct static methods declared on a Python class."""
     return [
         item
@@ -2109,7 +2182,9 @@ def static_method_nodes(node: ast.ClassDef) -> list[ast.FunctionDef | ast.AsyncF
     ]
 
 
-def direct_method_nodes(node: ast.ClassDef) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+def direct_method_nodes(
+    node: ast.ClassDef,
+) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
     """Return directly declared methods, including private and magic methods."""
     return [
         item
@@ -2130,7 +2205,9 @@ def analyze_python_class(
         public_methods=public_method_nodes(node),
         attrs=self_attribute_names(node) | class_field_annotation_names(node),
     )
-    add_python_class_shape_findings(context, node, shape.public_methods, shape.attrs, findings)
+    add_python_class_shape_findings(
+        context, node, shape.public_methods, shape.attrs, findings
+    )
     add_python_class_contract_findings(
         context,
         node,
@@ -2242,7 +2319,11 @@ def add_python_class_contract_findings(
     if is_test_case_class(context.path, node):
         return
     static_methods = static_method_nodes(node)
-    if static_methods and len(static_methods) == len(shape.direct_methods) and not is_algorithm_contract_class(node):
+    if (
+        static_methods
+        and len(static_methods) == len(shape.direct_methods)
+        and not is_algorithm_contract_class(node)
+    ):
         add_finding(
             findings,
             context.root,
@@ -2346,7 +2427,11 @@ def is_redundant_class_shape(
         or node.bases
     ):
         return False
-    if len(shape.direct_methods) == 1 and shape.direct_methods[0].name == "__call__" and not shape.attrs:
+    if (
+        len(shape.direct_methods) == 1
+        and shape.direct_methods[0].name == "__call__"
+        and not shape.attrs
+    ):
         return True
     return len(shape.public_methods) <= 1 and len(shape.attrs) <= 1
 
@@ -2388,7 +2473,9 @@ def analyze_python_function(
     function_shape = python_function_shape(node, parents)
     add_python_function_shape_findings(context, node, function_shape, findings)
     add_python_function_type_findings(context, node, function_shape, findings)
-    add_python_function_effect_findings(context, node, function_shape, parents, findings)
+    add_python_function_effect_findings(
+        context, node, function_shape, parents, findings
+    )
     return add_python_function_bucket_finding(context, node, function_shape, findings)
 
 
@@ -2529,7 +2616,11 @@ def add_python_function_type_findings(
             0,
             "split-input-variants-so-static-analysis-knows-the-shape",
         )
-    if shape.is_public_boundary and shape.none_checks > 0 and shape.optional_annotations > 0:
+    if (
+        shape.is_public_boundary
+        and shape.none_checks > 0
+        and shape.optional_annotations > 0
+    ):
         add_finding(
             findings,
             context.root,
@@ -2545,7 +2636,9 @@ def add_python_function_type_findings(
         )
 
 
-def is_standard_cli_optional_boundary(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+def is_standard_cli_optional_boundary(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> bool:
     """Return true for the standard CLI ``main(argv=None)`` testable entrypoint."""
     return node.name == "main" and "argv" in python_boundary_parameter_names(node)
 
@@ -2609,7 +2702,9 @@ def add_python_redundancy_findings(
             "remove-wrapper-or-document-domain-contract",
         )
     passthrough = is_passthrough_call(node)
-    if passthrough is not None and not is_algorithm_contract_factory_method(node, parents):
+    if passthrough is not None and not is_algorithm_contract_factory_method(
+        node, parents
+    ):
         callee, forwarded_count = passthrough
         add_finding(
             findings,
@@ -2719,7 +2814,7 @@ def cpp_raw_string_literal_end(text: str, start: int) -> int | None:
     delimiter = text[delimiter_start:open_paren]
     if any(char in delimiter for char in "\\ \t\n\r()"):
         return None
-    terminator = f"){delimiter}\""
+    terminator = f'){delimiter}"'
     close = text.find(terminator, open_paren + 1)
     if close == -1:
         return None
@@ -3041,7 +3136,9 @@ def cpp_forwarded_argument_name(argument: str, parameter_names: set[str]) -> str
     argument = argument.strip()
     if argument in parameter_names:
         return argument
-    move_match = re.fullmatch(r"(?:std::)?move\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", argument)
+    move_match = re.fullmatch(
+        r"(?:std::)?move\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", argument
+    )
     if move_match and move_match.group(1) in parameter_names:
         return move_match.group(1)
     forward_match = re.fullmatch(
@@ -3074,7 +3171,8 @@ def cpp_passthrough_call(params: str, body: str) -> tuple[str, int] | None:
     forwarded = [
         forwarded_name
         for argument in arguments
-        if (forwarded_name := cpp_forwarded_argument_name(argument, parameter_set)) is not None
+        if (forwarded_name := cpp_forwarded_argument_name(argument, parameter_set))
+        is not None
     ]
     if len(forwarded) != len(parameter_names) or set(forwarded) != parameter_set:
         return None
@@ -3123,7 +3221,11 @@ def cpp_has_side_effect(params: str, body: str) -> bool:
 
 def cpp_mixed_effect_function(name: str, params: str, body: str) -> bool:
     """Return true when a C++ function returns a value while crossing effects."""
-    return cpp_returns_value(body) and cpp_has_side_effect(params, body) and not is_effect_adapter_name(name)
+    return (
+        cpp_returns_value(body)
+        and cpp_has_side_effect(params, body)
+        and not is_effect_adapter_name(name)
+    )
 
 
 def cpp_trivial_format_function(name: str, body: str) -> str | None:
@@ -3221,7 +3323,9 @@ def cpp_class_shape(
     public_methods = [item for item in public_members if "(" in item and ")" in item]
     public_fields = [item for item in public_members if item not in public_methods]
     name = match.group("name")
-    aggregate_value_object = bool(public_fields) and cpp_aggregate_value_object_name(name)
+    aggregate_value_object = bool(public_fields) and cpp_aggregate_value_object_name(
+        name
+    )
     return CppClassShape(
         name=name,
         line=line_at(analysis_text, match.start()),
@@ -3359,7 +3463,11 @@ def add_cpp_dependency_source_class_findings(
 
 def is_redundant_cpp_class_shape(shape: CppClassShape) -> bool:
     """Return true for C++ classes whose shape needs dependency-source confirmation."""
-    if shape.base_count > 0 or shape.aggregate_value_object or shape.scalar_operator_value_object:
+    if (
+        shape.base_count > 0
+        or shape.aggregate_value_object
+        or shape.scalar_operator_value_object
+    ):
         return False
     return shape.public_methods <= 1 and shape.public_fields <= 1
 
@@ -3700,7 +3808,9 @@ def build_snippet_map(
     for relative_path, lines in by_path.items():
         path = root / relative_path
         try:
-            source_lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+            source_lines = path.read_text(
+                encoding="utf-8", errors="ignore"
+            ).splitlines()
         except OSError:
             continue
         for line_number in lines:
@@ -3728,7 +3838,9 @@ def summarize_findings(
     review_signal_count = decision_counts.get(SIGNAL_CLASS_REVIEW, 0)
     gate_signal_count = decision_counts.get(SIGNAL_CLASS_GATE, 0)
     error_signal_count = decision_counts.get(SIGNAL_CLASS_ERROR, 0)
-    dimension_counts = Counter(finding_facts(finding)["dimension"] for finding in findings)
+    dimension_counts = Counter(
+        finding_facts(finding)["dimension"] for finding in findings
+    )
     solid_signal_counts = Counter(
         principle
         for finding in findings
@@ -3760,9 +3872,9 @@ def summarize_findings(
         "solid_counts": dict(solid_counts),
         "top_files": [
             {"path": path, "findings": count}
-            for path, count in Counter(finding.path for finding in findings).most_common(
-                TOP_FILES_SUMMARY_LIMIT
-            )
+            for path, count in Counter(
+                finding.path for finding in findings
+            ).most_common(TOP_FILES_SUMMARY_LIMIT)
         ],
     }
 
@@ -4079,7 +4191,9 @@ def collect_baseline_findings(
     materialized_relatives = sorted(set(relative_sources) | set(selected_relatives))
     with tempfile.TemporaryDirectory() as tmp_dir:
         baseline_root = Path(tmp_dir)
-        materialize_git_baseline(root, spec.baseline_ref, baseline_root, materialized_relatives)
+        materialize_git_baseline(
+            root, spec.baseline_ref, baseline_root, materialized_relatives
+        )
         baseline_files = [
             (baseline_root / relative).resolve()
             for relative in selected_relatives
@@ -4213,7 +4327,9 @@ def collect_findings(
     )
     for path in files:
         if path.suffix in PYTHON_SUFFIXES:
-            findings.extend(analyze_python_file(root, path, thresholds, python_usage_index))
+            findings.extend(
+                analyze_python_file(root, path, thresholds, python_usage_index)
+            )
         elif path.suffix in CPP_SUFFIXES:
             findings.extend(analyze_cpp_file(root, path, thresholds, cpp_usage_index))
     return findings
@@ -4235,7 +4351,9 @@ def emit_json_report(run: AnalyzerRun, args: argparse.Namespace) -> None:
     finding_payloads = [finding_payload(finding) for finding in run.findings]
     payload: dict[str, object] = {"summary": run.summary, "findings": finding_payloads}
     if args.include_snippets:
-        snippets = build_snippet_map(run.root, run.findings, context=args.snippet_context)
+        snippets = build_snippet_map(
+            run.root, run.findings, context=args.snippet_context
+        )
         for payload_item, finding in zip(finding_payloads, run.findings, strict=True):
             payload_item["snippet"] = snippets.get((finding.path, finding.line), "")
     print(json.dumps(payload, indent=2, sort_keys=True))
@@ -4261,14 +4379,20 @@ def emit_markdown_report(run: AnalyzerRun, args: argparse.Namespace) -> None:
 
 def emit_text_report(run: AnalyzerRun) -> None:
     """Print line-oriented text output."""
-    for finding in sorted(run.findings, key=lambda item: (item.path, item.line, item.kind)):
+    for finding in sorted(
+        run.findings, key=lambda item: (item.path, item.line, item.kind)
+    ):
         print(finding.render())
     print(f"OOP_READABILITY_FILES={len(run.files)}")
     print(f"OOP_READABILITY_FINDINGS={len(run.findings)}")
     print(f"OOP_READABILITY_STATUS_REASON={run.summary['status_reason']}")
-    print(f"OOP_READABILITY_ERROR_SIGNAL_FINDINGS={run.summary['error_signal_findings']}")
+    print(
+        f"OOP_READABILITY_ERROR_SIGNAL_FINDINGS={run.summary['error_signal_findings']}"
+    )
     print(f"OOP_READABILITY_GATE_SIGNAL_FINDINGS={run.summary['gate_signal_findings']}")
-    print(f"OOP_READABILITY_REVIEW_SIGNAL_FINDINGS={run.summary['review_signal_findings']}")
+    print(
+        f"OOP_READABILITY_REVIEW_SIGNAL_FINDINGS={run.summary['review_signal_findings']}"
+    )
     print(
         "OOP_READABILITY_TYPED_BOUNDARY_COUNTS="
         + json.dumps(run.summary["typed_boundary_counts"], sort_keys=True)

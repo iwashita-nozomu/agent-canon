@@ -1220,39 +1220,6 @@ def discover_rollout_context(agent_context_id: str, turn_id: str) -> dict[str, o
     }
 
 
-def _rollout_files_from_root(root: Path) -> tuple[Path, ...]:
-    """Enumerate eligible rollout files for the context-discovery scan."""
-    files: set[Path] = set()
-    try:
-        for year in (
-            path
-            for path in root.iterdir()
-            if path.is_dir() and RUNTIME_EVENT_YEAR.fullmatch(path.name)
-        ):
-            for month in (
-                path
-                for path in year.iterdir()
-                if path.is_dir() and RUNTIME_EVENT_MONTH_DAY.fullmatch(path.name)
-            ):
-                for day in (
-                    path
-                    for path in month.iterdir()
-                    if path.is_dir()
-                    and RUNTIME_EVENT_MONTH_DAY.fullmatch(path.name)
-                ):
-                    for path in day.iterdir():
-                        if not path.is_file():
-                            continue
-                        identity = _rollout_name_identity(path)
-                        if identity is None:
-                            continue
-                        if identity[0] == f"{year.name}-{month.name}-{day.name}":
-                            files.add(path.resolve())
-    except OSError as exc:
-        raise RuntimeEventMaterializationError("source_unavailable", str(exc)) from exc
-    return tuple(sorted(files, key=lambda path: path.as_posix().encode("utf-8")))
-
-
 def discover_rollout_path(selector: RuntimeEventSelector) -> Path:
     """Return the exact rollout path certified by ContextDiscoveryV1."""
     context = discover_rollout_context(selector.agent_context_id, selector.turn_id)
@@ -4640,15 +4607,6 @@ def _fsync_archive_directory(path: Path) -> None:
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
-
-
-def _append_bytes_fsync(path: Path, payload: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("ab") as stream:
-        stream.write(payload)
-        stream.flush()
-        os.fsync(stream.fileno())
-    _fsync_archive_directory(path.parent)
 
 
 def _atomic_write_bytes(path: Path, payload: bytes) -> None:

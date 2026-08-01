@@ -12,10 +12,21 @@ from __future__ import annotations
 
 import argparse
 import ast
-import fnmatch
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+try:
+    from tools.shared.path_filters import path_is_excluded
+except ModuleNotFoundError:
+    for parent in Path(__file__).resolve().parents:
+        if parent.name == "tools":
+            repo_root = parent.parent
+            if str(repo_root) not in sys.path:
+                sys.path.append(str(repo_root))
+            break
+    from tools.shared.path_filters import path_is_excluded
 
 DEFAULT_PATHS = ("python", "tests", "tools", "mcp")
 DEFAULT_EXCLUDES = (
@@ -91,26 +102,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def path_is_excluded(relative: Path, exclude_patterns: list[str]) -> bool:
-    """Return true when a root-relative path matches an exclude pattern."""
-    relative_posix = relative.as_posix()
-    for raw_pattern in exclude_patterns:
-        pattern = raw_pattern.strip().strip("/")
-        if not pattern:
-            continue
-        if any(char in pattern for char in "*?[]"):
-            if fnmatch.fnmatch(relative_posix, pattern):
-                return True
-            continue
-        if (
-            relative_posix == pattern
-            or relative_posix.startswith(f"{pattern}/")
-            or pattern in relative.parts
-        ):
-            return True
-    return False
-
-
 def iter_changed_files(root: Path) -> list[Path]:
     """Return changed Python files relative to HEAD, including untracked files."""
     diff = subprocess.run(
@@ -139,7 +130,9 @@ def iter_python_files(
     changed: bool,
 ) -> list[Path]:
     """Return Python files to scan."""
-    candidates = iter_changed_files(root) if changed else iter_selected_files(root, paths)
+    candidates = (
+        iter_changed_files(root) if changed else iter_selected_files(root, paths)
+    )
     files: list[Path] = []
     for candidate in candidates:
         if candidate.suffix != ".py" or not candidate.is_file():

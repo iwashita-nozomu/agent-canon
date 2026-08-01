@@ -12,10 +12,21 @@ from __future__ import annotations
 
 import argparse
 import ast
-import fnmatch
 import json
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+try:
+    from tools.shared.path_filters import is_hidden, path_is_excluded
+except ModuleNotFoundError:
+    for parent in Path(__file__).resolve().parents:
+        if parent.name == "tools":
+            repo_root = parent.parent
+            if str(repo_root) not in sys.path:
+                sys.path.append(str(repo_root))
+            break
+    from tools.shared.path_filters import is_hidden, path_is_excluded
 
 DEFAULT_PATHS = ("python/jax_util",)
 DEFAULT_EXCLUDES = (
@@ -90,40 +101,17 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def path_is_excluded(relative: Path, exclude_patterns: list[str]) -> bool:
-    """Return true when a root-relative path matches an exclude pattern."""
-    relative_posix = relative.as_posix()
-    for raw_pattern in exclude_patterns:
-        pattern = raw_pattern.strip().strip("/")
-        if not pattern:
-            continue
-        if any(char in pattern for char in "*?[]"):
-            if fnmatch.fnmatch(relative_posix, pattern):
-                return True
-            continue
-        if (
-            relative_posix == pattern
-            or relative_posix.startswith(f"{pattern}/")
-            or pattern in relative.parts
-        ):
-            return True
-    return False
-
-
-def is_hidden(path: Path) -> bool:
-    """Return true when any path part is hidden."""
-    return any(part.startswith(".") for part in path.parts)
-
-
 def iter_python_files(
     root: Path,
     raw_paths: list[str],
     exclude_patterns: list[str],
 ) -> list[Path]:
     """Expand explicit files and directories into Python source files."""
-    targets = [root / raw_path for raw_path in raw_paths] if raw_paths else [
-        root / raw_path for raw_path in DEFAULT_PATHS
-    ]
+    targets = (
+        [root / raw_path for raw_path in raw_paths]
+        if raw_paths
+        else [root / raw_path for raw_path in DEFAULT_PATHS]
+    )
     files: list[Path] = []
     for target in targets:
         if target.is_file() and target.suffix == ".py":
@@ -171,7 +159,9 @@ def keyword_string_value(call: ast.Call, keyword_name: str) -> str | None:
     for keyword in call.keywords:
         if keyword.arg != keyword_name:
             continue
-        if isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
+        if isinstance(keyword.value, ast.Constant) and isinstance(
+            keyword.value.value, str
+        ):
             return keyword.value.value
     return None
 
@@ -258,10 +248,14 @@ def analyze_file(root: Path, path: Path) -> list[Finding]:
                         ),
                     )
                 )
-            if called_name in {"submit", "submit_device"} and keyword_string_value(
-                node,
-                "event",
-            ) == "iter":
+            if (
+                called_name in {"submit", "submit_device"}
+                and keyword_string_value(
+                    node,
+                    "event",
+                )
+                == "iter"
+            ):
                 findings.append(
                     Finding(
                         path=relative,
@@ -275,7 +269,9 @@ def analyze_file(root: Path, path: Path) -> list[Finding]:
                     )
                 )
         elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-            matched_callee = calls_name(getattr(node, "value", None), DIRECT_RUN_LOG_NAMES)
+            matched_callee = calls_name(
+                getattr(node, "value", None), DIRECT_RUN_LOG_NAMES
+            )
             for name in assigned_names(node):
                 if name.endswith(SUMMARY_FIELD_LIST_SUFFIXES):
                     findings.append(
@@ -311,7 +307,9 @@ def collect_findings(root: Path, files: list[Path]) -> list[Finding]:
     findings: list[Finding] = []
     for path in files:
         findings.extend(analyze_file(root, path))
-    return sorted(findings, key=lambda item: (item.path, item.line, item.code, item.symbol))
+    return sorted(
+        findings, key=lambda item: (item.path, item.line, item.code, item.symbol)
+    )
 
 
 def write_json(files: list[Path], findings: list[Finding]) -> None:

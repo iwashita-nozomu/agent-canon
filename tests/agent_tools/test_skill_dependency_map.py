@@ -33,6 +33,7 @@ from skill_dependency_map import (  # noqa: E402
     _json_digest_from_graph,
     _normalize_identifier,
     _resolve_tool_id,
+    _validate_loaded_graph,
     build_graph,
     check_artifacts,
     readback_mermaid,
@@ -52,10 +53,9 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         """All skills, phases, resolved commands, tools, and edge kinds are present."""
         graph = build_graph(PROJECT_ROOT)
         self.assertEqual(graph["schema"], "agent_canon.skill_tool_invocation_graph.v2")
-        self.assertEqual(graph["skill_count"], 60)
-        self.assertEqual(len(graph["skills"]), 60)
-        self.assertEqual(len(graph["phases"]), 180)
-        self.assertEqual(len(graph["commands"]), 387)
+        self.assertEqual(graph["skill_count"], len(graph["skills"]))
+        self.assertEqual(len(graph["phases"]), graph["skill_count"] * 3)
+        self.assertGreater(len(graph["commands"]), graph["skill_count"])
         self.assertGreater(len(graph["tools"]), 0)
         correspondence = graph["design_correspondence"]
         self.assertEqual(len(correspondence["clause_ids"]), 15)
@@ -113,8 +113,8 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         graph = build_graph(PROJECT_ROOT)
         records = {record["id"]: record for record in graph["identity_records"]}
         command_projections = graph["commands"]
-        self.assertEqual(len(command_projections), 387)
         resolution = resolve_agent_canon_source_root(PROJECT_ROOT)
+        expected_command_count = 0
         for skill in (item["display_label"] for item in graph["skills"]):
             packet = packet_for_skill(resolution, skill)
             for phase, rows in (
@@ -122,6 +122,7 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                 ("conditional", packet.resolved_conditional_commands),
                 ("maintenance", packet.resolved_maintenance_commands),
             ):
+                expected_command_count += len(rows)
                 for index, row in enumerate(rows):
                     projection = next(
                         item
@@ -136,6 +137,7 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                     self.assertEqual(
                         records[projection["ref"]["id"]]["kind"], "command"
                     )
+        self.assertEqual(len(command_projections), expected_command_count)
 
     def test_invocation_order_is_derived_and_command_order_is_immutable(self) -> None:
         """Ordinals follow the existing order function and #461 report order."""
@@ -336,10 +338,8 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         changed["artifact_id"] = "edited"
         self.assertNotEqual(_json_digest_from_graph(changed), baseline)
 
-    def test_checker_rejects_stale_json_mermaid_and_dependency_design_omission(
-        self,
-    ) -> None:
-        """Edited machine or Mermaid artifacts and an omitted dependency skill fail closed."""
+    def test_checker_rejects_stale_mermaid(self) -> None:
+        """Edited Mermaid artifacts fail closed."""
         check_artifacts(PROJECT_ROOT)
         markdown_path = PROJECT_ROOT / "documents/runtime/skill-dependency-graph.md"
         json_path = PROJECT_ROOT / "documents/runtime/skill-dependency-graph.json"
@@ -352,22 +352,22 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "stale_artifact"):
                 check_artifacts(PROJECT_ROOT)
-            markdown_path.write_text(original_markdown, encoding="utf-8")
-            machine = json.loads(original_json)
-            machine["skills"] = [
-                item
-                for item in machine["skills"]
-                if item["ref"]["id"] != "skill:dependency-design"
-            ]
-            json_path.write_text(
-                json.dumps(machine, ensure_ascii=False, separators=(",", ":")),
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(ValueError, "dependency-design:omission"):
-                check_artifacts(PROJECT_ROOT)
         finally:
             markdown_path.write_text(original_markdown, encoding="utf-8")
             json_path.write_text(original_json, encoding="utf-8")
+
+    def test_matching_count_rejects_dependency_design_omission(self) -> None:
+        """A count-matching machine graph still requires dependency-design identity."""
+        machine = copy.deepcopy(build_graph(PROJECT_ROOT))
+        machine["skills"] = [
+            item
+            for item in machine["skills"]
+            if item["ref"]["id"] != "skill:dependency-design"
+        ]
+        machine["skill_count"] = len(machine["skills"])
+        machine["json_digest"] = _json_digest_from_graph(machine)
+        with self.assertRaisesRegex(ValueError, "dependency-design:omission"):
+            _validate_loaded_graph(machine)
 
 
 if __name__ == "__main__":

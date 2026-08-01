@@ -12,8 +12,20 @@ from __future__ import annotations
 
 import argparse
 import ast
+import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+try:
+    from tools.shared.path_filters import is_hidden
+except ModuleNotFoundError:
+    for parent in Path(__file__).resolve().parents:
+        if parent.name == "tools":
+            repo_root = parent.parent
+            if str(repo_root) not in sys.path:
+                sys.path.append(str(repo_root))
+            break
+    from tools.shared.path_filters import is_hidden
 
 DEFAULT_MAX_FUNCTION_LINES = 80
 DEFAULT_MAX_CLASS_LINES = 220
@@ -86,11 +98,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def is_hidden(path: Path) -> bool:
-    """Return true when any path part is hidden."""
-    return any(part.startswith(".") for part in path.parts)
-
-
 def iter_python_files(root: Path, raw_paths: list[str]) -> list[Path]:
     """Expand file and directory arguments into Python source files."""
     targets = [root / raw_path for raw_path in raw_paths] if raw_paths else [root]
@@ -122,10 +129,9 @@ def public_method_count(node: ast.ClassDef) -> int:
     """Count public methods declared directly on a class."""
     count = 0
     for item in node.body:
-        if (
-            isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and not item.name.startswith("_")
-        ):
+        if isinstance(
+            item, (ast.FunctionDef, ast.AsyncFunctionDef)
+        ) and not item.name.startswith("_"):
             count += 1
     return count
 
@@ -137,7 +143,9 @@ def analyze_file(path: Path, thresholds: Thresholds) -> list[Violation]:
     line_count = len(text.splitlines())
     if line_count > thresholds.max_file_lines:
         violations.append(
-            Violation(path, 1, "file_lines", path.name, line_count, thresholds.max_file_lines)
+            Violation(
+                path, 1, "file_lines", path.name, line_count, thresholds.max_file_lines
+            )
         )
 
     tree = ast.parse(text, filename=str(path))
@@ -208,7 +216,9 @@ def main() -> int:
         violations.extend(analyze_file(path, thresholds))
 
     final_score = score(files, violations)
-    for violation in sorted(violations, key=lambda item: (item.path, item.line, item.kind)):
+    for violation in sorted(
+        violations, key=lambda item: (item.path, item.line, item.kind)
+    ):
         print(violation.render(root))
     print(f"REFACTOR_SURFACE_FILES={len(files)}")
     print(f"REFACTOR_SURFACE_VIOLATIONS={len(violations)}")

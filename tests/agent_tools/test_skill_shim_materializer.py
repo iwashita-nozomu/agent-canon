@@ -2,7 +2,7 @@
 
 # @dependency-start
 # contract test
-# responsibility Verifies 60-row materializer fixed-point and readback evidence.
+# responsibility Verifies catalog-derived materializer fixed-point and readback evidence.
 # upstream design ../../documents/design/skill-runtime-shim-materialization.md approved materializer contract
 # upstream implementation ../../tools/agent_tools/skill_shim_materializer.py single shim writer
 # downstream implementation ../../tests/fixtures/skill-runtime-shim/fixed-point/expected.json fixed-point oracle
@@ -54,8 +54,10 @@ class SkillShimMaterializerTest(unittest.TestCase):
         self.assertTrue(actual["equal_record_digests"])
         self.assertTrue(actual["equal_projection_digests"])
         self.assertTrue(actual["equal_readback_digest"])
-        self.assertEqual(len(actual["first_run"]["record_digests"]), 60)
-        self.assertEqual(len(actual["first_run"]["projection_digests"]), 60)
+        self.assertEqual(
+            len(actual["first_run"]["record_digests"]),
+            len(actual["first_run"]["projection_digests"]),
+        )
         self.assertEqual(actual["status"], "pass")
 
     def test_materialization_record_digest_is_read_back_from_generated_bytes(self) -> None:

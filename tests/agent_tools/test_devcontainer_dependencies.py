@@ -31,6 +31,7 @@ from tools.agent_tools.devcontainer_dependencies import (
     ManifestRole,
     ManifestSource,
     build_plan,
+    EnvironmentBoundaryModel,
     load_plan,
     manifest_sources,
     parse_record,
@@ -127,9 +128,11 @@ def render_toml(value: object) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, dict):
-        return "{ " + ", ".join(
-            f"{key} = {render_toml(item)}" for key, item in value.items()
-        ) + " }"
+        return (
+            "{ "
+            + ", ".join(f"{key} = {render_toml(item)}" for key, item in value.items())
+            + " }"
+        )
     if isinstance(value, list):
         return "[" + ", ".join(render_toml(item) for item in value) + "]"
     return json.dumps(value)
@@ -137,7 +140,11 @@ def render_toml(value: object) -> str:
 
 def write_manifest(path: Path, records: list[dict[str, Any]]) -> None:
     """Write a small TOML fixture without depending on a TOML writer."""
-    lines = ['schema = "agent-canon.devcontainer-dependencies"', "schema_version = 2", ""]
+    lines = [
+        'schema = "agent-canon.devcontainer-dependencies"',
+        "schema_version = 2",
+        "",
+    ]
     if records:
         for item in records:
             lines.append("[[records]]")
@@ -148,6 +155,70 @@ def write_manifest(path: Path, records: list[dict[str, Any]]) -> None:
         lines.append("records = []")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def hash_requirement(
+    name: str,
+    version: str,
+    hashes: Sequence[str],
+    *,
+    marker: str | None = None,
+) -> str:
+    """Build one pip-compile requirement record for boundary fixtures."""
+    backslash = chr(92)
+    marker_text = f"; {marker}" if marker is not None else ""
+    lines = [f"{name}=={version}{marker_text} {backslash}"]
+    for index, digest in enumerate(hashes):
+        continuation = f" {backslash}" if index < len(hashes) - 1 else ""
+        lines.append(f"    --hash=sha256:{digest}{continuation}")
+    return "\n".join(lines) + "\n"
+
+
+def write_boundary_fixture(
+    root: Path,
+    requirements: str,
+) -> tuple[EnvironmentBoundaryModel, Path]:
+    """Build a valid parent boundary fixture with supplied requirements."""
+    vendor_root = root / "vendor" / "agent-canon"
+    vendor_root.parent.mkdir(parents=True, exist_ok=True)
+    vendor_root.symlink_to(ROOT, target_is_directory=True)
+
+    def write_file(relative: str, content: str, *, executable: bool = False) -> Path:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        if executable:
+            path.chmod(0o755)
+        return path
+
+    write_file("README.md", "# fixture\n")
+    write_file("docker/README.md", "# fixture\n")
+    write_file(
+        "docker/Dockerfile",
+        "FROM python:3.11\n"
+        "RUN apt-get install -y rsync openssh-client graphviz python3.11-venv\n",
+    )
+    requirements_path = write_file("docker/requirements.txt", requirements)
+    write_file(
+        "docker/install_python_dependencies.sh",
+        "python3 -m pip install -r docker/requirements.txt\n",
+        executable=True,
+    )
+    write_file("pyproject.toml", "[build-system]\n")
+    write_file(".dockerignore", "vendor/agent-canon\n.git\n.state\n")
+    write_file(".gitignore", ".venv/\nvenv/\n")
+    write_file(
+        ".devcontainer/devcontainer.json",
+        '{"postCreateCommand": "vendor/agent-canon/.devcontainer/post-create.sh '
+        'post-create-parent.sh"}\n',
+    )
+    write_file(".devcontainer/post-create-parent.sh", "#!/bin/sh\n", executable=True)
+    write_file(
+        ".devcontainer/dependencies.toml",
+        'schema = "agent-canon.devcontainer-dependencies"\n'
+        "schema_version = 2\nrecords = []\n",
+    )
+    return EnvironmentBoundaryModel(root, vendor_root), requirements_path
 
 
 def loaded_manifest(
@@ -258,7 +329,9 @@ class DependencyModelTests(unittest.TestCase):
                 loaded_manifest(
                     Path("parent.toml"),
                     (
-                        parse_record(record("parent"), path=Path("parent.toml"), index=0),
+                        parse_record(
+                            record("parent"), path=Path("parent.toml"), index=0
+                        ),
                     ),
                     role=ManifestRole.PARENT_OVERLAY,
                 ),
@@ -504,11 +577,23 @@ class DependencyModelTests(unittest.TestCase):
                 (
                     loaded_manifest(
                         Path("a.toml"),
-                        (parse_record(record("a", provides=["same"]), path=Path("a.toml"), index=0),),
+                        (
+                            parse_record(
+                                record("a", provides=["same"]),
+                                path=Path("a.toml"),
+                                index=0,
+                            ),
+                        ),
                     ),
                     loaded_manifest(
                         Path("b.toml"),
-                        (parse_record(record("b", provides=["same"]), path=Path("b.toml"), index=0),),
+                        (
+                            parse_record(
+                                record("b", provides=["same"]),
+                                path=Path("b.toml"),
+                                index=0,
+                            ),
+                        ),
                     ),
                 )
             )
@@ -517,12 +602,22 @@ class DependencyModelTests(unittest.TestCase):
                 (
                     loaded_manifest(
                         Path("missing.toml"),
-                        (parse_record(record("missing", deps=["absent"]), path=Path("missing.toml"), index=0),),
+                        (
+                            parse_record(
+                                record("missing", deps=["absent"]),
+                                path=Path("missing.toml"),
+                                index=0,
+                            ),
+                        ),
                     ),
                 )
             )
-        cycle_a = parse_record(record("a", deps=["b"]), path=Path("cycle.toml"), index=0)
-        cycle_b = parse_record(record("b", deps=["a"]), path=Path("cycle.toml"), index=1)
+        cycle_a = parse_record(
+            record("a", deps=["b"]), path=Path("cycle.toml"), index=0
+        )
+        cycle_b = parse_record(
+            record("b", deps=["a"]), path=Path("cycle.toml"), index=1
+        )
         with self.assertRaisesRegex(DependencyError, "cycle"):
             build_plan((loaded_manifest(Path("cycle.toml"), (cycle_a, cycle_b)),))
 
@@ -531,7 +626,9 @@ class DependencyModelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             parent = root / ".devcontainer" / "dependencies.toml"
-            vendor = root / "vendor" / "agent-canon" / ".devcontainer" / "dependencies.toml"
+            vendor = (
+                root / "vendor" / "agent-canon" / ".devcontainer" / "dependencies.toml"
+            )
             write_manifest(parent, [record("parent")])
             write_manifest(vendor, [record("vendor")])
             self.assertEqual(
@@ -547,6 +644,164 @@ class DependencyModelTests(unittest.TestCase):
                 (ManifestSource(vendor, ManifestRole.CANONICAL),),
             )
 
+    def test_manifest_sources_rejects_stale_tools_agent_canon_duplicate(self) -> None:
+        """Reject an identical copied manifest that is not the canonical entity."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            vendor = (
+                root / "vendor" / "agent-canon" / ".devcontainer" / "dependencies.toml"
+            )
+            tools = (
+                root / "tools" / "agent-canon" / ".devcontainer" / "dependencies.toml"
+            )
+            write_manifest(vendor, [record("vendor")])
+            write_manifest(tools, [record("vendor")])
+
+            with self.assertRaisesRegex(DependencyError, "ambiguous canonical"):
+                manifest_sources(root, root / "vendor" / "agent-canon")
+
+    def test_manifest_sources_never_uses_tools_projection_manifest(self) -> None:
+        """A tools projection cannot become the canonical dependency manifest."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            tools = (
+                root / "tools" / "agent-canon" / ".devcontainer" / "dependencies.toml"
+            )
+            write_manifest(tools, [record("tools")])
+
+            self.assertEqual(
+                manifest_sources(root, root / "vendor" / "agent-canon"), ()
+            )
+
+    def test_boundary_tool_resolution_uses_real_tools_projection(self) -> None:
+        """Strip the source tools prefix when resolving the parent projection."""
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            vendor_root = workspace / "vendor" / "agent-canon"
+            vendor_tools = vendor_root / "tools"
+            vendor_tools.mkdir(parents=True)
+            for relative in (
+                "tools/requirement_sync_validator.py",
+                "tools/ci/python_env_policy.py",
+            ):
+                path = vendor_root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("print('ok')\n", encoding="utf-8")
+            projection_root = workspace / "tools" / "agent-canon"
+            projection_root.parent.mkdir(parents=True)
+            projection_root.symlink_to(
+                Path("..") / "vendor" / "agent-canon" / "tools",
+                target_is_directory=True,
+            )
+            model = EnvironmentBoundaryModel(workspace, vendor_root)
+            self.assertEqual(
+                model._resolve_agent_canon_root_path(
+                    "tools/requirement_sync_validator.py"
+                ),
+                vendor_root / "tools" / "requirement_sync_validator.py",
+            )
+            self.assertEqual(
+                model._resolve_agent_canon_root_path("tools/ci/python_env_policy.py"),
+                vendor_root / "tools" / "ci" / "python_env_policy.py",
+            )
+
+    def test_boundary_tool_resolution_rejects_stale_projection_ambiguity(
+        self,
+    ) -> None:
+        """Reject identical copied roots and ignore parent compatibility wrappers."""
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            vendor_root = workspace / "vendor" / "agent-canon"
+            source = vendor_root / "tools" / "requirement_sync_validator.py"
+            projection = (
+                workspace / "tools" / "agent-canon" / "requirement_sync_validator.py"
+            )
+            wrapper = workspace / "tools" / "requirement_sync_validator.py"
+            for path, content in (
+                (source, "source\n"),
+                (projection, "source\n"),
+                (wrapper, "wrapper\n"),
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            model = EnvironmentBoundaryModel(workspace, vendor_root)
+
+            with self.assertRaisesRegex(DependencyError, "ambiguous AgentCanon"):
+                model._resolve_agent_canon_root_path(
+                    "tools/requirement_sync_validator.py"
+                )
+
+            projection.unlink()
+            source.unlink()
+            self.assertEqual(
+                model._resolve_agent_canon_root_path(
+                    "tools/requirement_sync_validator.py"
+                ),
+                source,
+            )
+
+    def test_requirements_accept_hash_lock_records_and_preserve_markers(self) -> None:
+        """Accept hash records through the public boundary findings route."""
+        with tempfile.TemporaryDirectory() as temporary:
+            requirements = (
+                "# generated lock\n"
+                + hash_requirement(
+                    "jupyterlab",
+                    "1.2.3",
+                    ("a" * 64, "b" * 64),
+                    marker="python_version >= '3.0'",
+                )
+                + "    # via project\n"
+                + hash_requirement("notebook", "1.0.0", ("c" * 64,))
+                + hash_requirement("ipykernel", "1.0.0", ("d" * 64,))
+                + hash_requirement("pydeps", "1.0.0", ("e" * 64,))
+                + hash_requirement("snakeviz", "1.0.0", ("f" * 64,))
+                + hash_requirement("pyyaml", "1.0.0", ("0" * 64,))
+            )
+            model, path = write_boundary_fixture(Path(temporary), requirements)
+
+            report = model.validate()
+
+        self.assertEqual(report.status, "pass")
+        self.assertFalse(
+            [finding for finding in report.findings if finding.path == str(path)]
+        )
+
+    def test_requirements_reject_malformed_hash_records_and_options(self) -> None:
+        """Reject invalid lock records through public boundary findings."""
+        backslash = chr(92)
+        cases = {
+            "malformed continuation": (
+                f"package==1.0 {backslash}\n    not-a-hash\n",
+                "malformed requirement continuation",
+            ),
+            "orphan hash": (
+                f"--hash=sha256:{'a' * 64}\n",
+                "orphan requirement hash",
+            ),
+            "malformed hash": (
+                f"package==1.0 {backslash}\n    --hash=sha256:short\n",
+                "malformed requirement hash",
+            ),
+            "requirement option": (
+                "--index-url https://pypi.org/simple\n",
+                "requirement option without requirement",
+            ),
+        }
+
+        for name, (contents, message) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                model, path = write_boundary_fixture(Path(temporary), contents)
+                report = model.validate()
+
+                findings = [
+                    finding for finding in report.findings if finding.path == str(path)
+                ]
+                self.assertTrue(
+                    any(message in finding.detail for finding in findings),
+                    report.findings,
+                )
+
     def test_canonical_manifest_owns_pinned_pyyaml_independently(self) -> None:
         """AgentCanon's mounted validators receive their own exact PyYAML record."""
         plan = load_plan(ROOT, ROOT)
@@ -557,7 +812,9 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(pyyaml.version, "6.0.2")
         self.assertEqual(pyyaml.deps, ("python3-pip",))
         self.assertEqual(pyyaml.verification.executable, "python3")
-        self.assertTrue(any("yaml.__version__" in arg for arg in pyyaml.verification.args))
+        self.assertTrue(
+            any("yaml.__version__" in arg for arg in pyyaml.verification.args)
+        )
 
     def test_empty_parent_overlay_merges_with_nonempty_vendor_manifest(self) -> None:
         """Allow an empty parent overlay when the canonical vendor is non-empty."""
@@ -703,7 +960,9 @@ class DependencyModelTests(unittest.TestCase):
             runner = FakeRunner()
             installer = Installer(runner)
             receipts = root / "receipts"
-            self.assertEqual(installer.install(plan, workspace=root, receipts=receipts), ("tool",))
+            self.assertEqual(
+                installer.install(plan, workspace=root, receipts=receipts), ("tool",)
+            )
 
             resumed = FakeRunner()
             self.assertEqual(
@@ -727,7 +986,9 @@ class DependencyModelTests(unittest.TestCase):
                 sum(command[0] == "dpkg-query" for command in rebuilt.calls),
                 2,
             )
-            apt_install = next(command for command in rebuilt.calls if command[0] == "apt-get")
+            apt_install = next(
+                command for command in rebuilt.calls if command[0] == "apt-get"
+            )
             self.assertIn("--reinstall", apt_install)
 
             failing = FakeRunner(fail_on="apt-get")
@@ -934,7 +1195,9 @@ class DependencyModelTests(unittest.TestCase):
                 index=0,
             )
 
-    def test_static_bootstrap_and_post_create_contract_has_no_legacy_install_routes(self) -> None:
+    def test_static_bootstrap_and_post_create_contract_has_no_legacy_install_routes(
+        self,
+    ) -> None:
         bootstrap = (ROOT / ".devcontainer" / "bootstrap-dependencies.sh").read_text(
             encoding="utf-8"
         )
@@ -968,9 +1231,7 @@ class DependencyModelTests(unittest.TestCase):
         cache_function = post_create.split("build_agent_canon_cache() {", 1)[1].split(
             "\n}\n", 1
         )[0]
-        self.assertIn(
-            "if agent-canon structured-analysis build", cache_function
-        )
+        self.assertIn("if agent-canon structured-analysis build", cache_function)
         self.assertNotIn("return 1", cache_function)
         self.assertEqual(
             post_create.count('"$devcontainer_dir/finalize-shared-runtime.sh"'), 1
