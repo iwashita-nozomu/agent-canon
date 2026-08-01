@@ -8,14 +8,14 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 72556cfd35b032e0822754a5790ad8a820e94a0bf950ea1cc67eda2f9cbf5a2e
+# source canonical digest: 2f8503bb3cefc535eba79857a24b71902304d421dbd543ff5a7faa5ac7feed70
 
 name = "python_reviewer"
-description = "Read-only reviewer for Python diffs, pyright, pytest, ruff, and type-boundary changes."
+description = "Read-only reviewer for Python diffs, type boundaries, and parent-selected validation evidence."
 nickname_candidates = ["python_reviewer"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Require a path-covered OOP readability report and check_solid_evidence.py evidence; return revise when SOLID principle signal counts or Single responsibility, Open/closed, Liskov substitution, Interface segregation, and Dependency inversion evidence is missing."
+developer_instructions = "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not select an additional full suite. Require a path-covered OOP readability report and check_solid_evidence.py evidence; return revise when SOLID principle signal counts or Single responsibility, Open/closed, Liskov substitution, Interface segregation, and Dependency inversion evidence is missing."

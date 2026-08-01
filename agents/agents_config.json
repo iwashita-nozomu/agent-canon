@@ -2574,7 +2574,7 @@
     },
     "python_reviewer": {
       "name": "python_reviewer",
-      "description": "Read-only reviewer for Python diffs, pyright, pytest, ruff, and type-boundary changes.",
+      "description": "Read-only reviewer for Python diffs, type boundaries, and parent-selected validation evidence.",
       "nickname_candidates": [
         "python_reviewer"
       ],
@@ -2582,7 +2582,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Require a path-covered OOP readability report and check_solid_evidence.py evidence; return revise when SOLID principle signal counts or Single responsibility, Open/closed, Liskov substitution, Interface segregation, and Dependency inversion evidence is missing.",
+      "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not select an additional full suite. Require a path-covered OOP readability report and check_solid_evidence.py evidence; return revise when SOLID principle signal counts or Single responsibility, Open/closed, Liskov substitution, Interface segregation, and Dependency inversion evidence is missing.",
       "logical_role_id": "change_reviewer+python_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/20",
       "profile_id": "luna_reasoning_high",
@@ -2604,7 +2604,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "72556cfd35b032e0822754a5790ad8a820e94a0bf950ea1cc67eda2f9cbf5a2e"
+      "projection_digest": "2f8503bb3cefc535eba79857a24b71902304d421dbd543ff5a7faa5ac7feed70"
     },
     "report_reviewer": {
       "name": "report_reviewer",
@@ -3500,7 +3500,7 @@
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "72556cfd35b032e0822754a5790ad8a820e94a0bf950ea1cc67eda2f9cbf5a2e"
+      "projection_digest": "2f8503bb3cefc535eba79857a24b71902304d421dbd543ff5a7faa5ac7feed70"
     },
     {
       "id": "report_reviewer",
@@ -3740,6 +3740,6 @@
     "materializer": "tools/agent_tools/model_profile_registry.py",
     "registry_ref": "agents/model_profiles.toml",
     "role_count": 34,
-    "projection_digest": "df7c396997d45830970d5fd191a6356a82ca13c5a3b1c08871194534532a566b"
+    "projection_digest": "35f5934bcdabe1703a38d79a8c2d15aabb57b462a4c85838211fc5340831e013"
   }
 }

@@ -25,8 +25,10 @@ review_activation_policy:
     rework_when: behavior_owner_boundary_correctness_validation_or_publication_changes
     record_without_new_wave: duplicate_stylistic_already_covered_or_evidence_free
   validation:
+    owner_ref: "agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary"
+    route_source: parent_packet.validation_route
     order: static_then_targeted
-    full_suite_or_remote_ci: final_candidate_only_when_touched_contract_requires
+    full_suite_or_remote_ci: see_owner_ref
   artifacts:
     empty_reviewer_or_template_files: do_not_materialize
 
