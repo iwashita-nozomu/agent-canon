@@ -82,6 +82,7 @@ class ContainerPack:
     context: str
     target: str | None
     image_tag: str
+    platform: str | None
     smoke: SmokeSpec
     runtime: RuntimeSpec
 
@@ -274,6 +275,9 @@ def load_pack(path_like: str | Path) -> ContainerPack:
     target = pack_section.get("target")
     if target is not None and not isinstance(target, str):
         raise ValueError(f"{path}: [pack].target must be a string if present")
+    platform = pack_section.get("platform")
+    if platform is not None and not isinstance(platform, str):
+        raise ValueError(f"{path}: [pack].platform must be a string if present")
 
     smoke_shell = smoke_section.get("shell", "/bin/bash")
     if not isinstance(smoke_shell, str):
@@ -297,6 +301,7 @@ def load_pack(path_like: str | Path) -> ContainerPack:
         context=context,
         target=target,
         image_tag=image_tag,
+        platform=platform,
         smoke=SmokeSpec(
             shell=smoke_shell,
             commands=require_string_list(smoke_section, "commands", path, "smoke"),
@@ -359,6 +364,8 @@ def build_build_command(
         command.append("--no-cache")
     if pack.target:
         command.extend(["--target", pack.target])
+    if pack.platform:
+        command.extend(["--platform", pack.platform])
     command.append(str(workspace_path(pack.context)))
     return command
 

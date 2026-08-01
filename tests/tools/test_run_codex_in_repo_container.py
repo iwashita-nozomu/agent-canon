@@ -61,6 +61,7 @@ def test_runtime_identity(tmp_path: Path) -> None:
                 'dockerfile = "docker/Dockerfile"',
                 'context = "."',
                 'image_tag = "agent-canon-runtime-identity:test"',
+                'platform = "linux/amd64"',
                 "",
                 "[smoke]",
                 "commands = []",
@@ -167,3 +168,4 @@ def test_runtime_identity(tmp_path: Path) -> None:
         (bootstrap, finalize, compose, environment_manifest, managed_runner)
     )
     assert "exec codex" in result.stdout
+    assert "--platform linux/amd64" in result.stdout
