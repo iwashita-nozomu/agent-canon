@@ -580,8 +580,8 @@ class DependencyModelTests(unittest.TestCase):
                 (ManifestSource(vendor, ManifestRole.CANONICAL),),
             )
 
-    def test_manifest_sources_supports_tools_agent_canon_root(self) -> None:
-        """Prefer vendor manifest first, then accept tools/agent-canon manifest."""
+    def test_manifest_sources_rejects_stale_tools_agent_canon_duplicate(self) -> None:
+        """Never merge a stale projection manifest with canonical AgentCanon."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             vendor = (
@@ -592,41 +592,94 @@ class DependencyModelTests(unittest.TestCase):
             )
             write_manifest(vendor, [record("vendor")])
             write_manifest(tools, [record("tools")])
-            sources = manifest_sources(root, root / "vendor" / "agent-canon")
+
+            with self.assertRaisesRegex(DependencyError, "ambiguous canonical"):
+                manifest_sources(root, root / "vendor" / "agent-canon")
+
+            write_manifest(tools, [record("vendor")])
             self.assertEqual(
-                sources,
-                (
-                    ManifestSource(vendor, ManifestRole.CANONICAL),
-                    ManifestSource(tools, ManifestRole.CANONICAL),
-                ),
+                manifest_sources(root, root / "vendor" / "agent-canon"),
+                (ManifestSource(vendor, ManifestRole.CANONICAL),),
             )
 
-    def test_boundary_tool_resolution_prefers_agentcanon_root_or_tools_alias(
-        self,
-    ) -> None:
-        """Boundary checks accept AgentCanon tools from tools/agent-canon when needed."""
+    def test_manifest_sources_never_uses_tools_projection_manifest(self) -> None:
+        """A tools projection cannot become the canonical dependency manifest."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            tools = (
+                root / "tools" / "agent-canon" / ".devcontainer" / "dependencies.toml"
+            )
+            write_manifest(tools, [record("tools")])
+
+            self.assertEqual(
+                manifest_sources(root, root / "vendor" / "agent-canon"), ()
+            )
+
+    def test_boundary_tool_resolution_uses_real_tools_projection(self) -> None:
+        """Strip the source tools prefix when resolving the parent projection."""
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary)
             vendor_root = workspace / "vendor" / "agent-canon"
-            tools_root = workspace / "tools" / "agent-canon"
-            (tools_root / "tools").mkdir(parents=True)
+            vendor_tools = vendor_root / "tools"
+            vendor_tools.mkdir(parents=True)
             for relative in (
                 "tools/requirement_sync_validator.py",
                 "tools/ci/python_env_policy.py",
             ):
-                path = tools_root / relative
+                path = vendor_root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("print('ok')\n", encoding="utf-8")
+            projection_root = workspace / "tools" / "agent-canon"
+            projection_root.parent.mkdir(parents=True)
+            projection_root.symlink_to(
+                Path("..") / "vendor" / "agent-canon" / "tools",
+                target_is_directory=True,
+            )
             model = EnvironmentBoundaryModel(workspace, vendor_root)
             self.assertEqual(
                 model._resolve_agent_canon_root_path(
                     "tools/requirement_sync_validator.py"
                 ),
-                tools_root / "tools/requirement_sync_validator.py",
+                vendor_root / "tools" / "requirement_sync_validator.py",
             )
             self.assertEqual(
                 model._resolve_agent_canon_root_path("tools/ci/python_env_policy.py"),
-                tools_root / "tools/ci/python_env_policy.py",
+                vendor_root / "tools" / "ci" / "python_env_policy.py",
+            )
+
+    def test_boundary_tool_resolution_rejects_stale_projection_ambiguity(
+        self,
+    ) -> None:
+        """Reject differing active roots and ignore parent compatibility wrappers."""
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            vendor_root = workspace / "vendor" / "agent-canon"
+            source = vendor_root / "tools" / "requirement_sync_validator.py"
+            projection = (
+                workspace / "tools" / "agent-canon" / "requirement_sync_validator.py"
+            )
+            wrapper = workspace / "tools" / "requirement_sync_validator.py"
+            for path, content in (
+                (source, "source\n"),
+                (projection, "stale\n"),
+                (wrapper, "wrapper\n"),
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            model = EnvironmentBoundaryModel(workspace, vendor_root)
+
+            with self.assertRaisesRegex(DependencyError, "ambiguous AgentCanon"):
+                model._resolve_agent_canon_root_path(
+                    "tools/requirement_sync_validator.py"
+                )
+
+            projection.unlink()
+            source.unlink()
+            self.assertEqual(
+                model._resolve_agent_canon_root_path(
+                    "tools/requirement_sync_validator.py"
+                ),
+                source,
             )
 
     def test_canonical_manifest_owns_pinned_pyyaml_independently(self) -> None:

@@ -1014,6 +1014,28 @@ def load_manifest(source: ManifestSource) -> LoadedManifest:
     return LoadedManifest(source=source, records=parsed)
 
 
+def _require_file_candidate_agreement(
+    candidates: Sequence[Path], *, description: str
+) -> None:
+    """Reject active file candidates that do not identify equal content."""
+    if len(candidates) < 2:
+        return
+    reference = candidates[0]
+    for candidate in candidates[1:]:
+        try:
+            if reference.samefile(candidate):
+                continue
+            matches = reference.read_bytes() == candidate.read_bytes()
+        except OSError as exc:
+            raise DependencyError(
+                f"cannot compare {description}: {reference} and {candidate}: {exc}"
+            ) from exc
+        if not matches:
+            raise DependencyError(
+                f"ambiguous {description}: {reference} and {candidate} differ"
+            )
+
+
 def manifest_sources(
     workspace: Path, vendor_root: Path | None = None
 ) -> tuple[ManifestSource, ...]:
@@ -1022,10 +1044,6 @@ def manifest_sources(
     vendor = (vendor_root or workspace / "vendor" / "agent-canon").resolve()
     parent_path = workspace / ".devcontainer" / "dependencies.toml"
     vendor_path = vendor / ".devcontainer" / "dependencies.toml"
-    tools_agent_canon_root = workspace / "tools" / "agent-canon"
-    tools_agent_canon_path = (
-        tools_agent_canon_root / ".devcontainer" / "dependencies.toml"
-    )
     if vendor == workspace and parent_path == vendor_path:
         return (
             (ManifestSource(vendor_path, ManifestRole.CANONICAL),)
@@ -1035,15 +1053,21 @@ def manifest_sources(
     sources: list[ManifestSource] = []
     if parent_path.is_file():
         sources.append(ManifestSource(parent_path, ManifestRole.PARENT_OVERLAY))
+    if vendor_path.is_file():
+        projection_path = (
+            workspace / "tools" / "agent-canon" / ".devcontainer" / "dependencies.toml"
+        )
+        duplicate_candidates = tuple(
+            path for path in (vendor_path, projection_path) if path.is_file()
+        )
+        _require_file_candidate_agreement(
+            duplicate_candidates,
+            description="canonical AgentCanon dependency manifest sources",
+        )
     if vendor_path.is_file() and vendor_path.resolve() not in {
         source.path for source in sources
     }:
         sources.append(ManifestSource(vendor_path, ManifestRole.CANONICAL))
-    if tools_agent_canon_path.is_file() and tools_agent_canon_path.resolve() not in {
-        source.path for source in sources
-    }:
-        # Parent projections may contain a legacy tools/agent-canon alias to AgentCanon.
-        sources.append(ManifestSource(tools_agent_canon_path, ManifestRole.CANONICAL))
     return tuple(sources)
 
 
@@ -1347,15 +1371,33 @@ class EnvironmentBoundaryModel:
         return tuple(requirements)
 
     def _resolve_agent_canon_root_path(self, relative: str) -> Path:
-        """Return the first existing AgentCanon path for a shared tool path."""
-        candidates = (
-            self.vendor_root / relative,
-            self.workspace / "tools" / "agent-canon" / relative,
+        """Resolve one source-relative path across active AgentCanon tool roots."""
+        relative_path = PurePosixPath(relative)
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            raise DependencyError(
+                f"invalid AgentCanon source-relative path: {relative}"
+            )
+        source_path = self.vendor_root.joinpath(*relative_path.parts)
+        candidates = [source_path]
+        if (
+            not self.standalone
+            and relative_path.parts
+            and relative_path.parts[0] == "tools"
+        ):
+            candidates.append(
+                self.workspace
+                / "tools"
+                / "agent-canon"
+                / Path(*relative_path.parts[1:])
+            )
+        active_candidates = tuple(
+            candidate for candidate in candidates if candidate.is_file()
         )
-        for candidate in candidates:
-            if candidate.is_file():
-                return candidate
-        return self.vendor_root / relative
+        _require_file_candidate_agreement(
+            active_candidates,
+            description=f"AgentCanon source path {relative}",
+        )
+        return active_candidates[0] if active_candidates else source_path
 
     def _check_parent_container(
         self, findings: list[BoundaryFinding], checked: list[str]
