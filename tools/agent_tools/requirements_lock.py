@@ -69,13 +69,11 @@ class RequirementParseError:
 
     path: Path
     code: RequirementErrorCode
-    line_number: int | None
+    line_number: int
     detail: str
 
     def render(self) -> str:
         """Return the diagnostic used by consumer finding projections."""
-        if self.line_number is None:
-            return f"{self.path}: {self.detail}"
         return f"{self.path}:{self.line_number}: {self.detail}"
 
 

@@ -759,3 +759,45 @@ def test_validate_requirements_rejects_invalid_direct_reference_boundaries(
         "invalid-line:8",
         "invalid-line:9",
     ]
+
+
+def test_validate_requirements_projects_every_parse_error_to_line_only(
+    tmp_path: Path,
+) -> None:
+    """All canonical parser errors retain only the legacy line finding detail."""
+    module = load_container_config_module()
+    write_file(
+        tmp_path,
+        "docker/requirements.txt",
+        "\n".join(
+            [
+                "jupyterlab",
+                "notebook",
+                "ipykernel",
+                "pydeps",
+                "snakeviz",
+                "pyyaml",
+                "--index-url https://pypi.org/simple",
+                "--hash=sha256:" + "a" * 64,
+                "package==1.0 \\",
+                "    --hash=sha256:short",
+                "package==1.0 \\",
+                "    not-a-hash",
+                "not a requirement",
+                "package==1.0 \\",
+                "",
+            ]
+        ),
+    )
+
+    findings = module.validate_requirements(tmp_path)
+
+    assert [finding.detail for finding in findings] == [
+        "invalid-line:7",
+        "invalid-line:8",
+        "invalid-line:10",
+        "invalid-line:12",
+        "invalid-line:13",
+        "invalid-line:14",
+    ]
+    assert all("requirement" not in finding.detail for finding in findings)

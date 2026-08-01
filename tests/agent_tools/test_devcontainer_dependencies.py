@@ -725,17 +725,48 @@ class DependencyModelTests(unittest.TestCase):
             )
 
     def test_requirements_parse_errors_project_to_boundary_findings(self) -> None:
-        """Project canonical parser errors without reimplementing parsing."""
-        with tempfile.TemporaryDirectory() as temporary:
-            model, path = write_boundary_fixture(
-                Path(temporary), "--index-url https://pypi.org/simple\n"
+        """Preserve the base finding detail for every parser error category."""
+        backslash = chr(92)
+        cases = {
+            "malformed continuation": (
+                f"package==1.0 {backslash}\n    not-a-hash\n",
+                lambda path: f"{path}:2: malformed requirement continuation",
+            ),
+            "orphan hash": (
+                f"--hash=sha256:{'a' * 64}\n",
+                lambda path: f"{path}:1: orphan requirement hash",
+            ),
+            "malformed hash": (
+                f"package==1.0 {backslash}\n    --hash=sha256:short\n",
+                lambda path: f"{path}:2: malformed requirement hash",
+            ),
+            "requirement option": (
+                "--index-url https://pypi.org/simple\n",
+                lambda path: f"{path}:1: requirement option without requirement",
+            ),
+            "unterminated continuation": (
+                f"package==1.0 {backslash}\n",
+                lambda path: f"{path}: unterminated requirement continuation",
+            ),
+            "invalid requirement": (
+                "not a requirement\n",
+                lambda _path: "unsupported requirement syntax: not a requirement",
+            ),
+        }
+
+        for name, (contents, expected_detail) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                model, path = write_boundary_fixture(Path(temporary), contents)
+                report = model.validate()
+
+                findings = [
+                    finding for finding in report.findings if finding.path == str(path)
+                ]
+
+            self.assertEqual(
+                [finding.detail for finding in findings],
+                [expected_detail(path)],
             )
-
-            report = model.validate()
-
-        findings = [finding for finding in report.findings if finding.path == str(path)]
-        self.assertEqual(len(findings), 1)
-        self.assertIn("requirement option without requirement", findings[0].detail)
 
     def test_canonical_manifest_owns_pinned_pyyaml_independently(self) -> None:
         """AgentCanon's mounted validators receive their own exact PyYAML record."""

@@ -47,7 +47,6 @@ if str(AGENT_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_DIR))
 
 from requirements_lock import (  # noqa: E402,I001  # pyright: ignore[reportMissingTypeStubs]
-    RequirementErrorCode,
     parse_requirements,
 )
 from surface_manifest import (
@@ -303,12 +302,13 @@ def validate_requirements(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     parsed = parse_requirements(path)
     for error in parsed.errors:
-        detail = (
-            f"invalid-line:{error.line_number}"
-            if error.code is RequirementErrorCode.INVALID_REQUIREMENT
-            else error.detail
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                f"invalid-line:{error.line_number}",
+            )
         )
-        findings.append(Finding("dependency_contract_violation", relative, detail))
     if parsed.valid:
         requirements = {
             record.normalized_name for record in parsed.records if record.is_active()

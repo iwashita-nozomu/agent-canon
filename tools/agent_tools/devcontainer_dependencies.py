@@ -44,9 +44,12 @@ from typing import Any, Protocol
 from packaging.utils import canonicalize_name
 
 try:
-    from .requirements_lock import parse_requirements
+    from .requirements_lock import RequirementErrorCode, parse_requirements
 except ImportError:  # pragma: no cover - direct script execution path.
-    from requirements_lock import parse_requirements  # type: ignore[no-redef]
+    from requirements_lock import (  # type: ignore[no-redef]
+        RequirementErrorCode,
+        parse_requirements,
+    )
 
 try:  # pragma: no cover - the branch depends on the interpreter image.
     import tomllib
@@ -1384,9 +1387,13 @@ class EnvironmentBoundaryModel:
         if requirements is not None:
             parsed_requirements = parse_requirements(requirements)
             for error in parsed_requirements.errors:
-                findings.append(
-                    BoundaryFinding("python", str(requirements), error.render())
-                )
+                if error.code is RequirementErrorCode.INVALID_REQUIREMENT:
+                    detail = error.detail
+                elif error.code is RequirementErrorCode.UNTERMINATED_CONTINUATION:
+                    detail = f"{requirements}: {error.detail}"
+                else:
+                    detail = error.render()
+                findings.append(BoundaryFinding("python", str(requirements), detail))
             if parsed_requirements.valid:
                 declared_requirements = tuple(
                     record
