@@ -127,11 +127,6 @@ if [ -d "${repo_root}/vendor/agent-canon" ]; then
     printf 'devcontainer parent environment source must be a regular file: %s\n' "$parent_environment_source" >&2
     exit 1
   fi
-  host_zshrc="${HOME}/.zshrc"
-  if [ ! -f "$host_zshrc" ] || [ -L "$host_zshrc" ]; then
-    printf 'devcontainer requires a regular host zshrc source: %s\n' "$host_zshrc" >&2
-    exit 1
-  fi
 fi
 
 if [[ "$runtime_shell" != /* || "$runtime_shell" == *[!A-Za-z0-9._/-]* ]]; then
@@ -151,10 +146,9 @@ volume_lines+=(
   "        target: /var/lib/agent-canon/runtime"
 )
 if [ "$parent_layout" = true ]; then
-  host_zshrc_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$host_zshrc")"
   volume_lines+=(
     "      - type: bind"
-    "        source: ${host_zshrc_yaml}"
+    '        source: "${HOME}/.zshrc"'
     '        target: "/etc/project-template/zsh/.zshrc"'
     "        read_only: true"
   )

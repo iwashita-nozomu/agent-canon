@@ -68,10 +68,13 @@ symlink 先の `devcontainer.json` は、親レポのルートから AgentCanon 
 
 - `.devcontainer/parent-environment.sh` ->
   `/etc/project-template/parent-environment.sh`
-- host の明示的な `~/.zshrc` -> `/etc/project-template/zsh/.zshrc`
+- host の configured source expression `${HOME}/.zshrc` ->
+  `/etc/project-template/zsh/.zshrc`
 
-host `~/.zshrc` は regular file であることを実行前提とし、欠落・directory・symlink
-を別の guessed path で補いません。image-owned
+validator は生成 Compose の host zshrc mount が bind type、source expression、target、
+read-only を満たすことを静的に確認し、fresh clone / CI runner の現在の host file を
+probe しません。実行時は host の `${HOME}/.zshrc` が regular file であることを
+runtime premise とし、欠落・directory・symlink を別の guessed path で補いません。image-owned
 `/etc/project-template/zsh/.zshenv` は後続の親 image 側でこの read-only mounted
 parent script を source します。
 

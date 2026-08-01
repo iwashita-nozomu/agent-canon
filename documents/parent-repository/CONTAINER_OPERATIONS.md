@@ -41,9 +41,11 @@ AgentCanon は mounted developer/agent tool と共有 runtime の source を所�
 host ~/.zshrc                         -> /etc/project-template/zsh/.zshrc
 ```
 
-host `~/.zshrc` は明示的な入力 premise です。generator はその exact path が
-regular file であることを確認し、欠落、directory、symlink の場合は失敗します。
-別の host path を探索したり、空の zshrc を生成したりしません。
+host `${HOME}/.zshrc` は明示的な mount source expression です。validator は生成
+Compose の bind type、source expression、target、read-only を静的に検証します。
+実行時には展開後の exact path が regular file である必要がありますが、fresh clone / CI
+validation は現在の runner host file を probe しません。別の host path を探索したり、
+空の zshrc を生成したりしません。
 
 後続の親 image は image-owned `/etc/project-template/zsh/.zshenv` から mounted
 `/etc/project-template/parent-environment.sh` を source します。これにより zsh

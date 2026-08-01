@@ -134,9 +134,10 @@ AgentCanon の実体パスを直接呼び出します。
 - `post-create-parent.sh` は shared post-create の成功後に呼ぶ親固有 source とする。
 - Compose の生成物は親の `.agent-canon/docker-compose.generated.yml` に置く。
 - 親の default pack が zsh を選ぶ場合、generator は pack の `runtime.shell` を
-  process boundary とし、host `~/.zshrc` と parent environment script を read-only
-  mount する。host `~/.zshrc` は regular file の明示 premise であり、代替 path は
-  探索しない。
+  process boundary とし、host の `${HOME}/.zshrc` expression と parent environment
+  script を read-only mount する。validator はこの source expression、bind type、target、
+  read-only を静的に確認する。実行時には host `${HOME}/.zshrc` が regular file である
+  必要があり、代替 path は探索しない。
 
 この分離により、shared runtime の更新と親プロジェクトの hook / build 設定を
 別々に review でき、親固有の変更が AgentCanon source の pin を汚染しません。
