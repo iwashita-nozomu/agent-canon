@@ -33,6 +33,11 @@ rather than local implementation judgment.
 - Required review artifact:
 - Review state:
 - Implementation / handoff blocker:
+- Semantic responsibility contract:
+  - Run-local instance:
+  - Policy reference:
+  - Active-packet source reference:
+  - Allocation state:
 
 ## Goals
 
@@ -75,6 +80,8 @@ rather than local implementation judgment.
 ## Implementation Source Packet
 
 <!-- List every artifact the worker must read before editing: user_request_contract.md, schedule.md, this design brief, design_review.md when active, document_flow_review.md when active, test_plan.md only when post-implementation test design is active, repo docs, dependency surfaces, code paths, tests, and external references if any. Mark each item required or not used. -->
+
+<!-- For semantic deltas, include the run-local semantic_responsibility_contract.toml instance. It is populated from the reusable template and is read before implementation. -->
 
 <!-- Packet entry: entry_id=implementation-source-packet. Preserve the exact active-packet references, selected graph-packet identity, materialization reader, and dependency on entry:abstract-design-frame. -->
 

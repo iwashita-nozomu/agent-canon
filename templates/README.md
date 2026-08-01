@@ -64,3 +64,7 @@ as their semantic owner. Each consumer records only the responsibility region an
 semantic delta; it does not require fixed sections or repeat signature, type, namespace, or field
 facts. A design document or generated experiment records the guide reference and its projection
 anchor when that trace is materialized.
+
+`templates/documents/semantic-responsibility-contract.template.toml` は空の instance
+shape を提供します。値を埋めた semantic responsibility contract は run-local artifact
+として active design packet から参照し、template source へ戻しません。

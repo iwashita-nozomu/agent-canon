@@ -10,6 +10,7 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
 downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates canonical runtime references
 downstream design ../skills/change-review.md consumes forward and reverse correspondence at review
 upstream design ../../documents/design/request-intent-and-update-relation.md compact request/update and related-document closure contract
+upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and obligation ownership contract
 @dependency-end
 -->
 
@@ -26,6 +27,7 @@ upstream design ../../documents/design/request-intent-and-update-relation.md com
 | implementation handoff | `agents/COMMUNICATION_PROTOCOL.md`、`agents/workflows/implementation-waterfall-workflow.md` | clause map と digest を handoff に載せる | 実装者の代わりに実装しない |
 | review | `agents/skills/change-review.md` | forward / reverse coverage と drift を判定対象にする | review policy を再定義しない |
 | evidence / validation | 各 design doc の validation route | clause と evidence の readback を残す | 成功メッセージだけで十分条件にしない |
+| semantic responsibility allocation | `documents/design/semantic-responsibility-contract.md` と run-local instance | delta action、obligation、primary owner、hard-edge closure を対応付ける | class/module/file の構造 mandate や協調指標を導入しない |
 
 ## Related Document Closure
 
@@ -51,6 +53,13 @@ closure receipt です。worker の design-read operation はこの receipt と 
 implementation-ready state にし、change-review の reverse-read operation は changed path
 から design clause、owner、root projection の reverse-trace-complete state にして、各 readback
 を review evidence にします。
+
+semantic responsibility contract の closure は、実装前に active design packet の
+`source_refs` から run-local instance を読み、各 delta の action と obligation を
+implementation target / validation route に forward-map します。各 obligation は一つの
+primary verification owner を持ち、supporting evidence は別 property/role に限ります。
+reverse-read では変更 path から semantic grouping と owner evidence を戻しますが、
+hard-edge closure は grouping の根拠であり class/module/file の mandate にはしません。
 
 ## Exact Data / State Model
 

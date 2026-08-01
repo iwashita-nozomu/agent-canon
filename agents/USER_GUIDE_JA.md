@@ -42,6 +42,9 @@ workflow family、role behavior、validation gate の正本はリンク先の ow
 - C / C++ 差分では `cpp-review` を既定で使います。
 - 局所 diff を findings-first で見るときは `change-review` を使います。
 - Markdown 差分では `md-style-check` を使います。
+- semantic delta、obligation、一次検証 owner、hard-edge closure を設計する場合は
+  [semantic responsibility contract](../documents/design/semantic-responsibility-contract.md)
+  と run-local instance template を先に読みます。
 - 文書構造、reader path、claim support、source map、canonical route、document responsibility が変わる Markdown 差分では、`structure-planning` と `prose-reasoning-graph` を先に使い、closeout の `Document Structure Evidence` に構造解析 evidence を残します。
 - typo / link / format-only の Markdown 差分では、`md-style-check` と `structure_contract=skipped:<reason>` を evidence に残します。
 - owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じた repo-changing 差分では `owner-bounded-routing` を使い、existing tool を読了 gate なしに先に実行し、owner boundary、existing-tool route、targeted validation を evidence に残します。
@@ -67,7 +70,9 @@ workflow family、role behavior、validation gate の正本はリンク先の ow
 - 既定の流れは workflow family で変わります。owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている修正は `Owner-Bounded Change`、それ以外の repo-changing task は `要件整理 -> 調査 -> 実行計画立案 -> 計画レビュー -> 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー -> 実装` を基準にします。
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 subagent で行います。
 - `詳細設計レビュー` を通す前に実装へ進みません。
-- observable behavior、regression risk、または test contract を変える code 変更では `test_designer` を別 instance で立て、実装前に nasty case を洗います。contract-only wrapper は static contract validation と canonical command evidence を使います。
+- `test_designer` は owning mechanism の確立または修復後に、semantic responsibility
+  contract の owner で閉じない test-owned runtime risk が残る場合だけ起動します。
+  contract-only wrapper は static contract validation と canonical command evidence を使います。
 - 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します。
 - write scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認します。

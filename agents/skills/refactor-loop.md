@@ -7,6 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable refactor structure contract
 upstream design dependency-analysis.md unified change-impact and repair-planning packet
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback loop
+upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner contract
 upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings for refactor plans
 upstream design ../internal-routines/design-implementation-correspondence.md design read, clause fingerprint, and drift-block route
 @dependency-end
@@ -50,7 +51,7 @@ topology を構成する refactor は、次の順序を正本とします。
 設計文書、CI、source module を先に完成扱いにして consumer 実装を後回しに
 する経路は禁止します。consumer が完成形を materialize できない間は、共有
 module の追従、projection 移行、checker の更新を完了扱いにしません。中間状態を
-通す互換経路は追加せず、各段階に過剰な操作検証を要求せず、最後の return gate
+通す別経路は追加せず、各段階に過剰な操作検証を要求せず、最後の return gate
 で完成した全体を検証します。
 この実行順の所有者は `refactor-loop` であり、`structure-refactor` は構造
 surface / runtime boundary の分類を、`agent-canon-update` は AgentCanon 固有の
@@ -107,10 +108,13 @@ the design trace before accepting a path or dependency-direction change.
    current repair batch に必要な excerpt だけを載せます。raw finding、raw
    raw text-search hit、単一 file 名だけから実装計画を作ってはいけません。
 1. refactor pass では `Behavior Contract:` を先に固定します。
+1. semantic responsibility contract を active design packet から参照し、各 semantic delta の
+   action と obligation/primary verification owner を実装前に割り当てます。hard-edge closure
+   は semantic grouping を示しますが、class、module、file の形を決める根拠にはしません。
 1. file moves、module boundary、repair slice、path mapping、responsibility map が非自明な場合は `structure-planning` で構造 contract を先に固定します。
 1. `Allowed Structural Delta:` と `Forbidden Semantic Delta:` を分けて書きます。
 1. API 形状を変える refactor では `Expected API:` を先に固定します。
-   ここには public names、call shape、config field、削除する互換 surface、
+   ここには public names、call shape、config field、削除する旧 surface、
    subagent が従うべき利用例を含めます。subagent handoff にはこの
    `Expected API:` を必ず渡します。
 1. user-facing return までの内部 step では、途中状態を毎回動作可能に保つための
@@ -169,9 +173,9 @@ the design trace before accepting a path or dependency-direction change.
    変更行に直接乗る finding、同じ変更 object に属する related structural finding、
    変更外 finding を分けます。
 1. 外部 repo や bare snapshot の OOP survey では、元 repo を編集せず、commit SHA、解析 path、`--exclude vendor --exclude reports` などの除外条件、Markdown / JSON report を run bundle に残します。
-1. `test_designer`、baseline capture、full scan / rescan は、behavior-changing
-   / regression-prone code refactor、behavior oracle 不足、root / shared
-   contract wave、または tool-owned global property に比例して使います。
+1. `test_designer` は owning mechanism の確立または修復後に、既存 owner と targeted
+   validation では閉じない test-owned runtime risk が残った場合だけ使います。baseline
+   capture、full scan / rescan は、選択された validation route が必要とする場合に使います。
    prompt / docs / static-contract refactor では、owner が選んだ static
    validation と targeted validation で閉じます。
 1. closeout 前に `python3 tools/ci/check_merge_structure.py ...` の要否を確認します。
@@ -408,9 +412,8 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
    - 実装後に reviewer finding を統合する責任を持ちますが、review 判定を
      自分だけで完了扱いにしません。
 1. `test_designer`
-   - behavior-changing / regression-prone code refactor、behavior oracle 不足、
-     root / shared contract wave、または owner-selected validation だけでは
-     behavior preservation を証明できない場合に implementation 前に起動します。
+   - owning mechanism の確立または修復後に、既存 owner と targeted validation だけでは
+     閉じない test-owned runtime risk が残る場合に起動します。
    - regression case、nasty case、behavior-preservation assertions を設計し、
      実装 agent へ渡します。
 1. Write-capable implementation agent
@@ -455,7 +458,7 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
   - Python なら `python-review`
   - C / C++ なら `cpp-review`
 - `docs_workflow_steward`
-  - design 見直し、OOP boundary、解析 score gate が workflow と docs に残っているか
+  - design 見直し、OOP boundary、解析 finding gate が workflow と docs に残っているか
 
 ## Runtime Contract Clauses
 
@@ -569,8 +572,8 @@ The runtime discovery adapter delegates these required operating clauses to this
    default; `spark_worker` only through
    `--select-agent-type implementer=spark_worker:<evidence>` recorded in stdout /
    manifest),
-   `test_designer` defines regression coverage before behavior-changing or
-   regression-prone code changes, and a
+   `test_designer` defines regression coverage only after the owning mechanism is
+   established or repaired and an unresolved test-owned runtime risk remains, and a
    separate read-only reviewer
    (`diff_triage_reviewer` by default; `python_reviewer` / `cpp_reviewer` only
    from changed-path evidence, parent packet evidence, or explicit review-pack
@@ -616,5 +619,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    reason exists, classify the underspecified handoff as `handoff_prompt_gap`,
    batch the related targets, and repair this skill/handoff before launching the
    next writer.
-1. Run `test_designer` before behavior-changing or regression-prone implementation and keep regression coverage in the same pass. For contract-only wrapper refactors, use static contract validation and canonical command evidence.
+1. Run `test_designer` only after the owning mechanism is established or repaired and
+   an unresolved test-owned runtime risk remains. For contract-only wrapper refactors,
+   use static contract validation and canonical command evidence.
 1. If file structure changes, plan the integration check with `python3 tools/ci/check_merge_structure.py ...`.

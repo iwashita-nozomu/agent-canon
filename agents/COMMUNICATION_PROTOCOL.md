@@ -46,6 +46,12 @@ The closure packet is transported as path+section+clause/ref references; DIC own
 traversal and closure decisions, while this protocol owns capsule visibility and
 handoff transport.
 
+Implementation design packets also carry a `source_refs` reference to the
+run-local `semantic_responsibility_contract.toml` instance. That instance is
+the allocation readback for each semantic delta: one action, its obligations,
+and exactly one primary verification owner per obligation. It is not a second
+active-packet schema or a repository-wide populated registry.
+
 After completed integration tree/remote readback, this protocol records the dispatch of the
 existing owner cleanup executors and transports their receipts into the closeout packet. The
 cleanup executors retain their existing owners and receipt formats.
@@ -260,6 +266,13 @@ record is the only gate input. Producers, shared normalizers, materializers,
 runtime checkers, and the waterfall gate must consume this same closed field
 set and schema name.
 
+The `implementation_source_packet` and `design_to_implementation_trace` entries
+must include the logical `artifact:semantic_responsibility_contract.toml`
+source reference when the task has semantic deltas. The reference points into
+the current run bundle; the contract checker validates the instance identity
+and references without turning the active packet into a second responsibility
+schema.
+
 ## Pre-Edit Repository Investigation Packet
 
 Before selecting edit paths, direct parent edits, or write-capable subagent
@@ -279,6 +292,8 @@ before implementation.
   result paths, not broad raw text-search dumps
 - `reuse_survey`: existing tools, skills, workflows, helpers, libraries, and
   why reuse / extension / deletion / new implementation was selected
+- `semantic_responsibility_contract`: run-local contract path, policy reference,
+  delta actions, obligation owners, and hard-edge closure readback
 - `stale_surface_scan`: obsolete mirror, generated artifact, legacy wrapper,
   old convention, or source-canon drift checked before edits
 - `dependency_scope`: `dependency_edit_scope.txt`, `dependency_graph.tsv`, or

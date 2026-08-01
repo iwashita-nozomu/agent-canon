@@ -38,7 +38,7 @@ Natural-language keywords do not activate this skill. `$oop-readability-check`,
 `$python-review`, and `$cpp-review` are separate downstream consumers: they
 produce post-hoc OOP/SOLID, Python, or C/C++ evidence after an implementation
 diff exists. They do not select this design owner, and this skill does not
-duplicate their checks or scores.
+duplicate their checks or evidence.
 
 When the changed surface includes a Docstring or template projection, read
 `documents/conventions/DOCSTRING_GUIDE.md` as the semantic owner. The packet
@@ -58,8 +58,8 @@ constructor/factory contract where the responsibility model requires them;
 record legal state transitions and dependency direction explicitly.
 The packet fixes responsibility, type, state, boundary, dependency, static
 delegation, implementation, and review contracts. It is a design producer, not
-an implementation, checker, post-hoc score, language-specific review, test
-first, or evaluator-writing route.
+an implementation, checker, language-specific review, test-first, or
+evaluator-writing route.
 
 ## Required output
 
@@ -70,8 +70,9 @@ Produce exactly one packet in this order:
    interfaces, factories, adapters, checkers, docs, and tests with path and symbol.
 3. `Responsibility Map`: component, subject, reason, replaceable unit, owned state,
    effects, and collaborators.
-4. `Responsibility Split Ledger`: the labeled operation/dependency graph, candidate
-   partitions, indivisible edges, coordination-only root, and split/cohesion decision.
+4. `Semantic Responsibility Contract`: semantic deltas, one implementation action per
+   delta, obligations, primary verification owners, supporting properties/roles, and
+   hard-edge closure. Use the run-local instance referenced by the active design packet.
 5. `Type Contract`: abstract roles, minimal Protocol/interface methods and typed
    signatures, type parameters, value-object fields, aggregate root, constructor or
    factory API, and error type.
@@ -87,57 +88,24 @@ Produce exactly one packet in this order:
     review gate.
 11. `Open Decisions`: genuine external blockers only; no worker naming or API choice.
 
-## Responsibility Split Ledger
+## Semantic Responsibility Contract
 
-Record a directed labeled graph `G=(V,E)` before naming a class or aggregate.
-Vertices may be candidate types/objects, invariants, legal transitions, policies,
-effects, owners, change reasons, and operations. Every edge uses one of these
-labels: `maintains-invariant`, `atomic-transition`, `owns-state`, `owns-policy`,
-`owns-effect`, `changes-for`, `verified-by`, `replaced-by`,
-`shared-transaction`, `consistency-boundary`, `substitutability-boundary`,
-`calls`, `depends-on`, or `coordinates`.
+Before naming a class, aggregate, module, or file, create or reuse the run-local
+semantic responsibility contract referenced by the active design packet. A delta has
+one action from `reuse|extend|replace|introduce` and one or more obligations. Each
+obligation has exactly one primary verification owner from the contract's owner kinds.
+Supporting evidence is recorded only for a distinct property or role.
 
-Use the fixed ledger columns below; do not decide from connected components alone:
+Close the following hard edges before describing semantic grouping:
+`invariant`, `atomic_transition`, `transaction`, `lifecycle`, `effect`,
+`consistency`, and `substitutability`. The grouping explains meaning and verification
+ownership. It does not prescribe a class, module, file, directory, or function.
 
-```text
-name, node_kind, invariant, state_transitions, policy, owner,
-verification_owner, change_reasons, external_effects,
-substitutability_boundary, replacement_boundary, cohesive_operations,
-dependency_edges, partition_cut_edges, indivisible_edges, candidate_partition,
-coordination_cost, baseline_coordination_cost, handoff_edges_current,
-handoff_edges_retained, handoff_edges_new, partition_status, rejection_reason,
-coordination_only, decision, coordination_owner, rejected_mechanical_reason
-```
-
-`node_kind` is one of `type|invariant|transition|policy|effect|owner|change_reason|operation`.
-Serialize graph edges as `source->target:label`, partitions as
-`part-<n>=<comma-separated node names>`, partition cuts as
-`part-<n>=[source->target:label,...]`, and coordination costs as non-negative
-two-decimal `Decimal` values.
-
-First close over `maintains-invariant`, `atomic-transition`,
-`shared-transaction`, `consistency-boundary`, and
-`substitutability-boundary`; none may cross a partition. Then enumerate every
-non-empty candidate partition, including `part-0` containing all nodes in
-first-seen order. Keep all current semantic handoffs and add only new semantic
-handoffs required by a partition. The baseline is the actual cost of the
-current handoff multiset, not zero. Use
-`coordination_cost(P) <= baseline_coordination_cost` and a coherent owner and
-contract for every part. This is a labeled graph decision, not a
-connected-components shortcut. A higher-cost partition is `keep_cohesive`, even when
-the responsibility dimensions look independent. Fixed rejection reasons are
-`empty-part`, `duplicate-node`, `cuts-indivisible-edge`,
-`splits-atomic-operation`, `incoherent-owner`, `not-independent`, and
-`coordination-cost-increased`.
-
-The required numeric example is an `OrderService` whose current trace has
-`place->parse_json` (1.00), `place->pricing_policy` (1.00),
-`place->repository` (1.00), `place->retry_lifecycle` (1.00), and
-`place->event_io` (1.00). Its baseline is `5.00`. A partition into adapter,
-order aggregate, pricing policy, repository Protocol, retry coordinator, event
-adapter, and a creation/connection/ordering-only coordinator retains `5.00` and
-is admissible. A partition that adds a second consistency/retry handoff costs
-`6.00` and must remain cohesive; the graph records that added handoff.
+The semantic contract is allocated before implementation. An `existing_test` owner
+records `contract_ref -> changed_mechanism_ref -> observable_assertion ->
+decidable_oracle` and a `removal_witness`. `test_designer` is a post-implementation
+route only for unresolved test-owned runtime risk after the owning mechanism is
+established or repaired.
 
 ## Type, state, and responsibility rules
 
@@ -155,12 +123,11 @@ is admissible. A partition that adds a second consistency/retry handoff costs
   and adapters perform one raw-external-to-typed normalization.
 - Policy depends on stable abstractions and typed values; details do not import
   policy. Composition roots create, connect, and order only.
-- Split independently changeable, verifiable, owned, effectful, or substitutable
-  dimensions only when the ledger admits a partition. Keep operations tied by one
-  invariant or atomic transition together. Preserve each independent invariant
-  and owner. Never use line/function count, method, file, or class size as the
-  split oracle; responsibility accumulation or an oversized responsibility is
-  evidence to model, not a mechanical partition decision.
+- Group independently changeable, verifiable, owned, effectful, or substitutable
+  meanings only after the hard-edge closure. Keep operations tied by one invariant
+  or atomic transition together and preserve each independent owner. The semantic
+  contract is the decision record; implementation shape follows the owning design,
+  dependency direction, and validation route.
 
 The packet must reject these accumulated responsibilities: an `OrderService` that
 also owns order invariants, pricing, repository access, JSON parsing, retry/lifecycle,
@@ -175,7 +142,7 @@ transitions. For each value object, record typed immutable fields, one normaliza
 boundary, equality, serialization, and typed construction failure. For each
 abstract role, record minimal operations, associated values, substitution law, and
 forbidden concrete dependencies. Every independent external effect and change reason
-is assigned to an owner before a partition is selected.
+is assigned to an owner before semantic grouping is selected.
 
 ## Boundary and composition contract
 
@@ -202,7 +169,7 @@ owners:
   targets are consumers; root-anchored build/install paths and lifecycle-owned result paths
   are read back from `documents/design/cpp-build-layout.md`.
 - Explicit `Any`: `python3 tools/agent_tools/check_static_any.py --submodule-aware`.
-- OOP/SOLID signals: `$oop-readability-check`; do not copy its score into this skill.
+- OOP/SOLID signals: `$oop-readability-check`; keep its evidence with the owning review.
 - Dependency headers/graph: `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review --fail-missing`.
 - Schema or algorithm checks: existing checker only when the changed implementation
   path is in that checker’s scope; otherwise `not_applicable`.
@@ -228,9 +195,8 @@ The implementation trace points to exact paths, symbols, validation, and review
 owners. `$oop-readability-check`, `$python-review`, and `$cpp-review` consume the
 later implementation diff; they do not feed ownership backward into this skill.
 T14 uses a fresh read-only `gpt-5.4-mini` evaluator. The evaluator reports observed
-status only; the parent owns raw bytes, score, critical-pass, convergence, final
-completion, and graph artifacts.
+status only; the parent owns raw bytes, critical-pass, convergence, final completion,
+and graph artifacts.
 
 The packet schema is `agent_canon.oop_type_design_packet.v1`. No new checker,
-registry, task role, evaluator writer, compatibility path, or keyword route is
-introduced by this skill.
+registry, task role, evaluator writer, or keyword route is introduced by this skill.

@@ -132,7 +132,12 @@ in the Codex host runtime.
 - 研究系の task では `research-workflow` を outer loop に使います。
 - tuning、探索、比較改善を backlog 付きで継続反復する task では `adaptive-improvement-loop` を outer loop にします。
 - 実験 topic の review、`run.py` 直実行、GPU/JAX 環境所有、artifact schema、notebook readiness を確認するときは `experiment-review` を使います。
-- observable behavior、regression risk、または test contract を変える code 変更では `test-design` を使い、実装前に nasty case と regression case を先に固定します。contract-only wrapper は static contract validation と canonical command evidence を使います。
+- semantic delta、obligation、一次検証 owner、hard-edge closure を実装前に割り当てるときは
+  `documents/design/semantic-responsibility-contract.md` と
+  `templates/documents/semantic-responsibility-contract.template.toml` を正本として使います。
+- `test-design` は owning mechanism の確立または修復後に、既存 owner と targeted validation
+  では閉じない test-owned runtime risk がある場合だけ起動します。contract-only wrapper は
+  static contract validation と canonical command evidence を使います。
 - owner boundary、差し替え可能な単位、validation route、public impact boundary が evidence で閉じている修正、typo / link / format-only、Routine docs、Focused code では `owner-bounded-routing` を使い、existing tool を読了 gate なしに先に実行し、owner boundary、existing-tool route、targeted validation を evidence に残します。file 数だけでは route を固定しません。
 - 文書整理で正本、generated evidence、closed issue record、重複見出しを分けるときは `document-canon-cleanup` を使います。
 - dependency manifest、reverse edge、cycle、full-repo manifest inventory、または修正対象の change-impact / repair-planning packet を作るときは `dependency-analysis` を使います。

@@ -8,6 +8,7 @@ upstream design ./coding-conventions-house-style.md shared implementation style 
 upstream design ./coding-conventions-python.md Python convention entrypoint
 upstream design ./coding-conventions-cpp.md C++ source/header ownership and target boundary
 upstream design ../design/protocols.md Protocol and type-boundary placement contract
+upstream design ../design/semantic-responsibility-contract.md semantic responsibility allocation and hard-edge grouping
 downstream implementation ../../tools/oop/python/readability.py Python OOP typed-boundary evidence
 downstream implementation ../../tools/oop/cpp/readability.py C++ OOP typed-boundary evidence
 downstream implementation ../../tools/oop/python/rule_inventory.py inventories Python OOP rule surfaces
@@ -44,6 +45,15 @@ C++ の source/header ownership、target interface、build/test/experiment bound
 - 継承は契約の特殊化に限定し、実装共有のための深い継承階層を禁止します。
 - composition を既定にし、所有する部品と lifecycle を明示します。
 - `None` を渡して内部で runtime 分岐する設計より、型、値オブジェクト、`Protocol`、`Optional` を外した別 entrypoint、または variant boundary で静的解析へ委譲します。
+
+### Semantic responsibility boundary
+
+意味上の責務を変更するときは、[Semantic Responsibility Contract](../design/semantic-responsibility-contract.md)
+で delta の action と obligation の primary verification owner を先に割り当てます。
+invariant、atomic transition、transaction、lifecycle、effect、consistency、
+substitutability は semantic grouping の hard edge として扱いますが、そこから
+class、module、file、directory の形を機械的に要求しません。OOP の構造判断は
+責務、状態、契約、dependency direction の evidence に戻します。
 
 ### C++ target responsibility
 

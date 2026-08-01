@@ -3,6 +3,7 @@
 contract policy
 responsibility Documents テスト規約（共通） for this repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../design/semantic-responsibility-contract.md semantic responsibility allocation and verification ownership
 @dependency-end
 -->
 
@@ -83,6 +84,16 @@ upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership
 cmake --build "$ROOT/build/cpp/<profile>" --target cpp-tests
 ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure
 ```
+
+## 2.5 Semantic responsibility test ownership
+
+実装前に active design packet が参照する run-local semantic responsibility
+contract で、delta の obligation と一次検証 owner を割り当てます。既存 test を
+primary owner にする場合は、contract、changed mechanism、observable assertion、
+decidable oracle、removal witness を一続きで記録します。supporting evidence は
+異なる property または role の証拠に限ります。実装 mechanism の確立後にも
+test-owned runtime risk が残る場合だけ `test_designer` を起動し、checker-owned
+property や内部形状を test へ移しません。
 
 ## 3. Unit Test Contract
 

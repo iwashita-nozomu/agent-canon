@@ -578,7 +578,7 @@ IMPLEMENTATION_GUARDRAIL_MARKERS = {
         "implementation shortcut",
     ),
     "agents/canonical/CODEX_WORKFLOW.md": (
-        "compatibility-preservation drift",
+        "legacy-route drift",
         "duplicate implementation",
         "canonical owner",
         "caller migration",

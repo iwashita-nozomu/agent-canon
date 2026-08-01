@@ -138,6 +138,13 @@ language = "python"
 summary = "Design-document claim evidence checker documentation."
 
 [[tool]]
+id = "check-semantic-responsibility-contract"
+tool = "tools/agent_tools/check_semantic_responsibility_contract.py"
+doc = "documents/tools/check_semantic_responsibility_contract.md"
+language = "python"
+summary = "Semantic responsibility contract schema, identity, and reference checker documentation."
+
+[[tool]]
 id = "dependency-module-change"
 tool = "tools/agent_tools/dependency_module_change.py"
 doc = "documents/tools/dependency_module_change.md"

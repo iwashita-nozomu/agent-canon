@@ -11,6 +11,7 @@ upstream design ../../documents/operations/BRANCH_SCOPE.md defines Git commit co
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback workflow
 upstream design ../internal-routines/design-implementation-correspondence.md design read/fingerprint/handoff correspondence route
 upstream design ../../documents/design/request-intent-and-update-relation.md compact task-packet request and update projection
+upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner allocation
 downstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -34,7 +35,7 @@ answer completion で閉じ、explicit write clause は owner handoff に進み�
 質問の operation は evidence-read、resulting state は answer-complete、completion evidence
 は evidence-backed answer と task-packet readback です。explicit write clause の operation
 は owner handoff、resulting state は write-ready、completion evidence は owner/write-set/
-acceptance readback です。update の operation は compatible active context への overlay、
+acceptance readback です。update の operation は同一 active context への overlay、
 resulting state は sparse delta、completion evidence は changed-clause と delta readback
 です。worker は selected design と DIC closure packet を implementation 前に読み、review
 は changed path から design clause への reverse trace を readback します。
@@ -80,10 +81,15 @@ chunk/checkpoint into delivery.
 Use `tools/bin/agent-canon docs check <changed-markdown-paths>` as the single
 Markdown/math/Mermaid route and consume the single official
 `agent-canon.posttooluse-stop.v1` PostToolUse/Stop dispatcher output. The
-CompletionCoverage route has no scalar OOP score, line/length, test-count,
+CompletionCoverage route has no scalar OOP metric, line/length, test-count,
 coverage, mutation, private-helper, or checker-retest completion gate.
 
 ## Stages
+
+Before implementation, the active design packet reads the run-local semantic
+responsibility contract. It allocates every semantic delta, implementation action,
+obligation, and primary verification owner before the worker handoff. The worker
+does not create a second semantic ledger; review reads the same instance back.
 
 1. intake and semantic decision sufficiency
 1. owner-critical context and validation route
@@ -120,8 +126,8 @@ route are ready.
 - repo-changing implementation / patch / doc-edit work では、別の writer
   が必要なときだけ selected write-capable implementer handoff を bootstrap
   または schedule する。owner、責務、context、write authority、validation
-  route が互換な active agent は revised scope でも再利用する。独立 review、
-  disjoint write authority、互換性のない owner/context、または context
+  route が同一の active agent は revised scope でも再利用する。独立 review、
+  disjoint write authority、異なる owner/context、または context
   integrity failure の場合だけ fresh agent を起動する。parent-direct repo
   edit は、別 writer が不要な場合でも明示承認または spawn/tool gate blocker
   の例外証拠を記録する既存ルートに従う
@@ -165,6 +171,7 @@ route are ready.
   場合の supplemental evidence としてだけ使います。広い実行を予定する前に、
   静的解析・読み取りで何が未確認として残ったかを記録します。
 - 詳細設計が編集対象 path に絞る前に、責務 model、概念 graph または layer model、非対象、将来拡張 layer、評価軸、canonical surface 関係を含む `Abstract Design Frame` を書くか引用する。実装 scope、file list、validation は nearest editable path や current finding ではなく、この frame から導く
+- semantic responsibility contract の run-local instance を active design packet から参照し、実装前に obligation と一次検証 owner を割り当てる。各 delta は `reuse|extend|replace|introduce` のいずれか一つの action を持ち、hard-edge closure は semantic grouping だけを決める。
 - 実装 path を選ぶ前に、承認済み design packet が owner、canonical paths、forbidden paths、required checks をすでに固定していない限り、`python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json` を走らせるか引用する。bounded candidate path を source packet seed にし、responsibility search と dependency scope で owner、edit scope、forbidden path を確定する。deterministic search が失敗した場合は path selection を `router_unavailable_blocker` へ遷移させ、owner、responsibility、dependency evidence が一つの canonical route を示した時点で継続する
 - 編集前の repo 調査は `agents/COMMUNICATION_PROTOCOL.md` が所有する `Pre-Edit Repository Investigation Packet` として固定する。既存 repo 調査が甘いまま実装へ進んだ場合は、差分を広げる前にこの packet を作り直す
 - `Pre-Edit Repository Investigation Packet` は、次に進む具体的な作業と担当者を 1 つ書いて閉じます。別の探索へ広げる前に、その作業を実装、検証、Issue 処理のいずれかへ進めます。
@@ -188,7 +195,7 @@ route are ready.
   runtime contract、config surface の判断不足は `design_issue_blocker` として
   扱い、implementation shortcut にしません。
 - 実装前に承認済み `design_brief.md` の `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map`、`Design-To-Implementation Trace` を読み、各 implementation slice と downstream side effect が抽象責務 model から導かれていることを確認してから design artifact path、design section、test-plan item、user-request clause ID を引用する
-- 実装中に設計上の問題を見つけたら、勝手に実装で吸収せず `design_issue_blocker` と evidence を記録して詳細設計 / design review へ戻る。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾を、local fallback、wrapper、helper、分岐、互換 route、test 緩和、説明だけの上書きで処理してはいけない
+- 実装中に設計上の問題を見つけたら、勝手に実装で吸収せず `design_issue_blocker` と evidence を記録して詳細設計 / design review へ戻る。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾を、local fallback、wrapper、helper、分岐、別経路、test 緩和、説明だけの上書きで処理してはいけない
 - implementation slice は contract-complete implementation として閉じる。request clause、acceptance contract、`Implementation Source Packet`、validation route を結び、要求を縮める implementation shortcut を見つけたら `design_issue_blocker` と evidence を記録して design review へ戻る
 - 見た目の広さ、`Owner-Bounded Change`、MVP、thin slice は暫定的な routing、wave、validation profile の signal に留めます。実装 behavior は request clauses、acceptance contract、implementation source packet、design trace、dependency-expanded scope、validation route、review gate から導き、owner boundary や impact surface が違うと分かった時点で route を更新します。
 - 同じ implementation pass で直せるのは、承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従だけです。判断が必要なら設計問題として扱う
@@ -256,7 +263,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. ユーザー向けの作業更新、最終報告、レビュー要約、handoff guidance、reader-facing docs は日本語で書く。内部の field name、enum value、role key、helper 風の語は、command、path、table、正確な evidence reference に閉じる。専門語が必要な場合は、既存の repository term または外部標準 term を使い、自然文で説明する。
 1. During requirements, resolve avoidable ambiguity from notes, guardrails, documents, prior logs, and local code or tests before asking the user; record the sweep and evidence in `user_request_contract.md`.
 1. Keep `unknown_or_open_question` out of active must-do, must-not-do, and completion-evidence clauses; move remaining unknowns to deferred or escalation entries after the sweep.
-1. For repo-changing implementation / patch / doc-edit work, bootstrap or schedule a selected write-capable implementer only when a separate writer is needed. Reuse a compatible active agent for revised scope; independent review, disjoint write authority, incompatible owner/context, or failed context integrity require a fresh agent. Plan, detailed-design, and document-flow reviewers are selected only when an owner-critical validation or unresolved branch activates them. Routine docs and Focused code still use targeted validation, and parent-direct edits follow the recorded exception route when required.
+1. For repo-changing implementation / patch / doc-edit work, bootstrap or schedule a selected write-capable implementer only when a separate writer is needed. Reuse the same active agent for revised scope; independent review, disjoint write authority, differing owner/context, or failed context integrity require a fresh agent. Plan, detailed-design, and document-flow reviewers are selected only when an owner-critical validation or unresolved branch activates them. Routine docs and Focused code still use targeted validation, and parent-direct edits follow the recorded exception route when required.
 1. If the user explicitly asks for subagent coding/implementation/patch/editing, route completion through the selected write-capable implementer after the pre-handoff investigation packet derives dependency-expanded handoff scope, validation route, and `tool_rejection_preflight` evidence from route seed, responsibility search, reuse survey, and stale-surface scan.
 1. Use `agents/canonical/ARTIFACT_PLACEMENT.md` before creating task-facing documents.
 1. Before detailed design selects implementation paths, write or cite an abstract design frame: responsibility model, concept graph or layer model, non-goals, future extension layers, evaluation axes, and canonical-surface relationships. Implementation scope, file list, and validation must be derived from that frame rather than from the nearest editable path or current finding alone.
@@ -287,7 +294,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Update canonical docs before runtime entrypoints when both are affected.
 1. Before implementation, close the Design Integrity Gate: the `Abstract Design Frame` or parent-direct design-boundary note must name the responsibility model, replaceable unit, non-goals, and validation route before file-level work starts. Missing API shape, responsibility boundary, path layout, naming, algorithm, test oracle, dependency direction, runtime contract, or config-surface decisions are `design_issue_blocker` findings, not implementation latitude.
 1. Before implementation, read the approved `design_brief.md` `Abstract Design Frame`, `Implementation Source Packet`, `Design Side-Effect Map`, and `Design-To-Implementation Trace`; confirm each implementation slice and downstream side effect is derived from the abstract responsibility model before citing the design artifact path, design section, test-plan item, and user-request clause IDs.
-1. If implementation exposes a design issue, record `design_issue_blocker=<issue>` plus evidence and return to detailed design / design review. API shape, responsibility boundary, path layout, naming, algorithm, theorem target, test oracle, dependency direction, runtime contract, and config-surface gaps resolve through design review, with local fallback, wrappers, helpers, branches, compatibility routes, test relaxation, and docs overwrite treated as out-of-scope routes.
+1. If implementation exposes a design issue, record `design_issue_blocker=<issue>` plus evidence and return to detailed design / design review. API shape, responsibility boundary, path layout, naming, algorithm, theorem target, test oracle, dependency direction, runtime contract, and config-surface gaps resolve through design review, with local fallback, wrappers, helpers, branches, alternate routes, test relaxation, and docs overwrite treated as out-of-scope routes.
 1. Close each implementation slice as a contract-complete implementation. Link the request clause, acceptance contract, `Implementation Source Packet`, and validation route; if the work would shrink the requested behavior into an implementation shortcut, record `design_issue_blocker=<issue>` plus evidence and return to design review.
 1. Treat apparent breadth, `Owner-Bounded Change`, MVP, and thin slice labels as provisional routing, wave, and validation-profile signals. Implementation behavior is derived from the request clauses, acceptance contract, implementation source packet, design trace, dependency-expanded scope, validation route, and review gate. Revise the route when those sources show a different owner boundary or impact surface.
 1. Only typo, formatting, import, and bounded mechanical follow-through that is uniquely determined by the approved design, local precedent, and existing responsibility boundary may be fixed in the same implementation pass. Anything requiring judgment is a design issue.
