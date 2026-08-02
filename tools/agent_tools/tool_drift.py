@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
@@ -67,6 +68,16 @@ class TextCheck:
 
 
 @dataclass(frozen=True)
+class CommandCheck:
+    """One required shell command pattern for a tool contract."""
+
+    path: str
+    pattern: str
+    detail: str
+    required_count: int = 1
+
+
+@dataclass(frozen=True)
 class ToolContract:
     """One tool/convention consistency contract."""
 
@@ -74,6 +85,7 @@ class ToolContract:
     tool: str
     links: tuple[LinkCheck, ...]
     text_checks: tuple[TextCheck, ...] = ()
+    command_checks: tuple[CommandCheck, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -260,10 +272,11 @@ CONTRACTS = (
             LinkCheck("templates/agents/closeout_gate.md"),
             LinkCheck("tests/agent_tools/test_generated_artifact_guard.py"),
         ),
-        text_checks=(
-            TextCheck(
+        text_checks=(),
+        command_checks=(
+            CommandCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
+                r'^python3\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/generated_artifact_guard\.py"\s+--root\s+"\$\{WORKSPACE_ROOT\}"\s*$',
                 "missing-generated-artifact-pr-guard",
             ),
         ),
@@ -287,18 +300,8 @@ CONTRACTS = (
         text_checks=(
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing',
-                "missing-strict-dependency-review",
-            ),
-            TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
                 'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"',
                 "missing-agent-runtime-alignment-check",
-            ),
-            TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
-                'python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate',
-                "missing-accumulated-agent-eval-producer",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
@@ -309,6 +312,18 @@ CONTRACTS = (
                 "tools/ci/check_agent_canon_pr.sh",
                 "not_applicable_standalone_source",
                 "missing-standalone-shared-surface-skip",
+            ),
+        ),
+        command_checks=(
+            CommandCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                r'^bash\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/run_repo_dependency_review\.sh"\s+--fail-missing\s+--cycle-report-only\s+--report-dir\s+"\$\{PR_DEPENDENCY_REVIEW_DIR\}"\s*$',
+                "missing-strict-dependency-review",
+            ),
+            CommandCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                r'^(?:AGENT_CANON_HOOK_ARCHIVE_DIR="\$\{PR_HOOK_ARCHIVE_DIR\}"\s+)?python3\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/run_accumulated_agent_evals\.py"\s+--run-id\s+agent-canon-pr-gate\s+--log-dir\s+"\$\{PR_AGENT_EVAL_LOG_DIR\}"\s*$',
+                "missing-accumulated-agent-eval-producer",
             ),
         ),
     ),
@@ -599,6 +614,87 @@ def check_text(
     ]
 
 
+def collect_shell_executable_commands(path: Path) -> tuple[str, ...]:
+    """Collect executable command lines from a shell script."""
+    raw_lines = path.read_text(encoding="utf-8").splitlines()
+    continuation_lines: list[str] = []
+    current = ""
+    for raw_line in raw_lines:
+        without_newline = raw_line.rstrip()
+        if without_newline.endswith("\\"):
+            current += (" " if current else "") + without_newline[:-1].rstrip()
+            continue
+        full_line = current + (" " if current else "") + without_newline
+        current = ""
+        continuation_lines.append(full_line)
+    if current:
+        continuation_lines.append(current)
+
+    commands: list[str] = []
+    disabled_depth = 0
+    for raw_line in continuation_lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+        if re.match(r"^\s*#", line):
+            continue
+        if re.match(r"^\s*:", line):
+            continue
+        if re.match(r"^\s*(echo|printf)\b", line):
+            continue
+        if re.search(r"\|\|\s*true\b", line):
+            continue
+        if re.match(r"^\s*if\b.*\bfalse\b.*\bthen\b\s*$", line):
+            disabled_depth += 1
+            continue
+        if re.match(r"^\s*fi\b", line):
+            disabled_depth = max(0, disabled_depth - 1)
+            continue
+        if disabled_depth > 0:
+            continue
+        line = line.split(" #", 1)[0].rstrip()
+        if not line:
+            continue
+        commands.append(re.sub(r"\s+", " ", line))
+    return tuple(commands)
+
+
+def check_command(
+    root: Path, contract: ToolContract, command_check: CommandCheck
+) -> list[Finding]:
+    """Check one required shell command pattern."""
+    path = resolve_repo_path(root, command_check.path)
+    if not path.is_file():
+        return [
+            Finding("missing-file", contract.name, command_check.path, command_check.detail)
+        ]
+    commands = collect_shell_executable_commands(path)
+    pattern = re.compile(command_check.pattern)
+    hits = [command for command in commands if pattern.search(command)]
+    if not hits:
+        return [
+            Finding(
+                "missing-required-command",
+                contract.name,
+                command_check.path,
+                command_check.detail,
+            )
+        ]
+    if len(hits) != command_check.required_count:
+        return [
+            Finding(
+                "duplicate-required-command",
+                contract.name,
+                command_check.path,
+                (
+                    f"{command_check.detail}:actual={len(hits)}:"
+                    f"expected={command_check.required_count}"
+                ),
+            )
+        ]
+    return []
+
+
 def projected_runtime_snippet(root: Path, snippet: str) -> str:
     """Map standalone AgentCanon tool paths to a parent runtime projection."""
     if not (root / "tools" / "agent-canon").exists() or (root / "tools" / "ci").exists():
@@ -731,6 +827,8 @@ def run_checks(root: Path, names: Sequence[str]) -> list[Finding]:
             findings.extend(check_link(contract, link, all_edges))
         for text_check in contract.text_checks:
             findings.extend(check_text(root, contract, text_check))
+        for command_check in contract.command_checks:
+            findings.extend(check_command(root, contract, command_check))
         if contract.name == "tool_catalog":
             findings.extend(check_catalog_entries(root))
     return sorted(

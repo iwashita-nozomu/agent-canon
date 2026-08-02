@@ -325,9 +325,101 @@ class CheckToolConventionDriftTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "missing-required-text:agent_canon_pr_check:"
+                "missing-required-command:agent_canon_pr_check:"
                 "tools/ci/check_agent_canon_pr.sh:"
                 "missing-strict-dependency-review",
+                result.stdout,
+            )
+
+    def test_pr_check_strict_dependency_review_command_does_not_count_comment(self) -> None:
+        """Dependency-review command only in comments is rejected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_agent_canon_pr_contract(root)
+            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            command = (
+                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
+                '--fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"'
+            )
+            script.write_text(
+                script.read_text(encoding="utf-8").replace(command, f"# {command}"),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-command:agent_canon_pr_check:"
+                "tools/ci/check_agent_canon_pr.sh:"
+                "missing-strict-dependency-review",
+                result.stdout,
+            )
+
+    def test_pr_check_strict_dependency_review_command_does_not_count_echo_printf_or_suppression(self) -> None:
+        """Dependency-review command via echo/printf/suppression is rejected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_agent_canon_pr_contract(root)
+            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            command = (
+                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
+                '--fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"'
+            )
+            script.write_text(
+                script.read_text(encoding="utf-8").replace(
+                    command, f'echo "{command}"\nprintf "{command}"\n{command} || true'
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-command:agent_canon_pr_check:"
+                "tools/ci/check_agent_canon_pr.sh:"
+                "missing-strict-dependency-review",
+                result.stdout,
+            )
+
+    def test_pr_check_strict_dependency_review_command_is_recognized_once(self) -> None:
+        """Duplicate dependency-review invocation in PR check is rejected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_agent_canon_pr_contract(root)
+            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            command = (
+                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
+                '--fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"'
+            )
+            script.write_text(
+                script.read_text(encoding="utf-8") + f"\n{command}\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "duplicate-required-command:agent_canon_pr_check:"
+                "tools/ci/check_agent_canon_pr.sh:"
+                "missing-strict-dependency-review:actual=2:expected=1",
+                result.stdout,
+            )
+
+    def test_pr_check_strict_dependency_review_command_passes(self) -> None:
+        """Canonical dependency-review command passes command extraction."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_agent_canon_pr_contract(root)
+
+            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn(
+                "missing-required-command:agent_canon_pr_check:"
+                "tools/ci/check_agent_canon_pr.sh:",
                 result.stdout,
             )
 
@@ -347,7 +439,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "missing-required-text:agent_canon_pr_check:"
+                "missing-required-command:agent_canon_pr_check:"
                 "tools/ci/check_agent_canon_pr.sh:"
                 "missing-accumulated-agent-eval-producer",
                 result.stdout,
@@ -391,7 +483,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "missing-required-text:generated_artifact_guard:"
+                "missing-required-command:generated_artifact_guard:"
                 "tools/ci/check_agent_canon_pr.sh:"
                 "missing-generated-artifact-pr-guard",
                 result.stdout,
