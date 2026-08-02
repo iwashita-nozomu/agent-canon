@@ -39,8 +39,8 @@ downstream design ../../README.md AgentCanon source reader route
 ├── README.md                         # parent-owned regular file
 ├── .devcontainer/                    # parent-owned regular directory
 │   ├── devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json
-│   ├── parent-environment.sh         # parent environment value source; initially empty
-│   ├── parent-environment.toml       # ordered variable-name manifest
+│   ├── parent-environment.sh         # optional pair: value source
+│   ├── parent-environment.toml       # optional pair: ordered name manifest
 │   └── post-create-parent.sh         # parent-specific source
 ├── .gitmodules                       # AgentCanon submodule declaration
 ├── documents/README.md                # parent document index
@@ -90,10 +90,14 @@ Regular surface は親レポが ownership を持ち、親固有の責務や stat
 - `python/`、`src/`、`include/`、`lib/`: 親レポの production implementation。
 - `goal.md`: 親レポ固有の current task state。AgentCanon view に戻さない。
 
-`.devcontainer/parent-environment.sh` は親環境の値の唯一の source、
-`.devcontainer/parent-environment.toml` は ordered variable names のみを持つ
-regular file です。validator は shell を実行せず、許可された export line と TOML
-の順序付き name を完全一致させます。
+`.devcontainer/parent-environment.sh` と
+`.devcontainer/parent-environment.toml` は optional pair です。両方がない状態は
+parent environment 無効として成立します。有効にする場合は両 path を宣言し、各 path
+が regular file または regular file へ解決できる Symlink であることを必要条件にします。
+片方だけの宣言と、実体がない・file 以外へ解決する Symlink は失敗です。shell file は
+親環境の値の唯一の source、TOML は ordered variable names のみを持つ manifest であり、
+validator は shell を実行せず、許可された export line と TOML の順序付き name を
+完全一致させます。
 
 ## Directory owner document
 
@@ -134,10 +138,11 @@ AgentCanon の実体パスを直接呼び出します。
 - `post-create-parent.sh` は shared post-create の成功後に呼ぶ親固有 source とする。
 - Compose の生成物は親の `.agent-canon/docker-compose.generated.yml` に置く。
 - 親の default pack が zsh を選ぶ場合、generator は pack の `runtime.shell` を
-  process boundary とし、host の `${HOME}/.zshrc` expression と parent environment
-  script を read-only mount する。validator はこの source expression、bind type、target、
-  read-only を静的に確認する。実行時には host `${HOME}/.zshrc` が regular file である
-  必要があり、代替 path は探索しない。
+  process boundary とし、host の `${HOME}/.zshrc` expression を read-only mount
+  する。parent environment pair が有効な場合だけ、その shell source も read-only
+  mount する。validator は各 source expression、bind type、target、read-only を静的に
+  確認する。実行時には host `${HOME}/.zshrc` が regular file である必要があり、代替
+  path は探索しない。
 
 この分離により、shared runtime の更新と親プロジェクトの hook / build 設定を
 別々に review でき、親固有の変更が AgentCanon source の pin を汚染しません。
@@ -173,6 +178,7 @@ path / mode の判定は `repo_structure_contract.py` と surface manifest check
 委譲します。README の tree と checker の結果が異なる場合は、まず ownership と
 manifest を確認し、Symlink を実体に置き換えて合わせません。
 
-parent environment の構造 path は必要条件です。readiness や structure checker の
-pass は、Compose の runtime behavior、image-owned zsh startup、または parent value
-の意味が成立したことを単独では証明しません。
+parent environment は optional pair の両方不在、または両方が file 実体へ解決できる
+状態を構造上の必要条件にします。readiness や structure checker の pass は、Compose
+の runtime behavior、image-owned zsh startup、または parent value の意味が成立した
+ことを単独では証明しません。

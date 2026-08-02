@@ -301,6 +301,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             def fail_diff(
                 command_root: Path,
                 args: list[str] | tuple[str, ...],
+                extra_environment: dict[str, str] | None = None,
             ) -> subprocess.CompletedProcess[str]:
                 if args and args[0] == "diff":
                     return subprocess.CompletedProcess(
@@ -309,7 +310,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                         stdout="",
                         stderr="fixture diff failure",
                     )
-                return real_run_git(command_root, args)
+                return real_run_git(command_root, args, extra_environment)
 
             with patch.object(selector, "run_git", side_effect=fail_diff):
                 with self.assertRaises(selector.SelectorFailure) as raised:
@@ -317,8 +318,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
 
         self.assertEqual(raised.exception.reason, "pr_changed_paths_diff_failed")
 
-    def test_ci_prepares_shallow_pull_request_base_and_passes_exact_argument(self) -> None:
-        """CI deepens a depth-one checkout and binds selection to the event base."""
+    def test_ci_auth_required_fetch_succeeds_without_persisting_credential(self) -> None:
+        """CI authenticates a needed fetch and binds selection to the event base."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             checkout, event, base = shallow_pr_checkout(root)
@@ -326,6 +327,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 "GITHUB_ACTIONS": "true",
                 "GITHUB_EVENT_NAME": "pull_request",
                 "GITHUB_EVENT_PATH": str(event),
+                "AGENT_CANON_PR_READ_TOKEN": "fixture-read-token",
             }
             unresolved = subprocess.run(
                 ["git", "rev-parse", "--verify", f"{base}^{{commit}}"],
@@ -336,17 +338,112 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             )
             self.assertNotEqual(unresolved.returncode, 0)
 
-            prepared, source = selector.prepare_ci_base(checkout, environment)
+            real_run_git = selector.run_git
+            fetch_environments: list[dict[str, str]] = []
+
+            def inspect_fetch(
+                command_root: Path,
+                args: list[str] | tuple[str, ...],
+                extra_environment: dict[str, str] | None = None,
+            ) -> subprocess.CompletedProcess[str]:
+                if args and args[0] == "fetch":
+                    self.assertEqual(tuple(args[-2:]), ("origin", base))
+                    self.assertIsNotNone(extra_environment)
+                    fetch_environment = dict(extra_environment or {})
+                    self.assertEqual(fetch_environment["GIT_TERMINAL_PROMPT"], "0")
+                    self.assertEqual(
+                        fetch_environment["GIT_CONFIG_KEY_0"],
+                        "http.https://github.com/.extraheader",
+                    )
+                    self.assertTrue(
+                        fetch_environment["GIT_CONFIG_VALUE_0"].startswith(
+                            "AUTHORIZATION: basic "
+                        )
+                    )
+                    fetch_environments.append(fetch_environment)
+                return real_run_git(command_root, args, extra_environment)
+
+            with patch.object(selector, "run_git", side_effect=inspect_fetch):
+                prepared = selector.prepare_ci_base(checkout, environment)
 
             diff = selector.load_diff(
                 checkout,
                 environment,
-                prepared,
+                prepared.base_sha,
+            )
+            persisted = subprocess.run(
+                [
+                    "git",
+                    "config",
+                    "--local",
+                    "--get-all",
+                    "http.https://github.com/.extraheader",
+                ],
+                cwd=checkout,
+                check=False,
+                capture_output=True,
+                text=True,
             )
 
         self.assertEqual(diff.base_sha, base)
-        self.assertEqual(source, "github_event_pull_request_base_sha")
+        self.assertTrue(prepared.fetched)
+        self.assertEqual(len(fetch_environments), 1)
+        self.assertEqual(prepared.base_source, "github_event_pull_request_base_sha")
         self.assertEqual(diff.base_source, "github_event_pull_request_base_sha")
+        self.assertNotEqual(persisted.returncode, 0)
+        self.assertEqual(persisted.stdout, "")
+
+    def test_ci_skips_fetch_when_base_object_and_history_are_available(self) -> None:
+        """A complete checkout needs neither a fetch nor a read credential."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = commit_change(root, "vendor/agent-canon")
+            event = root / "event.json"
+            event.write_text(
+                json.dumps({"pull_request": {"base": {"sha": base}}}),
+                encoding="utf-8",
+            )
+            environment = {
+                "GITHUB_ACTIONS": "true",
+                "GITHUB_EVENT_NAME": "pull_request",
+                "GITHUB_EVENT_PATH": str(event),
+            }
+            real_run_git = selector.run_git
+
+            def reject_fetch(
+                command_root: Path,
+                args: list[str] | tuple[str, ...],
+                extra_environment: dict[str, str] | None = None,
+            ) -> subprocess.CompletedProcess[str]:
+                if args and args[0] == "fetch":
+                    self.fail("history-ready CI preparation must not fetch")
+                return real_run_git(command_root, args, extra_environment)
+
+            with patch.object(selector, "run_git", side_effect=reject_fetch):
+                prepared = selector.prepare_ci_base(root, environment)
+
+        self.assertEqual(prepared.base_sha, base)
+        self.assertFalse(prepared.fetched)
+
+    def test_ci_missing_fetch_credential_is_typed_failure(self) -> None:
+        """A fetch-required GitHub checkout fails before unauthenticated fetch."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            checkout, event, _base = shallow_pr_checkout(root)
+            with self.assertRaises(selector.SelectorFailure) as raised:
+                selector.prepare_ci_base(
+                    checkout,
+                    {
+                        "GITHUB_ACTIONS": "true",
+                        "GITHUB_EVENT_NAME": "pull_request",
+                        "GITHUB_EVENT_PATH": str(event),
+                    },
+                )
+
+        self.assertEqual(
+            raised.exception.reason,
+            "pr_base_read_credential_missing",
+        )
 
     def test_ci_rejects_missing_or_mismatched_trusted_base_argument(self) -> None:
         """Normal CI selection cannot invent or replace the prepared event base."""

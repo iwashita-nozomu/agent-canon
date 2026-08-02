@@ -45,6 +45,8 @@ AGENT_CANON_CREDENTIALS = (
     "AGENT_CANON_REPO_TOKEN",
     "AGENT_CANON_REPO_SSH_KEY",
 )
+AGENT_CANON_PR_READ_CREDENTIAL = "AGENT_CANON_PR_READ_TOKEN"
+GITHUB_TOKEN_EXPRESSION = "${{ github.token }}"
 WORKFLOW_DISPATCH_INPUT_PATTERN = re.compile(
     r"\$\{\{\s*(?:inputs|github\.event\.inputs)"
     r"\s*(?:\.\s*[A-Za-z_][A-Za-z0-9_-]*|\[\s*['\"][^'\"]+['\"]\s*\])"
@@ -523,11 +525,11 @@ def agent_canon_static_gate_findings(
     findings: list[Finding] = []
     wrapper = "bash tools/ci/check_agent_canon_pr.sh"
     run_steps = [
-        (context.index, run)
+        (context, run)
         for context in step_contexts(workflow)
         if isinstance((run := context.step.get("run")), str)
     ]
-    wrapper_steps = [index for index, run in run_steps if wrapper in run]
+    wrapper_steps = [context for context, run in run_steps if wrapper in run]
     if len(wrapper_steps) != 1:
         findings.append(
             Finding(
@@ -536,9 +538,35 @@ def agent_canon_static_gate_findings(
                 f"canonical_candidate_gate_consumer_count:{len(wrapper_steps)}",
             )
         )
+    non_step_read_credential = AGENT_CANON_PR_READ_CREDENTIAL in (
+        set(as_string_dict(workflow.get("env")) or {})
+        | {
+            name
+            for _job_name, job in job_items(workflow)
+            for name in set(as_string_dict(job.get("env")) or {})
+        }
+    )
+    if non_step_read_credential:
+        findings.append(
+            Finding(
+                "error",
+                path,
+                "canonical_candidate_gate_read_credential_must_be_step_local",
+            )
+        )
+    for context in wrapper_steps:
+        step_env = as_string_dict(context.step.get("env")) or {}
+        if step_env.get(AGENT_CANON_PR_READ_CREDENTIAL) != GITHUB_TOKEN_EXPRESSION:
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    f"run_step_{context.index}_missing_step_local_github_read_credential",
+                )
+            )
     if re.search(r"(?m)^  push:\s*$", workflow_text):
         findings.append(Finding("error", path, "duplicate_push_trigger_for_candidate_gate"))
-    for index, run in run_steps:
+    for context, run in run_steps:
         if wrapper in run:
             continue
         for command in AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS:
@@ -547,7 +575,7 @@ def agent_canon_static_gate_findings(
                     Finding(
                         "error",
                         path,
-                        f"run_step_{index}_duplicates_canonical_gate:{command}",
+                        f"run_step_{context.index}_duplicates_canonical_gate:{command}",
                     )
                 )
     return findings

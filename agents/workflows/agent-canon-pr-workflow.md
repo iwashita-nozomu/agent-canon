@@ -207,14 +207,21 @@ standalone AgentCanon source checkout retains the strict source graph gate.
 
 GitHub Actions resolves the comparison base from
 `pull_request.base.sha` in its trusted event payload. Before normal selection,
-`check_agent_canon_pr.sh` invokes `--prepare-ci-base`, fetches the exact event SHA
-and connected history even from a depth-one checkout, then supplies the emitted
-SHA as `--trusted-base-sha`. The selector requires that argument to equal the
-event SHA and rejects CI `AGENT_CANON_PR_BASE_REF` overrides. Local and test
-callers provide `AGENT_CANON_PR_BASE_REF` explicitly and cannot use the trusted
-CI argument. A base equal to `HEAD`, an unresolvable or history-unreachable base,
-and failed fetch or diff commands produce a typed selector failure; no fallback
-base or empty-diff success is inferred.
+`check_agent_canon_pr.sh` invokes `--prepare-ci-base`. The selector first verifies
+that the exact event base object and the merge-base history needed for comparison
+are already available; that state skips fetch and needs no credential. When a
+shallow or incomplete checkout needs fetch, the workflow supplies
+`AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}` only to the static-gate step, and
+the selector applies it through process-local Git configuration for the exact
+event SHA. The credential is not written to checkout or repository Git config,
+and `actions/checkout` retains `persist-credentials: false`. Public, private, and
+fork PRs use this same trusted event-SHA route. The emitted SHA is supplied as
+`--trusted-base-sha`; the selector requires it to equal the event SHA and rejects
+CI `AGENT_CANON_PR_BASE_REF` overrides. Local and test callers provide
+`AGENT_CANON_PR_BASE_REF` explicitly and retain their credential-free route. A
+missing fetch credential, base equal to `HEAD`, unresolvable or
+history-unreachable base, and failed fetch or diff command produce a typed
+selector failure; no fallback base or empty-diff success is inferred.
 
 ### One-Judgment-Owner Check Handoff
 

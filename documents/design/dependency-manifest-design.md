@@ -130,15 +130,21 @@ selector itself. Strict graph validation remains the semantic authority after
 selection; the bootstrap read only decides whether that authority is required.
 
 CI comparison uses the pull request base SHA from the trusted GitHub event.
-The PR entrypoint first runs the selector's `--prepare-ci-base` mode, fetches that
-exact commit while deepening a shallow checkout to connected history, and passes
-the emitted SHA back through `--trusted-base-sha`. Normal selection accepts the
-argument only when it exactly matches the event SHA; CI
-`AGENT_CANON_PR_BASE_REF` overrides and local trusted-base arguments are typed
-failures. Local and fixture selection supplies an explicit
-`AGENT_CANON_PR_BASE_REF`. Equal-to-HEAD, unresolved, history-unreachable, fetch,
-or diff failures do not become an empty change set. Unknown profile IDs and
-malformed canonical profile/surface owners fail by the same rule.
+The PR entrypoint first runs the selector's `--prepare-ci-base` mode. An existing
+exact base object with usable merge-base history skips fetch without requiring a
+credential. If the checkout is shallow or incomplete, only the static-gate step
+receives `AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}`; the selector uses it as
+process-local Git configuration while fetching the exact event SHA and connected
+history. It does not persist the credential in checkout or repository Git config,
+and `actions/checkout` keeps `persist-credentials: false`. Public, private, and
+fork PRs all use that same trusted event-SHA route. The emitted SHA is passed back
+through `--trusted-base-sha`, and normal selection accepts the argument only when
+it exactly matches the event SHA. CI `AGENT_CANON_PR_BASE_REF` overrides and local
+trusted-base arguments are typed failures. Local and fixture selection supplies
+an explicit, credential-free `AGENT_CANON_PR_BASE_REF`. Equal-to-HEAD, unresolved,
+history-unreachable, missing-fetch-credential, fetch, or diff failures do not
+become an empty change set. Unknown profile IDs and malformed canonical
+profile/surface owners fail by the same rule.
 
 The receipt's owner/root/PID/status binding and required skipped
 reason/evidence are sufficient for the checker-to-quick-CI handoff. A
