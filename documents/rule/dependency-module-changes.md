@@ -67,7 +67,7 @@ owner 引数または topic environment owner を再利用し、他に明示指�
 | 親 vendor 状態 | topic identity | owner / next action |
 | --- | --- | --- |
 | clean `main`、かつ worktree `HEAD == :$PREFIX` staged index gitlink | 不要 | parent pin/root projection pass |
-| clean `main`、requested topic != current `vendor/<module>` branch | requested topic | `--placement workspace` で requested topic の workspace clone を作成し、`vendor/<module>` は source owner のまま維持 |
+| clean `main`、requested topic != current `vendor/<module>` branch | requested topic | vendor-first で requested topic の branch を作成/継続し、`vendor/<module>` を source owner として維持 |
 | named topic branch。committed difference と non-colliding local materialized path を含めてよい | `current_branch` または同一 requested topic | current `vendor/<module>` が source owner。dirty / ahead / diverged は evidence として保持 |
 | named topic branch、requested topic != named `current_branch` | requested topic | `workspace/<sanitized-requested-topic>/agent-canon` fallback。`workspace/main` は生成しない |
 | requested topic の sanitized identity が `main` | `main` | typed stop: `NEXT_ACTION=topic_identity_required` |
