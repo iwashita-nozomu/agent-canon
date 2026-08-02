@@ -27,11 +27,23 @@ if [[ "$#" -ne 0 ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-SUPERPROJECT_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
-if [ -n "${SUPERPROJECT_ROOT}" ]; then
-  WORKSPACE_ROOT="${SUPERPROJECT_ROOT}"
-else
-  WORKSPACE_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel)"
+source "${SCRIPT_DIR}/../lib/repo_paths.sh"
+WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
+CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "${WORKSPACE_ROOT}")"
+CANON_SYNC_TOOL="${CANON_TOOLS_ROOT}/sync_agent_canon.sh"
+if [ ! -f "${CANON_SYNC_TOOL}" ]; then
+  CANON_SYNC_TOOL="${CANON_TOOLS_ROOT}/agent-canon/sync_agent_canon.sh"
+fi
+if [ ! -f "${CANON_SYNC_TOOL}" ]; then
+  echo "AGENT_CANON_PR_SOURCE_TOOLS_ROOT=missing"
+  echo "AGENT_CANON_PR_SOURCE_TOOLS_REASON=agent_canon_source_tools_root_resolve_failed"
+  exit 1
+fi
+AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${HOME}/.tools/agent-canon/cargo-target}"
+AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
+if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
+  && [ -f "${WORKSPACE_ROOT}/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]; then
+  AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
 fi
 cd "${WORKSPACE_ROOT}"
 
@@ -77,20 +89,25 @@ else
 fi
 run_direct_agent_checks() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-    bash tools/sync_agent_canon.sh check
+    bash "${CANON_SYNC_TOOL}" check
   else
     echo "SHARED_SURFACE_DRIFT=not_applicable_standalone_source"
   fi
-  python3 tools/agent_tools/check_agent_runtime_alignment.py
+  run_convention_compliance_gate
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"
   AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 tools/agent_tools/evaluate_codex_agent_roles.py --accumulate
+    python3 "${CANON_TOOLS_ROOT}/agent_tools/evaluate_codex_agent_roles.py" --accumulate
   AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate
+    python3 "${CANON_TOOLS_ROOT}/agent_tools/evaluate_skill_workflow_prompts.py" --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate
+}
+
+run_convention_compliance_gate() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json
 }
 
 run_shared_surface_status() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-    bash tools/sync_agent_canon.sh status
+    bash "${CANON_SYNC_TOOL}" status
   else
     echo "SHARED_SURFACE_STATUS=not_applicable_standalone_source"
   fi
@@ -98,10 +115,38 @@ run_shared_surface_status() {
 
 run_shared_surface_check() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-    bash tools/sync_agent_canon.sh check
+    bash "${CANON_SYNC_TOOL}" check
   else
     echo "SHARED_SURFACE_DRIFT=not_applicable_standalone_source"
   fi
+}
+
+run_agent_canon() {
+  if [ -x "${CANON_TOOLS_ROOT}/bin/agent-canon" ]; then
+    "${CANON_TOOLS_ROOT}/bin/agent-canon" "$@"
+    return 0
+  fi
+  if [ -x "${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" ]; then
+    "${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" "$@"
+    return 0
+  fi
+  if [ -x "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon" ]; then
+    "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon" "$@"
+    return 0
+  fi
+  if [ -x "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon" ]; then
+    "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon" "$@"
+    return 0
+  fi
+  if command -v cargo >/dev/null 2>&1 \
+    && [ -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ]; then
+    CARGO_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR}" \
+      cargo run --quiet --manifest-path "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" -- "$@"
+    return 0
+  fi
+  echo "AGENT_CANON_CLI_BLOCKER=agent_canon_cli_unavailable" >&2
+  echo "AGENT_CANON_CLI_REASON=agent-canon CLI binary/shim missing and cargo route unavailable" >&2
+  return 127
 }
 
 agentcanon_pr_branch_dirty() {
@@ -249,7 +294,7 @@ run_pr_agent_checks() {
   if [[ -f Makefile ]] && grep -qE "^[.]?PHONY:.*\\bagent-checks\\b|^agent-checks:" Makefile; then
     make agent-checks
   else
-    bash tools/ci/check_agent_canon_latest.sh
+    bash "${CANON_TOOLS_ROOT}/ci/check_agent_canon_latest.sh"
     run_direct_agent_checks
   fi
 }
@@ -275,10 +320,10 @@ run_pr_quick_ci() {
   if agentcanon_pr_branch_pending; then
     latest_ci_gate="deferred_branch_pr"
     latest_ci_next="run_all_checks_or_merge_agent-canon-PR"
-    echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
+    echo "AGENT_CANON_PR_CI_COMMAND=bash ${CANON_TOOLS_ROOT}/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
     set +e
     AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
-      bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
+      bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh" "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
     quick_ci_rc=$?
     set -e
     echo "AGENT_CANON_PR_CI_LATEST_GATE=${latest_ci_gate}"
@@ -286,10 +331,10 @@ run_pr_quick_ci() {
     echo "AGENT_CANON_PR_CI_EXIT=${quick_ci_rc}"
     return "$quick_ci_rc"
   fi
-  echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
+  echo "AGENT_CANON_PR_CI_COMMAND=bash ${CANON_TOOLS_ROOT}/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
   set +e
   AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
-    bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
+    bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh" "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
   quick_ci_rc=$?
   set -e
   echo "AGENT_CANON_PR_CI_LATEST_GATE=${latest_ci_gate}"
@@ -359,23 +404,23 @@ run_standalone_static_gate_ci() {
   cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
   cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
   cargo test --manifest-path rust/agent-canon/Cargo.toml
-  python3 tools/agent_tools/tool_catalog.py
-  python3 tools/agent_tools/tool_proof_coverage.py
-  python3 tools/agent_tools/responsibility_scope.py
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_catalog.py"
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_proof_coverage.py"
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/responsibility_scope.py"
   BASE_REF="${GITHUB_BASE_REF:-main}"
   git fetch origin "${BASE_REF}" --depth=1 || true
-  python3 tools/agent_tools/import_responsibility.py --changed --baseline-ref "origin/${BASE_REF}"
-  python3 tools/agent_tools/issue_sync.py
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/import_responsibility.py" --changed --baseline-ref "origin/${BASE_REF}"
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/issue_sync.py"
   AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"
+    python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"
   AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 tools/agent_tools/eval_accumulation_check.py
-  python3 tools/agent_tools/check_agent_runtime_alignment.py
-  python3 tools/agent_tools/smoke_test_research_perspective_pack.py
-  python3 tools/agent_tools/check_convention_compliance.py
-  python3 tools/agent_tools/skill_tool_commands.py check
-  python3 tools/ci/check_github_workflows.py
-  python3 tools/ci/container_config.py
+    python3 "${CANON_TOOLS_ROOT}/agent_tools/eval_accumulation_check.py"
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/smoke_test_research_perspective_pack.py"
+  run_convention_compliance_gate
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
+  python3 "${CANON_TOOLS_ROOT}/ci/check_github_workflows.py"
+  python3 "${CANON_TOOLS_ROOT}/ci/container_config.py"
 }
 
 github_repo_security_status() {
@@ -457,7 +502,7 @@ echo ""
 
 echo "2b️⃣  GitHub workflow and PR template checks"
 if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-  python3 tools/ci/check_github_workflows.py
+  python3 "${CANON_TOOLS_ROOT}/ci/check_github_workflows.py"
 else
   echo "GITHUB_WORKFLOW_CHECK=owned_by_standalone_static_gate"
 fi
@@ -479,12 +524,12 @@ echo ""
 echo "6️⃣  strict dependency review"
 # This graph build is the producer for the strict dependency review and the
 # prepared graph consumers in the subsequent quick CI invocation.
-tools/bin/agent-canon graph build --root . --profile default --format json
+	run_agent_canon graph build --root . --profile default --format json
 if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-  python3 tools/agent_tools/tool_drift.py
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py"
 fi
-bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
-python3 tools/agent_tools/render_dependency_manifest_graph.py \
+bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
+	python3 "${CANON_TOOLS_ROOT}/agent_tools/render_dependency_manifest_graph.py" \
   --root . \
   --scope full \
   --markdown-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.md" \
@@ -493,7 +538,7 @@ write_pr_gate_receipt
 echo ""
 
 echo "7️⃣  documentation checks"
-tools/bin/agent-canon docs check
+	run_agent_canon docs check
 echo ""
 
 echo "8️⃣  repository quick CI"
@@ -501,7 +546,7 @@ run_pr_quick_ci
 echo ""
 
 echo "8b️⃣  generated artifact guard"
-python3 tools/agent_tools/generated_artifact_guard.py --root "${WORKSPACE_ROOT}"
+	python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"
 echo ""
 
 emit_generated_completeness_receipt

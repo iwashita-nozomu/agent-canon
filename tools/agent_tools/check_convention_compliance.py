@@ -446,7 +446,8 @@ BRANCH_WORKTREE_CREATION_GUARD_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
 WORKFLOW_GATE_CONSUMERS = ("tools/ci/check_agent_canon_pr.sh",)
 WORKFLOW_GATE_COMMAND_RE = re.compile(
-    r"(?m)^\s*python3\s+tools/agent_tools/check_convention_compliance\.py\s*$"
+    r'(?m)^\s*python3\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/check_convention_compliance\.py"\s+'
+    r'--root\s+"\$\{WORKSPACE_ROOT\}"\s+--format\s+json$'
 )
 WORKFLOW_GATE_FORBIDDEN_RE = re.compile(
     r"(?is)(?:do\s+not|don't|never|skip|omit)\s+(?:\S+\s+){0,6}?"
