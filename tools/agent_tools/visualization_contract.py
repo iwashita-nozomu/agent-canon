@@ -19,7 +19,7 @@ import re
 from collections.abc import Mapping, Sequence
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Literal, NotRequired, TypeAlias, TypedDict, TypeVar, cast
+from typing import Literal, TypeAlias, TypedDict, TypeVar, cast
 
 JsonScalar: TypeAlias = None | bool | int | float | str
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
@@ -94,6 +94,10 @@ class FilterRecord(TypedDict):
     mode: FilterMode
     enabled: bool
     selected_item_ids: list[str]
+
+
+class _OptionalFilters(TypedDict, total=False):
+    filters: list[FilterRecord]
 
 
 class VisualizationSourceItem(TypedDict):
@@ -199,7 +203,7 @@ class ToolCall(TypedDict):
     arguments: dict[str, JsonValue]
 
 
-class CoverageArguments(TypedDict):
+class CoverageArguments(_OptionalFilters):
     request_id: str
     literal_request: str
     literal_items: list[VisualizationSourceItem]
@@ -208,10 +212,9 @@ class CoverageArguments(TypedDict):
     artifact_id: str
     renderer_id: str
     artifact_format: ArtifactFormat
-    filters: NotRequired[list[FilterRecord]]
 
 
-class DependencyManifestArguments(TypedDict):
+class DependencyManifestArguments(_OptionalFilters):
     request_id: str
     literal_request: str
     literal_items: list[VisualizationSourceItem]
@@ -221,10 +224,9 @@ class DependencyManifestArguments(TypedDict):
     renderer_id: str
     artifact_format: ArtifactFormat
     dependency_manifest_locator: str
-    filters: NotRequired[list[FilterRecord]]
 
 
-class AlgorithmFlowchartArguments(TypedDict):
+class AlgorithmFlowchartArguments(_OptionalFilters):
     request_id: str
     literal_request: str
     literal_items: list[VisualizationSourceItem]
@@ -236,10 +238,9 @@ class AlgorithmFlowchartArguments(TypedDict):
     jit_ir_locator: str
     lean_evidence_locator: str
     theorem_graph_locator: str
-    filters: NotRequired[list[FilterRecord]]
 
 
-class DocumentMermaidArguments(TypedDict):
+class DocumentMermaidArguments(_OptionalFilters):
     request_id: str
     literal_request: str
     literal_items: list[VisualizationSourceItem]
@@ -249,10 +250,9 @@ class DocumentMermaidArguments(TypedDict):
     renderer_id: str
     artifact_format: ArtifactFormat
     document_locator: str
-    filters: NotRequired[list[FilterRecord]]
 
 
-class RepositoryGraphArguments(TypedDict):
+class RepositoryGraphArguments(_OptionalFilters):
     request_id: str
     literal_request: str
     literal_items: list[VisualizationSourceItem]
@@ -262,10 +262,9 @@ class RepositoryGraphArguments(TypedDict):
     renderer_id: str
     artifact_format: ArtifactFormat
     repository_locator: str
-    filters: NotRequired[list[FilterRecord]]
 
 
-class KnowledgeGraphArguments(TypedDict):
+class KnowledgeGraphArguments(_OptionalFilters):
     request_id: str
     literal_request: str
     literal_items: list[VisualizationSourceItem]
@@ -275,7 +274,6 @@ class KnowledgeGraphArguments(TypedDict):
     renderer_id: str
     artifact_format: ArtifactFormat
     graph_locator: str
-    filters: NotRequired[list[FilterRecord]]
 
 
 VISUALIZATION_SOURCE_UNIVERSE_SCHEMA = "agent_canon.visualization_source_universe.v1"
