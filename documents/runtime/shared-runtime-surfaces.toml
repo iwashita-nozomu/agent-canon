@@ -50,6 +50,41 @@ class = "active_contract"
 local_override_allowed = true
 
 [[surface]]
+path = "tools/sync_agent_canon.sh"
+mode = "regular"
+owner = "agent-canon"
+class = "runtime_surface"
+sync_control = true
+
+[[surface]]
+path = "tools/agent_tools/surface_manifest.py"
+mode = "regular"
+owner = "agent-canon"
+class = "active_contract"
+sync_control = true
+
+[[surface]]
+path = "tools/agent_tools/update_agent_canon.sh"
+mode = "regular"
+owner = "agent-canon"
+class = "active_contract"
+sync_control = true
+
+[[surface]]
+path = "documents/runtime/SHARED_RUNTIME_SURFACES.md"
+mode = "regular"
+owner = "agent-canon"
+class = "runtime_surface"
+sync_control = true
+
+[[surface]]
+path = "documents/runtime/shared-runtime-surfaces.toml"
+mode = "regular"
+owner = "agent-canon"
+class = "runtime_surface"
+sync_control = true
+
+[[surface]]
 path = "tools/agent-canon"
 mode = "symlink"
 source = "tools"
@@ -125,8 +160,6 @@ paths = [
   "documents/design/dependency-manifest-design.md",
   "documents/operations/notes-lifecycle.md",
   "documents/conventions/REVIEW_PROCESS.md",
-  "documents/runtime/SHARED_RUNTIME_SURFACES.md",
-  "documents/runtime/shared-runtime-surfaces.toml",
   "documents/runtime/log-surface-inventory.json",
   "documents/agent-canon/agent-canon-update-route.md",
   "documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",

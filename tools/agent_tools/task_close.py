@@ -22,8 +22,7 @@ import json
 import re
 import subprocess
 import sys
-from collections.abc import Iterable
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -46,10 +45,8 @@ if __package__:
 else:
     from workspace_scope import resolve_report_root
 if __package__:
-    from . import repo_structure_contract
     from . import surface_manifest
 else:
-    from tools.agent_tools import repo_structure_contract
     from tools.agent_tools import surface_manifest
 from report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
@@ -84,15 +81,6 @@ DOCUMENT_SPLIT_DECISION_PREFIXES = (
 DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
 AGENT_CANON_PREFIX = "vendor/agent-canon"
-AGENT_CANON_SYNC_CONTROL_PATHS = (
-    "tools/sync_agent_canon.sh",
-    "tools/agent_tools/surface_manifest.py",
-    "tools/agent_tools/update_agent_canon.sh",
-    surface_manifest.DEFAULT_DOC,
-    surface_manifest.DEFAULT_MANIFEST,
-    repo_structure_contract.DEFAULT_CONTRACT,
-)
-
 
 
 def _resolve_report_root(report_root: str | None, workspace_root: Path) -> Path:
@@ -677,27 +665,49 @@ def _gitlink_commit_resolvable(workspace: Path) -> str | None:
 
 
 def _parse_gitlink_ref_updates(lines: tuple[str, ...]) -> tuple[str | None, str | None]:
-    """Parse one or more `git diff --raw` lines for submodule hash updates."""
-    for line in lines:
-        fields = line.strip().split()
-        if not fields or not fields[0].startswith(":"):
+    """Parse `git diff --raw` lines for AgentCanon gitlink target path updates."""
+
+    def _as_hash(raw_hash: str) -> str | None:
+        return None if raw_hash in {"0" * 40, ""} else raw_hash
+
+    for raw in lines:
+        metadata, separator, paths = raw.partition("\t")
+        if not separator:
+            continue
+        fields = metadata.split()
+        if len(fields) < 4:
+            continue
+        if not fields[0].startswith(":"):
             continue
         mode_old = fields[0].lstrip(":")
-        mode_new = fields[1] if len(fields) > 1 else ""
+        mode_new = fields[1]
         if mode_old != "160000" or mode_new != "160000":
             continue
-        if len(fields) < 5:
+        old_hash = _as_hash(fields[2])
+        new_hash = _as_hash(fields[3])
+        status = fields[4] if len(fields) > 4 else "M"
+
+        path_fields = paths.split("\t")
+        if not path_fields or not path_fields[0]:
             continue
-        if len(fields) == 5:
-            path_field = fields[4]
+        old_path = _normalize_path(path_fields[0])
+        new_path = _normalize_path(path_fields[-1])
+
+        if status.startswith(("R", "C")) and len(path_fields) >= 2:
+            old_path = _normalize_path(path_fields[0])
+            new_path = _normalize_path(path_fields[1])
         else:
-            path_field = fields[5]
-        path = path_field.split("\t", 1)[-1]
-        if not path or path != AGENT_CANON_PREFIX:
+            new_path = old_path
+
+        if status.startswith("R"):
+            if old_path == AGENT_CANON_PREFIX and new_path != AGENT_CANON_PREFIX:
+                continue
+            if new_path == AGENT_CANON_PREFIX and old_path != AGENT_CANON_PREFIX:
+                return old_hash, new_hash
             continue
-        old_hash = fields[2] if fields[2] not in {"0" * 40} else None
-        new_hash = fields[3] if fields[3] not in {"0" * 40} else None
-        return old_hash, new_hash
+
+        if new_path == AGENT_CANON_PREFIX:
+            return old_hash, new_hash
     return None, None
 
 
@@ -721,6 +731,25 @@ def _gitlink_update_candidates(workspace: Path) -> tuple[str | None, str | None]
     return _parse_gitlink_ref_updates(tuple(outputs))
 
 
+def _sync_control_paths(workspace: Path, prefix: str = AGENT_CANON_PREFIX) -> tuple[str, ...]:
+    """Return manifest entries that are explicitly marked as sync-control."""
+    try:
+        manifest = surface_manifest.load_manifest(
+            workspace,
+            prefix,
+            surface_manifest.DEFAULT_MANIFEST,
+        )
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return tuple()
+    return tuple(
+        sorted(
+            _normalize_path(entry.path)
+            for entry in manifest.entries
+            if entry.sync_control
+        )
+    )
+
+
 def _gitlink_target_commit_resolvable(workspace: Path) -> str | None:
     """Return the targeted gitlink commit object only when vendor/agent-canon is changed."""
     old_hash, new_hash = _gitlink_update_candidates(workspace)
@@ -737,9 +766,8 @@ def _gitlink_target_commit_resolvable(workspace: Path) -> str | None:
 
 
 def _sync_gate_manifest_prefixes(workspace: Path) -> tuple[str, ...]:
-    """Return copy/regular materialization prefixes plus sync control files."""
-    control_paths = {_normalize_path(path) for path in AGENT_CANON_SYNC_CONTROL_PATHS}
-    return tuple(sorted(control_paths | set(agent_canon_parent_sync_manifest_prefixes(workspace))))
+    """Return copy/regular materialization prefixes."""
+    return agent_canon_parent_sync_manifest_prefixes(workspace)
 
 
 def agent_canon_parent_sync_gate_required(
@@ -751,13 +779,16 @@ def agent_canon_parent_sync_gate_required(
     resolved_workspace = workspace or Path.cwd()
     normalized = {_normalize_path(item) for item in changed_paths}
     sync_targets = set(_sync_gate_manifest_prefixes(resolved_workspace))
-    sync_control_targets = {_normalize_path(path) for path in AGENT_CANON_SYNC_CONTROL_PATHS}
+    sync_control_targets = set(_sync_control_paths(resolved_workspace))
+    exact_root_symlink_paths = set(agent_canon_parent_sync_manifest_exact_paths(resolved_workspace))
     symlink_sources = set(
         agent_canon_parent_sync_symlink_source_paths(resolved_workspace)
     )
 
     for path in normalized:
         if path in sync_control_targets:
+            return True
+        if path in exact_root_symlink_paths:
             return True
         if _path_in_prefix(path, symlink_sources):
             continue
