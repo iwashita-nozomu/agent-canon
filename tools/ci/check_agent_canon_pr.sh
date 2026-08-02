@@ -102,7 +102,7 @@ run_direct_agent_checks() {
 }
 
 run_convention_compliance_gate() {
-  python3 ${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py --root ${WORKSPACE_ROOT} --format json
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json
 }
 
 run_shared_surface_status() {

@@ -664,7 +664,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             result = self.run_checker(root)
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn(
+                "missing-positive-convention-compliance-command",
+                result.stdout,
+            )
             self.assertNotIn(".agents/skills", result.stdout)
 
     def test_policy_source_tables_exclude_generated_skill_shims(self) -> None:
@@ -722,6 +725,47 @@ class CheckConventionComplianceTest(unittest.TestCase):
             workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             workflow.write_text(
                 "#!/usr/bin/env bash\n# Mention check_convention_compliance.py only.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-positive-convention-compliance-command",
+                result.stdout,
+            )
+
+    def test_workflow_hook_positive_quoted_canonical_command(self) -> None:
+        """A canonical quoted root/format invocation satisfies the positive command check."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow.write_text(
+                "#!/usr/bin/env bash\n"
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py"'
+                ' --root "${WORKSPACE_ROOT}" --format json\n',
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertNotIn(
+                "missing-positive-convention-compliance-command",
+                result.stdout,
+            )
+
+    def test_workflow_hook_requires_no_trailing_whitespace(self) -> None:
+        """A positive command with trailing space is rejected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow.write_text(
+                "#!/usr/bin/env bash\n"
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py"'
+                ' --root "${WORKSPACE_ROOT}" --format json \n',
                 encoding="utf-8",
             )
 
