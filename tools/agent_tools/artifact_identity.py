@@ -21,8 +21,10 @@ import os
 import stat
 import subprocess
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
+
+UTC = timezone.utc  # noqa: UP017
 
 ARTIFACT_IDENTITY_SCHEMA = "agent-canon.artifact-identity.v1"
 ARTIFACT_ROLES = frozenset(
