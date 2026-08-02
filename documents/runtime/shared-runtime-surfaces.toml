@@ -172,7 +172,6 @@ paths = [
   "documents/conventions/python/15_jax_rules.md",
   "documents/conventions/python/20_benchmark_policy.md",
   "documents/conventions/python/30_experiment_directory_structure.md",
-  "documents/design/README.md",
   "documents/design/protocols.md",
   "documents/tools/README.md",
   "documents/tools/tool-docs.toml",
@@ -459,4 +458,6 @@ paths = [
   "tests/agent_tools/test_check_mcp_inventory.py",
   "tests/agent_tools/test_repo_mcp_server.py",
   "tests/tools/test_mirror_skill_shims.py",
+  "tests/agent_tools/test_check_algorithm_module_public_surface.py",
+  "tests/agent_tools/test_check_algorithm_module_nested_contract.py",
 ]

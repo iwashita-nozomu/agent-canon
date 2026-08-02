@@ -223,6 +223,11 @@ A derived repo may create its own server contract, bootstrap contract, host
 requirements, template remote policy, or root `documents/README.md`; those files
 are reviewed and committed as template or derived-repo content.
 
+Project-owned root document subtrees are likewise regular parent content. A
+path such as `documents/design/README.md` may use the logical AgentCanon
+document path without becoming an AgentCanon surface or a standalone-only
+root-absence target.
+
 `standalone_only` manifest entries are intentionally absent from template and
 derived repo roots. If a legacy symlink or copy remains at such a path,
 `bash tools/sync_agent_canon.sh check` reports it and `link-root` removes it.
